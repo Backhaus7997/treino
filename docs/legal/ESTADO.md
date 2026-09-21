@@ -64,10 +64,30 @@ cae el trámite del D-U-N-S, que era el de mayor plazo del proyecto.
 
 ### Por qué 14 días y no 10
 
-Argentina exige 10 (art. 34 de la Ley 24.240, Resolución 424/2020) y la Unión
-Europea 14. Con 14 **una sola regla cumple en todas partes**, sin lógica por
-jurisdicción. El derecho es **irrenunciable**: una cláusula que diga «no hay
-reembolsos» se tiene por no escrita y se aplica la ley igual.
+Argentina exige 10 (art. 34 de la Ley 24.240) y la Unión Europea 14. Con 14 **una
+sola regla cumple en todas partes**, sin lógica por jurisdicción. El derecho es
+**irrenunciable**: una cláusula que diga «no hay reembolsos» se tiene por no
+escrita y se aplica la ley igual.
+
+> ⚠️ **Este razonamiento quedó incompleto (2026-09-21).** Citaba la Resolución
+> 424/2020, **derogada** por el art. 10 de la Disposición 954/2025. La que la
+> reemplaza trae una exención que la vieja no tenía: su **art. 3 inciso b)** exime
+> «cuando el consumidor efectivamente haya utilizado o consumido el producto o
+> servicio contratado». TREINO es una app que se usa el mismo día que se paga, así
+> que el inciso es **directamente relevante**.
+>
+> **Qué NO se concluye de esto — dos preguntas abiertas, no una.** Primera: si
+> entrenar con la app cuenta como «efectivamente utilizado o consumido» tratándose
+> de una suscripción de tracto sucesivo. Segunda: si contara, el art. 3 exime de
+> lo previsto en el art. 1 —la obligación de tener el botón—, y si además recorta
+> el derecho de fondo del art. 34, que es irrenunciable y no lo dicta esta norma,
+> tampoco está resuelto. **Las dos son pregunta de abogado.**
+>
+> La decisión de negocio de mantener 14 días puede quedar igual: ser más generoso
+> que la ley siempre se puede. Lo que ya no se sostiene es el sustento tal como
+> está escrito arriba.
+>
+> → Detalle y texto citado en [spec-web-legal.md §3.6](./spec-web-legal.md).
 
 ### Por qué el cobro quedó mixto
 
@@ -243,17 +263,43 @@ publicar.
 Las rutas legales viven bajo **`/es/`** en `gettreino.com` (Next.js con
 `[locale]`, repo `treino-app`). Cuatro publicadas, seis faltan.
 
-### El botón de arrepentimiento ya cumple
+### El botón de arrepentimiento cumple — pero falta el segundo botón
 
-Verificado contra la Resolución 424/2020, punto por punto: enlace en el pie de
-la home, texto literal «Botón de Arrepentimiento», **formulario sin login** —la
-norma prohíbe expresamente pedir registración previa—, informa los 14 días y
-menciona el código de identificación.
+Enlace en el pie de la home, texto literal «Botón de Arrepentimiento»,
+**formulario sin login**, informa los 14 días y menciona el código de
+identificación. Esos requisitos siguen vigentes bajo la **Disposición 954/2025**
+(BO 4/9/2025), así que **no hay motivo para creer que el botón haya dejado de
+cumplir por la derogación**.
+
+Dicho con precisión, porque acá el matiz es el punto: la transcripción literal
+del art. 1 de la 954/2025 no se pudo confirmar contra el Boletín Oficial, así que
+esto **no** es una re-verificación punto por punto. Es que los requisitos
+conocidos siguen ahí. Volver a verificarlo punto por punto contra el texto
+original sigue pendiente. → [spec-web-legal.md §3.1](./spec-web-legal.md).
+
+> ⚠️ **La verificación original estaba hecha contra una norma derogada.** Decía
+> «verificado contra la Resolución 424/2020, punto por punto». El art. 10 de la
+> 954/2025 derogó esa resolución y la 316/2018. Los requisitos sobrevivieron casi
+> iguales —por eso el botón sigue cumpliendo— pero afirmar «ya cumple» apoyado en
+> una norma muerta es exactamente la advertencia falsa de la §11.1 de `AGENTS.md`.
+> Corregido el 2026-09-21.
+
+**Lo que la 954/2025 agrega y no teníamos: el «BOTÓN DE BAJA DE SERVICIO»** (su
+art. 4). Es un **segundo botón**, distinto del de arrepentimiento y distinto de
+`/es/eliminar-cuenta`, con los mismos requisitos de ubicación y acceso. Alcanza al
+plan del **entrenador** (cobro directo); la baja del **alumno** la gestionan Apple
+y Google. El art. 8 dio 60 días para adecuarse: **exigible desde el 2025-11-04,
+o sea que estamos fuera de plazo.**
+
+La capacidad ya existe (`cancelMySubscription` + `plan_cancel.dart`); lo que falta
+es la puerta pública. Y la **Disposición 3/2026** (BO 6/2/2026) permite verificar
+identidad detrás del link, lo que evita tener que construir un camino de baja
+anónimo. → [spec-web-legal.md §3.5](./spec-web-legal.md).
 
 **Lo que falta verificar es que el correo con el código salga dentro de las 24
-horas.** Es lo primero que se controla después de encontrar el botón, y no se
-puede comprobar desde afuera: hay que mandar el formulario real y confirmar que
-llega.
+horas**, ahora **en los dos botones**. Es lo primero que se controla después de
+encontrarlos, y no se puede comprobar desde afuera: hay que mandar el formulario
+real y confirmar que llega.
 
 ### El problema que ya existe
 
