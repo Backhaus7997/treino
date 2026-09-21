@@ -4684,7 +4684,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get privacyAnalyticsExplainer =>
-      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.';
+      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.';
 
   @override
   String get privacyAnalyticsCrashNote =>
@@ -9368,7 +9368,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get privacyAnalyticsExplainer =>
-      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.';
+      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.';
 
   @override
   String get privacyAnalyticsCrashNote =>

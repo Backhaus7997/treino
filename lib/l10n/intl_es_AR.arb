@@ -4127,7 +4127,7 @@
   "@privacyAnalyticsSubtitle": {
     "description": "Subtitulo del interruptor de analitica"
   },
-  "privacyAnalyticsExplainer": "Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.",
+  "privacyAnalyticsExplainer": "Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.",
   "@privacyAnalyticsExplainer": {
     "description": "Parrafo que explica que pasa al desactivar la analitica"
   },

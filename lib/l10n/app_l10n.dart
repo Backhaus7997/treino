@@ -8106,7 +8106,7 @@ abstract class AppL10n {
   /// Parrafo que explica que pasa al desactivar la analitica
   ///
   /// In es_AR, this message translates to:
-  /// **'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.'**
+  /// **'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.'**
   String get privacyAnalyticsExplainer;
 
   /// Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue.

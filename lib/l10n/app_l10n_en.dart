@@ -4591,7 +4591,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get privacyAnalyticsExplainer =>
-      'If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub on the web, it is configured separately there.';
+      'If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.';
 
   @override
   String get privacyAnalyticsCrashNote =>
