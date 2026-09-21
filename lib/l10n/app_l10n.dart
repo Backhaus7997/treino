@@ -8084,6 +8084,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.'**
   String get moderationBlockedMessage;
+
+  /// Titulo de la pantalla y de la seccion de privacidad en el perfil
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Privacidad'**
+  String get privacyTitle;
+
+  /// Titulo del interruptor de analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Analítica de uso'**
+  String get privacyAnalyticsTitle;
+
+  /// Subtitulo del interruptor de analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nos ayuda a entender qué partes de la app se usan.'**
+  String get privacyAnalyticsSubtitle;
+
+  /// Parrafo que explica que pasa al desactivar la analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.'**
+  String get privacyAnalyticsExplainer;
+
+  /// Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
+  String get privacyAnalyticsCrashNote;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

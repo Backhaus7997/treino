@@ -15,6 +15,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'core/analytics/analytics_consent.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
 
@@ -166,10 +167,6 @@ Future<void> main() async {
       };
     }
 
-    // Analytics: colección habilitada explícitamente para que los eventos
-    // lleguen tanto en debug (DebugView) como en release (dashboard real).
-    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-
     // google_sign_in 7.x requires a single initialize() before any authenticate()
     // call. Both iOS and Android pick up clientId/serverClientId from their
     // native bundles (Info.plist URL scheme on iOS, google-services.json on
@@ -200,6 +197,18 @@ Future<void> main() async {
     // depending on sharedPreferencesProvider.requireValue (ThemeModeNotifier,
     // SidebarCollapsedNotifier) are safe at init time (ADR-LM-009).
     final prefs = await SharedPreferences.getInstance();
+
+    // Analytics: se enciende según lo que el usuario haya elegido, NO siempre.
+    //
+    // Antes estaba fijo en `true` unas líneas más arriba, y la Política de
+    // Privacidad promete que el consentimiento se puede revocar en cualquier
+    // momento. Un documento que el usuario acepta no puede prometer un control
+    // que no existe, así que la llamada se mudó acá abajo: necesita las
+    // preferencias, que recién se resuelven en esta línea.
+    //
+    // El default sigue siendo habilitado — ver `analyticsConsentFromPrefs`.
+    await FirebaseAnalytics.instance
+        .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
 
     runApp(
       ProviderScope(

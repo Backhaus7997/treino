@@ -13,6 +13,7 @@ import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cue
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/apariencia_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/privacidad_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/seguridad_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
@@ -22,7 +23,14 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 /// cuenta vive en la app mobile (donde se crea la cuenta y donde aplican las
 /// políticas de las stores). Se puede reintroducir si se decide tener el flujo
 /// también en web.
-enum AjustesTab { cuenta, notificaciones, facturacion, apariencia, seguridad }
+enum AjustesTab {
+  cuenta,
+  notificaciones,
+  facturacion,
+  apariencia,
+  privacidad,
+  seguridad,
+}
 
 extension AjustesTabX on AjustesTab {
   String get label => switch (this) {
@@ -30,6 +38,7 @@ extension AjustesTabX on AjustesTab {
         AjustesTab.notificaciones => 'Notificaciones', // i18n: Fase W3
         AjustesTab.facturacion => 'Facturación TREINO', // i18n: Fase W3
         AjustesTab.apariencia => 'Apariencia', // i18n: Fase W3
+        AjustesTab.privacidad => 'Privacidad', // i18n: Fase W3
         AjustesTab.seguridad => 'Seguridad', // i18n: Fase W3
       };
 
@@ -38,6 +47,7 @@ extension AjustesTabX on AjustesTab {
         AjustesTab.notificaciones => TreinoIcon.bell,
         AjustesTab.facturacion => TreinoIcon.sidebarPagos,
         AjustesTab.apariencia => TreinoIcon.appearance,
+        AjustesTab.privacidad => TreinoIcon.shieldCheck,
         AjustesTab.seguridad => TreinoIcon.lock,
       };
 }
@@ -282,6 +292,7 @@ class _TabBody extends StatelessWidget {
         AjustesTab.notificaciones => const NotificacionesTab(),
         AjustesTab.facturacion => const FacturacionTab(),
         AjustesTab.apariencia => const AparienciaTab(),
+        AjustesTab.privacidad => const PrivacidadTab(),
         AjustesTab.seguridad => const SeguridadTab(),
       },
     );

@@ -4114,5 +4114,25 @@
   "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.",
   "@moderationBlockedMessage": {
     "description": "Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde."
+  },
+  "privacyTitle": "Privacidad",
+  "@privacyTitle": {
+    "description": "Titulo de la pantalla y de la seccion de privacidad en el perfil"
+  },
+  "privacyAnalyticsTitle": "Analítica de uso",
+  "@privacyAnalyticsTitle": {
+    "description": "Titulo del interruptor de analitica"
+  },
+  "privacyAnalyticsSubtitle": "Nos ayuda a entender qué partes de la app se usan.",
+  "@privacyAnalyticsSubtitle": {
+    "description": "Subtitulo del interruptor de analitica"
+  },
+  "privacyAnalyticsExplainer": "Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub desde la web, ahí se configura aparte.",
+  "@privacyAnalyticsExplainer": {
+    "description": "Parrafo que explica que pasa al desactivar la analitica"
+  },
+  "privacyAnalyticsCrashNote": "No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.",
+  "@privacyAnalyticsCrashNote": {
+    "description": "Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue."
   }
 }
