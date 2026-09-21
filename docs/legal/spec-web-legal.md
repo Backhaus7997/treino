@@ -64,10 +64,10 @@ afirmar sobre el chequeo.)*
 
 | Requisito | Estado |
 |---|---|
-| Acceso desde la página de inicio | **Sí** — enlace en el pie, presente en la home |
+| Alcanzable desde la home | **Sí** — enlace en el pie, presente en la home |
 | Texto sin ambigüedad | **Sí** — dice literalmente «Botón de Arrepentimiento» |
 | Sin registración previa ni otro trámite | **Sí** — el formulario no pide iniciar sesión |
-| Lugar destacado | **Sí** — pie de página, que es la práctica de mercado |
+| «A simple vista … y en el primer acceso» | **No, y es una decisión tomada** — sigue en el pie. Ver §3.2 |
 | Formulario con datos de la compra | **Sí** — nombre, correo, fecha, plan y notas |
 | Informa el plazo | **Sí** — 14 días |
 | Menciona el código de identificación | **Sí** |
@@ -144,10 +144,15 @@ compra o del servicio contratado. Agrega que al momento de usarlo el proveedor
 **no podrá requerir registración previa ni ningún otro trámite adicional**.
 
 > **Precisión.** Los arts. 3, 4 y 5 de abajo están transcriptos **literales** del
-> texto publicado. Este párrafo del art. 1 es una **descripción**, no una cita:
-> la transcripción literal del art. 1 no se pudo confirmar contra el original y
-> un entrecomillado sería una cita inventada. Antes de apoyarse en su redacción
-> exacta, leerlo en el Boletín Oficial.
+> texto publicado. El resto de este párrafo del art. 1 es una **descripción**, no
+> una cita. Antes de apoyarse en su redacción exacta, leerlo en el Boletín
+> Oficial.
+>
+> **Lo que sí está confirmado textual** (2026-09-21, contra el aviso del BO del
+> 4/9/2025) es la frase de ubicación: **«a simple vista, en lugar destacado y en
+> el primer acceso»**. Aparece idéntica en el art. 1 y en el art. 4 — y el art. 4
+> ya estaba transcripto literal acá, así que las dos fuentes coinciden. Esa frase
+> es la que decide §1.1 y §3.2, y por eso se verificó aparte.
 
 #### El art. 5 — las 24 horas y el código, para LOS DOS botones
 
@@ -180,8 +185,43 @@ el alcance.)*
 | **Desde la home** | Alcanzable desde `gettreino.com` en un click |
 | **Sin login para LLEGAR** | Una persona sin sesión iniciada tiene que poder **abrir** el formulario. Ver el matiz de la 3/2026 abajo |
 | **Sin pasos previos** | Nada de "primero ingresá a tu cuenta" ni menúes intermedios **antes** del link |
-| **Destacado** | El pie de página alcanza y es la práctica de mercado. No puede estar detrás de un acordeón ni en una página de tercer nivel |
+| **«A simple vista … y en el primer acceso»** | Ver el recuadro de abajo: el criterio cambió con la derogación y la ubicación actual es una decisión tomada, no un cumplimiento verificado |
 | **Texto literal** | El enlace dice **"Botón de Arrepentimiento"**. Nada de "Gestión de suscripción" ni eufemismos: la norma pide que no deje dudas |
+
+> ⚠️ **Los dos botones están en el pie —el de baja desde el 2026-09-21— y la
+> norma vigente pide más que eso.** (Que estén publicados no quiere decir que
+> funcionen: el canal que registra las solicitudes está caído en los dos. Eso
+> es §3.5, y es más urgente que esto.)
+>
+> El criterio **cambió con la derogación**, y la conclusión vieja de este archivo
+> se quedó sin fundamento sin que nada lo indicara:
+>
+> | | Texto |
+> |---|---|
+> | **Res. 424/2020** (derogada) | «link de acceso fácil y directo **desde la página de inicio**» |
+> | **Disp. 954/2025**, arts. 1 y 4 | «**a simple vista, en lugar destacado y en el primer acceso**» |
+>
+> Bajo la redacción vieja, un enlace en el pie de la home cumple **literal**:
+> está «desde la página de inicio». Por eso se puso ahí y por eso este archivo
+> decía «el pie alcanza y es la práctica de mercado». Bajo «a simple vista … en
+> el primer acceso», esa misma frase ya no describe algo que exige scrollear
+> pasando el Hero y las ValueProps.
+>
+> Los arts. 1 y 4 usan la **misma** redacción: esto no es del botón de baja, el
+> de arrepentimiento lo arrastra desde antes de que el otro existiera.
+>
+> **Decisión del 2026-09-21: se dejan en el pie.** La tomó Martín, con el texto
+> de la norma y la alternativa —una franja fina sobre el Navbar— sobre la mesa.
+> Mover los links cambia la primera pantalla de la landing en todas las páginas,
+> y esa es una decisión de negocio, no de implementación.
+>
+> **Lo que NO hay que hacer con esto:** ni «arreglarlo» por iniciativa propia en
+> un PR de otra cosa, ni volver a escribir que el pie alcanza. Queda como riesgo
+> conocido y aceptado, a revisar con el abogado junto con los nueve documentos.
+> Si la decisión se da vuelta, el lugar es el `Navbar` de `treino-app`
+> (`fixed top-0 h-16`), y hay **11 lugares** que compensan su altura con
+> `pt-24`/`pt-20`/`pt-16` — todos se tocan en el mismo PR o la landing queda con
+> el contenido debajo del header.
 
 #### El matiz de la Disposición 3/2026 — se puede verificar identidad
 
@@ -278,19 +318,46 @@ Lo mismo que el arrepentimiento, y por el mismo motivo:
 | **Profesor / entrenador** | Directo, Mercado Pago, desde el Coach Hub | **TREINO** — acá hace falta el botón |
 | **Alumno** | Compra integrada (Apple / Google) | La **tienda**. El sitio indica la ruta, no ofrece el flujo |
 
-#### Qué falta construir, concretamente
+#### Qué falta construir — actualizado el 2026-09-21
 
-La **capacidad** ya existe: `cancelMySubscription` del lado del servidor y
-`plan_cancel.dart` en el Coach Hub. Lo que falta es **la puerta pública**:
+La **capacidad** ya existía (`cancelMySubscription` del lado del servidor y
+`plan_cancel.dart` en el Coach Hub). La **puerta pública se construyó** en
+`treino-app#15`, mergeado el 2026-09-21.
 
-1. Un link en el pie de `gettreino.com`, al lado del de arrepentimiento, con el
-   texto literal «Botón de Baja de Servicio».
-2. Su página, alcanzable **sin sesión iniciada**.
-3. Detrás, verificación de identidad razonable (habilitada por la 3/2026 — §3.2),
-   y de ahí al flujo de baja que ya existe.
-4. Respuesta por el mismo medio **dentro de las 24 h** con código de
-   identificación. No es analogía con el arrepentimiento: lo dice el **art. 5**,
-   que nombra expresamente «la solicitud de baja del servicio» (§3.1).
+Estado de los cuatro puntos, **verificado contra producción**, no contra el
+código:
+
+| | Qué pedía | Estado |
+|---|---|---|
+| 1 | Link en el pie con el texto literal «Botón de Baja de Servicio» | ✅ `curl https://gettreino.com/es` lo devuelve |
+| 2 | Su página, alcanzable **sin sesión iniciada** | ✅ `/es/baja-de-servicio` → `200` |
+| 3 | Verificación de identidad detrás (habilitada por la 3/2026) | ⬜ **No se puso, a propósito.** El art. 4 prohíbe «otro trámite adicional»; la 3/2026 *permite* verificar, no obliga. Se pide nombre, correo, plan y canal, y la identidad la valida quien procesa |
+| 4 | Respuesta en **24 h** con código de identificación (art. 5) | ❌ **BLOQUEADO** — ver abajo |
+
+> 🚨 **El punto 4 no funciona, y tampoco funciona el del arrepentimiento.**
+>
+> Medido el 2026-09-21 contra producción:
+>
+> ```
+> GET https://gettreino.com/api/baja-de-servicio  →  {"configured":false}
+> GET https://gettreino.com/api/arrepentimiento   →  {"configured":false}
+> ```
+>
+> El sumidero que registra las solicitudes **nunca se cargó en Vercel**. Las dos
+> páginas se ven, los dos formularios se completan, y al enviar el servidor
+> contesta `503`: no se registra nada, no se emite código y no sale ningún
+> correo. El formulario deriva a `treino@gettreino.com` y le dice a la persona
+> que su pedido cuenta desde hoy, que es lo único que se puede hacer sin el
+> sumidero — pero eso es una red de contención, no el cumplimiento del art. 5.
+>
+> **Esto no se arregla con código.** Hay que cargar la variable de entorno
+> `ARREPENTIMIENTO_WEBHOOK_URL` en Vercel; el endpoint de baja cae a esa misma
+> variable a propósito, así que **con cargar una andan los dos**.
+>
+> Tener el botón visible y el canal muerto es peor que no tenerlo, porque la
+> persona se va creyendo que hizo el trámite. Es lo más urgente de este archivo.
+
+El **art. 8** dio 60 días para adecuarse: exigible desde el **2025-11-04**.
 
 El punto 3 es lo que hace que esto sea chico: sin la 3/2026 habría que construir
 un camino de baja público y anónimo, paralelo al que ya existe y sin forma de

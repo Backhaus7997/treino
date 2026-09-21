@@ -301,15 +301,21 @@ plan del **entrenador** (cobro directo); la baja del **alumno** la gestionan App
 y Google. El art. 8 dio 60 días para adecuarse: **exigible desde el 2025-11-04,
 o sea que estamos fuera de plazo.**
 
-La capacidad ya existe (`cancelMySubscription` + `plan_cancel.dart`); lo que falta
-es la puerta pública. Y la **Disposición 3/2026** (BO 6/2/2026) permite verificar
-identidad detrás del link, lo que evita tener que construir un camino de baja
-anónimo. → [spec-web-legal.md §3.5](./spec-web-legal.md).
+**La puerta pública se construyó** en `treino-app#15`, mergeado el 2026-09-21:
+link en el pie con el texto literal y página sin login, las dos verificadas
+contra producción. → [spec-web-legal.md §3.5](./spec-web-legal.md).
 
-**Lo que falta verificar es que el correo con el código salga dentro de las 24
-horas**, ahora **en los dos botones**. Es lo primero que se controla después de
-encontrarlos, y no se puede comprobar desde afuera: hay que mandar el formulario
-real y confirmar que llega.
+> 🚨 **Pero el canal que registra las solicitudes está caído, en los DOS
+> botones.** Medido el 2026-09-21: `/api/arrepentimiento` y
+> `/api/baja-de-servicio` contestan `{"configured":false}`. La variable
+> `ARREPENTIMIENTO_WEBHOOK_URL` nunca se cargó en Vercel, así que toda solicitud
+> válida recibe un `503`: no se registra, no se emite código y no sale correo.
+>
+> No se arregla con código — es cargar la variable. El endpoint de baja cae a esa
+> misma variable a propósito, así que **con una andan los dos**.
+>
+> Un botón visible con el canal muerto es peor que no tenerlo: la persona se va
+> creyendo que hizo el trámite. **Es lo más urgente de este archivo.**
 
 ### El problema que ya existe
 
