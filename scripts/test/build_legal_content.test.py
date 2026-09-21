@@ -303,6 +303,56 @@ class GeneradorLegal(unittest.TestCase):
         self.assertIn(BLANCO, r.stdout + r.stderr,
                       "aborto, pero sin decir que archivo hay que arreglar")
 
+    # --- tablas ----------------------------------------------------------
+
+    def test_la_tabla_conserva_la_etiqueta_de_fila(self):
+        """Con el encabezado de la 1ª columna vacío, esa columna es la ETIQUETA.
+
+        Sin esto se perdía: el `zip(header, row)` filtra por `if v and h`, y ahi
+        `h` es "". En `terminos-suscripcion.md` eso producia DOS BULLETS
+        IDENTICOS para «quién gestiona la baja» y «quién gestiona el reembolso»
+        —los dos «Contratado en la web: TREINO — Contratado desde la app: La
+        tienda»— asi que el usuario no podia distinguirlos. En un documento
+        legal sobre bajas y reembolsos. Lo encontro Codex en el PR #1207 (P1).
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        filas = [
+            "| | En la web | En la app |",
+            "|---|---|---|",
+            "| Baja | TREINO | La tienda |",
+            "| Reembolso | TREINO | La tienda |",
+        ]
+        salida = blc.flatten_table(filas)
+
+        self.assertEqual(len(salida), 2)
+        self.assertNotEqual(
+            salida[0], salida[1],
+            "dos filas distintas dieron el MISMO bullet: se perdio la etiqueta")
+        self.assertIn("Baja", salida[0])
+        self.assertIn("Reembolso", salida[1])
+
+    def test_la_tabla_normal_no_cambia(self):
+        """CONTROL: con encabezado en la 1ª columna, el formato es el de antes.
+
+        Sin este control, el arreglo de arriba podria estar metiendo la etiqueta
+        en TODAS las tablas y el otro test pasaria igual.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        salida = blc.flatten_table([
+            "| Dato | Quién lo ve |",
+            "|---|---|",
+            "| Tu peso | Sólo vos |",
+        ])
+        self.assertEqual(salida, ["• Tu peso: Sólo vos"])
+
     # --- el split app/web ------------------------------------------------
 
     def test_al_dart_solo_van_los_de_en_el_binario(self):

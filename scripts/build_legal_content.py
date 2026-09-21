@@ -81,6 +81,18 @@ WEB_OUT = ROOT / "build" / "legal-web"
 # de Apple habla de lo que pasa «within the app», y un sitio web no es la app.
 LANDING_OUT = ROOT / "web" / "legal" / "legal-content.json"
 
+# El MANIFIESTO: slug + titulo + nada mas.
+#
+# Existe por peso de bundle, no por comodidad. El pie de `gettreino.com` es un
+# componente de CLIENTE y esta en todas las paginas: si importa el JSON completo
+# para pintar nueve titulos, el navegador se baja el corpus legal entero —92 KB
+# con el cuerpo de los nueve documentos— en cada visita a la landing.
+#
+# Lo marco Codex en treino-app#14 (P2). La salida no es que la landing mantenga
+# su propia lista de nombres —seria otra copia mas que nada compara— sino que el
+# generador emita las dos cosas desde la misma fuente.
+LANDING_MANIFEST = ROOT / "web" / "legal" / "legal-manifest.json"
+
 CONTACT_EMAIL = "[[PENDIENTE]]"   # se sobreescribe desde aviso-legal.md
 SITE = "gettreino.com"
 
@@ -166,15 +178,36 @@ def flatten_table(rows: list[str]) -> list[str]:
     header, body = cells[0], cells[1:]
     if not body:
         return []
+    # Cuando el encabezado de la PRIMERA columna esta vacio, esa columna no es un
+    # dato: es la ETIQUETA de la fila. Hay que conservarla aparte.
+    #
+    # Sin esto se perdia, porque el `zip(header, row)` de abajo filtra por
+    # `if v and h` y ahi `h` es "". El caso real, en terminos-suscripcion.md:
+    #
+    #     | | Contratado en la web | Contratado desde la app |
+    #     | Quién gestiona la baja      | TREINO | La tienda |
+    #     | Quién gestiona el reembolso | TREINO | La tienda |
+    #
+    # salia como DOS BULLETS IDENTICOS —«Contratado en la web: TREINO —
+    # Contratado desde la app: La tienda»— y el usuario no podia distinguir la
+    # baja del reembolso. En un documento legal sobre bajas y reembolsos.
+    etiquetas = bool(header) and not header[0]
+
     out = []
     for row in body:
         if len(row) == 2:
             left, right = row
             out.append(f"• {left}: {right}" if left else f"• {right}")
         else:
-            parts = [f"{h}: {v}" for h, v in zip(header, row) if v and h]
-            out.append("• " + " — ".join(parts) if parts
-                       else "• " + " — ".join(x for x in row if x))
+            pares = list(zip(header, row))
+            prefijo = ""
+            if etiquetas and pares and pares[0][1]:
+                prefijo = f"{pares[0][1]} — "
+                pares = pares[1:]
+            parts = [f"{h}: {v}" for h, v in pares if v and h]
+            out.append("• " + prefijo + " — ".join(parts) if parts
+                       else "• " + prefijo.rstrip(" —")
+                       + " — ".join(x for x in row if x))
     return out
 
 
@@ -776,6 +809,18 @@ def emit_landing(docs: list[dict]) -> str:
                       sort_keys=False) + "\n"
 
 
+def emit_manifest(docs: list[dict]) -> str:
+    """Slug y titulo de los nueve. Lo que el pie necesita y nada mas."""
+    return json.dumps({
+        "$comment": (
+            "GENERADO POR scripts/build_legal_content.py en el repo `treino`. "
+            "Es el indice liviano de legal-content.json — mismo orden, mismos "
+            "slugs. NO EDITAR A MANO."
+        ),
+        "documents": [{"slug": d["slug"], "title": d["title"]} for d in docs],
+    }, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true",
@@ -835,6 +880,10 @@ def main() -> int:
         if (not LANDING_OUT.exists()
                 or LANDING_OUT.read_text(encoding="utf-8") != landing):
             stale.append(str(LANDING_OUT.relative_to(ROOT)))
+        manifiesto = emit_manifest(docs)
+        if (not LANDING_MANIFEST.exists()
+                or LANDING_MANIFEST.read_text(encoding="utf-8") != manifiesto):
+            stale.append(str(LANDING_MANIFEST.relative_to(ROOT)))
         if stale:
             print("[!] Desfasaje: se edito docs/legal/ y no se regenero.\n"
                   "    Corre: python3 scripts/build_legal_content.py\n",
@@ -853,6 +902,9 @@ def main() -> int:
                     if args.preview else LANDING_OUT)
     landing_path.parent.mkdir(parents=True, exist_ok=True)
     landing_path.write_text(emit_landing(docs), encoding="utf-8")
+    manifest_path = (ROOT / "build/legal-preview/legal-manifest.json"
+                     if args.preview else LANDING_MANIFEST)
+    manifest_path.write_text(emit_manifest(docs), encoding="utf-8")
 
     print(f"[OK] {dart_path.relative_to(ROOT)}")
     print(f"[OK] {landing_path.relative_to(ROOT)}  ({len(docs)} documentos)")
