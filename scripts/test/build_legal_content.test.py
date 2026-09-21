@@ -342,6 +342,58 @@ class GeneradorLegal(unittest.TestCase):
                     f"{nombre} se emitio al Dart y no esta en EN_EL_BINARIO: "
                     "su texto viaja en el binario movil")
 
+    # --- el tercer eslabon: la landing -----------------------------------
+
+    def test_al_json_de_la_landing_van_los_NUEVE(self):
+        """El JSON lleva los nueve, no los dos de `EN_EL_BINARIO`.
+
+        El split del binario existe por la Guideline 3.1.3 de Apple, que habla
+        de lo que pasa «within the app». Un sitio web no es la app: filtrar ahi
+        tambien dejaria a `gettreino.com` sin siete documentos legales que la
+        Guideline 1.2 y la ley de consumidor SI le piden publicar.
+
+        O sea: los dos filtros son opuestos a proposito, y este test lo fija
+        para que nadie los unifique «por consistencia».
+        """
+        import json as _json
+        tmp = self.arbol_git()
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
+
+        destino = tmp / "web" / "legal" / "legal-content.json"
+        self.assertTrue(destino.exists(), "no se emitio el JSON de la landing")
+        d = _json.loads(destino.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            [x["slug"] for x in d["documents"]],
+            [slug for _, slug, _, _ in DOCS],
+            "el JSON no lleva los nueve documentos, o cambio el orden")
+        self.assertTrue(d.get("sourceSha"),
+                        "falta el sha: sin el, el control cruzado con "
+                        "`treino-app` tiene que re-derivar todo")
+
+    def test_el_sha_cambia_si_cambia_el_texto(self):
+        """CONTROL: el sha tiene que MOVERSE con el contenido.
+
+        Un sha que no se mueve es peor que ninguno: los dos repos comparan una
+        cadena que siempre coincide y el control cruzado pasa en verde sobre
+        textos distintos.
+        """
+        import json as _json
+
+        def sha_de(cuerpo: str) -> str:
+            tmp = self.arbol_git(**{
+                BLANCO: doc("terminos", "Términos y Condiciones",
+                            "kTermsSections", cuerpo=cuerpo),
+            })
+            self.assertEqual(self.correr(tmp).returncode, 0)
+            destino = tmp / "web" / "legal" / "legal-content.json"
+            return _json.loads(destino.read_text(encoding="utf-8"))["sourceSha"]
+
+        self.assertNotEqual(sha_de("Texto publicable."),
+                            sha_de("Texto publicable, distinto."),
+                            "el sha no se movio al cambiar el texto")
+
     # --- lo que NO se puede romper al arreglar ---------------------------
 
     def test_allow_pending_sigue_previsualizando(self):
