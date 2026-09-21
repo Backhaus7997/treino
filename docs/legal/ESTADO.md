@@ -263,25 +263,28 @@ publicar.
 Las rutas legales viven bajo **`/es/`** en `gettreino.com` (Next.js con
 `[locale]`, repo `treino-app`). Cuatro publicadas, seis faltan.
 
-### El botón de arrepentimiento cumple — pero falta el segundo botón
+### El botón de arrepentimiento: re-verificación PENDIENTE, y falta el segundo botón
 
-Enlace en el pie de la home, texto literal «Botón de Arrepentimiento»,
-**formulario sin login**, informa los 14 días y menciona el código de
-identificación. Esos requisitos siguen vigentes bajo la **Disposición 954/2025**
-(BO 4/9/2025), así que **no hay motivo para creer que el botón haya dejado de
-cumplir por la derogación**.
+**Estado: no verificado.** No «cumple» hasta que alguien lo contraste contra el
+texto original de la 954/2025.
 
-Dicho con precisión, porque acá el matiz es el punto: la transcripción literal
-del art. 1 de la 954/2025 no se pudo confirmar contra el Boletín Oficial, así que
-esto **no** es una re-verificación punto por punto. Es que los requisitos
-conocidos siguen ahí. Volver a verificarlo punto por punto contra el texto
-original sigue pendiente. → [spec-web-legal.md §3.1](./spec-web-legal.md).
+Lo que sí se sabe: el botón tiene enlace en el pie de la home, texto literal
+«Botón de Arrepentimiento», **formulario sin login**, informa los 14 días y
+menciona el código de identificación. Esos requisitos siguen vigentes bajo la
+**Disposición 954/2025** (BO 4/9/2025), así que **no hay motivo para creer que
+haya dejado de cumplir por la derogación**.
+
+**Pero eso no es lo mismo que cumplir.** La transcripción literal del art. 1 no se
+pudo confirmar contra el Boletín Oficial, y un texto que no se leyó puede traer
+condiciones que no están en esta lista. Tratar esto como un gate legal aprobado
+sería adelantarse. → [spec-web-legal.md §3.1](./spec-web-legal.md).
 
 > ⚠️ **La verificación original estaba hecha contra una norma derogada.** Decía
 > «verificado contra la Resolución 424/2020, punto por punto». El art. 10 de la
-> 954/2025 derogó esa resolución y la 316/2018. Los requisitos sobrevivieron casi
-> iguales —por eso el botón sigue cumpliendo— pero afirmar «ya cumple» apoyado en
-> una norma muerta es exactamente la advertencia falsa de la §11.1 de `AGENTS.md`.
+> 954/2025 derogó esa resolución y la 316/2018. Los requisitos **conocidos**
+> sobrevivieron casi iguales, así que probablemente siga cumpliendo — pero
+> «probablemente» no es «verificado», y afirmar «ya cumple» apoyado en una norma
+> muerta es exactamente la advertencia falsa de la §11.1 de `AGENTS.md`.
 > Corregido el 2026-09-21.
 
 **Lo que la 954/2025 agrega y no teníamos: el «BOTÓN DE BAJA DE SERVICIO»** (su

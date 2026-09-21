@@ -526,9 +526,11 @@ def build_story():
           "de verificación de identidad y seguridad». El link sigue teniendo que "
           "ser público; lo que viene después, no"],
          ["<b>Código en 24 horas</b>",
-          "La norma exige informar por el mismo medio, dentro de las 24 horas, "
-          "un código de identificación del arrepentimiento. Es lo que casi "
-          "nadie implementa y lo primero que se verifica"],
+          "El art. 5 de la Disposición 954/2025 exige informar por el mismo "
+          "medio, dentro de las 24 horas, un código de identificación. Nombra "
+          "la revocación <b>y/o la solicitud de baja</b>, así que aplica a los "
+          "DOS botones, no sólo al de arrepentimiento. Es lo que casi nadie "
+          "implementa y lo primero que se verifica"],
          ["<b>Baja en línea</b>",
           "Sin llamar ni escribir, por el mismo medio en que se contrató "
           "(art. 10 ter, Ley 24.240). El flujo vive en el Coach Hub web, pero "

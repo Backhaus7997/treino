@@ -48,13 +48,14 @@ viven bajo `/es/`, no en la raíz. Cuatro ya están publicadas y funcionando:
 | `/es/aviso-legal` | 404 |
 | `/es/cookies` | 404 |
 
-### 1.1 El Botón de Arrepentimiento ya cumple
+### 1.1 El Botón de Arrepentimiento — re-verificación PENDIENTE
 
-Los requisitos de la tabla se contrastaron contra la **Disposición 954/2025**.
-**No es una verificación punto por punto contra el texto original**: la
-transcripción literal de su art. 1 no se pudo confirmar contra el Boletín Oficial
-(ver §3.1), así que lo de acá cubre los requisitos que sí están confirmados y
-nada más.
+**No tratar esta tabla como un gate legal aprobado.** Los requisitos se
+contrastaron contra la **Disposición 954/2025**, pero la transcripción literal de
+su art. 1 no se pudo confirmar contra el Boletín Oficial (ver §3.1). Un texto que
+no se leyó puede traer condiciones que no están acá.
+
+Lo que la tabla dice es: de los requisitos **conocidos**, éstos se cumplen.
 
 *(La verificación anterior decía «punto por punto» y era contra la Resolución
 424/2020, **derogada** por el art. 10 de la 954/2025 — ver §3. Los requisitos
@@ -127,8 +128,10 @@ argentina y vende desde Argentina, está claramente alcanzada.
 > ⚠️ **La Resolución 424/2020 está DEROGADA.** El art. 10 de la 954/2025 derogó
 > las Resoluciones 316/2018 y 424/2020 y las reemplazó por un texto único. Este
 > documento las citaba hasta el 2026-09-21; la verificación previa del botón
-> estaba hecha contra una norma muerta. Los requisitos de fondo sobrevivieron
-> casi iguales, así que el botón **no** dejó de cumplir — pero la 954/2025 trae
+> estaba hecha contra una norma muerta. Los requisitos conocidos sobrevivieron
+> casi iguales, así que **no hay motivo para creer que el botón haya dejado de
+> cumplir por la derogación** — pero eso no es lo mismo que decir que cumple:
+> falta re-verificar el art. 1 contra el texto original (§3.1). Y la 954/2025 trae
 > **dos cosas que la 424/2020 no tenía**: el botón de baja (§3.5) y las
 > exenciones del art. 3 (§3.6).
 
@@ -138,15 +141,31 @@ El **art. 1** obliga a los proveedores que venden a distancia por web o canal
 digital a tener, **a simple vista, en lugar destacado y en el primer acceso**, un
 link denominado **«BOTÓN DE ARREPENTIMIENTO»** para solicitar la revocación de la
 compra o del servicio contratado. Agrega que al momento de usarlo el proveedor
-**no podrá requerir registración previa ni ningún otro trámite adicional**, y que
-debe responderse por el mismo medio dentro de las **24 horas** informando un
-**código de identificación** de la solicitud.
+**no podrá requerir registración previa ni ningún otro trámite adicional**.
 
-> **Precisión.** Los arts. 3 y 4 de abajo están transcriptos **literales** del
+> **Precisión.** Los arts. 3, 4 y 5 de abajo están transcriptos **literales** del
 > texto publicado. Este párrafo del art. 1 es una **descripción**, no una cita:
 > la transcripción literal del art. 1 no se pudo confirmar contra el original y
 > un entrecomillado sería una cita inventada. Antes de apoyarse en su redacción
 > exacta, leerlo en el Boletín Oficial.
+
+#### El art. 5 — las 24 horas y el código, para LOS DOS botones
+
+El plazo de respuesta **no sale del art. 1**: es un artículo aparte, y por eso
+alcanza también al botón de baja del art. 4.
+
+> «A partir de la solicitud de revocación de la aceptación **y/o de la solicitud
+> de baja del servicio**, dentro de las VEINTICUATRO (24) horas subsiguientes y
+> por el mismo medio, el proveedor deberá informar al consumidor el código de
+> identificación […]»
+
+Ese **«y/o de la solicitud de baja del servicio»** es el que cierra la pregunta:
+las 24 horas con código **no son sólo del arrepentimiento**. Los dos botones
+tienen que responder igual.
+
+*(La cita está cortada en el cierre — de ahí el `[…]`. Lo que sigue al código de
+identificación no se pudo confirmar. El fragmento citado sí, y es el que decide
+el alcance.)*
 
 **Fuentes:**
 
@@ -270,7 +289,8 @@ La **capacidad** ya existe: `cancelMySubscription` del lado del servidor y
 3. Detrás, verificación de identidad razonable (habilitada por la 3/2026 — §3.2),
    y de ahí al flujo de baja que ya existe.
 4. Respuesta por el mismo medio **dentro de las 24 h** con código de
-   identificación, igual que el arrepentimiento.
+   identificación. No es analogía con el arrepentimiento: lo dice el **art. 5**,
+   que nombra expresamente «la solicitud de baja del servicio» (§3.1).
 
 El punto 3 es lo que hace que esto sea chico: sin la 3/2026 habría que construir
 un camino de baja público y anónimo, paralelo al que ya existe y sin forma de
@@ -407,7 +427,8 @@ Pendiente:
 
 | | Qué | Lo exige |
 |---|---|---|
-| ☐ | Probar de punta a punta que el correo con el código llega en 24 h | **Disp. 954/2025 art. 1** |
+| ☐ | **Re-verificar el art. 1 de la 954/2025 contra el texto del Boletín Oficial.** Su transcripción literal no se pudo confirmar, así que la tabla del §1.1 cubre sólo los requisitos conocidos | **Disp. 954/2025 art. 1** |
+| ☐ | Probar de punta a punta que el correo con el código llega en 24 h — **en LOS DOS botones** | **Disp. 954/2025 art. 5** |
 | ☐ | Las seis páginas legales que faltan | Apple 1.2, consumidor |
 | ☐ | Footer con identificación del titular (razón social, CUIT, domicilio) | Comercio electrónico AR |
 | ☐ | Banner de cookies con rechazo tan visible como aceptar | RGPD |
