@@ -7,7 +7,7 @@ dart: kHealthConsentSections
 # Consentimiento para el tratamiento de datos de salud
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.0 (borrador)
+**Versión:** 1.0
 
 > Documento con doble función: el **texto que se muestra al usuario** y la
 > **especificación del flujo** que hay que construir. Hoy ese consentimiento no

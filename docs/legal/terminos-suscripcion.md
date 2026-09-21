@@ -7,11 +7,23 @@ dart: kSubscriptionSections
 # Términos de Suscripción de TREINO
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.1 (borrador)
+**Versión:** 1.1
 
-> ⚠️ **BORRADOR.** Complementa los [Términos y
-> Condiciones](./terminos-y-condiciones.md). Para entrenadores rigen además los
-> [Términos para Entrenadores](./contrato-entrenador.md).
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> Complementa los [Términos y Condiciones](./terminos-y-condiciones.md). Para
+> entrenadores rigen además los [Términos para Entrenadores](./contrato-entrenador.md).
+>
+> **Qué falta mirar:** si entrenar con la app cuenta como «efectivamente
+> utilizado o consumido el servicio» a los fines del art. 3 inc. b) de la
+> Disposición 954/2025, y si esa exención recorta además el derecho de fondo del
+> art. 34. La política de 14 días no depende de la respuesta —ser más generoso
+> que la ley se puede siempre— pero el sustento sí.
 
 <!-- publish:start -->
 

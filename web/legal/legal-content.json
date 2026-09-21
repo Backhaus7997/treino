@@ -383,7 +383,7 @@
     {
       "slug": "retencion",
       "title": "Retención y eliminación de datos",
-      "lastUpdated": "17 de septiembre de 2026",
+      "lastUpdated": "21 de septiembre de 2026",
       "sections": [
         {
           "heading": "1. CÓMO ELIMINÁS TU CUENTA",
@@ -395,7 +395,7 @@
         },
         {
           "heading": "3. QUÉ NO SE ELIMINA, Y POR QUÉ",
-          "body": "Esto es lo que hay que leer con atención. Tres cosas sobreviven, por razones distintas.\n• Dato: Pagos (payments) — Qué queda: El registro, con tu uid a secas — Por qué: Respaldo contable y fiscal del entrenador. No contiene tu nombre: al borrarse userPublicProfiles/{uid} el identificador deja de resolver a una persona\n• Dato: Reseñas (reviews) — Qué queda: La puntuación numérica — Por qué: Sostiene el promedio del entrenador. Borrarla alteraría retroactivamente la reputación de un tercero\n• Dato: Chat (chats/messages) — Qué queda: El hilo, para el otro participante — Por qué: La conversación también le pertenece a la otra persona\n\nEn los tres casos, la des-identificación opera por la vía de que ninguno de esos documentos guarda tu nombre desnormalizado — sólo el uid, que tras el borrado ya no resuelve contra ningún perfil.\n\n⚠️ Punto abierto para revisión legal. Este esquema es razonable y está pensado, pero hay tres decisiones que conviene que valide un abogado: > 1. Si la retención del texto de las reseñas (no sólo el número) es sostenible frente a un pedido de supresión del art. 16 de la Ley 25.326. 2. Si conservar el contenido del chat requiere aviso previo explícito al momento del borrado, en vez de sólo estar escrito acá. 3. Cuál es el plazo fiscal concreto de conservación de payments según la normativa aplicable, y si corresponde purgarlos al vencerlo. > Hoy el usuario no recibe ningún aviso de que esto queda. Como mínimo, la pantalla de confirmación de borrado debería decírselo."
+          "body": "Esto es lo que hay que leer con atención. Tres cosas sobreviven, por razones distintas.\n• Dato: Pagos (payments) — Qué queda: El registro, con tu uid a secas — Por qué: Respaldo contable y fiscal del entrenador. No contiene tu nombre: al borrarse userPublicProfiles/{uid} el identificador deja de resolver a una persona\n• Dato: Reseñas (reviews) — Qué queda: La puntuación numérica — Por qué: Sostiene el promedio del entrenador. Borrarla alteraría retroactivamente la reputación de un tercero\n• Dato: Chat (chats/messages) — Qué queda: El hilo, para el otro participante — Por qué: La conversación también le pertenece a la otra persona\n\nEn los tres casos, la des-identificación opera por la vía de que ninguno de esos documentos guarda tu nombre desnormalizado — sólo el uid, que tras el borrado ya no resuelve contra ningún perfil."
         },
         {
           "heading": "4. COPIAS DE SEGURIDAD",
@@ -447,5 +447,5 @@
       ]
     }
   ],
-  "sourceSha": "ef8cb89570d37edcffc2a52fa10a865c6686589592e260860b90fea84eed5ffc"
+  "sourceSha": "dc110b1e9b360b2c897fb5f6ee028639948dd626e64e7f3ab48b617ed8faa3b7"
 }

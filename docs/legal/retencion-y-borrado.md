@@ -7,7 +7,7 @@ dart: kDataRetentionSections
 # Política de Retención y Eliminación de Datos
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.0 (borrador)
+**Versión:** 1.0
 
 > Documento de respaldo de la [Política de Privacidad](./politica-de-privacidad.md),
 > secciones 8 y 10. Escrito contra el comportamiento real de
@@ -100,19 +100,6 @@ En los tres casos, la des-identificación opera por la vía de que **ninguno de
 esos documentos guarda tu nombre desnormalizado** — sólo el `uid`, que tras el
 borrado ya no resuelve contra ningún perfil.
 
-> ⚠️ **Punto abierto para revisión legal.** Este esquema es razonable y está
-> pensado, pero hay tres decisiones que conviene que valide un abogado:
->
-> 1. Si la retención del **texto de las reseñas** (no sólo el número) es
->    sostenible frente a un pedido de supresión del art. 16 de la Ley 25.326.
-> 2. Si conservar el **contenido del chat** requiere aviso previo explícito al
->    momento del borrado, en vez de sólo estar escrito acá.
-> 3. Cuál es el **plazo fiscal concreto** de conservación de `payments` según la
->    normativa aplicable, y si corresponde purgarlos al vencerlo.
->
-> Hoy el usuario no recibe ningún aviso de que esto queda. Como mínimo, la
-> pantalla de confirmación de borrado debería decírselo.
-
 ---
 
 ## 4. Copias de seguridad
@@ -179,6 +166,29 @@ de tu entrenador**, dentro de los 10 días corridos. Es gratuito.
 ---
 
 <!-- publish:end -->
+
+## ANEXO INTERNO — preguntas abiertas para el abogado
+
+**No es texto de usuario.** Vive después de `publish:end` a propósito: estaba
+arriba, adentro de lo publicable, y era lo único en los nueve documentos que un
+usuario habría leído como «esto no está terminado». Peor todavía, el último
+párrafo le anunciaba al usuario que no se le avisa algo — decírselo así es no
+avisarle igual, pero por escrito.
+
+El esquema de la sección 3 es razonable y está pensado. Lo que sigue son las
+tres decisiones que conviene que valide un abogado cuando llegue:
+
+1. Si la retención del **texto de las reseñas** (no sólo el número) es
+   sostenible frente a un pedido de supresión del art. 16 de la Ley 25.326.
+2. Si conservar el **contenido del chat** requiere aviso previo explícito al
+   momento del borrado, en vez de sólo estar escrito en el documento.
+3. Cuál es el **plazo fiscal concreto** de conservación de `payments` según la
+   normativa aplicable, y si corresponde purgarlos al vencerlo.
+
+**Pendiente de producto, independiente del abogado:** la pantalla de
+confirmación de borrado no le dice al usuario qué sobrevive. La sección 3 sí lo
+dice, pero ahí llega el que va a buscarlo. Conviene decirlo en el momento.
+
 
 ## 8. Nota de implementación (no se publica)
 

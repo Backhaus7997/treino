@@ -1,24 +1,39 @@
 # `docs/legal/` — documentos legales de TREINO
 
-Fuente de verdad de los textos legales. Lo que hoy ve el usuario in-app vive en
-`lib/features/auth/presentation/legal/legal_content.dart`; estos documentos son
-su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
+Fuente de verdad de los textos legales. **De acá salen las tres salidas**, por
+`scripts/build_legal_content.py`:
 
-**Ninguno está publicado. Todos son borradores.**
+    docs/legal/*.md
+      ├─ legal_content.dart   (la app — sólo Términos y Privacidad, ver EN_EL_BINARIO)
+      ├─ web/legal/*.html     (tool/build_legal_pages.dart)
+      └─ legal-content.json   (gettreino.com, repo treino-app)
+
+Ninguna de las tres se edita a mano. Se edita el markdown y se corre el
+generador.
+
+**ESTADO: los nueve están PUBLICADOS, sin revisión legal.** Decisión del titular
+del 2026-09-21: se sale al mercado con estos textos y el dictamen profesional se
+hace después. Cada documento lleva arriba —fuera de lo publicable— qué le falta
+mirar al abogado cuando llegue.
+
+Los dos de mayor exposición, para que no se pierdan en la lista:
+**`descargo-medico.md`** (si alguien se lesiona, es la defensa, y no hay
+corrección posterior) y **`contrato-entrenador.md`** (relación laboral
+encubierta, y ahí el abogado no mejora cláusulas: dice cómo operar).
 
 | Documento | Qué es | Estado |
 |---|---|---|
 | **[ESTADO.md](./ESTADO.md)** | **Empezá por acá.** Todo el contexto, las decisiones tomadas y lo que falta, autocontenido | Vigente |
 | [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 18 hallazgos | Leer primero |
-| [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Borrador — 3 cláusulas esperan D2, D3, D4/D6 |
-| [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 14 días y baja | Borrador |
-| [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, contra el mapa de datos real | Borrador |
-| [descargo-medico.md](./descargo-medico.md) | Asunción de riesgo + dónde mostrarlo | Borrador — **revisión legal obligatoria** |
-| [contrato-entrenador.md](./contrato-entrenador.md) | Términos para PFs: independencia, datos de alumnos, planes | Borrador — **revisión legal obligatoria** |
-| [consentimiento-datos-salud.md](./consentimiento-datos-salud.md) | Texto + spec del flujo de consentimiento expreso | Borrador |
-| [normas-de-comunidad.md](./normas-de-comunidad.md) | Publicable + spec de reporte y bloqueo (Apple 1.2) | Borrador |
-| [retencion-y-borrado.md](./retencion-y-borrado.md) | Qué se borra, qué se conserva. URL para Google Play | Borrador |
-| [aviso-legal.md](./aviso-legal.md) | Identificación del titular | Borrador |
+| [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Publicado — sin revisión legal |
+| [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 14 días y baja | Publicado — sin revisión legal |
+| [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, contra el mapa de datos real | Publicado — sin revisión legal |
+| [descargo-medico.md](./descargo-medico.md) | Asunción de riesgo + dónde mostrarlo | Publicado — **sin revisión legal, y es el de mayor exposición** |
+| [contrato-entrenador.md](./contrato-entrenador.md) | Términos para PFs: independencia, datos de alumnos, planes | Publicado — **sin revisión legal, riesgo laboral** |
+| [consentimiento-datos-salud.md](./consentimiento-datos-salud.md) | Texto + spec del flujo de consentimiento expreso | Publicado — sin revisión legal |
+| [normas-de-comunidad.md](./normas-de-comunidad.md) | Publicable + spec de reporte y bloqueo (Apple 1.2) | Publicado — sin revisión legal |
+| [retencion-y-borrado.md](./retencion-y-borrado.md) | Qué se borra, qué se conserva. URL para Google Play | Publicado — sin revisión legal |
+| [aviso-legal.md](./aviso-legal.md) | Identificación del titular | Publicado — sin revisión legal |
 | [guia-legal-treino.pdf](./guia-legal-treino.pdf) | Guía de decisiones y trámites para el Product Owner | Vigente |
 | [briefing-revision-legal.pdf](./briefing-revision-legal.pdf) | El briefing en PDF — es lo que se le manda al abogado junto con los documentos | Generado |
 | [documentos-legales-treino.pdf](./documentos-legales-treino.pdf) | Los nueve documentos compilados en un PDF, con los pendientes resaltados. Para que el PO y el abogado lean sin abrir el repo | Generado |

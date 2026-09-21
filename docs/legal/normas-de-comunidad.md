@@ -7,12 +7,23 @@ dart: kCommunitySections
 # Normas de Comunidad de TREINO
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.0 (borrador)
+**Versión:** 1.0
 
-> ⚠️ **BORRADOR.** Este documento cumple doble función: es el texto que se
-> publica, **y** la especificación de lo que hay que construir. La parte
-> especificada —reporte y bloqueo— **hoy no existe en el código**, y sin ella
-> Apple rechaza la app. Ver el anexo al final.
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> **Qué falta:** nada del código. El cartel anterior decía que reportar y
+> bloquear «hoy no existe en el código» y que sin eso Apple rechaza la app. Es
+> falso desde los PRs #1114 y #1189–#1196: `lib/features/moderation/` tiene
+> reportes, bloqueo, filtro de términos y la cola de revisión en el Coach Hub.
+>
+> Lo que sí conviene sostener: este documento promete revisar todo reporte
+> **dentro de las 24 horas**, y esa promesa ahora tiene herramienta. Que siga
+> siendo cierta depende de que alguien mire la cola.
 
 ---
 
