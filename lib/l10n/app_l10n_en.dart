@@ -4578,4 +4578,22 @@ class AppL10nEn extends AppL10n {
   @override
   String get moderationBlockedMessage =>
       'That text can\'t be posted because it breaks the Community Guidelines. Please review it and try again.';
+
+  @override
+  String get privacyTitle => 'Privacy';
+
+  @override
+  String get privacyAnalyticsTitle => 'Usage analytics';
+
+  @override
+  String get privacyAnalyticsSubtitle =>
+      'Helps us understand which parts of the app get used.';
+
+  @override
+  String get privacyAnalyticsExplainer =>
+      'If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.';
+
+  @override
+  String get privacyAnalyticsCrashNote =>
+      'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
 }

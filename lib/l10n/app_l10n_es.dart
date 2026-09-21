@@ -4671,6 +4671,24 @@ class AppL10nEs extends AppL10n {
   @override
   String get moderationBlockedMessage =>
       'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.';
+
+  @override
+  String get privacyTitle => 'Privacidad';
+
+  @override
+  String get privacyAnalyticsTitle => 'Analítica de uso';
+
+  @override
+  String get privacyAnalyticsSubtitle =>
+      'Nos ayuda a entender qué partes de la app se usan.';
+
+  @override
+  String get privacyAnalyticsExplainer =>
+      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.';
+
+  @override
+  String get privacyAnalyticsCrashNote =>
+      'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -9337,4 +9355,22 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get moderationBlockedMessage =>
       'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.';
+
+  @override
+  String get privacyTitle => 'Privacidad';
+
+  @override
+  String get privacyAnalyticsTitle => 'Analítica de uso';
+
+  @override
+  String get privacyAnalyticsSubtitle =>
+      'Nos ayuda a entender qué partes de la app se usan.';
+
+  @override
+  String get privacyAnalyticsExplainer =>
+      'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.';
+
+  @override
+  String get privacyAnalyticsCrashNote =>
+      'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 }

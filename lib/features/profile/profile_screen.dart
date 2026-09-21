@@ -169,9 +169,36 @@ class _AthleteProfile extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // ── Legales section ──────────────────────────────────────────────
+          // ── Privacidad section ───────────────────────────────────────────
+          //
+          // Sección propia y no un ítem dentro de Legales: los de Legales son
+          // DOCUMENTOS que se leen, y esto es un control que se acciona.
+          // Meterlo ahí haría que el usuario que busca "cómo apago esto" tenga
+          // que entrar a una lista de textos legales para encontrarlo.
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(8),
+            child: _A11ySectionGroup(
+              title: l10n.privacyTitle.toUpperCase(),
+              palette: palette,
+              tiles: [
+                Semantics(
+                  button: true,
+                  label: l10n.privacyAnalyticsTitle,
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.shieldCheck,
+                    title: l10n.privacyAnalyticsTitle,
+                    inGroup: true,
+                    onTap: () => context.push('/profile/settings/privacidad'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // ── Legales section ──────────────────────────────────────────────
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(9),
             child: _A11ySectionGroup(
               title: l10n.profileSectionLegal.toUpperCase(),
               palette: palette,
@@ -197,7 +224,7 @@ class _AthleteProfile extends ConsumerWidget {
           // parity polish 2026-06-01. Settings as a dedicated surface stays
           // deferred to a future SDD (notifications, theme, language).
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(9),
+            delay: AppMotion.stagger(10),
             child: _A11ySectionGroup(
               title: 'SESIÓN', // i18n: Fase 6 Etapa 3
               palette: palette,

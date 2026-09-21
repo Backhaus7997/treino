@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/coach_hub_app.dart';
+import 'core/analytics/analytics_consent.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
 
@@ -42,10 +43,6 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Analytics: colección habilitada para tracking de actions del Coach Hub
-  // web. Crashlytics no aplica acá (no soporta web).
-  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-
   // Coach Hub MVP NO usa Google Sign-In (decisión #2 del propose). Solo
   // email/password. Por eso NO inicializamos `GoogleSignIn.instance` acá
   // — el plugin web es scope aparte (Etapa 7.5 o follow-up).
@@ -64,6 +61,13 @@ Future<void> main() async {
   // SidebarCollapsedNotifier) are safe at init time on the web target too
   // (ADR-LM-009). Mirrors lib/main.dart.
   final prefs = await SharedPreferences.getInstance();
+
+  // Analytics: según lo que el usuario haya elegido, NO siempre. Espejo de
+  // `lib/main.dart` — la Política de Privacidad promete poder revocar el
+  // consentimiento en cualquier momento, y eso vale para las dos superficies.
+  // La llamada vive acá abajo porque necesita las preferencias.
+  await FirebaseAnalytics.instance
+      .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
 
   runApp(
     ProviderScope(
