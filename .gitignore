@@ -79,14 +79,36 @@ devtools_options.yaml
 scripts/places.local.json
 
 # Env de Firebase Functions (convención oficial de Firebase):
-#   - `.env` y `.env.<project-id>` SÍ se versionan: son config por entorno,
-#     no secretos. Los secretos reales van a Secret Manager
-#     (`firebase functions:secrets:set`), como RESEND_API_KEY.
+#   - `.env.<project-id>` SÍ se versiona: es config por entorno, no secretos.
+#     Hoy está `functions/.env.treino-dev`. Los secretos reales van a Secret
+#     Manager (`firebase functions:secrets:set`), como RESEND_API_KEY.
+#     ⚠️ Esta línea decía que `.env` PELADO también se versiona. No es cierto:
+#     `functions/.gitignore:3` lo ignora desde antes que esto se escribiera.
 #   - `.env.local` y `.env*.local` NUNCA: son overrides por máquina, y son el
 #     lugar donde termina cayendo una API key en un `git add .` distraído.
 #     Sin barra inicial: aplican en cualquier directorio del repo.
 .env.local
 .env*.local
+
+# `.secret.local` — el archivo donde el EMULADOR lee los `defineSecret()`.
+#
+# ⚠️ Los patrones de arriba NO lo cubren, y es fácil creer que sí: `.env*.local`
+# exige que empiece con `.env`. Este empieza con `.secret`.
+#
+# Es exactamente el archivo que la documentación de Firebase te dice que crees
+# para correr functions en local, así que cualquiera que levante el emulador con
+# una función que usa secretos lo va a escribir — y hasta esta línea, git lo
+# trackeaba. Se detectó al ir a poner un `MP_ACCESS_TOKEN` de prueba adentro.
+.secret.local
+*.secret.local
+
+# Claves privadas `.p8` de Apple (Sign in with Apple, APNs, App Store Connect).
+#
+# Apple las emite UNA sola vez: si se filtra hay que revocarla y reconfigurar
+# los providers. Se descargan al directorio de descargas con un nombre tipo
+# `AuthKey_XXXXXXXXXX.p8` y se mueven a mano, que es justo el movimiento que
+# termina dejándolas en la raíz de un repo.
+*.p8
 
 # Registro de skills de IA (`.atl/`) — GENERADO y específico de cada máquina.
 #
