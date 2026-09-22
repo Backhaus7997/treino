@@ -915,13 +915,28 @@ describe("resolveReport — P1-C: un fallo real al encolar el aviso aborta la re
 });
 
 describe("resolveReport — P1-D: no se puede resolver el mismo reporte dos veces", () => {
-  it("la segunda resolucion tira failed-precondition, y el audit_log conserva el removedContent ORIGINAL", async () => {
+  it("una accion DISTINTA sobre un reporte ya resuelto tira failed-precondition, sin ejecutar nada", async () => {
+    // Deliberadamente aislado de P1-B: si la segunda accion fuera OTRO
+    // contentRemoved sobre el mismo post, el guard "ni texto ni media" de
+    // P1-B ya lo bloquearia por su cuenta (el texto quedo vacio tras la
+    // primera resolucion) y este test no probaria PASO 0 en soledad. Con
+    // una accion DISTINTA (userSuspended) — el escenario que describe el
+    // bug: "una accion distinta puede suspender a alguien despues de que
+    // otro moderador ya descarto el reporte" — nada MAS que PASO 0 puede
+    // bloquear esto: el usuario existe en Auth y el post existe con
+    // authorUid == targetOwnerUid, asi que sin el guard la suspension
+    // SI se ejecutaria.
+    const targetOwnerUid = "owner-double-1";
+    await getAuth(app).createUser({
+      uid: targetOwnerUid, email: `${targetOwnerUid}@test.com`,
+    });
+    extraCleanupUids.push(targetOwnerUid);
+
     await sembrarReporte("r1", 3600_000, {
-      targetKind: "post", targetId: "post-double-1",
-      targetOwnerUid: "owner-double-1",
+      targetKind: "post", targetId: "post-double-1", targetOwnerUid,
     });
     await db.collection("posts").doc("post-double-1").set({
-      text: "contenido original", authorUid: "owner-double-1",
+      text: "contenido original", authorUid: targetOwnerUid,
     });
     extraCleanupPaths.push("posts/post-double-1", "audit_log/moderation__r1");
 
@@ -931,22 +946,19 @@ describe("resolveReport — P1-D: no se puede resolver el mismo reporte dos vece
       reportId: "r1", status: "actioned", action: "contentRemoved",
     });
 
-    // Moderador 2, con la cola vieja: intenta resolver el MISMO reporte de
-    // nuevo. Sin el guard de PASO 0, esto leeria posts/post-double-1.text
-    // YA VACIO (por la resolucion de mod1) y lo pisaria igual —"tenia
-    // exito" sobre contenido que ya no existe como tal— y el audit_log
-    // determinístico quedaria con removedContent: "".
+    // Moderador 2, con la cola vieja: intenta userSuspended sobre el MISMO
+    // reporte, ya resuelto por mod1.
     await expect(
       resolveReportHandler(db, app, "mod2", {
-        reportId: "r1", status: "dismissed", action: "none",
+        reportId: "r1", status: "actioned", action: "userSuspended",
       }),
     ).rejects.toThrow(/ya resolvio este reporte/i);
 
-    // El texto sigue vacio (de la PRIMERA resolucion, no de una segunda).
-    const post = await db.collection("posts").doc("post-double-1").get();
-    expect(post.get("text")).toBe("");
+    // Nunca se llego a deshabilitar a nadie.
+    const user = await getAuth(app).getUser(targetOwnerUid);
+    expect(user.disabled).toBe(false);
 
-    // Y la evidencia original sigue intacta: la escribio mod1, no mod2.
+    // Y la evidencia original de mod1 sigue intacta — nadie la piso.
     const audit = await db.collection("audit_log").doc("moderation__r1").get();
     expect(audit.get("removedContent")).toBe("contenido original");
     expect(audit.get("moderatorUid")).toBe("mod1");
