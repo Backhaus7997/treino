@@ -106,6 +106,15 @@ const REDACTABLE_FIELD: Record<string, string | undefined> = {
 };
 
 /**
+ * Codigo gRPC de `FAILED_PRECONDITION`.
+ *
+ * Es 9. El 10 es `ABORTED` — confundirlos hace que una carrera perdida se
+ * propague como error inesperado en vez de tratarse. Mismo valor que usa
+ * `quarantine-vetted-content.ts`.
+ */
+const FAILED_PRECONDITION = 9;
+
+/**
  * Corta la llamada si quien llama no tiene el claim.
  *
  * Se llama PRIMERO en los tres callables. No es defensa en profundidad: es la
@@ -412,6 +421,7 @@ export async function resolveReportHandler(
   let removedContent: string | null = null;
   let redactPath: string | null = null;
   let redactField: string | null = null;
+  let redactUpdateTime: FirebaseFirestore.Timestamp | null = null;
 
   if (action === "contentRemoved") {
     // "Retirar contenido" no aplica a una persona: para eso esta
@@ -448,6 +458,12 @@ export async function resolveReportHandler(
     removedContent = String(contenido.get(field) ?? "");
     redactPath = path;
     redactField = field;
+    // Precondicion para el PASO 3. Entre este `get` y la redaccion el autor
+    // puede editar su propio contenido —`firestore.rules:4366` deja
+    // actualizar una resena— y entonces `removedContent` guardaria un texto
+    // mientras se redacta otro. El audit_log es lo que se mira en una
+    // apelacion: si miente, miente exactamente donde importa.
+    redactUpdateTime = contenido.updateTime ?? null;
   } else if (action === "userSuspended") {
     // El uid sale del reporte, nunca del input del cliente.
     if (targetOwnerUid === moderatorUid) {
@@ -504,7 +520,30 @@ export async function resolveReportHandler(
   // PASO 3 — ejecutar de verdad.
   // -------------------------------------------------------------------
   if (action === "contentRemoved" && redactPath && redactField) {
-    await db.doc(redactPath).update({ [redactField]: "" });
+    try {
+      await db.doc(redactPath).update(
+        { [redactField]: "" },
+        redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
+      );
+    } catch (err) {
+      if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+        // El autor edito el contenido entre el PASO 1 y ahora. No se redacta:
+        // el moderador decidio sobre un texto que ya no esta, y el
+        // `removedContent` que quedo en audit_log es el de esa version vieja.
+        //
+        // El reporte NO se marca resuelto —el PASO 4 no llega a correr— asi
+        // que vuelve a la cola con el contenido nuevo a la vista. La entrada
+        // de audit_log tiene id deterministico (`moderation__{reportId}`), de
+        // modo que el reintento la pisa en vez de dejar dos versiones del
+        // mismo hecho.
+        throw new HttpsError(
+          "aborted",
+          "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
+          "reporte sigue en la cola.",
+        );
+      }
+      throw err;
+    }
   } else if (action === "userSuspended") {
     await getAuth(app).updateUser(targetOwnerUid, { disabled: true });
   } else if (action === "userWarned") {
