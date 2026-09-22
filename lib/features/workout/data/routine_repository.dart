@@ -9,9 +9,11 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Timestamp;
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/telemetry/non_fatal.dart';
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
+import '../domain/routine_day.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_status.dart';
 import '../domain/routine_visibility.dart';
@@ -45,6 +47,54 @@ class RoutineRepository {
 
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
+
+  /// Corre [ModerationGuard.ensure] sobre los CUATRO campos de texto libre de
+  /// una rutina: `name`, `split`, `summary`, y los anidados `days[].name` /
+  /// `days[].slots[].notes`. Se llama ANTES de cualquier escritura — mismo
+  /// criterio que el resto del repo (`PostRepository`, `ChatRepository`,
+  /// `UserRepository`): el guard corre del lado de afuera del `.set()`/
+  /// `.update()`, nunca después, para que un texto vetado nunca llegue a
+  /// quedar publicado mientras la excepción todavía se está propagando.
+  ///
+  /// `athlete_notes` (notas privadas del PF sobre un alumno) NO pasa por acá
+  /// a propósito: vive en un repositorio y una colección totalmente
+  /// distintos, y el criterio de esta feature es "si otro usuario lo va a
+  /// leer, entra" — esas notas no las lee nadie más que su autor.
+  ///
+  /// No todos los métodos de escritura mandan los cuatro campos —
+  /// `updateUserOwned`, por ejemplo, nunca manda `split` ni `summary` (ver su
+  /// dartdoc) — así que cada caller pasa SÓLO lo que su propio payload
+  /// realmente escribe. Revisar un campo que no se va a persistir bloquearía
+  /// una edición por contenido que ni siquiera llega a Firestore; por eso
+  /// [split] y [summary] son opcionales acá y sus callers los omiten cuando
+  /// no forman parte del write.
+  ///
+  /// El `campo:` de los anidados usa la MISMA forma indexada que el registro
+  /// del servidor (`quarantineRoutineIfVetted` en
+  /// `functions/src/moderation/quarantine-vetted-content.ts`, p.ej.
+  /// `'days[1].slots[3].notes'`) y no una traducción al castellano: hoy nada
+  /// la parsea —[ModerationBlockedException] sólo se compara por tipo en
+  /// toda la UI, nunca por `campo`— así que la única ganancia real es en
+  /// logs y en poder correlacionar el mismo documento en los dos lados sin
+  /// traducir nada.
+  static void _ensureRoutineTextIsClean({
+    required String name,
+    String? split,
+    String? summary,
+    required List<RoutineDay> days,
+  }) {
+    ModerationGuard.ensure(name, campo: 'name');
+    ModerationGuard.ensure(split, campo: 'split');
+    ModerationGuard.ensure(summary, campo: 'summary');
+    for (var i = 0; i < days.length; i++) {
+      final day = days[i];
+      ModerationGuard.ensure(day.name, campo: 'days[$i].name');
+      for (var j = 0; j < day.slots.length; j++) {
+        ModerationGuard.ensure(day.slots[j].notes,
+            campo: 'days[$i].slots[$j].notes');
+      }
+    }
+  }
 
   /// Returns only system-seeded template routines (source == 'system').
   ///
@@ -106,6 +156,13 @@ class RoutineRepository {
         'user-created routines must not carry assignedTo',
       );
     }
+
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
 
     // Strip trainer-only keys before write — the Firestore create rule for
     // user-created routines requires that `assignedBy` and `assignedTo` be
@@ -218,6 +275,12 @@ class RoutineRepository {
     // editing a routine that carries a resumen, but may not change it.
     // Sending it here would make every athlete edit of such a routine fail
     // with permission-denied. The athlete editor has no summary field either.
+    //
+    // Same reason `split` and `summary` are OMITTED from the moderation
+    // guard call below: neither travels in this payload, so checking them
+    // would risk blocking an edit over content that never reaches Firestore.
+    _ensureRoutineTextIsClean(name: draft.name, days: draft.days);
+
     final json = <String, Object?>{
       'name': draft.name,
       'level': draft.level.toJson(),
@@ -261,6 +324,13 @@ class RoutineRepository {
     if (draft.id.isEmpty) {
       throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
     }
+
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
 
     // Build update payload with ONLY the content fields the trainer controls.
     // Omitting assignedBy, assignedTo, source, createdBy, createdAt, id,
@@ -314,6 +384,13 @@ class RoutineRepository {
     if (draft.id.isEmpty) {
       throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
     }
+
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
 
     // Build update payload with ONLY the content fields the trainer controls.
     // Omitting assignedBy, source, createdBy, createdAt, assignedTo, id,
@@ -606,6 +683,13 @@ class RoutineRepository {
       );
     }
 
+    _ensureRoutineTextIsClean(
+      name: routine.name,
+      split: routine.split,
+      summary: routine.summary,
+      days: routine.days,
+    );
+
     final json = routine.toJson()..remove('id');
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);
@@ -656,6 +740,14 @@ class RoutineRepository {
       assignedTo: null,
       visibility: RoutineVisibility.private,
     );
+
+    _ensureRoutineTextIsClean(
+      name: templateRoutine.name,
+      split: templateRoutine.split,
+      summary: templateRoutine.summary,
+      days: templateRoutine.days,
+    );
+
     final json = templateRoutine.toJson()..remove('id');
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);

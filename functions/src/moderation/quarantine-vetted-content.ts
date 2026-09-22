@@ -278,6 +278,166 @@ export async function quarantineAuthorName(input: {
   return true;
 }
 
+/** Un dato en `moderation_quarantine` para UN campo de UNA rutina. */
+export interface RoutineQuarantineFinding {
+  /**
+   * Identifica el campo exacto que fallo — `'name'`, `'split'`, `'summary'`,
+   * o la forma indexada `'days[1].slots[3].notes'` para los anidados. Mismo
+   * shape que usa `ModerationGuard.ensure` del lado del cliente
+   * (`routine_repository.dart`), a proposito: un mismo documento roto deja el
+   * MISMO identificador de campo en el log del cliente y en el registro del
+   * servidor, y correlacionar los dos no requiere traducir nada.
+   */
+  field: string;
+  verdict: ModerationVerdict;
+}
+
+interface RoutineSlotLike {
+  notes?: unknown;
+}
+
+interface RoutineDayLike {
+  name?: unknown;
+  slots?: RoutineSlotLike[];
+}
+
+export interface QuarantineRoutineInput {
+  db: Firestore;
+  /** Ruta completa del documento `routines/{routineId}` que disparo el trigger. */
+  path: string;
+  /** `data()` del snapshot `after`. */
+  data: FirebaseFirestore.DocumentData;
+  /** Autor del contenido, si se puede derivar. Para la cola de moderacion. */
+  authorUid?: string;
+  /** Misma precondicion de concurrencia que `quarantineIfVetted` — ver su
+   * dartdoc. Aca el riesgo es mayor: lo que se pisaria sin ella no es un
+   * campo suelto, es el array `days` ENTERO. */
+  updateTime?: FirebaseFirestore.Timestamp;
+}
+
+/** Verdict de un texto, o `null` si no amerita ninguno (vacio, o `ok`). */
+function verdictFor(value: unknown): ModerationVerdict | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const verdict = checkText(value);
+  return verdict === "ok" ? null : verdict;
+}
+
+/**
+ * Cuarentena de rutinas.
+ *
+ * Superficie distinta a `quarantineIfVetted`: una rutina puede tener CUATRO
+ * campos de texto libre vetables en el mismo write — `name`, `split` y
+ * `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
+ * anidados dentro de un array. Por eso esta funcion NO reusa
+ * `quarantineIfVetted` (que redacta UN campo top-level con
+ * `.update({[field]: valor})`): Firestore no permite actualizar un elemento
+ * de array por indice, asi que hay que leer el array COMPLETO, redactar
+ * adentro en memoria, y reescribirlo entero en una sola escritura.
+ *
+ * Un finding por campo vetado, no un solo veredicto: dos campos vetados en el
+ * mismo write (p.ej. `name` Y `days[1].slots[3].notes`) dejan DOS registros en
+ * `moderation_quarantine`, cada uno con su propio `field` — la cola de
+ * moderacion no pierde ninguno de los dos.
+ */
+export async function quarantineRoutineIfVetted(
+  input: QuarantineRoutineInput,
+): Promise<RoutineQuarantineFinding[]> {
+  const { db, path, data, authorUid, updateTime } = input;
+
+  const findings: RoutineQuarantineFinding[] = [];
+  const topLevelRedactions: Record<string, string> = {};
+
+  for (const field of ["name", "split", "summary"] as const) {
+    const verdict = verdictFor(data[field]);
+    if (!verdict) continue;
+    findings.push({ field, verdict });
+    if (verdict === "block") topLevelRedactions[field] = REDACTADO;
+  }
+
+  const days: RoutineDayLike[] = Array.isArray(data.days) ? data.days : [];
+  let daysChanged = false;
+  const newDays = days.map((day, i) => {
+    let out = day;
+
+    const nameVerdict = verdictFor(day.name);
+    if (nameVerdict) {
+      findings.push({ field: `days[${i}].name`, verdict: nameVerdict });
+      if (nameVerdict === "block") {
+        out = { ...out, name: REDACTADO };
+        daysChanged = true;
+      }
+    }
+
+    const slots: RoutineSlotLike[] = Array.isArray(day.slots) ? day.slots : [];
+    let slotsChanged = false;
+    const newSlots = slots.map((slot, j) => {
+      const notesVerdict = verdictFor(slot.notes);
+      if (!notesVerdict) return slot;
+      findings.push({
+        field: `days[${i}].slots[${j}].notes`,
+        verdict: notesVerdict,
+      });
+      if (notesVerdict !== "block") return slot;
+      slotsChanged = true;
+      return { ...slot, notes: REDACTADO };
+    });
+    if (slotsChanged) {
+      out = { ...out, slots: newSlots };
+      daysChanged = true;
+    }
+
+    return out;
+  });
+
+  if (findings.length === 0) return [];
+
+  // El registro se escribe para CADA finding, block o review — mismo criterio
+  // que `quarantineIfVetted`: `review` es "que alguien lo mire", y si no
+  // queda anotado en ningun lado no significa nada.
+  for (const f of findings) {
+    const id = `${path.replace(/\//g, "__")}__${f.field.replace(/[[\].]/g, "_")}`;
+    await db.collection(QUARANTINE_COLLECTION).doc(id).set(
+      {
+        path,
+        field: f.field,
+        kind: "routine",
+        verdict: f.verdict,
+        authorUid: authorUid ?? null,
+        redacted: f.verdict === "block",
+        at: new Date(),
+      },
+      { merge: true },
+    );
+  }
+
+  const hasBlocked = findings.some((f) => f.verdict === "block");
+  if (!hasBlocked) return findings;
+
+  const update: Record<string, unknown> = { ...topLevelRedactions };
+  if (daysChanged) update.days = newDays;
+
+  try {
+    await db
+      .doc(path)
+      .update(update, updateTime ? { lastUpdateTime: updateTime } : {});
+  } catch (err) {
+    // FAILED_PRECONDITION: la rutina cambio despues del evento. No se pisa:
+    // la escritura nueva disparo su propio trigger y se revisa por su cuenta.
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      logger.info("quarantine: la rutina cambio, la revisa su propio evento", {
+        path,
+      });
+      return findings;
+    }
+    throw err;
+  }
+  logger.warn("rutina con contenido vetado redactada por el servidor", {
+    path,
+  });
+
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // Wrappers. `onDocumentWritten` y no `onDocumentCreated`: editar un post
 // cambia su texto, y el guard del cliente vive en `PostRepository.update` por
@@ -416,6 +576,34 @@ export const quarantineReview = onDocumentWritten(
       value: after.get("comment"),
       kind: "review",
       authorUid: after.get("athleteId") as string | undefined,
+      updateTime: after.updateTime,
+    });
+  },
+);
+
+/**
+ * Cuarentena de rutinas — wrapper fino, mismo patron que los de arriba.
+ * Ver el dartdoc de [quarantineRoutineIfVetted] para el porque de la logica
+ * de adentro.
+ *
+ * `authorUid` sale de `createdBy` (rutina propia del atleta) o, si no esta,
+ * de `assignedBy` (plan asignado o plantilla del PF) — quien haya escrito el
+ * texto. `assignedTo` NUNCA es el autor: es el alumno al que se la comparte,
+ * no quien la redacto.
+ */
+export const quarantineRoutine = onDocumentWritten(
+  { document: "routines/{routineId}", region: REGION },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    const data = after.data() ?? {};
+    await quarantineRoutineIfVetted({
+      db: getFirestore(),
+      path: after.ref.path,
+      data,
+      authorUid:
+        (data.createdBy as string | undefined) ??
+        (data.assignedBy as string | undefined),
       updateTime: after.updateTime,
     });
   },

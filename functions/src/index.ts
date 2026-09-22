@@ -304,17 +304,24 @@ export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
 // Cuarentena de terminos vetados. El filtro del cliente
 // (`lib/core/moderation/`) es el que satisface la Guideline 1.2 de App Review
 // —el contenido no llega a postearse— pero se saltea con el SDK directo. Estos
-// cuatro triggers son la capa que no se puede evadir.
+// siete triggers son la capa que no se puede evadir.
 //
 // `onDocumentWritten` y no `onDocumentCreated`: editar un post cambia su
 // texto, y un trigger solo-create deja abierta la puerta de crear algo limpio
 // y editarlo. Ver el encabezado de `moderation/quarantine-vetted-content.ts`.
+//
+// `quarantineRoutine` cubre `routines/{routineId}` (name, split, summary,
+// days[].name, days[].slots[].notes) y `quarantineTrainerProfileName` ya
+// cuarentena `trainerBio` ademas del `displayName` — no tienen export propio
+// distinto porque no son triggers nuevos, son el mismo `trainerPublicProfiles`
+// de siempre con un campo mas.
 export {
   quarantineChatMessage,
   quarantineDisplayNameOnWrite,
   quarantinePost,
   quarantinePublicProfileName,
   quarantineReview,
+  quarantineRoutine,
   quarantineTrainerProfileName,
 } from "./moderation/quarantine-vetted-content";
 

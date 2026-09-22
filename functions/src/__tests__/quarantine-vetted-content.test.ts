@@ -11,6 +11,9 @@
  *     "npx jest --forceExit quarantine-vetted-content"
  */
 
+import { readFileSync } from "fs";
+import { join } from "path";
+
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
@@ -356,4 +359,28 @@ describe("trainerBio (quarantineTrainerProfileName)", () => {
       expect((await db.doc("users/t3").get()).get("trainerBio")).toBe(VETADO);
     },
   );
+});
+
+describe("superficies que NO se tocan", () => {
+  // `athlete_notes/{trainerId}_{athleteId}` son las notas PRIVADAS que el PF
+  // escribe sobre un alumno — a proposito, fuera del criterio de esta feature
+  // ("si otro usuario lo va a leer, entra"): nadie mas que el propio PF las
+  // lee (`firestore.rules:4040`). Sumar un trigger ahi seria censurar
+  // contenido que nunca sale del backstage del entrenador.
+  //
+  // Assert de codigo fuente y no de Firestore, a proposito: no hay NINGUN
+  // trigger escuchando `athlete_notes` hoy, asi que escribir un doc ahi y
+  // comprobar que "no paso nada" no ejercita ningun camino de este modulo —
+  // pasaria igual aunque alguien agregara el trigger manana con un bug que no
+  // redacta. Leer el codigo fuente es lo unico que de verdad fija la
+  // decision: si alguien agrega `onDocumentWritten` sobre `athlete_notes` en
+  // este archivo, este test se pone rojo y obliga a una decision consciente
+  // en vez de colarse en un PR sin que nadie lo note.
+  it("quarantine-vetted-content.ts no declara ningun trigger sobre athlete_notes", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "moderation", "quarantine-vetted-content.ts"),
+      "utf8",
+    );
+    expect(source).not.toContain("athlete_notes");
+  });
 });

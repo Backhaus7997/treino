@@ -8,8 +8,13 @@ import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/reviews/data/review_repository.dart';
 import 'package:treino/features/reviews/domain/review.dart';
+import 'package:treino/features/workout/data/routine_repository.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 
 /// El filtro esta CABLEADO a las superficies, no solo escrito.
 ///
@@ -208,6 +213,216 @@ void main() {
       final publico =
           await firestore.collection('trainerPublicProfiles').doc('t1').get();
       expect(publico.data()!['trainerBio'], 'Entreno hace 10 anios.');
+    });
+  });
+
+  group('rutinas', () {
+    // Los CUATRO campos de texto libre de una rutina: `name`, `split`,
+    // `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
+    // anidados. Cada test de abajo ejercita un metodo de escritura distinto
+    // con un campo distinto, asi que entre todos quedan los seis metodos Y
+    // los cuatro campos cubiertos sin repetir la matriz completa — la
+    // exhaustividad campo x metodo ya la tiene
+    // `quarantine-routine-fields.test.ts` del lado del servidor.
+    RoutineSlot slot({String? notes}) => RoutineSlot(
+          exerciseId: 'e1',
+          exerciseName: 'Press banca',
+          muscleGroup: 'chest',
+          targetSets: 3,
+          targetRepsMin: 8,
+          targetRepsMax: 12,
+          restSeconds: 90,
+          notes: notes,
+        );
+
+    test('createUserOwned rechaza el nombre vetado y no escribe nada',
+        () async {
+      final repo = RoutineRepository(firestore: firestore);
+
+      await expectLater(
+        repo.createUserOwned(
+          uid: 'a1',
+          draft: const Routine(
+            id: '',
+            name: _vetado,
+            split: null,
+            level: ExperienceLevel.beginner,
+            days: [],
+          ),
+        ),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      expect((await firestore.collection('routines').get()).docs, isEmpty);
+    });
+
+    test(
+        'updateUserOwned rechaza: editar una rutina limpia para meter el '
+        'nombre vetado', () async {
+      // La misma evasion barata que en posts: publicar algo inocente y
+      // editarlo. Sin guard en el UPDATE, el guard del CREATE no alcanza.
+      final repo = RoutineRepository(firestore: firestore);
+      final saved = await repo.createUserOwned(
+        uid: 'a1',
+        draft: const Routine(
+          id: '',
+          name: 'Mi rutina',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: [],
+        ),
+      );
+
+      await expectLater(
+        repo.updateUserOwned(
+          uid: 'a1',
+          draft: saved.copyWith(name: _vetado),
+        ),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      final doc = await firestore.collection('routines').doc(saved.id).get();
+      expect(doc.data()!['name'], 'Mi rutina',
+          reason: 'el update piso el nombre igual');
+    });
+
+    test('createAssigned rechaza el split vetado y no escribe nada', () async {
+      final repo = RoutineRepository(firestore: firestore);
+
+      await expectLater(
+        repo.createAssigned(const Routine(
+          id: '',
+          name: 'Plan asignado',
+          split: _vetado,
+          level: ExperienceLevel.beginner,
+          days: [],
+          assignedBy: 't1',
+          assignedTo: 'a1',
+        )),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      expect((await firestore.collection('routines').get()).docs, isEmpty);
+    });
+
+    test('updateAssigned rechaza el resumen vetado y no pisa el doc', () async {
+      final repo = RoutineRepository(firestore: firestore);
+      final saved = await repo.createAssigned(const Routine(
+        id: '',
+        name: 'Plan asignado',
+        split: 'PPL',
+        summary: 'Resumen original.',
+        level: ExperienceLevel.beginner,
+        days: [],
+        assignedBy: 't1',
+        assignedTo: 'a1',
+      ));
+
+      await expectLater(
+        repo.updateAssigned(uid: 't1', draft: saved.copyWith(summary: _vetado)),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      final doc = await firestore.collection('routines').doc(saved.id).get();
+      expect(doc.data()!['summary'], 'Resumen original.',
+          reason: 'el update piso el resumen igual');
+    });
+
+    test('createTemplate rechaza el nombre de un dia vetado y no escribe nada',
+        () async {
+      final repo = RoutineRepository(firestore: firestore);
+
+      await expectLater(
+        repo.createTemplate(Routine(
+          id: '',
+          name: 'Plantilla',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: [
+            RoutineDay(dayNumber: 1, name: 'Dia 1', slots: [slot()]),
+            const RoutineDay(dayNumber: 2, name: _vetado, slots: []),
+          ],
+          assignedBy: 't1',
+        )),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      expect((await firestore.collection('routines').get()).docs, isEmpty);
+    });
+
+    test(
+        'updateTemplate rechaza notas vetadas en days[1].slots[1] (NO el '
+        'primer slot) y no pisa el doc', () async {
+      // Un bug de indice pasa desapercibido si el unico caso probado es la
+      // posicion 0 — mismo motivo que el test gemelo del lado del servidor.
+      final repo = RoutineRepository(firestore: firestore);
+      final saved = await repo.createTemplate(Routine(
+        id: '',
+        name: 'Plantilla',
+        split: 'PPL',
+        level: ExperienceLevel.beginner,
+        days: [
+          RoutineDay(
+              dayNumber: 1, name: 'Dia 1', slots: [slot(notes: 'buena forma')]),
+          RoutineDay(
+            dayNumber: 2,
+            name: 'Dia 2',
+            slots: [
+              slot(notes: 'buena forma'),
+              slot(notes: 'controlar el descenso'),
+            ],
+          ),
+        ],
+        assignedBy: 't1',
+      ));
+
+      final draft = saved.copyWith(days: [
+        saved.days[0],
+        saved.days[1].copyWith(slots: [
+          saved.days[1].slots[0],
+          saved.days[1].slots[1].copyWith(notes: _vetado),
+        ]),
+      ]);
+
+      await expectLater(
+        repo.updateTemplate(uid: 't1', draft: draft),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      final doc = await firestore.collection('routines').doc(saved.id).get();
+      final days = doc.data()!['days'] as List<dynamic>;
+      final day1Slots =
+          (days[1] as Map<String, dynamic>)['slots'] as List<dynamic>;
+      expect((day1Slots[1] as Map<String, dynamic>)['notes'],
+          'controlar el descenso',
+          reason: 'el update piso las notas igual');
+    });
+
+    test(
+        'vocabulario de dominio (musculo, dorsal, aductores) no se rechaza '
+        'en ningun campo', () async {
+      final repo = RoutineRepository(firestore: firestore);
+
+      final saved = await repo.createUserOwned(
+        uid: 'a1',
+        draft: Routine(
+          id: '',
+          name: 'Rutina dorsal y aductores',
+          split: null,
+          summary: 'Trabaja el musculo dorsal.',
+          level: ExperienceLevel.beginner,
+          days: [
+            RoutineDay(
+              dayNumber: 1,
+              name: 'Dia de aductores',
+              slots: [slot(notes: 'Foco en el musculo dorsal')],
+            ),
+          ],
+        ),
+      );
+
+      expect(saved.name, 'Rutina dorsal y aductores');
+      expect((await firestore.collection('routines').get()).docs, hasLength(1));
     });
   });
 
