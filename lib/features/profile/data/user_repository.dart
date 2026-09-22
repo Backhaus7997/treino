@@ -451,6 +451,17 @@ class UserRepository {
           campo: 'displayName');
     }
 
+    // La bio del PF (`trainerBio`) es texto libre que cualquier autenticado
+    // lee en trainerPublicProfiles/{uid} (firestore.rules:1843) — a
+    // diferencia de `users/{uid}`, que es owner-only. Mismo partial, mismo
+    // guard: [_trainerPublicSubsetFromPartial] dual-escribe `trainerBio` a
+    // los dos documentos desde este mismo `efectivo` en el batch de abajo,
+    // así que un solo `ensure` cubre las dos escrituras.
+    if (efectivo.containsKey('trainerBio')) {
+      ModerationGuard.ensure(efectivo['trainerBio'] as String?,
+          campo: 'trainerBio');
+    }
+
     _assertTrainerLocationStateIsValid(efectivo);
     final sanitized = Map<String, Object?>.fromEntries(
       efectivo.entries.where((e) => !_immutableFields.contains(e.key)),

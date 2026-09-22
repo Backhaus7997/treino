@@ -172,6 +172,45 @@ void main() {
     });
   });
 
+  group('bio del entrenador (trainerBio)', () {
+    test('update rechaza la bio vetada y no la escribe en ningun documento',
+        () async {
+      final repo = UserRepository(firestore: firestore);
+      await firestore.collection('users').doc('t1').set({
+        'uid': 't1',
+        'trainerBio': 'Bio original limpia.',
+      });
+      await firestore.collection('trainerPublicProfiles').doc('t1').set({
+        'uid': 't1',
+        'trainerBio': 'Bio original limpia.',
+      });
+
+      await expectLater(
+        repo.update('t1', {'trainerBio': _vetado}),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+
+      final privado = await firestore.collection('users').doc('t1').get();
+      final publico =
+          await firestore.collection('trainerPublicProfiles').doc('t1').get();
+      expect(privado.data()!['trainerBio'], 'Bio original limpia.',
+          reason: 'el update piso la bio en users igual');
+      expect(publico.data()!['trainerBio'], 'Bio original limpia.',
+          reason: 'el update piso la bio en trainerPublicProfiles igual');
+    });
+
+    test('update deja pasar una bio limpia y la dual-escribe', () async {
+      final repo = UserRepository(firestore: firestore);
+      await firestore.collection('users').doc('t1').set({'uid': 't1'});
+
+      await repo.update('t1', {'trainerBio': 'Entreno hace 10 anios.'});
+
+      final publico =
+          await firestore.collection('trainerPublicProfiles').doc('t1').get();
+      expect(publico.data()!['trainerBio'], 'Entreno hace 10 anios.');
+    });
+  });
+
   group('el mensaje al usuario', () {
     test('la excepcion no carga copy: eso vive en l10n', () {
       // Una capa de datos que devuelve castellano rioplatense obliga a

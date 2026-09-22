@@ -350,6 +350,21 @@ export const quarantinePublicProfileName = onDocumentWritten(
   },
 );
 
+/**
+ * El nombre quedó corto: además del `displayName`, este trigger también
+ * cuarentena `trainerBio` — no se separó en un segundo `onDocumentWritten`
+ * sobre el mismo documento (mismo criterio que `quarantinePost`, que ya
+ * corre `quarantineIfVetted` + `quarantineAuthorName` juntos en un solo
+ * trigger: un doc, un evento, una sola vuelta).
+ *
+ * `trainerBio` usa `quarantineIfVetted` directo, NO `quarantineDisplayName`:
+ * a diferencia del nombre, el reemplazo es la cadena vacía (no hay que
+ * derivar nada del uid) y sólo vive en ESTE documento — `users/{uid}` también
+ * guarda una copia, pero esa es owner-only read (`firestore.rules:234`) y
+ * nunca la lee otro usuario, así que no entra al criterio de esta capa
+ * ("si otro usuario lo va a leer"). Redactar sólo el espejo público es
+ * suficiente para Guideline 1.2.
+ */
 export const quarantineTrainerProfileName = onDocumentWritten(
   { document: "trainerPublicProfiles/{uid}", region: REGION },
   async (event) => {
@@ -360,6 +375,15 @@ export const quarantineTrainerProfileName = onDocumentWritten(
       event.params.uid,
       after.get("displayName"),
     );
+    await quarantineIfVetted({
+      db: getFirestore(),
+      path: after.ref.path,
+      field: "trainerBio",
+      value: after.get("trainerBio"),
+      kind: "profile",
+      authorUid: event.params.uid,
+      updateTime: after.updateTime,
+    });
   },
 );
 

@@ -21,6 +21,10 @@ import {
   quarantineIfVetted,
 } from "../moderation/quarantine-vetted-content";
 
+// `trainerBio` reusa `quarantineIfVetted` (kind "profile") — no tiene una
+// funcion propia como `quarantineDisplayName`, asi que sus tests viven en el
+// describe de abajo en vez de sumar un import nuevo.
+
 const VETADO = "sos un hijo de puta";
 
 const REVIEW = "sos un pelotudo";
@@ -267,4 +271,89 @@ describe("quarantineDisplayName", () => {
     expect(v).toBe("ok");
     expect((await db.doc("users/u9").get()).get("displayName")).toBe("Martín");
   });
+});
+
+describe("trainerBio (quarantineTrainerProfileName)", () => {
+  // El filtro de terminos vetados llegaba a Feed, Chat, Resenas y
+  // displayName, pero no a la bio del PF. `trainerBio` vive en
+  // trainerPublicProfiles/{uid}, que cualquier autenticado puede leer
+  // (firestore.rules:1843) — a diferencia de users/{uid}, que es owner-only
+  // (firestore.rules:234). Por eso estos tests ejercitan `quarantineIfVetted`
+  // directo sobre ESE documento, como lo hace el trigger real.
+  it("redacta trainerBio vetada y deja registro", async () => {
+    await db.doc("trainerPublicProfiles/t1").set({
+      uid: "t1",
+      trainerBio: VETADO,
+    });
+
+    const v = await quarantineIfVetted({
+      db,
+      path: "trainerPublicProfiles/t1",
+      field: "trainerBio",
+      value: VETADO,
+      kind: "profile",
+      authorUid: "t1",
+    });
+
+    expect(v).toBe("block");
+    const doc = await db.doc("trainerPublicProfiles/t1").get();
+    expect(doc.get("trainerBio")).toBe("");
+
+    const reg = await registro("trainerPublicProfiles/t1");
+    expect(reg.exists).toBe(true);
+    expect(reg.get("field")).toBe("trainerBio");
+    expect(reg.get("verdict")).toBe("block");
+  });
+
+  it("no toca una bio limpia", async () => {
+    await db.doc("trainerPublicProfiles/t2").set({
+      uid: "t2",
+      trainerBio: LIMPIO,
+    });
+
+    const v = await quarantineIfVetted({
+      db,
+      path: "trainerPublicProfiles/t2",
+      field: "trainerBio",
+      value: LIMPIO,
+      kind: "profile",
+      authorUid: "t2",
+    });
+
+    expect(v).toBe("ok");
+    expect((await db.doc("trainerPublicProfiles/t2").get()).get("trainerBio"))
+      .toBe(LIMPIO);
+  });
+
+  it(
+    "NO toca users/{uid}.trainerBio — esa copia es owner-only read, " +
+      "nunca la lee otro usuario",
+    async () => {
+      // Decision de diseno: a diferencia de displayName (que SI se redacta
+      // en users, userPublicProfiles Y trainerPublicProfiles porque las tres
+      // copias son leidas por otros en algun punto del sistema), la bio solo
+      // necesita redactarse en su espejo publico. Este test fija esa
+      // decision: si alguien "simplifica" el trigger reusando
+      // quarantineDisplayName-style multi-doc para bio, este test lo
+      // atrapa.
+      await db.doc("users/t3").set({ uid: "t3", trainerBio: VETADO });
+      await db.doc("trainerPublicProfiles/t3").set({
+        uid: "t3",
+        trainerBio: VETADO,
+      });
+
+      await quarantineIfVetted({
+        db,
+        path: "trainerPublicProfiles/t3",
+        field: "trainerBio",
+        value: VETADO,
+        kind: "profile",
+        authorUid: "t3",
+      });
+
+      expect((await db.doc("trainerPublicProfiles/t3").get()).get("trainerBio"))
+        .toBe("");
+      expect((await db.doc("users/t3").get()).get("trainerBio")).toBe(VETADO);
+    },
+  );
 });
