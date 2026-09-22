@@ -7,7 +7,9 @@ apunta a la evidencia.
 > Google audita esto contra el comportamiento real del binario. Una
 > declaración incompleta es motivo de rechazo o de baja de la ficha.
 
-Verificado contra el código el **2026-08-25**.
+Verificado contra el código el **2026-09-22**. La revisión anterior era del
+2026-08-25; sus pendientes están cerrados al final del archivo, y esta pasada
+corrigió **una fila de la declaración** — ver *Actividad en la app*.
 
 ---
 
@@ -115,9 +117,13 @@ alumno le paga al entrenador por fuera— pero **sí registra cuánto es y si es
 paga** (decisión D5). Que el dinero no pase por la app no cambia que el monto
 esté guardado en ella, y Play pregunta por el dato, no por el flujo de fondos.
 
-**Ningún número de tarjeta ni dato bancario toca la app.** Mercado Pago y las
-compras integradas de Apple/Google resuelven el cobro en su propio checkout;
-TREINO sólo recibe el estado resultante.
+**Ningún número de tarjeta ni dato bancario toca la app.** Mercado Pago resuelve
+el cobro en su propio checkout —fuera del binario, en la web— y TREINO sólo
+recibe el estado resultante.
+
+> Esta línea nombraba también *"las compras integradas de Apple/Google"*. Ya no
+> existen: el SDK de compras salió del binario en el PR #1201 y su backend en el
+> #1206. **El único canal de cobro es Mercado Pago**, para los dos productos.
 
 ### Mensajes
 
@@ -129,8 +135,26 @@ TREINO sólo recibe el estado resultante.
 
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
-| Interacciones | Sí | No | Obligatorio | Analytics | `firebase_analytics` |
+| Interacciones | Sí | No | **Opcional** | Analytics | `firebase_analytics`, con consentimiento en `lib/core/analytics/analytics_consent.dart` |
 | Contenido generado por el usuario | Sí | Sí — según privacidad del post | Opcional | Funcionalidad | Posts del feed (amigos / comunidad / público) |
+
+⚠️ **Esta fila decía «Obligatorio» y era una declaración falsa.** Para Google,
+*obligatorio* significa que el usuario **no puede** desactivar la recolección. En
+TREINO sí puede: `analyticsConsentFromPrefs` (`analytics_consent.dart:21`) lee
+`kAnalyticsConsentKey`, y `AnalyticsConsentNotifier` lo escribe desde la app.
+
+El default es `true` — o sea **opt-out**: viene prendido y se apaga. Eso lo hace
+opcional igual. «Obligatorio» describe si existe la salida, no si está tomada por
+defecto.
+
+Declarar de más también es declarar mal: Google audita la ficha contra el
+comportamiento real del binario, y una app que ofrece un toggle mientras su ficha
+dice que no lo ofrece es la misma clase de discrepancia que una que recolecta sin
+declarar.
+
+> Si algún día el consentimiento pasa a ser **opt-in explícito**, el cambio es en
+> `analytics_consent.dart`, en el texto de la política **y acá**, en el mismo PR.
+> El dartdoc de esa función ya deja escrita la primera mitad de esa regla.
 
 ### Rendimiento de la app
 
@@ -195,15 +219,37 @@ Cada `match` con `contentType` es un camino de subida. Al 2026-09-18 devuelve
 Si ese comando devuelve un `contentType` que no esté en esta tabla, hay un tipo
 de dato sin declarar.
 
+## Resuelto — lo que era pendiente y ya no
+
+- [x] **Política de privacidad publicada.** **Verificada en vivo el 2026-09-22:**
+      `https://gettreino.com/es/privacidad`. Es la URL que va en Play Console.
+
+      Este renglón decía *"hoy no existe. Es bloqueante duro de la publicación"*,
+      y era el único bloqueante declarado del documento. La página se genera desde
+      `docs/legal/politica-de-privacidad.md` —fuente única— y `app.gettreino.com`
+      sirve el mismo texto desde el mismo lugar.
+
+- [x] **Analytics en release: activo, y OPCIONAL.** Ver la nota de *Actividad en
+      la app* más arriba — ese matiz cambió una fila de la declaración.
+
+- [x] **Compras dentro de la app: NO.** Y ahora es verdad.
+
+      ⚠️ **Antes no lo era.** Este renglón decía que *"el binario móvil no tiene
+      ningún flujo de pago"* mientras `pubspec.yaml` arrastraba
+      `purchases_flutter`, que mete `com.android.billingclient:billing` en el
+      AAB. **Google escanea el binario**: encontrar la librería de billing en una
+      app cuya ficha declara que no vende nada es exactamente la discrepancia que
+      frena una publicación.
+
+      Cerrado por los PRs #1201 (el SDK fuera del binario) y #1206 (el webhook y
+      su backend). Nunca procesó una compra real. El alumno paga por Mercado Pago
+      en `gettreino.com`; el entrenador, en el Coach Hub web.
+
 ## Pendientes antes de cargar
 
-- [ ] **Política de privacidad publicada en una URL pública.** Play la exige y
-      hoy no existe. Es bloqueante duro de la publicación.
-- [ ] Confirmar si Analytics queda activo en el build de release o se apaga.
 - [ ] Decidir si Rankings cuenta como *contenido compartido públicamente*. Es
       opt-in explícito del atleta y el scope es por gimnasio, pero el opt-in hay
       que reflejarlo acá.
-- [ ] **Compras dentro de la app**: depende de #644, que está congelada. Hoy el
-      binario móvil **no** tiene ningún flujo de pago — el paywall del PF vive en
-      el Coach Hub **web** (`lib/features/coach_hub/`), no en la app. Con el
-      código de hoy la respuesta es **no**.
+
+Es el único que queda, y **no es bloqueante**: es una decisión de cómo declarar
+algo que ya se comporta bien, no un dato sin declarar.
