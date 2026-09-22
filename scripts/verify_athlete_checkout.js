@@ -58,7 +58,7 @@
  *      Opcional: `CICLO=annual` para probar el anual (default `monthly`).
  */
 
-const { initializeApp } = require("firebase-admin/app");
+const { inicializarAdmin, PROJECT_ID_EMULADOR } = require("./lib/admin");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
 const fs = require("fs");
@@ -134,7 +134,7 @@ function exigirTokenDePrueba() {
 
 exigirTokenDePrueba();
 
-const PROJECT_ID = "treino-dev";
+const PROJECT_ID = PROJECT_ID_EMULADOR;
 const REGION = "southamerica-east1";
 const FUNCTIONS_HOST = process.env.FUNCTIONS_EMULATOR_HOST || "localhost:5001";
 const CICLO = process.env.CICLO || "monthly";
@@ -144,9 +144,14 @@ const CICLO = process.env.CICLO || "monthly";
 const UID = "verify-athlete-checkout";
 const EMAIL = "verify-athlete-checkout@example.test";
 
-initializeApp({ projectId: PROJECT_ID });
-const db = getFirestore();
-const auth = getAuth();
+// Credenciales: la UNICA puerta (#834). `scripts/test/frontera.test.js`
+// verifica que ningun script de `scripts/` resuelva la credencial por su
+// cuenta, y este archivo entro en rojo por llamar a `initializeApp` directo.
+// El guard tenia razon: el punto de `lib/admin` es que exista UN solo lugar
+// que decide contra que proyecto se escribe.
+const { app } = inicializarAdmin({ projectId: PROJECT_ID });
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 const ok = (m) => console.log(`  ✓ ${m}`);
 const info = (m) => console.log(`  · ${m}`);
@@ -176,7 +181,11 @@ async function prepararAlumno() {
   } catch {
     // No existia. Es el caso normal de la primera corrida.
   }
-  await auth.createUser({ uid: UID, email: EMAIL, password: "verificador-123" });
+  // Sin password A PROPOSITO: el ingreso es por custom token, asi que ninguna
+  // hace falta. Habia un literal aca y `gitleaks` lo marco — con razon, aunque
+  // fuera de un usuario descartable: la regla no puede distinguirlos, y un
+  // repo que amnistia literales de password deja de detectar los que importan.
+  await auth.createUser({ uid: UID, email: EMAIL });
 
   await db.collection("users").doc(UID).set({
     role: "athlete",
