@@ -7,6 +7,7 @@
  */
 
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
@@ -19,6 +20,8 @@ import {
   resolveReportHandler,
   REVIEWS_COLLECTION,
 } from "../moderation/report-review";
+import { dedupeKey } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 
 let app: App;
 let db: Firestore;
@@ -32,18 +35,52 @@ afterAll(async () => {
   await deleteApp(app);
 });
 
+// Rutas de Firestore y uids de Auth que un test individual crea fuera de
+// "reports"/REVIEWS_COLLECTION (posts, reviews, mensajes, audit_log,
+// mail_queue, usuarios). NO se barren esas colecciones enteras como las de
+// arriba: las comparten otros archivos de test (mail-outbox.test.ts,
+// notify-appointment.test.ts, audit-log.test.ts, etc.) corriendo contra el
+// mismo proyecto, y un DELETE masivo ahi les borraria datos en el medio de
+// una corrida completa de la suite.
+let extraCleanupPaths: string[] = [];
+let extraCleanupUids: string[] = [];
+
+beforeEach(() => {
+  extraCleanupPaths = [];
+  extraCleanupUids = [];
+});
+
 afterEach(async () => {
   for (const c of ["reports", REVIEWS_COLLECTION]) {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
+  await Promise.all(
+    extraCleanupPaths.map((p) => db.doc(p).delete().catch(() => undefined)),
+  );
+  await Promise.all(
+    extraCleanupUids.map((u) =>
+      getAuth(app).deleteUser(u).catch(() => undefined),
+    ),
+  );
 });
 
 const req = (token?: Record<string, unknown>) =>
   ({ auth: token ? { uid: "mod1", token } : null }) as
     unknown as CallableRequest<unknown>;
 
-async function sembrarReporte(id: string, hace: number) {
+async function sembrarReporte(
+  id: string,
+  hace: number,
+  overrides: Partial<{
+    targetKind: string;
+    targetId: string;
+    targetOwnerUid: string;
+    reporterUid: string;
+    reason: string;
+    detail: string;
+  }> = {},
+) {
   await db.collection("reports").doc(id).set({
     reporterUid: "r1",
     targetKind: "post",
@@ -52,6 +89,7 @@ async function sembrarReporte(id: string, hace: number) {
     reason: "harassment",
     detail: "me dijeron cosas",
     createdAt: new Date(Date.now() - hace),
+    ...overrides,
   });
 }
 
@@ -274,8 +312,13 @@ describe("resolveContentPath", () => {
 describe("resolveReport", () => {
   it("escribe el resultado en report_reviews", async () => {
     await sembrarReporte("r1", 3600_000);
+    // `contentRemoved` ahora EJECUTA de verdad, asi que el post tiene que
+    // existir — antes de este cambio la etiqueta se escribia igual sin
+    // tocar nada, y este fixture no lo necesitaba.
+    await db.collection("posts").doc("p1").set({ text: "post a retirar" });
+    extraCleanupPaths.push("posts/p1");
 
-    await resolveReportHandler(db, "mod1", {
+    await resolveReportHandler(db, app, "mod1", {
       reportId: "r1", status: "actioned", action: "contentRemoved",
       note: "post borrado",
     });
@@ -292,7 +335,7 @@ describe("resolveReport", () => {
     // inexistentes —un id mal tipeado, un cliente viejo— y la cola miente
     // sobre cuanto se resolvio.
     await expect(
-      resolveReportHandler(db, "mod1", {
+      resolveReportHandler(db, app, "mod1", {
         reportId: "no-existe", status: "dismissed", action: "none",
       }),
     ).rejects.toThrow(/no existe/);
@@ -301,7 +344,7 @@ describe("resolveReport", () => {
   it("rechaza status 'pending'", async () => {
     await sembrarReporte("r1", 3600_000);
     await expect(
-      resolveReportHandler(db, "mod1", {
+      resolveReportHandler(db, app, "mod1", {
         reportId: "r1", status: "pending", action: "none",
       }),
     ).rejects.toThrow(HttpsError);
@@ -310,7 +353,7 @@ describe("resolveReport", () => {
   it("rechaza una accion inventada", async () => {
     await sembrarReporte("r1", 3600_000);
     await expect(
-      resolveReportHandler(db, "mod1", {
+      resolveReportHandler(db, app, "mod1", {
         reportId: "r1", status: "actioned", action: "borrarTodo",
       }),
     ).rejects.toThrow(HttpsError);
@@ -319,7 +362,7 @@ describe("resolveReport", () => {
   it("rechaza una nota de mas de 1000", async () => {
     await sembrarReporte("r1", 3600_000);
     await expect(
-      resolveReportHandler(db, "mod1", {
+      resolveReportHandler(db, app, "mod1", {
         reportId: "r1", status: "dismissed", action: "none",
         note: "x".repeat(1001),
       }),
@@ -332,12 +375,243 @@ describe("resolveReport", () => {
     await sembrarReporte("r1", 3600_000);
     const antes = (await db.collection("reports").doc("r1").get()).data();
 
-    await resolveReportHandler(db, "mod1", {
+    await resolveReportHandler(db, app, "mod1", {
       reportId: "r1", status: "dismissed", action: "none",
     });
 
     const despues = (await db.collection("reports").doc("r1").get()).data();
     expect(despues).toEqual(antes);
+  });
+});
+
+describe("resolveReport — ejecuta la accion de verdad", () => {
+  // Hasta este cambio, `resolveReport` escribia solo la ETIQUETA y ninguna
+  // accion se ejecutaba: el boton "Contenido retirado" no retiraba nada. Este
+  // bloque prueba la EJECUCION, no la etiqueta — cada test lee el efecto
+  // directo (Firestore, Auth, mail_queue), nunca el valor de retorno.
+
+  describe("contentRemoved", () => {
+    it("en un post deja el campo text vacio EN FIRESTORE", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-cr-1", targetOwnerUid: "owner-cr-1",
+      });
+      await db.collection("posts").doc("post-cr-1").set({
+        text: "contenido original del post", authorUid: "owner-cr-1",
+      });
+      extraCleanupPaths.push("posts/post-cr-1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      });
+
+      const post = await db.collection("posts").doc("post-cr-1").get();
+      expect(post.get("text")).toBe("");
+    });
+
+    it("en una review deja el campo comment vacio EN FIRESTORE", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "review", targetId: "review-cr-1",
+        targetOwnerUid: "owner-cr-2",
+      });
+      await db.collection("reviews").doc("review-cr-1").set({
+        comment: "comentario original de la review",
+      });
+      extraCleanupPaths.push("reviews/review-cr-1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      });
+
+      const review = await db.collection("reviews").doc("review-cr-1").get();
+      expect(review.get("comment")).toBe("");
+    });
+
+    it("en un mensaje deja el texto vacio, con el chatId derivado del par de uids", async () => {
+      const reporterUid = "rep-msg-cr-1";
+      const targetOwnerUid = "owner-msg-cr-1";
+      const chatId = [reporterUid, targetOwnerUid].sort().join("_");
+      const msgPath = `chats/${chatId}/messages/msg-cr-1`;
+
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "message", targetId: "msg-cr-1", reporterUid, targetOwnerUid,
+      });
+      await db.doc(msgPath).set({
+        text: "mensaje original", senderId: targetOwnerUid,
+      });
+      extraCleanupPaths.push(msgPath);
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      });
+
+      const msg = await db.doc(msgPath).get();
+      expect(msg.get("text")).toBe("");
+    });
+
+    it("sobre un perfil tira invalid-argument y NO toca el documento del usuario", async () => {
+      const targetOwnerUid = "owner-profile-cr-1";
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "profile", targetId: targetOwnerUid, targetOwnerUid,
+      });
+      await db.collection("users").doc(targetOwnerUid).set({
+        displayName: "Nombre Original",
+      });
+      extraCleanupPaths.push(`users/${targetOwnerUid}`);
+
+      await expect(
+        resolveReportHandler(db, app, "mod1", {
+          reportId: "r1", status: "actioned", action: "contentRemoved",
+        }),
+      ).rejects.toThrow(/perfil/);
+
+      const user = await db.collection("users").doc(targetOwnerUid).get();
+      expect(user.get("displayName")).toBe("Nombre Original");
+    });
+
+    it("sobre contenido inexistente tira, y report_reviews NO queda marcado resuelto", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-no-existe-cr-1",
+        targetOwnerUid: "owner-cr-3",
+      });
+      // A proposito: nunca se crea posts/post-no-existe-cr-1.
+
+      await expect(
+        resolveReportHandler(db, app, "mod1", {
+          reportId: "r1", status: "actioned", action: "contentRemoved",
+        }),
+      ).rejects.toThrow(HttpsError);
+
+      const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+      expect(rev.exists).toBe(false);
+    });
+  });
+
+  describe("userSuspended", () => {
+    it("deja al usuario disabled:true en Firebase Auth", async () => {
+      const targetOwnerUid = "user-to-suspend-1";
+      await getAuth(app).createUser({
+        uid: targetOwnerUid, email: `${targetOwnerUid}@test.com`,
+      });
+      extraCleanupUids.push(targetOwnerUid);
+      await sembrarReporte("r1", 3600_000, { targetKind: "post", targetOwnerUid });
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      });
+
+      const user = await getAuth(app).getUser(targetOwnerUid);
+      expect(user.disabled).toBe(true);
+    });
+
+    it("sobre uno mismo tira invalid-argument", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetOwnerUid: "mod1",
+      });
+
+      await expect(
+        resolveReportHandler(db, app, "mod1", {
+          reportId: "r1", status: "actioned", action: "userSuspended",
+        }),
+      ).rejects.toThrow(HttpsError);
+    });
+
+    it("sobre otro moderador tira permission-denied y no lo deshabilita", async () => {
+      const otroModeradorUid = "mod2-target";
+      await getAuth(app).createUser({
+        uid: otroModeradorUid, email: `${otroModeradorUid}@test.com`,
+      });
+      await getAuth(app).setCustomUserClaims(otroModeradorUid, { moderator: true });
+      extraCleanupUids.push(otroModeradorUid);
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetOwnerUid: otroModeradorUid,
+      });
+
+      await expect(
+        resolveReportHandler(db, app, "mod1", {
+          reportId: "r1", status: "actioned", action: "userSuspended",
+        }),
+      ).rejects.toThrow(HttpsError);
+
+      const user = await getAuth(app).getUser(otroModeradorUid);
+      expect(user.disabled).toBe(false);
+    });
+  });
+
+  describe("userWarned", () => {
+    it("encola un mail sin el contenido reportado ni nada que identifique al denunciante", async () => {
+      const reporterUid = "denunciante-secreto-1";
+      const targetOwnerUid = "advertido-1";
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-warn-1", reporterUid, targetOwnerUid,
+        reason: "harassment", detail: "texto MUY identificable que escribio el denunciante",
+      });
+      await db.collection("posts").doc("post-warn-1").set({
+        text: "contenido reportado sensible", authorUid: targetOwnerUid,
+      });
+      extraCleanupPaths.push("posts/post-warn-1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userWarned",
+      });
+
+      const id = dedupeKey("moderation-user-warned", "r1", targetOwnerUid);
+      extraCleanupPaths.push(`${MAIL_QUEUE_COLLECTION}/${id}`);
+      const mail = await db.collection(MAIL_QUEUE_COLLECTION).doc(id).get();
+      expect(mail.exists).toBe(true);
+      expect(mail.get("toUid")).toBe(targetOwnerUid);
+
+      // El documento COMPLETO, no solo `params`: si algun dia alguien mete el
+      // dato sensible en otra clave del doc, esto lo agarra igual.
+      const crudo = JSON.stringify(mail.data());
+      expect(crudo).not.toContain(reporterUid);
+      expect(crudo).not.toContain("texto MUY identificable");
+      expect(crudo).not.toContain("contenido reportado sensible");
+    });
+  });
+
+  describe("audit_log", () => {
+    it("moderation__{reportId} guarda el contenido original y quien resolvio", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-audit-1", targetOwnerUid: "owner-audit-1",
+      });
+      await db.collection("posts").doc("post-audit-1").set({
+        text: "el original que hace falta para poder apelar",
+      });
+      extraCleanupPaths.push("posts/post-audit-1", "audit_log/moderation__r1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      });
+
+      const audit = await db.collection("audit_log").doc("moderation__r1").get();
+      expect(audit.exists).toBe(true);
+      expect(audit.get("kind")).toBe("moderation");
+      expect(audit.get("action")).toBe("contentRemoved");
+      expect(audit.get("moderatorUid")).toBe("mod1");
+      expect(audit.get("removedContent")).toBe(
+        "el original que hace falta para poder apelar",
+      );
+    });
+
+    it("dismissed/none NO escribe audit_log y NO toca ningun contenido", async () => {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-dismiss-1", targetOwnerUid: "owner-dismiss-1",
+      });
+      await db.collection("posts").doc("post-dismiss-1").set({
+        text: "esto no se toca",
+      });
+      extraCleanupPaths.push("posts/post-dismiss-1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "dismissed", action: "none",
+      });
+
+      const audit = await db.collection("audit_log").doc("moderation__r1").get();
+      expect(audit.exists).toBe(false);
+
+      const post = await db.collection("posts").doc("post-dismiss-1").get();
+      expect(post.get("text")).toBe("esto no se toca");
+    });
   });
 });
 

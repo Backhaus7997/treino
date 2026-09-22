@@ -55,11 +55,24 @@
  * `assertModerator`, no la firma del dispositivo.
  */
 
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { HttpsError, onCall, type CallableRequest } from
   "firebase-functions/v2/https";
 
+import { enqueueMail } from "../mail/enqueue-mail";
+
 const REGION = "southamerica-east1";
+
+/** Mismo patron que `notify-appointment.ts:37` y el resto del repo. */
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
 
 /** Coleccion del resultado de moderacion. Cerrada a todo cliente. */
 export const REVIEWS_COLLECTION = "report_reviews";
@@ -78,6 +91,19 @@ const ACCIONES: ReportAction[] = [
 
 /** Tope de la nota del moderador, igual que `detail` en `reports`. */
 const NOTA_MAX = 1000;
+
+/**
+ * Campo de texto a redactar por superficie, para `contentRemoved`.
+ *
+ * `profile` no tiene entrada: un reporte de perfil no se resuelve borrando
+ * texto, se resuelve dando de baja la cuenta. Ver el guard en
+ * `resolveReportHandler`.
+ */
+const REDACTABLE_FIELD: Record<string, string | undefined> = {
+  post: "text",
+  review: "comment",
+  message: "text",
+};
 
 /**
  * Corta la llamada si quien llama no tiene el claim.
@@ -303,8 +329,31 @@ export async function markReportViewedHandler(
   });
 }
 
+/**
+ * Resuelve un reporte Y EJECUTA la accion elegida.
+ *
+ * Hasta ahora esto escribia solo la ETIQUETA en `report_reviews` — el boton
+ * "Contenido retirado" no retiraba nada, "Usuario advertido" no avisaba a
+ * nadie. Un reporte marcado como resuelto sobre una accion que no paso es
+ * exactamente la afirmacion falsa que AGENTS.md 11.1 prohibe, asi que el
+ * orden de este handler no es incidental:
+ *
+ * 1. Se valida y se resuelve QUE hay que hacer (puede tirar sin escribir
+ *    nada: perfil con `contentRemoved`, contenido que ya no existe,
+ *    autosuspension, suspender a otro moderador).
+ * 2. Se escribe `audit_log` ANTES de mutar nada irreversible. Si se redacta
+ *    primero y el audit_log falla despues, el texto original se pierde para
+ *    siempre — no hay apelacion posible. Si es al reves y lo que falla es la
+ *    mutacion, el peor caso es una entrada de audit de mas sobre un reporte
+ *    que sigue sin resolver, que es recuperable.
+ * 3. Se ejecuta la mutacion de verdad (redactar, deshabilitar, encolar mail).
+ * 4. Recien ACA se marca `report_reviews` como resuelto. Si cualquier paso
+ *    anterior tira, la ejecucion corta y este paso nunca se alcanza: el
+ *    reporte queda sin resolver en vez de mentir sobre una accion que fallo.
+ */
 export async function resolveReportHandler(
   db: Firestore,
+  app: App,
   moderatorUid: string,
   input: { reportId?: unknown; status?: unknown; action?: unknown; note?: unknown },
 ): Promise<{ ok: true }> {
@@ -345,11 +394,134 @@ export async function resolveReportHandler(
   // `report_reviews` se llena de resoluciones de reportes que no existen —
   // por un id mal tipeado o por un cliente viejo— y la cola queda mintiendo
   // sobre cuanto se resolvio.
-  const reporte = await db.collection("reports").doc(reportId).get();
-  if (!reporte.exists) {
+  const reporteSnap = await db.collection("reports").doc(reportId).get();
+  if (!reporteSnap.exists) {
     throw new HttpsError("not-found", "Ese reporte no existe.");
   }
 
+  const reporteData = reporteSnap.data() ?? {};
+  const targetKind = String(reporteData.targetKind ?? "");
+  const targetId = String(reporteData.targetId ?? "");
+  const targetOwnerUid = String(reporteData.targetOwnerUid ?? "");
+  const reporterUid = String(reporteData.reporterUid ?? "");
+
+  // -------------------------------------------------------------------
+  // PASO 1 — resolver que hay que hacer. Puede tirar; si tira, no se
+  // escribio nada todavia.
+  // -------------------------------------------------------------------
+  let removedContent: string | null = null;
+  let redactPath: string | null = null;
+  let redactField: string | null = null;
+
+  if (action === "contentRemoved") {
+    // "Retirar contenido" no aplica a una persona: para eso esta
+    // userSuspended. Redactar el displayName de alguien en silencio es peor
+    // que fallar ruidoso.
+    if (targetKind === "profile") {
+      throw new HttpsError(
+        "invalid-argument",
+        "contentRemoved no aplica a un reporte de perfil: usa userSuspended " +
+        "para dar de baja la cuenta.",
+      );
+    }
+
+    const path = resolveContentPath({
+      targetKind, targetId, reporterUid, targetOwnerUid,
+    });
+    const field = REDACTABLE_FIELD[targetKind];
+    if (!path || !field) {
+      throw new HttpsError(
+        "failed-precondition",
+        "No se pudo ubicar el contenido de este reporte (targetKind: " +
+        `${targetKind || "desconocido"}).`,
+      );
+    }
+
+    const contenido = await db.doc(path).get();
+    if (!contenido.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        `El contenido reportado ya no existe (${path}).`,
+      );
+    }
+
+    removedContent = String(contenido.get(field) ?? "");
+    redactPath = path;
+    redactField = field;
+  } else if (action === "userSuspended") {
+    // El uid sale del reporte, nunca del input del cliente.
+    if (targetOwnerUid === moderatorUid) {
+      throw new HttpsError(
+        "invalid-argument",
+        "No te podes dar de baja a vos mismo.",
+      );
+    }
+
+    const target = await getAuth(app).getUser(targetOwnerUid).catch(
+      (err: { code?: string }) => {
+        if (err?.code === "auth/user-not-found" ||
+            err?.code === "auth/invalid-uid") {
+          return null;
+        }
+        throw err;
+      },
+    );
+    if (!target) {
+      throw new HttpsError(
+        "failed-precondition",
+        "El usuario de este reporte ya no existe.",
+      );
+    }
+    // Sin este guard, el primer moderador que se enoje desarma al equipo.
+    if (target.customClaims?.moderator === true) {
+      throw new HttpsError(
+        "permission-denied",
+        "No podes dar de baja a otro moderador.",
+      );
+    }
+  }
+
+  // -------------------------------------------------------------------
+  // PASO 2 — audit_log ANTES de mutar. Ver el docstring de arriba.
+  // -------------------------------------------------------------------
+  if (action !== "none") {
+    await db.collection("audit_log").doc(`moderation__${reportId}`).set({
+      kind: "moderation",
+      reportId,
+      moderatorUid,
+      action,
+      status,
+      targetKind,
+      targetOwnerUid,
+      // El original, SOLO cuando `contentRemoved` lo redacta. Sin esto no
+      // hay apelacion posible y la redaccion es irreversible.
+      removedContent,
+      at: new Date(),
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // PASO 3 — ejecutar de verdad.
+  // -------------------------------------------------------------------
+  if (action === "contentRemoved" && redactPath && redactField) {
+    await db.doc(redactPath).update({ [redactField]: "" });
+  } else if (action === "userSuspended") {
+    await getAuth(app).updateUser(targetOwnerUid, { disabled: true });
+  } else if (action === "userWarned") {
+    // Sin el contenido reportado, sin el motivo textual del denunciante y
+    // sin nada que identifique a quien reporto — mismo criterio que
+    // `notify-report-created.ts:9-17`.
+    await enqueueMail(app, {
+      toUid: targetOwnerUid,
+      kind: "moderation-user-warned",
+      scope: reportId,
+      params: {},
+    });
+  }
+
+  // -------------------------------------------------------------------
+  // PASO 4 — recien aca se marca resuelto.
+  // -------------------------------------------------------------------
   await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
     {
       status,
@@ -453,7 +625,8 @@ export const markReportViewed = onCall({ region: REGION }, async (req) => {
 
 export const resolveReport = onCall({ region: REGION }, async (req) => {
   const uid = assertModerator(req);
-  return resolveReportHandler(getFirestore(), uid, req.data ?? {});
+  const app = ensureApp();
+  return resolveReportHandler(getFirestore(app), app, uid, req.data ?? {});
 });
 
 export const moderationStats = onCall({ region: REGION }, async (req) => {
