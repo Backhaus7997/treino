@@ -36,7 +36,10 @@
 #     de athlete-paywall-sessions.test.js — los únicos cuyo fixture, a
 #     propósito, NO siembra el doc que el `get()` va a buscar.
 #
-#     En esta máquina el JDK 21 YA ESTÁ (Homebrew). El comando correcto:
+#     En esta máquina el JDK 21 YA ESTÁ (Homebrew). **Ya no hay que anteponerlo
+#     a mano**: este script busca un JDK 21 cuando el del PATH no sirve, y
+#     `/opt/homebrew/opt/openjdk@21` es una de las rutas que mira. Ver
+#     `lib/java21.sh`. Antes acá decía:
 #
 #       JAVA_HOME=/opt/homebrew/opt/openjdk@21 \
 #       PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH \
@@ -71,6 +74,20 @@ if [[ ! -f "${RULES_TEST_DIR}/rules.test.js" ]]; then
   echo "Create it first (see companion JS suite)."
   exit 1
 fi
+
+# --- Java 21+, que firebase-tools 15+ exige ----------------------------------
+#
+# Esto es un NO-OP en CI: el job `rules-test` corre en ubuntu con un JDK 21 del
+# runner, y `asegurar_java21` retorna en su primera línea sin tocar nada. Sólo
+# actúa en las máquinas de desarrollo donde el `java` del PATH es viejo.
+#
+# Antes vivía como una receta escrita a mano en el comentario de arriba —el
+# `JAVA_HOME=/opt/homebrew/opt/openjdk@21` de la línea 41—. Una receta en un
+# comentario hay que encontrarla, copiarla y volver a pegarla cada vez que se
+# abre una terminal; el script la ejecuta solo.
+# shellcheck source=lib/java21.sh
+source "${SCRIPT_DIR}/lib/java21.sh"
+asegurar_java21 || exit 1
 
 # --- run via firebase emulators:exec -----------------------------------------
 #
