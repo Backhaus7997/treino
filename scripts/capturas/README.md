@@ -44,9 +44,21 @@ migrar, corré los siete contra el emulador y mirá que impriman lo de siempre.
 ## Receta completa
 
 ```bash
+# 0. Deps de scripts/. En un clone nuevo NO las instala nadie: ni
+#    `bootstrap.sh` ni `emulator.sh` tocan `scripts/package.json`, y sin esto
+#    los siete scripts fallan con MODULE_NOT_FOUND. `ci` y no `install`:
+#    la versión del lockfile es la que CI prueba (ver la trampa de más arriba).
+npm --prefix scripts ci
+
 # 1. Emulador. Desde el #1214 se busca el JDK 21 solo (`scripts/lib/java21.sh`),
 #    así que no hace falta exportar JAVA_HOME a mano — con Java 17 en el PATH
 #    firebase-tools 15 no arranca y antes había que pasárselo.
+#
+#    ⚠️ CON REGLAS. Si `firestore.deploy.rules` no existe, el emulador avisa
+#    «will default to allowing all reads and writes» y sigue — y ahí las
+#    capturas salen mostrando datos que un usuario real NO ve (le pasó a la
+#    06: «ENTRENARON HOY» con filas que las reglas deniegan). Generalo primero:
+node scripts/strip_rules.js
 SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 
 # 2. Semilla base del repo

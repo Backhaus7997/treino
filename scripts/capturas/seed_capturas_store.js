@@ -181,6 +181,21 @@ function diasDelMes(atras, n) {
       pausedAt: null,
       sharedWithTrainer: true,
     }, { merge: true });
+
+    // El grant REAL, que es lo que miran las reglas. `sharedWithTrainer: true`
+    // en el vínculo es sólo la intención: `firestore.rules` deja al PF leer
+    // las sesiones de un alumno si existe `session_shares/{athleteId}` y su
+    // `trainerId` es el suyo (regla de `match /sessions/`). Sin este doc, el
+    // dashboard pide las sesiones y se come un permission-denied.
+    //
+    // Sin esto, «ENTRENARON HOY» salía VACÍO con las reglas puestas y lleno
+    // con el emulador sin reglas — que es como se sacó la primera tanda de
+    // capturas, y por eso la 06 mostraba filas que un PF real no ve. El seed
+    // base sólo otorga `seed-athlete-001`, y el de `seed-athlete-003` apunta a
+    // `seed-coach-002`: va `{ merge: true }` para pisarle el trainerId.
+    bl.set(db.collection('session_shares').doc(a), {
+      trainerId: COACH,
+    }, { merge: true });
   });
   await bl.commit();
 

@@ -34,7 +34,15 @@ const COACH = 'seed-coach-001';
 
 // Importes en pesos, en el orden en que se asignan a los alumnos encontrados.
 const IMPORTES = [32000, 32000];
-const CONCEPTOS = ['Plan mensual · Septiembre', 'Plan mensual · Septiembre'];
+
+// El concepto se DERIVA del mes en curso, no se escribe a mano. Con el literal
+// «Plan mensual · Septiembre» puesto, cualquier regeneración de octubre en
+// adelante mostraba un `periodKey` correcto y un concepto con el mes viejo —
+// una captura de tienda que se contradice sola.
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+  'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const mesEnCurso = MESES[new Date().getMonth()];
+const CONCEPTO = `Plan mensual · ${mesEnCurso[0].toUpperCase()}${mesEnCurso.slice(1)}`;
 
 (async () => {
   // 1. Borrar lo que sembró una corrida anterior.
@@ -104,7 +112,7 @@ const CONCEPTOS = ['Plan mensual · Septiembre', 'Plan mensual · Septiembre'];
       trainerId: COACH,
       athleteId,
       amountArs: IMPORTES[i],
-      concept: CONCEPTOS[i],
+      concept: CONCEPTO,
       status: 'pending',
       periodKey: `${ahora.getUTCFullYear()}-${String(ahora.getUTCMonth() + 1).padStart(2, '0')}`,
       createdAt: T.fromDate(ahora),
