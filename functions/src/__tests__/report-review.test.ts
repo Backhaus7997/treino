@@ -93,6 +93,41 @@ async function sembrarReporte(
   });
 }
 
+/**
+ * Envuelve `db` para que la escritura de `audit_log` (el PASO 2 de
+ * `resolveReportHandler`) dispare, justo antes de completarse, una edicion
+ * REAL sobre otro documento — el autor editando su propio contenido en la
+ * misma ventana que describe el commit 00472767.
+ *
+ * No es un mock de Firestore: el UNICO punto que se intercepta es el
+ * `.set()` de `audit_log`, y lo que hace antes de dejarlo pasar es una
+ * escritura de verdad contra el emulador (`interferir`). Todo lo demas
+ * (`.doc()`, y `.collection()` para cualquier otro nombre) va directo al
+ * `db` real, sin envolver nada — por eso el `lastUpdateTime` que el PASO 1
+ * ya capturo queda viejo DE VERDAD, y la precondicion del PASO 3 falla por
+ * su cuenta, no porque el test la haya forzado.
+ */
+function dbConCarrera(
+  real: Firestore,
+  interferir: () => Promise<unknown>,
+): Firestore {
+  const wrapped = {
+    doc: (path: string) => real.doc(path),
+    collection: (name: string) => {
+      if (name !== "audit_log") return real.collection(name);
+      return {
+        doc: (id: string) => ({
+          set: async (data: FirebaseFirestore.DocumentData) => {
+            await interferir();
+            return real.collection("audit_log").doc(id).set(data);
+          },
+        }),
+      };
+    },
+  };
+  return wrapped as unknown as Firestore;
+}
+
 describe("assertModerator", () => {
   it("sin auth, permission-denied", () => {
     expect(() => assertModerator(req())).toThrow(HttpsError);
@@ -481,6 +516,56 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
         }),
       ).rejects.toThrow(HttpsError);
 
+      const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+      expect(rev.exists).toBe(false);
+    });
+
+    it("si el autor edita entre leer y redactar, tira aborted, NO redacta y el reporte sigue en la cola", async () => {
+      // Commit 00472767: entre el PASO 1 (lee el contenido para
+      // audit_log) y el PASO 3 (lo redacta) no habia precondicion, y el
+      // autor puede editar lo suyo mientras tanto (firestore.rules:4366
+      // deja actualizar una resena). Este test fuerza esa ventana de
+      // verdad, sin mockear Firestore ni forzar el codigo 9 a mano.
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-race-1",
+        targetOwnerUid: "owner-race-1",
+      });
+      await db.collection("posts").doc("post-race-1").set({
+        text: "texto que el moderador miro",
+      });
+      extraCleanupPaths.push("posts/post-race-1", "audit_log/moderation__r1");
+
+      const conCarrera = dbConCarrera(db, async () => {
+        // El autor edita SU contenido justo en la ventana entre el PASO 1
+        // (que ya leyo "texto que el moderador miro") y el PASO 3 (que
+        // todavia no corrio). Escritura real contra el emulador, no un
+        // efecto simulado.
+        await db.collection("posts").doc("post-race-1").update({
+          text: "texto nuevo que escribio el autor",
+        });
+      });
+
+      let error: unknown;
+      try {
+        await resolveReportHandler(conCarrera, app, "mod1", {
+          reportId: "r1", status: "actioned", action: "contentRemoved",
+        });
+      } catch (e) {
+        error = e;
+      }
+
+      // 1. tira aborted.
+      expect(error).toBeInstanceOf(HttpsError);
+      expect((error as HttpsError).code).toBe("aborted");
+      expect((error as HttpsError).message).toMatch(/cambio mientras lo revisabas/);
+
+      // 2. el contenido NO quedo redactado — conserva el texto NUEVO, el
+      // que escribio el autor durante la carrera.
+      const post = await db.collection("posts").doc("post-race-1").get();
+      expect(post.get("text")).toBe("texto nuevo que escribio el autor");
+
+      // 3. report_reviews NO quedo marcado resuelto — el reporte sigue en
+      // la cola. Es la diferencia entre "fallo" y "fallo mintiendo".
       const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
       expect(rev.exists).toBe(false);
     });
