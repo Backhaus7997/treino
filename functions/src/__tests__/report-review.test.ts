@@ -18,6 +18,7 @@ import {
   listPendingReportsHandler,
   moderationStatsHandler,
   resolveReportHandler,
+  extractStoragePath,
   REVIEWS_COLLECTION,
 } from "../moderation/report-review";
 import { dedupeKey } from "../mail/enqueue-mail";
@@ -124,6 +125,49 @@ function dbConCarrera(
         }),
       };
     },
+    // PASO 0 de resolveReportHandler reclama el reporte con una transaccion
+    // ANTES de llegar a nada de lo de arriba. Sin este passthrough, este
+    // wrapper (que no implementaba runTransaction) rompe con "is not a
+    // function" antes de que la carrera que este helper simula llegue a
+    // importar.
+    runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
+      real.runTransaction(fn),
+  };
+  return wrapped as unknown as Firestore;
+}
+
+/**
+ * Envuelve `db` para que la escritura a `mail_queue` (PASO 3 de
+ * `resolveReportHandler`, accion `userWarned`) tire un error REAL en vez de
+ * escribir — simula, por ejemplo, que Firestore rechaza el `.create()`.
+ *
+ * Mismo truco que `dbConCarrera`: solo se intercepta esa coleccion puntual,
+ * todo lo demas (incluida `runTransaction`, que PASO 0 necesita) va al `db`
+ * real sin envolver nada.
+ *
+ * El codigo del error es 14 (UNAVAILABLE), a proposito distinto de
+ * ALREADY_EXISTS (6): si fuera 6, `enqueueWarningMailOrThrow` lo tragaria
+ * como dedupe esperado, que es precisamente el caso que este test NO quiere
+ * simular.
+ */
+function dbConEscrituraDeMailQueFalla(real: Firestore): Firestore {
+  const wrapped = {
+    doc: (path: string) => real.doc(path),
+    collection: (name: string) => {
+      if (name !== MAIL_QUEUE_COLLECTION) return real.collection(name);
+      return {
+        doc: () => ({
+          create: async () => {
+            const err = new Error("simulated Firestore write failure") as
+              Error & { code?: number };
+            err.code = 14;
+            throw err;
+          },
+        }),
+      };
+    },
+    runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
+      real.runTransaction(fn),
   };
   return wrapped as unknown as Firestore;
 }
@@ -578,7 +622,16 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
         uid: targetOwnerUid, email: `${targetOwnerUid}@test.com`,
       });
       extraCleanupUids.push(targetOwnerUid);
-      await sembrarReporte("r1", 3600_000, { targetKind: "post", targetOwnerUid });
+      // El autor tiene que derivarse del CONTENIDO (P1-A): sin este post,
+      // deriveContentOwnerUid no encuentra nada que leer y userSuspended
+      // tira failed-precondition en vez de suspender a nadie.
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-suspend-1", targetOwnerUid,
+      });
+      await db.collection("posts").doc("post-suspend-1").set({
+        text: "x", authorUid: targetOwnerUid,
+      });
+      extraCleanupPaths.push("posts/post-suspend-1");
 
       await resolveReportHandler(db, app, "mod1", {
         reportId: "r1", status: "actioned", action: "userSuspended",
@@ -589,15 +642,23 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
     });
 
     it("sobre uno mismo tira invalid-argument", async () => {
+      // El autor derivado del contenido (post-self-1.authorUid) tiene que
+      // SER "mod1" para que este test ejercite el guard de autosuspension
+      // — no el guard de "no se pudo derivar el autor", que tambien tira
+      // HttpsError y taparia lo que este test dice probar.
       await sembrarReporte("r1", 3600_000, {
-        targetKind: "post", targetOwnerUid: "mod1",
+        targetKind: "post", targetId: "post-self-1", targetOwnerUid: "mod1",
       });
+      await db.collection("posts").doc("post-self-1").set({
+        text: "x", authorUid: "mod1",
+      });
+      extraCleanupPaths.push("posts/post-self-1");
 
       await expect(
         resolveReportHandler(db, app, "mod1", {
           reportId: "r1", status: "actioned", action: "userSuspended",
         }),
-      ).rejects.toThrow(HttpsError);
+      ).rejects.toThrow(/no te podes dar de baja a vos mismo/i);
     });
 
     it("sobre otro moderador tira permission-denied y no lo deshabilita", async () => {
@@ -607,15 +668,23 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
       });
       await getAuth(app).setCustomUserClaims(otroModeradorUid, { moderator: true });
       extraCleanupUids.push(otroModeradorUid);
+      // Idem: el autor derivado tiene que ser el otro moderador, para que
+      // el guard que se ejercite sea el de "no podes dar de baja a otro
+      // moderador" y no el de derivacion fallida.
       await sembrarReporte("r1", 3600_000, {
-        targetKind: "post", targetOwnerUid: otroModeradorUid,
+        targetKind: "post", targetId: "post-othermod-1",
+        targetOwnerUid: otroModeradorUid,
       });
+      await db.collection("posts").doc("post-othermod-1").set({
+        text: "x", authorUid: otroModeradorUid,
+      });
+      extraCleanupPaths.push("posts/post-othermod-1");
 
       await expect(
         resolveReportHandler(db, app, "mod1", {
           reportId: "r1", status: "actioned", action: "userSuspended",
         }),
-      ).rejects.toThrow(HttpsError);
+      ).rejects.toThrow(/no podes dar de baja a otro moderador/i);
 
       const user = await getAuth(app).getUser(otroModeradorUid);
       expect(user.disabled).toBe(false);
@@ -697,6 +766,209 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
       const post = await db.collection("posts").doc("post-dismiss-1").get();
       expect(post.get("text")).toBe("esto no se toca");
     });
+  });
+});
+
+describe("resolveReport — P1-A: el dueno se deriva del contenido, no del reporte", () => {
+  it("userSuspended deshabilita al AUTOR REAL, no al targetOwnerUid declarado, y el audit_log guarda los dos uids", async () => {
+    // El ataque: alguien reporta un post GENUINAMENTE reportable de
+    // `autorReal`, pero escribe el uid de `uidMentido` como
+    // targetOwnerUid. firestore.rules:4622-4623 solo exige que sea un
+    // string no vacio — nunca lo ata al autor real. El moderador ve
+    // contenido que si viola las normas y aprieta "Dar de baja": sin este
+    // fix, eso deshabilitaria a la persona equivocada.
+    const autorReal = "autor-real-1";
+    const uidMentido = "pedro-mentido-1";
+    await getAuth(app).createUser({
+      uid: autorReal, email: `${autorReal}@test.com`,
+    });
+    await getAuth(app).createUser({
+      uid: uidMentido, email: `${uidMentido}@test.com`,
+    });
+    extraCleanupUids.push(autorReal, uidMentido);
+
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p1a-1", targetOwnerUid: uidMentido,
+    });
+    await db.collection("posts").doc("post-p1a-1").set({
+      text: "post genuinamente reportable", authorUid: autorReal,
+    });
+    extraCleanupPaths.push("posts/post-p1a-1", "audit_log/moderation__r1");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "userSuspended",
+    });
+
+    const real = await getAuth(app).getUser(autorReal);
+    expect(real.disabled).toBe(true);
+
+    // La persona que el denunciante trato de incriminar NUNCA se toca.
+    const pedro = await getAuth(app).getUser(uidMentido);
+    expect(pedro.disabled).toBe(false);
+
+    // La evidencia del intento queda en el audit_log: los DOS uids.
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("targetOwnerUid")).toBe(uidMentido);
+    expect(audit.get("derivedOwnerUid")).toBe(autorReal);
+  });
+
+  it("contenido inexistente + userSuspended: tira failed-precondition, nunca dar de baja a partir de un uid no verificable", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-no-existe-p1a",
+      targetOwnerUid: "cualquiera-p1a",
+    });
+    // A proposito: nunca se crea posts/post-no-existe-p1a, asi que no hay
+    // de donde derivar el autor.
+
+    await expect(
+      resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow(/no se pudo verificar el autor/i);
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.exists).toBe(false);
+  });
+});
+
+describe("resolveReport — P1-B: contentRemoved tambien limpia la media", () => {
+  it("mensaje de SOLO imagen (text vacio, media presente): contentRemoved limpia mediaUrl y el audit_log guarda la URL original", async () => {
+    const reporterUid = "rep-msg-p1b-1";
+    const targetOwnerUid = "owner-msg-p1b-1";
+    const chatId = [reporterUid, targetOwnerUid].sort().join("_");
+    const msgPath = `chats/${chatId}/messages/msg-p1b-1`;
+    const originalUrl =
+      "https://firebasestorage.googleapis.com/v0/b/x/o/chatMedia%2F" +
+      `${chatId}%2F${targetOwnerUid}%2Fmsg-p1b-1.jpg?alt=media&token=abc123`;
+
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "message", targetId: "msg-p1b-1", reporterUid, targetOwnerUid,
+    });
+    // A proposito SIN `text` (o vacio): un mensaje de solo imagen. Antes de
+    // este fix, "Contenido retirado" tenia exito sin tocar `mediaUrl`.
+    await db.doc(msgPath).set({
+      mediaUrl: originalUrl, mediaType: "image", senderId: targetOwnerUid,
+    });
+    extraCleanupPaths.push(msgPath, "audit_log/moderation__r1");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const msg = await db.doc(msgPath).get();
+    expect(msg.get("mediaUrl")).toBe("");
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("removedMediaUrl")).toBe(originalUrl);
+  });
+
+  it("sin texto ni media: contentRemoved tira en vez de tener exito silencioso", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-vacio-p1b-1",
+      targetOwnerUid: "owner-vacio-p1b-1",
+    });
+    await db.collection("posts").doc("post-vacio-p1b-1").set({
+      text: "", authorUid: "owner-vacio-p1b-1",
+    });
+    extraCleanupPaths.push("posts/post-vacio-p1b-1");
+
+    await expect(
+      resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/ni contenido multimedia/i);
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.exists).toBe(false);
+  });
+});
+
+describe("resolveReport — P1-C: un fallo real al encolar el aviso aborta la resolucion", () => {
+  it("si falla la escritura a mail_queue, la resolucion aborta y report_reviews NO queda resuelto", async () => {
+    const targetOwnerUid = "advertido-p1c-1";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p1c-1", targetOwnerUid,
+    });
+    await db.collection("posts").doc("post-p1c-1").set({
+      text: "contenido", authorUid: targetOwnerUid,
+    });
+    extraCleanupPaths.push("posts/post-p1c-1", "audit_log/moderation__r1");
+
+    const conFalloDeEscritura = dbConEscrituraDeMailQueFalla(db);
+
+    await expect(
+      resolveReportHandler(conFalloDeEscritura, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userWarned",
+      }),
+    ).rejects.toThrow();
+
+    // El reporte sigue sin resolver — no quedo marcado con el aviso
+    // perdido para siempre.
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.exists).toBe(false);
+
+    // Y nada quedo encolado (la escritura fallo de verdad, no es dedupe).
+    const id = dedupeKey("moderation-user-warned", "r1", targetOwnerUid);
+    const mail = await db.collection(MAIL_QUEUE_COLLECTION).doc(id).get();
+    expect(mail.exists).toBe(false);
+  });
+});
+
+describe("resolveReport — P1-D: no se puede resolver el mismo reporte dos veces", () => {
+  it("la segunda resolucion tira failed-precondition, y el audit_log conserva el removedContent ORIGINAL", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-double-1",
+      targetOwnerUid: "owner-double-1",
+    });
+    await db.collection("posts").doc("post-double-1").set({
+      text: "contenido original", authorUid: "owner-double-1",
+    });
+    extraCleanupPaths.push("posts/post-double-1", "audit_log/moderation__r1");
+
+    // Moderador 1: resuelve contentRemoved. El texto queda vacio y el
+    // audit_log guarda el original.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // Moderador 2, con la cola vieja: intenta resolver el MISMO reporte de
+    // nuevo. Sin el guard de PASO 0, esto leeria posts/post-double-1.text
+    // YA VACIO (por la resolucion de mod1) y lo pisaria igual —"tenia
+    // exito" sobre contenido que ya no existe como tal— y el audit_log
+    // determinístico quedaria con removedContent: "".
+    await expect(
+      resolveReportHandler(db, app, "mod2", {
+        reportId: "r1", status: "dismissed", action: "none",
+      }),
+    ).rejects.toThrow(/ya resolvio este reporte/i);
+
+    // El texto sigue vacio (de la PRIMERA resolucion, no de una segunda).
+    const post = await db.collection("posts").doc("post-double-1").get();
+    expect(post.get("text")).toBe("");
+
+    // Y la evidencia original sigue intacta: la escribio mod1, no mod2.
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("removedContent")).toBe("contenido original");
+    expect(audit.get("moderatorUid")).toBe("mod1");
+  });
+});
+
+describe("extractStoragePath", () => {
+  it("deriva el path del objeto de una URL de descarga de Firebase Storage", () => {
+    expect(
+      extractStoragePath(
+        "https://firebasestorage.googleapis.com/v0/b/x/o/" +
+        "postPhotos%2Fuid1%2Fpost1.jpg?alt=media&token=abc",
+      ),
+    ).toBe("postPhotos/uid1/post1.jpg");
+  });
+
+  it("devuelve null para una URL que no es de Firebase Storage", () => {
+    expect(extractStoragePath("https://example.com/foo.jpg")).toBeNull();
+  });
+
+  it("devuelve null para una URL malformada, sin tirar", () => {
+    expect(extractStoragePath("no-es-una-url")).toBeNull();
   });
 });
 

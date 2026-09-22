@@ -58,10 +58,13 @@
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { logger } from "firebase-functions";
 import { HttpsError, onCall, type CallableRequest } from
   "firebase-functions/v2/https";
 
-import { enqueueMail } from "../mail/enqueue-mail";
+import { dedupeKey } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION, type MailKind } from "../mail/types";
 
 const REGION = "southamerica-east1";
 
@@ -103,6 +106,43 @@ const REDACTABLE_FIELD: Record<string, string | undefined> = {
   post: "text",
   review: "comment",
   message: "text",
+};
+
+/**
+ * Campo de MEDIA a limpiar por superficie, para `contentRemoved`.
+ *
+ * Sin esto, "Contenido retirado" redacta el texto y deja la foto/video
+ * publicados: un post o mensaje de solo imagen ya tiene `text` vacio
+ * (`post_card.dart:198-200`, `chat_screen.dart:490-511`), asi que la
+ * redaccion "tenia exito" sin haber retirado nada visible — el mismo bug
+ * que este cambio vino a arreglar, visto del otro lado.
+ *
+ * `review` no tiene entrada: una resena (`review.dart`) no tiene campo de
+ * media.
+ */
+const REDACTABLE_MEDIA_FIELD: Record<string, string | undefined> = {
+  post: "photoUrl",
+  message: "mediaUrl",
+};
+
+/**
+ * Campo de AUTOR real por superficie — de donde se deriva el dueno del
+ * contenido en `deriveContentOwnerUid`. Nunca `targetOwnerUid`: lo declara
+ * el denunciante y `firestore.rules:4622-4623` solo valida que sea un
+ * string no vacio, nunca lo ata al autor real.
+ *
+ * `post.authorUid` (`post.dart`), `review.athleteId` (`review.dart` — quien
+ * ESCRIBIO el comentario, no `trainerId`, que es sobre quien es la resena),
+ * `message.senderId` (`message.dart`).
+ *
+ * `profile` no tiene entrada: el dueno de un reporte de perfil ES
+ * `targetId` (mismo criterio que documenta `resolveContentPath`), no un
+ * campo a leer de un documento.
+ */
+const OWNER_FIELD: Record<string, string | undefined> = {
+  post: "authorUid",
+  review: "athleteId",
+  message: "senderId",
 };
 
 /**
@@ -190,6 +230,46 @@ export function resolveContentPath(input: {
     // al moderador a buscar un documento que nunca estuvo ahi.
     return null;
   }
+}
+
+/**
+ * El dueno REAL del contenido reportado, segun el documento — nunca segun
+ * `targetOwnerUid`, que lo declara el denunciante.
+ *
+ * Sin esto: alguien reporta un post genuinamente reportable de Juan pero
+ * escribe el uid de Pedro; el moderador ve contenido que si viola las
+ * normas, aprieta "Dar de baja", y se deshabilita a Pedro en vez de a Juan.
+ *
+ * Devuelve `null` cuando el contenido no existe o no se puede derivar el
+ * autor — NUNCA cae de vuelta a `targetOwnerUid`. Quien llama decide que
+ * hacer con un `null` (ver `resolveReportHandler`, PASO 1).
+ */
+async function deriveContentOwnerUid(
+  db: Firestore,
+  input: {
+    targetKind: string;
+    targetId: string;
+    reporterUid: string;
+    targetOwnerUid: string;
+  },
+): Promise<string | null> {
+  const { targetKind, targetId } = input;
+
+  if (targetKind === "profile") {
+    // El `targetId` de un reporte de perfil ES el uid (mismo criterio que
+    // `resolveContentPath`), no un campo a leer de un documento.
+    return targetId || null;
+  }
+
+  const path = resolveContentPath(input);
+  const field = OWNER_FIELD[targetKind];
+  if (!path || !field) return null;
+
+  const snap = await db.doc(path).get();
+  if (!snap.exists) return null;
+
+  const uid = snap.get(field);
+  return typeof uid === "string" && uid.length > 0 ? uid : null;
 }
 
 /**
@@ -338,6 +418,89 @@ export async function markReportViewedHandler(
   });
 }
 
+/** Codigo gRPC de `ALREADY_EXISTS`. Mismo valor que usa `enqueue-mail.ts`. */
+const ALREADY_EXISTS = 6;
+
+/**
+ * Encola el mail de aviso DIRECTO contra `db`, sin pasar por `enqueueMail`.
+ *
+ * `enqueueMail` nunca tira (por diseno: no puede volar un trigger que
+ * comparte evento con FCM, ver su docstring) y devuelve `null` TANTO cuando
+ * el mail YA esta encolado (dedupe, esperado) COMO cuando la ESCRITURA A
+ * FIRESTORE FALLA (no esperado) — con esa API no hay forma de distinguir
+ * los dos casos desde el valor de retorno.
+ *
+ * Para `resolveReportHandler` eso es inaceptable: un fallo de escritura real
+ * tiene que abortar la resolucion, no marcarla resuelta con el aviso perdido
+ * para siempre. Mismo patron que `notify-report-created.ts:50-75`:
+ * `.create()` con id deterministico, y solo ALREADY_EXISTS (6) se traga —
+ * cualquier otro error se propaga.
+ *
+ * Contra `db` (el parametro del handler) y no contra `getFirestore(app)`:
+ * asi un test puede interceptar esta escritura puntual, igual que
+ * `dbConCarrera` intercepta `audit_log`.
+ */
+async function enqueueWarningMailOrThrow(
+  db: Firestore,
+  reportId: string,
+  toUid: string,
+): Promise<void> {
+  const kind: MailKind = "moderation-user-warned";
+  const id = dedupeKey(kind, reportId, toUid);
+
+  await db
+    .collection(MAIL_QUEUE_COLLECTION)
+    .doc(id)
+    .create({
+      toUid,
+      kind,
+      params: {},
+      status: "pending",
+      attempts: 0,
+      createdAt: new Date(),
+    })
+    .catch((err: { code?: number }) => {
+      if (err?.code === ALREADY_EXISTS) {
+        logger.info("resolveReport: mail de aviso ya encolado", {
+          reportId,
+          toUid,
+        });
+        return;
+      }
+      throw err;
+    });
+}
+
+/**
+ * Deriva el path de Storage (relativo al bucket) de una URL de descarga de
+ * Firebase Storage.
+ *
+ * Mismo algoritmo que `ChatMediaUploadService.extractStoragePath` del
+ * cliente (`chat_media_upload_service.dart:131-145`), portado a Node: el
+ * path del objeto viaja como UN solo segmento, urlencodeado, despues de
+ * `/o/` (`https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}`).
+ *
+ * Devuelve `null` para cualquier URL que no tenga exactamente esa forma —
+ * nunca inventa un path a partir de otra cosa. `photoUrl` y `mediaUrl` en
+ * este repo siempre vienen de `getDownloadURL()` (`post_photo_upload_service`,
+ * `chat_media_upload_service`), asi que en el caso real esto deriva; el
+ * `null` es para lo inesperado.
+ */
+export function extractStoragePath(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("firebasestorage.googleapis.com")) {
+      return null;
+    }
+    const segments = parsed.pathname.split("/").filter((s) => s.length > 0);
+    const last = segments[segments.length - 1];
+    if (!last) return null;
+    return decodeURIComponent(last);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resuelve un reporte Y EJECUTA la accion elegida.
  *
@@ -399,6 +562,35 @@ export async function resolveReportHandler(
     );
   }
 
+  // -------------------------------------------------------------------
+  // PASO 0 — reclamar el reporte ATOMICAMENTE antes de escribir el audit o
+  // ejecutar nada. Mismo patron transaccional que `markReportViewedHandler`.
+  //
+  // Sin esto, dos moderadores con la cola vieja podian resolver el MISMO
+  // reporte dos veces: el segundo `contentRemoved` leia el campo ya vacio
+  // (por la primera resolucion) y escribia `removedContent: ""` encima del
+  // original —destruyendo la unica evidencia—, y una accion distinta podia
+  // suspender a alguien despues de que otro moderador ya habia descartado
+  // el reporte.
+  //
+  // Esto cierra con certeza el caso descrito: alguien resuelve DESPUES de
+  // que otro ya termino (secuencial, aunque sea segundos despues). Una
+  // doble resolucion verdaderamente simultanea —la misma ventana de
+  // milisegundos— haria falta envolver TODO el handler en una transaccion
+  // (incluidas las llamadas a Auth y al mail queue), y eso no es lo que se
+  // pidio ni lo que este chequeo garantiza.
+  // -------------------------------------------------------------------
+  await db.runTransaction(async (tx) => {
+    const rev = await tx.get(db.collection(REVIEWS_COLLECTION).doc(reportId));
+    const yaResuelto = rev.get("status") as ReportStatus | undefined;
+    if (yaResuelto === "actioned" || yaResuelto === "dismissed") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Otro moderador ya resolvio este reporte.",
+      );
+    }
+  });
+
   // Que el reporte exista se verifica ANTES de escribir. Sin esto,
   // `report_reviews` se llena de resoluciones de reportes que no existen —
   // por un id mal tipeado o por un cliente viejo— y la cola queda mintiendo
@@ -419,9 +611,18 @@ export async function resolveReportHandler(
   // escribio nada todavia.
   // -------------------------------------------------------------------
   let removedContent: string | null = null;
+  let removedMediaUrl: string | null = null;
   let redactPath: string | null = null;
-  let redactField: string | null = null;
+  let redactUpdates: Record<string, string> | null = null;
   let redactUpdateTime: FirebaseFirestore.Timestamp | null = null;
+  // El dueno REAL del contenido, derivado del documento — nunca de
+  // `targetOwnerUid`. Ver `deriveContentOwnerUid`.
+  let derivedOwnerUid: string | null = null;
+  // Uid efectivamente usado para userSuspended/userWarned. Es
+  // `derivedOwnerUid`, nunca `targetOwnerUid` — separado en su propia
+  // variable solo para dejar explicito, en el PASO 3, que esas dos acciones
+  // NUNCA leen `targetOwnerUid` directamente.
+  let ownerUidForMutation: string | null = null;
 
   if (action === "contentRemoved") {
     // "Retirar contenido" no aplica a una persona: para eso esta
@@ -438,8 +639,8 @@ export async function resolveReportHandler(
     const path = resolveContentPath({
       targetKind, targetId, reporterUid, targetOwnerUid,
     });
-    const field = REDACTABLE_FIELD[targetKind];
-    if (!path || !field) {
+    const textField = REDACTABLE_FIELD[targetKind];
+    if (!path || !textField) {
       throw new HttpsError(
         "failed-precondition",
         "No se pudo ubicar el contenido de este reporte (targetKind: " +
@@ -455,46 +656,105 @@ export async function resolveReportHandler(
       );
     }
 
-    removedContent = String(contenido.get(field) ?? "");
+    const mediaField = REDACTABLE_MEDIA_FIELD[targetKind];
+    const textVal = String(contenido.get(textField) ?? "");
+    const mediaVal = mediaField ? String(contenido.get(mediaField) ?? "") : "";
+
+    // Ni texto ni media: no hay nada que retirar. Antes esto "tenia exito"
+    // en silencio sobre un mensaje de solo imagen (text vacio, sin campo de
+    // media mapeado) sin tocar la foto — el mismo bug que este cambio
+    // arregla, visto del otro lado: mejor fallar ruidoso que mentir que se
+    // retiro algo.
+    if (!textVal && !mediaVal) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Este reporte no tiene texto ni contenido multimedia para retirar.",
+      );
+    }
+
+    removedContent = textVal;
+    removedMediaUrl = mediaVal || null;
     redactPath = path;
-    redactField = field;
+    const updates: Record<string, string> = { [textField]: "" };
+    if (mediaField && mediaVal) updates[mediaField] = "";
+    redactUpdates = updates;
     // Precondicion para el PASO 3. Entre este `get` y la redaccion el autor
     // puede editar su propio contenido —`firestore.rules:4366` deja
     // actualizar una resena— y entonces `removedContent` guardaria un texto
     // mientras se redacta otro. El audit_log es lo que se mira en una
     // apelacion: si miente, miente exactamente donde importa.
     redactUpdateTime = contenido.updateTime ?? null;
-  } else if (action === "userSuspended") {
-    // El uid sale del reporte, nunca del input del cliente.
-    if (targetOwnerUid === moderatorUid) {
-      throw new HttpsError(
-        "invalid-argument",
-        "No te podes dar de baja a vos mismo.",
-      );
-    }
 
-    const target = await getAuth(app).getUser(targetOwnerUid).catch(
-      (err: { code?: string }) => {
-        if (err?.code === "auth/user-not-found" ||
-            err?.code === "auth/invalid-uid") {
-          return null;
-        }
-        throw err;
-      },
-    );
-    if (!target) {
+    const ownerField = OWNER_FIELD[targetKind];
+    const contentOwner = ownerField ? contenido.get(ownerField) : undefined;
+    derivedOwnerUid = typeof contentOwner === "string" && contentOwner.length > 0
+      ? contentOwner : null;
+  } else if (action === "userSuspended" || action === "userWarned") {
+    // El uid SALE DEL CONTENIDO, nunca de `targetOwnerUid`: lo declara el
+    // denunciante y `firestore.rules:4622-4623` solo valida que sea un
+    // string no vacio, nunca lo ata al autor real del post/resena/mensaje.
+    derivedOwnerUid = await deriveContentOwnerUid(db, {
+      targetKind, targetId, reporterUid, targetOwnerUid,
+    });
+    if (derivedOwnerUid === null) {
+      // Dar de baja (o avisar) a partir de un uid no verificable es
+      // exactamente lo que este arreglo existe para impedir.
       throw new HttpsError(
         "failed-precondition",
-        "El usuario de este reporte ya no existe.",
+        "No se pudo verificar el autor de este contenido (targetKind: " +
+        `${targetKind || "desconocido"}); no se puede ejecutar ${action} a ` +
+        "partir de un uid no verificable.",
       );
     }
-    // Sin este guard, el primer moderador que se enoje desarma al equipo.
-    if (target.customClaims?.moderator === true) {
-      throw new HttpsError(
-        "permission-denied",
-        "No podes dar de baja a otro moderador.",
+    ownerUidForMutation = derivedOwnerUid;
+
+    if (action === "userSuspended") {
+      if (ownerUidForMutation === moderatorUid) {
+        throw new HttpsError(
+          "invalid-argument",
+          "No te podes dar de baja a vos mismo.",
+        );
+      }
+
+      const target = await getAuth(app).getUser(ownerUidForMutation).catch(
+        (err: { code?: string }) => {
+          if (err?.code === "auth/user-not-found" ||
+              err?.code === "auth/invalid-uid") {
+            return null;
+          }
+          throw err;
+        },
       );
+      if (!target) {
+        throw new HttpsError(
+          "failed-precondition",
+          "El usuario de este reporte ya no existe.",
+        );
+      }
+      // Sin este guard, el primer moderador que se enoje desarma al equipo.
+      if (target.customClaims?.moderator === true) {
+        throw new HttpsError(
+          "permission-denied",
+          "No podes dar de baja a otro moderador.",
+        );
+      }
     }
+  }
+
+  // Un mismatch entre lo declarado y lo derivado es señal de un reporte
+  // malicioso — el denunciante escribio un `targetOwnerUid` que no es el
+  // autor real del contenido. No aborta la operacion: el contenido
+  // reportado es real y hay que poder actuar sobre el. Pero tiene que
+  // quedar visible para quien opera (el log) y en la evidencia (el audit).
+  if (derivedOwnerUid !== null && derivedOwnerUid !== targetOwnerUid) {
+    logger.warn(
+      "resolveReport: targetOwnerUid declarado no coincide con el autor " +
+      "real del contenido — posible reporte malicioso",
+      {
+        reportId, targetKind, action,
+        declaredOwnerUid: targetOwnerUid, derivedOwnerUid,
+      },
+    );
   }
 
   // -------------------------------------------------------------------
@@ -508,10 +768,14 @@ export async function resolveReportHandler(
       action,
       status,
       targetKind,
+      // Declarado por el denunciante Y derivado del contenido — evidencia
+      // de un posible mismatch (ver el `logger.warn` de arriba).
       targetOwnerUid,
+      derivedOwnerUid,
       // El original, SOLO cuando `contentRemoved` lo redacta. Sin esto no
       // hay apelacion posible y la redaccion es irreversible.
       removedContent,
+      removedMediaUrl,
       at: new Date(),
     });
   }
@@ -519,10 +783,10 @@ export async function resolveReportHandler(
   // -------------------------------------------------------------------
   // PASO 3 — ejecutar de verdad.
   // -------------------------------------------------------------------
-  if (action === "contentRemoved" && redactPath && redactField) {
+  if (action === "contentRemoved" && redactPath && redactUpdates) {
     try {
       await db.doc(redactPath).update(
-        { [redactField]: "" },
+        redactUpdates,
         redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
       );
     } catch (err) {
@@ -544,18 +808,52 @@ export async function resolveReportHandler(
       }
       throw err;
     }
-  } else if (action === "userSuspended") {
-    await getAuth(app).updateUser(targetOwnerUid, { disabled: true });
-  } else if (action === "userWarned") {
+
+    // Storage: BEST-EFFORT. La UI ya deja de mostrar el media apenas se
+    // limpia el campo de arriba —eso es lo que resuelve "la imagen sigue
+    // visible"—, asi que esto es defensa en profundidad (la URL vieja, con
+    // su token, nunca evalua storage.rules) y su fallo NUNCA aborta la
+    // resolucion.
+    if (removedMediaUrl) {
+      const storagePath = extractStoragePath(removedMediaUrl);
+      if (!storagePath) {
+        logger.warn(
+          "resolveReport: no se pudo derivar el path de Storage de la URL " +
+          "— solo se limpio la referencia en Firestore, el objeto puede " +
+          "seguir en el bucket",
+          { reportId, mediaUrl: removedMediaUrl },
+        );
+      } else {
+        try {
+          await getStorage(app).bucket().file(storagePath).delete();
+          logger.info("resolveReport: objeto de Storage borrado", {
+            reportId, storagePath,
+          });
+        } catch (err) {
+          const code = (err as { code?: number }).code;
+          if (code === 404) {
+            logger.info(
+              "resolveReport: el objeto de Storage ya no existia",
+              { reportId, storagePath },
+            );
+          } else {
+            logger.warn(
+              "resolveReport: no se pudo borrar el objeto de Storage — " +
+              "solo se limpio la referencia en Firestore",
+              { reportId, storagePath, error: err },
+            );
+          }
+        }
+      }
+    }
+  } else if (action === "userSuspended" && ownerUidForMutation) {
+    await getAuth(app).updateUser(ownerUidForMutation, { disabled: true });
+  } else if (action === "userWarned" && ownerUidForMutation) {
     // Sin el contenido reportado, sin el motivo textual del denunciante y
     // sin nada que identifique a quien reporto — mismo criterio que
-    // `notify-report-created.ts:9-17`.
-    await enqueueMail(app, {
-      toUid: targetOwnerUid,
-      kind: "moderation-user-warned",
-      scope: reportId,
-      params: {},
-    });
+    // `notify-report-created.ts:9-17`. Un fallo real ACA tira (ver
+    // `enqueueWarningMailOrThrow`) y aborta la resolucion.
+    await enqueueWarningMailOrThrow(db, reportId, ownerUidForMutation);
   }
 
   // -------------------------------------------------------------------
