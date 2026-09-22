@@ -33,6 +33,13 @@ sesión.
 > queda es **declararla en Play Console**, que es un trámite de consola, no de
 > producto.
 
+**Borrado de datos puntuales, sin cerrar la cuenta:** podés pedirlo
+escribiendo a treino@gettreino.com, con el correo de tu cuenta, y respondemos
+dentro de los 5 días hábiles (art. 16 de la Ley 25.326, ver sección 5). Dos
+casos son más rápidos porque los resolvés vos mismo desde la app: una
+publicación propia, desde el menú de la publicación, y una medición que
+hayas cargado vos, desde tu pantalla de medidas.
+
 ---
 
 ## 2. Qué se elimina
