@@ -256,6 +256,35 @@ async function llamarCallable(token) {
   return j.result;
 }
 
+/**
+ * Si un hostname es REALMENTE de Mercado Pago.
+ *
+ * ── Por qué no alcanza con `endsWith` ──
+ *
+ * Acá decía `hostname.endsWith("mercadopago.com")`, y eso da **true** para
+ * `fake-mercadopago.com`: el sufijo puede venir precedido por cualquier cosa.
+ * Lo marcó CodeQL como `js/incomplete-url-substring-sanitization`, severidad
+ * alta, y tenía razón.
+ *
+ * El error de fondo no es el operador: es validar la FORMA del valor en vez de
+ * compararlo contra una lista. Es exactamente lo que `src/lib/destinos.ts` de
+ * la landing existe para no hacer con el `?next=`.
+ *
+ * Por eso: igualdad exacta contra los dominios conocidos, o subdominio con el
+ * PUNTO adelante —`auth.mercadopago.com.ar` sí, `evilmercadopago.com.ar` no—.
+ * El punto es lo único que separa un subdominio de un prefijo arbitrario.
+ *
+ * Que acá el valor venga de una respuesta de MP y no de un usuario no cambia
+ * nada: una aserción que se puede satisfacer con un host ajeno no está
+ * verificando lo que dice verificar.
+ */
+const DOMINIOS_DE_MP = ["mercadopago.com.ar", "mercadopago.com"];
+
+function esHostDeMercadoPago(hostname) {
+  const h = String(hostname).toLowerCase();
+  return DOMINIOS_DE_MP.some((d) => h === d || h.endsWith(`.${d}`));
+}
+
 async function main() {
   console.log(`\nVerificando el checkout del alumno — ciclo ${CICLO}\n`);
 
@@ -274,8 +303,7 @@ async function main() {
   } catch {
     fallar(`el init_point no es una URL: ${init}`);
   }
-  if (!destino.hostname.endsWith("mercadopago.com.ar") &&
-      !destino.hostname.endsWith("mercadopago.com")) {
+  if (!esHostDeMercadoPago(destino.hostname)) {
     fallar(`el init_point NO apunta a Mercado Pago: ${destino.hostname}`);
   }
   ok(`init_point de Mercado Pago: ${destino.origin}${destino.pathname}`);
