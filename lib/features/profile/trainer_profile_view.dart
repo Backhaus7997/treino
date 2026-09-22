@@ -63,7 +63,32 @@ class TrainerProfileView extends ConsumerWidget {
     final isVisible = pub != null;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+      // El inset inferior SUMA `MediaQuery.paddingOf(context).bottom`, no es
+      // un 28 fijo.
+      //
+      // El shell corre con `extendBody: true`, así que el `Scaffold` no le
+      // resta al body el alto de la barra flotante: lo publica en
+      // `padding.bottom` (margen + 8 + alto animado ≈ 94-114 con un home
+      // indicator de 34 — ver el dartdoc de `TreinoBottomBar`). Con 28 fijos
+      // el último ítem de esta lista quedaba DEBAJO del vidrio al final del
+      // scroll, sin forma de despejarlo.
+      //
+      // Y el último ítem es «Eliminar cuenta», que existe para cumplir el
+      // Apple Guideline 5.1.1(v) (ver el comentario de su `_MenuRow`). Medido
+      // en el simulador de iPhone 6.5" con `content_size
+      // accessibility-extra-large`: al tope del scroll el botón se leía
+      // A TRAVÉS de la barra y no había más scroll. A tamaño de texto normal
+      // la pantalla entra entera y el bug no se ve, que es por lo que
+      // sobrevivió.
+      //
+      // Es el mismo patrón del #830, y la rama de atleta
+      // (`profile_screen.dart`) ya lo hacía bien.
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        28 + MediaQuery.paddingOf(context).bottom,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         // Header — TU CUENTA / YO
