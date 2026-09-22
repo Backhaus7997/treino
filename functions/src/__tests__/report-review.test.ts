@@ -770,7 +770,7 @@ describe("resolveReport — ejecuta la accion de verdad", () => {
 });
 
 describe("resolveReport — P1-A: el dueno se deriva del contenido, no del reporte", () => {
-  it("userSuspended deshabilita al AUTOR REAL, no al targetOwnerUid declarado, y el audit_log guarda los dos uids", async () => {
+  it("userSuspended deshabilita al AUTOR REAL, no al declarado; audit_log guarda los dos uids", async () => {
     // El ataque: alguien reporta un post GENUINAMENTE reportable de
     // `autorReal`, pero escribe el uid de `uidMentido` como
     // targetOwnerUid. firestore.rules:4622-4623 solo exige que sea un
@@ -812,7 +812,7 @@ describe("resolveReport — P1-A: el dueno se deriva del contenido, no del repor
     expect(audit.get("derivedOwnerUid")).toBe(autorReal);
   });
 
-  it("contenido inexistente + userSuspended: tira failed-precondition, nunca dar de baja a partir de un uid no verificable", async () => {
+  it("contenido inexistente + userSuspended: falla, no dar de baja con uid no verificable", async () => {
     await sembrarReporte("r1", 3600_000, {
       targetKind: "post", targetId: "post-no-existe-p1a",
       targetOwnerUid: "cualquiera-p1a",
@@ -832,7 +832,7 @@ describe("resolveReport — P1-A: el dueno se deriva del contenido, no del repor
 });
 
 describe("resolveReport — P1-B: contentRemoved tambien limpia la media", () => {
-  it("mensaje de SOLO imagen (text vacio, media presente): contentRemoved limpia mediaUrl y el audit_log guarda la URL original", async () => {
+  it("mensaje de SOLO imagen: contentRemoved limpia mediaUrl y audit_log guarda la URL original", async () => {
     const reporterUid = "rep-msg-p1b-1";
     const targetOwnerUid = "owner-msg-p1b-1";
     const chatId = [reporterUid, targetOwnerUid].sort().join("_");
