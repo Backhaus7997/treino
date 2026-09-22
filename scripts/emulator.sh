@@ -13,9 +13,13 @@ set -euo pipefail
 # los calcula functions/src/ranking-aggregate.ts; sin el emulador de functions
 # esos rankings quedaban siempre vacíos aunque el alumno estuviera adentro (#365).
 #
-# Requisitos (solo para el modo con Functions):
-#   - Java 21+  — el emulador de firebase-tools 15+ no arranca con Java 17.
-#   - Deps de functions instaladas:  (cd functions && npm install)
+# Requisitos:
+#   - Java 21+  — lo exige firebase-tools 15+ para CUALQUIER emulador, no sólo
+#     para el de Functions. **Ya no hace falta resolverlo a mano**: este script
+#     busca un JDK 21 si el del PATH no sirve (ver `lib/java21.sh`). Android
+#     Studio trae el suyo y es el primero de la lista.
+#   - Deps de functions instaladas (sólo para el modo con Functions):
+#     (cd functions && npm install)
 #
 # Modo liviano (solo Firestore + Auth, sin compilar TS ni tocar functions/):
 #   SKIP_FUNCTIONS=1 ./scripts/emulator.sh
@@ -57,6 +61,18 @@ set -euo pipefail
 # `emulators:start` no toca la red de los servicios emulados, así que nombrar
 # treino-dev acá no alcanza producción. Lo que alcanzaba producción era el
 # default, y el default ya no puede.
+
+# Java 21+, que `firebase-tools` 15+ exige para cualquier emulador.
+#
+# Va ANTES del branch de SKIP_FUNCTIONS a propósito: ese camino también levanta
+# Firestore y Auth, y los dos son Java. Ponerlo abajo dejaba al modo liviano
+# —el que usa quien no quiere compilar TypeScript— chocándose igual.
+#
+# `asegurar_java21` no hace NADA si el `java` del PATH ya sirve, así que esto no
+# cambia el comportamiento en ninguna máquina donde hoy funcione.
+# shellcheck source=lib/java21.sh
+source "$(dirname "$0")/lib/java21.sh"
+asegurar_java21 || exit 1
 
 if [ "${SKIP_FUNCTIONS:-0}" = "1" ]; then
   echo "SKIP_FUNCTIONS=1 -> Firestore + Auth solamente (sin Functions)."
