@@ -402,6 +402,86 @@ async function funcionesConCodigoViejo(eps, token, project) {
   return viejas;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  Cuándo una huérfana deja de ser un estado y pasa a ser podredumbre
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// El mensaje de la guarda de huérfanas dice —bien— que hay DOS lecturas:
+// "falta mergear la rama que las trae" o "hay que borrarlas a mano". La
+// primera es legítima y TRANSITORIA. La segunda es un endpoint corriendo sin
+// fuente auditable.
+//
+// Lo único que separa una de la otra es el TIEMPO. Una rama que todavía no se
+// mergeó lleva horas, o un par de días. Una que lleva una semana desplegada y
+// sin mergear no se está por mergear: está muerta, y la función que dejó viva
+// hay que borrarla. Las dos lecturas terminan en la misma acción.
+//
+// Siete días porque es una semana entera: entra un fin de semana largo, una
+// licencia corta, y el ciclo de review más lento que este repo tolera. Si a
+// los siete días la rama sigue sin mergear, el problema ya no es el timing.
+const DIAS_DE_GRACIA_HUERFANA = 7;
+
+/**
+ * Hace cuántos días una función quedó huérfana, o `null` si no se pudo datar.
+ *
+ * ── Por qué NO alcanza con `updateTime` ──
+ *
+ * `updateTime` es cuándo se deployó por última vez, no cuándo quedó huérfana.
+ * Para los dos caminos que crean una huérfana da resultados distintos:
+ *
+ *   · Deployada desde una rama sin mergear → nació huérfana. `updateTime` ES
+ *     la fecha de orfandad. Exacto.
+ *   · Su declaración se borró del código (el caso `rcWebhook`, #1206) → vivió
+ *     declarada y legítima un montón de tiempo antes de quedar huérfana.
+ *     `updateTime` puede ser de hace meses y la orfandad de ayer.
+ *
+ * Usar `updateTime` solo en el segundo caso haría que el deploy siguiente al
+ * merge del PR que borra una función CORTE, por algo que pasó hace una hora.
+ * Eso es exactamente la guarda que el equipo aprende a saltear un viernes.
+ *
+ * ── De dónde sale la fecha buena ──
+ *
+ * `git log -S<nombre>` devuelve el último commit donde CAMBIÓ la cantidad de
+ * apariciones de ese nombre en `functions/src`. Si la función se borró, ése es
+ * el commit que la borró: la fecha exacta en que quedó huérfana. Si el nombre
+ * nunca existió en esta historia —la rama sin mergear— no devuelve nada, y ahí
+ * `updateTime` sí es la respuesta correcta.
+ *
+ * Se toma el MÁXIMO de las dos: si una función se borró del código y DESPUÉS
+ * alguien la redeployó desde una rama, la orfandad vigente arranca en el
+ * redeploy. Y el máximo siempre empuja la fecha hacia adelante, o sea hacia
+ * MENOS días, o sea hacia no cortar. Cuando el instrumento duda, afloja.
+ *
+ * ── Los bordes, dichos en voz alta ──
+ *
+ * El pickaxe cuenta apariciones en todo `functions/src`, no sólo el export: si
+ * un test que nombra la función se tocó después del borrado, gana esa fecha
+ * más nueva. Vuelve a errar hacia menos días. Es una heurística para una
+ * FECHA, no para decidir si hay huérfana —eso ya está decidido comparando la
+ * API contra los endpoints compilados, que no es heurístico.
+ */
+function diasHuerfana(nombre, updateTime) {
+  let borrado = null;
+  try {
+    // `execFileSync` y no `execSync`: sin shell no hay nada que escapar, y
+    // `nombre` viene de la API de Google, no de este repo.
+    borrado = require("child_process")
+      .execFileSync(
+        "git",
+        ["log", "-1", "--format=%cI", `-S${nombre}`, "--", "functions/src"],
+        { cwd: ROOT, encoding: "utf8" },
+      )
+      .trim();
+  } catch {
+    // Sin git, o un checkout sin historia: nos queda `updateTime`.
+  }
+  const fechas = [borrado, updateTime]
+    .map((t) => (t ? new Date(t).getTime() : NaN))
+    .filter((t) => Number.isFinite(t));
+  if (!fechas.length) return null;
+  return Math.floor((Date.now() - Math.max(...fechas)) / 86_400_000);
+}
+
 /**
  * La firma de un índice, para poder comparar los dos lados.
  *
@@ -420,6 +500,48 @@ function firmaDeIndice(i) {
   return `${i.collectionGroup}: ${campos.join(", ")}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  Los avisos que no cortan, pero que no se pueden perder en el scroll
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// El 2026-09-21, al mergear #1206 y deployar, `rcWebhook` quedó viva en
+// producción sin una línea de código en `main`: un endpoint HTTP público sin
+// fuente auditable. La guarda de huérfanas de más abajo CORRIÓ en ese deploy e
+// imprimió el aviso correcto. No sirvió de nada.
+//
+// El bug no era la detección. Era la POSICIÓN:
+//
+//   1. El aviso salía en el medio de la salida del preflight.
+//   2. Abajo de él, el propio preflight imprimía `preflight: OK`. Lo último
+//      que uno lee es verde.
+//   3. Encima de eso, `firebase deploy` escupe sus ~48 líneas.
+//
+// Un aviso tapado por su propio "OK" y por medio kilómetro de scroll no es un
+// aviso: es decoración. Este bloque lo corre al final de todo y le pone marco,
+// y la línea de cierre del preflight deja de poder decir un verde pelado
+// mientras haya algo sin atender.
+//
+// ── Por qué acá y no un exit code distinto ──
+//
+// Se evaluó. No existe. `lifecycleHooks.js` de firebase-tools hace
+// `else if (code !== 0) reject(...)` sobre el hook de `predeploy`: CUALQUIER
+// código distinto de 0 aborta el deploy igual que `fallar()`, sólo que con un
+// mensaje peor ("Command terminated with non-zero exit code 2"). No hay un
+// escalón intermedio que el runner sepa leer. El único canal que queda para
+// "seguí, pero mirá esto" es la salida de texto — así que el trabajo es
+// ganarle al scroll, no inventar una señal que nadie escucha.
+function resumirAvisos(avisos) {
+  if (!avisos.length) return;
+  const linea = "═".repeat(74);
+  console.warn(
+    `\n${linea}\n` +
+      `  ⚠️  ${avisos.length} AVISO(S) QUE NO CORTAN ESTE DEPLOY — LEELOS IGUAL\n` +
+      linea,
+  );
+  avisos.forEach((a) => console.warn(`\n  ${a}\n`));
+  console.warn(linea);
+}
+
 /** Imprime los problemas encontrados y corta el deploy. */
 function fallar(problemas) {
   console.error(`\npreflight: ${problemas.length} problema(s) — el deploy va a fallar.\n`);
@@ -429,6 +551,9 @@ function fallar(problemas) {
 
 async function main() {
   const problemas = [];
+  // Lo que no corta el deploy pero tiene que sobrevivir al scroll. Se junta
+  // acá y se imprime al final de todo: ver `resumirAvisos()`.
+  const avisos = [];
 
   // Va primero y fuera de los `skip()` de abajo a propósito: no necesita
   // credenciales ni red, así que es el único chequeo que corre SIEMPRE —
@@ -601,20 +726,26 @@ async function main() {
     if (!huerfanos.length && !fantasmas.length) {
       console.log(`  ✓ ${vivos.size} índices — el repo y producción dicen lo mismo`);
     }
+    // Van al resumen final por la misma razón que las funciones huérfanas: son
+    // `console.warn` en el medio de la salida, con un `preflight: OK` abajo y
+    // las ~48 líneas del deploy encima. Idéntica forma de perderse. No se les
+    // pone escalada por antigüedad porque no hay de dónde sacar la fecha —
+    // la API de Firestore no dice desde cuándo vive un índice, y un índice de
+    // más tampoco es un endpoint público sin fuente.
     if (huerfanos.length) {
-      console.warn(
-        `\n  ⚠️ ${huerfanos.length} índice(s) viven en producción y NO están en ` +
+      avisos.push(
+        `⚠️ ${huerfanos.length} índice(s) viven en producción y NO están en ` +
           "firestore.indexes.json:\n" +
-          huerfanos.map((k) => `     ${k}`).join("\n") +
-          "\n     Un deploy de índices puede OFRECER borrarlos. Sumalos al archivo.\n",
+          huerfanos.map((k) => `       ${k}`).join("\n") +
+          "\n\n     Un deploy de índices puede OFRECER borrarlos. Sumalos al archivo.",
       );
     }
     if (fantasmas.length) {
-      console.warn(
-        `\n  ⚠️ ${fantasmas.length} índice(s) declarados que en producción NO ` +
+      avisos.push(
+        `⚠️ ${fantasmas.length} índice(s) declarados que en producción NO ` +
           "existen:\n" +
-          fantasmas.map((k) => `     ${k}`).join("\n") +
-          "\n     Hay una query que ya falla o va a fallar. Deployá los índices.\n",
+          fantasmas.map((k) => `       ${k}`).join("\n") +
+          "\n\n     Hay una query que ya falla o va a fallar. Deployá los índices.",
       );
     }
   } catch (e) {
@@ -640,9 +771,42 @@ async function main() {
   //     después del deploy la lista tiene que quedar vacía y ahí sí significa
   //     otra cosa.
   //
-  // AVISA, NO CORTA, por lo mismo que los índices: ninguna de las dos rompe el
-  // deploy que está por correr, y una guarda que frena por algo que no es
-  // suyo es la que el equipo aprende a saltear.
+  // ── AVISA, Y DESPUÉS DE UNA SEMANA CORTA ──
+  //
+  // El 2026-09-21 esta guarda funcionó y no sirvió: al mergear #1206 y
+  // deployar, `rcWebhook` quedó viva en producción sin código en `main`, y el
+  // aviso salió impreso, correcto, y se perdió en el scroll. Hubo que borrarla
+  // a mano días después, cuando alguien se acordó.
+  //
+  // Se consideraron tres formas de arreglarlo, y las tres se escriben acá
+  // porque la próxima persona que lea esto va a proponer alguna de las otras:
+  //
+  //   · Mandarla a `problemas` y listo. NO. El propio mensaje de abajo admite
+  //     que una huérfana también puede ser "falta mergear la rama que las
+  //     trae", que es legítimo y dura horas. Cortar el deploy de otro por eso
+  //     es, palabra por palabra, la guarda que el encabezado de este archivo
+  //     se prohíbe a sí mismo en la línea "vale más una guarda que a veces no
+  //     opina que una que el equipo aprende a saltear".
+  //   · Un exit code distinto para "aviso". NO EXISTE: firebase-tools hace
+  //     `if (code !== 0) reject(...)` sobre el hook de predeploy. Está la
+  //     evidencia completa arriba de `resumirAvisos()`.
+  //   · Resumen al final. Necesario pero INSUFICIENTE solo: el aviso deja de
+  //     estar tapado por su propio "OK", pero sigue siendo el mismo aviso con
+  //     el mismo peso el día 1 y el día 30. Un cartel que nunca escala es un
+  //     cartel que se aprende a ignorar — este repo ya tiene esa cicatriz.
+  //
+  // Va el resumen final MÁS la escalada por antigüedad, porque resuelven dos
+  // mitades distintas del mismo bug: el resumen arregla que no se LEA, la
+  // escalada arregla que no se ACTÚE. Y la escalada no rompe la regla de
+  // fail-soft, porque no corta por "hay una huérfana": corta por "hace una
+  // semana que hay una huérfana", que ya no es ningún estado transitorio.
+  // Cómo se data eso, y por qué no alcanza `updateTime`, está en
+  // `diasHuerfana()`.
+  //
+  // `sinDeployar` queda como estaba, en `console.log` sin drama: antes de un
+  // deploy es el estado NORMAL —son las que están por nacer— y subirlas al
+  // resumen sería llenarlo de ruido esperable. Un resumen que grita todos los
+  // días es el mismo bug con otra cara.
   //
   // Va DESPUÉS del chequeo de frescura a propósito: ése ya tiene la lista de
   // funciones desplegadas, pero se pide de nuevo en vez de compartirla — son
@@ -655,24 +819,67 @@ async function main() {
       { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!r.ok) throw new Error(`cloudfunctions ${r.status}`);
-    const vivas = new Set(
-      ((await r.json()).functions || []).map((f) => f.name.split("/").pop()),
+    // Mapa y no Set: `updateTime` es la mitad de la fecha de orfandad.
+    const vivas = new Map(
+      ((await r.json()).functions || []).map((f) => [
+        f.name.split("/").pop(),
+        f.updateTime,
+      ]),
     );
     const declaradas = new Set(eps.map(([nombre]) => nombre));
-    const huerfanas = [...vivas].filter((n) => !declaradas.has(n));
+    const huerfanas = [...vivas.keys()]
+      .filter((n) => !declaradas.has(n))
+      .map((n) => ({ nombre: n, dias: diasHuerfana(n, vivas.get(n)) }));
     const sinDeployar = [...declaradas].filter((n) => !vivas.has(n));
+
+    // `dias === null` es "no la pude datar", y cae del lado de avisar. Una
+    // guarda que corta cuando NO PUDO MEDIR es peor que no tenerla: enseña que
+    // el rojo no significa nada.
+    const podridas = huerfanas.filter(
+      (h) => h.dias !== null && h.dias >= DIAS_DE_GRACIA_HUERFANA,
+    );
+    const frescas = huerfanas.filter((h) => !podridas.includes(h));
 
     if (!huerfanas.length && !sinDeployar.length) {
       console.log(`  ✓ ${vivas.size} funciones — el código y producción dicen lo mismo`);
     }
-    if (huerfanas.length) {
-      console.warn(
-        `\n  ⚠️ ${huerfanas.length} función(es) viven en producción y el código NO ` +
+    if (frescas.length) {
+      avisos.push(
+        `⚠️ ${frescas.length} función(es) viven en producción y el código NO ` +
           "las declara:\n" +
-          huerfanas.map((n) => `     ${n}`).join("\n") +
-          "\n     Corren código que no está en `main`. O falta mergear la rama que\n" +
+          frescas
+            .map(
+              (h) =>
+                `       ${h.nombre} — huérfana hace ` +
+                `${h.dias === null ? "no sé cuántos" : h.dias} día(s)`,
+            )
+            .join("\n") +
+          "\n\n     Corren código que no está en `main`. O falta mergear la rama que\n" +
           "     las trae, o hay que borrarlas a mano — un deploy completo va a\n" +
-          "     ofrecer lo segundo.\n",
+          "     ofrecer lo segundo.\n" +
+          `     A los ${DIAS_DE_GRACIA_HUERFANA} días esto deja de ser un aviso ` +
+          "y corta el deploy.",
+      );
+    }
+    if (podridas.length) {
+      problemas.push(
+        `✗ ${podridas.length} función(es) llevan ${DIAS_DE_GRACIA_HUERFANA}+ días vivas en ` +
+          "producción sin código en `main`:\n" +
+          podridas
+            .map((h) => `       ${h.nombre} — huérfana hace ${h.dias} día(s)`)
+            .join("\n") +
+          "\n    A esta altura ya no es 'falta mergear la rama': una rama que lleva\n" +
+          `    ${DIAS_DE_GRACIA_HUERFANA}+ días desplegada y sin mergear está ` +
+          "muerta. Son endpoints\n" +
+          "    corriendo código que nadie puede auditar en `main`.\n" +
+          "    Borralas con:\n" +
+          podridas
+            .map(
+              (h) =>
+                `      firebase functions:delete ${h.nombre} --project ${project}`,
+            )
+            .join("\n") +
+          "\n    Si el código TIENE que existir, mergeá la rama y volvé a deployar.",
       );
     }
     if (sinDeployar.length) {
@@ -685,8 +892,21 @@ async function main() {
     console.log(`preflight: no pude chequear las funciones vivas (${e.message})`);
   }
 
+  // Los avisos van ANTES de `fallar()` y antes del OK, o sea al final de todo
+  // lo demás. En el camino que corta, los `problemas` quedan últimos a
+  // propósito: son la razón por la que el deploy se muere y tienen que ser lo
+  // último que se lee.
+  resumirAvisos(avisos);
   if (problemas.length) fallar(problemas);
-  console.log("preflight: OK");
+
+  // La línea de cierre NO puede ser un verde pelado mientras haya algo sin
+  // atender. Ése fue literalmente el bug del 2026-09-21: el aviso de
+  // `rcWebhook` se imprimió y abajo decía "preflight: OK".
+  console.log(
+    avisos.length
+      ? `preflight: OK — con ${avisos.length} aviso(s) SIN ATENDER (arriba ↑)`
+      : "preflight: OK",
+  );
 }
 
 main().catch((e) => skip(`error inesperado (${e.message})`));
