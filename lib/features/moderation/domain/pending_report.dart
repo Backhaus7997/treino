@@ -18,6 +18,10 @@ class PendingReport {
     required this.createdAt,
     required this.firstViewedAt,
     required this.contentPath,
+    required this.derivedOwnerUid,
+    required this.derivedOwnerName,
+    required this.attemptedAction,
+    required this.attemptedAt,
   });
 
   /// Lee un item de la respuesta del callable.
@@ -46,6 +50,16 @@ class PendingReport {
       firstViewedAt: fecha('firstViewedAt'),
       contentPath:
           raw['contentPath'] is String ? raw['contentPath']! as String : null,
+      derivedOwnerUid: raw['derivedOwnerUid'] is String
+          ? raw['derivedOwnerUid']! as String
+          : null,
+      derivedOwnerName: raw['derivedOwnerName'] is String
+          ? raw['derivedOwnerName']! as String
+          : null,
+      attemptedAction: raw['attemptedAction'] is String
+          ? raw['attemptedAction']! as String
+          : null,
+      attemptedAt: fecha('attemptedAt'),
     );
   }
 
@@ -68,6 +82,45 @@ class PendingReport {
 
   /// Ruta del documento reportado, o `null` si no se pudo derivar.
   final String? contentPath;
+
+  /// El autor REAL del contenido, derivado del documento por el servidor.
+  ///
+  /// `null` cuando el contenido ya no existe o no se pudo derivar. NO cae de
+  /// vuelta a [targetOwnerUid]: ese lo declara quien denuncia y nada lo ata
+  /// al autor real, así que mostrarlo como si lo fuera sería peor que no
+  /// mostrar nada — es sobre este uid que se ejecuta «Dar de baja».
+  final String? derivedOwnerUid;
+
+  /// `displayName` de ese autor, si lo tiene.
+  ///
+  /// Un uid no se reconoce de un vistazo; el nombre sí. Van los dos: el
+  /// nombre para reconocer, el uid para no confundir a dos parecidos.
+  final String? derivedOwnerName;
+
+  /// La acción que YA se ejecutó —o pudo haberse ejecutado— sobre este
+  /// reporte sin que la resolución llegara a cerrarse. `null` en el caso
+  /// normal.
+  ///
+  /// Auth y el mail queue no entran en una transacción de Firestore, así que
+  /// un `userSuspended` que deshabilita la cuenta y después no llega a
+  /// marcar el reporte devuelve el reporte a la cola. Antes volvía mudo, y
+  /// el siguiente moderador lo descartaba: `dismissed`/`none` escrito sobre
+  /// una cuenta dada de baja.
+  final String? attemptedAction;
+
+  /// Cuándo se anotó ese intento. `null` si no hay ninguno.
+  final DateTime? attemptedAt;
+
+  /// `true` cuando el uid que declaró quien denuncia NO es el autor real.
+  ///
+  /// Es señal de un intento de abuso: alguien denuncia contenido de Juan
+  /// escribiendo el uid de Pedro. El servidor ya no ejecuta nada sobre el
+  /// declarado, pero quien aprieta el botón tiene que verlo — hasta ahora
+  /// sólo iba a un `logger.warn` de Cloud Logging, invisible desde acá.
+  bool get uidDeclaradoNoCoincide {
+    final derivado = derivedOwnerUid;
+    return derivado != null && derivado != targetOwnerUid;
+  }
 
   /// Horas desde que entro el reporte. `null` si no tiene fecha.
   int? get horasDesdeQueEntro {

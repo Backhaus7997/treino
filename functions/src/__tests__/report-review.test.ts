@@ -20,7 +20,9 @@ import {
   moderationStatsHandler,
   resolveReportHandler,
   extractStoragePath,
+  removalDocId,
   REVIEWS_COLLECTION,
+  REMOVALS_COLLECTION,
 } from "../moderation/report-review";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -61,7 +63,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  for (const c of ["reports", REVIEWS_COLLECTION]) {
+  for (const c of ["reports", REVIEWS_COLLECTION, REMOVALS_COLLECTION]) {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
@@ -127,9 +129,17 @@ function dbConCarrera(
       if (name !== "audit_log") return real.collection(name);
       return {
         doc: (id: string) => ({
-          set: async (data: FirebaseFirestore.DocumentData) => {
+          get: () => real.collection("audit_log").doc(id).get(),
+          // `opts` se reenvia: sin eso, el `{ merge: true }` con el que se
+          // anula el intento se perdia y la entrada entera quedaba pisada
+          // por el parche — el doble destruia justo lo que el test mide.
+          set: async (
+            data: FirebaseFirestore.DocumentData,
+            opts?: FirebaseFirestore.SetOptions,
+          ) => {
             await interferir();
-            return real.collection("audit_log").doc(id).set(data);
+            const ref = real.collection("audit_log").doc(id);
+            return opts ? ref.set(data, opts) : ref.set(data);
           },
         }),
       };
@@ -141,6 +151,110 @@ function dbConCarrera(
     // importar.
     runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
       real.runTransaction(fn),
+    // Igual que `runTransaction`: el PASO 3 de contentRemoved redacta y
+    // escribe el marcador de retiro en UN batch atomico, asi que sin este
+    // passthrough el wrapper rompe con "is not a function" antes de llegar
+    // a lo que el helper simula.
+    batch: () => real.batch(),
+  };
+  return wrapped as unknown as Firestore;
+}
+
+/**
+ * Envuelve `db` para que el CIERRE del PASO 4 —la escritura a
+ * `report_reviews` que trae `status`— tire un error real, dejando pasar todo
+ * lo anterior: el claim del PASO 0, el audit_log del PASO 2, la mutacion del
+ * PASO 3 y el marcador de intento.
+ *
+ * Es el estado parcial del hallazgo: la cuenta queda deshabilitada en Auth y
+ * el reporte vuelve a la cola. Sin marcador de intento, volvia SIN un solo
+ * indicio de que ya se habia accionado.
+ *
+ * El codigo 14 (UNAVAILABLE) a proposito: no es una precondicion fallida ni
+ * un ALREADY_EXISTS, es "Firestore no pudo escribir".
+ */
+function dbConCierreQueFalla(real: Firestore): Firestore {
+  const wrapped = {
+    doc: (path: string) => real.doc(path),
+    collection: (name: string) => {
+      if (name !== REVIEWS_COLLECTION) return real.collection(name);
+      return {
+        // Un Proxy y no un objeto suelto: el PASO 0 le pasa este ref a
+        // `tx.get()`, que valida `instanceof DocumentReference`. Un doble
+        // plano rompe ahi, antes de que la resolucion llegue a ejecutar
+        // nada — y el test pasaria a medir otra cosa.
+        doc: (id: string) => {
+          const ref = real.collection(REVIEWS_COLLECTION).doc(id);
+          return new Proxy(ref, {
+            get(target, prop) {
+              if (prop === "set") {
+                return (
+                  data: FirebaseFirestore.DocumentData,
+                  opts?: FirebaseFirestore.SetOptions,
+                ) => {
+                  // Solo el cierre. El marcador de intento y la liberacion
+                  // del claim no traen `status` y tienen que pasar.
+                  if ("status" in data) {
+                    const err = new Error("simulated write failure") as
+                      Error & { code?: number };
+                    err.code = 14;
+                    return Promise.reject(err);
+                  }
+                  return opts ? target.set(data, opts) : target.set(data);
+                };
+              }
+              const v = Reflect.get(target, prop, target) as unknown;
+              return typeof v === "function" ? v.bind(target) : v;
+            },
+          });
+        },
+      };
+    },
+    runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
+      real.runTransaction(fn),
+    batch: () => real.batch(),
+  };
+  return wrapped as unknown as Firestore;
+}
+
+/**
+ * Envuelve `db` para que SOLO la confirmacion del audit_log (el
+ * `outcome: "executed"` del PASO 4) tire, dejando pasar la entrada del
+ * PASO 2 y su lectura previa.
+ *
+ * Es el unico punto donde una resolucion puede abortar DESPUES del PASO 2 y
+ * sin pasar por `anularIntento` — o sea, el unico lugar donde se ve si el
+ * marcador de intento se escribio o no.
+ */
+function dbConConfirmacionDeAuditQueFalla(real: Firestore): Firestore {
+  const wrapped = {
+    doc: (path: string) => real.doc(path),
+    collection: (name: string) => {
+      if (name !== "audit_log") return real.collection(name);
+      return {
+        doc: (id: string) => {
+          const ref = real.collection("audit_log").doc(id);
+          return {
+            get: () => ref.get(),
+            set: (
+              data: FirebaseFirestore.DocumentData,
+              opts?: FirebaseFirestore.SetOptions,
+            ) => {
+              if (data.outcome === "executed") {
+                const err = new Error("simulated write failure") as
+                  Error & { code?: number };
+                err.code = 14;
+                return Promise.reject(err);
+              }
+              return opts ? ref.set(data, opts) : ref.set(data);
+            },
+          };
+        },
+      };
+    },
+    runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
+      real.runTransaction(fn),
+    batch: () => real.batch(),
   };
   return wrapped as unknown as Firestore;
 }
@@ -177,6 +291,11 @@ function dbConEscrituraDeMailQueFalla(real: Firestore): Firestore {
     },
     runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
       real.runTransaction(fn),
+    // Igual que `runTransaction`: el PASO 3 de contentRemoved redacta y
+    // escribe el marcador de retiro en UN batch atomico, asi que sin este
+    // passthrough el wrapper rompe con "is not a function" antes de llegar
+    // a lo que el helper simula.
+    batch: () => real.batch(),
   };
   return wrapped as unknown as Firestore;
 }
@@ -914,7 +1033,20 @@ describe("resolveReport — P1-C: un fallo real al encolar el aviso aborta la re
     // El reporte sigue sin resolver — no quedo marcado con el aviso
     // perdido para siempre.
     const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
-    expect(rev.exists).toBe(false);
+    expect(rev.get("status")).toBeUndefined();
+    expect(rev.get("resolvedAt")).toBeUndefined();
+
+    // Pero SI queda el marcador de intento, y esto cambio a proposito: antes
+    // este test exigia `rev.exists === false`, o sea que un `userWarned`
+    // fallado no dejara rastro.
+    //
+    // Un `.create()` que tira no prueba que no se haya escrito — una caida de
+    // red despues del commit se ve igual desde aca. La respuesta honesta a
+    // "se mando el aviso?" es "no sabemos", y eso es justo lo que la cola
+    // tiene que mostrarle al proximo moderador antes de que decida. La
+    // certeza solo existe donde Firestore rechaza la escritura entera (la
+    // precondicion de la redaccion), y ahi el intento SI se anula.
+    expect(rev.get("attemptedAction")).toBe("userWarned");
 
     // Y nada quedo encolado (la escritura fallo de verdad, no es dedupe).
     const id = dedupeKey("moderation-user-warned", "r1", targetOwnerUid);
@@ -1221,5 +1353,572 @@ describe("moderationStats", () => {
     expect(s.pending).toBe(0);
     expect(s.oldestPendingAt).toBeNull();
     expect(s.oldestPendingHours).toBeNull();
+  });
+});
+
+describe("resolveReport — P3-A: los duplicados de un reporte ya accionado", () => {
+  /**
+   * Siembra DOS reportes sobre el mismo post, de denunciantes distintos —
+   * que es lo que pasa de verdad: el id de un reporte incluye al
+   * denunciante (`firestore.rules:4614-4616`), asi que veinte denuncias
+   * sobre el mismo post son veinte documentos.
+   */
+  async function sembrarDosDenunciasDelMismoPost(postId: string) {
+    const owner = `owner-${postId}`;
+    await sembrarReporte("r1", 4 * 3600_000, {
+      targetKind: "post", targetId: postId,
+      targetOwnerUid: owner, reporterUid: "denunciante-1",
+    });
+    await sembrarReporte("r2", 3 * 3600_000, {
+      targetKind: "post", targetId: postId,
+      targetOwnerUid: owner, reporterUid: "denunciante-2",
+    });
+    await db.collection("posts").doc(postId).set({
+      text: "contenido que viola las normas", authorUid: owner,
+    });
+    extraCleanupPaths.push(
+      `posts/${postId}`,
+      "audit_log/moderation__r1",
+      "audit_log/moderation__r2",
+    );
+    return owner;
+  }
+
+  it("el duplicado se cierra como contentRemoved y apunta al reporte que lo ejecuto", async () => {
+    const owner = await sembrarDosDenunciasDelMismoPost("post-p3a-1");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // El segundo: mismo contenido, ya vacio. Antes tiraba "no tiene texto ni
+    // contenido multimedia para retirar" — un mensaje FALSO — y dejaba al
+    // moderador sin forma de cerrarlo salvo como dismissed/none.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.get("status")).toBe("actioned");
+    expect(rev.get("action")).toBe("contentRemoved");
+
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    expect(audit.get("action")).toBe("contentRemoved");
+    // Apunta a donde esta la evidencia, y NO duplica el texto original con
+    // una copia vacia que leeria como "lo retirado era la cadena vacia".
+    expect(audit.get("alreadyRemovedByReportId")).toBe("r1");
+    expect(audit.get("removedContent")).toBeNull();
+    // El dueno derivado sigue saliendo del contenido, no del reporte.
+    expect(audit.get("derivedOwnerUid")).toBe(owner);
+  });
+
+  it("el retiro deja el marcador indexado por CONTENIDO, no por reporte", async () => {
+    const owner = await sembrarDosDenunciasDelMismoPost("post-p3a-2");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const marca = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId("post", "post-p3a-2"))
+      .get();
+    expect(marca.exists).toBe(true);
+    expect(marca.get("reportId")).toBe("r1");
+    expect(marca.get("derivedOwnerUid")).toBe(owner);
+    expect(marca.get("path")).toBe("posts/post-p3a-2");
+    expect(marca.get("removedMedia")).toBe(false);
+    // El texto retirado NO se copia aca: vive en el audit_log.
+    expect(marca.get("removedContent")).toBeUndefined();
+  });
+
+  it("el duplicado NO vuelve a tocar el contenido", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-3");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    const despuesDelPrimero =
+      (await db.collection("posts").doc("post-p3a-3").get()).updateTime;
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const post = await db.collection("posts").doc("post-p3a-3").get();
+    expect(post.get("text")).toBe("");
+    // Misma version del documento: el duplicado no escribio nada encima.
+    expect(post.updateTime?.isEqual(despuesDelPrimero!)).toBe(true);
+  });
+
+  it("si el contenido ademas se borro, el duplicado se cierra igual", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-4");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    // El autor borra el post despues de que la moderacion lo retiro. El
+    // hecho de que se retiro no deja de ser cierto porque el documento ya
+    // no este.
+    await db.collection("posts").doc("post-p3a-4").delete();
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.get("action")).toBe("contentRemoved");
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    // El dueno derivado sale del marcador cuando el documento ya no esta.
+    expect(audit.get("derivedOwnerUid")).toBe("owner-post-p3a-4");
+  });
+
+  it("el marcador NO cubre contenido NUEVO: si el autor reescribe, se redacta", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-5");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    // El autor reescribe el mismo post. Hay contenido NUEVO: el segundo
+    // reporte tiene que retirarlo de verdad, no cerrarse como duplicado.
+    await db.collection("posts").doc("post-p3a-5").update({
+      text: "lo volvi a escribir igual",
+    });
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const post = await db.collection("posts").doc("post-p3a-5").get();
+    expect(post.get("text")).toBe("");
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    expect(audit.get("removedContent")).toBe("lo volvi a escribir igual");
+    expect(audit.get("alreadyRemovedByReportId")).toBeNull();
+  });
+
+  it("si el autor republica antes del cierre, el duplicado aborta", async () => {
+    // El camino del duplicado no escribe sobre el contenido, asi que no
+    // tiene donde poner el `lastUpdateTime` que protege al camino normal.
+    // Sin la revalidacion del PASO 4, el reporte quedaria cerrado como
+    // "contenido retirado" sobre contenido VIVO.
+    await sembrarDosDenunciasDelMismoPost("post-p3a-7");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // El autor restaura el texto DESPUES de que el PASO 1 del duplicado lo
+    // vio vacio — `dbConCarrera` interfiere en la escritura del audit_log,
+    // que es justo esa ventana.
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3a-7").update({
+        text: "lo republique",
+      }),
+    );
+
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r2", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.exists).toBe(false);
+    // Y el contenido republicado sigue en pie: el reporte vuelve a la cola
+    // para que lo miren de nuevo, ahora con texto.
+    expect((await db.collection("posts").doc("post-p3a-7").get()).get("text"))
+      .toBe("lo republique");
+  });
+
+  it("la redaccion y el marcador son atomicos: si el autor edita en el medio, no entra ninguno", async () => {
+    const owner = "owner-post-p3a-6";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3a-6", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3a-6").set({
+      text: "texto original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3a-6", "audit_log/moderation__r1");
+
+    // El autor edita entre el PASO 1 y el PASO 3 — la misma carrera que
+    // cubre el test de `aborted`, mirada desde el marcador.
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3a-6").update({ text: "lo edite" }),
+    );
+
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    const marca = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId("post", "post-p3a-6"))
+      .get();
+    // Sin esta atomicidad el marcador quedaria diciendo que se retiro algo
+    // que sigue publicado — y habilitaria a cerrar los duplicados sobre
+    // contenido vivo.
+    expect(marca.exists).toBe(false);
+    expect((await db.collection("posts").doc("post-p3a-6").get()).get("text"))
+      .toBe("lo edite");
+  });
+});
+
+describe("resolveReport — P3-B: un estado parcial tiene que ser visible", () => {
+  it("el audit_log nace como intento y el cierre lo confirma", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-1",
+      targetOwnerUid: "owner-p3b-1",
+    });
+    await db.collection("posts").doc("post-p3b-1").set({
+      text: "algo", authorUid: "owner-p3b-1",
+    });
+    extraCleanupPaths.push("posts/post-p3b-1", "audit_log/moderation__r1");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("outcome")).toBe("executed");
+    expect(audit.get("executedAt")).toBeDefined();
+
+    // Y el marcador de intento no sobrevive al cierre: si quedara, la cola
+    // avisaria "aca se ejecuto algo sin confirmar" sobre un reporte que ya
+    // tiene su resolucion escrita al lado.
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("status")).toBe("actioned");
+    expect(rev.get("attemptedAction")).toBeUndefined();
+    expect(rev.get("attemptedAt")).toBeUndefined();
+  });
+
+  it("userSuspended ejecutado + cierre fallado: la cuenta queda de baja Y la cola lo dice", async () => {
+    const owner = "owner-p3b-2";
+    await getAuth(app).createUser({ uid: owner });
+    extraCleanupUids.push(owner);
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-2", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-2").set({
+      text: "algo", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-2", "audit_log/moderation__r1");
+
+    await expect(
+      resolveReportHandler(dbConCierreQueFalla(db), app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow();
+
+    // El estado parcial existe — Auth no entra en una transaccion de
+    // Firestore, asi que esto no se puede evitar.
+    expect((await getAuth(app).getUser(owner)).disabled).toBe(true);
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("status")).toBeUndefined();
+
+    // Lo que SI se puede evitar es que sea invisible. El reporte vuelve a la
+    // cola, y vuelve avisando. Antes volvia mudo: el proximo moderador lo
+    // descartaba y quedaba dismissed/none sobre una cuenta dada de baja.
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1).toBeDefined();
+    expect(r1!.attemptedAction).toBe("userSuspended");
+    expect(r1!.attemptedAt).not.toBeNull();
+  });
+
+  it("liberar el claim tras el error NO se lleva puesto el aviso", async () => {
+    // El review no existia antes del claim, asi que la liberacion lo borraba
+    // ENTERO — y con el, la unica senal de que ya se habia accionado.
+    const owner = "owner-p3b-3";
+    await getAuth(app).createUser({ uid: owner });
+    extraCleanupUids.push(owner);
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-3", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-3").set({
+      text: "algo", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-3", "audit_log/moderation__r1");
+
+    await expect(
+      resolveReportHandler(dbConCierreQueFalla(db), app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow();
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.exists).toBe(true);
+    expect(rev.get("attemptedAction")).toBe("userSuspended");
+    // Y el claim si se libero: un reintento no tiene que esperar el TTL.
+    expect(rev.get("claimedAt")).toBeUndefined();
+    expect(rev.get("claimedBy")).toBeUndefined();
+  });
+
+  it("si la mutacion NO entro, el intento se anula en vez de quedar mintiendo", async () => {
+    const owner = "owner-p3b-4";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-4", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-4").set({
+      text: "texto original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-4", "audit_log/moderation__r1");
+
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3b-4").update({ text: "lo edite" }),
+    );
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    // Firestore rechazo la escritura entera, asi que ACA sabemos con certeza
+    // que no se muto nada. El audit_log no puede seguir afirmando que se
+    // retiro un contenido que sigue publicado.
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("outcome")).toBe("failed");
+    expect(audit.get("removedContent")).toBe("texto original");
+
+    // Y la cola no avisa de un estado parcial que no existe: una advertencia
+    // que grita siempre entrena a ignorarla (AGENTS.md 11.1).
+    const cola = await listPendingReportsHandler(db);
+    expect(cola.reports.find((r) => r.id === "r1")!.attemptedAction).toBeNull();
+  });
+
+  it("descartar un reporte con intento previo deja el cierre escrito en el audit_log", async () => {
+    const owner = "owner-p3b-5";
+    await getAuth(app).createUser({ uid: owner });
+    extraCleanupUids.push(owner);
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-5", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-5").set({
+      text: "algo", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-5", "audit_log/moderation__r1");
+
+    await expect(
+      resolveReportHandler(dbConCierreQueFalla(db), app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow();
+
+    // El siguiente moderador lo descarta igual. `dismissed`/`none` no
+    // escribe audit_log por su cuenta —descartar no es accionar— pero la
+    // entrada del intento YA existe, y sin el cierre la apelacion leeria
+    // "se intento userSuspended" de un lado y "no se acciono" del otro.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "dismissed", action: "none",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("action")).toBe("userSuspended");
+    expect(audit.get("closedAs")).toMatchObject({
+      status: "dismissed", action: "none",
+    });
+  });
+
+  it("un reintento con OTRA accion NO borra la evidencia del intento anterior", async () => {
+    // El id del audit es deterministico y el PASO 2 lo pisa entero. Sin
+    // preservar el anterior, un userSuspended que deshabilito la cuenta y no
+    // llego a cerrarse, seguido de un contentRemoved, borraba la unica
+    // evidencia de la baja — y la cuenta quedaba deshabilitada sin nada que
+    // lo dijera.
+    const owner = "owner-p3b-6";
+    await getAuth(app).createUser({ uid: owner });
+    extraCleanupUids.push(owner);
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-6", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-6").set({
+      text: "contenido original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-6", "audit_log/moderation__r1");
+
+    await expect(
+      resolveReportHandler(dbConCierreQueFalla(db), app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow();
+    expect((await getAuth(app).getUser(owner)).disabled).toBe(true);
+
+    // El siguiente moderador ve el aviso y decide retirar el contenido.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("action")).toBe("contentRemoved");
+    const previos = audit.get("previousAttempts") as unknown[];
+    expect(previos).toHaveLength(1);
+    expect(previos[0]).toMatchObject({
+      action: "userSuspended", derivedOwnerUid: owner,
+    });
+  });
+
+  it("un intento ANULADO no se preserva: ahi sabemos que no paso nada", async () => {
+    // CONTROL NEGATIVO del historial. `outcome: "failed"` es el unico caso
+    // donde hay certeza de que la mutacion no entro, y es justo el caso para
+    // el que se escribio la regla de pisar la entrada en vez de acumular.
+    const owner = "owner-p3b-7";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-7", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-7").set({
+      text: "texto original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-7", "audit_log/moderation__r1");
+
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3b-7").update({ text: "lo edite" }),
+    );
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("previousAttempts")).toEqual([]);
+    expect(audit.get("removedContent")).toBe("lo edite");
+  });
+
+  it("un duplicado que aborta NO deja un aviso de intento: no muto nada", async () => {
+    // El camino del duplicado no redacta, no toca Auth y no encola mail. Un
+    // `attemptedAction` ahi seria la alarma que grita siempre: el proximo
+    // moderador leeria "ya se ejecuto algo aca" sobre un reporte donde no
+    // paso absolutamente nada.
+    await sembrarReporte("r1", 4 * 3600_000, {
+      targetKind: "post", targetId: "post-p3b-8",
+      targetOwnerUid: "owner-p3b-8", reporterUid: "denunciante-1",
+    });
+    await sembrarReporte("r2", 3 * 3600_000, {
+      targetKind: "post", targetId: "post-p3b-8",
+      targetOwnerUid: "owner-p3b-8", reporterUid: "denunciante-2",
+    });
+    await db.collection("posts").doc("post-p3b-8").set({
+      text: "contenido", authorUid: "owner-p3b-8",
+    });
+    extraCleanupPaths.push(
+      "posts/post-p3b-8",
+      "audit_log/moderation__r1",
+      "audit_log/moderation__r2",
+    );
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // r2 es el duplicado. Aborta en la confirmacion del audit, que es
+    // despues del PASO 2 y fuera del alcance de `anularIntento`.
+    await expect(
+      resolveReportHandler(dbConConfirmacionDeAuditQueFalla(db), app, "mod1", {
+        reportId: "r2", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow();
+
+    const cola = await listPendingReportsHandler(db);
+    const r2 = cola.reports.find((r) => r.id === "r2");
+    expect(r2).toBeDefined();
+    expect(r2!.attemptedAction).toBeNull();
+    // Y el review que creo su propio claim se borro entero, sin dejar un
+    // documento vacio donde antes no habia nada.
+    expect((await db.collection(REVIEWS_COLLECTION).doc("r2").get()).exists)
+      .toBe(false);
+  });
+
+  it("un dismissed/none SIN intento previo sigue sin escribir audit_log", async () => {
+    // CONTROL NEGATIVO del `closedAs` de arriba: el `set` con merge del
+    // cierre no puede CREAR una entrada donde no habia ninguna.
+    await sembrarReporte("r1", 3600_000);
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "dismissed", action: "none",
+    });
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.exists).toBe(false);
+  });
+});
+
+describe("listPendingReports — P3-C: la cola dice SOBRE QUIEN se acciona", () => {
+  it("devuelve el autor real derivado del contenido y su nombre", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-1",
+      // El denunciante declara un uid que NO es el autor.
+      targetOwnerUid: "declarado-p3c",
+    });
+    await db.collection("posts").doc("post-p3c-1").set({
+      text: "algo", authorUid: "autor-real-p3c",
+    });
+    await db.collection("users").doc("autor-real-p3c").set({
+      displayName: "Juan Real",
+    });
+    extraCleanupPaths.push("posts/post-p3c-1", "users/autor-real-p3c");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+
+    expect(r1!.derivedOwnerUid).toBe("autor-real-p3c");
+    expect(r1!.derivedOwnerName).toBe("Juan Real");
+    // El declarado SIGUE viajando: la pantalla lo necesita para poder decir
+    // "declararon otro uid" y nombrarlo.
+    expect(r1!.targetOwnerUid).toBe("declarado-p3c");
+  });
+
+  it("si el contenido ya no existe, el autor es null — NUNCA el declarado", async () => {
+    // Caer de vuelta a `targetOwnerUid` seria mostrar un uid ajeno bajo la
+    // etiqueta "Autor" en la pantalla donde se aprieta "Dar de baja".
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-2",
+      targetOwnerUid: "declarado-p3c-2",
+    });
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBeNull();
+    expect(r1!.derivedOwnerName).toBeNull();
+  });
+
+  it("un reporte de perfil deriva el autor del targetId, sin leer nada", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "profile", targetId: "uid-del-perfil",
+      targetOwnerUid: "uid-del-perfil",
+    });
+    await db.collection("users").doc("uid-del-perfil").set({
+      displayName: "Perfil Reportado",
+    });
+    extraCleanupPaths.push("users/uid-del-perfil");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBe("uid-del-perfil");
+    expect(r1!.derivedOwnerName).toBe("Perfil Reportado");
+  });
+
+  it("sin displayName devuelve el uid igual: el nombre es un extra, no un requisito", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-4", targetOwnerUid: "o-p3c-4",
+    });
+    await db.collection("posts").doc("post-p3c-4").set({
+      text: "algo", authorUid: "o-p3c-4",
+    });
+    extraCleanupPaths.push("posts/post-p3c-4");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBe("o-p3c-4");
+    expect(r1!.derivedOwnerName).toBeNull();
+  });
+
+  it("una cola vacia no rompe el getAll", async () => {
+    // `db.getAll()` sin refs tira. Es el caso mas comun de todos: la cola al
+    // dia.
+    const cola = await listPendingReportsHandler(db);
+    expect(cola.reports).toHaveLength(0);
   });
 });

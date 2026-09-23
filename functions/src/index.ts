@@ -163,6 +163,15 @@ export {
   syncAthletePaywallOnTrainerLink,
   sweepAthletePaywall,
 } from "./subscriptions/athlete-paywall-enforced";
+
+// El mail al alumno que choco un tope del plan free. Corre 05:00 ART, media
+// hora despues del barrido de arriba: aquel resuelve `athletePaywallEnforced`,
+// y correr primero dejaria a este decidiendo sobre el estado de anteayer para
+// quien cambio de situacion durante la noche.
+//
+// Es el unico canal posible: bajo 3.1.3(f) la app no puede decir donde se
+// paga. Ver el encabezado de `free-limit-mail.ts`.
+export { sweepFreeLimitMail } from "./subscriptions/free-limit-mail";
 // Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
 // (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
 //

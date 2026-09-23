@@ -1,7 +1,13 @@
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FirebaseFirestore, SetOptions, Timestamp;
+    show
+        CollectionReference,
+        FirebaseFirestore,
+        GetOptions,
+        SetOptions,
+        Source,
+        Timestamp;
 
 import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
@@ -419,6 +425,21 @@ class UserRepository {
     return UserProfile.fromJson(data);
   }
 
+  /// Como [get], pero del SERVIDOR: nunca de la caché local.
+  ///
+  /// Para decisiones que escriben evidencia, como el consentimiento del alta.
+  /// La caché puede tener una versión vieja del doc, y decidir sobre ella
+  /// pisaría lo que ya está en el servidor. Sin conexión tira, a propósito:
+  /// es preferible no poder terminar el alta a registrar consentimiento sobre
+  /// un dato que no se pudo confirmar.
+  Future<UserProfile?> getFromServer(String uid) async {
+    final snap =
+        await _users.doc(uid).get(const GetOptions(source: Source.server));
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    return UserProfile.fromJson(data);
+  }
+
   /// Partial update. Immutable fields are filtered out defensively.
   /// `updatedAt` is always overwritten — callers do not set it.
   ///
@@ -447,6 +468,48 @@ class UserRepository {
   /// partial, la primera rama de [_resolveEffectiveLocationConsent] resuelve
   /// el gate sin `get()`, y el espejo recibe las ubicaciones del FORMULARIO
   /// —lo que el PF efectivamente consintió— en el único commit que hay.
+  /// Deja anotado que el alumno chocó un tope del plano free.
+  ///
+  /// ── Para qué sirve, y por qué NO lo lee la app ──
+  ///
+  /// Para que el backend pueda mandarle un mail contándole que hay una salida.
+  /// La app no puede decírselo: la Guideline 3.1.3(f) de Apple exime del IAP a
+  /// las apps companion siempre que no haya compras adentro **ni llamados a
+  /// comprar afuera**, y ese amparo es lo que sostiene el cobro del entrenador.
+  /// La hoja de límite no cambia ni una palabra por esto — lo que se escribe
+  /// acá es invisible, y Apple revisa la interfaz.
+  ///
+  /// El mail está explícitamente permitido: *«send communications outside of
+  /// the app to their user base about purchasing methods other than in-app
+  /// purchase»*.
+  ///
+  /// ── Por qué NO pasa por [update] ──
+  ///
+  /// Porque [update] resuelve el subset público, el consentimiento de
+  /// ubicación y el guard de moderación: una LECTURA y un batch por cada tope
+  /// tocado, para anotar dos campos que sólo mira una función. Esto es una
+  /// escritura sola, con `merge`.
+  ///
+  /// ── Total: nunca tira ──
+  ///
+  /// Se llama al abrir la hoja, y la hoja tiene que abrirse igual. Que el
+  /// usuario no vea el mensaje que explica por qué no puede hacer algo —porque
+  /// falló una anotación que no le importa— sería cambiarle un límite
+  /// explicado por uno mudo.
+  Future<void> registrarTopeTocado(String uid, String tope) async {
+    try {
+      await _users.doc(uid).set(
+        <String, Object?>{
+          'freePlanLimitHitKind': tope,
+          'freePlanLimitHitAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      // Ver el dartdoc: la hoja abre igual.
+    }
+  }
+
   Future<void> update(
     String uid,
     Map<String, Object?> partial, {

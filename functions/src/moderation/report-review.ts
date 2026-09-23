@@ -82,6 +82,55 @@ function ensureApp(): App {
 /** Coleccion del resultado de moderacion. Cerrada a todo cliente. */
 export const REVIEWS_COLLECTION = "report_reviews";
 
+/**
+ * Que CONTENIDO ya fue retirado por la cola. Un doc por contenido, no por
+ * reporte. Cerrada a todo cliente.
+ *
+ * ## Por que existe
+ *
+ * El id de un reporte es `{targetKind}_{targetId}_{reporterUid}`
+ * (`firestore.rules:4614-4616`), asi que veinte denunciantes sobre el mismo
+ * post son VEINTE documentos. El moderador resuelve el primero con
+ * `contentRemoved`, el texto queda en `""` y la media limpia — y los otros
+ * diecinueve se vuelven imposibles de cerrar: el PASO 1 lee los dos campos
+ * vacios y tira «Este reporte no tiene texto ni contenido multimedia para
+ * retirar».
+ *
+ * Ese mensaje era FALSO, que es exactamente lo que AGENTS.md 11.1 prohibe:
+ * si habia contenido y si se retiro. Y no dejaba salida — el moderador podia
+ * cerrarlos solo como `dismissed`/`none`, o sea registrando «no se acciono»
+ * sobre contenido que se retiro. Dos registros del mismo hecho, y el que
+ * miente es el que queda.
+ *
+ * Lo que falta para distinguir «nunca hubo contenido» de «ya se retiro» es
+ * una pregunta que NINGUNA coleccion de hoy contesta con un solo `get()`:
+ * `audit_log` esta indexado por reporte (`moderation__{reportId}`) y
+ * `report_reviews` tambien. Esta, en cambio, esta indexada por el CONTENIDO.
+ *
+ * ## Por que no es `moderation_quarantine`
+ *
+ * Aquella registra lo que caza el filtro de terminos vetados
+ * (`quarantine-vetted-content.ts`) y su forma lo dice: `verdict`, `field`,
+ * `redacted`. Meter ahi las redacciones del moderador humano le daria a
+ * `verdict` un valor que no significa nada y mezclaria dos preguntas
+ * distintas —«el filtro lo caso» y «un moderador lo retiro»— en una
+ * coleccion que ya tiene duenos y tests propios.
+ */
+export const REMOVALS_COLLECTION = "moderation_removals";
+
+/**
+ * Id del marcador de retiro, derivado del contenido y no del reporte.
+ *
+ * `{targetKind}__{targetId}` y no la ruta del documento (que es lo que usa
+ * `moderation_quarantine`) por los MENSAJES: su ruta lleva el `chatId`, que
+ * se deriva del par `reporterUid`/`targetOwnerUid` — o sea que cambia con
+ * quien denuncia. Un marcador cuyo id depende del denunciante no serviria
+ * para lo unico que este marcador existe para hacer.
+ */
+export function removalDocId(targetKind: string, targetId: string): string {
+  return `${targetKind}__${targetId}`;
+}
+
 export type ReportStatus = "pending" | "actioned" | "dismissed";
 export type ReportAction =
   | "none"
@@ -182,6 +231,39 @@ interface PendingReport {
   reporterUid: string;
   createdAt: string | null;
   firstViewedAt: string | null;
+  /**
+   * La accion que YA se ejecuto —o se pudo haber ejecutado— sobre este
+   * reporte sin que la resolucion llegara a cerrarse. `null` en el caso
+   * normal.
+   *
+   * Un `userSuspended` que deshabilita la cuenta en Auth y despues no llega
+   * al PASO 4 devuelve el reporte a la cola sin ningun indicio: el proximo
+   * moderador lo descarta y queda `dismissed`/`none` escrito sobre una
+   * cuenta dada de baja. Auth y el mail queue no entran en una transaccion
+   * de Firestore, asi que ese estado parcial no se puede evitar — lo unico
+   * que se puede es que NO SEA INVISIBLE para quien aprieta el boton.
+   */
+  attemptedAction: ReportAction | null;
+  /** Cuando se anoto ese intento. `null` si no hay ninguno. */
+  attemptedAt: string | null;
+  /**
+   * El autor REAL del contenido, derivado del documento. `null` cuando el
+   * contenido no existe o no se puede derivar.
+   *
+   * La tarjeta de la cola mostraba `contentPath`, `reason`, `targetKind` y
+   * `detail` — nunca a QUIEN se le da de baja, que es la unica de las cuatro
+   * acciones irreversible desde ahi. Y `targetOwnerUid` no sirve para
+   * mostrarlo: lo declara el denunciante (ver `OWNER_FIELD`). Mostrar el
+   * declarado seria peor que no mostrar nada.
+   */
+  derivedOwnerUid: string | null;
+  /**
+   * `displayName` de ese autor. `null` si no lo tiene o no se pudo derivar.
+   *
+   * Un uid no se reconoce de un vistazo; el nombre si. Van los dos: el
+   * nombre para reconocer, el uid para no confundirse entre dos parecidos.
+   */
+  derivedOwnerName: string | null;
   /**
    * Ruta del documento reportado, o `null` si no se puede derivar.
    *
@@ -346,6 +428,10 @@ export async function listPendingReportsHandler(
       const status = rev.get("status") as ReportStatus | undefined;
       if (status === "actioned" || status === "dismissed") continue;
       const visto = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
+      // Ver `PendingReport.attemptedAction`.
+      const intento = rev.get("attemptedAction") as ReportAction | undefined;
+      const intentoAt = rev.get("attemptedAt") as
+        { toDate(): Date } | undefined;
 
       const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
       const reporterUid = String(doc.get("reporterUid") ?? "");
@@ -363,6 +449,14 @@ export async function listPendingReportsHandler(
         reporterUid,
         createdAt: createdAt ? createdAt.toDate().toISOString() : null,
         firstViewedAt: visto ? visto.toDate().toISOString() : null,
+        attemptedAction: intento ?? null,
+        attemptedAt: intentoAt ? intentoAt.toDate().toISOString() : null,
+        // Los completa `completarDuenos`, DESPUES del escaneo: derivarlos
+        // adentro del loop serian dos lecturas mas por cada documento
+        // escaneado —hasta 2000—, y solo hacen falta para los que se
+        // devuelven.
+        derivedOwnerUid: null,
+        derivedOwnerName: null,
         contentPath: resolveContentPath({
           targetKind,
           targetId,
@@ -375,11 +469,83 @@ export async function listPendingReportsHandler(
     if (snap.size < LOTE) break;
   }
 
+  await completarDuenos(db, out);
+
   return {
     reports: out,
     scanned: escaneados,
     reachedScanCap: escaneados >= TOPE_ESCANEO && out.length < objetivo,
   };
+}
+
+/**
+ * Completa `derivedOwnerUid`/`derivedOwnerName` de una pagina de la cola.
+ *
+ * Dos `getAll` y no dos lecturas por reporte: una pagina de cincuenta
+ * costaria cien viajes secuenciales, y esto corre mientras el moderador mira
+ * la pantalla en blanco. El SDK devuelve los snapshots en el orden de las
+ * refs, que es de lo que depende el emparejado de abajo.
+ *
+ * Los `null` NO caen de vuelta a `targetOwnerUid`. Ese campo lo declara el
+ * denunciante y nadie lo ata al autor real (`OWNER_FIELD`): mostrarlo como
+ * si fuera el autor es justo el bug que `deriveContentOwnerUid` cerro del
+ * lado de la ejecucion, y reabrirlo del lado de la pantalla seria peor —
+ * ahi es donde alguien decide apretar "Dar de baja".
+ */
+async function completarDuenos(
+  db: Firestore,
+  reportes: PendingReport[],
+): Promise<void> {
+  if (reportes.length === 0) return;
+
+  // `profile` no necesita lectura: su `targetId` ES el uid, mismo criterio
+  // que `resolveContentPath` y `deriveContentOwnerUid`.
+  const aLeer: { reporte: PendingReport; campo: string; path: string }[] = [];
+  for (const r of reportes) {
+    if (r.targetKind === "profile") {
+      r.derivedOwnerUid = r.targetId || null;
+      continue;
+    }
+    const campo = OWNER_FIELD[r.targetKind];
+    if (campo && r.contentPath) {
+      aLeer.push({ reporte: r, campo, path: r.contentPath });
+    }
+  }
+
+  if (aLeer.length > 0) {
+    const snaps = await db.getAll(...aLeer.map((x) => db.doc(x.path)));
+    snaps.forEach((snap, i) => {
+      const { reporte, campo } = aLeer[i];
+      const uid = snap.exists ? snap.get(campo) : undefined;
+      reporte.derivedOwnerUid =
+        typeof uid === "string" && uid.length > 0 ? uid : null;
+    });
+  }
+
+  const uids = [
+    ...new Set(
+      reportes
+        .map((r) => r.derivedOwnerUid)
+        .filter((u): u is string => u !== null),
+    ),
+  ];
+  if (uids.length === 0) return;
+
+  const perfiles = await db.getAll(
+    ...uids.map((u) => db.collection("users").doc(u)),
+  );
+  const nombres = new Map<string, string>();
+  for (const snap of perfiles) {
+    const nombre = snap.get("displayName");
+    if (typeof nombre === "string" && nombre.length > 0) {
+      nombres.set(snap.id, nombre);
+    }
+  }
+  for (const r of reportes) {
+    r.derivedOwnerName = r.derivedOwnerUid
+      ? nombres.get(r.derivedOwnerUid) ?? null
+      : null;
+  }
 }
 
 /**
@@ -749,17 +915,23 @@ export async function resolveReportHandler(
     );
   });
 
+  // Lo llena `executeClaimedResolution` en cuanto deja anotado el intento
+  // (PASO 2). El catch de abajo lo necesita: una vez que `attemptedAction`
+  // esta escrito, borrar el review entero se lleva puesta la unica senal de
+  // que sobre este reporte YA se ejecuto —o se pudo haber ejecutado— algo.
+  const progreso = { intentoRegistrado: false };
+
   try {
     await executeClaimedResolution(db, app, moderatorUid, reportId, {
       status: status as ReportStatus,
       action: action as ReportAction,
       note: typeof note === "string" ? note : null,
-    });
+    }, progreso);
   } catch (err) {
     // Liberar el claim para que un reintento legitimo no tenga que esperar
     // el TTL. Best-effort: si esto mismo falla, `CLAIM_TTL_MS` sigue siendo
     // la red de seguridad.
-    const liberar = reviewExistiaAntesDelClaim
+    const liberar = reviewExistiaAntesDelClaim || progreso.intentoRegistrado
       ? reviewRef.set(
         { claimedAt: FieldValue.delete(), claimedBy: FieldValue.delete() },
         { merge: true },
@@ -779,6 +951,43 @@ export async function resolveReportHandler(
 }
 
 /**
+ * Deja escrito que el intento del PASO 2 NO se ejecuto.
+ *
+ * Se llama solo desde donde se SABE que no se muto nada — hoy, la
+ * precondicion de la redaccion, que Firestore rechaza atomicamente. Para
+ * cualquier otro error el intento queda en `attempted`, que es la respuesta
+ * honesta: no sabemos si entro.
+ *
+ * Best-effort: si esto falla, lo peor que queda es un `attempted` sobre algo
+ * que no paso — que sub-afirma, que es el lado seguro del error.
+ *
+ * Tambien baja `progreso.intentoRegistrado`, y no es un detalle: el catch de
+ * `resolveReportHandler` lo lee para decidir si puede borrar el review que su
+ * propio claim creo. Anulado el intento, ese documento no tiene nada que
+ * decir, y dejarlo vacio seria basura sobre un reporte que vuelve a la cola
+ * exactamente como estaba. Una cola que avisa "aca paso algo" sobre un
+ * reporte donde no paso nada entrena a ignorar el aviso (AGENTS.md 11.1).
+ */
+async function anularIntento(
+  db: Firestore,
+  reportId: string,
+  progreso: { intentoRegistrado: boolean },
+): Promise<void> {
+  await db.collection("audit_log").doc(`moderation__${reportId}`).set(
+    { outcome: "failed", failedAt: new Date() },
+    { merge: true },
+  );
+  await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
+    {
+      attemptedAction: FieldValue.delete(),
+      attemptedAt: FieldValue.delete(),
+    },
+    { merge: true },
+  );
+  progreso.intentoRegistrado = false;
+}
+
+/**
  * PASO 1 a PASO 4 de `resolveReportHandler`, sobre un reporte YA reclamado
  * por su PASO 0.
  *
@@ -794,6 +1003,7 @@ async function executeClaimedResolution(
   moderatorUid: string,
   reportId: string,
   input: { status: ReportStatus; action: ReportAction; note: string | null },
+  progreso: { intentoRegistrado: boolean },
 ): Promise<void> {
   const { status, action, note } = input;
 
@@ -828,6 +1038,16 @@ async function executeClaimedResolution(
   // El dueno REAL del contenido, derivado del documento — nunca de
   // `targetOwnerUid`. Ver `deriveContentOwnerUid`.
   let derivedOwnerUid: string | null = null;
+  // Id del reporte desde el que YA se habia retirado este mismo contenido,
+  // cuando este reporte es uno de los duplicados de aquel. `null` en
+  // cualquier otro caso. Ver `REMOVALS_COLLECTION`.
+  let alreadyRemovedByReportId: string | null = null;
+  // Version del contenido que vio el camino del DUPLICADO, para revalidarla
+  // en el PASO 4. `null` cuando el documento no existia; `undefined` cuando
+  // este no es un duplicado y la guarda no aplica. Ver el PASO 4.
+  let guardaDeDuplicado:
+    | { path: string; updateTime: FirebaseFirestore.Timestamp | null }
+    | undefined;
   // Uid efectivamente usado para userSuspended/userWarned. Es
   // `derivedOwnerUid`, nunca `targetOwnerUid` — separado en su propia
   // variable solo para dejar explicito, en el PASO 3, que esas dos acciones
@@ -858,68 +1078,130 @@ async function executeClaimedResolution(
       );
     }
 
+    // Un retiro ANTERIOR sobre este mismo contenido, disparado desde otro
+    // reporte. Es lo unico que distingue «nunca hubo contenido» de «ya se
+    // retiro», y sin esa distincion los duplicados de un mismo post no se
+    // pueden cerrar. Ver el docstring de `REMOVALS_COLLECTION`.
+    const retiroPrevio = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId(targetKind, targetId))
+      .get();
+
     const contenido = await db.doc(path).get();
-    if (!contenido.exists) {
+    const mediaField = REDACTABLE_MEDIA_FIELD[targetKind];
+    const textVal = contenido.exists
+      ? String(contenido.get(textField) ?? "")
+      : "";
+    const mediaVal = contenido.exists && mediaField
+      ? String(contenido.get(mediaField) ?? "")
+      : "";
+
+    // Que no haya nada que retirar significa DOS cosas distintas, y hasta
+    // ahora las dos daban el mismo error. El marcador es lo unico que las
+    // separa: si existe, este reporte es uno de los duplicados del que si
+    // acciono (ver `REMOVALS_COLLECTION`).
+    const yaRetirado = !textVal && !mediaVal && retiroPrevio.exists;
+
+    if (!yaRetirado && !contenido.exists) {
       throw new HttpsError(
         "failed-precondition",
         `El contenido reportado ya no existe (${path}).`,
       );
     }
-
-    const mediaField = REDACTABLE_MEDIA_FIELD[targetKind];
-    const textVal = String(contenido.get(textField) ?? "");
-    const mediaVal = mediaField ? String(contenido.get(mediaField) ?? "") : "";
-
-    // Ni texto ni media: no hay nada que retirar. Antes esto "tenia exito"
-    // en silencio sobre un mensaje de solo imagen (text vacio, sin campo de
-    // media mapeado) sin tocar la foto — el mismo bug que este cambio
-    // arregla, visto del otro lado: mejor fallar ruidoso que mentir que se
-    // retiro algo.
-    if (!textVal && !mediaVal) {
+    if (!yaRetirado && !textVal && !mediaVal) {
+      // Ni texto ni media, y nadie lo retiro antes: de verdad no hay nada.
+      // Antes esto "tenia exito" en silencio sobre un mensaje de solo imagen
+      // (text vacio, sin campo de media mapeado) sin tocar la foto — el
+      // mismo bug que este modulo vino a arreglar, visto del otro lado:
+      // mejor fallar ruidoso que mentir que se retiro algo.
       throw new HttpsError(
         "failed-precondition",
         "Este reporte no tiene texto ni contenido multimedia para retirar.",
       );
     }
 
-    removedContent = textVal;
-    removedMediaUrl = mediaVal || null;
-    redactPath = path;
-    const updates: Record<string, string> = { [textField]: "" };
-    if (mediaField && mediaVal) updates[mediaField] = "";
-    redactUpdates = updates;
-    // Precondicion para el PASO 3. Entre este `get` y la redaccion el autor
-    // puede editar su propio contenido —`firestore.rules:4366` deja
-    // actualizar una resena— y entonces `removedContent` guardaria un texto
-    // mientras se redacta otro. El audit_log es lo que se mira en una
-    // apelacion: si miente, miente exactamente donde importa.
-    redactUpdateTime = contenido.updateTime ?? null;
-
+    // El dueno REAL, del documento — nunca `targetOwnerUid`, que lo declara
+    // el denunciante (ver `OWNER_FIELD`). Se deriva para los dos caminos de
+    // abajo porque los dos lo escriben en el audit_log.
     const ownerField = OWNER_FIELD[targetKind];
-    const contentOwner = ownerField ? contenido.get(ownerField) : undefined;
-    derivedOwnerUid = typeof contentOwner === "string" && contentOwner.length > 0
-      ? contentOwner : null;
-
-    // Path y "confianza" del media a borrar, derivados ACA — antes del
-    // audit_log del PASO 2 — para que la evidencia registre de antemano si
-    // el path confiaba o no, no solo el resultado del borrado despues.
-    // `expectedMediaPathPrefix` arma el prefijo con `derivedOwnerUid`,
-    // NUNCA con `targetOwnerUid`: ese es justo el bug que este bloque
-    // cierra (P2-A) — usar el declarado lo reabriria una capa mas abajo.
-    if (removedMediaUrl) {
-      removedMediaStoragePath = extractStoragePath(
-        removedMediaUrl,
-        getStorage(app).bucket().name,
-      );
-      const prefix = derivedOwnerUid
-        ? expectedMediaPathPrefix(
-          targetKind, derivedOwnerUid, reporterUid, targetOwnerUid,
-        )
+    const contentOwner = contenido.exists && ownerField
+      ? contenido.get(ownerField)
+      : undefined;
+    derivedOwnerUid =
+      typeof contentOwner === "string" && contentOwner.length > 0
+        ? contentOwner
         : null;
-      removedMediaPathTrusted = !!(
-        removedMediaStoragePath && prefix &&
-        removedMediaStoragePath.startsWith(prefix)
-      );
+
+    if (yaRetirado) {
+      // DUPLICADO de un reporte ya accionado: no hay nada nuevo que retirar
+      // PORQUE ya se retiro. Se deja cerrar como `contentRemoved` —que es lo
+      // que de verdad paso— apuntando al reporte que lo ejecuto.
+      //
+      // No se redacta nada: `redactPath`/`redactUpdates` quedan en `null` y
+      // el PASO 3 no corre. Y `removedContent` queda en `null` en vez de
+      // `""`: la evidencia del original vive en el `audit_log` de AQUEL
+      // reporte, y escribir aca una copia vacia del mismo campo haria que
+      // una apelacion leyera "el texto retirado era la cadena vacia".
+      const previo = retiroPrevio.get("reportId");
+      alreadyRemovedByReportId =
+        typeof previo === "string" && previo.length > 0 ? previo : null;
+
+      // La version exacta que se esta mirando. El camino normal se protege
+      // de una edicion concurrente con `lastUpdateTime`; este no escribe
+      // nada sobre el contenido, asi que no tiene donde poner esa
+      // precondicion — y sin ella, un autor que republica entre este `get`
+      // y el cierre deja el reporte marcado "contenido retirado" sobre
+      // contenido VIVO. El PASO 4 la revalida.
+      guardaDeDuplicado = {
+        path,
+        updateTime: contenido.exists ? contenido.updateTime ?? null : null,
+      };
+
+      // Si el documento ya no esta, el dueno derivado sale del marcador —
+      // que lo guardo cuando el contenido si existia. Sigue sin salir nunca
+      // de `targetOwnerUid`.
+      if (derivedOwnerUid === null) {
+        const guardado = retiroPrevio.get("derivedOwnerUid");
+        derivedOwnerUid =
+          typeof guardado === "string" && guardado.length > 0
+            ? guardado
+            : null;
+      }
+    } else {
+      removedContent = textVal;
+      removedMediaUrl = mediaVal || null;
+      redactPath = path;
+      const updates: Record<string, string> = { [textField]: "" };
+      if (mediaField && mediaVal) updates[mediaField] = "";
+      redactUpdates = updates;
+      // Precondicion para el PASO 3. Entre este `get` y la redaccion el
+      // autor puede editar su propio contenido —`firestore.rules:4366` deja
+      // actualizar una resena— y entonces `removedContent` guardaria un
+      // texto mientras se redacta otro. El audit_log es lo que se mira en
+      // una apelacion: si miente, miente exactamente donde importa.
+      redactUpdateTime = contenido.updateTime ?? null;
+
+      // Path y "confianza" del media a borrar, derivados ACA — antes del
+      // audit_log del PASO 2 — para que la evidencia registre de antemano si
+      // el path confiaba o no, no solo el resultado del borrado despues.
+      // `expectedMediaPathPrefix` arma el prefijo con `derivedOwnerUid`,
+      // NUNCA con `targetOwnerUid`: ese es justo el bug que este bloque
+      // cierra (P2-A) — usar el declarado lo reabriria una capa mas abajo.
+      if (removedMediaUrl) {
+        removedMediaStoragePath = extractStoragePath(
+          removedMediaUrl,
+          getStorage(app).bucket().name,
+        );
+        const prefix = derivedOwnerUid
+          ? expectedMediaPathPrefix(
+            targetKind, derivedOwnerUid, reporterUid, targetOwnerUid,
+          )
+          : null;
+        removedMediaPathTrusted = !!(
+          removedMediaStoragePath && prefix &&
+          removedMediaStoragePath.startsWith(prefix)
+        );
+      }
     }
   } else if (action === "userSuspended" || action === "userWarned") {
     // El uid SALE DEL CONTENIDO, nunca de `targetOwnerUid`: lo declara el
@@ -991,10 +1273,55 @@ async function executeClaimedResolution(
 
   // -------------------------------------------------------------------
   // PASO 2 — audit_log ANTES de mutar. Ver el docstring de arriba.
+  //
+  // Se escribe como INTENTO, no como hecho. Entre esta linea y el PASO 4 hay
+  // una mutacion que puede fallar —y Auth y el mail queue no entran en una
+  // transaccion de Firestore, asi que no hay forma de atarlos—, y un
+  // `audit_log` que afirma `action: "contentRemoved"` sobre una redaccion
+  // que despues se aborto es una afirmacion falsa sobre el unico registro
+  // que se mira en una apelacion (AGENTS.md 11.1). `outcome` lo dice:
+  // `attempted` acá, `executed` en el PASO 4, `failed` cuando sabemos que
+  // la mutacion no entro.
   // -------------------------------------------------------------------
   if (action !== "none") {
+    // Lo que ya habia escrito un intento ANTERIOR sobre este mismo reporte.
+    //
+    // El id es deterministico (`moderation__{reportId}`) y este `set` lo
+    // pisa entero — a proposito, para que un reintento no deje dos
+    // versiones del mismo hecho. Pero eso vale para reintentar LA MISMA
+    // accion despues de un fallo conocido, no para empezar OTRA sobre un
+    // intento que nunca se confirmo: un `userSuspended` que deshabilito la
+    // cuenta y no llego a cerrarse, seguido de un `contentRemoved`, borraba
+    // la unica evidencia de la baja — incluido su `removedContent`— y
+    // dejaba la cuenta deshabilitada sin nada que lo dijera.
+    //
+    // `outcome: "failed"` no se preserva: ahi SABEMOS que no se ejecuto
+    // nada, que es justo el caso para el que se escribio la regla de pisar.
+    //
+    // Sin tope: una vez que un reporte cierra bien, el PASO 0 rechaza
+    // cualquier resolucion nueva, asi que esto solo crece mientras los
+    // cierres fallan.
+    const auditPrevio = await db.collection("audit_log")
+      .doc(`moderation__${reportId}`).get();
+    const previousAttempts: unknown[] = [];
+    if (auditPrevio.exists && auditPrevio.get("outcome") !== "failed") {
+      const viejos = auditPrevio.get("previousAttempts");
+      if (Array.isArray(viejos)) previousAttempts.push(...viejos);
+      previousAttempts.push({
+        action: auditPrevio.get("action") ?? null,
+        outcome: auditPrevio.get("outcome") ?? null,
+        moderatorUid: auditPrevio.get("moderatorUid") ?? null,
+        derivedOwnerUid: auditPrevio.get("derivedOwnerUid") ?? null,
+        // El original viaja con su intento: es la unica copia que existe.
+        removedContent: auditPrevio.get("removedContent") ?? null,
+        removedMediaUrl: auditPrevio.get("removedMediaUrl") ?? null,
+        at: auditPrevio.get("at") ?? null,
+      });
+    }
+
     await db.collection("audit_log").doc(`moderation__${reportId}`).set({
       kind: "moderation",
+      previousAttempts,
       reportId,
       moderatorUid,
       action,
@@ -1013,22 +1340,92 @@ async function executeClaimedResolution(
       // matchea el prefijo del dueno derivado se arma para borrar
       // contenido ajeno. `null` cuando no hubo media que borrar.
       removedMediaPathTrusted,
+      // Cuando este reporte es un DUPLICADO de otro que ya retiro el mismo
+      // contenido: el id de aquel. `null` en cualquier otro caso. Sin esto,
+      // una apelacion leeria diecinueve entradas `contentRemoved` con
+      // `removedContent: null` y no tendria como saber donde esta el texto
+      // original ni por que estas no lo traen.
+      alreadyRemovedByReportId,
+      // Ver el comentario de arriba. Lo confirma el PASO 4.
+      outcome: "attempted",
       at: new Date(),
     });
+
+    // La misma noticia en `report_reviews`, que es lo que lee la COLA.
+    //
+    // Sin esto, un `userSuspended` que ejecuta y despues no llega al PASO 4
+    // deja la cuenta deshabilitada en Auth, el audit escrito, y el reporte
+    // de vuelta en la cola sin un solo indicio: el proximo moderador lo
+    // descarta y queda `dismissed`/`none` sobre una cuenta dada de baja.
+    // El audit_log sabe lo que paso, pero nadie lo mira antes de apretar un
+    // boton — la cola si.
+    //
+    // No va en la misma escritura que el audit porque son dos colecciones
+    // distintas; y no hace falta que sean atomicas: las dos pasan ANTES de
+    // mutar nada, asi que si la segunda falla, el PASO 3 no llega a correr.
+    //
+    // El camino del DUPLICADO se saltea: no ejecuta ninguna mutacion —no
+    // redacta, no toca Auth, no encola mail— asi que no hay nada que pueda
+    // quedar a medias, y avisarlo igual seria la alarma que grita siempre.
+    if (alreadyRemovedByReportId === null) {
+      await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
+        { attemptedAction: action, attemptedAt: new Date() },
+        { merge: true },
+      );
+      progreso.intentoRegistrado = true;
+    }
   }
 
   // -------------------------------------------------------------------
   // PASO 3 — ejecutar de verdad.
   // -------------------------------------------------------------------
   if (action === "contentRemoved" && redactPath && redactUpdates) {
+    // La redaccion y el marcador de retiro van en UN SOLO batch atomico, no
+    // en dos escrituras seguidas, por el mismo motivo por el que el marcador
+    // existe: si la redaccion entrara y el marcador no, el contenido quedaria
+    // vacio SIN registro de quien lo vacio, y los duplicados volverian a ser
+    // imposibles de cerrar — justo el agujero que este marcador cierra, esta
+    // vez abierto por el propio arreglo.
+    //
+    // Firestore acepta la precondicion `lastUpdateTime` adentro del batch,
+    // asi que la carrera contra una edicion del autor sigue cubierta igual
+    // que antes: si la precondicion falla, no entra NINGUNA de las dos.
+    const lote = db.batch();
+    lote.update(
+      db.doc(redactPath),
+      redactUpdates,
+      redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
+    );
+    lote.set(
+      db.collection(REMOVALS_COLLECTION)
+        .doc(removalDocId(targetKind, targetId)),
+      {
+        targetKind,
+        targetId,
+        // La ruta, para poder leer el marcador a mano sin volver a
+        // derivarla. NO sirve como id: ver `removalDocId`.
+        path: redactPath,
+        // Desde que reporte se ejecuto. Es lo que los duplicados escriben en
+        // su propio audit_log para apuntar a donde esta la evidencia.
+        reportId,
+        moderatorUid,
+        derivedOwnerUid,
+        // El TEXTO NO se guarda. Vive en `audit_log/moderation__{reportId}`,
+        // que es lo que se mira en una apelacion; copiarlo aca seria una
+        // copia mas de datos de terceros. Mismo criterio que
+        // `moderation_quarantine`.
+        removedMedia: removedMediaUrl !== null,
+        at: new Date(),
+      },
+      { merge: true },
+    );
+
     try {
-      await db.doc(redactPath).update(
-        redactUpdates,
-        redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
-      );
+      await lote.commit();
     } catch (err) {
       if ((err as { code?: number }).code === FAILED_PRECONDITION) {
-        // El autor edito el contenido entre el PASO 1 y ahora. No se redacta:
+        // El autor edito el contenido entre el PASO 1 y ahora. No se redacta
+        // —ni se escribe el marcador de retiro, que va en el mismo batch—:
         // el moderador decidio sobre un texto que ya no esta, y el
         // `removedContent` que quedo en audit_log es el de esa version vieja.
         //
@@ -1037,6 +1434,21 @@ async function executeClaimedResolution(
         // de audit_log tiene id deterministico (`moderation__{reportId}`), de
         // modo que el reintento la pisa en vez de dejar dos versiones del
         // mismo hecho.
+        //
+        // Y hasta que eso pase, el intento se anula: Firestore rechazo la
+        // escritura ENTERA, asi que aca —y solo aca— sabemos con certeza que
+        // no se muto nada. Sin esto el audit_log quedaba afirmando
+        // `contentRemoved` con un `removedContent` que nunca se retiro, y si
+        // despues alguien descartaba el reporte, `report_reviews` decia
+        // `dismissed`/`none`: dos registros del mismo hecho contradiciendose,
+        // y el que se mira en una apelacion es el que mentia.
+        await anularIntento(db, reportId, progreso).catch((limpiezaErr) => {
+          logger.warn(
+            "resolveReport: no se pudo anular el intento tras la carrera — " +
+            "el audit_log queda en 'attempted'",
+            { reportId, error: limpiezaErr },
+          );
+        });
         throw new HttpsError(
           "aborted",
           "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
@@ -1121,19 +1533,111 @@ async function executeClaimedResolution(
   // "dismissed", ese mismo valor ya excluye cualquier claim nuevo (primer
   // chequeo de la transaccion del PASO 0), asi que dejarlos no protege
   // nada mas — quedarian como metadata muerta sobre un reporte resuelto.
+  //
+  // El audit_log se confirma PRIMERO, y a proposito no en la misma escritura
+  // que el cierre. Las dos ordenes posibles fallan distinto y una sola de
+  // ellas falla del lado seguro:
+  //
+  // - confirmar el audit y no llegar a cerrar → el audit dice `executed` y
+  //   el reporte vuelve a la cola CON su `attemptedAction` a la vista. El
+  //   moderador ve que ya se ejecuto algo antes de decidir. Recuperable.
+  // - cerrar primero y no llegar a confirmar → `report_reviews` afirma que
+  //   se acciono mientras el audit todavia dice `attempted`. Sub-afirma, que
+  //   es el lado seguro, pero el reporte ya salio de la cola y nadie vuelve
+  //   a mirarlo.
+  //
+  // Por eso va en este orden. Una transaccion no arregla nada de esto: la
+  // mutacion de verdad (Auth, el mail queue) vive fuera de Firestore.
   // -------------------------------------------------------------------
-  await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
-    {
-      status,
-      action,
-      note,
-      reviewedBy: moderatorUid,
-      resolvedAt: new Date(),
-      claimedAt: FieldValue.delete(),
-      claimedBy: FieldValue.delete(),
-    },
-    { merge: true },
-  );
+  const auditRef = db.collection("audit_log").doc(`moderation__${reportId}`);
+  if (action !== "none") {
+    await auditRef.set(
+      { outcome: "executed", executedAt: new Date() },
+      { merge: true },
+    );
+  } else {
+    // `dismissed`/`none` NO crea una entrada de audit_log — hay un test que
+    // lo fija, y esta bien: descartar no es accionar.
+    //
+    // Pero si YA existe una, es de un intento anterior sobre ESTE reporte
+    // que no llego a cerrarse. Dejarla sin el cierre hace que la apelacion
+    // lea «se intento userSuspended» de un lado y «descartado, no se
+    // acciono» del otro, sin nada que las ate. `closedAs` las ata.
+    const previa = await auditRef.get();
+    if (previa.exists) {
+      await auditRef.set(
+        { closedAs: { status, action, at: new Date() } },
+        { merge: true },
+      );
+    }
+  }
+
+  const cierre = {
+    status,
+    action,
+    note,
+    reviewedBy: moderatorUid,
+    resolvedAt: new Date(),
+    claimedAt: FieldValue.delete(),
+    claimedBy: FieldValue.delete(),
+    // El intento del PASO 2 ya no es una incognita: se cerro. Dejarlo
+    // haria que la cola avisara "aca se ejecuto algo sin confirmar" sobre
+    // un reporte que ya tiene su resolucion escrita al lado.
+    attemptedAction: FieldValue.delete(),
+    attemptedAt: FieldValue.delete(),
+  };
+  const reviewRef = db.collection(REVIEWS_COLLECTION).doc(reportId);
+
+  if (guardaDeDuplicado === undefined) {
+    await reviewRef.set(cierre, { merge: true });
+    return;
+  }
+
+  // El camino del DUPLICADO no escribio nada sobre el contenido, asi que no
+  // tuvo donde poner el `lastUpdateTime` que protege al camino normal. Sin
+  // esto, entre el `get` del PASO 1 y esta linea el autor puede republicar
+  // —restaurar el texto o volver a subir la foto— y el reporte quedaria
+  // cerrado como "contenido retirado" sobre contenido VIVO, con el audit
+  // afirmando lo mismo. Es la clase de registro falso que este modulo entero
+  // existe para no producir (AGENTS.md 11.1).
+  //
+  // La transaccion es lo que hace la revalidacion ATOMICA y no un
+  // chequeo-y-despues-escribo: Firestore aborta el commit si el documento
+  // leido cambio, asi que la ventana no es "chica", es cero.
+  //
+  // Se compara `updateTime` y no "sigue vacio": cualquier escritura sobre
+  // ese documento merece que el moderador lo vuelva a mirar, y `null`
+  // (no existia) contra `null` cubre el caso de que ademas se haya borrado.
+  const guarda = guardaDeDuplicado;
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(db.doc(guarda.path));
+      const ahora = snap.exists ? snap.updateTime ?? null : null;
+      const sinCambios = guarda.updateTime === null
+        ? ahora === null
+        : ahora !== null && ahora.isEqual(guarda.updateTime);
+      if (!sinCambios) {
+        throw new HttpsError(
+          "aborted",
+          "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
+          "reporte sigue en la cola.",
+        );
+      }
+      tx.set(reviewRef, cierre, { merge: true });
+    });
+  } catch (err) {
+    // Este camino no muta NADA: si el cierre no entro, no entro nada. El
+    // audit ya se habia confirmado como `executed` unas lineas arriba, y
+    // dejarlo asi seria afirmar una ejecucion que no ocurrio.
+    await anularIntento(db, reportId, progreso).catch((limpiezaErr) => {
+      logger.warn(
+        "resolveReport: no se pudo anular el intento del duplicado — el " +
+        "audit_log queda en 'executed' sobre un cierre que no entro",
+        { reportId, error: limpiezaErr },
+      );
+    });
+    throw err;
+  }
 }
 
 /**
