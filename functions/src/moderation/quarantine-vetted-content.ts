@@ -74,6 +74,58 @@ const REDACTADO = "";
 const FAILED_PRECONDITION = 9;
 
 /**
+ * Escribe (merge) sobre el registro de cuarentena [id], pero SOLO si
+ * [updateTime] no es mas viejo que la version ya escrita ahi.
+ *
+ * Todo lo que este archivo escribe sobre `redacted` pasa por aca: tanto el
+ * registro optimista inicial (`quarantineIfVetted` / `quarantineRoutineIfVetted`,
+ * ANTES de intentar el `update()` del documento fuente) como la correccion
+ * cuando ese `update()` aborta por precondicion (`marcarRedaccionAbandonada`,
+ * mas abajo). Las dos escrituras son async y el trigger que las dispara puede
+ * entregar eventos fuera de orden entre invocaciones concurrentes del MISMO
+ * documento — sin esta guarda, cualquiera de las dos puede pisar el resultado
+ * de una invocacion MAS NUEVA que ya escribio el suyo. Con ella, gana siempre
+ * la version mas alta, sin importar en que orden llegaron las escrituras.
+ *
+ * La transaccion compara contra `sourceUpdateTime`, el `updateTime` del
+ * documento fuente que la invocacion GANADORA tenia en el momento de escribir
+ * — no contra el `updateTime` actual del documento (que en el momento de la
+ * correccion YA esta en una version mas nueva por definicion: es POR ESO que
+ * el `update()` abortó). `Timestamp.valueOf()` esta documentado para esto
+ * (google-cloud/firestore `timestamp.d.ts`): devuelve un string pensado para
+ * compararse con `>`/`<`.
+ *
+ * Sin `updateTime` no hay con que comparar: se hace el merge sin condicion,
+ * igual que antes de este fix — no todos los llamadores lo pasan.
+ */
+async function escribirRegistroVersionado(
+  db: Firestore,
+  id: string,
+  updateTime: FirebaseFirestore.Timestamp | undefined,
+  data: FirebaseFirestore.DocumentData,
+): Promise<void> {
+  const ref = db.collection(QUARANTINE_COLLECTION).doc(id);
+  if (!updateTime) {
+    await ref.set(data, { merge: true });
+    return;
+  }
+  await db.runTransaction(async (tx) => {
+    const actual = await tx.get(ref);
+    const previa = actual.get("sourceUpdateTime") as
+      | FirebaseFirestore.Timestamp
+      | undefined;
+    if (previa && previa.valueOf() > updateTime.valueOf()) {
+      // Una invocacion mas nueva ya escribio su resultado aca. Silencio a
+      // proposito, mismo criterio que el log de mas abajo: esa escritura
+      // nueva disparo SU PROPIO trigger y ya se reviso por su cuenta.
+      logger.info("quarantine: se descarta una escritura vieja", { id });
+      return;
+    }
+    tx.set(ref, { ...data, sourceUpdateTime: updateTime }, { merge: true });
+  });
+}
+
+/**
  * Corrige el registro cuando la redaccion se abandona por precondicion.
  *
  * `redacted` se escribe ANTES de intentar el `update()` (para que el
@@ -82,15 +134,20 @@ const FAILED_PRECONDITION = 9;
  * queda afirmando `redacted: true` sobre un documento que no se toco. Quien
  * modera filtrando por `redacted: false` para ver que falta atender no ve
  * ese documento — una advertencia falsa (§11.1).
+ *
+ * A traves de [escribirRegistroVersionado] y NO con un `.set()` directo: una
+ * invocacion VIEJA (la de este `catch`, justamente) puede llegar a esta
+ * correccion DESPUES de que una invocacion mas nueva ya registro Y redacto
+ * bien — sin la guarda de version, este merge incondicional pisaria ese
+ * `redacted: true` correcto con un `false`. Misma familia de bug que el que
+ * este comentario describe arriba, del otro lado.
  */
 async function marcarRedaccionAbandonada(
   db: Firestore,
   id: string,
+  updateTime: FirebaseFirestore.Timestamp | undefined,
 ): Promise<void> {
-  await db
-    .collection(QUARANTINE_COLLECTION)
-    .doc(id)
-    .set({ redacted: false }, { merge: true });
+  await escribirRegistroVersionado(db, id, updateTime, { redacted: false });
 }
 
 export interface QuarantineInput {
@@ -143,21 +200,18 @@ export async function quarantineIfVetted(
   // UN registro, no dos. La cola de moderacion no necesita el historial de
   // intentos, necesita saber que este documento esta pendiente.
   const id = path.replace(/\//g, "__");
-  await db.collection(QUARANTINE_COLLECTION).doc(id).set(
-    {
-      path,
-      field,
-      kind,
-      verdict,
-      authorUid: authorUid ?? null,
-      // El TEXTO NO se guarda. Puede tener datos personales de terceros, y en
-      // el chat puede tener datos de salud. Quien modere abre el documento
-      // original, autenticado.
-      redacted: verdict === "block",
-      at: new Date(),
-    },
-    { merge: true },
-  );
+  await escribirRegistroVersionado(db, id, updateTime, {
+    path,
+    field,
+    kind,
+    verdict,
+    authorUid: authorUid ?? null,
+    // El TEXTO NO se guarda. Puede tener datos personales de terceros, y en
+    // el chat puede tener datos de salud. Quien modere abre el documento
+    // original, autenticado.
+    redacted: verdict === "block",
+    at: new Date(),
+  });
 
   if (verdict !== "block") return verdict;
 
@@ -174,7 +228,7 @@ export async function quarantineIfVetted(
     if ((err as { code?: number }).code === FAILED_PRECONDITION) {
       logger.info("quarantine: el documento cambio, lo revisa su propio evento",
         { path, field });
-      await marcarRedaccionAbandonada(db, id);
+      await marcarRedaccionAbandonada(db, id, updateTime);
       return verdict;
     }
     throw err;
@@ -365,6 +419,12 @@ export async function quarantineRoutineIfVetted(
 ): Promise<RoutineQuarantineFinding[]> {
   const { db, path, data, authorUid, updateTime } = input;
 
+  // Un solo lugar para armar el id del registro de UN campo -- lo usan tanto
+  // el loop de registro inicial como la correccion de mas abajo, y las dos
+  // tienen que coincidir SIEMPRE para el mismo campo.
+  const idFor = (field: string) =>
+    `${path.replace(/\//g, "__")}__${field.replace(/[[\].]/g, "_")}`;
+
   const findings: RoutineQuarantineFinding[] = [];
   const topLevelRedactions: Record<string, string> = {};
 
@@ -429,19 +489,15 @@ export async function quarantineRoutineIfVetted(
   // que `quarantineIfVetted`: `review` es "que alguien lo mire", y si no
   // queda anotado en ningun lado no significa nada.
   for (const f of findings) {
-    const id = `${path.replace(/\//g, "__")}__${f.field.replace(/[[\].]/g, "_")}`;
-    await db.collection(QUARANTINE_COLLECTION).doc(id).set(
-      {
-        path,
-        field: f.field,
-        kind: "routine",
-        verdict: f.verdict,
-        authorUid: authorUid ?? null,
-        redacted: f.verdict === "block",
-        at: new Date(),
-      },
-      { merge: true },
-    );
+    await escribirRegistroVersionado(db, idFor(f.field), updateTime, {
+      path,
+      field: f.field,
+      kind: "routine",
+      verdict: f.verdict,
+      authorUid: authorUid ?? null,
+      redacted: f.verdict === "block",
+      at: new Date(),
+    });
   }
 
   const hasBlocked = findings.some((f) => f.verdict === "block");
@@ -467,12 +523,7 @@ export async function quarantineRoutineIfVetted(
       await Promise.all(
         findings
           .filter((f) => f.verdict === "block")
-          .map((f) =>
-            marcarRedaccionAbandonada(
-              db,
-              `${path.replace(/\//g, "__")}__${f.field.replace(/[[\].]/g, "_")}`,
-            ),
-          ),
+          .map((f) => marcarRedaccionAbandonada(db, idFor(f.field), updateTime)),
       );
       return findings;
     }

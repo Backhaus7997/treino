@@ -228,6 +228,64 @@ describe("hallazgos de la revision", () => {
     },
   );
 
+  it(
+    "una invocacion VIEJA no corrige a redacted:false un registro que ya " +
+      "escribio una invocacion MAS NUEVA (carrera)",
+    async () => {
+      // finding 2 del PR #1227: `marcarRedaccionAbandonada` mezclaba
+      // `{redacted: false}` sin condicion. Con el trigger disparado fuera de
+      // orden, una invocacion VIEJA puede fallar su precondicion y ejecutar
+      // esa correccion DESPUES de que una invocacion MAS NUEVA ya registro Y
+      // redacto bien -- el registro final quedaba diciendo "no se redacto"
+      // sobre un campo que si se redacto.
+      //
+      // Deterministico por orden de `await`, no por timing: no hay sleep ni
+      // mock de reloj. Se simulan las DOS invocaciones llamando
+      // `quarantineIfVetted` dos veces, en el orden en que TERMINAN (la mas
+      // nueva primero, de punta a punta) y no en el orden en que un trigger
+      // real las hubiera disparado.
+      const ref = db.doc("posts/pCarrera");
+      await ref.set({ text: VETADO, authorUid: "u1" });
+      const versionVieja = (await ref.get()).updateTime;
+
+      // El documento se reescribe -- un campo SIN RELACION, `text` queda
+      // igual -- y esta es la version que gana la carrera del lado del
+      // documento fuente. Con `text` sin cambios el emulador de Firestore no
+      // avanza `updateTime` (lo probé: dos escrituras con el mismo valor
+      // exacto dan el MISMO updateTime, y el test necesita dos timestamps
+      // realmente distintos para ejercitar la comparacion). Tocar un campo
+      // ajeno es ademas mas fiel al bug real: CUALQUIER write al documento
+      // redispara el trigger para `text`, no solo una edicion de `text`
+      // (ver el dartdoc de `quarantinePost`).
+      await ref.update({ otroCampo: "cualquier cosa sin relacion" });
+      const versionNueva = (await ref.get()).updateTime;
+
+      // La invocacion MAS NUEVA corre PRIMERO y termina de punta a punta:
+      // registra Y redacta con exito (su `updateTime` coincide con la
+      // version actual del documento).
+      await quarantineIfVetted({
+        db, path: "posts/pCarrera", field: "text", value: VETADO,
+        kind: "post", authorUid: "u1", updateTime: versionNueva,
+      });
+      expect((await ref.get()).get("text")).toBe("");
+      expect((await registro("posts/pCarrera")).get("redacted")).toBe(true);
+
+      // Recien ahora "llega" la invocacion VIEJA, con `versionVieja`: su
+      // update() aborta por FAILED_PRECONDITION porque el documento ya esta
+      // en la version que escribio la invocacion nueva.
+      await quarantineIfVetted({
+        db, path: "posts/pCarrera", field: "text", value: VETADO,
+        kind: "post", authorUid: "u1", updateTime: versionVieja,
+      });
+
+      // El bug: esta correccion pisaba el registro con `redacted: false`.
+      // Tiene que seguir en `true` -- el campo SI esta redactado.
+      const regFinal = await registro("posts/pCarrera");
+      expect(regFinal.get("redacted")).toBe(true);
+      expect((await ref.get()).get("text")).toBe("");
+    },
+  );
+
   it("redacta el authorDisplayName vetado del post", async () => {
     // Viaja DENORMALIZADO y lo pone el cliente: la regla de create lo acepta
     // sin atarlo al perfil. Un post con `text` LIMPIO y nombre vetado en el
