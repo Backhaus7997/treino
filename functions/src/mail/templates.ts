@@ -629,6 +629,27 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       // Cuando la ruta exista, el CTA vuelve con SU url — no con el fallback.
     );
 
+  // El correo NO lleva el contenido reportado, ni el motivo textual de quien
+  // denuncio, ni nada que lo identifique — mismo criterio que
+  // `moderation-report-created`, arriba, y el docstring de
+  // `notify-report-created.ts:9-17`. Es un aviso sobrio: se revisó contenido
+  // de la cuenta y se tomó una medida.
+  case "moderation-user-warned":
+    return build(
+      "Revisamos contenido tuyo en TREINO", // i18n: email transaccional
+      "Advertencia de moderación",
+      [
+        ["Un moderador de TREINO revisó contenido de tu cuenta."],
+        ["Como resultado, tu cuenta recibió una advertencia."],
+        [
+          "Te pedimos que repases las ", strong("Normas de Comunidad"),
+          " antes de tu próxima publicación.",
+        ],
+      ],
+      "IR A TREINO",
+      ctaUrl,
+    );
+
   case "link-requested":
     return build(
       "Tenés una solicitud de vinculación",
