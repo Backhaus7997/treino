@@ -168,6 +168,61 @@ void main() {
     });
   });
 
+  group('perfilAseguradoProvider — calendario e intento en vuelo', () {
+    // Hallazgo de Codex en #1232: las esperas se SUMAN. Con 0/3/10/30 los
+    // intentos salían a los 0, 3, 13 y 43 s.
+    test('las esperas por default dan intentos a los 0, 3, 10 y 30 s', () {
+      final c = ProviderContainer();
+      addTearDown(c.dispose);
+      var acumulado = Duration.zero;
+      final momentos = [
+        for (final espera in c.read(esperasDelPerfilProvider))
+          acumulado += espera,
+      ];
+
+      expect(momentos, const [
+        Duration.zero,
+        Duration(seconds: 3),
+        Duration(seconds: 10),
+        Duration(seconds: 30),
+      ]);
+    });
+
+    test('el provider registra el intento en vuelo, y esperar() lo espera',
+        () async {
+      final enVuelo = Completer<void>();
+      when(
+        () => repo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+        ),
+      ).thenAnswer((_) => enVuelo.future);
+      final c = contenedor();
+      c.listen(perfilAseguradoProvider, (_, __) {});
+      auth.add(usuario());
+      await pumpEventQueue();
+
+      var termino = false;
+      unawaited(
+        c.read(intentoDelPerfilProvider).esperar().then((_) => termino = true),
+      );
+      await pumpEventQueue();
+      expect(termino, isFalse);
+
+      enVuelo.complete();
+      await pumpEventQueue();
+      expect(termino, isTrue);
+    });
+
+    test('esperar() no tira si el intento falla, y respeta el tope', () async {
+      await IntentoDelPerfil.enVuelo(Future<void>.error(Exception('offline')))
+          .esperar();
+      final nunca = Completer<void>();
+      await IntentoDelPerfil.enVuelo(nunca.future)
+          .esperar(tope: const Duration(milliseconds: 10));
+    });
+  });
+
   // Hallazgo de la revisión: un reintento podía crear `users/{uid}` —con el
   // mail— justo antes de que «Cancelar cuenta» borrara la cuenta de Auth, y el
   // doc quedaba huérfano (cancelOnboarding no borra el de Firestore).

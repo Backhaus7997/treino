@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/telemetry/non_fatal.dart';
@@ -7,18 +8,56 @@ import '../../auth/application/auth_providers.dart'
     show authStateChangesProvider;
 import '../../profile/application/user_providers.dart';
 
-/// Esperas antes de cada intento de [perfilAseguradoProvider]: uno enseguida
-/// y tres más, cada vez más separados.
+/// Esperas ENTRE intentos de [perfilAseguradoProvider]. Se suman: 0, 3, 7 y
+/// 20 s dan intentos a los 0, 3, 10 y 30 s del arranque del alta.
+///
+/// Con 0/3/10/30 los intentos salían a los 0, 3, 13 y 43 s, y el último
+/// podía no llegar a correr antes de que la persona terminara el alta
+/// (hallazgo de Codex en #1232).
 ///
 /// Es un provider para que los tests lo corran sin esperar de verdad.
 final esperasDelPerfilProvider = Provider<List<Duration>>(
   (_) => const [
     Duration.zero,
     Duration(seconds: 3),
-    Duration(seconds: 10),
-    Duration(seconds: 30),
+    Duration(seconds: 7),
+    Duration(seconds: 20),
   ],
 );
+
+/// El `createIfAbsent` de [perfilAseguradoProvider] que está en vuelo, si hay
+/// uno.
+///
+/// Existe para «Cancelar cuenta». Un intento que ya salió no se puede frenar,
+/// pero sí esperar. Si escribiera DESPUÉS de borrar la cuenta, el doc quedaría
+/// huérfano aunque la cancelación lo limpiara (hallazgo P1 de Codex en #1232).
+class IntentoDelPerfil {
+  IntentoDelPerfil();
+
+  /// Para tests: arranca con un intento en vuelo.
+  @visibleForTesting
+  IntentoDelPerfil.enVuelo(Future<void> intento) : _enVuelo = intento;
+
+  Future<void>? _enVuelo;
+
+  /// Espera a que termine el intento en vuelo, si hay uno. Nunca tira.
+  ///
+  /// Con tope: sin conexión, un batch encolado no termina hasta que vuelva la
+  /// red. Pasado el tope se sigue igual, porque esperar más dejaría a la
+  /// persona trabada en «Cancelar cuenta».
+  Future<void> esperar({Duration tope = const Duration(seconds: 10)}) async {
+    final enVuelo = _enVuelo;
+    if (enVuelo == null) return;
+    try {
+      await enVuelo.timeout(tope);
+    } catch (_) {
+      // Falló o pasó el tope: en los dos casos no queda nada que esperar.
+    }
+  }
+}
+
+final intentoDelPerfilProvider =
+    Provider.autoDispose<IntentoDelPerfil>((_) => IntentoDelPerfil());
 
 /// Reporter de [perfilAseguradoProvider], inyectable para los tests.
 final reportePerfilAseguradoProvider =
@@ -30,8 +69,10 @@ final reportePerfilAseguradoProvider =
 /// de que `cancelOnboarding` borrara la cuenta de Auth. Y ese doc queda
 /// huérfano: `cancelOnboarding` no borra el de Firestore (`UserRepository.delete`
 /// tira siempre) y no hay trigger que lo limpie al borrar la cuenta de Auth.
-/// Un intento que ya salió no se puede frenar; los siguientes, sí. Si la
-/// cancelación falla, el flag vuelve a false y los reintentos arrancan de nuevo.
+/// Un intento que ya salió no se puede frenar, pero la pantalla lo espera
+/// antes de borrar la cuenta ([IntentoDelPerfil]); los siguientes no salen.
+/// Si la cancelación falla, el flag vuelve a false y los reintentos arrancan
+/// de nuevo.
 ///
 /// autoDispose: lo mantiene vivo [perfilAseguradoProvider], que lo watchea, y
 /// muere con el alta. La cuenta siguiente arranca con el flag en false.
@@ -59,6 +100,9 @@ final altaCanceladaProvider = StateProvider.autoDispose<bool>((_) => false);
 /// Si ningún intento anda, reporta un non-fatal y el alta sigue igual: ya no
 /// depende de este doc para avanzar, y el submit lo crea (self-heal).
 final perfilAseguradoProvider = FutureProvider.autoDispose<void>((ref) async {
+  // Antes del return temprano: la cancelación necesita este objeto vivo para
+  // esperar el intento en vuelo.
+  final intento = ref.watch(intentoDelPerfilProvider);
   if (ref.watch(altaCanceladaProvider)) return;
   // El watch de arriba reconstruye este provider cuando cambia el flag, pero
   // no en el acto: flutter_riverpod lo ejecuta en el próximo frame
@@ -92,7 +136,9 @@ final perfilAseguradoProvider = FutureProvider.autoDispose<void>((ref) async {
     if (espera > Duration.zero) await Future<void>.delayed(espera);
     if (!vivo || cancelacion.state) return;
     try {
-      await repo.createIfAbsent(uid: uid, email: cuenta.email ?? '');
+      final enVuelo = repo.createIfAbsent(uid: uid, email: cuenta.email ?? '');
+      intento._enVuelo = enVuelo;
+      await enVuelo;
       return;
     } catch (e, st) {
       ultimoError = e;
