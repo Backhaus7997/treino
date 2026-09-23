@@ -232,6 +232,21 @@ interface PendingReport {
   createdAt: string | null;
   firstViewedAt: string | null;
   /**
+   * La accion que YA se ejecuto —o se pudo haber ejecutado— sobre este
+   * reporte sin que la resolucion llegara a cerrarse. `null` en el caso
+   * normal.
+   *
+   * Un `userSuspended` que deshabilita la cuenta en Auth y despues no llega
+   * al PASO 4 devuelve el reporte a la cola sin ningun indicio: el proximo
+   * moderador lo descarta y queda `dismissed`/`none` escrito sobre una
+   * cuenta dada de baja. Auth y el mail queue no entran en una transaccion
+   * de Firestore, asi que ese estado parcial no se puede evitar — lo unico
+   * que se puede es que NO SEA INVISIBLE para quien aprieta el boton.
+   */
+  attemptedAction: ReportAction | null;
+  /** Cuando se anoto ese intento. `null` si no hay ninguno. */
+  attemptedAt: string | null;
+  /**
    * Ruta del documento reportado, o `null` si no se puede derivar.
    *
    * Sin esto la cola es inservible para los reportes de MENSAJE: el cliente
@@ -395,6 +410,10 @@ export async function listPendingReportsHandler(
       const status = rev.get("status") as ReportStatus | undefined;
       if (status === "actioned" || status === "dismissed") continue;
       const visto = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
+      // Ver `PendingReport.attemptedAction`.
+      const intento = rev.get("attemptedAction") as ReportAction | undefined;
+      const intentoAt = rev.get("attemptedAt") as
+        { toDate(): Date } | undefined;
 
       const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
       const reporterUid = String(doc.get("reporterUid") ?? "");
@@ -412,6 +431,8 @@ export async function listPendingReportsHandler(
         reporterUid,
         createdAt: createdAt ? createdAt.toDate().toISOString() : null,
         firstViewedAt: visto ? visto.toDate().toISOString() : null,
+        attemptedAction: intento ?? null,
+        attemptedAt: intentoAt ? intentoAt.toDate().toISOString() : null,
         contentPath: resolveContentPath({
           targetKind,
           targetId,
@@ -798,17 +819,23 @@ export async function resolveReportHandler(
     );
   });
 
+  // Lo llena `executeClaimedResolution` en cuanto deja anotado el intento
+  // (PASO 2). El catch de abajo lo necesita: una vez que `attemptedAction`
+  // esta escrito, borrar el review entero se lleva puesta la unica senal de
+  // que sobre este reporte YA se ejecuto —o se pudo haber ejecutado— algo.
+  const progreso = { intentoRegistrado: false };
+
   try {
     await executeClaimedResolution(db, app, moderatorUid, reportId, {
       status: status as ReportStatus,
       action: action as ReportAction,
       note: typeof note === "string" ? note : null,
-    });
+    }, progreso);
   } catch (err) {
     // Liberar el claim para que un reintento legitimo no tenga que esperar
     // el TTL. Best-effort: si esto mismo falla, `CLAIM_TTL_MS` sigue siendo
     // la red de seguridad.
-    const liberar = reviewExistiaAntesDelClaim
+    const liberar = reviewExistiaAntesDelClaim || progreso.intentoRegistrado
       ? reviewRef.set(
         { claimedAt: FieldValue.delete(), claimedBy: FieldValue.delete() },
         { merge: true },
@@ -828,6 +855,43 @@ export async function resolveReportHandler(
 }
 
 /**
+ * Deja escrito que el intento del PASO 2 NO se ejecuto.
+ *
+ * Se llama solo desde donde se SABE que no se muto nada — hoy, la
+ * precondicion de la redaccion, que Firestore rechaza atomicamente. Para
+ * cualquier otro error el intento queda en `attempted`, que es la respuesta
+ * honesta: no sabemos si entro.
+ *
+ * Best-effort: si esto falla, lo peor que queda es un `attempted` sobre algo
+ * que no paso — que sub-afirma, que es el lado seguro del error.
+ *
+ * Tambien baja `progreso.intentoRegistrado`, y no es un detalle: el catch de
+ * `resolveReportHandler` lo lee para decidir si puede borrar el review que su
+ * propio claim creo. Anulado el intento, ese documento no tiene nada que
+ * decir, y dejarlo vacio seria basura sobre un reporte que vuelve a la cola
+ * exactamente como estaba. Una cola que avisa "aca paso algo" sobre un
+ * reporte donde no paso nada entrena a ignorar el aviso (AGENTS.md 11.1).
+ */
+async function anularIntento(
+  db: Firestore,
+  reportId: string,
+  progreso: { intentoRegistrado: boolean },
+): Promise<void> {
+  await db.collection("audit_log").doc(`moderation__${reportId}`).set(
+    { outcome: "failed", failedAt: new Date() },
+    { merge: true },
+  );
+  await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
+    {
+      attemptedAction: FieldValue.delete(),
+      attemptedAt: FieldValue.delete(),
+    },
+    { merge: true },
+  );
+  progreso.intentoRegistrado = false;
+}
+
+/**
  * PASO 1 a PASO 4 de `resolveReportHandler`, sobre un reporte YA reclamado
  * por su PASO 0.
  *
@@ -843,6 +907,7 @@ async function executeClaimedResolution(
   moderatorUid: string,
   reportId: string,
   input: { status: ReportStatus; action: ReportAction; note: string | null },
+  progreso: { intentoRegistrado: boolean },
 ): Promise<void> {
   const { status, action, note } = input;
 
@@ -1112,6 +1177,15 @@ async function executeClaimedResolution(
 
   // -------------------------------------------------------------------
   // PASO 2 — audit_log ANTES de mutar. Ver el docstring de arriba.
+  //
+  // Se escribe como INTENTO, no como hecho. Entre esta linea y el PASO 4 hay
+  // una mutacion que puede fallar —y Auth y el mail queue no entran en una
+  // transaccion de Firestore, asi que no hay forma de atarlos—, y un
+  // `audit_log` que afirma `action: "contentRemoved"` sobre una redaccion
+  // que despues se aborto es una afirmacion falsa sobre el unico registro
+  // que se mira en una apelacion (AGENTS.md 11.1). `outcome` lo dice:
+  // `attempted` acá, `executed` en el PASO 4, `failed` cuando sabemos que
+  // la mutacion no entro.
   // -------------------------------------------------------------------
   if (action !== "none") {
     await db.collection("audit_log").doc(`moderation__${reportId}`).set({
@@ -1140,8 +1214,34 @@ async function executeClaimedResolution(
       // `removedContent: null` y no tendria como saber donde esta el texto
       // original ni por que estas no lo traen.
       alreadyRemovedByReportId,
+      // Ver el comentario de arriba. Lo confirma el PASO 4.
+      outcome: "attempted",
       at: new Date(),
     });
+
+    // La misma noticia en `report_reviews`, que es lo que lee la COLA.
+    //
+    // Sin esto, un `userSuspended` que ejecuta y despues no llega al PASO 4
+    // deja la cuenta deshabilitada en Auth, el audit escrito, y el reporte
+    // de vuelta en la cola sin un solo indicio: el proximo moderador lo
+    // descarta y queda `dismissed`/`none` sobre una cuenta dada de baja.
+    // El audit_log sabe lo que paso, pero nadie lo mira antes de apretar un
+    // boton — la cola si.
+    //
+    // No va en la misma escritura que el audit porque son dos colecciones
+    // distintas; y no hace falta que sean atomicas: las dos pasan ANTES de
+    // mutar nada, asi que si la segunda falla, el PASO 3 no llega a correr.
+    //
+    // El camino del DUPLICADO se saltea: no ejecuta ninguna mutacion —no
+    // redacta, no toca Auth, no encola mail— asi que no hay nada que pueda
+    // quedar a medias, y avisarlo igual seria la alarma que grita siempre.
+    if (alreadyRemovedByReportId === null) {
+      await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
+        { attemptedAction: action, attemptedAt: new Date() },
+        { merge: true },
+      );
+      progreso.intentoRegistrado = true;
+    }
   }
 
   // -------------------------------------------------------------------
@@ -1202,6 +1302,21 @@ async function executeClaimedResolution(
         // de audit_log tiene id deterministico (`moderation__{reportId}`), de
         // modo que el reintento la pisa en vez de dejar dos versiones del
         // mismo hecho.
+        //
+        // Y hasta que eso pase, el intento se anula: Firestore rechazo la
+        // escritura ENTERA, asi que aca —y solo aca— sabemos con certeza que
+        // no se muto nada. Sin esto el audit_log quedaba afirmando
+        // `contentRemoved` con un `removedContent` que nunca se retiro, y si
+        // despues alguien descartaba el reporte, `report_reviews` decia
+        // `dismissed`/`none`: dos registros del mismo hecho contradiciendose,
+        // y el que se mira en una apelacion es el que mentia.
+        await anularIntento(db, reportId, progreso).catch((limpiezaErr) => {
+          logger.warn(
+            "resolveReport: no se pudo anular el intento tras la carrera — " +
+            "el audit_log queda en 'attempted'",
+            { reportId, error: limpiezaErr },
+          );
+        });
         throw new HttpsError(
           "aborted",
           "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
@@ -1286,7 +1401,45 @@ async function executeClaimedResolution(
   // "dismissed", ese mismo valor ya excluye cualquier claim nuevo (primer
   // chequeo de la transaccion del PASO 0), asi que dejarlos no protege
   // nada mas — quedarian como metadata muerta sobre un reporte resuelto.
+  //
+  // El audit_log se confirma PRIMERO, y a proposito no en la misma escritura
+  // que el cierre. Las dos ordenes posibles fallan distinto y una sola de
+  // ellas falla del lado seguro:
+  //
+  // - confirmar el audit y no llegar a cerrar → el audit dice `executed` y
+  //   el reporte vuelve a la cola CON su `attemptedAction` a la vista. El
+  //   moderador ve que ya se ejecuto algo antes de decidir. Recuperable.
+  // - cerrar primero y no llegar a confirmar → `report_reviews` afirma que
+  //   se acciono mientras el audit todavia dice `attempted`. Sub-afirma, que
+  //   es el lado seguro, pero el reporte ya salio de la cola y nadie vuelve
+  //   a mirarlo.
+  //
+  // Por eso va en este orden. Una transaccion no arregla nada de esto: la
+  // mutacion de verdad (Auth, el mail queue) vive fuera de Firestore.
   // -------------------------------------------------------------------
+  const auditRef = db.collection("audit_log").doc(`moderation__${reportId}`);
+  if (action !== "none") {
+    await auditRef.set(
+      { outcome: "executed", executedAt: new Date() },
+      { merge: true },
+    );
+  } else {
+    // `dismissed`/`none` NO crea una entrada de audit_log — hay un test que
+    // lo fija, y esta bien: descartar no es accionar.
+    //
+    // Pero si YA existe una, es de un intento anterior sobre ESTE reporte
+    // que no llego a cerrarse. Dejarla sin el cierre hace que la apelacion
+    // lea «se intento userSuspended» de un lado y «descartado, no se
+    // acciono» del otro, sin nada que las ate. `closedAs` las ata.
+    const previa = await auditRef.get();
+    if (previa.exists) {
+      await auditRef.set(
+        { closedAs: { status, action, at: new Date() } },
+        { merge: true },
+      );
+    }
+  }
+
   const cierre = {
     status,
     action,
@@ -1295,6 +1448,11 @@ async function executeClaimedResolution(
     resolvedAt: new Date(),
     claimedAt: FieldValue.delete(),
     claimedBy: FieldValue.delete(),
+    // El intento del PASO 2 ya no es una incognita: se cerro. Dejarlo
+    // haria que la cola avisara "aca se ejecuto algo sin confirmar" sobre
+    // un reporte que ya tiene su resolucion escrita al lado.
+    attemptedAction: FieldValue.delete(),
+    attemptedAt: FieldValue.delete(),
   };
   const reviewRef = db.collection(REVIEWS_COLLECTION).doc(reportId);
 
@@ -1318,21 +1476,36 @@ async function executeClaimedResolution(
   // Se compara `updateTime` y no "sigue vacio": cualquier escritura sobre
   // ese documento merece que el moderador lo vuelva a mirar, y `null`
   // (no existia) contra `null` cubre el caso de que ademas se haya borrado.
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(db.doc(guardaDeDuplicado.path));
-    const ahora = snap.exists ? snap.updateTime ?? null : null;
-    const sinCambios = guardaDeDuplicado.updateTime === null
-      ? ahora === null
-      : ahora !== null && ahora.isEqual(guardaDeDuplicado.updateTime);
-    if (!sinCambios) {
-      throw new HttpsError(
-        "aborted",
-        "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
-        "reporte sigue en la cola.",
+  const guarda = guardaDeDuplicado;
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(db.doc(guarda.path));
+      const ahora = snap.exists ? snap.updateTime ?? null : null;
+      const sinCambios = guarda.updateTime === null
+        ? ahora === null
+        : ahora !== null && ahora.isEqual(guarda.updateTime);
+      if (!sinCambios) {
+        throw new HttpsError(
+          "aborted",
+          "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
+          "reporte sigue en la cola.",
+        );
+      }
+      tx.set(reviewRef, cierre, { merge: true });
+    });
+  } catch (err) {
+    // Este camino no muta NADA: si el cierre no entro, no entro nada. El
+    // audit ya se habia confirmado como `executed` unas lineas arriba, y
+    // dejarlo asi seria afirmar una ejecucion que no ocurrio.
+    await anularIntento(db, reportId, progreso).catch((limpiezaErr) => {
+      logger.warn(
+        "resolveReport: no se pudo anular el intento del duplicado — el " +
+        "audit_log queda en 'executed' sobre un cierre que no entro",
+        { reportId, error: limpiezaErr },
       );
-    }
-    tx.set(reviewRef, cierre, { merge: true });
-  });
+    });
+    throw err;
+  }
 }
 
 /**
