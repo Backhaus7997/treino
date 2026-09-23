@@ -485,17 +485,37 @@ async function enqueueWarningMailOrThrow(
  * este repo siempre vienen de `getDownloadURL()` (`post_photo_upload_service`,
  * `chat_media_upload_service`), asi que en el caso real esto deriva; el
  * `null` es para lo inesperado.
+ *
+ * ## Dos debilidades que tenia la primera version
+ *
+ * 1. `hostname.includes(...)` — lo marco CodeQL (alerta 29, "Incomplete URL
+ *    substring sanitization"). Un host atacante puede llevar ese dominio
+ *    adentro: `firebasestorage.googleapis.com.evil.com` pasaba el chequeo.
+ *    Ahora la comparacion es EXACTA.
+ * 2. El docstring prometia "exactamente esa forma" y el codigo se quedaba
+ *    con el ULTIMO segmento, sin mirar el `/o/`: `.../cualquier/cosa`
+ *    devolvia `cosa` como si fuera un path de objeto. Esa es la §11.1 —
+ *    un comentario que tranquiliza sobre algo que el codigo de al lado no
+ *    hace. Ahora la forma se valida de verdad.
+ *
+ * El mismo par de debilidades estaba en el original Dart del que se porto
+ * esto; van corregidas juntas, porque son el mismo bug en dos lenguajes.
  */
 export function extractStoragePath(url: string): string | null {
   try {
     const parsed = new URL(url);
-    if (!parsed.hostname.includes("firebasestorage.googleapis.com")) {
+    // Comparacion EXACTA, no `includes`: ver la debilidad 1 del docstring.
+    if (parsed.hostname !== "firebasestorage.googleapis.com") {
       return null;
     }
+    // La forma es `/v0/b/{bucket}/o/{path}`: el path es UN segmento
+    // urlencodeado y va inmediatamente despues de `o`. Cualquier otra cosa
+    // no es una URL de descarga y devuelve null.
     const segments = parsed.pathname.split("/").filter((s) => s.length > 0);
-    const last = segments[segments.length - 1];
-    if (!last) return null;
-    return decodeURIComponent(last);
+    if (segments.length !== 5) return null;
+    const [v0, b, , o, encoded] = segments;
+    if (v0 !== "v0" || b !== "b" || o !== "o" || !encoded) return null;
+    return decodeURIComponent(encoded);
   } catch {
     return null;
   }
