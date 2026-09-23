@@ -39,6 +39,17 @@ export type MailKind =
   // Sin el, la cola de revision existe pero nadie la mira, y las 24 horas que
   // promete `docs/legal/normas-de-comunidad.md:123` siguen siendo mentira.
   | "moderation-report-created"
+  // Aviso al usuario reportado cuando un moderador resuelve el reporte con
+  // "advertido". `resolveReport` guardaba solo la etiqueta y no avisaba a
+  // nadie — esto es lo que la hace real.
+  //
+  // NO lleva el contenido reportado, ni el motivo textual del denunciante,
+  // ni nada que lo identifique — mismo criterio que
+  // `notify-report-created.ts:9-17`. Sin `prefKey`, como sus hermanos legales
+  // (`moderation-report-created`, `payment-overdue`): no es una notificacion
+  // de producto que se pueda apagar, es que se reviso contenido de la cuenta
+  // y se tomo una medida.
+  | "moderation-user-warned"
   // ── Suscripcion del PF a TREINO ─────────────────────────────────────────
   //
   // OJO — NO CONFUNDIR CON `payment-overdue`. Ese va al ATLETA y es sobre la
