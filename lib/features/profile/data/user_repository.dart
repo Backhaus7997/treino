@@ -426,6 +426,48 @@ class UserRepository {
   /// partial, la primera rama de [_resolveEffectiveLocationConsent] resuelve
   /// el gate sin `get()`, y el espejo recibe las ubicaciones del FORMULARIO
   /// —lo que el PF efectivamente consintió— en el único commit que hay.
+  /// Deja anotado que el alumno chocó un tope del plano free.
+  ///
+  /// ── Para qué sirve, y por qué NO lo lee la app ──
+  ///
+  /// Para que el backend pueda mandarle un mail contándole que hay una salida.
+  /// La app no puede decírselo: la Guideline 3.1.3(f) de Apple exime del IAP a
+  /// las apps companion siempre que no haya compras adentro **ni llamados a
+  /// comprar afuera**, y ese amparo es lo que sostiene el cobro del entrenador.
+  /// La hoja de límite no cambia ni una palabra por esto — lo que se escribe
+  /// acá es invisible, y Apple revisa la interfaz.
+  ///
+  /// El mail está explícitamente permitido: *«send communications outside of
+  /// the app to their user base about purchasing methods other than in-app
+  /// purchase»*.
+  ///
+  /// ── Por qué NO pasa por [update] ──
+  ///
+  /// Porque [update] resuelve el subset público, el consentimiento de
+  /// ubicación y el guard de moderación: una LECTURA y un batch por cada tope
+  /// tocado, para anotar dos campos que sólo mira una función. Esto es una
+  /// escritura sola, con `merge`.
+  ///
+  /// ── Total: nunca tira ──
+  ///
+  /// Se llama al abrir la hoja, y la hoja tiene que abrirse igual. Que el
+  /// usuario no vea el mensaje que explica por qué no puede hacer algo —porque
+  /// falló una anotación que no le importa— sería cambiarle un límite
+  /// explicado por uno mudo.
+  Future<void> registrarTopeTocado(String uid, String tope) async {
+    try {
+      await _users.doc(uid).set(
+        <String, Object?>{
+          'freePlanLimitHitKind': tope,
+          'freePlanLimitHitAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      // Ver el dartdoc: la hoja abre igual.
+    }
+  }
+
   Future<void> update(
     String uid,
     Map<String, Object?> partial, {

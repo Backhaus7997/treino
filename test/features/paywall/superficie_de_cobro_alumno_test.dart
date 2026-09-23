@@ -346,6 +346,43 @@ void main() {
             'lugar donde se podia pasar otra.',
       );
     });
+
+    test('la hoja de limite no ANUNCIA el mail', () {
+      // La hoja anota que el tope se toco, para que el backend pueda mandar un
+      // mail con la salida. Esa anotacion es INVISIBLE, y ahi esta todo el
+      // asunto: lo que Apple revisa es la interfaz, y un dato que el usuario no
+      // ve no es un llamado a comprar.
+      //
+      // Un «te mandamos un mail con los planes» impreso aca SI lo seria:
+      // señalizaria el camino de compra desde adentro del binario, que es
+      // exactamente lo que 3.1.3(f) prohibe. La diferencia entre lo que hacemos
+      // y una infraccion es que el usuario no se entera por la app.
+      //
+      // Se escanea el TEXTO que la hoja puede mostrar: las claves de l10n y los
+      // literales. Los comentarios se sacan —explican por que existe el mail, y
+      // esa prosa tiene que poder nombrarlo—.
+      final hoja = File(
+        'lib/features/paywall/presentation/free_plan_limit_sheet.dart',
+      );
+      final codigo = _sinComentarios(hoja).toLowerCase();
+
+      for (final prohibido in [
+        'mail',
+        'correo',
+        'email',
+        'te escribimos',
+        'te avisamos',
+      ]) {
+        expect(
+          codigo.contains(prohibido),
+          isFalse,
+          reason: 'la hoja nombra «$prohibido». Anotar el tope es invisible y '
+              'esta bien; ANUNCIAR que va a llegar un mail con los planes es '
+              'señalizar la compra desde adentro de la app, y se lleva puesta '
+              'la exencion 3.1.3(f) del ENTRENADOR.',
+        );
+      }
+    });
   });
 
   group('los guards de esta carpeta se normalizan bien', () {
