@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:treino/features/auth/data/apple_sign_in_gateway.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/auth/presentation/legal/legal_content.dart';
@@ -47,9 +49,12 @@ final _fakeProfile = UserProfile(
   updatedAt: DateTime.utc(2026, 5, 11),
 );
 
+class _MockAppleSignInGateway extends Mock implements AppleSignInGateway {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
+    registerFallbackValue(<AppleIDAuthorizationScopes>[]);
   });
 
   late MockFirebaseAuth fbAuth;
@@ -60,6 +65,9 @@ void main() {
   late MockUserRepository mockRepo;
   late MockGoogleSignIn googleSignIn;
   late AuthService sut;
+
+  /// `reason` de cada non-fatal que reportó el servicio.
+  late List<String> reportados;
 
   setUp(() {
     fbAuth = MockFirebaseAuth();
@@ -106,11 +114,14 @@ void main() {
     // El callable exige auth; despues del alta el usuario YA esta firmado.
     when(() => fbAuth.currentUser).thenReturn(user);
 
+    reportados = <String>[];
     sut = AuthService(
       firebaseAuth: fbAuth,
       userRepository: mockRepo,
       functions: functions,
       googleSignIn: googleSignIn,
+      nonFatalReporter: (error, stack, {required reason}) async =>
+          reportados.add(reason),
     );
   });
 
@@ -491,6 +502,9 @@ void main() {
         password: 'Pass1234',
       );
       expect(result, user);
+      // Best-effort, pero no mudo: ese catch vacío escondió por qué las
+      // cuentas llegaban al alta sin `users/{uid}`.
+      expect(reportados.single, contains('signInWithEmail'));
     });
 
     // signIn backfill no longer synthesizes a displayName from the email
@@ -767,6 +781,8 @@ void main() {
           email: 'a@b.c',
         ),
       ).called(1);
+      // Control del test de abajo: si el create anda, no se reporta nada.
+      expect(reportados, isEmpty);
     });
 
     test('signInWithGoogle: createIfAbsent throwing does NOT fail the sign-in',
@@ -785,6 +801,56 @@ void main() {
       final result = await sut.signInWithGoogle();
 
       expect(result, user);
+      expect(reportados.single, contains('signInWithGoogle'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // signInWithApple
+  // ---------------------------------------------------------------------------
+  group('AuthService.signInWithApple', () {
+    // El camino de una de las cuentas que en producción llegaron al alta sin
+    // `users/{uid}` (22/09): el create del login falló y nadie se enteró.
+    test('createIfAbsent tirando no rompe el login, pero se reporta', () async {
+      final apple = _MockAppleSignInGateway();
+      when(
+        () => apple.getAppleIDCredential(
+          scopes: any(named: 'scopes'),
+          nonce: any(named: 'nonce'),
+        ),
+      ).thenAnswer(
+        (_) async => const AuthorizationCredentialAppleID(
+          userIdentifier: 'apple-user',
+          givenName: null,
+          familyName: null,
+          authorizationCode: 'auth-code',
+          email: null,
+          identityToken: 'id-token',
+          state: null,
+        ),
+      );
+      when(() => fbAuth.signInWithCredential(any()))
+          .thenAnswer((_) async => cred);
+      when(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+        ),
+      ).thenThrow(Exception('Firestore down'));
+      final conApple = AuthService(
+        firebaseAuth: fbAuth,
+        userRepository: mockRepo,
+        functions: functions,
+        googleSignIn: googleSignIn,
+        appleGateway: apple,
+        nonFatalReporter: (error, stack, {required reason}) async =>
+            reportados.add(reason),
+      );
+
+      final result = await conApple.signInWithApple();
+
+      expect(result, user);
+      expect(reportados.single, contains('signInWithApple'));
     });
   });
 
