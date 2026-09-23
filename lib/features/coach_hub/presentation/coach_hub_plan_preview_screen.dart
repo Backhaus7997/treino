@@ -9,6 +9,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hu
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -46,6 +47,20 @@ class CoachHubPlanPreviewScreen extends ConsumerStatefulWidget {
   ConsumerState<CoachHubPlanPreviewScreen> createState() =>
       _CoachHubPlanPreviewScreenState();
 }
+
+/// Resultado de intentar asignarle el plan importado a UN atleta, dentro del
+/// batch en paralelo de [_CoachHubPlanPreviewScreenState._assign]. `null` en
+/// el `Future.wait` sigue significando éxito — mismo criterio que antes de
+/// este fix, que sólo guardaba el `athleteId` en el fallo.
+///
+/// Antes de esto el catch-all devolvía nada más que el id y perdía la
+/// excepción real: un `ModerationBlockedException` (contenido vetado —
+/// reintentar no sirve NUNCA, el mismo plan vuelve a fallar igual) se
+/// mostraba con el mismo "Probá de nuevo" que un fallo de red (donde
+/// reintentar sí puede andar). Mismo patrón que `ResultadoDePublicar` en
+/// `routine_actions_provider.dart`: se preserva la categoría en el resultado
+/// del batch en vez de aplanarla en el `catch`.
+typedef _FalloAsignacion = ({String athleteId, String? campoBloqueo});
 
 class _CoachHubPlanPreviewScreenState
     extends ConsumerState<CoachHubPlanPreviewScreen> {
@@ -172,32 +187,70 @@ class _CoachHubPlanPreviewScreenState
     // falló — que es justo lo que alimenta el reintento acotado de abajo.
     // `Future.wait` preserva el orden de entrada, así que `failed` sigue
     // saliendo en orden de selección, igual que con el loop.
-    final resultados = await Future.wait(
-      athleteIds.map((athleteId) async {
-        final routine = _buildRoutine(
-          plan: plan,
-          trainerUid: trainerUid,
-          athleteId: athleteId,
+    // Tipo de retorno EXPLICITO a propósito: sin él, Dart tiene que inferir
+    // el tipo de la función a partir de tres `return` con formas distintas
+    // (`null`, un record con `campoBloqueo: String`, uno con
+    // `campoBloqueo: null`) y unificarlos de abajo hacia arriba. Anotado, cada
+    // `return` se chequea CONTRA `_FalloAsignacion?` en vez de aportar a esa
+    // inferencia — sin esto `campoBloqueo: null` podía terminar tipado `Null`
+    // en vez de `String?` y romper la forma que espera `_FalloAsignacion`.
+    Future<_FalloAsignacion?> intentarAsignar(String athleteId) async {
+      final routine = _buildRoutine(
+        plan: plan,
+        trainerUid: trainerUid,
+        athleteId: athleteId,
+      );
+      try {
+        // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es
+        // donde su dartdoc siempre dijo que estaba. `routine_created` sí se
+        // queda — lleva un `source` que sólo conoce el llamador.
+        await repo.createAssigned(routine);
+        analytics.logRoutineCreated(
+          source: RoutineCreationSource.trainerAssigned,
+          daysCount: routine.days.length,
+          weeksCount: routine.numWeeks,
         );
-        try {
-          // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es
-          // donde su dartdoc siempre dijo que estaba. `routine_created` sí se
-          // queda — lleva un `source` que sólo conoce el llamador.
-          await repo.createAssigned(routine);
-          analytics.logRoutineCreated(
-            source: RoutineCreationSource.trainerAssigned,
-            daysCount: routine.days.length,
-            weeksCount: routine.numWeeks,
-          );
-          return null;
-        } catch (_) {
-          return athleteId;
-        }
-      }),
-    );
-    final failed = resultados.whereType<String>().toList();
+        return null;
+      } on ModerationBlockedException catch (e) {
+        // Rama propia y NO el catch-all de abajo: `_ensureRoutineTextIsClean`
+        // (routine_repository.dart) corre sobre el MISMO `plan`
+        // (name/split/summary/days) para los N atletas de este batch —
+        // si el guard bloquea a uno los bloquea a TODOS, con el mismo
+        // `campo`. Caer en el catch-all acá era justo el bug: mostraba
+        // "Probá de nuevo" sobre un plan que va a fallar siempre, sin
+        // ninguna guía de qué corregir.
+        return (athleteId: athleteId, campoBloqueo: e.campo);
+      } catch (_) {
+        return (athleteId: athleteId, campoBloqueo: null);
+      }
+    }
+
+    final resultados = await Future.wait(athleteIds.map(intentarAsignar));
+    final failed = resultados.whereType<_FalloAsignacion>().toList();
 
     if (!mounted) return;
+
+    // Bloqueo del filtro de términos vetados: por el determinismo de arriba,
+    // si ALGUNO de los fallos trae `campoBloqueo` es porque TODOS los
+    // atletas de este batch comparten el mismo plan bloqueado. No hay
+    // subconjunto que reintentar -- "Probá de nuevo" es consejo falso acá -- y
+    // un mensaje por atleta repetiría N veces lo mismo cuando es un plan
+    // bloqueado, no N fallos independientes. `ubicacionLegible` le ahorra al
+    // PF adivinar cuál de hasta 40 notas (5 días x 8 slots) fue.
+    final campoBloqueado = failed
+        .map((f) => f.campoBloqueo)
+        .firstWhere((campo) => campo != null, orElse: () => null);
+    if (campoBloqueado != null) {
+      final l10n = AppL10n.of(context);
+      final ubicacion = ModerationGuard.ubicacionLegible(campoBloqueado);
+      setState(() {
+        _error = ubicacion == null
+            ? l10n.moderationBlockedMessage
+            : '$ubicacion: ${l10n.moderationBlockedMessage}';
+        _saving = false;
+      });
+      return;
+    }
 
     // Total failure: nothing was saved. Keep the parsed plan and the current
     // selection so the trainer can retry without re-uploading the Excel.
@@ -218,7 +271,7 @@ class _CoachHubPlanPreviewScreenState
       setState(() {
         _selectedAthleteIds
           ..clear()
-          ..addAll(failed);
+          ..addAll(failed.map((f) => f.athleteId));
         _error = 'Plan asignado a $ok atleta(s). ${failed.length} fallaron. '
             'Quedaron seleccionados para reintentar.';
         _saving = false;

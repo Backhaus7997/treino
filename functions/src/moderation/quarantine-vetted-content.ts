@@ -73,6 +73,83 @@ const REDACTADO = "";
  */
 const FAILED_PRECONDITION = 9;
 
+/**
+ * Escribe (merge) sobre el registro de cuarentena [id], pero SOLO si
+ * [updateTime] no es mas viejo que la version ya escrita ahi.
+ *
+ * Todo lo que este archivo escribe sobre `redacted` pasa por aca: tanto el
+ * registro optimista inicial (`quarantineIfVetted` / `quarantineRoutineIfVetted`,
+ * ANTES de intentar el `update()` del documento fuente) como la correccion
+ * cuando ese `update()` aborta por precondicion (`marcarRedaccionAbandonada`,
+ * mas abajo). Las dos escrituras son async y el trigger que las dispara puede
+ * entregar eventos fuera de orden entre invocaciones concurrentes del MISMO
+ * documento — sin esta guarda, cualquiera de las dos puede pisar el resultado
+ * de una invocacion MAS NUEVA que ya escribio el suyo. Con ella, gana siempre
+ * la version mas alta, sin importar en que orden llegaron las escrituras.
+ *
+ * La transaccion compara contra `sourceUpdateTime`, el `updateTime` del
+ * documento fuente que la invocacion GANADORA tenia en el momento de escribir
+ * — no contra el `updateTime` actual del documento (que en el momento de la
+ * correccion YA esta en una version mas nueva por definicion: es POR ESO que
+ * el `update()` abortó). `Timestamp.valueOf()` esta documentado para esto
+ * (google-cloud/firestore `timestamp.d.ts`): devuelve un string pensado para
+ * compararse con `>`/`<`.
+ *
+ * Sin `updateTime` no hay con que comparar: se hace el merge sin condicion,
+ * igual que antes de este fix — no todos los llamadores lo pasan.
+ */
+async function escribirRegistroVersionado(
+  db: Firestore,
+  id: string,
+  updateTime: FirebaseFirestore.Timestamp | undefined,
+  data: FirebaseFirestore.DocumentData,
+): Promise<void> {
+  const ref = db.collection(QUARANTINE_COLLECTION).doc(id);
+  if (!updateTime) {
+    await ref.set(data, { merge: true });
+    return;
+  }
+  await db.runTransaction(async (tx) => {
+    const actual = await tx.get(ref);
+    const previa = actual.get("sourceUpdateTime") as
+      | FirebaseFirestore.Timestamp
+      | undefined;
+    if (previa && previa.valueOf() > updateTime.valueOf()) {
+      // Una invocacion mas nueva ya escribio su resultado aca. Silencio a
+      // proposito, mismo criterio que el log de mas abajo: esa escritura
+      // nueva disparo SU PROPIO trigger y ya se reviso por su cuenta.
+      logger.info("quarantine: se descarta una escritura vieja", { id });
+      return;
+    }
+    tx.set(ref, { ...data, sourceUpdateTime: updateTime }, { merge: true });
+  });
+}
+
+/**
+ * Corrige el registro cuando la redaccion se abandona por precondicion.
+ *
+ * `redacted` se escribe ANTES de intentar el `update()` (para que el
+ * registro exista aunque la funcion se caiga en el medio), pero eso significa
+ * que si el `update()` despues aborta por `FAILED_PRECONDITION` el registro
+ * queda afirmando `redacted: true` sobre un documento que no se toco. Quien
+ * modera filtrando por `redacted: false` para ver que falta atender no ve
+ * ese documento — una advertencia falsa (§11.1).
+ *
+ * A traves de [escribirRegistroVersionado] y NO con un `.set()` directo: una
+ * invocacion VIEJA (la de este `catch`, justamente) puede llegar a esta
+ * correccion DESPUES de que una invocacion mas nueva ya registro Y redacto
+ * bien — sin la guarda de version, este merge incondicional pisaria ese
+ * `redacted: true` correcto con un `false`. Misma familia de bug que el que
+ * este comentario describe arriba, del otro lado.
+ */
+async function marcarRedaccionAbandonada(
+  db: Firestore,
+  id: string,
+  updateTime: FirebaseFirestore.Timestamp | undefined,
+): Promise<void> {
+  await escribirRegistroVersionado(db, id, updateTime, { redacted: false });
+}
+
 export interface QuarantineInput {
   db: Firestore;
   /** Ruta completa del documento que disparo el trigger. */
@@ -123,21 +200,18 @@ export async function quarantineIfVetted(
   // UN registro, no dos. La cola de moderacion no necesita el historial de
   // intentos, necesita saber que este documento esta pendiente.
   const id = path.replace(/\//g, "__");
-  await db.collection(QUARANTINE_COLLECTION).doc(id).set(
-    {
-      path,
-      field,
-      kind,
-      verdict,
-      authorUid: authorUid ?? null,
-      // El TEXTO NO se guarda. Puede tener datos personales de terceros, y en
-      // el chat puede tener datos de salud. Quien modere abre el documento
-      // original, autenticado.
-      redacted: verdict === "block",
-      at: new Date(),
-    },
-    { merge: true },
-  );
+  await escribirRegistroVersionado(db, id, updateTime, {
+    path,
+    field,
+    kind,
+    verdict,
+    authorUid: authorUid ?? null,
+    // El TEXTO NO se guarda. Puede tener datos personales de terceros, y en
+    // el chat puede tener datos de salud. Quien modere abre el documento
+    // original, autenticado.
+    redacted: verdict === "block",
+    at: new Date(),
+  });
 
   if (verdict !== "block") return verdict;
 
@@ -154,6 +228,7 @@ export async function quarantineIfVetted(
     if ((err as { code?: number }).code === FAILED_PRECONDITION) {
       logger.info("quarantine: el documento cambio, lo revisa su propio evento",
         { path, field });
+      await marcarRedaccionAbandonada(db, id, updateTime);
       return verdict;
     }
     throw err;
@@ -278,6 +353,189 @@ export async function quarantineAuthorName(input: {
   return true;
 }
 
+/** Un dato en `moderation_quarantine` para UN campo de UNA rutina. */
+export interface RoutineQuarantineFinding {
+  /**
+   * Identifica el campo exacto que fallo — `'name'`, `'split'`, `'summary'`,
+   * o la forma indexada `'days[1].slots[3].notes'` para los anidados. Mismo
+   * shape que usa `ModerationGuard.ensure` del lado del cliente
+   * (`routine_repository.dart`), a proposito: un mismo documento roto deja el
+   * MISMO identificador de campo en el log del cliente y en el registro del
+   * servidor, y correlacionar los dos no requiere traducir nada.
+   */
+  field: string;
+  verdict: ModerationVerdict;
+}
+
+interface RoutineSlotLike {
+  notes?: unknown;
+}
+
+interface RoutineDayLike {
+  name?: unknown;
+  slots?: RoutineSlotLike[];
+}
+
+export interface QuarantineRoutineInput {
+  db: Firestore;
+  /** Ruta completa del documento `routines/{routineId}` que disparo el trigger. */
+  path: string;
+  /** `data()` del snapshot `after`. */
+  data: FirebaseFirestore.DocumentData;
+  /** Autor del contenido, si se puede derivar. Para la cola de moderacion. */
+  authorUid?: string;
+  /** Misma precondicion de concurrencia que `quarantineIfVetted` — ver su
+   * dartdoc. Aca el riesgo es mayor: lo que se pisaria sin ella no es un
+   * campo suelto, es el array `days` ENTERO. */
+  updateTime?: FirebaseFirestore.Timestamp;
+}
+
+/** Verdict de un texto, o `null` si no amerita ninguno (vacio, o `ok`). */
+function verdictFor(value: unknown): ModerationVerdict | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const verdict = checkText(value);
+  return verdict === "ok" ? null : verdict;
+}
+
+/**
+ * Cuarentena de rutinas.
+ *
+ * Superficie distinta a `quarantineIfVetted`: una rutina puede tener CINCO
+ * campos de texto libre vetables en el mismo write — `name`, `split` y
+ * `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
+ * anidados dentro de un array. Por eso esta funcion NO reusa
+ * `quarantineIfVetted` (que redacta UN campo top-level con
+ * `.update({[field]: valor})`): Firestore no permite actualizar un elemento
+ * de array por indice, asi que hay que leer el array COMPLETO, redactar
+ * adentro en memoria, y reescribirlo entero en una sola escritura.
+ *
+ * Un finding por campo vetado, no un solo veredicto: dos campos vetados en el
+ * mismo write (p.ej. `name` Y `days[1].slots[3].notes`) dejan DOS registros en
+ * `moderation_quarantine`, cada uno con su propio `field` — la cola de
+ * moderacion no pierde ninguno de los dos.
+ */
+export async function quarantineRoutineIfVetted(
+  input: QuarantineRoutineInput,
+): Promise<RoutineQuarantineFinding[]> {
+  const { db, path, data, authorUid, updateTime } = input;
+
+  // Un solo lugar para armar el id del registro de UN campo -- lo usan tanto
+  // el loop de registro inicial como la correccion de mas abajo, y las dos
+  // tienen que coincidir SIEMPRE para el mismo campo.
+  const idFor = (field: string) =>
+    `${path.replace(/\//g, "__")}__${field.replace(/[[\].]/g, "_")}`;
+
+  const findings: RoutineQuarantineFinding[] = [];
+  const topLevelRedactions: Record<string, string> = {};
+
+  for (const field of ["name", "split", "summary"] as const) {
+    const verdict = verdictFor(data[field]);
+    if (!verdict) continue;
+    findings.push({ field, verdict });
+    if (verdict === "block") topLevelRedactions[field] = REDACTADO;
+  }
+
+  const days: RoutineDayLike[] = Array.isArray(data.days) ? data.days : [];
+  let daysChanged = false;
+  const newDays = days.map((day, i) => {
+    // Un `day` que no sea un objeto (`null` via SDK directo, por ejemplo) no
+    // tiene `.name` ni `.slots` que leer. Saltearlo con seguridad es lo que
+    // impide que UN elemento basura tire toda la funcion — sin este guard,
+    // `day.name` de mas abajo lanza `TypeError` ANTES de que se escriba
+    // ningun finding (ni los top-level, ni los del resto del array), asi que
+    // el filtro entero queda desactivado para ese write. El elemento queda
+    // tal cual en el array: no es nuestro trabajo "arreglarlo", solo no dejar
+    // que apague el resto del documento.
+    if (day === null || typeof day !== "object") return day;
+    let out = day;
+
+    const nameVerdict = verdictFor(day.name);
+    if (nameVerdict) {
+      findings.push({ field: `days[${i}].name`, verdict: nameVerdict });
+      if (nameVerdict === "block") {
+        out = { ...out, name: REDACTADO };
+        daysChanged = true;
+      }
+    }
+
+    const slots: RoutineSlotLike[] = Array.isArray(day.slots) ? day.slots : [];
+    let slotsChanged = false;
+    const newSlots = slots.map((slot, j) => {
+      // Mismo motivo que el guard de `day` de arriba, un nivel mas adentro:
+      // un `slots: [null]` no puede apagar el filtro de `day.name` ni del
+      // resto de los slots del mismo dia.
+      if (slot === null || typeof slot !== "object") return slot;
+      const notesVerdict = verdictFor(slot.notes);
+      if (!notesVerdict) return slot;
+      findings.push({
+        field: `days[${i}].slots[${j}].notes`,
+        verdict: notesVerdict,
+      });
+      if (notesVerdict !== "block") return slot;
+      slotsChanged = true;
+      return { ...slot, notes: REDACTADO };
+    });
+    if (slotsChanged) {
+      out = { ...out, slots: newSlots };
+      daysChanged = true;
+    }
+
+    return out;
+  });
+
+  if (findings.length === 0) return [];
+
+  // El registro se escribe para CADA finding, block o review — mismo criterio
+  // que `quarantineIfVetted`: `review` es "que alguien lo mire", y si no
+  // queda anotado en ningun lado no significa nada.
+  for (const f of findings) {
+    await escribirRegistroVersionado(db, idFor(f.field), updateTime, {
+      path,
+      field: f.field,
+      kind: "routine",
+      verdict: f.verdict,
+      authorUid: authorUid ?? null,
+      redacted: f.verdict === "block",
+      at: new Date(),
+    });
+  }
+
+  const hasBlocked = findings.some((f) => f.verdict === "block");
+  if (!hasBlocked) return findings;
+
+  const update: Record<string, unknown> = { ...topLevelRedactions };
+  if (daysChanged) update.days = newDays;
+
+  try {
+    await db
+      .doc(path)
+      .update(update, updateTime ? { lastUpdateTime: updateTime } : {});
+  } catch (err) {
+    // FAILED_PRECONDITION: la rutina cambio despues del evento. No se pisa:
+    // la escritura nueva disparo su propio trigger y se revisa por su cuenta.
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      logger.info("quarantine: la rutina cambio, la revisa su propio evento", {
+        path,
+      });
+      // Un solo `update()` cubre TODOS los findings bloqueados de este write
+      // (todo `days` se reescribe entero). Si aborta, ninguno se redacto de
+      // verdad: hay que corregir el registro de cada uno, no solo del primero.
+      await Promise.all(
+        findings
+          .filter((f) => f.verdict === "block")
+          .map((f) => marcarRedaccionAbandonada(db, idFor(f.field), updateTime)),
+      );
+      return findings;
+    }
+    throw err;
+  }
+  logger.warn("rutina con contenido vetado redactada por el servidor", {
+    path,
+  });
+
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // Wrappers. `onDocumentWritten` y no `onDocumentCreated`: editar un post
 // cambia su texto, y el guard del cliente vive en `PostRepository.update` por
@@ -350,16 +608,49 @@ export const quarantinePublicProfileName = onDocumentWritten(
   },
 );
 
+/**
+ * El nombre quedó corto: además del `displayName`, este trigger también
+ * cuarentena `trainerBio` — no se separó en un segundo `onDocumentWritten`
+ * sobre el mismo documento (mismo criterio que `quarantinePost`, que ya
+ * corre `quarantineIfVetted` + `quarantineAuthorName` juntos en un solo
+ * trigger: un doc, un evento, una sola vuelta).
+ *
+ * `trainerBio` usa `quarantineIfVetted` directo, NO `quarantineDisplayName`:
+ * a diferencia del nombre, el reemplazo es la cadena vacía (no hay que
+ * derivar nada del uid) y sólo vive en ESTE documento — `users/{uid}` también
+ * guarda una copia, pero esa es owner-only read (`firestore.rules:234`) y
+ * nunca la lee otro usuario, así que no entra al criterio de esta capa
+ * ("si otro usuario lo va a leer"). Redactar sólo el espejo público es
+ * suficiente para Guideline 1.2.
+ */
 export const quarantineTrainerProfileName = onDocumentWritten(
   { document: "trainerPublicProfiles/{uid}", region: REGION },
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;
-    await quarantineDisplayName(
-      getFirestore(),
-      event.params.uid,
-      after.get("displayName"),
-    );
+    const db = getFirestore();
+    await quarantineDisplayName(db, event.params.uid, after.get("displayName"));
+
+    // `quarantineDisplayName` pudo haber escrito sobre ESTE MISMO documento:
+    // si el displayName estaba vetado, su batch toca `trainerPublicProfiles`.
+    // Usar `after.updateTime` (el snapshot ANTERIOR a ese batch) como
+    // precondicion de abajo la deja vieja, el `update()` de `trainerBio`
+    // aborta con FAILED_PRECONDITION, y la bio no se redacta en esta pasada
+    // aunque este vetada. Releer el doc antes de usarlo es lo que hace que
+    // la primera pasada redacte las DOS cosas y no dependa de que el batch
+    // vuelva a disparar este mismo trigger para autocurarse.
+    const fresh = await db.doc(after.ref.path).get();
+    if (!fresh.exists) return;
+
+    await quarantineIfVetted({
+      db,
+      path: after.ref.path,
+      field: "trainerBio",
+      value: fresh.get("trainerBio"),
+      kind: "profile",
+      authorUid: event.params.uid,
+      updateTime: fresh.updateTime,
+    });
   },
 );
 
@@ -392,6 +683,34 @@ export const quarantineReview = onDocumentWritten(
       value: after.get("comment"),
       kind: "review",
       authorUid: after.get("athleteId") as string | undefined,
+      updateTime: after.updateTime,
+    });
+  },
+);
+
+/**
+ * Cuarentena de rutinas — wrapper fino, mismo patron que los de arriba.
+ * Ver el dartdoc de [quarantineRoutineIfVetted] para el porque de la logica
+ * de adentro.
+ *
+ * `authorUid` sale de `createdBy` (rutina propia del atleta) o, si no esta,
+ * de `assignedBy` (plan asignado o plantilla del PF) — quien haya escrito el
+ * texto. `assignedTo` NUNCA es el autor: es el alumno al que se la comparte,
+ * no quien la redacto.
+ */
+export const quarantineRoutine = onDocumentWritten(
+  { document: "routines/{routineId}", region: REGION },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    const data = after.data() ?? {};
+    await quarantineRoutineIfVetted({
+      db: getFirestore(),
+      path: after.ref.path,
+      data,
+      authorUid:
+        (data.createdBy as string | undefined) ??
+        (data.assignedBy as string | undefined),
       updateTime: after.updateTime,
     });
   },
