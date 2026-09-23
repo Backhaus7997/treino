@@ -1188,8 +1188,44 @@ async function executeClaimedResolution(
   // la mutacion no entro.
   // -------------------------------------------------------------------
   if (action !== "none") {
+    // Lo que ya habia escrito un intento ANTERIOR sobre este mismo reporte.
+    //
+    // El id es deterministico (`moderation__{reportId}`) y este `set` lo
+    // pisa entero — a proposito, para que un reintento no deje dos
+    // versiones del mismo hecho. Pero eso vale para reintentar LA MISMA
+    // accion despues de un fallo conocido, no para empezar OTRA sobre un
+    // intento que nunca se confirmo: un `userSuspended` que deshabilito la
+    // cuenta y no llego a cerrarse, seguido de un `contentRemoved`, borraba
+    // la unica evidencia de la baja — incluido su `removedContent`— y
+    // dejaba la cuenta deshabilitada sin nada que lo dijera.
+    //
+    // `outcome: "failed"` no se preserva: ahi SABEMOS que no se ejecuto
+    // nada, que es justo el caso para el que se escribio la regla de pisar.
+    //
+    // Sin tope: una vez que un reporte cierra bien, el PASO 0 rechaza
+    // cualquier resolucion nueva, asi que esto solo crece mientras los
+    // cierres fallan.
+    const auditPrevio = await db.collection("audit_log")
+      .doc(`moderation__${reportId}`).get();
+    const previousAttempts: unknown[] = [];
+    if (auditPrevio.exists && auditPrevio.get("outcome") !== "failed") {
+      const viejos = auditPrevio.get("previousAttempts");
+      if (Array.isArray(viejos)) previousAttempts.push(...viejos);
+      previousAttempts.push({
+        action: auditPrevio.get("action") ?? null,
+        outcome: auditPrevio.get("outcome") ?? null,
+        moderatorUid: auditPrevio.get("moderatorUid") ?? null,
+        derivedOwnerUid: auditPrevio.get("derivedOwnerUid") ?? null,
+        // El original viaja con su intento: es la unica copia que existe.
+        removedContent: auditPrevio.get("removedContent") ?? null,
+        removedMediaUrl: auditPrevio.get("removedMediaUrl") ?? null,
+        at: auditPrevio.get("at") ?? null,
+      });
+    }
+
     await db.collection("audit_log").doc(`moderation__${reportId}`).set({
       kind: "moderation",
+      previousAttempts,
       reportId,
       moderatorUid,
       action,

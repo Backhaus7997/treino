@@ -1678,6 +1678,75 @@ describe("resolveReport — P3-B: un estado parcial tiene que ser visible", () =
     });
   });
 
+  it("un reintento con OTRA accion NO borra la evidencia del intento anterior", async () => {
+    // El id del audit es deterministico y el PASO 2 lo pisa entero. Sin
+    // preservar el anterior, un userSuspended que deshabilito la cuenta y no
+    // llego a cerrarse, seguido de un contentRemoved, borraba la unica
+    // evidencia de la baja — y la cuenta quedaba deshabilitada sin nada que
+    // lo dijera.
+    const owner = "owner-p3b-6";
+    await getAuth(app).createUser({ uid: owner });
+    extraCleanupUids.push(owner);
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-6", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-6").set({
+      text: "contenido original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-6", "audit_log/moderation__r1");
+
+    await expect(
+      resolveReportHandler(dbConCierreQueFalla(db), app, "mod1", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ).rejects.toThrow();
+    expect((await getAuth(app).getUser(owner)).disabled).toBe(true);
+
+    // El siguiente moderador ve el aviso y decide retirar el contenido.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("action")).toBe("contentRemoved");
+    const previos = audit.get("previousAttempts") as unknown[];
+    expect(previos).toHaveLength(1);
+    expect(previos[0]).toMatchObject({
+      action: "userSuspended", derivedOwnerUid: owner,
+    });
+  });
+
+  it("un intento ANULADO no se preserva: ahi sabemos que no paso nada", async () => {
+    // CONTROL NEGATIVO del historial. `outcome: "failed"` es el unico caso
+    // donde hay certeza de que la mutacion no entro, y es justo el caso para
+    // el que se escribio la regla de pisar la entrada en vez de acumular.
+    const owner = "owner-p3b-7";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3b-7", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3b-7").set({
+      text: "texto original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3b-7", "audit_log/moderation__r1");
+
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3b-7").update({ text: "lo edite" }),
+    );
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const audit = await db.collection("audit_log").doc("moderation__r1").get();
+    expect(audit.get("previousAttempts")).toEqual([]);
+    expect(audit.get("removedContent")).toBe("lo edite");
+  });
+
   it("un dismissed/none SIN intento previo sigue sin escribir audit_log", async () => {
     // CONTROL NEGATIVO del `closedAs` de arriba: el `set` con merge del
     // cierre no puede CREAR una entrada donde no habia ninguna.
