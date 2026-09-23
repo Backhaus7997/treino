@@ -11,6 +11,18 @@
  *     "npx jest --forceExit quarantine-vetted-content"
  */
 
+/**
+ * El wrapper se prueba DIRECTO para el grupo "el wrapper real" de mas abajo:
+ * el doble de `onDocumentWritten` devuelve el handler que recibe, asi que
+ * `quarantineTrainerProfileName` ES esa funcion y se la puede invocar con un
+ * evento armado a mano (mismo patron que `link-load-reconcile.test.ts`). El
+ * resto del archivo sigue llamando a las funciones puras directo, sin pasar
+ * por esto.
+ */
+jest.mock("firebase-functions/v2/firestore", () => ({
+  onDocumentWritten: (_opts: unknown, handler: unknown) => handler,
+}));
+
 import { readFileSync } from "fs";
 import { join } from "path";
 
@@ -22,7 +34,14 @@ import {
   quarantineAuthorName,
   quarantineDisplayName,
   quarantineIfVetted,
+  quarantineTrainerProfileName,
 } from "../moderation/quarantine-vetted-content";
+
+/** Firma real del handler una vez que el doble de arriba lo desenvuelve. */
+type TriggerHandler = (event: {
+  data: { after: FirebaseFirestore.DocumentSnapshot };
+  params: { uid: string };
+}) => Promise<void>;
 
 // `trainerBio` reusa `quarantineIfVetted` (kind "profile") — no tiene una
 // funcion propia como `quarantineDisplayName`, asi que sus tests viven en el
@@ -35,14 +54,24 @@ const LIMPIO = "buena rutina, gracias";
 
 let app: App;
 let db: Firestore;
+let defaultApp: App;
 
 beforeAll(() => {
   app = initializeApp({ projectId: "treino-dev" }, "quarantine-tests");
   db = getFirestore(app);
+  // El wrapper real (`quarantineTrainerProfileName`, ver el describe "el
+  // wrapper real" mas abajo) hace `getFirestore()` SIN argumentos, que
+  // resuelve la app DEFAULT — no la nombrada de arriba. En produccion solo
+  // existe una app, asi que nunca importa; aca hace falta una segunda app
+  // (misma `projectId`, mismo emulador via las env vars de conexion) para
+  // que ese `getFirestore()` interno encuentre algo en vez de tirar "The
+  // default Firebase app does not exist".
+  defaultApp = initializeApp({ projectId: "treino-dev" });
 });
 
 afterAll(async () => {
   await deleteApp(app);
+  await deleteApp(defaultApp);
 });
 
 afterEach(async () => {
@@ -359,6 +388,71 @@ describe("trainerBio (quarantineTrainerProfileName)", () => {
       expect((await db.doc("users/t3").get()).get("trainerBio")).toBe(VETADO);
     },
   );
+});
+
+describe("quarantineTrainerProfileName (el wrapper real, no las funciones puras)", () => {
+  it(
+    "redacta trainerBio EN LA PRIMERA PASADA cuando displayName tambien " +
+      "esta vetado",
+    async () => {
+      // finding 5: el wrapper llama quarantineDisplayName primero, que
+      // escribe un batch incluyendo ESTE MISMO documento
+      // (trainerPublicProfiles/{uid}) cuando displayName da "block". El
+      // codigo viejo usaba despues `after.updateTime` — el snapshot de ANTES
+      // de ese batch — como precondicion para trainerBio: quedaba vieja, el
+      // update() de trainerBio abortaba por FAILED_PRECONDITION, y la bio no
+      // se tocaba en esta pasada aunque estuviera vetada. Se autocuraba en
+      // una segunda pasada (el batch redispara este mismo trigger), pero eso
+      // es una ventana de un round-trip que este test no deja pasar: tiene
+      // que quedar redactada ACA, en la primera vuelta.
+      await db.doc("users/abcdef123").set({
+        uid: "abcdef123",
+        displayName: VETADO,
+      });
+      await db.doc("trainerPublicProfiles/abcdef123").set({
+        uid: "abcdef123",
+        displayName: VETADO,
+        trainerBio: VETADO,
+      });
+      const snap = await db.doc("trainerPublicProfiles/abcdef123").get();
+
+      await (quarantineTrainerProfileName as unknown as TriggerHandler)({
+        data: { after: snap },
+        params: { uid: "abcdef123" },
+      });
+
+      const after = await db.doc("trainerPublicProfiles/abcdef123").get();
+      expect(after.get("displayName")).toBe("usuario_abcdef");
+      expect(after.get("trainerBio")).toBe("");
+
+      const reg = await registro("trainerPublicProfiles/abcdef123");
+      expect(reg.exists).toBe(true);
+      expect(reg.get("verdict")).toBe("block");
+      expect(reg.get("redacted")).toBe(true);
+    },
+  );
+
+  it("no rompe el caso normal: displayName limpio, trainerBio vetada", async () => {
+    // Control de que el fix de finding 5 no le agrego una precondicion
+    // innecesaria al camino que ya andaba: si displayName NO se toca, el
+    // updateTime releido tiene que seguir siendo valido para trainerBio.
+    await db.doc("users/xyz999").set({ uid: "xyz999", displayName: "Xyz" });
+    await db.doc("trainerPublicProfiles/xyz999").set({
+      uid: "xyz999",
+      displayName: "Xyz",
+      trainerBio: VETADO,
+    });
+    const snap = await db.doc("trainerPublicProfiles/xyz999").get();
+
+    await (quarantineTrainerProfileName as unknown as TriggerHandler)({
+      data: { after: snap },
+      params: { uid: "xyz999" },
+    });
+
+    const after = await db.doc("trainerPublicProfiles/xyz999").get();
+    expect(after.get("displayName")).toBe("Xyz");
+    expect(after.get("trainerBio")).toBe("");
+  });
 });
 
 describe("superficies que NO se tocan", () => {
