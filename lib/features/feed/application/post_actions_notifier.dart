@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/post_photo_upload_service.dart';
 import '../domain/post.dart';
 import 'feed_screen_providers.dart';
 import 'post_providers.dart';
@@ -15,10 +16,35 @@ class PostActionsNotifier {
 
   final Ref _ref;
 
-  /// Deletes [postId] and invalidates every feed provider so the post
-  /// disappears from any screen currently rendering it.
-  Future<void> deletePost(String postId) async {
-    await _ref.read(postRepositoryProvider).delete(postId);
+  /// Deletes [post] and invalidates every feed provider so it disappears
+  /// from any screen currently rendering it.
+  ///
+  /// If [post] has a photo, the Storage object is deleted FIRST, before the
+  /// Firestore doc. Deleting the doc without confirming the photo is gone
+  /// would drop the post from every feed while `postPhotos/{uid}/{postId}`
+  /// stays live and downloadable by any authenticated user (storage.rules)
+  /// — the same failure mode documented for account deletion in
+  /// `functions/src/cascade/storage.ts`.
+  ///
+  /// [PostPhotoUploadService.deleteByDownloadUrl] already tells apart the two
+  /// cases that matter here: it returns `false` (NOT a failure) when the
+  /// object is simply already gone (`object-not-found` — e.g. a legacy post
+  /// whose photo was removed some other way), and rethrows for anything else
+  /// (permission, network — a real failure). This method lets that rethrow
+  /// propagate and deliberately never reaches `PostRepository.delete` in that
+  /// case: the post stays intact so the author can retry, instead of a
+  /// silent partial delete (post gone, photo still exposed) — that silence
+  /// is the bug this guards against. `PostCard._confirmDelete` already turns
+  /// any thrown error here into its existing "no pudimos borrar" SnackBar,
+  /// so no UI change was needed for the author to find out.
+  Future<void> deletePost(Post post) async {
+    final photoUrl = post.photoUrl;
+    if (photoUrl != null) {
+      await _ref
+          .read(postPhotoUploadServiceProvider)
+          .deleteByDownloadUrl(photoUrl);
+    }
+    await _ref.read(postRepositoryProvider).delete(post.id);
     invalidateAllFeedProviders(_ref);
   }
 
