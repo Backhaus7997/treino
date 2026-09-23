@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 import '../../../core/telemetry/non_fatal.dart';
 import '../domain/auth_failure.dart';
 import '../presentation/legal/legal_content.dart';
+import '../../profile/data/account_deletion_service.dart';
 import '../../profile/data/user_repository.dart';
 import 'apple_sign_in_gateway.dart';
 import 'nonce_helpers.dart';
@@ -38,7 +39,7 @@ class AuthService {
   /// `[DEFAULT]` en el acto, así que construirlo en la lista de
   /// inicialización ataba la CONSTRUCCIÓN de `AuthService` a que
   /// `Firebase.initializeApp()` ya hubiera terminado — incluso para los
-  /// caminos que nunca mandan un mail (reauth, signOut, cancelOnboarding).
+  /// caminos que nunca mandan un mail (reauth, signOut).
   /// El provider de Riverpod lo arma eager, así que eso convertía un detalle
   /// del canal de mails en una precondición de toda la capa de auth.
   late final FirebaseFunctions _functions = _injectedFunctions ??
@@ -535,50 +536,93 @@ class AuthService {
   }
 
   /// Hard-cancel onboarding for a user who just signed up and wants to bail
-  /// from ProfileSetup step 0. Deletes the Firestore profile doc (best-effort)
-  /// and then the Firebase Auth user (mandatory). The Auth delete auto-signs
-  /// the user out; we still clean the Google session cache so the next picker
-  /// shows fresh.
+  /// from ProfileSetup step 0. Va por el MISMO camino que «Eliminar cuenta» de
+  /// Ajustes: el callable `deleteAccount`, que corre la cascada completa y
+  /// borra la cuenta de Auth al final. Acá sólo queda cerrar la sesión local,
+  /// y la de Google para que el próximo picker salga limpio.
   ///
-  /// Throws [AuthFailure] on Firebase Auth delete failure (e.g.
-  /// `requires-recent-login` on stale tokens). On Firestore delete failure
-  /// we swallow and proceed — the Auth delete is the source of truth for
-  /// account existence.
+  /// Throws [AuthFailure.deletionFailed] si el callable falla o si la cuenta
+  /// de Auth sigue existiendo. En ese caso no toca la sesión: la cuenta sigue
+  /// viva y entera, y la persona puede reintentar.
   Future<void> cancelOnboarding() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Best-effort delete of the Firestore profile doc.
+    // Acá antes estaba `UserRepository.delete`, que tira SIEMPRE (las reglas
+    // le niegan el delete al cliente): el catch se lo tragaba, `user.delete()`
+    // borraba sólo la cuenta de Auth, y `users/{uid}` y
+    // `userPublicProfiles/{uid}` quedaban para siempre, con el mail de alguien
+    // que pidió no tener cuenta.
+    //
+    // La cascada es la COMPLETA y no una corta del alta: el alta sin terminar
+    // se reconoce por `displayName == null`, y ese campo el dueño lo puede
+    // volver a null (las reglas no lo pinean). Una cascada corta sobre una
+    // cuenta establecida le dejaba huérfanos los posts, rutinas y vínculos.
+    final DeletionResult resultado;
     try {
-      await _userRepository.delete(user.uid);
-    } catch (_) {
-      // Continue — Auth delete is what removes the account from Firebase.
-    }
-
-    // Mandatory delete of the Firebase Auth user.
-    try {
-      await user.delete();
-    } on FirebaseAuthException catch (e) {
-      // Stale-auth escape hatch: if the user no longer exists server-side
-      // (e.g., previously deleted by the account-deletion Cloud Function or
-      // by Firebase Console while this client still had a cached token),
-      // user.delete() returns user-not-found / token-expired. The local
-      // session is the only thing left to clean up — force-sign-out so the
-      // user is not stuck in a phantom auth state on profile-setup.
-      const staleAuthCodes = {
-        'user-not-found',
-        'user-token-expired',
-        'invalid-user-token',
-      };
-      if (staleAuthCodes.contains(e.code)) {
-        await _auth.signOut();
-      } else {
-        throw AuthFailure.fromFirebase(e);
+      resultado = await AccountDeletionService(functions: _functions)
+          .call(uid: user.uid);
+    } catch (e) {
+      // Un error no prueba que el servidor no haya borrado: la respuesta se
+      // puede perder con la cascada ya hecha. Si Auth confirma que la cuenta
+      // no existe, la baja salió, y tirar acá restauraría la sesión en la
+      // pantalla y reactivaría los reintentos del alta sobre una cuenta
+      // borrada.
+      if (await _laCuentaYaNoExiste(user)) {
+        await _cerrarSesionDeCuentaBorrada();
+        return;
       }
+      // Viva, o sin forma de saberlo: no se sigue. Borrar Auth sin la cascada
+      // es exactamente lo que dejaba los docs sin dueño.
+      throw AuthFailure.deletionFailed(cause: e);
     }
 
-    // Cleanup Google session cache. Firebase Auth is already cleared by
-    // user.delete(); this only matters if the user used Google to sign up.
+    // La misma señal que usa Ajustes (`AccountDeletionNotifier`): la cuenta se
+    // fue si y sólo si el servidor llegó a borrar Auth. Un `partial` sin eso es
+    // una cuenta viva, y se reintenta.
+    if (!resultado.deletedCollections.contains('users-auth')) {
+      throw AuthFailure.deletionFailed(cause: resultado.errors);
+    }
+
+    await _cerrarSesionDeCuentaBorrada();
+  }
+
+  /// `true` sólo si Auth CONFIRMA que la cuenta ya no existe. Sin red, o ante
+  /// cualquier otra respuesta, `false`: se la trata como viva.
+  ///
+  /// Sólo `user-not-found`. `user-token-expired` e `invalid-user-token` dicen
+  /// que la credencial no sirve, no que la cuenta no exista: salen también si
+  /// se cambió la contraseña en otro dispositivo. Tomarlos por baja le diría a
+  /// la persona que canceló con la cuenta y los docs vivos. Un falso negativo,
+  /// en cambio, cuesta un reintento, y `deleteAccount` es idempotente.
+  Future<bool> _laCuentaYaNoExiste(User user) async {
+    try {
+      await user.reload();
+      return false;
+    } on FirebaseAuthException catch (e) {
+      return e.code == 'user-not-found';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// La cuenta ya no existe: queda la sesión local. NO tira. Si tirara,
+  /// `AuthNotifier` restauraría el usuario y la pantalla reactivaría los
+  /// reintentos del alta sobre una cuenta borrada.
+  Future<void> _cerrarSesionDeCuentaBorrada() async {
+    try {
+      await _auth.signOut();
+    } catch (e, st) {
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.cancelOnboarding: signOut falló con la cuenta '
+            'ya borrada',
+      ));
+    }
+
+    // Cleanup Google session cache. Only matters if the user signed up with
+    // Google.
     try {
       await _googleSignIn.signOut();
     } catch (_) {

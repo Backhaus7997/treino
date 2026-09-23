@@ -51,7 +51,9 @@ class IntentoDelPerfil {
     try {
       await enVuelo.timeout(tope);
     } catch (_) {
-      // Falló o pasó el tope: en los dos casos no queda nada que esperar.
+      // Falló, o pasó el tope y se deja de esperar. Ojo: `timeout` NO cancela
+      // el intento, que puede seguir en vuelo y aterrizar después de la baja.
+      // Es el costo de no dejar a la persona trabada; ver el doc de arriba.
     }
   }
 }
@@ -65,10 +67,11 @@ final reportePerfilAseguradoProvider =
 
 /// «Cancelar cuenta» del alta está en curso: no se crea nada más.
 ///
-/// Sin esto, un reintento podía crear `users/{uid}` —con el mail— justo antes
-/// de que `cancelOnboarding` borrara la cuenta de Auth. Y ese doc queda
-/// huérfano: `cancelOnboarding` no borra el de Firestore (`UserRepository.delete`
-/// tira siempre) y no hay trigger que lo limpie al borrar la cuenta de Auth.
+/// Sin esto, un reintento podía crear `users/{uid}` —con el mail— en el medio
+/// de la cancelación: `AuthService.cancelOnboarding` borra con el callable
+/// `deleteAccount`, que barre los docs de Firestore y DESPUÉS la cuenta de
+/// Auth, así que lo que se escriba entre los dos pasos no lo borra nadie, y no
+/// hay trigger que lo limpie al borrar la cuenta de Auth.
 /// Un intento que ya salió no se puede frenar, pero la pantalla lo espera
 /// antes de borrar la cuenta ([IntentoDelPerfil]); los siguientes no salen.
 /// Si la cancelación falla, el flag vuelve a false y los reintentos arrancan

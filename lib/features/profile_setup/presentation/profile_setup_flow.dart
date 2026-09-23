@@ -40,6 +40,10 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   /// cuenta; un segundo «Cancelar cuenta» en ese rato dispararía otra baja, y
   /// si ésa fallaba, volvía a habilitar los reintentos con la primera todavía
   /// en curso.
+  ///
+  /// Mientras dure, la pantalla tampoco deja avanzar: un submit en el medio de
+  /// la baja recrearía el perfil entre el barrido de los docs y el borrado de
+  /// la cuenta de Auth, y quedaría huérfano.
   bool _cancelando = false;
 
   // No hardcoded `\n` — the header (maxLines: 2 + softWrap) wraps these for us,
@@ -162,7 +166,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     );
     if (confirmed != true) return;
     if (!mounted || _cancelando) return;
-    _cancelando = true;
+    setState(() => _cancelando = true);
 
     // Frena los reintentos de `users/{uid}` ANTES de borrar la cuenta, y espera
     // al que ya esté en vuelo: un doc escrito después del borrado quedaría
@@ -178,7 +182,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       context.go('/welcome');
     } catch (_) {
       if (!mounted) return;
-      _cancelando = false;
+      setState(() => _cancelando = false);
       // La cuenta sigue viva: los reintentos vuelven a correr.
       ref.read(altaCanceladaProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +251,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                           TreinoIcon.close,
                           color: palette.textPrimary,
                         ),
-                        onPressed: _onCancel,
+                        onPressed: _cancelando ? null : _onCancel,
                         tooltip: 'Cancelar creación de cuenta',
                       ),
                     ),
@@ -286,7 +290,8 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                   const SizedBox(height: 12),
                   ProfileSetupFooter(
                     onBack: state.currentStep == 0 ? null : _onBack,
-                    onPrimary: state.canGoNext ? _onPrimary : null,
+                    onPrimary:
+                        state.canGoNext && !_cancelando ? _onPrimary : null,
                     primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
                     primaryLoading: state.isSubmitting,
                   ),

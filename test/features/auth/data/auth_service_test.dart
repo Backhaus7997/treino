@@ -881,45 +881,142 @@ void main() {
   // cancelOnboarding — hard-cancel an in-progress signup from ProfileSetup
   // ---------------------------------------------------------------------------
   group('AuthService.cancelOnboarding', () {
-    test('deletes Firestore profile + Firebase Auth user on happy path',
-        () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenAnswer((_) async {});
-      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+    // Un doble propio para `deleteAccount`: el `callable` del setUp lo
+    // comparten los mails, y con uno solo no se podría decir cuál corrió.
+    late MockHttpsCallable deleteCallable;
+    late MockCallableResult respuesta;
 
+    void responde(
+      List<String> deletedCollections, {
+      List<String> errors = const [],
+    }) =>
+        when(() => respuesta.data).thenReturn(<String, dynamic>{
+          'status': errors.isEmpty ? 'success' : 'partial',
+          'deletedCollections': deletedCollections,
+          'errors': errors,
+        });
+
+    setUp(() {
+      deleteCallable = MockHttpsCallable();
+      respuesta = MockCallableResult();
+      when(() => functions.httpsCallable('deleteAccount'))
+          .thenReturn(deleteCallable);
+      when(() => deleteCallable.call<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => respuesta);
+      responde(['users', 'userPublicProfiles', 'users-auth']);
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => fbAuth.signOut()).thenAnswer((_) async {});
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      // Por default la cuenta sigue viva para Auth.
+      when(() => user.reload()).thenAnswer((_) async {});
+    });
+
+    test(
+        'borra por deleteAccount (la cascada completa, con Auth al final del '
+        'servidor) y recién después cierra la sesión local', () async {
       await sut.cancelOnboarding();
 
-      verify(() => mockRepo.delete('uid-test')).called(1);
-      verify(() => user.delete()).called(1);
+      verifyInOrder([
+        () => deleteCallable.call<Map<String, dynamic>>({'uid': 'uid-test'}),
+        () => fbAuth.signOut(),
+      ]);
       verify(() => googleSignIn.signOut()).called(1);
+      // Auth lo borra el servidor. El `user.delete()` del cliente además tiraba
+      // `requires-recent-login` pasados 5 minutos del login.
+      verifyNever(() => user.delete());
     });
 
-    test('continues to delete Auth user even if Firestore delete throws',
+    test(
+        'si el callable falla NO sigue: ni borra Auth ni cierra la sesión, y '
+        'tira AuthFailure para que la persona reintente', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'si el callable falla pero Auth confirma que la cuenta ya no existe (la '
+        'respuesta se perdió con la cascada hecha), la baja salió: cierra la '
+        'sesión y completa', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'timeout', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-not-found'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
+    });
+
+    test(
+        'si el callable falla y no hay forma de confirmar (reload sin red), la '
+        'cuenta se trata como viva: tira y no cierra la sesión', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'sin red', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'network-request-failed'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'user-token-expired no confirma la baja (sale también con la cuenta '
+        'viva, p. ej. por un cambio de contraseña): tira y no cierra la sesión',
         () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenThrow(Exception('firestore down'));
-      when(() => user.delete()).thenAnswer((_) async {});
-      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-token-expired'),
+      );
 
-      await sut.cancelOnboarding();
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
 
-      verify(() => mockRepo.delete('uid-test')).called(1);
-      verify(() => user.delete()).called(1);
+      verifyNever(() => fbAuth.signOut());
     });
 
-    test('throws AuthFailure when Firebase Auth delete fails', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenThrow(
-        FirebaseAuthException(code: 'requires-recent-login'),
+    test(
+        'con la cuenta ya borrada, un signOut que falla no tira: se reporta y '
+        'la cancelación completa', () async {
+      when(() => fbAuth.signOut()).thenThrow(
+        FirebaseAuthException(code: 'internal-error'),
       );
 
-      await expectLater(
-        sut.cancelOnboarding(),
-        throwsA(isA<AuthFailure>()),
-      );
-      verify(() => user.delete()).called(1);
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      expect(reportados, [contains('AuthService.cancelOnboarding')]);
+    });
+
+    test(
+        'si el servidor no llegó a borrar Auth (partial sin users-auth), la '
+        'cuenta sigue viva: tira AuthFailure y no cierra la sesión', () async {
+      responde(['users', 'userPublicProfiles'], errors: ['auth: boom']);
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'un partial CON users-auth es una cuenta que ya no existe: cierra la '
+        'sesión igual, como Ajustes', () async {
+      responde(['users-auth'], errors: ['posts: boom']);
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
     });
 
     test('is a no-op when there is no current user', () async {
@@ -927,14 +1024,11 @@ void main() {
 
       await expectLater(sut.cancelOnboarding(), completes);
 
-      verifyNever(() => mockRepo.delete(any()));
-      verifyNever(() => user.delete());
+      verifyNever(() => deleteCallable.call<Map<String, dynamic>>(any()));
+      verifyNever(() => fbAuth.signOut());
     });
 
     test('swallows Google signOut failures (best-effort cleanup)', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenThrow(Exception('google down'));
 
       // Should NOT propagate the Google signOut error.
