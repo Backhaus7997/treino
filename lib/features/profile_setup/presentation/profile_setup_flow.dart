@@ -10,6 +10,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/presentation/widgets/terms_checkbox.dart';
+import '../application/perfil_asegurado_provider.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
 import '../application/terms_consent_provider.dart';
@@ -191,6 +192,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     final state = ref.watch(profileSetupNotifierProvider);
     // Sin consentimiento registrado, o todavía sin saberlo — ver _onPrimary.
     final needsTermsConsent = ref.watch(termsConsentRequiredProvider) ?? true;
+    // Mientras dure el alta, reintenta crear `users/{uid}` si el login no lo
+    // dejó. El resultado no se usa: watchearlo es lo que lo mantiene vivo.
+    ref.watch(perfilAseguradoProvider);
 
     return Scaffold(
       backgroundColor: palette.bg,
