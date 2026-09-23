@@ -881,6 +881,12 @@ async function executeClaimedResolution(
   // cuando este reporte es uno de los duplicados de aquel. `null` en
   // cualquier otro caso. Ver `REMOVALS_COLLECTION`.
   let alreadyRemovedByReportId: string | null = null;
+  // Version del contenido que vio el camino del DUPLICADO, para revalidarla
+  // en el PASO 4. `null` cuando el documento no existia; `undefined` cuando
+  // este no es un duplicado y la guarda no aplica. Ver el PASO 4.
+  let guardaDeDuplicado:
+    | { path: string; updateTime: FirebaseFirestore.Timestamp | null }
+    | undefined;
   // Uid efectivamente usado para userSuspended/userWarned. Es
   // `derivedOwnerUid`, nunca `targetOwnerUid` — separado en su propia
   // variable solo para dejar explicito, en el PASO 3, que esas dos acciones
@@ -978,6 +984,17 @@ async function executeClaimedResolution(
       const previo = retiroPrevio.get("reportId");
       alreadyRemovedByReportId =
         typeof previo === "string" && previo.length > 0 ? previo : null;
+
+      // La version exacta que se esta mirando. El camino normal se protege
+      // de una edicion concurrente con `lastUpdateTime`; este no escribe
+      // nada sobre el contenido, asi que no tiene donde poner esa
+      // precondicion — y sin ella, un autor que republica entre este `get`
+      // y el cierre deja el reporte marcado "contenido retirado" sobre
+      // contenido VIVO. El PASO 4 la revalida.
+      guardaDeDuplicado = {
+        path,
+        updateTime: contenido.exists ? contenido.updateTime ?? null : null,
+      };
 
       // Si el documento ya no esta, el dueno derivado sale del marcador —
       // que lo guardo cuando el contenido si existia. Sigue sin salir nunca
@@ -1270,18 +1287,52 @@ async function executeClaimedResolution(
   // chequeo de la transaccion del PASO 0), asi que dejarlos no protege
   // nada mas — quedarian como metadata muerta sobre un reporte resuelto.
   // -------------------------------------------------------------------
-  await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
-    {
-      status,
-      action,
-      note,
-      reviewedBy: moderatorUid,
-      resolvedAt: new Date(),
-      claimedAt: FieldValue.delete(),
-      claimedBy: FieldValue.delete(),
-    },
-    { merge: true },
-  );
+  const cierre = {
+    status,
+    action,
+    note,
+    reviewedBy: moderatorUid,
+    resolvedAt: new Date(),
+    claimedAt: FieldValue.delete(),
+    claimedBy: FieldValue.delete(),
+  };
+  const reviewRef = db.collection(REVIEWS_COLLECTION).doc(reportId);
+
+  if (guardaDeDuplicado === undefined) {
+    await reviewRef.set(cierre, { merge: true });
+    return;
+  }
+
+  // El camino del DUPLICADO no escribio nada sobre el contenido, asi que no
+  // tuvo donde poner el `lastUpdateTime` que protege al camino normal. Sin
+  // esto, entre el `get` del PASO 1 y esta linea el autor puede republicar
+  // —restaurar el texto o volver a subir la foto— y el reporte quedaria
+  // cerrado como "contenido retirado" sobre contenido VIVO, con el audit
+  // afirmando lo mismo. Es la clase de registro falso que este modulo entero
+  // existe para no producir (AGENTS.md 11.1).
+  //
+  // La transaccion es lo que hace la revalidacion ATOMICA y no un
+  // chequeo-y-despues-escribo: Firestore aborta el commit si el documento
+  // leido cambio, asi que la ventana no es "chica", es cero.
+  //
+  // Se compara `updateTime` y no "sigue vacio": cualquier escritura sobre
+  // ese documento merece que el moderador lo vuelva a mirar, y `null`
+  // (no existia) contra `null` cubre el caso de que ademas se haya borrado.
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(db.doc(guardaDeDuplicado.path));
+    const ahora = snap.exists ? snap.updateTime ?? null : null;
+    const sinCambios = guardaDeDuplicado.updateTime === null
+      ? ahora === null
+      : ahora !== null && ahora.isEqual(guardaDeDuplicado.updateTime);
+    if (!sinCambios) {
+      throw new HttpsError(
+        "aborted",
+        "El contenido cambio mientras lo revisabas. Volve a mirarlo: el " +
+        "reporte sigue en la cola.",
+      );
+    }
+    tx.set(reviewRef, cierre, { merge: true });
+  });
 }
 
 /**

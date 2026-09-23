@@ -1376,6 +1376,40 @@ describe("resolveReport — P3-A: los duplicados de un reporte ya accionado", ()
     expect(audit.get("alreadyRemovedByReportId")).toBeNull();
   });
 
+  it("si el autor republica antes del cierre, el duplicado aborta", async () => {
+    // El camino del duplicado no escribe sobre el contenido, asi que no
+    // tiene donde poner el `lastUpdateTime` que protege al camino normal.
+    // Sin la revalidacion del PASO 4, el reporte quedaria cerrado como
+    // "contenido retirado" sobre contenido VIVO.
+    await sembrarDosDenunciasDelMismoPost("post-p3a-7");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // El autor restaura el texto DESPUES de que el PASO 1 del duplicado lo
+    // vio vacio — `dbConCarrera` interfiere en la escritura del audit_log,
+    // que es justo esa ventana.
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3a-7").update({
+        text: "lo republique",
+      }),
+    );
+
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r2", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.exists).toBe(false);
+    // Y el contenido republicado sigue en pie: el reporte vuelve a la cola
+    // para que lo miren de nuevo, ahora con texto.
+    expect((await db.collection("posts").doc("post-p3a-7").get()).get("text"))
+      .toBe("lo republique");
+  });
+
   it("la redaccion y el marcador son atomicos: si el autor edita en el medio, no entra ninguno", async () => {
     const owner = "owner-post-p3a-6";
     await sembrarReporte("r1", 3600_000, {
