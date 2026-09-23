@@ -218,6 +218,48 @@ function dbConCierreQueFalla(real: Firestore): Firestore {
 }
 
 /**
+ * Envuelve `db` para que SOLO la confirmacion del audit_log (el
+ * `outcome: "executed"` del PASO 4) tire, dejando pasar la entrada del
+ * PASO 2 y su lectura previa.
+ *
+ * Es el unico punto donde una resolucion puede abortar DESPUES del PASO 2 y
+ * sin pasar por `anularIntento` — o sea, el unico lugar donde se ve si el
+ * marcador de intento se escribio o no.
+ */
+function dbConConfirmacionDeAuditQueFalla(real: Firestore): Firestore {
+  const wrapped = {
+    doc: (path: string) => real.doc(path),
+    collection: (name: string) => {
+      if (name !== "audit_log") return real.collection(name);
+      return {
+        doc: (id: string) => {
+          const ref = real.collection("audit_log").doc(id);
+          return {
+            get: () => ref.get(),
+            set: (
+              data: FirebaseFirestore.DocumentData,
+              opts?: FirebaseFirestore.SetOptions,
+            ) => {
+              if (data.outcome === "executed") {
+                const err = new Error("simulated write failure") as
+                  Error & { code?: number };
+                err.code = 14;
+                return Promise.reject(err);
+              }
+              return opts ? ref.set(data, opts) : ref.set(data);
+            },
+          };
+        },
+      };
+    },
+    runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
+      real.runTransaction(fn),
+    batch: () => real.batch(),
+  };
+  return wrapped as unknown as Firestore;
+}
+
+/**
  * Envuelve `db` para que la escritura a `mail_queue` (PASO 3 de
  * `resolveReportHandler`, accion `userWarned`) tire un error REAL en vez de
  * escribir — simula, por ejemplo, que Firestore rechaza el `.create()`.
@@ -1745,6 +1787,50 @@ describe("resolveReport — P3-B: un estado parcial tiene que ser visible", () =
     const audit = await db.collection("audit_log").doc("moderation__r1").get();
     expect(audit.get("previousAttempts")).toEqual([]);
     expect(audit.get("removedContent")).toBe("lo edite");
+  });
+
+  it("un duplicado que aborta NO deja un aviso de intento: no muto nada", async () => {
+    // El camino del duplicado no redacta, no toca Auth y no encola mail. Un
+    // `attemptedAction` ahi seria la alarma que grita siempre: el proximo
+    // moderador leeria "ya se ejecuto algo aca" sobre un reporte donde no
+    // paso absolutamente nada.
+    await sembrarReporte("r1", 4 * 3600_000, {
+      targetKind: "post", targetId: "post-p3b-8",
+      targetOwnerUid: "owner-p3b-8", reporterUid: "denunciante-1",
+    });
+    await sembrarReporte("r2", 3 * 3600_000, {
+      targetKind: "post", targetId: "post-p3b-8",
+      targetOwnerUid: "owner-p3b-8", reporterUid: "denunciante-2",
+    });
+    await db.collection("posts").doc("post-p3b-8").set({
+      text: "contenido", authorUid: "owner-p3b-8",
+    });
+    extraCleanupPaths.push(
+      "posts/post-p3b-8",
+      "audit_log/moderation__r1",
+      "audit_log/moderation__r2",
+    );
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // r2 es el duplicado. Aborta en la confirmacion del audit, que es
+    // despues del PASO 2 y fuera del alcance de `anularIntento`.
+    await expect(
+      resolveReportHandler(dbConConfirmacionDeAuditQueFalla(db), app, "mod1", {
+        reportId: "r2", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow();
+
+    const cola = await listPendingReportsHandler(db);
+    const r2 = cola.reports.find((r) => r.id === "r2");
+    expect(r2).toBeDefined();
+    expect(r2!.attemptedAction).toBeNull();
+    // Y el review que creo su propio claim se borro entero, sin dejar un
+    // documento vacio donde antes no habia nada.
+    expect((await db.collection(REVIEWS_COLLECTION).doc("r2").get()).exists)
+      .toBe(false);
   });
 
   it("un dismissed/none SIN intento previo sigue sin escribir audit_log", async () => {
