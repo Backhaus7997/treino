@@ -105,18 +105,21 @@ export interface AthleteProspectMailPlan {
  * De dónde viene la corrida que produjo el `SyncResult`.
  *
  * No es un detalle de implementación: es la diferencia entre un cambio que le
- * pasó AL USUARIO (su profe lo dio de baja) y uno que le pasó AL SISTEMA (se
- * encendió el enforcement y el barrido reconcilió a todos). El primero merece
- * un mail; el segundo, mandado en masa, es un incidente.
+ * pasó AL USUARIO y uno que no.
+ *
+ *   `"evento"`  — le pasó a esta persona. Es el ÚNICO que manda.
+ *   `"barrido"` — le pasó al sistema: se encendió el enforcement y la
+ *                 reconciliación volteó a todos de una.
+ *   `"alta"`    — la persona acaba de nacer. Ver la cláusula abajo.
  */
-export type OrigenDelCambio = "evento" | "barrido";
+export type OrigenDelCambio = "evento" | "barrido" | "alta";
 
 /**
  * Si corresponde escribirle, y con qué alcance de deduplicación.
  *
  * @param sync     - Lo que devolvió `syncAthletePaywallEnforced`.
  * @param degraded - Si el documento del usuario se leyó degradado.
- * @param origen   - Ver [OrigenDelCambio]. `"barrido"` nunca manda.
+ * @param origen   - Ver [OrigenDelCambio]. Sólo `"evento"` manda.
  * @param nowMs    - Reloj, inyectado.
  */
 export function decideAthleteProspectMail(
@@ -128,6 +131,26 @@ export function decideAthleteProspectMail(
   // El barrido reconcilia a TODOS. Ver el encabezado: sin esto, encender el
   // flag le manda el mail a la base entera en una sola corrida.
   if (origen === "barrido") return null;
+
+  // ── ⚠️ EL ALTA NO ES UNA PERDIDA DE COBERTURA ──
+  //
+  // `athletePaywallInputChanged` trata el CREATE como cambio, a proposito y por
+  // un motivo bueno: «un alumno recien registrado no tiene el campo, y
+  // "ausente" para la regla significa NO enforced», asi que sin esa rama el
+  // alumno nuevo se saltearia el paywall hasta tocar un vinculo.
+  //
+  // Pero para ESTE mail esa misma rama es una trampa. Un alumno que se registra
+  // sin entrenador y sin suscripcion resuelve a `enforced: true` en su primer
+  // milisegundo de vida, con un `changed: true` impecable — y recibiria
+  // «tu lugar ya no esta cubierto» en el segundo en que se dio de alta. A
+  // alguien que NUNCA estuvo cubierto, mezclado con el mail de bienvenida.
+  //
+  // El mail habla de una PERDIDA. Nacer sin algo no es perderlo.
+  //
+  // Es el mismo error de familia que las otras tres clausulas —confundir un
+  // cambio del sistema con algo que le paso a la persona— y se encontro
+  // preguntando «¿que le llega al alumno free que nunca tuvo profe?».
+  if (origen === "alta") return null;
 
   // Mismo criterio que el resto del paywall: sobre un documento que sabemos
   // que leimos mal no le escribimos a nadie sobre plata.
