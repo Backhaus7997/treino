@@ -357,6 +357,31 @@ class _FilaState extends ConsumerState<_Fila> {
               fontSize: AppTextSize.bodyDense,
             ),
           ),
+          const SizedBox(height: AppSpacing.s8),
+          // SOBRE QUIÉN se acciona. La tarjeta mostraba la ruta, el motivo,
+          // el tipo y el detalle — nunca a quién se le da de baja, que es la
+          // única de las cuatro acciones irreversible desde acá.
+          _Autor(reporte: reporte),
+          if (reporte.uidDeclaradoNoCoincide) ...[
+            const SizedBox(height: AppSpacing.s8),
+            _Aviso(
+              texto: 'Quien denunció declaró otro uid '
+                  '(${reporte.targetOwnerUid}). Es señal de reporte '
+                  'malicioso: las acciones se ejecutan sobre el autor real, '
+                  'no sobre el declarado.', // i18n: Fase W3
+              color: palette.danger,
+            ),
+          ],
+          if (reporte.attemptedAction != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            _Aviso(
+              texto: 'Sobre este reporte ya se ejecutó '
+                  '"${_accionLegible(reporte.attemptedAction!)}" y la '
+                  'resolución no llegó a cerrarse. Verificá antes de '
+                  'decidir.', // i18n: Fase W3
+              color: palette.warning,
+            ),
+          ],
           if (reporte.detail != null && reporte.detail!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.s8),
             Text(
@@ -471,6 +496,7 @@ class _FilaState extends ConsumerState<_Fila> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _SuspendConfirmationSheet(
+        reporte: widget.reporte,
         onConfirm: () => _resolver(context, ref, 'actioned', 'userSuspended'),
       ),
     );
@@ -487,7 +513,16 @@ class _FilaState extends ConsumerState<_Fila> {
 /// (deshabilitar la cuenta) y los botones son [TreinoButton], como el resto
 /// de esta pantalla, en vez del `_SheetButton` privado de aquel archivo.
 class _SuspendConfirmationSheet extends StatelessWidget {
-  const _SuspendConfirmationSheet({required this.onConfirm});
+  const _SuspendConfirmationSheet({
+    required this.reporte,
+    required this.onConfirm,
+  });
+
+  /// De acá sale a QUIÉN se da de baja. Preguntar "¿dar de baja esta
+  /// cuenta?" sin decir cuál convierte la confirmación en un trámite: el
+  /// paso existe para que alguien pueda frenar, y no se puede frenar lo que
+  /// no se ve.
+  final PendingReport reporte;
 
   /// Se invoca sólo al confirmar. El botón "Cancelar" cierra el sheet sin
   /// llamarlo.
@@ -535,6 +570,17 @@ class _SuspendConfirmationSheet extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: AppSpacing.s12),
+            _Autor(reporte: reporte, centrado: true),
+            if (reporte.uidDeclaradoNoCoincide) ...[
+              const SizedBox(height: AppSpacing.s8),
+              _Aviso(
+                texto: 'Quien denunció declaró otro uid '
+                    '(${reporte.targetOwnerUid}). La baja se ejecuta sobre '
+                    'el autor real.', // i18n: Fase W3
+                color: palette.danger,
+              ),
+            ],
             const SizedBox(height: AppSpacing.s20),
             Row(
               children: [
@@ -567,6 +613,102 @@ class _SuspendConfirmationSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Cómo se lee una acción de moderación en castellano.
+///
+/// El servidor manda el identificador del contrato (`userSuspended`), que es
+/// lo que corresponde en el payload. Mostrarlo tal cual en un aviso sobre
+/// una cuenta dada de baja sería escribirle jerga a la persona que tiene que
+/// decidir en ese momento.
+String _accionLegible(String action) {
+  switch (action) {
+    case 'contentRemoved':
+      return 'retirar el contenido'; // i18n: Fase W3
+    case 'userWarned':
+      return 'advertir al usuario'; // i18n: Fase W3
+    case 'userSuspended':
+      return 'dar de baja la cuenta'; // i18n: Fase W3
+    default:
+      return action;
+  }
+}
+
+/// Quién escribió el contenido reportado, derivado del documento.
+///
+/// Nunca `targetOwnerUid`: ese lo declara quien denuncia y nada lo ata al
+/// autor real. Cuando no se pudo derivar, lo dice — y no cae de vuelta al
+/// declarado, que sería mostrar un uid ajeno bajo la etiqueta "Autor" justo
+/// en la pantalla donde alguien aprieta "Dar de baja".
+class _Autor extends StatelessWidget {
+  const _Autor({required this.reporte, this.centrado = false});
+
+  final PendingReport reporte;
+
+  /// El sheet centra su columna entera; la tarjeta alinea a la izquierda.
+  final bool centrado;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final uid = reporte.derivedOwnerUid;
+
+    if (uid == null) {
+      return _Aviso(
+        texto: 'No pudimos derivar el autor de este contenido: las acciones '
+            'sobre la persona no se pueden ejecutar.', // i18n: Fase W3
+        color: palette.warning,
+      );
+    }
+
+    final nombre = reporte.derivedOwnerName;
+    return SelectableText(
+      // El uid siempre, aunque haya nombre: dos cuentas pueden llamarse
+      // igual, y el uid es lo que se pega en la consola de Firebase.
+      nombre == null ? 'Autor: $uid' : 'Autor: $nombre · $uid', // i18n: W3
+      textAlign: centrado ? TextAlign.center : TextAlign.start,
+      style: GoogleFonts.barlow(
+        color: palette.textPrimary,
+        fontSize: AppTextSize.bodyDense,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+}
+
+/// Un aviso de una línea, con su ícono y su color semántico.
+///
+/// [AppPalette.danger] cuando hace falta una decisión distinta (el uid
+/// declarado no es el autor real), [AppPalette.warning] cuando es atención y
+/// no acción — son hues distintos justamente para que se distingan de un
+/// vistazo, ver el dartdoc de los tokens.
+class _Aviso extends StatelessWidget {
+  const _Aviso({required this.texto, required this.color});
+
+  final String texto;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(TreinoIcon.warning, size: AppTextSize.body, color: color),
+        const SizedBox(width: AppSpacing.hairline * 2),
+        Expanded(
+          child: Text(
+            texto,
+            style: GoogleFonts.barlow(
+              color: color,
+              fontSize: AppTextSize.caption,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

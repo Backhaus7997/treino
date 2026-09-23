@@ -55,7 +55,13 @@ class _ServicioFalso implements ModerationQueueService {
   }
 }
 
-PendingReport _reporte({required String id, int horas = 2}) =>
+PendingReport _reporte({
+  required String id,
+  int horas = 2,
+  String? derivedOwnerUid = 'o1',
+  String? derivedOwnerName,
+  String? attemptedAction,
+}) =>
     PendingReport.fromMap({
       'id': id,
       'targetKind': 'post',
@@ -69,6 +75,9 @@ PendingReport _reporte({required String id, int horas = 2}) =>
           .subtract(Duration(hours: horas))
           .toIso8601String(),
       'contentPath': 'posts/p1',
+      if (derivedOwnerUid != null) 'derivedOwnerUid': derivedOwnerUid,
+      if (derivedOwnerName != null) 'derivedOwnerName': derivedOwnerName,
+      if (attemptedAction != null) 'attemptedAction': attemptedAction,
     });
 
 void main() {
@@ -245,5 +254,105 @@ void main() {
 
     expect(find.textContaining('No pudimos abrir la cola'), findsOneWidget);
     expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets('la tarjeta dice quién escribió el contenido', (tester) async {
+    // Mostraba la ruta, el motivo, el tipo y el detalle — nunca a quién se le
+    // da de baja, que es la única de las cuatro acciones irreversible desde
+    // acá. Van el nombre y el uid: el nombre para reconocer, el uid porque
+    // dos cuentas pueden llamarse igual y es lo que se pega en la consola.
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', derivedOwnerUid: 'uid-real', derivedOwnerName: 'Juan'),
+    ]);
+
+    expect(find.textContaining('Juan'), findsOneWidget);
+    expect(find.textContaining('uid-real'), findsOneWidget);
+  });
+
+  testWidgets('sin autor derivado lo dice, y NO cae al uid declarado',
+      (tester) async {
+    // `targetOwnerUid` lo escribe quien denuncia y nada lo ata al autor real.
+    // Mostrarlo bajo la etiqueta "Autor" en la pantalla donde alguien aprieta
+    // "Dar de baja" sería peor que no mostrar nada.
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', derivedOwnerUid: null),
+    ]);
+
+    expect(find.textContaining('No pudimos derivar el autor'), findsOneWidget);
+    expect(find.textContaining('Autor: o1'), findsNothing);
+  });
+
+  testWidgets('el uid declarado que no coincide se ve en la tarjeta',
+      (tester) async {
+    // Es señal de intento de abuso: se denuncia contenido de uno escribiendo
+    // el uid de otro. Hasta ahora eso sólo iba a un `logger.warn` de Cloud
+    // Logging — invisible para quien aprieta el botón irreversible.
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', derivedOwnerUid: 'otro-uid'),
+    ]);
+
+    expect(find.textContaining('declaró otro uid'), findsOneWidget);
+    expect(find.textContaining('(o1)'), findsOneWidget);
+  });
+
+  testWidgets(
+      'sin mismatch no hay aviso: una alarma que grita siempre se ignora',
+      (tester) async {
+    await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    expect(find.textContaining('declaró otro uid'), findsNothing);
+  });
+
+  testWidgets('una acción ya ejecutada se avisa, en castellano',
+      (tester) async {
+    // El reporte vuelve a la cola cuando la mutación entró y el cierre no.
+    // Antes volvía mudo y el siguiente moderador lo descartaba: dismissed/none
+    // escrito sobre una cuenta dada de baja.
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', attemptedAction: 'userSuspended'),
+    ]);
+
+    expect(find.textContaining('dar de baja la cuenta'), findsOneWidget);
+    // El identificador del contrato no se le muestra a quien decide.
+    expect(find.textContaining('userSuspended'), findsNothing);
+  });
+
+  testWidgets('sin intento previo, la tarjeta no avisa nada', (tester) async {
+    await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    expect(find.textContaining('no llegó a cerrarse'), findsNothing);
+  });
+
+  testWidgets('la confirmación de baja dice a QUIÉN se da de baja',
+      (tester) async {
+    // Preguntar "¿dar de baja esta cuenta?" sin decir cuál convierte la
+    // confirmación en un trámite: el paso existe para que alguien pueda
+    // frenar, y no se puede frenar lo que no se ve.
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', derivedOwnerUid: 'uid-real', derivedOwnerName: 'Juan'),
+    ]);
+
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿Dar de baja esta cuenta?'), findsOneWidget);
+    // Dos: el de la tarjeta de atrás y el del sheet.
+    expect(find.textContaining('uid-real'), findsNWidgets(2));
+  });
+
+  testWidgets(
+      'la confirmación también muestra el uid declarado que no coincide',
+      (tester) async {
+    await montar(tester, esModerador: true, reportes: [
+      _reporte(id: 'r1', derivedOwnerUid: 'otro-uid'),
+    ]);
+
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('La baja se ejecuta sobre el autor real'),
+      findsOneWidget,
+    );
   });
 }

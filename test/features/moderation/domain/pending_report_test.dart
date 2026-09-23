@@ -74,4 +74,56 @@ void main() {
       expect(_reporte().contentPath, 'posts/p1');
     });
   });
+
+  group('uidDeclaradoNoCoincide', () {
+    PendingReport con(String? derivado) => PendingReport.fromMap({
+          'id': 'post_p1_r1',
+          'targetOwnerUid': 'o1',
+          if (derivado != null) 'derivedOwnerUid': derivado,
+        });
+
+    test('el declarado y el derivado iguales NO es mismatch', () {
+      // Una alarma que grita siempre entrena a ignorarla, y el caso normal
+      // es este.
+      expect(con('o1').uidDeclaradoNoCoincide, isFalse);
+    });
+
+    test('distintos SI es mismatch', () {
+      // Señal de reporte malicioso: se denuncia contenido de uno escribiendo
+      // el uid de otro.
+      expect(con('otro').uidDeclaradoNoCoincide, isTrue);
+    });
+
+    test('sin derivado no se afirma un mismatch que no se puede saber', () {
+      // `null` significa "no se pudo derivar el autor", no "es otro". Tratar
+      // la ignorancia como acusación es la misma clase de afirmación sin
+      // verificar que AGENTS.md 11.1 trata.
+      expect(con(null).uidDeclaradoNoCoincide, isFalse);
+    });
+  });
+
+  group('campos nuevos de la cola', () {
+    test('lee el autor derivado, su nombre y el intento previo', () {
+      final r = PendingReport.fromMap(const {
+        'id': 'x',
+        'derivedOwnerUid': 'uid-real',
+        'derivedOwnerName': 'Juan',
+        'attemptedAction': 'userSuspended',
+        'attemptedAt': '2026-09-23T10:00:00.000Z',
+      });
+      expect(r.derivedOwnerUid, 'uid-real');
+      expect(r.derivedOwnerName, 'Juan');
+      expect(r.attemptedAction, 'userSuspended');
+      expect(r.attemptedAt, DateTime.utc(2026, 9, 23, 10));
+    });
+
+    test('sin esos campos quedan en null, no en vacio', () {
+      // La diferencia importa: "" se renderizaria como un autor sin nombre.
+      final r = PendingReport.fromMap(const {'id': 'x'});
+      expect(r.derivedOwnerUid, isNull);
+      expect(r.derivedOwnerName, isNull);
+      expect(r.attemptedAction, isNull);
+      expect(r.attemptedAt, isNull);
+    });
+  });
 }

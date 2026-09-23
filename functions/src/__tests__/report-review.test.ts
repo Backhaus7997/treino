@@ -1844,3 +1844,81 @@ describe("resolveReport — P3-B: un estado parcial tiene que ser visible", () =
     expect(audit.exists).toBe(false);
   });
 });
+
+describe("listPendingReports — P3-C: la cola dice SOBRE QUIEN se acciona", () => {
+  it("devuelve el autor real derivado del contenido y su nombre", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-1",
+      // El denunciante declara un uid que NO es el autor.
+      targetOwnerUid: "declarado-p3c",
+    });
+    await db.collection("posts").doc("post-p3c-1").set({
+      text: "algo", authorUid: "autor-real-p3c",
+    });
+    await db.collection("users").doc("autor-real-p3c").set({
+      displayName: "Juan Real",
+    });
+    extraCleanupPaths.push("posts/post-p3c-1", "users/autor-real-p3c");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+
+    expect(r1!.derivedOwnerUid).toBe("autor-real-p3c");
+    expect(r1!.derivedOwnerName).toBe("Juan Real");
+    // El declarado SIGUE viajando: la pantalla lo necesita para poder decir
+    // "declararon otro uid" y nombrarlo.
+    expect(r1!.targetOwnerUid).toBe("declarado-p3c");
+  });
+
+  it("si el contenido ya no existe, el autor es null — NUNCA el declarado", async () => {
+    // Caer de vuelta a `targetOwnerUid` seria mostrar un uid ajeno bajo la
+    // etiqueta "Autor" en la pantalla donde se aprieta "Dar de baja".
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-2",
+      targetOwnerUid: "declarado-p3c-2",
+    });
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBeNull();
+    expect(r1!.derivedOwnerName).toBeNull();
+  });
+
+  it("un reporte de perfil deriva el autor del targetId, sin leer nada", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "profile", targetId: "uid-del-perfil",
+      targetOwnerUid: "uid-del-perfil",
+    });
+    await db.collection("users").doc("uid-del-perfil").set({
+      displayName: "Perfil Reportado",
+    });
+    extraCleanupPaths.push("users/uid-del-perfil");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBe("uid-del-perfil");
+    expect(r1!.derivedOwnerName).toBe("Perfil Reportado");
+  });
+
+  it("sin displayName devuelve el uid igual: el nombre es un extra, no un requisito", async () => {
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3c-4", targetOwnerUid: "o-p3c-4",
+    });
+    await db.collection("posts").doc("post-p3c-4").set({
+      text: "algo", authorUid: "o-p3c-4",
+    });
+    extraCleanupPaths.push("posts/post-p3c-4");
+
+    const cola = await listPendingReportsHandler(db);
+    const r1 = cola.reports.find((r) => r.id === "r1");
+    expect(r1!.derivedOwnerUid).toBe("o-p3c-4");
+    expect(r1!.derivedOwnerName).toBeNull();
+  });
+
+  it("una cola vacia no rompe el getAll", async () => {
+    // `db.getAll()` sin refs tira. Es el caso mas comun de todos: la cola al
+    // dia.
+    const cola = await listPendingReportsHandler(db);
+    expect(cola.reports).toHaveLength(0);
+  });
+});
