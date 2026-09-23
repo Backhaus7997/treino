@@ -383,7 +383,7 @@
     {
       "slug": "retencion",
       "title": "Retención y eliminación de datos",
-      "lastUpdated": "22 de septiembre de 2026",
+      "lastUpdated": "23 de septiembre de 2026",
       "sections": [
         {
           "heading": "1. CÓMO ELIMINÁS TU CUENTA",
@@ -447,5 +447,5 @@
       ]
     }
   ],
-  "sourceSha": "8d7c13b43a238fe1e82133aac0942cbb13e161dd9cfdba33df8009ba827a98e0"
+  "sourceSha": "c290584b0c4d56d5dd0acf2221c02107bcf00bf0a4d9acf008243674eb146c64"
 }
