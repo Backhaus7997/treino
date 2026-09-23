@@ -303,16 +303,23 @@ void main() {
     expect(find.textContaining('declaró otro uid'), findsNothing);
   });
 
-  testWidgets('una acción ya ejecutada se avisa, en castellano',
+  testWidgets('un intento previo se avisa como INTENTO, no como hecho',
       (tester) async {
-    // El reporte vuelve a la cola cuando la mutación entró y el cierre no.
-    // Antes volvía mudo y el siguiente moderador lo descartaba: dismissed/none
-    // escrito sobre una cuenta dada de baja.
+    // El reporte vuelve a la cola cuando la mutación pudo haber entrado y el
+    // cierre no. Antes volvía mudo y el siguiente moderador lo descartaba:
+    // dismissed/none escrito sobre una cuenta dada de baja.
     await montar(tester, esModerador: true, reportes: [
       _reporte(id: 'r1', attemptedAction: 'userSuspended'),
     ]);
 
     expect(find.textContaining('dar de baja la cuenta'), findsOneWidget);
+    // "Se intentó", NO "se ejecutó". El servidor conserva este campo
+    // justamente cuando NO SABE si la mutación entró, y donde sí sabe que no
+    // entró lo borra. Afirmar la ejecución sobre una incógnita lleva a lo
+    // contrario de lo que el aviso busca: descartar el reporte creyendo
+    // aplicada una acción que puede no haberse aplicado nunca.
+    expect(find.textContaining('se intentó'), findsOneWidget);
+    expect(find.textContaining('ya se ejecutó'), findsNothing);
     // El identificador del contrato no se le muestra a quien decide.
     expect(find.textContaining('userSuspended'), findsNothing);
   });
@@ -320,7 +327,7 @@ void main() {
   testWidgets('sin intento previo, la tarjeta no avisa nada', (tester) async {
     await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
 
-    expect(find.textContaining('no llegó a cerrarse'), findsNothing);
+    expect(find.textContaining('se intentó'), findsNothing);
   });
 
   testWidgets('la confirmación de baja dice a QUIÉN se da de baja',

@@ -375,10 +375,18 @@ class _FilaState extends ConsumerState<_Fila> {
           if (reporte.attemptedAction != null) ...[
             const SizedBox(height: AppSpacing.s8),
             _Aviso(
-              texto: 'Sobre este reporte ya se ejecutó '
-                  '"${_accionLegible(reporte.attemptedAction!)}" y la '
-                  'resolución no llegó a cerrarse. Verificá antes de '
-                  'decidir.', // i18n: Fase W3
+              // "Se intentó", NO "se ejecutó". El servidor conserva este
+              // campo justamente cuando NO SABE si la mutación entró —una
+              // escritura que tira puede haber commiteado igual—, y donde sí
+              // sabe que no entró lo borra. Escribir "ya se ejecutó" sobre
+              // una incógnita es la afirmación falsa de AGENTS.md 11.1, y
+              // acá lleva a lo contrario de lo que este aviso busca: el
+              // moderador descarta el reporte creyendo que la acción está
+              // aplicada cuando puede no haberse aplicado nunca.
+              texto: 'Sobre este reporte se intentó '
+                  '"${_accionLegible(reporte.attemptedAction!)}" y no se pudo '
+                  'confirmar si entró. Puede estar aplicada: verificá antes '
+                  'de decidir.', // i18n: Fase W3
               color: palette.warning,
             ),
           ],
