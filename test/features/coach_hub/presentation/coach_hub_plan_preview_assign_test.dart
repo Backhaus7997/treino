@@ -260,8 +260,7 @@ void main() {
 
     testWidgets(
         'bloqueo del filtro de moderación: un solo mensaje de contenido '
-        'bloqueado, no "Probá de nuevo" (Codex P2, PR #1227)',
-        (tester) async {
+        'bloqueado, no "Probá de nuevo" (Codex P2, PR #1227)', (tester) async {
       final repo = _MockRoutineRepository();
       var llamadas = 0;
       when(() => repo.createAssigned(any())).thenAnswer((_) async {
