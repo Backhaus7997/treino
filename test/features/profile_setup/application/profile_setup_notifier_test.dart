@@ -14,6 +14,7 @@ import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userProfileProvider, userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
@@ -81,9 +82,13 @@ void main() {
     });
   }
 
+  /// [perfilObservado] reemplaza lo que la app OBSERVA del perfil (el stream
+  /// de `userProfileProvider`, que puede venir de la caché local) sin tocar
+  /// lo que hay en el "servidor" (`firestore`). Por default, el stream sale
+  /// del mismo firestore y los dos coinciden.
   ProviderContainer makeContainer({
     AvatarUploadService? avatarService,
-    bool perfilSinCargar = false,
+    Stream<UserProfile?> Function()? perfilObservado,
   }) {
     return ProviderContainer(overrides: [
       firestoreProvider.overrideWithValue(firestore),
@@ -101,14 +106,16 @@ void main() {
       // mirrors production (userProfileProvider watches repo.watch(uid))
       // instead of wiring the real authStateChanges() stream chain.
       userProfileProvider.overrideWith(
-        (ref) => perfilSinCargar
-            // Un stream que no emite nunca: el perfil queda en AsyncLoading,
-            // o sea «todavía no se sabe» si hay consentimiento.
-            ? StreamController<UserProfile?>().stream
-            : ref.watch(userRepositoryProvider).watch('u1'),
+        (ref) =>
+            perfilObservado?.call() ??
+            ref.watch(userRepositoryProvider).watch('u1'),
       ),
     ]);
   }
+
+  /// Un perfil observado que no emite nunca: queda en AsyncLoading, o sea
+  /// «todavía no se sabe» si hay consentimiento.
+  Stream<UserProfile?> nuncaEmite() => StreamController<UserProfile?>().stream;
 
   /// Primes [userProfileProvider] so its `.valueOrNull` is resolved (not
   /// AsyncLoading) by the time `submit()` reads it synchronously — mirrors
@@ -389,7 +396,7 @@ void main() {
         'perfil sin cargar + cuenta de email — resuelve contra el servidor: '
         'no exige el checkbox ni pisa la evidencia', () async {
       await seedUserDoc('u1');
-      final container = makeContainer(perfilSinCargar: true);
+      final container = makeContainer(perfilObservado: nuncaEmite);
       addTearDown(container.dispose);
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
@@ -407,11 +414,51 @@ void main() {
       );
     });
 
+    // Hallazgo de Codex en #1228. Lo que la app observa (la caché local) es
+    // una versión vieja del doc SIN `termsAcceptedAt`, pero el servidor sí lo
+    // tiene. La pantalla muestra el checkbox y la persona lo tilda: estampar
+    // sobre lo observado pisaría la evidencia original con la de hoy.
+    test(
+        'la caché dice que falta el consentimiento pero el servidor lo tiene '
+        '— no se pisa la evidencia', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer(
+        perfilObservado: () => Stream.value(
+          UserProfile(
+            uid: 'u1',
+            email: 'test@test.com',
+            displayName: null,
+            role: UserRole.athlete,
+            createdAt: DateTime.utc(2026, 1, 1),
+            updatedAt: DateTime.utc(2026, 1, 1),
+          ),
+        ),
+      );
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+
+      await notifier.submit();
+
+      final data =
+          (await firestore.collection('users').doc('u1').get()).data()!;
+      expect(data['displayName'], equals('Carlos'));
+      expect(
+        (data['termsAcceptedAt'] as Timestamp).toDate().toUtc(),
+        equals(DateTime.utc(2026, 1, 1, 12)),
+      );
+      expect(data.containsKey('acceptedTermsVersion'), isFalse);
+    });
+
     test(
         'perfil sin cargar + cuenta sin consentimiento — resuelve contra el '
         'servidor y exige el checkbox', () async {
       await seedUserDoc('u1', conConsentimiento: false);
-      final container = makeContainer(perfilSinCargar: true);
+      final container = makeContainer(perfilObservado: nuncaEmite);
       addTearDown(container.dispose);
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);

@@ -24,9 +24,12 @@ import '../../profile/application/user_providers.dart';
 /// - `null`: todavía no se sabe —el perfil no cargó, o el stream falló sin
 ///   un valor previo—. NO es `false`, y quien lee decide qué hacer: la
 ///   pantalla muestra el checkbox (preguntar de más no le cuesta nada a
-///   nadie; preguntar de menos es un alta sin consentimiento), y el submit lo
-///   resuelve contra el servidor antes de escribir, para no pisar la
-///   evidencia de una cuenta de email.
+///   nadie; preguntar de menos es un alta sin consentimiento).
+///
+/// Esto sale de lo que OBSERVA la app, que puede ser la caché local. Sirve
+/// para decidir qué mostrar, no para escribir: antes de estampar, el submit
+/// confirma contra el servidor todo lo que no sea `false`
+/// (`UserRepository.getFromServer`).
 final termsConsentRequiredProvider = Provider<bool?>((ref) {
   return ref.watch(
     userProfileProvider.select((perfil) {

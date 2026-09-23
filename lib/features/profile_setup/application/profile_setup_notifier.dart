@@ -317,13 +317,18 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       // anterior («sin perfil = OAuth nuevo») dejaba sin consentimiento a las
       // altas con Google/Apple cuyo doc sí se creaba en el login.
       //
-      // Si todavía no se sabe (perfil sin cargar), se le pregunta al servidor
-      // ANTES de escribir nada. Tratar el «no sé» como «hace falta» pisaría la
-      // evidencia de una cuenta de email con un timestamp posterior; tratarlo
-      // como «no hace falta» cerraría un alta sin consentimiento.
+      // Si lo observado dice que HAY consentimiento, se confía: lo estampó el
+      // registro por email. Si dice que falta, o todavía no se sabe, se
+      // confirma contra el SERVIDOR antes de decidir, porque de esto depende
+      // una escritura de evidencia. La caché local puede tener una versión
+      // vieja del doc sin `termsAcceptedAt`, y estampar sobre ella pisaría la
+      // evidencia original con un timestamp posterior (hallazgo de Codex en
+      // #1228). Sin conexión, el submit falla: es preferible a registrar
+      // consentimiento sobre un dato que no se pudo confirmar.
       final repo = ref.read(userRepositoryProvider);
-      var needsTermsConsent = ref.read(termsConsentRequiredProvider);
-      needsTermsConsent ??= (await repo.get(uid))?.termsAcceptedAt == null;
+      final yaHayEvidencia = ref.read(termsConsentRequiredProvider) == false;
+      final needsTermsConsent = !yaHayEvidencia &&
+          (await repo.getFromServer(uid))?.termsAcceptedAt == null;
       if (needsTermsConsent && !state.termsAccepted) {
         // Mismo patrón que 'username-taken': cortamos el spinner acá y
         // dejamos que el catch de abajo setee submitError con esta excepción.
