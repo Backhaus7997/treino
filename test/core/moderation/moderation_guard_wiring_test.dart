@@ -399,30 +399,79 @@ void main() {
     });
 
     test(
-        'vocabulario de dominio (musculo, dorsal, aductores) no se rechaza '
-        'en ningun campo', () async {
+        'vocabulario que roza el filtro (allowlist, "culo"/"puta" como '
+        'subcadena de palabras legitimas) no se rechaza en ningun campo',
+        () async {
+      // A diferencia del corpus viejo (musculo/dorsal/aductores: ninguna es
+      // subcadena de un termino de VETTED_ANTI_EVASION, asi que este test
+      // pasaba igual con el filtro vacio) este corpus usa palabras que SI
+      // entran a la pasada antievasion y sobreviven solo por la allowlist —
+      // "controlo" contiene "trolo", "computo" contiene "puto" — o que
+      // dependen de que la pasada A compare por palabra completa y no por
+      // subcadena — "calculo" contiene "culo". Si se rompe cualquiera de
+      // las dos cosas, este test se pone rojo.
       final repo = RoutineRepository(firestore: firestore);
 
       final saved = await repo.createUserOwned(
         uid: 'a1',
         draft: Routine(
           id: '',
-          name: 'Rutina dorsal y aductores',
-          split: null,
-          summary: 'Trabaja el musculo dorsal.',
+          name: 'Full body - controlo la tecnica',
+          split: 'El computo de series por grupo muscular',
+          summary: 'Trabajo el musculo dorsal sin descontrolo en la carga.',
           level: ExperienceLevel.beginner,
           days: [
             RoutineDay(
               dayNumber: 1,
-              name: 'Dia de aductores',
-              slots: [slot(notes: 'Foco en el musculo dorsal')],
+              name: 'Dia de aductores y calculo de RM',
+              slots: [
+                slot(notes: 'No te disputo el peso, priorizo la forma'),
+              ],
             ),
           ],
         ),
       );
 
-      expect(saved.name, 'Rutina dorsal y aductores');
+      expect(saved.name, 'Full body - controlo la tecnica');
       expect((await firestore.collection('routines').get()).docs, hasLength(1));
+    });
+
+    test(
+        'el cue que motivo todo: "matate" en una nota de entrenador ya no '
+        'bloquea la rutina', () async {
+      // finding 3: "matate" es jerga de gimnasio corriente ("matate en la
+      // ultima serie") y bajo de `block` a `review` — deja de impedir el
+      // guardado. `ModerationGuard.ensure` del cliente solo tira para
+      // `block`, asi que este test fija que una nota real de entrenador con
+      // "matate" ya puede guardarse.
+      final repo = RoutineRepository(firestore: firestore);
+
+      final saved = await repo.createUserOwned(
+        uid: 'a1',
+        draft: Routine(
+          id: '',
+          name: 'Rutina de piernas',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: [
+            RoutineDay(
+              dayNumber: 1,
+              name: 'Dia 1',
+              slots: [
+                slot(
+                  notes: 'Dale, matate en la ultima serie que ya casi '
+                      'terminamos',
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      expect(
+        saved.days[0].slots[0].notes,
+        'Dale, matate en la ultima serie que ya casi terminamos',
+      );
     });
   });
 
