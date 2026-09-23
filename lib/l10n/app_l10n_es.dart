@@ -1535,6 +1535,10 @@ class AppL10nEs extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String get profileSetupGymSelectError =>
+      'No pudimos cargar ese gimnasio. Inténtalo de nuevo o elige «OTRO GYM / SIN GYM».';
+
+  @override
   String get reAuthPasswordLabel => 'Contraseña';
 
   @override
@@ -6220,6 +6224,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileSetupCancelAccountError =>
       'No pudimos cancelar la cuenta. Probá de nuevo.';
+
+  @override
+  String get profileSetupGymSelectError =>
+      'No pudimos cargar ese gimnasio. Probá de nuevo o elegí «OTRO GYM / SIN GYM».';
 
   @override
   String get reAuthPasswordLabel => 'Contraseña';

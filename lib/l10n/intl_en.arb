@@ -1124,6 +1124,7 @@
   "profileSetupUsernameTaken": "That username is already taken",
   "profileSetupUsernameAvailable": "Username available",
   "profileSetupUsernameCheckError": "We couldn't check the username. Try again.",
+  "profileSetupGymSelectError": "We couldn't load that gym. Try again or pick «OTRO GYM / SIN GYM».",
   "routineEditorDiscardTitle": "Discard changes?",
   "routineEditorDiscardBody": "If you leave now you'll lose your unsaved changes.",
   "routineEditorDiscardConfirm": "Discard",

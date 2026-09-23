@@ -1500,6 +1500,10 @@ class AppL10nEn extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String get profileSetupGymSelectError =>
+      'We couldn\'t load that gym. Try again or pick «OTRO GYM / SIN GYM».';
+
+  @override
   String get reAuthPasswordLabel => 'Contraseña';
 
   @override
