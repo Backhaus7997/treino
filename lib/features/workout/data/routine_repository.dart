@@ -48,7 +48,7 @@ class RoutineRepository {
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
 
-  /// Corre [ModerationGuard.ensure] sobre los CUATRO campos de texto libre de
+  /// Corre [ModerationGuard.ensure] sobre los CINCO campos de texto libre de
   /// una rutina: `name`, `split`, `summary`, y los anidados `days[].name` /
   /// `days[].slots[].notes`. Se llama ANTES de cualquier escritura — mismo
   /// criterio que el resto del repo (`PostRepository`, `ChatRepository`,

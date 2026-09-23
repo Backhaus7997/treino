@@ -217,11 +217,11 @@ void main() {
   });
 
   group('rutinas', () {
-    // Los CUATRO campos de texto libre de una rutina: `name`, `split`,
+    // Los CINCO campos de texto libre de una rutina: `name`, `split`,
     // `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
     // anidados. Cada test de abajo ejercita un metodo de escritura distinto
     // con un campo distinto, asi que entre todos quedan los seis metodos Y
-    // los cuatro campos cubiertos sin repetir la matriz completa — la
+    // los cinco campos cubiertos sin repetir la matriz completa — la
     // exhaustividad campo x metodo ya la tiene
     // `quarantine-routine-fields.test.ts` del lado del servidor.
     RoutineSlot slot({String? notes}) => RoutineSlot(
