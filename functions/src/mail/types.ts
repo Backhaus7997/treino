@@ -96,6 +96,24 @@ export type MailKind =
   // Sin `prefKey`, igual que sus dos hermanos: es la respuesta a algo que el PF
   // acaba de intentar hacer, no una novedad de producto.
   | "limit-reached"
+  // ── El ALUMNO que se quedo sin cobertura ────────────────────────────────
+  //
+  // El equivalente de `limit-reached` para el otro rol, y por la misma razon
+  // de fondo: la app no puede decirle donde se paga, asi que el mail es el
+  // unico canal. Vale la misma cita textual de Apple de arriba.
+  //
+  // Lo produce `athlete-prospect-mail.ts`. Dispara cuando
+  // `athletePaywallEnforced` PASA a `true` —el profe lo dio de baja, o su
+  // propia suscripcion vencio— y nunca desde el barrido: ver alla por que esa
+  // distincion es la diferencia entre un mail y mandarselo a la base entera.
+  //
+  // ⚠️ CON `prefKey`, y es el UNICO de los cuatro del paywall que lo lleva.
+  // Los otros tres son transaccionales: le avisan a alguien que ya paga que
+  // algo paso con su plata. Este le OFRECE un producto a alguien que no lo
+  // compro, o sea que es una comunicacion comercial — y
+  // `docs/legal/politica-de-privacidad.md` promete que para esas «la oposicion
+  // es ABSOLUTA». Sin interruptor, esa linea seria mentira.
+  | "athlete-coverage-lost"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el

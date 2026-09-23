@@ -68,6 +68,8 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 
+import { avisarAlAlumnoSinCobertura } from "./athlete-prospect-mail";
+
 function ensureApp(): App {
   try {
     return getApp();
@@ -258,13 +260,18 @@ export const syncAthletePaywallOnUser = onDocumentWritten(
     // para todo lo que no sea un alumno, asi que dejarlo pasar LIMPIA el campo.
     const uid = event.params.uid;
     try {
-      const r = await syncAthletePaywallEnforced(ensureApp(), uid, after);
+      const app = ensureApp();
+      const r = await syncAthletePaywallEnforced(app, uid, after);
       if (r.changed) {
         logger.info("syncAthletePaywallOnUser: reconciliado", {
           uid,
           enforced: r.value,
         });
       }
+      // `"evento"`: esto le paso AL USUARIO —su suscripcion vencio— y no al
+      // sistema. Ver `athlete-prospect-mail.ts` para por que esa distincion
+      // decide si el mail sale o no.
+      await avisarAlAlumnoSinCobertura(app, r, "evento", Date.now(), logger);
     } catch (err) {
       // Catch-and-log sin relanzar, igual que el resto de los triggers de
       // subscriptions: un doc malformado no debe provocar una tormenta de
@@ -293,13 +300,17 @@ export const syncAthletePaywallOnTrainerLink = onDocumentWritten(
     if (!uid) return;
 
     try {
-      const r = await syncAthletePaywallEnforced(ensureApp(), uid);
+      const app = ensureApp();
+      const r = await syncAthletePaywallEnforced(app, uid);
       if (r.changed) {
         logger.info("syncAthletePaywallOnTrainerLink: reconciliado", {
           uid,
           enforced: r.value,
         });
       }
+      // El caso mas comun del mail: el profe termino el vinculo. Sigue siendo
+      // `"evento"` — le paso a esta persona, no a la base.
+      await avisarAlAlumnoSinCobertura(app, r, "evento", Date.now(), logger);
     } catch (err) {
       logger.error("syncAthletePaywallOnTrainerLink: error", { uid, err });
     }
@@ -361,6 +372,17 @@ export async function sweepAthletePaywallHandler(
         // la PRIMERA corrida cambia a todos — seria una linea de log por cada
         // usuario de la base. Los cambios individuales ya los loguean los dos
         // triggers, que son los que corren en regimen.
+
+        // Y por ESE mismo motivo, `"barrido"`: la primera corrida despues de
+        // encender el enforcement voltea a todos los alumnos sin cobertura que
+        // ya existen, cada uno con su `changed: true` legitimo. Mandar el mail
+        // ahi se lo manda a la base entera de una.
+        //
+        // Se llama igual —en vez de simplemente no llamar— para que la guarda
+        // sea REAL y no una convencion: si alguien manana cambia esta linea a
+        // `"evento"`, hay un test que se pone rojo. Una regla que se cumple
+        // porque nadie la llama no esta probada.
+        await avisarAlAlumnoSinCobertura(app, r, "barrido", Date.now(), logger);
       } catch (err) {
         // Un alumno con datos raros no puede frenar el barrido de los demas.
         logger.error("sweepAthletePaywall: error en un alumno", {
