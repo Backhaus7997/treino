@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart'
-    show firebaseAuthProvider;
+    show authStateChangesProvider, firebaseAuthProvider;
 import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userProfileProvider, userRepositoryProvider;
@@ -91,6 +91,8 @@ void main() {
         UserRepository(firestore: firestore),
       ),
       firebaseAuthProvider.overrideWithValue(mockAuth),
+      // El notifier ata su estado al uid logueado (ver su build()).
+      authStateChangesProvider.overrideWith((ref) => Stream.value(mockUser)),
       avatarUploadServiceProvider
           .overrideWithValue(avatarService ?? _FakeAvatarUploadService()),
       // QA-AUTH-001 (issue #434): submit() now reads userProfileProvider to
@@ -590,6 +592,89 @@ void main() {
       final storedDate =
           stored is Timestamp ? stored.toDate() : stored as DateTime;
       expect(storedDate.toUtc(), equals(_adultBornAt));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // El alta es de UNA cuenta: el estado no sobrevive al cambio de cuenta.
+  //
+  // Hallazgo de la revisión del cambio de Términos: el provider es de raíz y
+  // «Cancelar cuenta» / «Cerrar sesión» no lo reiniciaban. La cuenta siguiente
+  // en la misma sesión de la app heredaba el checkbox tildado, y su EMPEZAR
+  // estampaba un consentimiento que nunca dio. Los tests del grupo de arriba
+  // no podían verlo: cada uno arma un contenedor nuevo.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('el alta es de UNA cuenta', () {
+    late StreamController<User?> auth;
+    late ProviderContainer container;
+
+    User usuario(String uid) {
+      final u = _MockUser();
+      when(() => u.uid).thenReturn(uid);
+      return u;
+    }
+
+    setUp(() {
+      auth = StreamController<User?>();
+      container = ProviderContainer(overrides: [
+        authStateChangesProvider.overrideWith((ref) => auth.stream),
+      ]);
+      // Vivo durante todo el test, como lo mantiene la pantalla del alta.
+      container.listen(profileSetupNotifierProvider, (_, __) {});
+    });
+
+    tearDown(() async {
+      container.dispose();
+      await auth.close();
+    });
+
+    Future<void> tildaLosTerminos(User cuenta) async {
+      auth.add(cuenta);
+      await pumpEventQueue();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+      expect(
+          container.read(profileSetupNotifierProvider).termsAccepted, isTrue);
+    }
+
+    test(
+        'cancelar la cuenta o cerrar sesión reinicia el checkbox y el borrador',
+        () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(null); // cancelOnboarding / signOut
+      await pumpEventQueue();
+
+      final estado = container.read(profileSetupNotifierProvider);
+      expect(estado.termsAccepted, isFalse);
+      expect(estado.draft.bornAt, isNull);
+      expect(estado.currentStep, 0);
+    });
+
+    test('la cuenta siguiente NO hereda el tilde de la anterior', () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(usuario('cuenta-b'));
+      await pumpEventQueue();
+
+      expect(
+          container.read(profileSetupNotifierProvider).termsAccepted, isFalse);
+    });
+
+    // Control: la escucha es por uid y no por evento. Firebase re-emite al
+    // usuario al refrescar el token; si eso reiniciara el alta, se perdería el
+    // borrador en el medio del onboarding.
+    test('el mismo uid re-emitido (refresh del token) NO reinicia el alta',
+        () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(usuario('cuenta-a'));
+      await pumpEventQueue();
+
+      final estado = container.read(profileSetupNotifierProvider);
+      expect(estado.termsAccepted, isTrue);
+      expect(estado.draft.bornAt, equals(_adultBornAt));
     });
   });
 }

@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../auth/application/auth_providers.dart'
+    show authStateChangesProvider, firebaseAuthProvider;
 import '../../auth/presentation/legal/legal_content.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
@@ -124,6 +125,28 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
 
   @override
   ProfileSetupState build() {
+    // El alta es de UNA cuenta. El provider es de raíz, y hasta ahora sólo lo
+    // reiniciaba el flujo de «eliminar cuenta»: el estado sobrevivía a
+    // «Cancelar cuenta» y a «Cerrar sesión». Si alguien tildaba los Términos,
+    // cancelaba y otra persona se registraba en la misma sesión de la app, la
+    // segunda veía el checkbox YA tildado, y su EMPEZAR estampaba un
+    // consentimiento que nunca dio. Con él viajaba el borrador de la primera:
+    // usuario, fecha de nacimiento, gimnasio. Ahora, cuando la cuenta cambia,
+    // el alta arranca de cero. Un refresh del token re-emite el mismo uid y
+    // no toca nada.
+    //
+    // Es `listen` y no `watch` a propósito: `antes == null` es «auth todavía
+    // cargando» (o nadie logueado), y eso NO es otra cuenta. Con `watch`, el
+    // paso de cargando a logueado reiniciaba el borrador recién empezado.
+    ref.listen<String?>(
+      authStateChangesProvider.select((user) => user.valueOrNull?.uid),
+      (antes, ahora) {
+        if (antes != null && antes != ahora) ref.invalidateSelf();
+      },
+    );
+    // Y una verificación de username en vuelo de la cuenta anterior no puede
+    // escribir en el estado de la nueva.
+    _usernameCheckToken++;
     ref.onDispose(() => _usernameDebounce?.cancel());
     return const ProfileSetupState(
       draft: ProfileSetupDraft(),
