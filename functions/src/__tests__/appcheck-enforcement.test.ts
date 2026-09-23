@@ -82,22 +82,6 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
       "antes de volver a poner el flag.",
   },
-  "profile/cancel-onboarding:cancelOnboarding": {
-    permanence: "debt",
-    reason:
-      "El gemelo de deleteAccount para el alta sin completar, y hereda su " +
-      "motivo: lo llama la app movil, donde una parte real de los clientes " +
-      "todavia no atesta. Con el flag, «Cancelar cuenta» no borraria nunca los " +
-      "documentos de esos clientes y volveria el huerfano que este callable " +
-      "existe para evitar. La cerradura es que NO HAY BODY: el uid sale del " +
-      "token, asi que un llamador solo puede borrar lo SUYO, y solo si su " +
-      "alta nunca se completo (displayName null, no trainer).",
-    exitCondition:
-      "El mismo que deleteAccount, y conviene restaurarlos juntos: que el " +
-      "cliente movil emita atestacion valida en iOS y Android. Contar sobre " +
-      "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
-      "antes de poner el flag.",
-  },
   "chat/promote-chat-to-inquiry:promoteChatToInquiry": {
     // `debt` y no `decided`: a diferencia de los tres del Coach Hub web, acá
     // NO hay un impedimento de plataforma. La app del alumno activa App Check
@@ -381,7 +365,6 @@ const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
   "cancelMySubscription",
-  "cancelOnboarding",
   "createAthletePreapproval",
   "createPreapproval",
   "deleteAccount",
@@ -562,12 +545,6 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "profile/ensure-athlete-profile",
       symbol: "ensureAthleteProfile",
       as: "ensureAthleteProfile",
-      attested: false,
-    },
-    {
-      module: "profile/cancel-onboarding",
-      symbol: "cancelOnboarding",
-      as: "cancelOnboarding",
       attested: false,
     },
     {

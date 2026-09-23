@@ -55,7 +55,6 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
     registerFallbackValue(<AppleIDAuthorizationScopes>[]);
-    registerFallbackValue(HttpsCallableOptions());
   });
 
   late MockFirebaseAuth fbAuth;
@@ -882,93 +881,81 @@ void main() {
   // cancelOnboarding — hard-cancel an in-progress signup from ProfileSetup
   // ---------------------------------------------------------------------------
   group('AuthService.cancelOnboarding', () {
-    // Un doble propio para el callable del alta: el `callable` del setUp lo
-    // comparten los mails, y con uno solo no se podría decir CUÁL corrió antes
-    // del borrado de Auth.
-    late MockHttpsCallable cancelCallable;
+    // Un doble propio para `deleteAccount`: el `callable` del setUp lo
+    // comparten los mails, y con uno solo no se podría decir cuál corrió.
+    late MockHttpsCallable deleteCallable;
+    late MockCallableResult respuesta;
 
-    HttpsCallable pedirCallable() => functions.httpsCallable(
-          'cancelOnboarding',
-          options: any(named: 'options'),
-        );
+    void responde(
+      List<String> deletedCollections, {
+      List<String> errors = const [],
+    }) =>
+        when(() => respuesta.data).thenReturn(<String, dynamic>{
+          'status': errors.isEmpty ? 'success' : 'partial',
+          'deletedCollections': deletedCollections,
+          'errors': errors,
+        });
 
     setUp(() {
-      cancelCallable = MockHttpsCallable();
-      when(pedirCallable).thenReturn(cancelCallable);
-      when(() => cancelCallable.call<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => MockCallableResult());
+      deleteCallable = MockHttpsCallable();
+      respuesta = MockCallableResult();
+      when(() => functions.httpsCallable('deleteAccount'))
+          .thenReturn(deleteCallable);
+      when(() => deleteCallable.call<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => respuesta);
+      responde(['users', 'userPublicProfiles', 'users-auth']);
       when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => user.delete()).thenAnswer((_) async {});
+      when(() => fbAuth.signOut()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenAnswer((_) async {});
     });
 
     test(
-        'borra los docs del alta por el callable ANTES de borrar la cuenta de '
-        'Auth', () async {
+        'borra por deleteAccount (la cascada completa, con Auth al final del '
+        'servidor) y recién después cierra la sesión local', () async {
       await sut.cancelOnboarding();
 
-      // Invertido, el callable llegaría sin sesión y no borraría nada.
       verifyInOrder([
-        pedirCallable,
-        () => cancelCallable.call<Map<String, dynamic>>(any()),
-        () => user.delete(),
+        () => deleteCallable.call<Map<String, dynamic>>({'uid': 'uid-test'}),
+        () => fbAuth.signOut(),
       ]);
       verify(() => googleSignIn.signOut()).called(1);
-      expect(reportados, isEmpty);
-    });
-
-    test('no manda body: el uid lo saca el servidor del token', () async {
-      await sut.cancelOnboarding();
-
-      final body = verify(
-        () => cancelCallable.call<Map<String, dynamic>>(captureAny()),
-      ).captured.single;
-      expect(body, isA<Map<String, dynamic>>());
-      expect(body as Map<String, dynamic>, isEmpty);
-    });
-
-    test('le pone a la espera un techo más corto que el default del plugin',
-        () async {
-      await sut.cancelOnboarding();
-
-      final options = verify(
-        () => functions.httpsCallable(
-          'cancelOnboarding',
-          options: captureAny(named: 'options'),
-        ),
-      ).captured.single as HttpsCallableOptions;
-      expect(
-        options.timeout,
-        lessThan(HttpsCallableOptions().timeout),
-      );
+      // Auth lo borra el servidor. El `user.delete()` del cliente además tiraba
+      // `requires-recent-login` pasados 5 minutos del login.
+      verifyNever(() => user.delete());
     });
 
     test(
-        'si el callable falla, igual borra la cuenta de Auth y lo reporta '
-        '(best-effort, pero no en silencio)', () async {
-      when(() => cancelCallable.call<Map<String, dynamic>>(any())).thenThrow(
-        FirebaseFunctionsException(message: 'sin red', code: 'unavailable'),
+        'si el callable falla NO sigue: ni borra Auth ni cierra la sesión, y '
+        'tira AuthFailure para que la persona reintente', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
       );
 
-      await sut.cancelOnboarding();
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
 
-      verify(() => user.delete()).called(1);
-      expect(reportados, [contains('AuthService.cancelOnboarding')]);
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
     });
 
-    test('throws AuthFailure when Firebase Auth delete fails', () async {
-      when(() => user.delete()).thenThrow(
-        FirebaseAuthException(code: 'requires-recent-login'),
-      );
+    test(
+        'si el servidor no llegó a borrar Auth (partial sin users-auth), la '
+        'cuenta sigue viva: tira AuthFailure y no cierra la sesión', () async {
+      responde(['users', 'userPublicProfiles'], errors: ['auth: boom']);
 
-      await expectLater(
-        sut.cancelOnboarding(),
-        throwsA(isA<AuthFailure>()),
-      );
-      // Los docs ya se pidieron: un reintento vuelve a llamar al callable, que
-      // es idempotente.
-      verify(() => cancelCallable.call<Map<String, dynamic>>(any())).called(1);
-      verify(() => user.delete()).called(1);
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'un partial CON users-auth es una cuenta que ya no existe: cierra la '
+        'sesión igual, como Ajustes', () async {
+      responde(['users-auth'], errors: ['posts: boom']);
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
     });
 
     test('is a no-op when there is no current user', () async {
@@ -976,8 +963,8 @@ void main() {
 
       await expectLater(sut.cancelOnboarding(), completes);
 
-      verifyNever(pedirCallable);
-      verifyNever(() => user.delete());
+      verifyNever(() => deleteCallable.call<Map<String, dynamic>>(any()));
+      verifyNever(() => fbAuth.signOut());
     });
 
     test('swallows Google signOut failures (best-effort cleanup)', () async {

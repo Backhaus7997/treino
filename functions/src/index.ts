@@ -237,13 +237,6 @@ export {
 // tambien a la cuenta vieja que nunca tuvo doc publico.
 export { ensureAthleteProfile } from "./profile/ensure-athlete-profile";
 
-// La otra punta del alta: «Cancelar cuenta» en el paso 0 de ProfileSetup. Borra
-// lo que el login dejo (`users/{uid}`, `userPublicProfiles/{uid}`, el avatar)
-// ANTES de que el cliente borre la cuenta de Auth. Solo actua sobre un alta sin
-// completar (`displayName == null`); una cuenta establecida se borra con
-// `deleteAccount`.
-export { cancelOnboarding } from "./profile/cancel-onboarding";
-
 // Paywall del entrenador — el reconciliador. Es lo que hace que pagar
 // SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
 // entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para

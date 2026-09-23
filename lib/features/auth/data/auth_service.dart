@@ -9,6 +9,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 import '../../../core/telemetry/non_fatal.dart';
 import '../domain/auth_failure.dart';
 import '../presentation/legal/legal_content.dart';
+import '../../profile/data/account_deletion_service.dart';
 import '../../profile/data/user_repository.dart';
 import 'apple_sign_in_gateway.dart';
 import 'nonce_helpers.dart';
@@ -38,7 +39,7 @@ class AuthService {
   /// `[DEFAULT]` en el acto, así que construirlo en la lista de
   /// inicialización ataba la CONSTRUCCIÓN de `AuthService` a que
   /// `Firebase.initializeApp()` ya hubiera terminado — incluso para los
-  /// caminos que nunca mandan un mail (reauth, signOut, cancelOnboarding).
+  /// caminos que nunca mandan un mail (reauth, signOut).
   /// El provider de Riverpod lo arma eager, así que eso convertía un detalle
   /// del canal de mails en una precondición de toda la capa de auth.
   late final FirebaseFunctions _functions = _injectedFunctions ??
@@ -534,75 +535,55 @@ class AuthService {
     }
   }
 
-  /// Techo para el callable `cancelOnboarding`. El default del plugin es 60 s,
-  /// y todo ese rato la persona mira el paso 0 sin que pase nada después de
-  /// haber confirmado. Cortar no deja la cancelación a medias: el callable es
-  /// best-effort, y del lado del servidor el borrado termina aunque el cliente
-  /// haya dejado de esperar.
-  static const _cancelOnboardingTimeout = Duration(seconds: 20);
-
   /// Hard-cancel onboarding for a user who just signed up and wants to bail
-  /// from ProfileSetup step 0. Primero le pide al callable `cancelOnboarding`
-  /// que borre lo que dejó el login (`users/{uid}`, `userPublicProfiles/{uid}`
-  /// y el avatar, best-effort) y después borra el usuario de Firebase Auth
-  /// (mandatory). The Auth delete auto-signs the user out; we still clean the
-  /// Google session cache so the next picker shows fresh.
+  /// from ProfileSetup step 0. Va por el MISMO camino que «Eliminar cuenta» de
+  /// Ajustes: el callable `deleteAccount`, que corre la cascada completa y
+  /// borra la cuenta de Auth al final. Acá sólo queda cerrar la sesión local,
+  /// y la de Google para que el próximo picker salga limpio.
   ///
-  /// El orden no se puede invertir: sin sesión, el callable ya no se puede
-  /// llamar.
-  ///
-  /// Throws [AuthFailure] on Firebase Auth delete failure (e.g.
-  /// `requires-recent-login` on stale tokens). Si el callable falla, se
-  /// reporta y se sigue — the Auth delete is the source of truth for account
-  /// existence.
+  /// Throws [AuthFailure.deletionFailed] si el callable falla o si la cuenta
+  /// de Auth sigue existiendo. En ese caso no toca la sesión: la cuenta sigue
+  /// viva y entera, y la persona puede reintentar.
   Future<void> cancelOnboarding() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Best-effort como antes, pero ya no en silencio. Acá antes estaba
-    // `UserRepository.delete`, que tira SIEMPRE (las reglas le niegan el
-    // delete al cliente): el catch se lo tragaba, y cada «Cancelar cuenta»
-    // dejaba `users/{uid}` y `userPublicProfiles/{uid}` para siempre, con el
-    // mail de alguien que pidió no tener cuenta.
+    // Acá antes estaba `UserRepository.delete`, que tira SIEMPRE (las reglas
+    // le niegan el delete al cliente): el catch se lo tragaba, `user.delete()`
+    // borraba sólo la cuenta de Auth, y `users/{uid}` y
+    // `userPublicProfiles/{uid}` quedaban para siempre, con el mail de alguien
+    // que pidió no tener cuenta.
+    //
+    // La cascada es la COMPLETA y no una corta del alta: el alta sin terminar
+    // se reconoce por `displayName == null`, y ese campo el dueño lo puede
+    // volver a null (las reglas no lo pinean). Una cascada corta sobre una
+    // cuenta establecida le dejaba huérfanos los posts, rutinas y vínculos.
+    final DeletionResult resultado;
     try {
-      final callable = _functions.httpsCallable(
-        'cancelOnboarding',
-        options: HttpsCallableOptions(timeout: _cancelOnboardingTimeout),
-      );
-      await callable.call<Map<String, dynamic>>(<String, dynamic>{});
-    } catch (e, st) {
-      unawaited(_reportNonFatal(
-        e,
-        st,
-        reason:
-            'AuthService.cancelOnboarding: no se borraron los docs del alta',
-      ));
+      resultado = await AccountDeletionService(functions: _functions)
+          .call(uid: user.uid);
+    } catch (e) {
+      // No se sigue. Borrar Auth sin que la cascada haya corrido es
+      // exactamente lo que dejaba los docs sin dueño.
+      throw AuthFailure.deletionFailed(cause: e);
     }
 
-    // Mandatory delete of the Firebase Auth user.
+    // La misma señal que usa Ajustes (`AccountDeletionNotifier`): la cuenta se
+    // fue si y sólo si el servidor llegó a borrar Auth. Un `partial` sin eso es
+    // una cuenta viva, y se reintenta.
+    if (!resultado.deletedCollections.contains('users-auth')) {
+      throw AuthFailure.deletionFailed(cause: resultado.errors);
+    }
+
+    // La cuenta de Auth ya no existe: queda la sesión local.
     try {
-      await user.delete();
+      await _auth.signOut();
     } on FirebaseAuthException catch (e) {
-      // Stale-auth escape hatch: if the user no longer exists server-side
-      // (e.g., previously deleted by the account-deletion Cloud Function or
-      // by Firebase Console while this client still had a cached token),
-      // user.delete() returns user-not-found / token-expired. The local
-      // session is the only thing left to clean up — force-sign-out so the
-      // user is not stuck in a phantom auth state on profile-setup.
-      const staleAuthCodes = {
-        'user-not-found',
-        'user-token-expired',
-        'invalid-user-token',
-      };
-      if (staleAuthCodes.contains(e.code)) {
-        await _auth.signOut();
-      } else {
-        throw AuthFailure.fromFirebase(e);
-      }
+      throw AuthFailure.fromFirebase(e);
     }
 
-    // Cleanup Google session cache. Firebase Auth is already cleared by
-    // user.delete(); this only matters if the user used Google to sign up.
+    // Cleanup Google session cache. Only matters if the user signed up with
+    // Google.
     try {
       await _googleSignIn.signOut();
     } catch (_) {
