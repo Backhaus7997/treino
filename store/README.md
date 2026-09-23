@@ -17,22 +17,40 @@ capturas nuevas.
 
 ### App Store — capturas
 
-TREINO declara `TARGETED_DEVICE_FAMILY = "1,2"` (iPhone **y** iPad) y embebe
-`TreinoWatch Watch App` vía la build phase *Embed Watch Content*. Eso significa
-que **las tres familias son obligatorias**, no sólo iPhone.
+TREINO declara `TARGETED_DEVICE_FAMILY = "1"` (**sólo iPhone**, desde el #1219)
+y embebe `TreinoWatch Watch App` vía la build phase *Embed Watch Content*. O sea
+**dos familias obligatorias, no tres**: el iPad ya no.
 
 | Familia | Tamaño | Portrait (px) | Obligatorio |
 |---|---|---|---|
-| iPhone | 6.9" | **1320 × 2868** | Sí — cubre todos los iPhone por escalado |
-| iPad | 13" | **2064 × 2752** | Sí — la app corre en iPad |
+| iPhone | 6.5" | **1284 × 2778** | Sí — cubre todos los iPhone por escalado |
+| iPad | 13" | 2064 × 2752 | **No** — el binario ya no declara iPad (§6.4) |
 | Apple Watch | Series 11 46mm | **416 × 496** | Sí — hay watch app embebida |
 
 - 1 a 10 capturas por familia.
-- `.png` o `.jpg`, **sin canal alpha ni transparencia**.
-- Los tamaños menores los escala Apple solo — con 6.9" y 13" alcanza.
+- `.png` o `.jpg`, **sin canal alpha ni transparencia**. El PNG que devuelve
+  `xcrun simctl io … screenshot` **sale CON alfa** y App Store lo rechaza:
+  `magick "$f" -background black -alpha remove -alpha off -strip "$f"`, y
+  verificarlo con `sips -g hasAlpha`.
 
-Simuladores que ya están instalados en la máquina y dan el tamaño exacto:
-`iPhone 17 Pro Max`, `iPad Pro 13-inch (M5)`, `Apple Watch Series 11 (46mm)`.
+⚠️ **El slot de iPhone es 6.5", no 6.9".** Esta tabla decía 6.9" / 1320 × 2868,
+que es lo que dice la documentación general de Apple. Pero **la pantalla de esta
+ficha pidió 6.5"**, verificado en App Store Connect el **2026-09-22**, y el set
+de 6.9" que se había generado nunca se pudo subir. La lección es la de la §11.1
+de `AGENTS.md`: antes de generar, abrir **«View All Sizes in Media Manager»** y
+leer lo que pide *esa* ficha, en vez de deducirlo de la documentación.
+
+Simuladores que dan el tamaño exacto, sin reescalar:
+
+| Familia | Simulador | Nota |
+|---|---|---|
+| iPhone 6.5" | **iPhone 14 Plus** | no viene instanciado en Xcode 26/27; el device type sí existe y se crea con `simctl create` |
+| Apple Watch | **Apple Watch Series 11 (46mm)** | emparejado con el iPhone — ver «capturas del reloj» |
+
+⚠️ **`xcrun simctl status_bar` NO existe en watchOS** («Operation not
+supported»). La barra de estado del reloj no se puede fijar en 9:41 como la del
+iPhone: la hora de la captura es la real. Sacar las del reloj seguidas para que
+al menos coincidan entre sí.
 
 ### App Store — límites de texto
 
@@ -90,7 +108,7 @@ renombrar nada.
 store/
   ios/                                    ← layout de fastlane deliver
     metadata/<locale>/{name,subtitle,keywords,promotional_text,description,release_notes}.txt
-    screenshots/<locale>/{iphone-6.9,ipad-13,watch}/NN_nombre.png
+    screenshots/<locale>/{iphone-6.5,ipad-13,watch}/NN_nombre.png
   android/                                ← layout de fastlane supply
     metadata/<locale>/
       {title,short_description,full_description}.txt
@@ -219,7 +237,7 @@ export LANG=en_US.UTF-8
 ### 4.4 Capturar
 
 ```bash
-xcrun simctl io booted screenshot --type=png store/ios/screenshots/es-MX/iphone-6.9/01_sesion_activa.png
+xcrun simctl io booted screenshot --type=png store/ios/screenshots/es-MX/iphone-6.5/01_sesion_activa.png
 ```
 
 El simulador devuelve exactamente los píxeles del device, así que la captura ya
@@ -233,7 +251,7 @@ Apple rechaza PNG con transparencia y Play la rechaza en feature graphic y
 capturas. `simctl` puede dejar alpha, así que aplanar siempre antes de subir:
 
 ```bash
-sips -s format png --setProperty hasAlpha false store/ios/screenshots/es-MX/iphone-6.9/01_sesion_activa.png
+sips -s format png --setProperty hasAlpha false store/ios/screenshots/es-MX/iphone-6.5/01_sesion_activa.png
 ```
 
 ---
@@ -324,27 +342,38 @@ real termine en una captura de la ficha.
 Antes de publicar, confirmar que los tres nombres inventados no colisionen con
 un gimnasio real existente.
 
-### 6.4 El iPad es obligatorio en Apple y quizá nunca se probó
+### 6.4 El iPad — RESUELTO el 2026-09-23: se sacó (#1219)
 
-Asimetría entre las dos plataformas:
+Esta sección planteaba dos caminos. Se tomó el segundo.
+
+Cómo estaba la asimetría:
 
 - **iOS**: `TARGETED_DEVICE_FAMILY = "1,2"` e `Info.plist` declara
   `UISupportedInterfaceOrientations~ipad` con las **cuatro** orientaciones.
 - **Android**: `AndroidManifest.xml:39` fija `screenOrientation="portrait"`.
 
-O sea: en Android la app es sólo teléfono y sólo vertical, pero en iOS se
-ofrece como app de iPad rotable. Apple **exige** capturas de iPad 13" para
-publicar, y esas capturas van a mostrar el layout de iPad tal como está hoy.
+En Android la app era sólo teléfono y vertical, pero en iOS se ofrecía como app
+de iPad rotable. **Y esa declaración de iPad nunca la eligió nadie**: el
+`"1,2"` entró en `cf09068b`, el commit de `flutter create`, y no lo tocó nadie
+nunca —`git log -S'TARGETED_DEVICE_FAMILY = "1,2"'` devuelve ese solo commit—.
+Tampoco hay layout de tablet en `lib/`.
 
-Antes de capturar, abrir la app en `iPad Pro 13-inch (M5)` y mirar si el layout
-aguanta. Si es una UI de teléfono estirada, hay dos caminos y los dos son
-decisión de producto, no de este issue:
+**Decisión (Martín, 2026-09-23): iPhone-only para la 1.0.** El caso de uso es el
+teléfono en la mano en el gimnasio, y la superficie donde una pantalla grande
+tiene sentido —el Coach Hub— ya es web. Soportar iPad no es tildar una casilla:
+es revisar cada pantalla en otra proporción, con teclado, Split View y Stage
+Manager, y Apple rechaza explícitamente la UI de iPhone estirada.
 
-1. Arreglar el layout de iPad.
-2. Bajar `TARGETED_DEVICE_FAMILY` a `1` (sólo iPhone) y sacar el iPad de la
-   ficha — con eso las capturas de iPad dejan de ser obligatorias.
+`TARGETED_DEVICE_FAMILY = "1"` en las **tres** configuraciones del PBXProject
+(Debug, Release y Profile) — las del target de la Watch App quedan en `4`
+porque el target pisa el valor del proyecto. Con eso las capturas de iPad
+dejaron de ser obligatorias y el bloqueo «You must upload a screenshot for
+13-inch iPad displays» desapareció sin subir ninguna.
 
-Las carpetas `ipad-13/` quedan creadas para cualquiera de los dos desenlaces.
+Las carpetas `ipad-13/` quedan por si en una 1.1 se decide al revés.
+
+⚠️ **Un cambio de device family invalida el build que ya esté en App Store
+Connect.** Hay que subir uno nuevo, con el número de build arriba.
 
 ### 6.5 El ícono puede ser placeholder
 

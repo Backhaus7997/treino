@@ -139,6 +139,48 @@ void main() {
     expect(servicio.resueltos.first.action, 'none');
   });
 
+  testWidgets('dar de baja pide confirmacion antes de resolver nada',
+      (tester) async {
+    // Es la accion mas grave de las cuatro e irreversible desde la UI: tocar
+    // el boton no puede disparar la baja directo, tiene que haber un paso
+    // en el medio.
+    final servicio =
+        await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿Dar de baja esta cuenta?'), findsOneWidget);
+    expect(servicio.resueltos, isEmpty);
+  });
+
+  testWidgets('confirmar la baja resuelve con userSuspended', (tester) async {
+    final servicio =
+        await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sí, dar de baja'));
+    await tester.pumpAndSettle();
+
+    expect(servicio.resueltos, hasLength(1));
+    expect(servicio.resueltos.first.id, 'r1');
+    expect(servicio.resueltos.first.status, 'actioned');
+    expect(servicio.resueltos.first.action, 'userSuspended');
+  });
+
+  testWidgets('cancelar la confirmacion no resuelve nada', (tester) async {
+    final servicio =
+        await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    await tester.tap(find.text('Dar de baja'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+
+    expect(servicio.resueltos, isEmpty);
+  });
+
   testWidgets('la fila marca el reporte como MIRADO al renderizarse',
       (tester) async {
     // Listar no es mirar. El servidor dejó de estampar `firstViewedAt` al

@@ -36,14 +36,17 @@
  *  COMO SE CORRE
  * ═══════════════════════════════════════════════════════════════════════════
  *
- *   1. `functions/.secret.local` con el access token de PRUEBA de MP:
+ *   1. `functions/.secret.local` con el Access Token de PRUEBA de MP:
  *
- *        MP_ACCESS_TOKEN=TEST-xxxxxxxx-xxxxxx-...
+ *        MP_ACCESS_TOKEN=APP_USR-...
  *
- *      ⚠️ El de PRUEBA, que empieza con `TEST-`. Con el de produccion este
- *      script abre un cobro REAL en la cuenta real. El chequeo de abajo lo
- *      frena, pero el chequeo esta para el descuido, no para reemplazar el
- *      cuidado.
+ *      Sale de: MP Developers -> tu app -> Credenciales de PRUEBA -> Access
+ *      Token. **No la Public Key**, que esta justo arriba y empieza igual.
+ *
+ *      ⚠️ Los dos tipos de credencial usan el MISMO prefijo `APP_USR-`, asi
+ *      que mirandolas no se distinguen. Con la de produccion este script abre
+ *      un `preapproval_plan` REAL en la cuenta que factura. Por eso el chequeo
+ *      de abajo le pregunta a MP de quien es el token en vez de adivinar.
  *
  *   2. El emulador arriba, con functions:
  *
@@ -90,11 +93,37 @@ if (
  * de Mercado Pago: no cobra sin que alguien pague, pero deja basura en una
  * cuenta que factura y un `init_point` vivo que alguien puede pagar.
  *
- * Nunca imprime el valor. Sólo mira el prefijo, que es público por diseño: MP
- * distingue los tokens de prueba con `TEST-` justo para que se puedan chequear
- * sin exponerlos.
+ * ── ⚠️ Acá había un chequeo de PREFIJO, y estaba mal ──
+ *
+ * Decía: «los de prueba empiezan con `TEST-`». **No es cierto.** Medido el
+ * 2026-09-22 contra el panel real: la pantalla «Credenciales de prueba» de una
+ * aplicación de MP muestra una Public Key `APP_USR-421c07cf-…`. Los dos tipos
+ * de credencial usan HOY el mismo prefijo; el `TEST-` es del modelo viejo de
+ * sandbox.
+ *
+ * O sea que aquel chequeo hacía las dos cosas mal a la vez: rechazaba un token
+ * de prueba legítimo, y —peor— no habría podido distinguir uno de producción,
+ * porque se ven igual.
+ *
+ * El error de fondo es el mismo que el del `endsWith` de `esHostDeMercadoPago`,
+ * treinta líneas más abajo: **validar la forma del valor en vez de preguntarle
+ * a la fuente.** Los dos se escribieron el mismo día.
+ *
+ * ── Lo que sí distingue, porque lo dice MP ──
+ *
+ * `GET /users/me` devuelve la cuenta dueña del token, y las de prueba traen
+ * `test_user` en `tags`. Verificado contra la cuenta de prueba de TREINO:
+ *
+ *   { id: 3671163614, nickname: "TESTUSER1735334405…",
+ *     tags: ["user_product_seller", "test_user", "normal"] }
+ *
+ * Es una llamada de red en un script que ya depende de la red, y a cambio la
+ * respuesta es del emisor de la credencial en vez de una inferencia sobre un
+ * string. El id se imprime para poder cruzarlo contra el que muestra el panel.
+ *
+ * Nunca imprime el token.
  */
-function exigirTokenDePrueba() {
+async function exigirTokenDePrueba() {
   const ruta = path.join(__dirname, "..", "functions", ".secret.local");
   if (!fs.existsSync(ruta)) {
     console.error(
@@ -102,8 +131,9 @@ function exigirTokenDePrueba() {
         "  El emulador de functions lee los `defineSecret()` de ahí. Sin ese\n" +
         "  archivo, `MP_ACCESS_TOKEN` llega vacío y el callable falla con un\n" +
         "  error de Mercado Pago que no dice cuál es el problema real.\n\n" +
-        "  Crealo con el access token de PRUEBA:\n\n" +
-        "    MP_ACCESS_TOKEN=TEST-xxxxxxxx-xxxxxx-...\n",
+        "  Crealo con el Access Token de PRUEBA (MP Developers → tu app →\n" +
+        "  Credenciales de prueba):\n\n" +
+        "    MP_ACCESS_TOKEN=APP_USR-…\n",
     );
     process.exit(1);
   }
@@ -121,18 +151,48 @@ function exigirTokenDePrueba() {
   }
 
   const valor = linea.slice(linea.indexOf("=") + 1).trim().replace(/^["']|["']$/g, "");
-  if (!valor.startsWith("TEST-")) {
+
+  let cuenta;
+  try {
+    const r = await fetch("https://api.mercadopago.com/users/me", {
+      headers: { Authorization: `Bearer ${valor}` },
+    });
+    cuenta = await r.json();
+    if (!r.ok || !cuenta?.id) {
+      console.error(
+        `\n  ✗ Mercado Pago rechazó el token (HTTP ${r.status}).\n\n` +
+          `  ${JSON.stringify(cuenta).slice(0, 200)}\n\n` +
+          "  Revisá que sea el ACCESS TOKEN y no la Public Key: están uno\n" +
+          "  debajo del otro en el panel y los dos empiezan con `APP_USR-`.\n",
+      );
+      process.exit(1);
+    }
+  } catch (e) {
     console.error(
-      "\n  ✗ MP_ACCESS_TOKEN NO es un token de prueba.\n\n" +
-        "  Los de prueba empiezan con `TEST-`. Con el de producción este script\n" +
-        "  abre un preapproval_plan REAL en la cuenta que factura.\n\n" +
-        "  El de prueba sale de: MP Developers → tu app → Credenciales de prueba.\n",
+      `\n  ✗ No se pudo consultar /users/me: ${e.message}\n\n` +
+        "  Este chequeo necesita red. Es a propósito: no hay forma local de\n" +
+        "  distinguir un token de prueba de uno de producción.\n",
     );
     process.exit(1);
   }
-}
 
-exigirTokenDePrueba();
+  const tags = Array.isArray(cuenta.tags) ? cuenta.tags : [];
+  if (!tags.includes("test_user")) {
+    console.error(
+      "\n  ✗ El token NO es de una cuenta de prueba.\n\n" +
+        `  Pertenece a: ${cuenta.nickname || "?"} (id ${cuenta.id})\n` +
+        `  tags: ${JSON.stringify(tags)}\n\n` +
+        "  Una cuenta de prueba trae `test_user` ahí. Con este token, el script\n" +
+        "  abriría un preapproval_plan REAL en la cuenta que factura.\n\n" +
+        "  El correcto sale de: MP Developers → tu app → Credenciales de prueba\n" +
+        "  → Access Token. En esa misma pantalla, «Datos de las credenciales de\n" +
+        "  prueba» muestra el User ID que tiene que coincidir con el de arriba.\n",
+    );
+    process.exit(1);
+  }
+
+  ok(`token de PRUEBA — cuenta ${cuenta.id} (${cuenta.nickname})`);
+}
 
 const PROJECT_ID = PROJECT_ID_EMULADOR;
 const REGION = "southamerica-east1";
@@ -288,6 +348,10 @@ function esHostDeMercadoPago(hostname) {
 async function main() {
   console.log(`\nVerificando el checkout del alumno — ciclo ${CICLO}\n`);
 
+  // Primero de todo: que el token sea de prueba. Antes de crear el usuario y
+  // mucho antes de llamar al callable, que es lo que abriría el plan en MP.
+  await exigirTokenDePrueba();
+
   await prepararAlumno();
 
   const resultado = await llamarCallable(await idToken());
@@ -306,7 +370,19 @@ async function main() {
   if (!esHostDeMercadoPago(destino.hostname)) {
     fallar(`el init_point NO apunta a Mercado Pago: ${destino.hostname}`);
   }
-  ok(`init_point de Mercado Pago: ${destino.origin}${destino.pathname}`);
+  // ⚠️ La URL **entera**, con su query string.
+  //
+  // Acá decía `${destino.origin}${destino.pathname}`, que imprime
+  // `https://www.mercadopago.com.ar/subscriptions/checkout` y se COME el
+  // `?preapproval_plan_id=…` — que es lo único que identifica el plan. El
+  // resultado era un link que no se puede abrir: el script terminaba diciendo
+  // "abrí el init_point" después de haberlo recortado.
+  //
+  // Un valor sensible se recorta al imprimirlo; este no lo es —es una URL de
+  // checkout pública, la misma que el alumno recibe— y sin el query no sirve
+  // para nada.
+  ok("init_point de Mercado Pago:");
+  console.log(`\n    ${init}\n`);
 
   // ── 2. El discriminador, que es la pieza central del diseño ──
   //

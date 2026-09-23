@@ -383,11 +383,11 @@
     {
       "slug": "retencion",
       "title": "Retención y eliminación de datos",
-      "lastUpdated": "21 de septiembre de 2026",
+      "lastUpdated": "23 de septiembre de 2026",
       "sections": [
         {
           "heading": "1. CÓMO ELIMINÁS TU CUENTA",
-          "body": "Desde la app: Perfil → Ajustes → Eliminar cuenta. No hace falta pedírselo a nadie ni esperar aprobación.\n\nDesde la web: entrá a gettreino.com/es/eliminar-cuenta y seguí las instrucciones. No hace falta tener la app instalada ni iniciar sesión.\n\nRequisito de Google Play. Play exige que exista una URL accesible desde un navegador, sin instalar la app, donde se pueda solicitar la eliminación de la cuenta y de los datos. La página ya está publicada y lo cumple. Lo que queda es declararla en Play Console, que es un trámite de consola, no de producto."
+          "body": "Desde la app: Perfil → Ajustes → Eliminar cuenta. No hace falta pedírselo a nadie ni esperar aprobación.\n\nDesde la web: entrá a gettreino.com/es/eliminar-cuenta y seguí las instrucciones. No hace falta tener la app instalada ni iniciar sesión.\n\nRequisito de Google Play. Play exige que exista una URL accesible desde un navegador, sin instalar la app, donde se pueda solicitar la eliminación de la cuenta y de los datos. La página ya está publicada y lo cumple. Lo que queda es declararla en Play Console, que es un trámite de consola, no de producto.\n\nBorrado de datos puntuales, sin cerrar la cuenta: podés pedirlo escribiendo a treino@gettreino.com, con el correo de tu cuenta, y respondemos dentro de los 5 días hábiles (art. 16 de la Ley 25.326, ver sección 5). Dos casos son más rápidos porque los resolvés vos mismo desde la app: una publicación propia, desde el menú de la publicación, y una medición que hayas cargado vos, desde tu pantalla de medidas."
         },
         {
           "heading": "2. QUÉ SE ELIMINA",
@@ -447,5 +447,5 @@
       ]
     }
   ],
-  "sourceSha": "62b41cf5b31ac51391300d1ac2c133a73249e649a4ffada67c1d02e6aeb90b4e"
+  "sourceSha": "c290584b0c4d56d5dd0acf2221c02107bcf00bf0a4d9acf008243674eb146c64"
 }

@@ -1,8 +1,10 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/section_hero/section_hero.dart';
@@ -366,18 +368,26 @@ class _FilaState extends ConsumerState<_Fila> {
             ),
           ],
           const SizedBox(height: AppSpacing.s12),
-          Row(
+          // `Wrap` y no `Row`: con los cuatro botones no siempre entran en el
+          // ancho del Coach Hub, y la separación tiene que seguir siendo FIJA
+          // — nada de `spaceBetween` para llenar el ancho. `spacing` cubre el
+          // gap horizontal entre botones de una misma fila, `runSpacing` el
+          // gap vertical cuando envuelven. Mismo patrón que `_Resumen`, arriba.
+          Wrap(
+            spacing: AppSpacing.s8,
+            runSpacing: AppSpacing.s8,
             children: [
-              // `ghost` para descartar y `secondary` para las dos que SÍ
-              // accionan: cerrar sin hacer nada no puede verse igual de
-              // consecuente que retirar contenido ajeno.
+              // `ghost` para descartar, `secondary` para las que accionan y
+              // `danger` para la baja: cerrar sin hacer nada no puede verse
+              // igual de consecuente que retirar contenido ajeno, y dar de
+              // baja una cuenta no puede verse igual que las otras dos —
+              // es la única de las cuatro que es irreversible desde acá.
               TreinoButton(
                 label: 'Descartar', // i18n: Fase W3
                 variant: TreinoButtonVariant.ghost,
                 size: TreinoButtonSize.sm,
                 onPressed: () => _resolver(context, ref, 'dismissed', 'none'),
               ),
-              const SizedBox(width: AppSpacing.s8),
               TreinoButton(
                 label: 'Contenido retirado', // i18n: Fase W3
                 variant: TreinoButtonVariant.secondary,
@@ -385,13 +395,18 @@ class _FilaState extends ConsumerState<_Fila> {
                 onPressed: () =>
                     _resolver(context, ref, 'actioned', 'contentRemoved'),
               ),
-              const SizedBox(width: AppSpacing.s8),
               TreinoButton(
                 label: 'Usuario advertido', // i18n: Fase W3
                 variant: TreinoButtonVariant.secondary,
                 size: TreinoButtonSize.sm,
                 onPressed: () =>
                     _resolver(context, ref, 'actioned', 'userWarned'),
+              ),
+              TreinoButton(
+                label: 'Dar de baja', // i18n: Fase W3
+                variant: TreinoButtonVariant.danger,
+                size: TreinoButtonSize.sm,
+                onPressed: () => _confirmarBaja(context, ref),
               ),
             ],
           ),
@@ -419,6 +434,18 @@ class _FilaState extends ConsumerState<_Fila> {
       // ve abajo.
       ref.invalidate(pendingReportsProvider);
       ref.invalidate(moderationStatsProvider);
+    } on FirebaseFunctionsException catch (e) {
+      // Las acciones ahora pueden fallar por motivos DISTINTOS y accionables
+      // (contenido ya borrado, no aplica a un perfil, es otro moderador). El
+      // mensaje del HttpsError ya viene en castellano desde el backend — el
+      // genérico de abajo es sólo el resguardo para cuando no viene ninguno.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ?? 'No pudimos cerrar el reporte.', // i18n: Fase W3
+          ),
+        ),
+      );
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(
@@ -426,5 +453,120 @@ class _FilaState extends ConsumerState<_Fila> {
         ),
       );
     }
+  }
+
+  /// Pide confirmación antes de dar de baja la cuenta reportada.
+  ///
+  /// Es irreversible DESDE ACÁ — revertirla requiere la consola de Firebase—,
+  /// así que se confirma antes de disparar, mismo criterio que
+  /// `BlockConfirmationSheet` (`moderation/presentation/widgets/`).
+  Future<void> _confirmarBaja(BuildContext context, WidgetRef ref) async {
+    final palette = AppPalette.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: palette.bgCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (_) => _SuspendConfirmationSheet(
+        onConfirm: () => _resolver(context, ref, 'actioned', 'userSuspended'),
+      ),
+    );
+  }
+}
+
+/// Confirmación antes de dar de baja una cuenta desde la cola de moderación.
+///
+/// Copia el molde de `BlockConfirmationSheet`
+/// (`features/moderation/presentation/widgets/block_confirmation_sheet.dart`):
+/// drag handle + título + cuerpo + fila de dos botones, [onConfirm] se invoca
+/// SÓLO al confirmar. No se reutiliza ese widget tal cual porque su copy es
+/// específico de bloquear a otro usuario — acá la consecuencia es otra
+/// (deshabilitar la cuenta) y los botones son [TreinoButton], como el resto
+/// de esta pantalla, en vez del `_SheetButton` privado de aquel archivo.
+class _SuspendConfirmationSheet extends StatelessWidget {
+  const _SuspendConfirmationSheet({required this.onConfirm});
+
+  /// Se invoca sólo al confirmar. El botón "Cancelar" cierra el sheet sin
+  /// llamarlo.
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      child: TreinoFadeSlideIn(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: palette.border,
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s18),
+            Text(
+              '¿Dar de baja esta cuenta?', // i18n: Fase W3
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: AppTextSize.title,
+                color: palette.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              'La cuenta queda deshabilitada y no va a poder iniciar sesión. '
+              'Revertirlo requiere la consola de Firebase — esta acción no '
+              'se deshace desde acá.', // i18n: Fase W3
+              style: GoogleFonts.barlow(
+                fontSize: AppTextSize.bodyDense,
+                color: palette.textMuted,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.s20),
+            Row(
+              children: [
+                Expanded(
+                  child: TreinoButton(
+                    label: 'Cancelar', // i18n: Fase W3
+                    variant: TreinoButtonVariant.ghost,
+                    expand: true,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s12),
+                Expanded(
+                  child: TreinoButton(
+                    // Distinto del botón que abre este sheet A PROPÓSITO: el
+                    // mismo label en el trigger y en la confirmación es
+                    // ambiguo — para quien lee la pantalla y para un test que
+                    // busque por texto.
+                    label: 'Sí, dar de baja', // i18n: Fase W3
+                    variant: TreinoButtonVariant.danger,
+                    expand: true,
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onConfirm();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
