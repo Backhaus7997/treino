@@ -62,6 +62,10 @@ abstract final class ModerationFilter {
     // --- Pasada B: antievasion ------------------------------------------
     if (_evades(tokens)) return ModerationVerdict.block;
 
+    // --- Pasada C: letras sueltas ---------------------------------------
+    final deletreado = _spelledOut(tokens);
+    if (deletreado == ModerationVerdict.block) return ModerationVerdict.block;
+
     // --- Pasada A, severidad `review` ------------------------------------
     for (final t in tokens) {
       if (kVettedReviewWords.contains(t)) return ModerationVerdict.review;
@@ -70,7 +74,7 @@ abstract final class ModerationFilter {
       return ModerationVerdict.review;
     }
 
-    return ModerationVerdict.ok;
+    return deletreado ?? ModerationVerdict.ok;
   }
 
   /// Minuscula, sin diacriticos, sin leet y sin repeticiones.
@@ -117,11 +121,11 @@ abstract final class ModerationFilter {
         out.write(ch);
         continue;
       }
-      // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS
-      // lados. Sin esa regla `puta!` normaliza a `putai`, que no matchea
-      // `puta` por palabra completa: el leet a lo bruto produce falsos
-      // NEGATIVOS sobre el texto mas comun que existe, un insulto con signo
-      // de exclamacion.
+      // `!` solo se traduce con letra a los DOS lados. Sin esa regla `puta!`
+      // normaliza a `putai`, que no matchea `puta` por palabra completa: el
+      // leet a lo bruto produce falsos NEGATIVOS sobre el texto mas comun que
+      // existe, un insulto con signo de exclamacion. `@` y `$` se traducen
+      // siempre — ver `LEET_SOLO_ENTRE_LETRAS` en el generador.
       if (kVettedLeetOnlyBetweenLetters.contains(ch)) {
         final antes = i > 0 && _isAlnum(chars[i - 1]);
         final despues = i + 1 < chars.length && _isAlnum(chars[i + 1]);
@@ -230,5 +234,71 @@ abstract final class ModerationFilter {
       }
     }
     return false;
+  }
+
+  /// Las frases vetadas sin espacios: `hijo de puta` -> `hijodeputa`. Es la
+  /// forma en que quedan cuando se escriben con todas las letras separadas.
+  static final List<String> _compactBlockPhrases = [
+    for (final p in kVettedBlockPhrases) p.join(),
+  ];
+  static final List<String> _compactReviewPhrases = [
+    for (final p in kVettedReviewPhrases) p.join(),
+  ];
+
+  /// La pasada de las letras sueltas.
+  ///
+  /// `p i j a`, `p-i-j-a` y `h.i.j.o d.e p.u.t.a` dan puros tokens de UNA
+  /// letra. La pasada B ya los pega, pero solo los compara contra
+  /// `kVettedAntiEvasion`, que es chico a proposito —`pija`, `culo` y `puta`
+  /// no estan, porque por subcadena bloquearian `pijama`, `musculo` y
+  /// `computadora`—. Asi que cualquier termino fuera de ese subconjunto
+  /// pasaba entero escrito letra por letra.
+  ///
+  /// Aca se compara contra la lista COMPLETA, y por subcadena, pero solo
+  /// sobre corridas de tokens de UN caracter. Esa restriccion es la que hace
+  /// seguro lo que en la pasada B no lo es: el castellano no produce corridas
+  /// de letras sueltas —`musculo` es un token de siete, no siete de uno—, asi
+  /// que la subcadena no tiene palabras legitimas contra las que chocar. Por
+  /// subcadena y no exacto para que una letra legitima pegada adelante —`y p
+  /// u t a`— no alcance para salvarla.
+  ///
+  /// NO se extiende a fragmentos de dos o tres letras, como la pasada B: `por
+  /// no` pegado da `porno`. Ese es el precio de no bloquear castellano
+  /// corriente.
+  ///
+  /// Devuelve la severidad del peor termino encontrado, o `null` si no hay
+  /// ninguno.
+  static ModerationVerdict? _spelledOut(List<String> tokens) {
+    final corridas = <String>[];
+    final actual = StringBuffer();
+    var largo = 0;
+
+    void cerrar() {
+      if (largo > 1) corridas.add(actual.toString());
+      actual.clear();
+      largo = 0;
+    }
+
+    for (final t in tokens) {
+      if (t.length == 1) {
+        actual.write(t);
+        largo++;
+      } else {
+        cerrar();
+      }
+    }
+    cerrar();
+    if (corridas.isEmpty) return null;
+
+    bool contiene(Iterable<String> terminos) =>
+        corridas.any((c) => terminos.any(c.contains));
+
+    if (contiene(kVettedBlockWords) || contiene(_compactBlockPhrases)) {
+      return ModerationVerdict.block;
+    }
+    if (contiene(kVettedReviewWords) || contiene(_compactReviewPhrases)) {
+      return ModerationVerdict.review;
+    }
+    return null;
   }
 }

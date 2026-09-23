@@ -163,10 +163,14 @@
     "app de entrenamiento. Un filtro que la bloquea dura una semana.",
     "",
     "Los dos siguen vetados por la pasada A, que compara por PALABRA",
-    "COMPLETA — ahi `musculo` no es `culo` y no hay conflicto. Lo unico que",
-    "se resigna es cazarlos escritos como `c u l o`, y ese es el precio",
-    "correcto: un falso positivo sobre `musculo` le rompe la app a un",
-    "usuario que no hizo nada."
+    "COMPLETA — ahi `musculo` no es `culo` y no hay conflicto.",
+    "",
+    "Y escritos letra por letra —`c u l o`, `p-u-t-a`— los caza la pasada C,",
+    "que compara la lista COMPLETA por subcadena, pero solo contra corridas",
+    "de tokens de UNA letra. Esa restriccion es la que la hace segura: el",
+    "castellano no produce corridas de letras sueltas, asi que ahi la",
+    "subcadena no tiene contra que chocar. Una version anterior de este texto",
+    "decia que `c u l o` se resignaba; dejo de ser cierto con la pasada C."
   ],
   "antievasion": [
     "puto",
@@ -470,6 +474,76 @@
       "texto": "con-chudo",
       "espera": "ok",
       "por": "HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista"
+    },
+    {
+      "texto": "p i j a",
+      "espera": "block",
+      "por": "letras sueltas de un termino FUERA de `antievasion`: la pasada B lo pegaba y no tenia contra que compararlo. Lo caza la pasada C"
+    },
+    {
+      "texto": "p-i-j-a",
+      "espera": "block",
+      "por": "pasada C, separado por guiones"
+    },
+    {
+      "texto": "p.i.j.a",
+      "espera": "block",
+      "por": "pasada C, separado por puntos"
+    },
+    {
+      "texto": "h.i.j.o d.e p.u.t.a",
+      "espera": "block",
+      "por": "frase deletreada entera: la pasada C compara contra las frases sin espacios (`hijodeputa`)"
+    },
+    {
+      "texto": "y p u t a",
+      "espera": "block",
+      "por": "una letra legitima pegada adelante no la salva: la pasada C compara por subcadena dentro de la corrida"
+    },
+    {
+      "texto": "c u l o",
+      "espera": "review",
+      "por": "la pasada C respeta la severidad del termino: `culo` es `review` escrito normal y deletreado"
+    },
+    {
+      "texto": "por no entrenar",
+      "espera": "ok",
+      "por": "`por`+`no` pegados dan `porno`. La pasada C pega SOLO tokens de una letra por esto"
+    },
+    {
+      "texto": "hice 5 x 5 de sentadilla y 3 x 8 de press",
+      "espera": "ok",
+      "por": "la notacion de series produce letras sueltas legitimas (`s x s`, `y e x 8`): la corrida no contiene ningun termino"
+    },
+    {
+      "texto": "put@",
+      "espera": "block",
+      "por": "`@` al final de palabra. Con la regla vieja —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera"
+    },
+    {
+      "texto": "@nd@te a la concha",
+      "espera": "block",
+      "por": "`@` al principio de palabra"
+    },
+    {
+      "texto": "te voy @ matar",
+      "espera": "block",
+      "por": "`@` suelta como preposicion: sin traducirla la frase pierde su `a` y no matchea"
+    },
+    {
+      "texto": "p1j@",
+      "espera": "block",
+      "por": "digito y `@` final en el mismo termino"
+    },
+    {
+      "texto": "mandame el plan a juan@gmail.com",
+      "espera": "ok",
+      "por": "un mail: la `@` traducida siempre no inventa ningun termino"
+    },
+    {
+      "texto": "u$s 100 por mes",
+      "espera": "ok",
+      "por": "`$` entre letras, como se escribe el dolar en Argentina"
     }
   ]
 }

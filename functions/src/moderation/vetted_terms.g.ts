@@ -21,7 +21,7 @@ export const VETTED_LEET: Readonly<Record<string, string>> = {"!": "i", "$": "s"
  * Los simbolos de `VETTED_LEET` que SOLO se traducen con letra a los dos
  * lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
  */
-export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set(["!", "$", "@"]);
+export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set(["!"]);
 
 /**
  * Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -128,4 +128,18 @@ export const VETTED_CASES: readonly {
   { texto: "otro lo hizo mejor", espera: "ok", normalizado: "otro lo hizo mejor", por: "`otro`+`lo` pegados dan `otrolo`, que contiene `trolo`. La regla pide que los DOS fragmentos sean cortos, y `otro` no lo es" },
   { texto: "dale que va", espera: "ok", normalizado: "dale que va", por: "tres fragmentos cortos seguidos se pegan: `dalequeva` no contiene nada, y tiene que seguir siendo asi" },
   { texto: "con-chudo", espera: "ok", normalizado: "con-chudo", por: "HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista" },
+  { texto: "p i j a", espera: "block", normalizado: "p i j a", por: "letras sueltas de un termino FUERA de `antievasion`: la pasada B lo pegaba y no tenia contra que compararlo. Lo caza la pasada C" },
+  { texto: "p-i-j-a", espera: "block", normalizado: "p-i-j-a", por: "pasada C, separado por guiones" },
+  { texto: "p.i.j.a", espera: "block", normalizado: "p.i.j.a", por: "pasada C, separado por puntos" },
+  { texto: "h.i.j.o d.e p.u.t.a", espera: "block", normalizado: "h.i.j.o d.e p.u.t.a", por: "frase deletreada entera: la pasada C compara contra las frases sin espacios (`hijodeputa`)" },
+  { texto: "y p u t a", espera: "block", normalizado: "y p u t a", por: "una letra legitima pegada adelante no la salva: la pasada C compara por subcadena dentro de la corrida" },
+  { texto: "c u l o", espera: "review", normalizado: "c u l o", por: "la pasada C respeta la severidad del termino: `culo` es `review` escrito normal y deletreado" },
+  { texto: "por no entrenar", espera: "ok", normalizado: "por no entrenar", por: "`por`+`no` pegados dan `porno`. La pasada C pega SOLO tokens de una letra por esto" },
+  { texto: "hice 5 x 5 de sentadilla y 3 x 8 de press", espera: "ok", normalizado: "hice s x s de sentadilla y e x 8 de press", por: "la notacion de series produce letras sueltas legitimas (`s x s`, `y e x 8`): la corrida no contiene ningun termino" },
+  { texto: "put@", espera: "block", normalizado: "puta", por: "`@` al final de palabra. Con la regla vieja —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera" },
+  { texto: "@nd@te a la concha", espera: "block", normalizado: "andate a la concha", por: "`@` al principio de palabra" },
+  { texto: "te voy @ matar", espera: "block", normalizado: "te voy a matar", por: "`@` suelta como preposicion: sin traducirla la frase pierde su `a` y no matchea" },
+  { texto: "p1j@", espera: "block", normalizado: "pija", por: "digito y `@` final en el mismo termino" },
+  { texto: "mandame el plan a juan@gmail.com", espera: "ok", normalizado: "mandame el plan a juanagmail.com", por: "un mail: la `@` traducida siempre no inventa ningun termino" },
+  { texto: "u$s 100 por mes", espera: "ok", normalizado: "uss ioo por mes", por: "`$` entre letras, como se escribe el dolar en Argentina" },
 ];

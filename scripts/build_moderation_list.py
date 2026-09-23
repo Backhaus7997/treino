@@ -63,11 +63,19 @@ LEET = {
     "@": "a", "$": "s", "!": "i",
 }
 
-# Los simbolos solo se traducen cuando tienen letra a los DOS lados. Sin esa
-# regla `puta!` normaliza a `putai`, que no matchea `puta` por palabra
-# completa: el leet, puesto a lo bruto, produce falsos NEGATIVOS justo sobre
-# el texto mas comun (un insulto con signo de exclamacion al final).
-LEET_SOLO_ENTRE_LETRAS = {"@", "$", "!"}
+# `!` solo se traduce cuando tiene letra a los DOS lados. Sin esa regla `puta!`
+# normaliza a `putai`, que no matchea `puta` por palabra completa: el leet,
+# puesto a lo bruto, produce falsos NEGATIVOS justo sobre el texto mas comun
+# (un insulto con signo de exclamacion al final).
+#
+# `@` y `$` NO estan aca, y antes si estaban. Con la misma regla que `!`, la
+# forma mas natural de escribir en leet un termino femenino —`put@`, `p1j@`,
+# `c0nch@`— pasaba entera: la `@` del final no tiene letra a la derecha, no se
+# traducia, y quedaba `put`. Lo mismo `@ndate` al principio, y la `@` suelta de
+# `te voy @ matar`, que es la preposicion. El motivo de la regla es propio de
+# `!` —es puntuacion, y cierra frases—; `@` y `$` no cierran nada en
+# castellano. Se traducen siempre, igual que los digitos.
+LEET_SOLO_ENTRE_LETRAS = {"!"}
 
 # Runs de 3 o mas caracteres iguales colapsan a uno: `putooooo` -> `puto`.
 #
@@ -223,8 +231,7 @@ def normalizar(texto: str) -> str:
     """
     s = sin_diacriticos(texto.lower())
 
-    # Leet. Los simbolos solo con letra a los DOS lados: ver
-    # LEET_SOLO_ENTRE_LETRAS.
+    # Leet. `!` solo con letra a los DOS lados: ver LEET_SOLO_ENTRE_LETRAS.
     chars = list(s)
     fuera = []
     for i, ch in enumerate(chars):

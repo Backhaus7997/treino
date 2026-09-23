@@ -68,13 +68,17 @@ export function checkText(text: string): ModerationVerdict {
   // --- Pasada B: antievasion ---------------------------------------------
   if (evades(tokens)) return "block";
 
+  // --- Pasada C: letras sueltas ------------------------------------------
+  const deletreado = spelledOut(tokens);
+  if (deletreado === "block") return "block";
+
   // --- Pasada A, severidad `review` --------------------------------------
   for (const t of tokens) {
     if (VETTED_REVIEW_WORDS.has(t)) return "review";
   }
   if (hasPhrase(tokens, VETTED_REVIEW_PHRASES)) return "review";
 
-  return "ok";
+  return deletreado ?? "ok";
 }
 
 /**
@@ -120,10 +124,11 @@ function leet(s: string): string {
       out += ch;
       continue;
     }
-    // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS lados.
-    // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
-    // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
-    // texto mas comun que existe, un insulto con signo de exclamacion.
+    // `!` solo se traduce con letra a los DOS lados. Sin esa regla `puta!`
+    // normaliza a `putai`, que no matchea `puta` por palabra completa: el leet
+    // a lo bruto produce falsos NEGATIVOS sobre el texto mas comun que existe,
+    // un insulto con signo de exclamacion. `@` y `$` se traducen siempre — ver
+    // `LEET_SOLO_ENTRE_LETRAS` en el generador.
     if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
       const antes = i > 0 && isAlnum(chars[i - 1]);
       const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
@@ -233,4 +238,60 @@ function evades(tokens: readonly string[]): boolean {
     }
   }
   return false;
+}
+
+/**
+ * Las frases vetadas sin espacios: `hijo de puta` -> `hijodeputa`. Es la forma
+ * en que quedan cuando se escriben con todas las letras separadas.
+ */
+const COMPACT_BLOCK_PHRASES = VETTED_BLOCK_PHRASES.map((p) => p.join(""));
+const COMPACT_REVIEW_PHRASES = VETTED_REVIEW_PHRASES.map((p) => p.join(""));
+
+/**
+ * La pasada de las letras sueltas. ESPEJO de `_spelledOut` en
+ * `moderation_filter.dart` — ver ahi el porque completo.
+ *
+ * Corta: `p-i-j-a` da puros tokens de UNA letra; la pasada B los pega pero
+ * solo los compara contra `VETTED_ANTI_EVASION`, que no tiene `pija` ni
+ * `culo` a proposito. Aca se compara contra la lista COMPLETA, por subcadena,
+ * pero solo sobre corridas de tokens de un caracter — el castellano no produce
+ * esas corridas, asi que la subcadena no choca con palabras legitimas. No se
+ * extiende a fragmentos de dos o tres letras: `por no` pegado da `porno`.
+ */
+function spelledOut(tokens: readonly string[]): ModerationVerdict | null {
+  const corridas: string[] = [];
+  let actual = "";
+  let largo = 0;
+
+  const cerrar = (): void => {
+    if (largo > 1) corridas.push(actual);
+    actual = "";
+    largo = 0;
+  };
+
+  for (const t of tokens) {
+    if (t.length === 1) {
+      actual += t;
+      largo++;
+    } else {
+      cerrar();
+    }
+  }
+  cerrar();
+  if (corridas.length === 0) return null;
+
+  const contiene = (terminos: Iterable<string>): boolean => {
+    for (const termino of terminos) {
+      if (corridas.some((c) => c.includes(termino))) return true;
+    }
+    return false;
+  };
+
+  if (contiene(VETTED_BLOCK_WORDS) || contiene(COMPACT_BLOCK_PHRASES)) {
+    return "block";
+  }
+  if (contiene(VETTED_REVIEW_WORDS) || contiene(COMPACT_REVIEW_PHRASES)) {
+    return "review";
+  }
+  return null;
 }
