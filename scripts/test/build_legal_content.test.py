@@ -23,10 +23,12 @@ venir de la fecha. (Cuando estos tests se escribieron el ruido era concreto: el
 marcador del INPI seguia vivo en `aviso-legal.md`. Se cerro el 2026-09-21, pero
 el argumento no dependia de ese marcador en particular.)
 
-Los tres casos de `<!-- fecha:auto -->` usan `arbol_git()` en vez de `arbol()`,
-porque necesitan historial. El tercero es el control negativo y usa `arbol()` a
-proposito: sin repo, el generador tiene que abortar en vez de inventar una
-fecha.
+Los casos de `<!-- fecha:auto -->` ya no usan git: desde el #1220 la fecha sale
+del REGISTRO —`web/legal/legal-content.json`, el artefacto que viaja en el mismo
+commit que el markdown— y no del historial. `sembrar_registro()` deja el arbol
+como si se hubiera generado otro dia, que es todo lo que hace falta para
+reproducir el bug que motivo el cambio; `commitear()` fecha el commit aparte,
+para probar que esa fecha ya no entra en ningun lado.
 
 Los dos primeros casos son controles, y no son decorado: sin ellos un fixture
 mal armado tumbaria al generador por cualquier otra razon y los tests de la
@@ -34,6 +36,7 @@ fecha pasarian en verde sin haber medido nada.
 """
 
 import datetime
+import json
 import os
 import shutil
 import subprocess
@@ -49,12 +52,31 @@ FECHA_OK = "**Última actualización:** 3 de septiembre de 2026"
 FECHA_PENDIENTE = "**Última actualización:** [[PENDIENTE — fecha de publicación]]"
 FECHA_AUTO = "**Última actualización:** <!-- fecha:auto -->"
 
-# Una fecha de commit fija, para poder asertar contra un valor concreto en vez
-# de contra "algo que parezca una fecha". Un test que acepta cualquier fecha
-# pasa igual si el generador estampa la de hoy cuando deberia leer el historial.
+# DOS fechas fijas y DISTINTAS, para poder asertar contra valores concretos en
+# vez de contra "algo que parezca una fecha". Un test que acepta cualquier fecha
+# pasa igual si el generador estampa la de hoy cuando deberia leer el registro.
+#
+# `REGISTRADA` es la que tiene que salir publicada. `COMMIT_*` es la del commit,
+# o sea la que NO. Distintas a proposito: si fueran la misma, el test del #1217
+# no podria decir cual de las dos produjo la salida.
 COMMIT_ISO = "2026-03-14"
 COMMIT_ES = "14 de marzo de 2026"
+REGISTRADA = "5 de febrero de 2026"
+
 DART_OUT = Path("lib/features/auth/presentation/legal/legal_content.dart")
+# El registro de fechas. Es tambien el tercer eslabon —lo que consume la
+# landing— y desde el #1220 las dos cosas son la misma: la fecha vive donde se
+# publica, no en el historial.
+REGISTRO = Path("web/legal/legal-content.json")
+
+MESES_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+            "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+
+
+def hoy_es() -> str:
+    """Hoy en el formato que emite el generador."""
+    h = datetime.date.today()
+    return f"{h.day} de {MESES_ES[h.month - 1]} de {h.year}"
 
 # (archivo, slug, title, dart) — el ORDER completo de build_legal_content.py.
 # Si el generador suma un documento, estos fixtures fallan con "falta
@@ -128,19 +150,19 @@ class GeneradorLegal(unittest.TestCase):
             capture_output=True, text=True,
         )
 
-    def arbol_git(self, **overrides: str) -> Path:
-        """Como `arbol()`, pero con historial: un repo con todo commiteado.
+    def commitear(self, tmp: Path, iso: str) -> None:
+        """Commitea todo el arbol con una fecha FIJA de autor y de commit.
 
-        `arbol()` NO hace `git init` a proposito —los tests de marcadores no
-        necesitan historial— asi que los de `<!-- fecha:auto -->` necesitan su
-        propia version. La fecha del commit se fija con las variables de
-        entorno de git para poder asertar contra un valor exacto.
+        Existe para un solo test —el del #1217— y lo que ese test mide es una
+        AUSENCIA: que la fecha del commit no entra en lo que emite el
+        generador. Hasta el #1220 si entraba, y por eso `main` se ponia en rojo
+        cada vez que un PR de `docs/legal/` se mergeaba un dia distinto del que
+        se habia generado.
         """
-        tmp = self.arbol(**overrides)
         env = {
             **os.environ,
-            "GIT_AUTHOR_DATE": f"{COMMIT_ISO}T12:00:00",
-            "GIT_COMMITTER_DATE": f"{COMMIT_ISO}T12:00:00",
+            "GIT_AUTHOR_DATE": f"{iso}T12:00:00",
+            "GIT_COMMITTER_DATE": f"{iso}T12:00:00",
         }
 
         def git(*args: str, **kw) -> None:
@@ -152,7 +174,37 @@ class GeneradorLegal(unittest.TestCase):
         git("config", "user.name", "test")
         git("add", "-A")
         git("commit", "-q", "-m", "fixture", env=env)
-        return tmp
+
+    def sembrar_registro(self, tmp: Path, fecha: str = REGISTRADA) -> Path:
+        """Deja el arbol como si se hubiera generado el dia `fecha`.
+
+        Genera una vez —lo que estampa HOY en los nueve—, reescribe las fechas
+        a una fija, y vuelve a generar. La segunda pasada no es plomeria: es la
+        que prueba que el generador ADOPTA la fecha registrada en vez de volver
+        a estampar hoy, y ademas deja el `sourceSha` consistente con ella.
+
+        Se siembra con el generador real y no con un JSON escrito a mano a
+        proposito. La clave del registro es la entrada COMPLETA que emite
+        `emit_landing()`; un fixture a mano que se desincronizara de ese
+        formato daria "contenido distinto" SIEMPRE, y los tests de abajo
+        pasarian en verde midiendo el camino equivocado.
+        """
+        r = self.correr(tmp)
+        self.assertEqual(
+            r.returncode, 0,
+            f"la siembra fallo.\nstdout:{r.stdout}\nstderr:{r.stderr}")
+        reg = tmp / REGISTRO
+        self.assertTrue(reg.exists(), "la siembra no escribio el registro")
+        d = json.loads(reg.read_text(encoding="utf-8"))
+        for entrada in d["documents"]:
+            entrada["lastUpdated"] = fecha
+        reg.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n",
+                       encoding="utf-8")
+        r = self.correr(tmp)
+        self.assertEqual(
+            r.returncode, 0,
+            f"la resiembra fallo.\nstdout:{r.stdout}\nstderr:{r.stderr}")
+        return reg
 
     def dart_generado(self, tmp: Path) -> str:
         destino = tmp / DART_OUT
@@ -227,40 +279,104 @@ class GeneradorLegal(unittest.TestCase):
         self.assertIn(BLANCO, r.stdout + r.stderr,
                       "aborto, pero sin decir que archivo hay que arreglar")
 
-    # --- `<!-- fecha:auto -->`: la fecha sale del historial ---------------
+    # --- `<!-- fecha:auto -->`: la fecha sale del REGISTRO ----------------
+    #
+    # Hasta el #1220 salia de `git log`. Con **squash merge** —la convencion
+    # del repo— el commit que git encuentra despues del merge no es aquel en el
+    # que se escribio el texto: es el del MERGE. Entonces la fecha derivada
+    # CAMBIABA despues de commiteada, y todo PR que tocara `docs/legal/` y se
+    # mergeara un dia distinto del que se genero dejaba `main` en rojo (los
+    # cuatro shards, porque el gate corre una vez por shard). Paso con el #1217.
+    #
+    # Ahora la fecha se REGISTRA en el artefacto —que viaja en el mismo commit
+    # que el markdown— y solo se mueve cuando se mueve el contenido publicado.
+    # Estos cuatro tests son las cuatro mitades de eso: que se conserve, que se
+    # mueva, que el commit no la toque, y que el gate siga mordiendo.
 
-    def test_fecha_auto_sale_del_ultimo_commit(self):
-        """Con historial limpio, la fecha es la del commit que toco el archivo.
+    def test_la_fecha_registrada_sobrevive_a_regenerar(self):
+        """Regenerar sobre un texto sin cambios devuelve la MISMA fecha.
 
-        Es el caso que justifica el mecanismo: nadie tiene que acordarse de
-        mover la fecha porque no la escribe nadie. Se asierta contra una fecha
-        EXACTA y no contra "algo con forma de fecha": un test que acepta
-        cualquiera pasa igual si el generador estampa hoy.
+        Es la propiedad de la que depende el gate entero: si regenerar moviera
+        la fecha, `--check` compararia contra un artefacto que el propio
+        generador acaba de invalidar. Se asierta contra un valor EXACTO y no
+        contra "algo con forma de fecha": un test que acepta cualquiera pasa
+        igual si el generador vuelve a estampar hoy.
         """
-        tmp = self.arbol_git(**{
+        tmp = self.arbol(**{
             BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
                         fecha=FECHA_AUTO),
         })
-        r = self.correr(tmp)
-        self.assertEqual(r.returncode, 0,
-                         f"stdout:{r.stdout}\nstderr:{r.stderr}")
-        self.assertIn(
-            f"kTermsLastUpdated = '{COMMIT_ES}'", self.dart_generado(tmp),
-            "la fecha no salio del commit. Si dice la de hoy, el generador "
-            "esta inventandola en vez de leer el historial.")
+        self.sembrar_registro(tmp)
 
-    def test_fecha_auto_con_cambios_sin_commitear_usa_hoy(self):
-        """Con el archivo sucio, la fecha es HOY, no la del commit anterior.
+        r = self.correr(tmp, "--check")
+        self.assertEqual(
+            r.returncode, 0,
+            "regenerar movio la fecha sin que cambiara el texto: el gate se "
+            "pone rojo solo.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        self.assertIn(f"kTermsLastUpdated = '{REGISTRADA}'",
+                      self.dart_generado(tmp),
+                      "la fecha registrada no sobrevivio a la regeneracion")
 
-        Sin esto el flujo normal —editar, generar, commitear los dos juntos—
-        estamparia la fecha del cambio ANTERIOR: una fecha vieja para un texto
-        nuevo, que es justo lo que este mecanismo existe para impedir.
+    def test_la_fecha_del_commit_no_entra(self):
+        """EL CASO DEL #1217: artefacto de un dia, commit de otro, gate VERDE.
+
+        Reproduce la forma exacta del bug —un artefacto fechado el 5 de febrero
+        dentro de un commit fechado el 14 de marzo— y exige que `--check` pase.
+        Con la derivacion por `git log` esto salia ROJO: el generador leia el
+        14 de marzo del commit, lo comparaba contra el 5 de febrero del archivo
+        y reportaba desfasaje. El autor no podia evitarlo: al commitear, la
+        fecha del merge todavia no existia.
+
+        Las dos fechas son DISTINTAS a proposito. Si fueran la misma este test
+        no podria distinguir cual de las dos produjo la salida, que es
+        literalmente lo unico que mide.
         """
-        tmp = self.arbol_git(**{
+        tmp = self.arbol(**{
             BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
                         fecha=FECHA_AUTO),
         })
-        # editar DESPUES del commit: el texto cambia, el historial todavia no
+        self.sembrar_registro(tmp)
+        self.commitear(tmp, COMMIT_ISO)
+
+        r = self.correr(tmp, "--check")
+        self.assertEqual(
+            r.returncode, 0,
+            "el gate se puso rojo por la fecha del COMMIT, no por el "
+            "contenido. Es el #1217 otra vez.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        dart = self.dart_generado(tmp)
+        self.assertIn(f"kTermsLastUpdated = '{REGISTRADA}'", dart)
+        self.assertNotIn(
+            COMMIT_ES, dart,
+            "la fecha del commit se filtro a la salida: alguien volvio a "
+            "derivarla del historial")
+
+    def test_texto_nuevo_estampa_hoy(self):
+        """Si el texto publicable cambio, la fecha pasa a ser HOY.
+
+        Es la otra mitad del mecanismo. Sin ella el registro seria una fecha
+        congelada: el documento avanzaria y la linea "Ultima actualizacion"
+        seguiria diciendo cuando se genero la primera vez. No es hipotetico —es
+        lo que paso con las paginas del sitio, que quedaron en marzo mientras
+        el documento real avanzaba.
+
+        El segundo assert fija que la fecha es POR DOCUMENTO: tocar Terminos no
+        puede re-fechar Privacidad, que nadie edito.
+        """
+        tmp = self.arbol(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+            # Privacidad va con el centinela A PROPOSITO: es el testigo. El
+            # resto del fixture usa `FECHA_OK`, una fecha escrita a mano, que
+            # sale del markdown y no toca el registro — con esa, el assert de
+            # abajo pasaria sin haber mirado el mecanismo ni una vez.
+            "politica-de-privacidad.md": doc(
+                "privacidad", "Política de Privacidad", "kPrivacySections",
+                fecha=FECHA_AUTO),
+        })
+        self.sembrar_registro(tmp)
+
         destino = tmp / "docs" / "legal" / BLANCO
         destino.write_text(
             destino.read_text(encoding="utf-8").replace(
@@ -271,37 +387,73 @@ class GeneradorLegal(unittest.TestCase):
         self.assertEqual(r.returncode, 0,
                          f"stdout:{r.stdout}\nstderr:{r.stderr}")
         dart = self.dart_generado(tmp)
-        self.assertNotIn(
-            f"kTermsLastUpdated = '{COMMIT_ES}'", dart,
-            "el texto cambio y la fecha quedo en la del commit anterior: "
-            "una fecha vieja sobre un texto nuevo.")
-        hoy = datetime.date.today()
-        meses = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-                 "agosto", "septiembre", "octubre", "noviembre", "diciembre")
-        esperado = f"{hoy.day} de {meses[hoy.month - 1]} de {hoy.year}"
-        self.assertIn(f"kTermsLastUpdated = '{esperado}'", dart)
+        self.assertIn(
+            f"kTermsLastUpdated = '{hoy_es()}'", dart,
+            "el texto cambio y la fecha quedo en la registrada: una fecha "
+            "vieja sobre un texto nuevo.")
+        self.assertIn(
+            f"kPrivacyLastUpdated = '{REGISTRADA}'", dart,
+            "se re-fecho un documento que nadie toco")
 
-    def test_fecha_auto_sin_repo_aborta(self):
-        """CONTROL NEGATIVO: sin git no hay fecha, y no se inventa una.
+    def test_control_negativo_editar_sin_regenerar_sale_rojo(self):
+        """CONTROL NEGATIVO: un .md editado y no regenerado tiene que dar ROJO.
 
-        Es el caso que decide si el mecanismo es confiable. Caer a hoy cuando
-        no se puede leer el historial seria estampar una fecha inventada en un
-        documento legal, y el usuario no tiene forma de distinguir una fecha
-        derivada de una fabricada. Por el mismo criterio del resto del
-        generador —un defecto no es un default— aca se aborta.
+        Es la pregunta que decide si el #1220 arreglo el gate o lo apago. Un
+        gate que dejo de fallar no esta arreglado: esta apagado, y el verde de
+        los otros tres no distingue una cosa de la otra.
 
-        `arbol()` no hace `git init`, asi que el arbol no es un repo.
+        El control de este control es `test_la_fecha_registrada_sobrevive_a_
+        regenerar`: el MISMO arbol, sin la edicion, sale verde. Si los dos
+        salieran del mismo color, este no estaria midiendo la edicion.
         """
-        r = self.correr(self.arbol(**{
+        tmp = self.arbol(**{
             BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
                         fecha=FECHA_AUTO),
-        }))
+        })
+        self.sembrar_registro(tmp)
+
+        destino = tmp / "docs" / "legal" / BLANCO
+        antes = destino.read_text(encoding="utf-8")
+        despues = antes.replace("Texto publicable.",
+                                "Texto publicable, editado y sin regenerar.")
+        self.assertNotEqual(antes, despues,
+                            "la mutacion del control negativo no entro: el "
+                            "rojo (o el verde) no significaria nada")
+        destino.write_text(despues, encoding="utf-8")
+
+        r = self.correr(tmp, "--check")
+        self.assertEqual(
+            r.returncode, 1,
+            "el gate dejo pasar un markdown editado sin regenerar.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        self.assertIn("Desfasaje", r.stderr,
+                      "fallo, pero no por desfasaje: el rojo viene de otro lado")
+
+    def test_control_negativo_registro_ilegible_aborta(self):
+        """Un registro roto aborta en vez de re-fechar los nueve documentos.
+
+        Es el heredero del viejo "sin git no hay fecha, y no se inventa una":
+        cambio de donde sale la fecha, no el criterio. Tratar un JSON ilegible
+        como "registro vacio" estamparia hoy en los NUEVE de una sola vez, en
+        silencio, sobre textos que nadie toco — y el usuario no tiene forma de
+        distinguir una fecha registrada de una fabricada.
+        """
+        tmp = self.arbol(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+        })
+        self.sembrar_registro(tmp)
+        (tmp / REGISTRO).write_text("{ esto no es json", encoding="utf-8")
+
+        r = self.correr(tmp)
         self.assertNotEqual(
             r.returncode, 0,
-            "sin repo git el generador invento una fecha y la publico.\n"
+            "un registro ilegible paso como vacio y los nueve documentos "
+            "quedaron fechados hoy.\n"
             f"stdout:{r.stdout}\nstderr:{r.stderr}")
-        self.assertIn(BLANCO, r.stdout + r.stderr,
-                      "aborto, pero sin decir que archivo hay que arreglar")
+        self.assertIn(
+            "legal-content.json", r.stdout + r.stderr,
+            "aborto, pero sin decir que archivo hay que recuperar")
 
     # --- tablas ----------------------------------------------------------
 
@@ -376,7 +528,7 @@ class GeneradorLegal(unittest.TestCase):
             set(blc.EN_EL_BINARIO).issubset(set(blc.ORDER)),
             "EN_EL_BINARIO nombra un documento que no esta en ORDER")
 
-        tmp = self.arbol_git()
+        tmp = self.arbol()
         r = self.correr(tmp)
         self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
         dart = self.dart_generado(tmp)
@@ -406,7 +558,7 @@ class GeneradorLegal(unittest.TestCase):
         para que nadie los unifique «por consistencia».
         """
         import json as _json
-        tmp = self.arbol_git()
+        tmp = self.arbol()
         r = self.correr(tmp)
         self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
 
@@ -432,7 +584,7 @@ class GeneradorLegal(unittest.TestCase):
         import json as _json
 
         def sha_de(cuerpo: str) -> str:
-            tmp = self.arbol_git(**{
+            tmp = self.arbol(**{
                 BLANCO: doc("terminos", "Términos y Condiciones",
                             "kTermsSections", cuerpo=cuerpo),
             })
