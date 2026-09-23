@@ -201,6 +201,33 @@ describe("hallazgos de la revision", () => {
     expect((await ref.get()).get("text")).toBe("ya lo corregi");
   });
 
+  it(
+    "redacted queda en false cuando la redaccion se abandona por " +
+      "precondicion, aunque el veredicto sea block",
+    async () => {
+      // El registro se escribe con `redacted: verdict === "block"` ANTES de
+      // intentar el update() (para que exista aunque la funcion se caiga en
+      // el medio). Si el update() despues aborta por FAILED_PRECONDITION, el
+      // registro quedaba afirmando `redacted: true` sobre un documento que
+      // en realidad no se toco — una advertencia falsa (§11.1): quien modera
+      // filtrando por `redacted: false` para ver que falta atender no lo ve.
+      const ref = db.doc("posts/p11");
+      await ref.set({ text: VETADO, authorUid: "u1" });
+      const viejo = (await ref.get()).updateTime;
+      await ref.update({ text: "ya lo corregi" });
+
+      await quarantineIfVetted({
+        db, path: "posts/p11", field: "text", value: VETADO, kind: "post",
+        updateTime: viejo,
+      });
+
+      const reg = await registro("posts/p11");
+      expect(reg.get("verdict")).toBe("block");
+      expect(reg.get("redacted")).toBe(false);
+      expect((await ref.get()).get("text")).toBe("ya lo corregi");
+    },
+  );
+
   it("redacta el authorDisplayName vetado del post", async () => {
     // Viaja DENORMALIZADO y lo pone el cliente: la regla de create lo acepta
     // sin atarlo al perfil. Un post con `text` LIMPIO y nombre vetado en el
