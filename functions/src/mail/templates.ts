@@ -916,6 +916,48 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
     );
   }
 
+  // ── El ALUMNO que se quedo sin cobertura ────────────────────────────────
+  //
+  // NO NOMBRA AL ENTRENADOR, y es la decision central del copy. El disparador
+  // es `athletePaywallEnforced` pasando a `true`, y eso tiene DOS causas: que
+  // el profe termino el vinculo, o que la suscripcion propia del alumno
+  // vencio. «Tu profe te dio de baja» es FALSO en el segundo caso, y en el
+  // primero es una acusacion que TREINO no tiene por que hacer entre dos
+  // personas que se siguen conociendo.
+  //
+  // NO ENUMERA LOS TOPES, y tampoco es pereza. Los numeros del plan free viven
+  // en `athlete_entitlement.dart` (`kFreeMaxOwnRoutines`, `kFreeMaxRoutineDays`,
+  // `kFreeMaxRoutineWeeks`) y ya se desincronizaron una vez entre la constante,
+  // `firestore.rules` y el texto del `.arb` — y el que le habla al usuario fue
+  // el ultimo en enterarse. Un cuarto lugar con los mismos numeros es un cuarto
+  // lugar que se puede pudrir. El mail dice QUE cambia; la app, que lee las
+  // constantes, dice CUANTO.
+  //
+  // LO PRIMERO QUE DICE ES QUE NO SE PIERDE NADA. Quien recibe esto acaba de
+  // perder acceso sin haber hecho nada, y el miedo razonable es que se le hayan
+  // borrado los entrenamientos. Contestar eso ANTES de ofrecer nada es la
+  // diferencia entre un aviso y un aprieto.
+  case "athlete-coverage-lost":
+    return build(
+      "Tu lugar en TREINO ya no está cubierto", // i18n: email comercial
+      "Tus entrenamientos siguen donde están",
+      [
+        ["Tu cuenta de TREINO pasó al plan gratis."],
+        [
+          strong("No perdés nada de lo que ya hiciste"),
+          ": tus rutinas, tu historial y tus medidas siguen exactamente donde " +
+            "estaban, y los vas a seguir viendo.",
+        ],
+        [
+          "Lo que cambia es lo que podés armar de acá en adelante: el plan " +
+            "gratis tiene topes más chicos para las rutinas que te armás vos.",
+        ],
+        ["Si querés seguir sin esos topes, podés suscribirte por tu cuenta."],
+      ],
+      "VER EL PLAN",
+      ctaUrl,
+    );
+
   // ── Aviso de baja por inactividad ───────────────────────────────────────
   //
   // ESTE MAIL NO ENUMERA LO QUE SE BORRA, y es la decision del copy.
