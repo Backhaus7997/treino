@@ -73,6 +73,26 @@ const REDACTADO = "";
  */
 const FAILED_PRECONDITION = 9;
 
+/**
+ * Corrige el registro cuando la redaccion se abandona por precondicion.
+ *
+ * `redacted` se escribe ANTES de intentar el `update()` (para que el
+ * registro exista aunque la funcion se caiga en el medio), pero eso significa
+ * que si el `update()` despues aborta por `FAILED_PRECONDITION` el registro
+ * queda afirmando `redacted: true` sobre un documento que no se toco. Quien
+ * modera filtrando por `redacted: false` para ver que falta atender no ve
+ * ese documento — una advertencia falsa (§11.1).
+ */
+async function marcarRedaccionAbandonada(
+  db: Firestore,
+  id: string,
+): Promise<void> {
+  await db
+    .collection(QUARANTINE_COLLECTION)
+    .doc(id)
+    .set({ redacted: false }, { merge: true });
+}
+
 export interface QuarantineInput {
   db: Firestore;
   /** Ruta completa del documento que disparo el trigger. */
@@ -154,6 +174,7 @@ export async function quarantineIfVetted(
     if ((err as { code?: number }).code === FAILED_PRECONDITION) {
       logger.info("quarantine: el documento cambio, lo revisa su propio evento",
         { path, field });
+      await marcarRedaccionAbandonada(db, id);
       return verdict;
     }
     throw err;
@@ -325,7 +346,7 @@ function verdictFor(value: unknown): ModerationVerdict | null {
 /**
  * Cuarentena de rutinas.
  *
- * Superficie distinta a `quarantineIfVetted`: una rutina puede tener CUATRO
+ * Superficie distinta a `quarantineIfVetted`: una rutina puede tener CINCO
  * campos de texto libre vetables en el mismo write — `name`, `split` y
  * `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
  * anidados dentro de un array. Por eso esta funcion NO reusa
@@ -357,6 +378,15 @@ export async function quarantineRoutineIfVetted(
   const days: RoutineDayLike[] = Array.isArray(data.days) ? data.days : [];
   let daysChanged = false;
   const newDays = days.map((day, i) => {
+    // Un `day` que no sea un objeto (`null` via SDK directo, por ejemplo) no
+    // tiene `.name` ni `.slots` que leer. Saltearlo con seguridad es lo que
+    // impide que UN elemento basura tire toda la funcion — sin este guard,
+    // `day.name` de mas abajo lanza `TypeError` ANTES de que se escriba
+    // ningun finding (ni los top-level, ni los del resto del array), asi que
+    // el filtro entero queda desactivado para ese write. El elemento queda
+    // tal cual en el array: no es nuestro trabajo "arreglarlo", solo no dejar
+    // que apague el resto del documento.
+    if (day === null || typeof day !== "object") return day;
     let out = day;
 
     const nameVerdict = verdictFor(day.name);
@@ -371,6 +401,10 @@ export async function quarantineRoutineIfVetted(
     const slots: RoutineSlotLike[] = Array.isArray(day.slots) ? day.slots : [];
     let slotsChanged = false;
     const newSlots = slots.map((slot, j) => {
+      // Mismo motivo que el guard de `day` de arriba, un nivel mas adentro:
+      // un `slots: [null]` no puede apagar el filtro de `day.name` ni del
+      // resto de los slots del mismo dia.
+      if (slot === null || typeof slot !== "object") return slot;
       const notesVerdict = verdictFor(slot.notes);
       if (!notesVerdict) return slot;
       findings.push({
@@ -427,6 +461,19 @@ export async function quarantineRoutineIfVetted(
       logger.info("quarantine: la rutina cambio, la revisa su propio evento", {
         path,
       });
+      // Un solo `update()` cubre TODOS los findings bloqueados de este write
+      // (todo `days` se reescribe entero). Si aborta, ninguno se redacto de
+      // verdad: hay que corregir el registro de cada uno, no solo del primero.
+      await Promise.all(
+        findings
+          .filter((f) => f.verdict === "block")
+          .map((f) =>
+            marcarRedaccionAbandonada(
+              db,
+              `${path.replace(/\//g, "__")}__${f.field.replace(/[[\].]/g, "_")}`,
+            ),
+          ),
+      );
       return findings;
     }
     throw err;
@@ -530,19 +577,28 @@ export const quarantineTrainerProfileName = onDocumentWritten(
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;
-    await quarantineDisplayName(
-      getFirestore(),
-      event.params.uid,
-      after.get("displayName"),
-    );
+    const db = getFirestore();
+    await quarantineDisplayName(db, event.params.uid, after.get("displayName"));
+
+    // `quarantineDisplayName` pudo haber escrito sobre ESTE MISMO documento:
+    // si el displayName estaba vetado, su batch toca `trainerPublicProfiles`.
+    // Usar `after.updateTime` (el snapshot ANTERIOR a ese batch) como
+    // precondicion de abajo la deja vieja, el `update()` de `trainerBio`
+    // aborta con FAILED_PRECONDITION, y la bio no se redacta en esta pasada
+    // aunque este vetada. Releer el doc antes de usarlo es lo que hace que
+    // la primera pasada redacte las DOS cosas y no dependa de que el batch
+    // vuelva a disparar este mismo trigger para autocurarse.
+    const fresh = await db.doc(after.ref.path).get();
+    if (!fresh.exists) return;
+
     await quarantineIfVetted({
-      db: getFirestore(),
+      db,
       path: after.ref.path,
       field: "trainerBio",
-      value: after.get("trainerBio"),
+      value: fresh.get("trainerBio"),
       kind: "profile",
       authorUid: event.params.uid,
-      updateTime: after.updateTime,
+      updateTime: fresh.updateTime,
     });
   },
 );

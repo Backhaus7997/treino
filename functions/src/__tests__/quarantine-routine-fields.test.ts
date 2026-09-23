@@ -197,28 +197,75 @@ describe("quarantineRoutineIfVetted", () => {
     expect(after.days[1].slots[3].notes).toBe("");
   });
 
-  it("vocabulario de dominio (musculo, dorsal, aductores) no se toca", async () => {
-    const data = rutinaBase({
-      name: "Rutina dorsal y aductores",
-      split: "Full body - musculo completo",
-      summary: "Trabaja aductores, dorsal y musculo estabilizador.",
-    });
-    data.days[0].name = "Dia de aductores";
-    data.days[0].slots[0].notes = "Foco en el musculo dorsal";
-    await db.doc("routines/r7").set(data);
+  it(
+    "vocabulario que roza el filtro (allowlist, \"culo\"/\"puta\" como " +
+      "subcadena de palabras legitimas) no se toca",
+    async () => {
+      // A diferencia del corpus viejo (musculo/dorsal/aductores: ninguna es
+      // subcadena de un termino de VETTED_ANTI_EVASION, asi que este test
+      // pasaba igual con `checkText` devolviendo "ok" siempre) este corpus
+      // usa palabras que SI entran a la pasada antievasion y sobreviven solo
+      // por la allowlist — "controlo" contiene "trolo", "computo" contiene
+      // "puto" — o que dependen de que la pasada A compare por palabra
+      // completa y no por subcadena — "calculo" contiene "culo". Si se
+      // rompe cualquiera de las dos cosas, este test se pone rojo.
+      const data = rutinaBase({
+        name: "Full body - controlo la tecnica",
+        split: "El computo de series por grupo muscular",
+        summary: "Trabajo el musculo dorsal sin descontrolo en la carga.",
+      });
+      data.days[0].name = "Dia de aductores y calculo de RM";
+      data.days[1].slots[3].notes = "No te disputo el peso, priorizo la forma";
+      await db.doc("routines/r7").set(data);
 
-    const findings = await quarantineRoutineIfVetted({
-      db,
-      path: "routines/r7",
-      data,
-    });
+      const findings = await quarantineRoutineIfVetted({
+        db,
+        path: "routines/r7",
+        data,
+      });
 
-    expect(findings).toEqual([]);
-    const after = (await db.doc("routines/r7").get()).data()!;
-    expect(after.name).toBe("Rutina dorsal y aductores");
-    expect(after.split).toBe("Full body - musculo completo");
-    expect(after.days[0].slots[0].notes).toBe("Foco en el musculo dorsal");
-  });
+      expect(findings).toEqual([]);
+      const after = (await db.doc("routines/r7").get()).data()!;
+      expect(after.name).toBe("Full body - controlo la tecnica");
+      expect(after.split).toBe("El computo de series por grupo muscular");
+      expect(after.days[0].name).toBe("Dia de aductores y calculo de RM");
+      expect(after.days[1].slots[3].notes).toBe(
+        "No te disputo el peso, priorizo la forma",
+      );
+    },
+  );
+
+  it(
+    "el cue que motivo todo: 'matate' en una nota de entrenador ya no " +
+      "bloquea la rutina, pero queda para revision",
+    async () => {
+      // finding 3: "matate" es jerga de gimnasio corriente ("matate en la
+      // ultima serie") y bajo de `block` a `review` — deja de impedir el
+      // guardado, pero sigue quedando anotado para que un humano lo mire.
+      const data = rutinaBase();
+      data.days[1].slots[3].notes =
+        "Dale, matate en la ultima serie que ya casi terminamos";
+      await db.doc("routines/r13").set(data);
+
+      const findings = await quarantineRoutineIfVetted({
+        db,
+        path: "routines/r13",
+        data,
+      });
+
+      expect(findings).toEqual([
+        { field: "days[1].slots[3].notes", verdict: "review" },
+      ]);
+      // review no redacta: la nota del entrenador sobrevive tal cual.
+      const after = (await db.doc("routines/r13").get()).data()!;
+      expect(after.days[1].slots[3].notes).toBe(
+        "Dale, matate en la ultima serie que ya casi terminamos",
+      );
+      const reg = await registro("routines/r13", "days[1].slots[3].notes");
+      expect(reg.get("verdict")).toBe("review");
+      expect(reg.get("redacted")).toBe(false);
+    },
+  );
 
   it("severidad review deja registro pero NO redacta", async () => {
     // `review` significa "que alguien lo mire", no "no se puede guardar" —
@@ -291,6 +338,11 @@ describe("quarantineRoutineIfVetted", () => {
     const after = (await ref.get()).data()!;
     expect(after.name).toBe(VETADO); // no se toco: se abandono
     expect(after.estimatedMinutesPerDay).toBe(45); // la edicion sobrevive
+
+    // finding 6: el registro no puede seguir afirmando `redacted: true`
+    // sobre una rutina que en realidad no se toco.
+    const reg = await registro("routines/r11", "name");
+    expect(reg.get("redacted")).toBe(false);
   });
 
   it("no guarda el texto vetado en el registro", async () => {
@@ -306,4 +358,74 @@ describe("quarantineRoutineIfVetted", () => {
     expect(reg).not.toContain("puta");
     expect(reg).not.toContain("hijo");
   });
+
+  it(
+    "BLOQUEANTE: un days[] con un elemento null no apaga el filtro del " +
+      "resto del documento — el top-level se redacta y el registro se " +
+      "escribe igual",
+    async () => {
+      // Vector real: un escritor por SDK directo manda `days: [null]`.
+      // `Array.isArray(data.days)` protege que `days` sea un array, NO que
+      // sus elementos lo sean, y firestore.rules solo valida
+      // `data.days.size()` (no el tipo de los elementos). Antes del fix,
+      // `day.name` tiraba `TypeError: Cannot read properties of null` DENTRO
+      // del `.map()`, antes de llegar al loop que escribe
+      // `moderation_quarantine` — asi que ni el top-level se redactaba ni
+      // quedaba registro, y el termino vetado quedaba publicado.
+      const data = {
+        name: VETADO,
+        split: null,
+        summary: "Resumen limpio.",
+        days: [null],
+      };
+      await db.doc("routines/r14").set(data);
+
+      const findings = await quarantineRoutineIfVetted({
+        db,
+        path: "routines/r14",
+        data,
+      });
+
+      expect(findings).toEqual([{ field: "name", verdict: "block" }]);
+      expect((await db.doc("routines/r14").get()).get("name")).toBe("");
+      const reg = await registro("routines/r14", "name");
+      expect(reg.exists).toBe(true);
+      expect(reg.get("verdict")).toBe("block");
+    },
+  );
+
+  it(
+    "BLOQUEANTE: un slots[] con un elemento null no apaga el filtro del " +
+      "resto del dia ni del documento",
+    async () => {
+      const data = {
+        name: "Rutina limpia",
+        split: null,
+        summary: "Resumen limpio.",
+        days: [
+          { name: VETADO, slots: [null] },
+          { name: "Dia 2", slots: [{ notes: VETADO }, null] },
+        ],
+      };
+      await db.doc("routines/r15").set(data);
+
+      const findings = await quarantineRoutineIfVetted({
+        db,
+        path: "routines/r15",
+        data,
+      });
+
+      expect(findings).toEqual([
+        { field: "days[0].name", verdict: "block" },
+        { field: "days[1].slots[0].notes", verdict: "block" },
+      ]);
+      const after = (await db.doc("routines/r15").get()).data()!;
+      expect(after.days[0].name).toBe("");
+      expect(after.days[1].slots[0].notes).toBe("");
+      // Los `null` conviven en el array sin romper nada — no es nuestro
+      // trabajo "arreglarlos", solo no dejar que apaguen el resto.
+      expect(after.days[0].slots[0]).toBeNull();
+      expect(after.days[1].slots[1]).toBeNull();
+    },
+  );
 });
