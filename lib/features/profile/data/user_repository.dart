@@ -1,7 +1,13 @@
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FirebaseFirestore, SetOptions, Timestamp;
+    show
+        CollectionReference,
+        FirebaseFirestore,
+        GetOptions,
+        SetOptions,
+        Source,
+        Timestamp;
 
 import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
@@ -414,6 +420,21 @@ class UserRepository {
 
   Future<UserProfile?> get(String uid) async {
     final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    return UserProfile.fromJson(data);
+  }
+
+  /// Como [get], pero del SERVIDOR: nunca de la caché local.
+  ///
+  /// Para decisiones que escriben evidencia, como el consentimiento del alta.
+  /// La caché puede tener una versión vieja del doc, y decidir sobre ella
+  /// pisaría lo que ya está en el servidor. Sin conexión tira, a propósito:
+  /// es preferible no poder terminar el alta a registrar consentimiento sobre
+  /// un dato que no se pudo confirmar.
+  Future<UserProfile?> getFromServer(String uid) async {
+    final snap =
+        await _users.doc(uid).get(const GetOptions(source: Source.server));
     final data = snap.data();
     if (!snap.exists || data == null) return null;
     return UserProfile.fromJson(data);

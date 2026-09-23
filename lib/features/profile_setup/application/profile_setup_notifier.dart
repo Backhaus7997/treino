@@ -4,7 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../auth/application/auth_providers.dart'
+    show authStateChangesProvider, firebaseAuthProvider;
 import '../../auth/presentation/legal/legal_content.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
@@ -14,6 +15,7 @@ import '../../profile/domain/gender.dart';
 import '../domain/profile_setup_draft.dart';
 import '../domain/profile_setup_validators.dart';
 import 'profile_setup_providers.dart' show avatarUploadServiceProvider;
+import 'terms_consent_provider.dart';
 
 /// Estado de la verificación async de disponibilidad del username (handle
 /// público) en step 1. El handle se persiste como `displayName` y se renderiza
@@ -58,8 +60,8 @@ class ProfileSetupState {
   final UsernameAvailability usernameAvailability;
 
   /// Checkbox de Términos y Privacidad del último step. Solo se muestra (y
-  /// solo importa) para cuentas OAuth nuevas — ver `needsTermsConsent` en
-  /// [submit] (QA-AUTH-001, issue #434).
+  /// solo importa) para cuentas sin consentimiento registrado — ver
+  /// [termsConsentRequiredProvider] (QA-AUTH-001, issue #434).
   final bool termsAccepted;
 
   /// QA-PRO-106 (issue #430): el upload del avatar durante [submit] es
@@ -123,6 +125,28 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
 
   @override
   ProfileSetupState build() {
+    // El alta es de UNA cuenta. El provider es de raíz, y hasta ahora sólo lo
+    // reiniciaba el flujo de «eliminar cuenta»: el estado sobrevivía a
+    // «Cancelar cuenta» y a «Cerrar sesión». Si alguien tildaba los Términos,
+    // cancelaba y otra persona se registraba en la misma sesión de la app, la
+    // segunda veía el checkbox YA tildado, y su EMPEZAR estampaba un
+    // consentimiento que nunca dio. Con él viajaba el borrador de la primera:
+    // usuario, fecha de nacimiento, gimnasio. Ahora, cuando la cuenta cambia,
+    // el alta arranca de cero. Un refresh del token re-emite el mismo uid y
+    // no toca nada.
+    //
+    // Es `listen` y no `watch` a propósito: `antes == null` es «auth todavía
+    // cargando» (o nadie logueado), y eso NO es otra cuenta. Con `watch`, el
+    // paso de cargando a logueado reiniciaba el borrador recién empezado.
+    ref.listen<String?>(
+      authStateChangesProvider.select((user) => user.valueOrNull?.uid),
+      (antes, ahora) {
+        if (antes != null && antes != ahora) ref.invalidateSelf();
+      },
+    );
+    // Y una verificación de username en vuelo de la cuenta anterior no puede
+    // escribir en el estado de la nueva.
+    _usernameCheckToken++;
     ref.onDispose(() => _usernameDebounce?.cancel());
     return const ProfileSetupState(
       draft: ProfileSetupDraft(),
@@ -225,7 +249,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       state = state.copyWith(draft: state.draft.copyWith(heightCm: value));
 
   /// Checkbox de Términos y Privacidad del último step (solo relevante para
-  /// cuentas OAuth nuevas — QA-AUTH-001, issue #434).
+  /// cuentas sin consentimiento registrado — QA-AUTH-001, issue #434).
   void updateTermsAccepted(bool value) =>
       state = state.copyWith(termsAccepted: value);
 
@@ -287,18 +311,24 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       final draft = state.draft;
       final handle = draft.username?.trim() ?? '';
 
-      // QA-AUTH-001 (issue #434): OAuth sign-ins (Google/Apple) never pass
-      // through Register's Terms checkbox — they land here with NO
-      // `users/{uid}` doc yet (that is exactly what marks them as new: the
-      // router only sends a user to ProfileSetup once, and an existing email
-      // account's doc was already created by signUpWithEmail with
-      // termsAcceptedAt set). So `needsTermsConsent` is true only for those
-      // brand-new accounts; email accounts skip this gate entirely because
-      // their profile already exists. Checked ANTES del createIfAbsent de
-      // abajo — un self-heal (sesión restaurada sin doc) también cuenta como
-      // "sin evidencia de consentimiento" y debe re-pedirlo.
-      final needsTermsConsent =
-          ref.read(userProfileProvider).valueOrNull == null;
+      // QA-AUTH-001 (issue #434): la pregunta es si hay EVIDENCIA de
+      // consentimiento, no si existe el perfil — ver
+      // [termsConsentRequiredProvider], que explica por qué la versión
+      // anterior («sin perfil = OAuth nuevo») dejaba sin consentimiento a las
+      // altas con Google/Apple cuyo doc sí se creaba en el login.
+      //
+      // Si lo observado dice que HAY consentimiento, se confía: lo estampó el
+      // registro por email. Si dice que falta, o todavía no se sabe, se
+      // confirma contra el SERVIDOR antes de decidir, porque de esto depende
+      // una escritura de evidencia. La caché local puede tener una versión
+      // vieja del doc sin `termsAcceptedAt`, y estampar sobre ella pisaría la
+      // evidencia original con un timestamp posterior (hallazgo de Codex en
+      // #1228). Sin conexión, el submit falla: es preferible a registrar
+      // consentimiento sobre un dato que no se pudo confirmar.
+      final repo = ref.read(userRepositoryProvider);
+      final yaHayEvidencia = ref.read(termsConsentRequiredProvider) == false;
+      final needsTermsConsent = !yaHayEvidencia &&
+          (await repo.getFromServer(uid))?.termsAcceptedAt == null;
       if (needsTermsConsent && !state.termsAccepted) {
         // Mismo patrón que 'username-taken': cortamos el spinner acá y
         // dejamos que el catch de abajo setee submitError con esta excepción.
@@ -337,7 +367,6 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         throw StateError('username-taken');
       }
 
-      final repo = ref.read(userRepositoryProvider);
       // Self-heal: garantiza que users/{uid} + userPublicProfiles/{uid} existan
       // antes del update parcial (ver doc de submit). Idempotente.
       await repo.createIfAbsent(uid: uid, email: user.email ?? '');
