@@ -334,7 +334,7 @@ class PostCard extends ConsumerWidget {
     if (confirmed != true) return;
 
     try {
-      await ref.read(postActionsProvider).deletePost(post.id);
+      await ref.read(postActionsProvider).deletePost(post);
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteSuccess)));
