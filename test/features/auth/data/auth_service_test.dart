@@ -55,6 +55,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
     registerFallbackValue(<AppleIDAuthorizationScopes>[]);
+    registerFallbackValue(HttpsCallableOptions());
   });
 
   late MockFirebaseAuth fbAuth;
@@ -881,36 +882,81 @@ void main() {
   // cancelOnboarding — hard-cancel an in-progress signup from ProfileSetup
   // ---------------------------------------------------------------------------
   group('AuthService.cancelOnboarding', () {
-    test('deletes Firestore profile + Firebase Auth user on happy path',
-        () async {
+    // Un doble propio para el callable del alta: el `callable` del setUp lo
+    // comparten los mails, y con uno solo no se podría decir CUÁL corrió antes
+    // del borrado de Auth.
+    late MockHttpsCallable cancelCallable;
+
+    HttpsCallable pedirCallable() => functions.httpsCallable(
+          'cancelOnboarding',
+          options: any(named: 'options'),
+        );
+
+    setUp(() {
+      cancelCallable = MockHttpsCallable();
+      when(pedirCallable).thenReturn(cancelCallable);
+      when(() => cancelCallable.call<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => MockCallableResult());
       when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
       when(() => user.delete()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenAnswer((_) async {});
-
-      await sut.cancelOnboarding();
-
-      verify(() => mockRepo.delete('uid-test')).called(1);
-      verify(() => user.delete()).called(1);
-      verify(() => googleSignIn.signOut()).called(1);
     });
 
-    test('continues to delete Auth user even if Firestore delete throws',
+    test(
+        'borra los docs del alta por el callable ANTES de borrar la cuenta de '
+        'Auth', () async {
+      await sut.cancelOnboarding();
+
+      // Invertido, el callable llegaría sin sesión y no borraría nada.
+      verifyInOrder([
+        pedirCallable,
+        () => cancelCallable.call<Map<String, dynamic>>(any()),
+        () => user.delete(),
+      ]);
+      verify(() => googleSignIn.signOut()).called(1);
+      expect(reportados, isEmpty);
+    });
+
+    test('no manda body: el uid lo saca el servidor del token', () async {
+      await sut.cancelOnboarding();
+
+      final body = verify(
+        () => cancelCallable.call<Map<String, dynamic>>(captureAny()),
+      ).captured.single;
+      expect(body, isA<Map<String, dynamic>>());
+      expect(body as Map<String, dynamic>, isEmpty);
+    });
+
+    test('le pone a la espera un techo más corto que el default del plugin',
         () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenThrow(Exception('firestore down'));
-      when(() => user.delete()).thenAnswer((_) async {});
-      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      await sut.cancelOnboarding();
+
+      final options = verify(
+        () => functions.httpsCallable(
+          'cancelOnboarding',
+          options: captureAny(named: 'options'),
+        ),
+      ).captured.single as HttpsCallableOptions;
+      expect(
+        options.timeout,
+        lessThan(HttpsCallableOptions().timeout),
+      );
+    });
+
+    test(
+        'si el callable falla, igual borra la cuenta de Auth y lo reporta '
+        '(best-effort, pero no en silencio)', () async {
+      when(() => cancelCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'sin red', code: 'unavailable'),
+      );
 
       await sut.cancelOnboarding();
 
-      verify(() => mockRepo.delete('uid-test')).called(1);
       verify(() => user.delete()).called(1);
+      expect(reportados, [contains('AuthService.cancelOnboarding')]);
     });
 
     test('throws AuthFailure when Firebase Auth delete fails', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
       when(() => user.delete()).thenThrow(
         FirebaseAuthException(code: 'requires-recent-login'),
       );
@@ -919,6 +965,9 @@ void main() {
         sut.cancelOnboarding(),
         throwsA(isA<AuthFailure>()),
       );
+      // Los docs ya se pidieron: un reintento vuelve a llamar al callable, que
+      // es idempotente.
+      verify(() => cancelCallable.call<Map<String, dynamic>>(any())).called(1);
       verify(() => user.delete()).called(1);
     });
 
@@ -927,14 +976,11 @@ void main() {
 
       await expectLater(sut.cancelOnboarding(), completes);
 
-      verifyNever(() => mockRepo.delete(any()));
+      verifyNever(pedirCallable);
       verifyNever(() => user.delete());
     });
 
     test('swallows Google signOut failures (best-effort cleanup)', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenThrow(Exception('google down'));
 
       // Should NOT propagate the Google signOut error.

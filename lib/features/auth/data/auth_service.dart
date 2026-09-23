@@ -534,25 +534,49 @@ class AuthService {
     }
   }
 
+  /// Techo para el callable `cancelOnboarding`. El default del plugin es 60 s,
+  /// y todo ese rato la persona mira el paso 0 sin que pase nada después de
+  /// haber confirmado. Cortar no deja la cancelación a medias: el callable es
+  /// best-effort, y del lado del servidor el borrado termina aunque el cliente
+  /// haya dejado de esperar.
+  static const _cancelOnboardingTimeout = Duration(seconds: 20);
+
   /// Hard-cancel onboarding for a user who just signed up and wants to bail
-  /// from ProfileSetup step 0. Deletes the Firestore profile doc (best-effort)
-  /// and then the Firebase Auth user (mandatory). The Auth delete auto-signs
-  /// the user out; we still clean the Google session cache so the next picker
-  /// shows fresh.
+  /// from ProfileSetup step 0. Primero le pide al callable `cancelOnboarding`
+  /// que borre lo que dejó el login (`users/{uid}`, `userPublicProfiles/{uid}`
+  /// y el avatar, best-effort) y después borra el usuario de Firebase Auth
+  /// (mandatory). The Auth delete auto-signs the user out; we still clean the
+  /// Google session cache so the next picker shows fresh.
+  ///
+  /// El orden no se puede invertir: sin sesión, el callable ya no se puede
+  /// llamar.
   ///
   /// Throws [AuthFailure] on Firebase Auth delete failure (e.g.
-  /// `requires-recent-login` on stale tokens). On Firestore delete failure
-  /// we swallow and proceed — the Auth delete is the source of truth for
-  /// account existence.
+  /// `requires-recent-login` on stale tokens). Si el callable falla, se
+  /// reporta y se sigue — the Auth delete is the source of truth for account
+  /// existence.
   Future<void> cancelOnboarding() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Best-effort delete of the Firestore profile doc.
+    // Best-effort como antes, pero ya no en silencio. Acá antes estaba
+    // `UserRepository.delete`, que tira SIEMPRE (las reglas le niegan el
+    // delete al cliente): el catch se lo tragaba, y cada «Cancelar cuenta»
+    // dejaba `users/{uid}` y `userPublicProfiles/{uid}` para siempre, con el
+    // mail de alguien que pidió no tener cuenta.
     try {
-      await _userRepository.delete(user.uid);
-    } catch (_) {
-      // Continue — Auth delete is what removes the account from Firebase.
+      final callable = _functions.httpsCallable(
+        'cancelOnboarding',
+        options: HttpsCallableOptions(timeout: _cancelOnboardingTimeout),
+      );
+      await callable.call<Map<String, dynamic>>(<String, dynamic>{});
+    } catch (e, st) {
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason:
+            'AuthService.cancelOnboarding: no se borraron los docs del alta',
+      ));
     }
 
     // Mandatory delete of the Firebase Auth user.

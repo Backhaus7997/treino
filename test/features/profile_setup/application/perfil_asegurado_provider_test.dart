@@ -225,7 +225,8 @@ void main() {
 
   // Hallazgo de la revisión: un reintento podía crear `users/{uid}` —con el
   // mail— justo antes de que «Cancelar cuenta» borrara la cuenta de Auth, y el
-  // doc quedaba huérfano (cancelOnboarding no borra el de Firestore).
+  // doc quedaba huérfano (cancelOnboarding borra los docs ANTES de borrar la
+  // cuenta; lo que se escribe después no lo limpia nadie).
   group('perfilAseguradoProvider — «Cancelar cuenta»', () {
     test('con la cancelación en curso no intenta crear nada', () async {
       final llamadas = guion([true]);
