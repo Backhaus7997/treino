@@ -326,22 +326,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-        # Historial COMPLETO, sin blobs — lo necesita el paso «Gate de
-        # desfasaje legal» de más abajo.
+        # Sin `fetch-depth`: profundidad 1, el default.
         #
-        # `build_legal_content.py` deriva la fecha de «Última actualización»
-        # de cada documento con `git log -1 -- <path>`. En un checkout de
-        # profundidad 1 git trata el tip como el borde de la historia y
-        # devuelve LA FECHA DEL TIP para los nueve, aunque ninguno haya
-        # cambiado: `--check` regeneraría nueve fechas distintas de las
-        # commiteadas y se pondría rojo en TODO PR posterior.
+        # Hasta el #1220 este job pedía `fetch-depth: 0` + `filter: blob:none`
+        # por UN solo paso, el «Gate de desfasaje legal» de más abajo.
+        # `build_legal_content.py` derivaba la fecha de «Última actualización»
+        # con `git log -1 -- <path>`, y en un checkout de profundidad 1 git
+        # trata el tip como el borde de la historia y devuelve LA FECHA DEL TIP
+        # para los nueve documentos, aunque ninguno haya cambiado.
         #
-        # `filter: blob:none` es lo que lo hace barato: hacen falta las FECHAS
-        # de los commits, no el contenido de cada revisión. El job
-        # `legal-generado` ya pedía `fetch-depth: 0` por su `merge-base`.
-        with:
-          fetch-depth: 0
-          filter: blob:none
+        # Esa derivación ya no existe. La fecha se REGISTRA en
+        # `web/legal/legal-content.json`, que viaja en el mismo commit que el
+        # markdown, y el generador no llama a git ni una vez. Clonar la
+        # historia entera cuatro veces —una por shard— dejó de comprar nada.
+        #
+        # Lo que sí sigue usando git acá es el `git ls-files` del paso «Run
+        # tests», y ese lee el ÍNDICE, no el historial: anda igual en un
+        # checkout de profundidad 1. El job `legal-generado` conserva su
+        # `fetch-depth: 0` aparte, que lo necesita para el `merge-base`.
 
       - name: Set up Flutter
         # MISMA versión que `analyze` y que `visual-gate`. Ver el comentario del
