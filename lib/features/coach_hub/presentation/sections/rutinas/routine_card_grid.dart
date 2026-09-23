@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/tokens.dart';
+import '../../../../../l10n/app_l10n.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_source.dart';
@@ -630,6 +631,12 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
             'dos.',
       // i18n
       ResultadoDePublicar.falloAlCrear => 'No se pudo. Probá de nuevo.',
+      // A diferencia de las otras ramas de este switch, ESTA usa AppL10n:
+      // `moderationBlockedMessage` ya existe y lo usan otras cinco
+      // superficies — inventar una copia hardcodeada en paralelo la
+      // desalinearía si el texto de esa clave cambia.
+      ResultadoDePublicar.bloqueadoPorModeracion =>
+        AppL10n.of(context).moderationBlockedMessage,
     });
   }
 

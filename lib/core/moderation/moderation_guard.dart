@@ -62,4 +62,35 @@ abstract final class ModerationGuard {
       throw ModerationBlockedException(campo);
     }
   }
+
+  static final RegExp _diaSolo = RegExp(r'^days\[(\d+)\]\.name$');
+  static final RegExp _diaYSlot =
+      RegExp(r'^days\[(\d+)\]\.slots\[(\d+)\]\.notes$');
+
+  /// Traduce el `campo` crudo de [ModerationBlockedException] (p.ej.
+  /// `'days[3].slots[7].notes'`) a una ubicacion legible para un humano
+  /// (p.ej. "Dia 4, ejercicio 8"). `null` si [campo] no tiene una ubicacion
+  /// indexada que mostrar — top-level (`name`, `split`, `summary`) u otro
+  /// campo fuera de rutinas (`displayName`, `trainerBio`).
+  ///
+  /// El `campo` crudo usa indices de base 0 (para correlacionar con el
+  /// registro del servidor, ver el dartdoc de `_ensureRoutineTextIsClean` en
+  /// `routine_repository.dart`); los que ve el usuario empiezan en 1. Esta
+  /// funcion es la UNICA que lo traduce — antes de esto nada parseaba
+  /// `campo` en absoluto, asi que en una rutina de 5 dias x 8 slots el PF
+  /// tenia que adivinar cual de 40 notas era.
+  static String? ubicacionLegible(String campo) {
+    final soloDia = _diaSolo.firstMatch(campo);
+    if (soloDia != null) {
+      final dia = int.parse(soloDia.group(1)!) + 1;
+      return 'Día $dia'; // i18n: Fase 11
+    }
+    final diaYSlot = _diaYSlot.firstMatch(campo);
+    if (diaYSlot != null) {
+      final dia = int.parse(diaYSlot.group(1)!) + 1;
+      final ejercicio = int.parse(diaYSlot.group(2)!) + 1;
+      return 'Día $dia, ejercicio $ejercicio'; // i18n: Fase 11
+    }
+    return null;
+  }
 }

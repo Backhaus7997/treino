@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../core/utils/location_precision.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
@@ -373,10 +374,15 @@ class _ProfileEditTrainerScreenState
       } else {
         context.pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // `moderationBlockedMessage` va PRIMERO: `profileEditTrainerSaveError`
+      // invita a reintentar, y para un bloqueo del filtro de términos
+      // vetados eso es consejo falso — el mismo texto va a fallar siempre.
       setState(() {
-        _error = AppL10n.of(context).profileEditTrainerSaveError;
+        _error = e is ModerationBlockedException
+            ? AppL10n.of(context).moderationBlockedMessage
+            : AppL10n.of(context).profileEditTrainerSaveError;
         _saving = false;
       });
     }

@@ -10,6 +10,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
@@ -232,6 +233,11 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
               ratingsCount: null,
             ),
           );
+    } on ModerationBlockedException {
+      // Rama propia y no `falloAlCrear`: ese caso dice "no se pudo, probá de
+      // nuevo", y para un bloqueo del filtro de términos vetados eso es
+      // consejo falso — el mismo texto va a fallar siempre.
+      return ResultadoDePublicar.bloqueadoPorModeracion;
     } catch (_) {
       return ResultadoDePublicar.falloAlCrear;
     }
@@ -317,4 +323,10 @@ enum ResultadoDePublicar {
   /// La plantilla se creó pero sigue privada. Está en la biblioteca del PF y
   /// se publica desde su propio menú — reintentar acá crearía una segunda.
   creadaPeroSinPublicar,
+
+  /// No se creó: el filtro de términos vetados rechazó algún campo del plan.
+  /// Distinto de [falloAlCrear] porque el mensaje al PF tiene que ser
+  /// distinto — acá "probá de nuevo" es consejo falso, el mismo contenido va
+  /// a fallar siempre.
+  bloqueadoPorModeracion,
 }

@@ -493,5 +493,43 @@ void main() {
         expect(copy, isNotEmpty, reason: l.localeName);
       }
     });
+
+    group('ModerationGuard.ubicacionLegible', () {
+      // finding 2: `campo` viaja crudo (`'days[3].slots[7].notes'`) para
+      // correlacionar con el registro del servidor, pero nada lo parseaba
+      // para mostrarselo a un humano — en una rutina de 5 dias x 8 slots el
+      // PF tenia que adivinar cual de 40 notas era.
+      test('days[N].slots[M].notes -> "Dia N+1, ejercicio M+1"', () {
+        expect(ModerationGuard.ubicacionLegible('days[3].slots[7].notes'),
+            'Día 4, ejercicio 8');
+      });
+
+      test('days[N].name -> "Dia N+1"', () {
+        expect(ModerationGuard.ubicacionLegible('days[0].name'), 'Día 1');
+      });
+
+      test('el primer dia y el primer slot tambien son N+1, no N', () {
+        // El caso mas facil de arruinar: confundir 0-index con 1-index
+        // justo en el borde.
+        expect(ModerationGuard.ubicacionLegible('days[0].slots[0].notes'),
+            'Día 1, ejercicio 1');
+      });
+
+      test('campos top-level (name, split, summary) no tienen ubicacion', () {
+        for (final campo in ['name', 'split', 'summary']) {
+          expect(ModerationGuard.ubicacionLegible(campo), isNull,
+              reason: campo);
+        }
+      });
+
+      test(
+          'campos fuera de rutinas (displayName, trainerBio) no tienen '
+          'ubicacion', () {
+        for (final campo in ['displayName', 'trainerBio']) {
+          expect(ModerationGuard.ubicacionLegible(campo), isNull,
+              reason: campo);
+        }
+      });
+    });
   });
 }

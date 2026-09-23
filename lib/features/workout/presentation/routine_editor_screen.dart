@@ -13,6 +13,7 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -3138,15 +3139,28 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      final errorText = switch (widget.mode) {
-        TrainerAssigning() => l10n.coachCreatePlanError,
-        TrainerTemplating() => l10n.coachCreatePlanError,
-        SelfCreating() ||
-        SelfCustomizing() =>
-          e.toString().contains('permission-denied')
-              ? l10n.workoutSelfEditorPermissionDenied
-              : l10n.workoutSelfEditorError,
-      };
+      // El bloqueo del filtro de términos vetados va PRIMERO y no entra al
+      // switch de abajo: los tres mensajes de esas ramas invitan a
+      // reintentar, y para un bloqueo eso es consejo falso — el mismo texto
+      // va a fallar siempre. `ubicacionLegible` le ahorra al PF adivinar
+      // cual de hasta 40 notas (5 dias x 8 slots) fue.
+      final String errorText;
+      if (e is ModerationBlockedException) {
+        final ubicacion = ModerationGuard.ubicacionLegible(e.campo);
+        errorText = ubicacion == null
+            ? l10n.moderationBlockedMessage
+            : '$ubicacion: ${l10n.moderationBlockedMessage}';
+      } else {
+        errorText = switch (widget.mode) {
+          TrainerAssigning() => l10n.coachCreatePlanError,
+          TrainerTemplating() => l10n.coachCreatePlanError,
+          SelfCreating() ||
+          SelfCustomizing() =>
+            e.toString().contains('permission-denied')
+                ? l10n.workoutSelfEditorPermissionDenied
+                : l10n.workoutSelfEditorError,
+        };
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorText)),
       );

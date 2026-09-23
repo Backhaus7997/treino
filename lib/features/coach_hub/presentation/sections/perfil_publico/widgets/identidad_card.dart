@@ -16,12 +16,14 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Card «IDENTIDAD» — columna izquierda de `PerfilPublicoScreen` (WU-03).
 class IdentidadCard extends ConsumerStatefulWidget {
@@ -76,8 +78,14 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
         'trainerBio': _bio.text.trim(),
       });
       _toast('Bio guardada.'); // i18n: Fase 11
-    } catch (_) {
-      _toast('No se pudo guardar la bio. Probá de nuevo.'); // i18n: Fase 11
+    } catch (e) {
+      if (!mounted) return;
+      // `moderationBlockedMessage` va PRIMERO: "probá de nuevo" es consejo
+      // falso para un bloqueo del filtro de términos vetados — la misma bio
+      // va a fallar siempre.
+      _toast(e is ModerationBlockedException
+          ? AppL10n.of(context).moderationBlockedMessage
+          : 'No se pudo guardar la bio. Probá de nuevo.'); // i18n: Fase 11
     } finally {
       if (mounted) setState(() => _saving = false);
     }

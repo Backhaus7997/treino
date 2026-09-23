@@ -27,6 +27,7 @@ import '../../../../workout/presentation/widgets/prescription_summary.dart';
 import '../../../../workout/presentation/widgets/routine_action_buttons.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/analytics/analytics_service.dart';
+import '../../../../../core/moderation/moderation_guard.dart';
 import '../../../../../core/utils/firestore_error.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -2364,9 +2365,21 @@ class _RoutineEditorWebScreenState
         _onWriteDenied(trainerUid: trainerUid, modo: modo);
         return;
       }
+      // El bloqueo del filtro de términos vetados va PRIMERO: el mensaje
+      // generico de abajo ("probá de nuevo") es consejo falso para eso, el
+      // mismo texto va a fallar siempre. `ubicacionLegible` le ahorra al PF
+      // adivinar cual de hasta 40 notas (5 dias x 8 slots) fue.
       setState(() {
         _submitting = false;
-        _errorMessage = 'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
+        if (error is ModerationBlockedException) {
+          final ubicacion = ModerationGuard.ubicacionLegible(error.campo);
+          const base = 'Ese texto no se puede publicar porque incumple las '
+              'Normas de Comunidad. Revisalo y volvé a intentar.'; // i18n
+          _errorMessage = ubicacion == null ? base : '$ubicacion: $base';
+        } else {
+          _errorMessage =
+              'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
+        }
         _errorIsDenial = false;
       });
     }
