@@ -247,6 +247,24 @@ interface PendingReport {
   /** Cuando se anoto ese intento. `null` si no hay ninguno. */
   attemptedAt: string | null;
   /**
+   * El autor REAL del contenido, derivado del documento. `null` cuando el
+   * contenido no existe o no se puede derivar.
+   *
+   * La tarjeta de la cola mostraba `contentPath`, `reason`, `targetKind` y
+   * `detail` — nunca a QUIEN se le da de baja, que es la unica de las cuatro
+   * acciones irreversible desde ahi. Y `targetOwnerUid` no sirve para
+   * mostrarlo: lo declara el denunciante (ver `OWNER_FIELD`). Mostrar el
+   * declarado seria peor que no mostrar nada.
+   */
+  derivedOwnerUid: string | null;
+  /**
+   * `displayName` de ese autor. `null` si no lo tiene o no se pudo derivar.
+   *
+   * Un uid no se reconoce de un vistazo; el nombre si. Van los dos: el
+   * nombre para reconocer, el uid para no confundirse entre dos parecidos.
+   */
+  derivedOwnerName: string | null;
+  /**
    * Ruta del documento reportado, o `null` si no se puede derivar.
    *
    * Sin esto la cola es inservible para los reportes de MENSAJE: el cliente
@@ -433,6 +451,12 @@ export async function listPendingReportsHandler(
         firstViewedAt: visto ? visto.toDate().toISOString() : null,
         attemptedAction: intento ?? null,
         attemptedAt: intentoAt ? intentoAt.toDate().toISOString() : null,
+        // Los completa `completarDuenos`, DESPUES del escaneo: derivarlos
+        // adentro del loop serian dos lecturas mas por cada documento
+        // escaneado —hasta 2000—, y solo hacen falta para los que se
+        // devuelven.
+        derivedOwnerUid: null,
+        derivedOwnerName: null,
         contentPath: resolveContentPath({
           targetKind,
           targetId,
@@ -445,11 +469,83 @@ export async function listPendingReportsHandler(
     if (snap.size < LOTE) break;
   }
 
+  await completarDuenos(db, out);
+
   return {
     reports: out,
     scanned: escaneados,
     reachedScanCap: escaneados >= TOPE_ESCANEO && out.length < objetivo,
   };
+}
+
+/**
+ * Completa `derivedOwnerUid`/`derivedOwnerName` de una pagina de la cola.
+ *
+ * Dos `getAll` y no dos lecturas por reporte: una pagina de cincuenta
+ * costaria cien viajes secuenciales, y esto corre mientras el moderador mira
+ * la pantalla en blanco. El SDK devuelve los snapshots en el orden de las
+ * refs, que es de lo que depende el emparejado de abajo.
+ *
+ * Los `null` NO caen de vuelta a `targetOwnerUid`. Ese campo lo declara el
+ * denunciante y nadie lo ata al autor real (`OWNER_FIELD`): mostrarlo como
+ * si fuera el autor es justo el bug que `deriveContentOwnerUid` cerro del
+ * lado de la ejecucion, y reabrirlo del lado de la pantalla seria peor —
+ * ahi es donde alguien decide apretar "Dar de baja".
+ */
+async function completarDuenos(
+  db: Firestore,
+  reportes: PendingReport[],
+): Promise<void> {
+  if (reportes.length === 0) return;
+
+  // `profile` no necesita lectura: su `targetId` ES el uid, mismo criterio
+  // que `resolveContentPath` y `deriveContentOwnerUid`.
+  const aLeer: { reporte: PendingReport; campo: string; path: string }[] = [];
+  for (const r of reportes) {
+    if (r.targetKind === "profile") {
+      r.derivedOwnerUid = r.targetId || null;
+      continue;
+    }
+    const campo = OWNER_FIELD[r.targetKind];
+    if (campo && r.contentPath) {
+      aLeer.push({ reporte: r, campo, path: r.contentPath });
+    }
+  }
+
+  if (aLeer.length > 0) {
+    const snaps = await db.getAll(...aLeer.map((x) => db.doc(x.path)));
+    snaps.forEach((snap, i) => {
+      const { reporte, campo } = aLeer[i];
+      const uid = snap.exists ? snap.get(campo) : undefined;
+      reporte.derivedOwnerUid =
+        typeof uid === "string" && uid.length > 0 ? uid : null;
+    });
+  }
+
+  const uids = [
+    ...new Set(
+      reportes
+        .map((r) => r.derivedOwnerUid)
+        .filter((u): u is string => u !== null),
+    ),
+  ];
+  if (uids.length === 0) return;
+
+  const perfiles = await db.getAll(
+    ...uids.map((u) => db.collection("users").doc(u)),
+  );
+  const nombres = new Map<string, string>();
+  for (const snap of perfiles) {
+    const nombre = snap.get("displayName");
+    if (typeof nombre === "string" && nombre.length > 0) {
+      nombres.set(snap.id, nombre);
+    }
+  }
+  for (const r of reportes) {
+    r.derivedOwnerName = r.derivedOwnerUid
+      ? nombres.get(r.derivedOwnerUid) ?? null
+      : null;
+  }
 }
 
 /**
