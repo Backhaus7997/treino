@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +8,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../profile/application/user_providers.dart';
+import '../../workout/application/session_providers.dart';
 import '../domain/athlete_entitlement.dart';
 
 /// Qué eje del plan free se tocó. Cambia sólo el cuerpo del mensaje: el título
@@ -110,6 +114,46 @@ Future<void> showFreePlanLimitSheet(
     'cuerpo no puede decir cuántos días tiene ni cuántos sobran, que es todo '
     'lo que los distingue de days/weeks.',
   );
+  // ── Se anota que este alumno chocó un tope ──
+  //
+  // Lo lee el barrido nocturno para mandarle un mail con la salida. La app no
+  // puede decírsela: bajo 3.1.3(f) un cartel que diga dónde se paga YA es un
+  // "call to action for purchase outside of the app", tappable o no.
+  //
+  // ⚠️ **LA HOJA NO CAMBIA NI UNA PALABRA POR ESTO**, y no es un detalle: lo
+  // que Apple revisa es la interfaz. Una anotación invisible no es un llamado
+  // a comprar; un «te mandamos un mail» impreso acá sí lo sería, porque
+  // señalizaría el camino de compra desde adentro del binario.
+  //
+  // Va acá y no en el cuerpo de la hoja porque esta función corre UNA vez por
+  // presentación, mientras que un `build` corre las que haga falta.
+  //
+  // Sin `await` a propósito: la hoja abre ya, no espera a una anotación.
+  //
+  // ⚠️ El `try` NO es redundante con el que tiene `registrarTopeTocado`
+  // adentro, y lo encontró un test: ahí el catch cubre el fallo ASÍNCRONO de
+  // Firestore, pero cualquier cosa que tire ANTES de entrar al método —o un
+  // refactor futuro que le saque su propio catch— explota acá y se lleva
+  // puesta la hoja. El usuario se quedaría sin el mensaje que le explica por
+  // qué no puede hacer algo, por una anotación que no le importa.
+  //
+  // Dos redes, porque una sola falla en silencio y lo que se rompe es la
+  // pantalla, no la anotación.
+  try {
+    final contenedor = ProviderScope.containerOf(context, listen: false);
+    final uid = contenedor.read(currentUidProvider);
+    if (uid != null) {
+      unawaited(
+        contenedor
+            .read(userRepositoryProvider)
+            .registrarTopeTocado(uid, limit.name)
+            .catchError((_) {}),
+      );
+    }
+  } catch (_) {
+    // Ver arriba: la hoja abre igual.
+  }
+
   final palette = AppPalette.of(context);
   return showModalBottomSheet<void>(
     context: context,
