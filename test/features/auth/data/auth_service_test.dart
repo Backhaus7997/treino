@@ -907,6 +907,8 @@ void main() {
       when(() => fbAuth.currentUser).thenReturn(user);
       when(() => fbAuth.signOut()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      // Por default la cuenta sigue viva para Auth.
+      when(() => user.reload()).thenAnswer((_) async {});
     });
 
     test(
@@ -935,6 +937,49 @@ void main() {
 
       verifyNever(() => user.delete());
       verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'si el callable falla pero Auth confirma que la cuenta ya no existe (la '
+        'respuesta se perdió con la cascada hecha), la baja salió: cierra la '
+        'sesión y completa', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'timeout', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-not-found'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
+    });
+
+    test(
+        'si el callable falla y no hay forma de confirmar (reload sin red), la '
+        'cuenta se trata como viva: tira y no cierra la sesión', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'sin red', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'network-request-failed'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'con la cuenta ya borrada, un signOut que falla no tira: se reporta y '
+        'la cancelación completa', () async {
+      when(() => fbAuth.signOut()).thenThrow(
+        FirebaseAuthException(code: 'internal-error'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      expect(reportados, [contains('AuthService.cancelOnboarding')]);
     });
 
     test(

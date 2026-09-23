@@ -25,6 +25,7 @@ import 'package:treino/features/profile_setup/application/profile_setup_provider
 import 'package:treino/features/profile_setup/application/terms_consent_provider.dart';
 import 'package:treino/features/profile_setup/domain/profile_setup_draft.dart';
 import 'package:treino/features/profile_setup/presentation/profile_setup_flow.dart';
+import 'package:treino/features/profile_setup/presentation/widgets/profile_setup_footer.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// El alta en el paso 0, el único que ofrece «Cancelar cuenta».
@@ -32,6 +33,21 @@ class _PasoCero extends ProfileSetupNotifier {
   @override
   ProfileSetupState build() =>
       const ProfileSetupState(draft: ProfileSetupDraft(), currentStep: 0);
+}
+
+/// El paso 0 completo: con esto `canGoNext` es true y «SIGUIENTE» anda.
+class _PasoCeroListo extends ProfileSetupNotifier {
+  @override
+  ProfileSetupState build() => const ProfileSetupState(
+        draft: ProfileSetupDraft(username: 'ana_fit'),
+        currentStep: 0,
+        usernameAvailability: UsernameAvailability.available,
+      );
+
+  // El paso monta con el username precargado y lo vuelve a verificar contra
+  // Firestore (debounce de 450 ms). Acá la disponibilidad queda fija.
+  @override
+  void updateUsername(String value) {}
 }
 
 class _AuthFalso extends AuthNotifier {
@@ -55,6 +71,7 @@ class _MockUserRepository extends Mock implements UserRepository {}
 Widget _app({
   required Future<void> Function() alCancelar,
   Future<void>? reintentoEnVuelo,
+  ProfileSetupNotifier Function() paso = _PasoCero.new,
   List<Override> extra = const [],
 }) {
   final router = GoRouter(routes: [
@@ -66,7 +83,7 @@ Widget _app({
   ]);
   return ProviderScope(
     overrides: [
-      profileSetupNotifierProvider.overrideWith(_PasoCero.new),
+      profileSetupNotifierProvider.overrideWith(paso),
       termsConsentRequiredProvider.overrideWithValue(false),
       authNotifierProvider.overrideWith(() => _AuthFalso(alCancelar)),
       if (reintentoEnVuelo != null) ...[
@@ -189,6 +206,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(cancelaciones, 1);
+  });
+
+  // Hallazgo de Codex en #1233: con la pantalla viva durante la baja, alguien
+  // que se arrepiente podía avanzar y hacer submit en el medio de la cascada,
+  // y recrear el perfil justo antes de que se borre la cuenta de Auth.
+  testWidgets('mientras se cancela no se puede avanzar', (tester) async {
+    final baja = Completer<void>();
+    await tester.pumpWidget(_app(
+      reintentoEnVuelo: Future<void>.value(),
+      paso: _PasoCeroListo.new,
+      alCancelar: () => baja.future,
+    ));
+    await tester.pump();
+
+    VoidCallback? siguiente() => tester
+        .widget<ProfileSetupFooter>(find.byType(ProfileSetupFooter))
+        .onPrimary;
+    // Sin esto el test pasaría de vacío: un paso 0 incompleto ya tiene el
+    // botón apagado.
+    expect(siguiente(), isNotNull);
+
+    await _confirmarCancelacion(tester);
+    await tester.pump();
+
+    expect(siguiente(), isNull);
+
+    baja.complete();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('si cancelar falla, el reintento vuelve a quedar habilitado',

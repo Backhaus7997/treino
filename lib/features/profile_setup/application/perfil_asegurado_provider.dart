@@ -51,7 +51,9 @@ class IntentoDelPerfil {
     try {
       await enVuelo.timeout(tope);
     } catch (_) {
-      // Falló o pasó el tope: en los dos casos no queda nada que esperar.
+      // Falló, o pasó el tope y se deja de esperar. Ojo: `timeout` NO cancela
+      // el intento, que puede seguir en vuelo y aterrizar después de la baja.
+      // Es el costo de no dejar a la persona trabada; ver el doc de arriba.
     }
   }
 }

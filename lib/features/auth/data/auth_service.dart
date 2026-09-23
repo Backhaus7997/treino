@@ -563,8 +563,17 @@ class AuthService {
       resultado = await AccountDeletionService(functions: _functions)
           .call(uid: user.uid);
     } catch (e) {
-      // No se sigue. Borrar Auth sin que la cascada haya corrido es
-      // exactamente lo que dejaba los docs sin dueño.
+      // Un error no prueba que el servidor no haya borrado: la respuesta se
+      // puede perder con la cascada ya hecha. Si Auth confirma que la cuenta
+      // no existe, la baja salió, y tirar acá restauraría la sesión en la
+      // pantalla y reactivaría los reintentos del alta sobre una cuenta
+      // borrada.
+      if (await _laCuentaYaNoExiste(user)) {
+        await _cerrarSesionDeCuentaBorrada();
+        return;
+      }
+      // Viva, o sin forma de saberlo: no se sigue. Borrar Auth sin la cascada
+      // es exactamente lo que dejaba los docs sin dueño.
       throw AuthFailure.deletionFailed(cause: e);
     }
 
@@ -575,11 +584,43 @@ class AuthService {
       throw AuthFailure.deletionFailed(cause: resultado.errors);
     }
 
-    // La cuenta de Auth ya no existe: queda la sesión local.
+    await _cerrarSesionDeCuentaBorrada();
+  }
+
+  /// Lo que contesta Auth sobre una cuenta que ya no existe del lado del
+  /// servidor aunque este cliente todavía tenga su token.
+  static const _codigosDeCuentaInexistente = {
+    'user-not-found',
+    'user-token-expired',
+    'invalid-user-token',
+  };
+
+  /// `true` sólo si Auth CONFIRMA que la cuenta ya no existe. Sin red, o ante
+  /// cualquier otra respuesta, `false`: se la trata como viva.
+  Future<bool> _laCuentaYaNoExiste(User user) async {
+    try {
+      await user.reload();
+      return false;
+    } on FirebaseAuthException catch (e) {
+      return _codigosDeCuentaInexistente.contains(e.code);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// La cuenta ya no existe: queda la sesión local. NO tira. Si tirara,
+  /// `AuthNotifier` restauraría el usuario y la pantalla reactivaría los
+  /// reintentos del alta sobre una cuenta borrada.
+  Future<void> _cerrarSesionDeCuentaBorrada() async {
     try {
       await _auth.signOut();
-    } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+    } catch (e, st) {
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.cancelOnboarding: signOut falló con la cuenta '
+            'ya borrada',
+      ));
     }
 
     // Cleanup Google session cache. Only matters if the user signed up with
