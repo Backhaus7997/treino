@@ -587,22 +587,20 @@ class AuthService {
     await _cerrarSesionDeCuentaBorrada();
   }
 
-  /// Lo que contesta Auth sobre una cuenta que ya no existe del lado del
-  /// servidor aunque este cliente todavía tenga su token.
-  static const _codigosDeCuentaInexistente = {
-    'user-not-found',
-    'user-token-expired',
-    'invalid-user-token',
-  };
-
   /// `true` sólo si Auth CONFIRMA que la cuenta ya no existe. Sin red, o ante
   /// cualquier otra respuesta, `false`: se la trata como viva.
+  ///
+  /// Sólo `user-not-found`. `user-token-expired` e `invalid-user-token` dicen
+  /// que la credencial no sirve, no que la cuenta no exista: salen también si
+  /// se cambió la contraseña en otro dispositivo. Tomarlos por baja le diría a
+  /// la persona que canceló con la cuenta y los docs vivos. Un falso negativo,
+  /// en cambio, cuesta un reintento, y `deleteAccount` es idempotente.
   Future<bool> _laCuentaYaNoExiste(User user) async {
     try {
       await user.reload();
       return false;
     } on FirebaseAuthException catch (e) {
-      return _codigosDeCuentaInexistente.contains(e.code);
+      return e.code == 'user-not-found';
     } catch (_) {
       return false;
     }

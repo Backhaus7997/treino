@@ -971,6 +971,22 @@ void main() {
     });
 
     test(
+        'user-token-expired no confirma la baja (sale también con la cuenta '
+        'viva, p. ej. por un cambio de contraseña): tira y no cierra la sesión',
+        () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-token-expired'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
         'con la cuenta ya borrada, un signOut que falla no tira: se reporta y '
         'la cancelación completa', () async {
       when(() => fbAuth.signOut()).thenThrow(
