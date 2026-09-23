@@ -25,7 +25,11 @@ set -euo pipefail
 #   SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 #
 # Corré la app Flutter en otra terminal:
-#   flutter run --dart-define=USE_EMULATOR=true
+#   flutter run --flavor phone --dart-define=USE_EMULATOR=true
+#
+# El `--flavor phone` NO es opcional en Android: `android/app/build.gradle.kts`
+# declara DOS flavors —`phone` y `wear`— y sin elegir uno el build falla. Esta
+# línea lo omitía, así que el comando que documentaba no corría.
 #
 # --------------------------------------------------------------------------
 # Por qué `--project treino-dev` explícito en los dos `emulators:start` (#840)
