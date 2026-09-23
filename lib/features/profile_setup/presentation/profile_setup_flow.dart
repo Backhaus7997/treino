@@ -10,9 +10,9 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/presentation/widgets/terms_checkbox.dart';
-import '../../profile/application/user_providers.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
+import '../application/terms_consent_provider.dart';
 import 'steps/step_1_username_avatar.dart';
 import 'steps/step_2_born_at.dart';
 import 'steps/step_3_gym.dart';
@@ -58,11 +58,12 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       return;
     }
 
-    // QA-AUTH-001 (issue #434): cuentas OAuth nuevas (Google/Apple) nunca
-    // pasaron por el checkbox de Register. Mismo gate que register_screen —
-    // mostramos el snackbar y NO disparamos submit. Email ya tiene perfil
-    // (creado por signUpWithEmail) así que este gate no le aplica.
-    final needsTermsConsent = ref.read(userProfileProvider).valueOrNull == null;
+    // QA-AUTH-001 (issue #434): quien no tiene consentimiento registrado
+    // —las altas con Google/Apple nunca pasaron por el checkbox de Register—
+    // lo da acá. Mismo gate que register_screen: snackbar y NO se dispara el
+    // submit. Si todavía no se sabe (`null`), se pide: ver
+    // [termsConsentRequiredProvider].
+    final needsTermsConsent = ref.read(termsConsentRequiredProvider) ?? true;
     if (needsTermsConsent && !state.termsAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -188,9 +189,8 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     );
 
     final state = ref.watch(profileSetupNotifierProvider);
-    // OAuth nuevo (sin perfil aún) — ver comentario de _onPrimary.
-    final needsTermsConsent =
-        ref.watch(userProfileProvider).valueOrNull == null;
+    // Sin consentimiento registrado, o todavía sin saberlo — ver _onPrimary.
+    final needsTermsConsent = ref.watch(termsConsentRequiredProvider) ?? true;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -247,8 +247,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                       ],
                     ),
                   ),
-                  // Terms checkbox — solo en el último step y solo para OAuth
-                  // nuevo (email ya aceptó en Register). QA-AUTH-001 (#434).
+                  // Terms checkbox — solo en el último step y solo sin
+                  // consentimiento registrado (email ya aceptó en Register).
+                  // QA-AUTH-001 (#434).
                   if (state.isLastStep && needsTermsConsent) ...[
                     const SizedBox(height: 12),
                     TermsCheckbox(

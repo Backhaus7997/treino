@@ -14,6 +14,7 @@ import '../../profile/domain/gender.dart';
 import '../domain/profile_setup_draft.dart';
 import '../domain/profile_setup_validators.dart';
 import 'profile_setup_providers.dart' show avatarUploadServiceProvider;
+import 'terms_consent_provider.dart';
 
 /// Estado de la verificación async de disponibilidad del username (handle
 /// público) en step 1. El handle se persiste como `displayName` y se renderiza
@@ -58,8 +59,8 @@ class ProfileSetupState {
   final UsernameAvailability usernameAvailability;
 
   /// Checkbox de Términos y Privacidad del último step. Solo se muestra (y
-  /// solo importa) para cuentas OAuth nuevas — ver `needsTermsConsent` en
-  /// [submit] (QA-AUTH-001, issue #434).
+  /// solo importa) para cuentas sin consentimiento registrado — ver
+  /// [termsConsentRequiredProvider] (QA-AUTH-001, issue #434).
   final bool termsAccepted;
 
   /// QA-PRO-106 (issue #430): el upload del avatar durante [submit] es
@@ -225,7 +226,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       state = state.copyWith(draft: state.draft.copyWith(heightCm: value));
 
   /// Checkbox de Términos y Privacidad del último step (solo relevante para
-  /// cuentas OAuth nuevas — QA-AUTH-001, issue #434).
+  /// cuentas sin consentimiento registrado — QA-AUTH-001, issue #434).
   void updateTermsAccepted(bool value) =>
       state = state.copyWith(termsAccepted: value);
 
@@ -287,18 +288,19 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       final draft = state.draft;
       final handle = draft.username?.trim() ?? '';
 
-      // QA-AUTH-001 (issue #434): OAuth sign-ins (Google/Apple) never pass
-      // through Register's Terms checkbox — they land here with NO
-      // `users/{uid}` doc yet (that is exactly what marks them as new: the
-      // router only sends a user to ProfileSetup once, and an existing email
-      // account's doc was already created by signUpWithEmail with
-      // termsAcceptedAt set). So `needsTermsConsent` is true only for those
-      // brand-new accounts; email accounts skip this gate entirely because
-      // their profile already exists. Checked ANTES del createIfAbsent de
-      // abajo — un self-heal (sesión restaurada sin doc) también cuenta como
-      // "sin evidencia de consentimiento" y debe re-pedirlo.
-      final needsTermsConsent =
-          ref.read(userProfileProvider).valueOrNull == null;
+      // QA-AUTH-001 (issue #434): la pregunta es si hay EVIDENCIA de
+      // consentimiento, no si existe el perfil — ver
+      // [termsConsentRequiredProvider], que explica por qué la versión
+      // anterior («sin perfil = OAuth nuevo») dejaba sin consentimiento a las
+      // altas con Google/Apple cuyo doc sí se creaba en el login.
+      //
+      // Si todavía no se sabe (perfil sin cargar), se le pregunta al servidor
+      // ANTES de escribir nada. Tratar el «no sé» como «hace falta» pisaría la
+      // evidencia de una cuenta de email con un timestamp posterior; tratarlo
+      // como «no hace falta» cerraría un alta sin consentimiento.
+      final repo = ref.read(userRepositoryProvider);
+      var needsTermsConsent = ref.read(termsConsentRequiredProvider);
+      needsTermsConsent ??= (await repo.get(uid))?.termsAcceptedAt == null;
       if (needsTermsConsent && !state.termsAccepted) {
         // Mismo patrón que 'username-taken': cortamos el spinner acá y
         // dejamos que el catch de abajo setee submitError con esta excepción.
@@ -337,7 +339,6 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         throw StateError('username-taken');
       }
 
-      final repo = ref.read(userRepositoryProvider);
       // Self-heal: garantiza que users/{uid} + userPublicProfiles/{uid} existan
       // antes del update parcial (ver doc de submit). Idempotente.
       await repo.createIfAbsent(uid: uid, email: user.email ?? '');
