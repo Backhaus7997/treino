@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -255,6 +256,46 @@ void main() {
           findsOneWidget);
       // La selección NO se toca: los tres siguen elegidos para reintentar.
       expect(find.text('ASIGNAR PLAN A 3 ATLETAS'), findsOneWidget);
+    });
+
+    testWidgets(
+        'bloqueo del filtro de moderación: un solo mensaje de contenido '
+        'bloqueado, no "Probá de nuevo" (Codex P2, PR #1227)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      var llamadas = 0;
+      when(() => repo.createAssigned(any())).thenAnswer((_) async {
+        llamadas++;
+        // El guard (`_ensureRoutineTextIsClean`) corre sobre el MISMO `plan`
+        // para los tres atletas, así que las tres llamadas tiran el MISMO
+        // campo -- es lo que pasa en producción, no un mock inconsistente.
+        throw const ModerationBlockedException('days[0].slots[0].notes');
+      });
+
+      await _pumpPreview(tester, repo);
+      await _seleccionarTodosYAsignar(tester);
+      await tester.pumpAndSettle();
+
+      expect(llamadas, 3, reason: 'las tres asignaciones se intentaron');
+      expect(find.text('DASHBOARD'), findsNothing);
+
+      // El mensaje de contenido bloqueado, UNA sola vez -- no repetido por
+      // atleta. `ubicacionLegible('days[0].slots[0].notes')` da
+      // "Día 1, ejercicio 1".
+      expect(
+        find.text(
+          'Día 1, ejercicio 1: Ese texto no se puede publicar porque '
+          'incumple las Normas de Comunidad. Revisalo y volvé a intentar.',
+        ),
+        findsOneWidget,
+      );
+
+      // Lo que este fix reemplaza: ANTES cualquier excepción por atleta caía
+      // en el catch-all y mostraba esto -- consejo falso, reintentar no
+      // puede funcionar porque los tres comparten el mismo plan bloqueado.
+      expect(find.text('No pudimos guardar el plan. Probá de nuevo.'),
+          findsNothing);
+      expect(find.textContaining('fallaron'), findsNothing);
     });
   });
 }
