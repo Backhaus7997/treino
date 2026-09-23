@@ -62,6 +62,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "legal"
@@ -559,112 +560,213 @@ MESES_ES = (
 )
 
 
-def _git(*args: str) -> str | None:
-    """git dentro de ROOT. `None` si no se pudo (no hay repo, no hay git, …)."""
-    try:
-        r = subprocess.run(("git", "-C", str(ROOT), *args),
-                           capture_output=True, text=True, check=False)
-    except (OSError, ValueError):
-        return None
-    return r.stdout.strip() if r.returncode == 0 else None
-
-
 def _es_fecha(iso: str) -> str:
     """`2026-09-21` -> `21 de septiembre de 2026`."""
     y, m, d = (int(p) for p in iso.split("-"))
     return f"{d} de {MESES_ES[m - 1]} de {y}"
 
 
-def _publicable_en(rev: str, rel: str) -> str | None:
-    """Lo PUBLICABLE de `rel` en `rev`. `None` si ahi no existia el archivo."""
-    crudo = _git("show", f"{rev}:{rel}")
-    return None if crudo is None else publishable(crudo).strip()
+def _publicado(slug: str, title: str, version: int | None,
+               secciones: list[tuple[str, str]]) -> dict:
+    """Todo lo que la landing publica de un documento MENOS su fecha.
+
+    Es la CLAVE del registro de `fecha_auto()`: si algo de esto cambia, la
+    fecha se mueve; si no, se conserva. La lista de campos no esta elegida a
+    mano — es la entrada que emite `emit_landing()` sin `lastUpdated`, y hay un
+    test que lo fija. Si manana la landing publica un campo mas, entra solo en
+    la comparacion en vez de quedar afuera en silencio.
+    """
+    return {
+        "slug": slug,
+        "title": title,
+        **({"version": version} if version is not None else {}),
+        "sections": [{"heading": h, "body": b} for h, b in secciones],
+    }
 
 
-def fecha_auto(name: str) -> str:
-    """La fecha de `name`, derivada de cuando cambio DE VERDAD lo PUBLICABLE.
+_REGISTRO: dict[str, dict] | None = None
 
-    Por que no se escriben a mano: una fecha escrita a mano queda vieja la
+
+def _registro_danado(motivo: str) -> NoReturn:
+    """Aborta explicando que se rompio y como recuperarlo."""
+    sys.exit(f"[!] el registro de fechas esta danado: {motivo}\n"
+             f"      {LANDING_OUT.relative_to(ROOT)}\n\n"
+             "    Ahi vive la fecha de 'Ultima actualizacion' de los documentos\n"
+             "    legales, y es la UNICA copia. Si el generador siguiera, las\n"
+             "    estamparia todas con la de hoy y pisaria el registro: nueve\n"
+             "    textos anunciando una actualizacion que no ocurrio.\n\n"
+             "    Para recuperarlo:\n\n"
+             "        git checkout -- web/legal/legal-content.json")
+
+
+def _registro() -> dict[str, dict]:
+    """El registro de fechas —`web/legal/legal-content.json`— indexado por slug.
+
+    Se lee UNA vez por corrida. Si el archivo NO EXISTE, el registro queda
+    vacio y todos los documentos cuentan como nuevos: es el caso de la primera
+    generacion, donde HOY es la respuesta correcta.
+
+    Si existe, tiene que parecerse a lo que emite este generador, y si no se
+    ABORTA. No alcanza con que sea JSON parseable —esa fue la primera version y
+    la cazo Codex en el #1223 (P2)—: un `{"documents": []}` es JSON
+    perfectamente valido y se leia como "registro vacio", asi que la corrida
+    siguiente estampaba hoy en los NUEVE documentos y pisaba la unica copia de
+    las fechas. Medido: nueve fechas distintas (17, 21, 21, 17, 10, 10, 17, 22,
+    21 de septiembre) quedaron las nueve en "23 de septiembre", con exit 0 y sin
+    una advertencia. El comentario de esta funcion prometia que fallaba cerrado
+    y no era cierto — AGENTS.md §11.1.
+
+    Lo que NO se valida, a proposito: que esten los nueve slugs del ORDER. Un
+    documento legal nuevo entra sin entrada en el registro y tiene que poder
+    fecharse hoy; exigir los nueve convertiria "agregar un documento" en un
+    aborto. La linea esta en la FORMA del archivo, no en su completitud.
+    """
+    global _REGISTRO
+    if _REGISTRO is not None:
+        return _REGISTRO
+    if not LANDING_OUT.exists():
+        _REGISTRO = {}
+        return _REGISTRO
+
+    try:
+        crudo = json.loads(LANDING_OUT.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as err:
+        _registro_danado(f"{type(err).__name__}: {err}")
+
+    if not isinstance(crudo, dict):
+        _registro_danado("la raiz no es un objeto JSON")
+    # `sourceSha` lo emite SIEMPRE `emit_landing()`. Que falte significa que el
+    # archivo no salio de este generador, y entonces sus fechas no son un
+    # registro: son texto de origen desconocido.
+    sha = crudo.get("sourceSha")
+    if not isinstance(sha, str) or not sha.strip():
+        _registro_danado("le falta 'sourceSha', asi que no lo emitio este generador")
+    entradas = crudo.get("documents")
+    if not isinstance(entradas, list):
+        _registro_danado("'documents' no es una lista")
+    if not entradas:
+        _registro_danado("'documents' esta vacio; este generador nunca emite cero")
+
+    reg: dict[str, dict] = {}
+    for i, e in enumerate(entradas):
+        if not isinstance(e, dict):
+            _registro_danado(f"la entrada {i} de 'documents' no es un objeto")
+        slug = e.get("slug")
+        if not isinstance(slug, str) or not slug.strip():
+            _registro_danado(f"la entrada {i} de 'documents' no tiene 'slug'")
+        if slug in reg:
+            _registro_danado(f"'{slug}' aparece dos veces; una taparia a la otra")
+        fecha = e.get("lastUpdated")
+        if not isinstance(fecha, str) or not fecha.strip():
+            _registro_danado(f"'{slug}' no tiene 'lastUpdated'")
+        reg[slug] = e
+    _REGISTRO = reg
+    return _REGISTRO
+
+
+def fecha_auto(slug: str, title: str, version: int | None,
+               secciones: list[tuple[str, str]]) -> str:
+    """La fecha de un documento, REGISTRADA la vez que su texto cambio.
+
+    Por que no se escribe a mano: una fecha escrita a mano queda vieja la
     proxima vez que alguien edita el texto y no se acuerda de moverla. No es
     hipotetico —las paginas legales del sitio quedaron en marzo mientras el
     documento real avanzaba— y el costo no es cosmetico: la linea dice
     "Ultima actualizacion" en un documento que el usuario ACEPTA.
 
-    **Mira `publishable()`, no el archivo.** Varios documentos llevan anexos
+    POR QUE YA NO SALE DE `git log`
+    -------------------------------
+    "Cuando cambio este texto" parece un dato del historial, y asi estaba
+    escrito: se buscaba el commit donde cambio lo publicable y se usaba su
+    fecha. Funciona hasta que el repo hace **squash merge**, que es su
+    convencion (AGENTS.md §8). Despues del squash, el commit que git encuentra
+    no es aquel en el que se escribio el texto: es el del MERGE.
+
+    O sea que la misma entrada daba dos respuestas distintas segun cuando se
+    preguntara:
+
+      · el 22/09, generando en la rama  ->  "22 de septiembre"
+      · el 23/09, ya mergeada           ->  "23 de septiembre"
+
+    y `--check` compara lo generado contra lo commiteado. **Todo PR que tocara
+    `docs/legal/` y se mergeara un dia distinto del que se genero nacia
+    desfasado**, y dejaba `main` en rojo —los CUATRO shards, porque el gate
+    corre una vez por shard— para todos los que rebasearan despues. Paso con el
+    #1217 (`464023a6`): artefacto del 22/09, merge del 23/09.
+
+    No era zona horaria: ART y UTC leen el mismo 2026-09-23 para ese commit.
+    Tampoco alcanzaba con pedir la fecha de AUTOR en vez de la de commit: en un
+    squash de GitHub las dos son la del merge (medido sobre `464023a6`, las dos
+    dicen `2026-09-23T09:59:34-03:00`).
+
+    El defecto de fondo es que el gate le pedia al autor un dato del FUTURO.
+    Ningun valor que escribiera al commitear podia ser el correcto, porque el
+    correcto dependia del dia en que otra persona apretara "merge".
+
+    DE DONDE SALE AHORA
+    -------------------
+    La fecha deja de derivarse y pasa a ser un dato REGISTRADO, con el
+    contenido publicable como clave:
+
+      · Si el registro ya tiene este documento y lo que publica de el es
+        IDENTICO a lo que estamos por emitir, la fecha es la registrada. El
+        texto no cambio, asi que su fecha tampoco.
+      · Si no —cambio el texto, el titulo o la version, o el documento es
+        nuevo— la fecha es HOY. Es el unico momento en que se estampa una.
+
+    La clave es lo PUBLICABLE, no el archivo. Varios documentos llevan anexos
     internos despues de `<!-- publish:end -->` —checklists, specs, estado del
-    codigo— que no ve ningun usuario. Fechar por el archivo entero hace que
-    tachar un item de una checklist interna estampe la fecha de hoy sobre un
+    codigo— que no ve ningun usuario. Comparar el archivo entero haria que
+    tachar un item de una checklist interna estampara la fecha de hoy sobre un
     texto legal que no cambio: una actualizacion anunciada que no ocurrio, que
-    es la misma familia de mentira que este mecanismo existe para evitar.
+    es la misma familia de mentira que este mecanismo existe para evitar. La
+    comparacion va contra las SECCIONES ya derivadas, que ademas es un filtro
+    mas fino que el de antes: un reflow del markdown que produce el mismo texto
+    publicado tampoco mueve la fecha, porque para el usuario no cambio nada.
 
-    Dos fuentes, y el orden importa:
+    El registro es el propio artefacto, que viaja en el mismo commit que el
+    markdown: la fecha queda fijada por quien la puede ver y revisar, y ningun
+    merge posterior la mueve. El flujo normal cierra solo —editas, generas
+    (estampa hoy), commiteas los dos juntos— y CI regenera, encuentra el texto
+    igual al registrado, devuelve la misma fecha y `--check` pasa. Hoy, mañana
+    o dentro de tres semanas.
 
-      · Si lo publicable difiere de HEAD, la fecha es HOY. El commit que lo va
-        a guardar todavia no existe, asi que preguntarle a git devolveria la
-        fecha del cambio ANTERIOR: una fecha vieja para un texto nuevo.
-      · Si coincide, la del ultimo commit donde lo publicable CAMBIO respecto
-        de su padre. No el ultimo que toco el archivo: ese puede ser un
-        retoque del anexo.
+    Que significa la fecha, entonces: **el dia en que el texto se escribio y se
+    genero**, no el dia en que se publico. Es la lectura literal de "ultima
+    actualizacion", y ademas es la unica de las dos que el autor puede conocer
+    al commitear.
 
-    El flujo normal cierra solo: editas, generas (estampa hoy), commiteas los
-    dos juntos, y el commit queda fechado hoy. CI regenera con el arbol limpio,
-    encuentra ese mismo commit y `--check` pasa.
+    LO QUE ESTO CUESTA
+    ------------------
+    Dicho aca para que no sorprenda despues:
 
-    FALLA CERRADO, y son tres casos distintos:
+      · La fecha vive SOLO en el artefacto. Borrarlo y regenerar no la
+        reconstruye: los nueve saldrian fechados hoy. No se pierde —cada
+        version del JSON esta en el historial— pero se recupera de ahi, no del
+        generador:
 
-      · Sin repo, sin git o sin commits no hay historial que consultar.
-      · **En un clon SHALLOW git miente sin avisar**: trata el tip como el
-        borde de la historia y devuelve su fecha para todos los archivos. Eso
-        dejaria los nueve documentos fechados el dia del ultimo commit del
-        repo, aunque ninguno se haya tocado. Se detecta y se aborta.
-      · Si el historial no alcanza para encontrar donde cambio lo publicable.
+            git show <sha>:web/legal/legal-content.json
 
-    Una fecha inventada en un documento legal es peor que no generar: el
-    usuario no puede distinguir una derivada de una fabricada.
+      · Editar `lastUpdated` a mano en el JSON ya no lo pisa nadie: el
+        generador lee esa fecha y la devuelve tal cual, asi que `--check`
+        quedaria verde. Es el precio de que el artefacto sea el registro. Lo
+        acota que es un archivo generado y lo dice en su propio `$comment`, y
+        que para los dos documentos de `EN_EL_BINARIO` la fecha ademas se
+        estampa en `legal_content.dart`: ahi el hand-edit del JSON SI sale
+        rojo, porque el Dart commiteado conserva la fecha vieja.
+
+    Ya no se consulta git, y eso cierra de paso dos cosas que dependian de el:
+    el aborto por clon SHALLOW (git devolvia la fecha del tip para los nueve) y
+    el `fetch-depth: 0` que el job `test` pedia solo por este paso.
     """
-    rel = f"docs/legal/{name}"
-
-    if _git("rev-parse", "--git-dir") is None:
-        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' pero esto no es un repo git.\n"
-                 "    Sin historial no hay de donde sacar la fecha, y este\n"
-                 "    generador no la inventa. Escribi la fecha a mano si no\n"
-                 "    hay repo.")
-
-    if _git("rev-parse", "--is-shallow-repository") == "true":
-        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' y este clon es SHALLOW.\n"
-                 "    git trataria el tip como el borde de la historia y\n"
-                 "    devolveria su fecha para TODOS los documentos, aunque\n"
-                 "    ninguno se haya tocado. Eso no se nota mirando: por eso\n"
-                 "    se aborta en vez de arriesgarlo.\n\n"
-                 "        git fetch --unshallow\n\n"
-                 "    En CI: 'fetch-depth: 0' en el checkout del job.")
-
-    hoy = _es_fecha(datetime.date.today().isoformat())
-
-    actual = publishable((SRC / name).read_text(encoding="utf-8")).strip()
-    en_head = _publicable_en("HEAD", rel)
-    if en_head is None or actual != en_head:
-        # Sin commitear todavia, o nuevo: el cambio es de hoy.
-        return hoy
-
-    historial = _git("log", "--format=%H", "--", rel)
-    if not historial:
-        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' y git no tiene ningun commit\n"
-                 "    que lo toque. Commitealo primero, o escribi la fecha a\n"
-                 "    mano.")
-
-    for commit in historial.split("\n"):
-        aqui = _publicable_en(commit, rel)
-        antes = _publicable_en(f"{commit}^", rel)
-        if antes is None or aqui != antes:
-            iso = _git("log", "-1", "--format=%cd", "--date=short", commit)
-            if not iso:
-                break
-            return _es_fecha(iso)
-
-    sys.exit(f"[!] {name}: no se pudo ubicar en que commit cambio su texto\n"
-             "    publicable. Con el historial incompleto la fecha saldria\n"
-             "    inventada, asi que se aborta.")
+    registrado = _registro().get(slug)
+    if registrado is not None:
+        # `lastUpdated` no puede faltar ni venir vacio: `_registro()` aborta
+        # antes si el archivo no tiene la forma que emite este generador.
+        sin_fecha = {k: v for k, v in registrado.items() if k != "lastUpdated"}
+        if sin_fecha == _publicado(slug, title, version, secciones):
+            return registrado["lastUpdated"]
+    return _es_fecha(datetime.date.today().isoformat())
 
 
 def load() -> tuple[list[dict], list[str]]:
@@ -703,18 +805,16 @@ def load() -> tuple[list[dict], list[str]]:
         for hit in PENDING_RE.findall(um.group(1)):
             pending.append(f"{name} (fecha): {hit[:70]}")
 
-        # El centinela se resuelve DESPUES del barrido de marcadores, no antes:
-        # asi un `[[PENDIENTE]]` escrito en la misma linea sigue abortando en
-        # vez de quedar tapado por la fecha derivada.
-        updated_raw = um.group(1).strip()
-        if updated_raw == FECHA_AUTO:
-            updated_raw = fecha_auto(name)
-
         # `version:` y `published:` son opcionales, pero NO independientes:
         # el nombre de la constante de fecha lleva la version adentro
         # (kPrivacyV1PublishedAt), asi que una fecha sin version no tiene
         # nombre posible. Fallar aca es barato; fallar en la compilacion de
         # Dart despues de sobreescribir el archivo, no.
+        #
+        # Se resuelven ANTES que la fecha, y no es un reordenamiento cosmetico:
+        # `fecha_auto()` usa como clave TODO lo que se publica del documento, y
+        # la version es parte de eso. Un bump de version sin tocar el texto es
+        # un documento nuevo para quien lo acepta, asi que mueve la fecha.
         raw_v = fm.get("version")
         version = None
         if raw_v is not None:
@@ -735,6 +835,15 @@ def load() -> tuple[list[dict], list[str]]:
                 sys.exit(f"[!] {name}: 'published' debe ser YYYY-MM-DD, "
                          f"no {raw_p!r}")
             published = tuple(int(g) for g in pm.groups())
+
+        # El centinela se resuelve DESPUES del barrido de marcadores, no antes:
+        # asi un `[[PENDIENTE]]` escrito en la misma linea sigue abortando en
+        # vez de quedar tapado por la fecha registrada.
+        secciones = to_sections(md)
+        updated_raw = um.group(1).strip()
+        if updated_raw == FECHA_AUTO:
+            updated_raw = fecha_auto(fm["slug"], fm["title"], version,
+                                     secciones)
 
         docs.append({
             "file": name,
@@ -762,7 +871,7 @@ def load() -> tuple[list[dict], list[str]]:
                 None if version is None
                 else fm["dart"].replace("Sections", f"V{version}PublishedAt")
             ),
-            "sections": to_sections(md),
+            "sections": secciones,
         })
     # los demas .md son internos a proposito
     for extra in sorted(known - set(ORDER)):
