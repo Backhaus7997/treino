@@ -177,6 +177,31 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
+  // Alta sin fecha: la clave `bornAt` va AUSENTE, no en null
+  // ---------------------------------------------------------------------------
+  //
+  // firestore.rules llegó a denegar `bornAt: null` en el create (preguntaba
+  // `'bornAt' in data`) y nadie nuevo podía terminar el alta, con los tests de
+  // reglas en verde porque sembraban el doc sin la clave. Estos dos miran la
+  // CLAVE y no el valor: `snap.data()!['bornAt']` da null en los dos casos y
+  // no distingue nada.
+  group('Alta sin fecha — bornAt ausente, no null', () {
+    test('getOrCreate no escribe la clave bornAt', () async {
+      await repo.getOrCreate(uid: 'uid-alta-1', email: 'a@b.com');
+
+      final snap = await firestore.collection('users').doc('uid-alta-1').get();
+      expect(snap.data()!.containsKey('bornAt'), isFalse);
+    });
+
+    test('createIfAbsent no escribe la clave bornAt', () async {
+      await repo.createIfAbsent(uid: 'uid-alta-2', email: 'a@b.com');
+
+      final snap = await firestore.collection('users').doc('uid-alta-2').get();
+      expect(snap.data()!.containsKey('bornAt'), isFalse);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // T19: get
   // ---------------------------------------------------------------------------
   group('UserRepository.get', () {

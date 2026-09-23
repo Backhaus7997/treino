@@ -6,13 +6,17 @@
 // Rewritten AGAIN for gym-selection-v2 Phase 3 (addendum, AD-12): typed
 // search now runs via PlacesTextSearchService/placesTextSearchProvider
 // instead of the retired PlacesAutocompleteService/gymSearchSessionTokenProvider.
-import 'package:firebase_auth/firebase_auth.dart';
+//
+// Sep-2026: el paso ya no escribe `users/{uid}` ni lee el usuario de Auth
+// (ver el doc de Step3Gym). Por eso no hay override de `firebaseAuthProvider`:
+// si algo del paso vuelve a leerlo, estos tests revientan en vez de pasar con
+// un mock que tapa la dependencia. El mock de UserRepository queda sólo para
+// verificar que NUNCA se lo llama.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/places_nearby_search_service.dart';
 import 'package:treino/features/gyms/data/places_text_search_service.dart';
@@ -47,13 +51,6 @@ class _FakeProfileSetupNotifier extends ProfileSetupNotifier {
   @override
   void updateGymId(String? value) =>
       state = state.copyWith(draft: state.draft.copyWith(gymId: value));
-}
-
-class MockFirebaseAuth extends Mock implements FirebaseAuth {}
-
-class MockUser extends Mock implements User {
-  @override
-  String get uid => 'test-uid';
 }
 
 class MockPlacesTextSearchService extends Mock
@@ -113,8 +110,6 @@ Widget _buildStep({
 }
 
 void main() {
-  late MockFirebaseAuth mockAuth;
-  late MockUser mockUser;
   late MockPlacesTextSearchService mockPlacesService;
   late MockResolveGymPlaceService mockResolveService;
   late MockUserRepository mockUserRepo;
@@ -124,9 +119,6 @@ void main() {
   });
 
   setUp(() {
-    mockAuth = MockFirebaseAuth();
-    mockUser = MockUser();
-    when(() => mockAuth.currentUser).thenReturn(mockUser);
     mockPlacesService = MockPlacesTextSearchService();
     mockResolveService = MockResolveGymPlaceService();
     mockUserRepo = MockUserRepository();
@@ -136,7 +128,6 @@ void main() {
   List<Override> baseOverrides() => [
         profileSetupNotifierProvider
             .overrideWith(_FakeProfileSetupNotifier.new),
-        firebaseAuthProvider.overrideWithValue(mockAuth),
         placesTextSearchServiceProvider.overrideWithValue(mockPlacesService),
         resolveGymPlaceServiceProvider.overrideWithValue(mockResolveService),
         userRepositoryProvider.overrideWithValue(mockUserRepo),
@@ -184,8 +175,9 @@ void main() {
     });
 
     testWidgets(
-        'selecting a suggestion resolves it (no session token) and sets '
-        "draft.gymId to the Place's id", (tester) async {
+        'selecting a suggestion resolves it (no session token), sets '
+        "draft.gymId to the Place's id, and does NOT write users/{uid}",
+        (tester) async {
       when(() => mockPlacesService.search(
             textQuery: any(named: 'textQuery'),
             biasLatitude: any(named: 'biasLatitude'),
@@ -221,8 +213,10 @@ void main() {
             placeId: 'ChIJ_1',
             sessionToken: null,
           )).called(1);
-      verify(() => mockUserRepo.update('test-uid', {'gymId': 'ChIJ_1'}))
-          .called(1);
+      // Antes acá había un `verify(update).called(1)`, y estaba verde con el
+      // bug adentro: el mock aceptaba una escritura que las reglas denegaban
+      // sobre un `users/{uid}` inexistente. El gymId lo persiste `submit()`.
+      verifyNever(() => mockUserRepo.update(any(), any()));
 
       final container = ProviderScope.containerOf(
         tester.element(find.byType(Step3Gym)),
@@ -231,6 +225,50 @@ void main() {
         container.read(profileSetupNotifierProvider).draft.gymId,
         'ChIJ_1',
       );
+    });
+
+    testWidgets(
+        'si el resolve falla → avisa con un SnackBar y el draft no cambia',
+        (tester) async {
+      when(() => mockPlacesService.search(
+            textQuery: any(named: 'textQuery'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'QIVOX Villa Warcalde',
+              secondaryText: 'Some street 123',
+            ),
+          ]);
+      when(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenThrow(const ResolveGymPlaceFailure$Server(
+        'Places API request failed. Please try again.',
+        statusCode: 503,
+      ));
+
+      await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('QIVOX Villa Warcalde'));
+      await tester.pumpAndSettle();
+
+      // El síntoma del bug era justamente el silencio: tocar el gimnasio y que
+      // no pasara nada.
+      final l10n = AppL10n.of(tester.element(find.byType(Step3Gym)));
+      expect(find.text(l10n.profileSetupGymSelectError), findsOneWidget);
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(Step3Gym)),
+      );
+      expect(container.read(profileSetupNotifierProvider).draft.gymId, isNull);
+      verifyNever(() => mockUserRepo.update(any(), any()));
     });
 
     testWidgets('error state shows retry that re-issues the search',

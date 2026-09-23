@@ -926,6 +926,10 @@
   "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
   "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
   "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
+  "profileSetupGymSelectError": "No pudimos cargar ese gimnasio. Probá de nuevo o elegí «OTRO GYM / SIN GYM».",
+  "@profileSetupGymSelectError": {
+    "description": "SnackBar del paso de gimnasio del alta cuando no se pudo resolver el gimnasio tocado. Nombra la opcion tal cual se ve en pantalla (esta hardcodeada en GymSearchBox, sin traducir)."
+  },
   "reAuthPasswordLabel": "Contraseña",
   "profileGymSearchHint": "Buscar gym",
   "profileEditTrainerTitleEdit": "Editá tu perfil profesional",

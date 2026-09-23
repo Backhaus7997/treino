@@ -16,6 +16,13 @@
  * el día que alguien "endurezca" la regla exigiendo el campo, este test le
  * avisa que rompió el alta entera en vez de que lo descubra un usuario.
  *
+ * ⚠ Ese test solo NO alcanzó, y es la lección de este archivo: sembraba el doc
+ * SIN la clave, y la app nunca manda eso. `UserProfile.toJson()` emite
+ * `bornAt: null` (`user_profile.g.dart`), y la primera versión de la regla
+ * —`'bornAt' in data`— denegaba el null. Este archivo estaba verde mientras
+ * nadie nuevo podía terminar el alta (sep-2026). Los casos con `bornAt: null`
+ * son los que miden lo que de verdad llega; no los saques por redundantes.
+ *
  * Este archivo tiene que matchear `[-]rules\.test\.ts$` (package.json
  * `test:rules`) o no corre en CI.
  *
@@ -146,6 +153,19 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
       );
     });
 
+    it("con bornAt: null → permitido (es lo que manda la app)", async () => {
+      // El caso que importa de verdad: `UserProfile.toJson()` emite la clave
+      // en null, y ese es el payload de getOrCreate y createIfAbsent en toda
+      // versión de la app anterior al fix. Con `'bornAt' in data` esto era un
+      // assertFails, y el alta entera estaba rota.
+      await assertSucceeds(
+        setDoc(
+          doc(asUser(UID), "users", UID),
+          newUserDoc({ bornAt: null }),
+        ),
+      );
+    });
+
     it("con bornAt de otro tipo → denegado, no error de evaluación", async () => {
       // El `is timestamp` de la regla. Sin él esto no DENIEGA: tira error de
       // evaluación, que rebota la escritura con un mensaje que no dice nada.
@@ -188,6 +208,18 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
       );
     });
 
+    // El otro camino para borrarla, y el que se abriría si `bornAtKept`
+    // volviera a preguntar por la clave: `bornAtOk` acepta null, así que lo
+    // único que frena esto es que `bornAtKept` compare valores.
+    it("PONER EN NULL un bornAt ya cargado → denegado", async () => {
+      await seedUser({ bornAt: yearsAgo(20) });
+      await assertFails(
+        updateDoc(doc(asUser(UID), "users", UID), {
+          bornAt: null,
+        }),
+      );
+    });
+
     // Control de que la clausula nueva no rompio el resto: aplica a TODO
     // update, y un update que ni menciona bornAt tiene que seguir pasando
     // (`request.resource.data` es el documento resultante completo, no el diff).
@@ -207,6 +239,30 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
       await assertSucceeds(
         updateDoc(doc(asUser(UID), "users", UID), {
           bornAt: yearsAgo(25),
+        }),
+      );
+    });
+
+    // Las dos de abajo siembran la forma REAL de una cuenta sin fecha: la
+    // clave presente en null, porque así la crea `toJson()`. Sembrarla sin la
+    // clave es exactamente el fixture que dejó pasar el bug.
+    it("cargar bornAt sobre un doc con bornAt: null → permitido", async () => {
+      await seedUser({ bornAt: null });
+      await assertSucceeds(
+        updateDoc(doc(asUser(UID), "users", UID), {
+          bornAt: yearsAgo(25),
+        }),
+      );
+    });
+
+    it("un update ajeno sobre un doc con bornAt: null → permitido", async () => {
+      // Es la escritura del gimnasio durante el alta con un build viejo:
+      // `{gymId}` sobre el doc recién creado, que todavía no tiene fecha.
+      // Con la regla que preguntaba por la clave, esto se denegaba.
+      await seedUser({ bornAt: null });
+      await assertSucceeds(
+        updateDoc(doc(asUser(UID), "users", UID), {
+          gymId: "ChIJ_gym",
         }),
       );
     });

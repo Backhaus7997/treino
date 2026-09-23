@@ -589,6 +589,7 @@
   "profileSetupUsernameTaken": "Ese nombre de usuario ya está en uso",
   "profileSetupUsernameAvailable": "Nombre de usuario disponible",
   "profileSetupUsernameCheckError": "No pudimos comprobar el nombre de usuario. Inténtalo de nuevo.",
+  "profileSetupGymSelectError": "No pudimos cargar ese gimnasio. Inténtalo de nuevo o elige «OTRO GYM / SIN GYM».",
   "routineEditorDiscardTitle": "¿Descartar cambios?",
   "routineEditorDiscardBody": "Si sales ahora perderás los cambios sin guardar.",
   "routineEditorDiscardConfirm": "Descartar",

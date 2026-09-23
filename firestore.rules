@@ -205,6 +205,21 @@ service cloud.firestore {
     // `getOrCreate` al submit de ProfileSetup — un refactor del alta completa,
     // con el rollback del usuario huérfano de Auth de por medio.
     //
+    // Y AUSENTE INCLUYE `null`. `bornAt: null` dice lo mismo que la clave que
+    // falta —no hay fecha—, y las dos funciones de abajo lo tratan igual:
+    // preguntan por el VALOR (`get('bornAt', null)`), nunca por la CLAVE
+    // (`'bornAt' in data`, que es true aunque el valor sea null).
+    //
+    // No es un detalle. `UserProfile.toJson()` emite la clave en null
+    // (json_serializable, `user_profile.g.dart`), y ese JSON es el alta de
+    // TODAS las versiones de la app desde mayo. La primera versión de esta
+    // regla preguntaba por la clave y denegaba el alta entera —email, Google
+    // y Apple—: con ella nadie nuevo podía terminar de registrarse (sep-2026,
+    // se vio como "el paso de gimnasio sólo deja elegir OTRO GYM / SIN GYM").
+    // Y todo doc que ya tuviera `bornAt: null` quedaba sin poder recibir
+    // NINGÚN update que no cargara la fecha. El test que la cubría sembraba
+    // el doc SIN la clave, que no es lo que manda la app.
+    //
     // El `is timestamp` no es defensivo de más: sin él, un `bornAt` de otro
     // tipo no DENIEGA — tira error de evaluación, que rebota la escritura con
     // un mensaje que no dice nada. Es el mismo modo de falla que documenta el
@@ -221,11 +236,19 @@ service cloud.firestore {
     // autenticado mandaba `{bornAt: deleteField()}` sobre su propio documento y
     // las reglas lo PERMITÍAN. O sea que cualquiera se sacaba el dato de encima
     // y volvía a un estado indistinguible de una cuenta anterior al requisito.
+    //
+    // `bornAtKept` también compara VALORES, y tiene que hacerlo desde que
+    // `bornAtOk` acepta null: si siguiera preguntando por la clave,
+    // `{bornAt: null}` sobre una fecha cargada pasaría las dos funciones y la
+    // borraría igual que el `deleteField()` — la clave sigue estando y la
+    // fecha ya no. Antes eso lo frenaba `bornAtOk` de rebote, al rechazar el
+    // null.
     function bornAtKept(prev, next) {
-      return !('bornAt' in prev) || ('bornAt' in next);
+      return prev.get('bornAt', null) == null
+             || next.get('bornAt', null) != null;
     }
     function bornAtOk(data) {
-      return !('bornAt' in data)
+      return data.get('bornAt', null) == null
              || (data.bornAt is timestamp
                  && data.bornAt <= request.time - duration.value(4745, 'd'));
     }
@@ -449,7 +472,8 @@ service cloud.firestore {
                     // despues la cambia desde el editor de perfil.
                     && bornAtOk(request.resource.data)
                     // Y no alcanza con el piso: sin esta otra, en vez de
-                    // cambiarla por una invalida uno simplemente la BORRA.
+                    // cambiarla por una invalida uno simplemente la BORRA (o
+                    // la pone en null, que para `bornAtOk` es lo mismo).
                     && bornAtKept(resource.data, request.resource.data);
 
       // Delete denied — account deletion goes through privileged Cloud Function.

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 
+import '../../../core/telemetry/non_fatal.dart';
 import '../domain/auth_failure.dart';
 import '../presentation/legal/legal_content.dart';
 import '../../profile/data/user_repository.dart';
@@ -17,11 +20,13 @@ class AuthService {
     FirebaseFunctions? functions,
     GoogleSignIn? googleSignIn,
     AppleSignInGateway appleGateway = const RealAppleSignInGateway(),
+    NonFatalReporter? nonFatalReporter,
   })  : _auth = firebaseAuth,
         _userRepository = userRepository,
         _injectedFunctions = functions,
         _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-        _appleGateway = appleGateway;
+        _appleGateway = appleGateway,
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal;
 
   /// La misma región de todas las CFs de TREINO. Si no coincide, la llamada
   /// sale a `us-central1` y devuelve NOT_FOUND.
@@ -43,6 +48,23 @@ class AuthService {
   final UserRepository _userRepository;
   final GoogleSignIn _googleSignIn;
   final AppleSignInGateway _appleGateway;
+  final NonFatalReporter _reportNonFatal;
+
+  /// El `createIfAbsent` de después del login sigue siendo best-effort —el
+  /// login ya salió bien y no se rompe por esto—, pero ya no en silencio.
+  ///
+  /// En producción, en 3 de las 5 altas con Google/Apple del 16 al 22/09,
+  /// `users/{uid}` no nació en el login: apareció entre 34 y 95 s después.
+  /// Mientras tanto la cuenta recorrió el alta sin documento, y el paso de
+  /// gimnasio, que escribía ahí, fallaba. El `catch (_) {}` que había en los
+  /// tres logins se tragó el porqué, y sin él no hay forma de saberlo.
+  void _reportarAltaFallida(Object error, StackTrace stack, String camino) {
+    unawaited(_reportNonFatal(
+      error,
+      stack,
+      reason: 'AuthService.$camino: createIfAbsent falló después del login',
+    ));
+  }
 
   /// Creates the user, best-effort sends the verification email (a failure here
   /// is swallowed — it can be resent later), then atomically creates the
@@ -144,8 +166,8 @@ class AuthService {
         uid: user.uid,
         email: email,
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithEmail');
     }
 
     return user;
@@ -297,8 +319,8 @@ class AuthService {
         uid: cred.user!.uid,
         email: cred.user!.email ?? '',
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithGoogle');
     }
 
     return cred.user!;
@@ -359,8 +381,8 @@ class AuthService {
         uid: cred.user!.uid,
         email: cred.user!.email ?? '',
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithApple');
     }
 
     return cred.user!;

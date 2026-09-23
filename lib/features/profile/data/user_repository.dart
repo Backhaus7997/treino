@@ -99,6 +99,27 @@ class UserRepository {
     };
   }
 
+  /// Payload del ALTA de `users/{uid}`: el `toJson()` del perfil, sin la clave
+  /// `bornAt` cuando no hay fecha.
+  ///
+  /// `toJson()` emite la clave en null (json_serializable lo hace por
+  /// defecto), y la primera versión de `bornAtOk` en firestore.rules
+  /// preguntaba `'bornAt' in data`, que es true aunque el valor sea null:
+  /// denegaba el alta entera y nadie nuevo podía terminar de registrarse
+  /// (sep-2026). La regla ya trata null como ausente, pero el alta no puede
+  /// depender de eso: sin la clave, este payload pasa con las DOS versiones
+  /// de la regla. Mismo criterio que `createUserOwned` con `assignedTo` en
+  /// `RoutineRepository`.
+  ///
+  /// Sólo `bornAt`, a propósito: sacar todos los null cambiaría la forma de
+  /// cada campo del doc, y una regla que lee un campo sin `get()` tira error
+  /// de evaluación sobre la clave ausente, no sobre el null.
+  static Map<String, dynamic> _altaPayload(UserProfile profile) {
+    final json = profile.toJson();
+    if (json['bornAt'] == null) json.remove('bornAt');
+    return json;
+  }
+
   /// Builds a partial public update map from a raw update [partial], deriving
   /// `displayNameLowercase` when `displayName` is present. Returns `null` when
   /// no public-relevant fields (`displayName`, `avatarUrl`, `gymId`) are in
@@ -351,7 +372,7 @@ class UserRepository {
     );
 
     final batch = _firestore.batch();
-    batch.set(_users.doc(uid), profile.toJson());
+    batch.set(_users.doc(uid), _altaPayload(profile));
     batch.set(
       _userPublicProfiles.doc(uid),
       _publicSubsetFromProfile(profile),
@@ -382,7 +403,7 @@ class UserRepository {
     );
 
     final batch = _firestore.batch();
-    batch.set(_users.doc(uid), profile.toJson(), SetOptions(merge: true));
+    batch.set(_users.doc(uid), _altaPayload(profile), SetOptions(merge: true));
     batch.set(
       _userPublicProfiles.doc(uid),
       _publicSubsetFromProfile(profile),

@@ -2858,6 +2858,12 @@ abstract class AppL10n {
   /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
   String get profileSetupCancelAccountError;
 
+  /// SnackBar del paso de gimnasio del alta cuando no se pudo resolver el gimnasio tocado. Nombra la opcion tal cual se ve en pantalla (esta hardcodeada en GymSearchBox, sin traducir).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar ese gimnasio. Probá de nuevo o elegí «OTRO GYM / SIN GYM».'**
+  String get profileSetupGymSelectError;
+
   /// No description provided for @reAuthPasswordLabel.
   ///
   /// In es_AR, this message translates to:
