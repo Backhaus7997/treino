@@ -155,12 +155,18 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     if (confirmed != true) return;
     if (!mounted) return;
 
+    // Frena los reintentos de `users/{uid}` ANTES de borrar la cuenta: un doc
+    // creado en el medio quedaría huérfano, con el mail de alguien que pidió
+    // no tener cuenta. Ver [altaCanceladaProvider].
+    ref.read(altaCanceladaProvider.notifier).state = true;
     try {
       await ref.read(authNotifierProvider.notifier).cancelOnboarding();
       if (!mounted) return;
       context.go('/welcome');
     } catch (_) {
       if (!mounted) return;
+      // La cuenta sigue viva: los reintentos vuelven a correr.
+      ref.read(altaCanceladaProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppL10n.of(context).profileSetupCancelAccountError),

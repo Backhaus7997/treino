@@ -15,11 +15,20 @@ import 'package:treino/features/auth/application/auth_providers.dart'
 import 'package:treino/features/profile/application/user_providers.dart'
     show userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile_setup/application/perfil_asegurado_provider.dart';
 
 class _MockUser extends Mock implements User {}
 
 class _MockUserRepository extends Mock implements UserRepository {}
+
+const _sinEsperar = [
+  Duration.zero,
+  Duration.zero,
+  Duration.zero,
+  Duration.zero,
+];
 
 void main() {
   late _MockUserRepository repo;
@@ -30,9 +39,11 @@ void main() {
     repo = _MockUserRepository();
     reportados = [];
     auth = StreamController<User?>();
+    // Por default el doc no existe: es el caso para el que corre el reintento.
+    when(() => repo.get(any())).thenAnswer((_) async => null);
   });
 
-  // Sin await: en el test sin cuenta nadie escucha `auth`, y el `close()` de un
+  // Sin await: en los tests que no llegan a escuchar `auth`, el `close()` de un
   // StreamController sin listener no completa nunca (colgaba el tearDown).
   tearDown(() {
     auth.close();
@@ -46,8 +57,9 @@ void main() {
   }
 
   /// Cada llamada a createIfAbsent consume el próximo resultado: `true` anda,
-  /// `false` tira. Devuelve cuántas veces se llamó.
-  int Function() guion(List<bool> resultados) {
+  /// `false` tira. [antes] corre al principio de cada llamada. Devuelve
+  /// cuántas veces se llamó.
+  int Function() guion(List<bool> resultados, {void Function()? antes}) {
     var llamadas = 0;
     when(
       () => repo.createIfAbsent(
@@ -55,36 +67,45 @@ void main() {
         email: any(named: 'email'),
       ),
     ).thenAnswer((_) async {
+      antes?.call();
       final anda = resultados[llamadas++];
       if (!anda) throw Exception('client is offline');
     });
     return () => llamadas;
   }
 
-  Future<void> correr() async {
+  ProviderContainer contenedor({
+    List<Duration> esperas = _sinEsperar,
+    bool cancelada = false,
+  }) {
     final c = ProviderContainer(overrides: [
       authStateChangesProvider.overrideWith((ref) => auth.stream),
       userRepositoryProvider.overrideWithValue(repo),
-      esperasDelPerfilProvider.overrideWithValue(
-        const [Duration.zero, Duration.zero, Duration.zero, Duration.zero],
-      ),
+      esperasDelPerfilProvider.overrideWithValue(esperas),
       reportePerfilAseguradoProvider.overrideWithValue(
         (error, stack, {required reason}) async => reportados.add(reason),
       ),
+      if (cancelada) altaCanceladaProvider.overrideWith((ref) => true),
     ]);
     addTearDown(c.dispose);
-    // Lo mantiene vivo como lo hace la pantalla del alta.
+    return c;
+  }
+
+  /// Monta el reintento como la pantalla del alta (que lo mantiene vivo),
+  /// loguea la cuenta y espera a que termine.
+  Future<void> correr(ProviderContainer c) async {
     c.listen(perfilAseguradoProvider, (_, __) {});
     auth.add(usuario());
     await pumpEventQueue();
     await c.read(perfilAseguradoProvider.future);
+    await pumpEventQueue();
   }
 
   group('perfilAseguradoProvider', () {
     test('si el primer intento anda, no reintenta ni reporta', () async {
       final llamadas = guion([true]);
 
-      await correr();
+      await correr(contenedor());
 
       expect(llamadas(), 1);
       expect(reportados, isEmpty);
@@ -95,20 +116,41 @@ void main() {
     test('reintenta hasta que anda, y no reporta', () async {
       final llamadas = guion([false, false, true]);
 
-      await correr();
+      await correr(contenedor());
 
       expect(llamadas(), 3);
       expect(reportados, isEmpty);
     });
 
-    test('si ninguno anda, reporta UNA vez con la cantidad de intentos',
-        () async {
+    test('si ninguno anda y el doc no existe, reporta UNA vez', () async {
       final llamadas = guion([false, false, false, false]);
 
-      await correr();
+      await correr(contenedor());
 
       expect(llamadas(), 4);
+      expect(reportados.single, contains('sigue sin existir'));
       expect(reportados.single, contains('4 intentos'));
+    });
+
+    // Hallazgo de la revisión: el último intento puede fallar porque el doc
+    // APARECIÓ (el submit ganó la carrera y el pin de createdAt rechazó el
+    // batch). Reportar «sigue sin existir» ahí sería falso.
+    test('si ninguno anda pero el doc ya existe, NO reporta', () async {
+      guion([false, false, false, false]);
+      when(() => repo.get('u1')).thenAnswer(
+        (_) async => UserProfile(
+          uid: 'u1',
+          email: 'a@b.com',
+          displayName: 'carlos',
+          role: UserRole.athlete,
+          createdAt: DateTime.utc(2026, 9, 23),
+          updatedAt: DateTime.utc(2026, 9, 23),
+        ),
+      );
+
+      await correr(contenedor());
+
+      expect(reportados, isEmpty);
     });
 
     test('sin cuenta logueada no hace nada', () async {
@@ -123,6 +165,61 @@ void main() {
       await c.read(perfilAseguradoProvider.future);
 
       expect(llamadas(), 0);
+    });
+  });
+
+  // Hallazgo de la revisión: un reintento podía crear `users/{uid}` —con el
+  // mail— justo antes de que «Cancelar cuenta» borrara la cuenta de Auth, y el
+  // doc quedaba huérfano (cancelOnboarding no borra el de Firestore).
+  group('perfilAseguradoProvider — «Cancelar cuenta»', () {
+    test('con la cancelación en curso no intenta crear nada', () async {
+      final llamadas = guion([true]);
+
+      await correr(contenedor(cancelada: true));
+
+      expect(llamadas(), 0);
+    });
+
+    test('si se cancela entre intentos, no sigue ni reporta', () async {
+      late ProviderContainer c;
+      final llamadas = guion(
+        [false, false, false, false],
+        // La persona confirma «Cancelar cuenta» mientras sale el 1er intento.
+        // En un microtask: el 1er intento sale DENTRO del build del provider,
+        // y Riverpod no deja modificar otro provider ahí (en la app el flag lo
+        // cambia la pantalla, nunca el build).
+        antes: () => scheduleMicrotask(
+          () => c.read(altaCanceladaProvider.notifier).state = true,
+        ),
+      );
+      // Mide que una cancelación entre intentos corte el loop. En un
+      // ProviderContainer de test lo corta el rebuild que dispara el flag; la
+      // consulta explícita del flag en el loop (para cuando la app no tiene
+      // frames) NO queda aislada acá: el control negativo sin ella sale verde.
+      c = contenedor();
+
+      await correr(c);
+
+      expect(llamadas(), 1);
+      expect(reportados, isEmpty);
+    });
+
+    // Si `cancelOnboarding` falla (p. ej. requires-recent-login), la cuenta
+    // sigue viva y la pantalla vuelve el flag a false: los reintentos tienen
+    // que retomar, o esa cuenta se queda sin doc hasta el submit.
+    test('si la cancelación falla y el flag vuelve a false, reintenta',
+        () async {
+      final llamadas = guion([true]);
+      final c = contenedor(cancelada: true);
+
+      await correr(c);
+      expect(llamadas(), 0);
+
+      c.read(altaCanceladaProvider.notifier).state = false;
+      await pumpEventQueue();
+      await c.read(perfilAseguradoProvider.future);
+
+      expect(llamadas(), 1);
     });
   });
 }
