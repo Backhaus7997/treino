@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
+import 'package:treino/features/profile_setup/application/perfil_asegurado_provider.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_notifier.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/application/terms_consent_provider.dart';
@@ -30,6 +31,8 @@ Widget _flujo({required bool? requiereConsentimiento}) => ProviderScope(
       overrides: [
         profileSetupNotifierProvider.overrideWith(_UltimoPaso.new),
         termsConsentRequiredProvider.overrideWithValue(requiereConsentimiento),
+        // El reintento de `users/{uid}` tiene su propia suite; acá no corre.
+        perfilAseguradoProvider.overrideWith((ref) async {}),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),

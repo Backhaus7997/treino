@@ -10,6 +10,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/presentation/widgets/terms_checkbox.dart';
+import '../application/perfil_asegurado_provider.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
 import '../application/terms_consent_provider.dart';
@@ -33,6 +34,13 @@ class ProfileSetupFlow extends ConsumerStatefulWidget {
 
 class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   final _pageController = PageController();
+
+  /// Hay una cancelación de cuenta en curso. Entre confirmar y terminar puede
+  /// haber hasta 10 s de espera (el intento en vuelo) más la baja de la
+  /// cuenta; un segundo «Cancelar cuenta» en ese rato dispararía otra baja, y
+  /// si ésa fallaba, volvía a habilitar los reintentos con la primera todavía
+  /// en curso.
+  bool _cancelando = false;
 
   // No hardcoded `\n` — the header (maxLines: 2 + softWrap) wraps these for us,
   // so they stay correct under large OS text scaling and odd viewports (F4).
@@ -127,6 +135,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   /// navigates to /welcome. On failure shows a SnackBar and keeps the user
   /// on the current step.
   Future<void> _onCancel() async {
+    if (_cancelando) return;
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -152,14 +161,26 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       ),
     );
     if (confirmed != true) return;
-    if (!mounted) return;
+    if (!mounted || _cancelando) return;
+    _cancelando = true;
 
+    // Frena los reintentos de `users/{uid}` ANTES de borrar la cuenta, y espera
+    // al que ya esté en vuelo: un doc escrito después del borrado quedaría
+    // huérfano, con el mail de alguien que pidió no tener cuenta. Ver
+    // [altaCanceladaProvider] e [IntentoDelPerfil].
+    final auth = ref.read(authNotifierProvider.notifier);
+    final intento = ref.read(intentoDelPerfilProvider);
+    ref.read(altaCanceladaProvider.notifier).state = true;
+    await intento.esperar();
     try {
-      await ref.read(authNotifierProvider.notifier).cancelOnboarding();
+      await auth.cancelOnboarding();
       if (!mounted) return;
       context.go('/welcome');
     } catch (_) {
       if (!mounted) return;
+      _cancelando = false;
+      // La cuenta sigue viva: los reintentos vuelven a correr.
+      ref.read(altaCanceladaProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppL10n.of(context).profileSetupCancelAccountError),
@@ -191,6 +212,9 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
     final state = ref.watch(profileSetupNotifierProvider);
     // Sin consentimiento registrado, o todavía sin saberlo — ver _onPrimary.
     final needsTermsConsent = ref.watch(termsConsentRequiredProvider) ?? true;
+    // Mientras dure el alta, reintenta crear `users/{uid}` si el login no lo
+    // dejó. El resultado no se usa: watchearlo es lo que lo mantiene vivo.
+    ref.watch(perfilAseguradoProvider);
 
     return Scaffold(
       backgroundColor: palette.bg,
