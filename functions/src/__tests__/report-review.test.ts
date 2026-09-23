@@ -9,6 +9,7 @@
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
 import {
@@ -28,7 +29,15 @@ let app: App;
 let db: Firestore;
 
 beforeAll(() => {
-  app = initializeApp({ projectId: "treino-dev" }, "report-review-tests");
+  // `storageBucket` explicito: sin el, `getStorage(app).bucket()` (sin
+  // argumento — lo que usa `resolveReportHandler` en produccion, donde SI
+  // hay un bucket por defecto configurado) tira "Bucket name not specified
+  // or invalid". Mismo nombre que `cascade/storage.test.ts` y
+  // `delete-account.smoke.test.ts` para el mismo `projectId`.
+  app = initializeApp(
+    { projectId: "treino-dev", storageBucket: "treino-dev.appspot.com" },
+    "report-review-tests",
+  );
   db = getFirestore(app);
 });
 
@@ -965,6 +974,116 @@ describe("resolveReport — P1-D: no se puede resolver el mismo reporte dos vece
   });
 });
 
+describe("resolveReport — P2-A: el borrado de Storage exige que el path sea del dueno derivado", () => {
+  it("un photoUrl que apunta al objeto de OTRO usuario: el objeto NO se borra, y el audit_log lo registra", async () => {
+    // El ataque real: el atacante es autor de SU PROPIO post (asi que
+    // `authorUid`/derivedOwnerUid es el atacante mismo — esto NO es P1-A,
+    // aca no hay mentira sobre quien es el dueno), pero copio como
+    // `photoUrl` el path de un objeto ajeno. Sin el chequeo de prefijo,
+    // "Contenido retirado" borraria el archivo de la victima.
+    const atacanteUid = "atacante-p2a-1";
+    const victimaUid = "victima-p2a-1";
+    const bucket = getStorage(app).bucket();
+    const victimPath = `postPhotos/${victimaUid}/foto-victima-p2a.jpg`;
+    const fakePhotoUrl =
+      `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/` +
+      `${encodeURIComponent(victimPath)}?alt=media&token=xyz`;
+
+    // El objeto REAL de la victima, para poder confirmar que sigue ahi
+    // despues. Bucket real (no un mock): si el chequeo de prefijo tuviera
+    // un bug y de verdad intentara borrar, este test lo detectaria.
+    await bucket.file(victimPath).save(Buffer.from("foto de la victima"));
+
+    try {
+      await sembrarReporte("r1", 3600_000, {
+        targetKind: "post", targetId: "post-p2a-1", targetOwnerUid: atacanteUid,
+      });
+      await db.collection("posts").doc("post-p2a-1").set({
+        text: "post con photoUrl ajeno", authorUid: atacanteUid,
+        photoUrl: fakePhotoUrl,
+      });
+      extraCleanupPaths.push("posts/post-p2a-1", "audit_log/moderation__r1");
+
+      await resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      });
+
+      // El objeto de la victima SIGUE existiendo — no se borro.
+      const [existe] = await bucket.file(victimPath).exists();
+      expect(existe).toBe(true);
+
+      // El texto SI se redacto (eso no depende de Storage) y el audit_log
+      // deja explicito que el path del media NO era de confianza.
+      const post = await db.collection("posts").doc("post-p2a-1").get();
+      expect(post.get("text")).toBe("");
+
+      const audit = await db.collection("audit_log").doc("moderation__r1").get();
+      expect(audit.get("removedMediaPathTrusted")).toBe(false);
+      expect(audit.get("removedMediaUrl")).toBe(fakePhotoUrl);
+    } finally {
+      await bucket.file(victimPath).delete().catch(() => undefined);
+    }
+  });
+});
+
+describe("resolveReport — P2-B: el claim del PASO 0 excluye una carrera de verdad", () => {
+  it("dos resoluciones SIMULTANEAS sobre el mismo reporte: exactamente una tiene exito y el estado final es coherente", async () => {
+    // A diferencia de P1-D —secuencial: la primera resolucion termina
+    // ANTES de que arranque la segunda, asi que solo ejercita el chequeo
+    // de "status ya resuelto"— las dos promesas de aca arrancan JUNTAS, sin
+    // esperarse. Es la ventana de milisegundos que el PASO 0 tiene que
+    // excluir con una ESCRITURA, no con una lectura.
+    const targetOwnerUid = "owner-race2-1";
+    await getAuth(app).createUser({
+      uid: targetOwnerUid, email: `${targetOwnerUid}@test.com`,
+    });
+    extraCleanupUids.push(targetOwnerUid);
+
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-race2-1", targetOwnerUid,
+    });
+    await db.collection("posts").doc("post-race2-1").set({
+      text: "contenido", authorUid: targetOwnerUid,
+    });
+    extraCleanupPaths.push("posts/post-race2-1", "audit_log/moderation__r1");
+
+    const [r1, r2] = await Promise.allSettled([
+      resolveReportHandler(db, app, "mod1", {
+        reportId: "r1", status: "dismissed", action: "none",
+      }),
+      resolveReportHandler(db, app, "mod2", {
+        reportId: "r1", status: "actioned", action: "userSuspended",
+      }),
+    ]);
+
+    // Exactamente una de las dos tiene exito.
+    const resultados = [r1, r2];
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const fallida = resultados.find((r) => r.status === "rejected") as
+      PromiseRejectedResult;
+    expect(fallida.reason).toBeInstanceOf(HttpsError);
+    expect((fallida.reason as HttpsError).code).toBe("failed-precondition");
+
+    // El estado final es EXACTAMENTE el de la que gano — nunca una mezcla.
+    // El bug original permitia esto: mod2 deshabilita al usuario en Auth,
+    // pero mod1 gana el PASO 4 y deja report_reviews diciendo
+    // "dismissed"/"none" — una cuenta dada de baja con el registro
+    // diciendo que no se hizo nada.
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    const user = await getAuth(app).getUser(targetOwnerUid);
+
+    if (r1.status === "fulfilled") {
+      expect(rev.get("status")).toBe("dismissed");
+      expect(rev.get("action")).toBe("none");
+      expect(user.disabled).toBe(false);
+    } else {
+      expect(rev.get("status")).toBe("actioned");
+      expect(rev.get("action")).toBe("userSuspended");
+      expect(user.disabled).toBe(true);
+    }
+  });
+});
+
 describe("extractStoragePath", () => {
   it("deriva el path del objeto de una URL de descarga de Firebase Storage", () => {
     expect(
@@ -981,6 +1100,64 @@ describe("extractStoragePath", () => {
 
   it("devuelve null para una URL malformada, sin tirar", () => {
     expect(extractStoragePath("no-es-una-url")).toBeNull();
+  });
+
+  describe("regresion CodeQL — alerta 29 (Incomplete URL substring sanitization)", () => {
+    // Los tres tests de arriba pasaban igual con el bug puesto: ninguno
+    // ejercitaba un host que CONTIENE el dominio real sin SER el dominio
+    // real, ni un path bien-hosteado pero con otra forma.
+    it("no confunde un host que CONTIENE el dominio real con el dominio real", () => {
+      // Con `hostname.includes(...)` (el codigo original que marco
+      // CodeQL) este host pasaba el chequeo: el dominio REAL es
+      // "evil.com", "firebasestorage.googleapis.com" es solo un prefijo.
+      expect(
+        extractStoragePath(
+          "https://firebasestorage.googleapis.com.evil.com/v0/b/x/o/p.jpg",
+        ),
+      ).toBeNull();
+    });
+
+    it("no toma el ultimo segmento de cualquier path como si fuera /v0/b/.../o/...", () => {
+      // Con el codigo original (`pathSegments.lastWhere` sin validar la
+      // forma completa) esto devolvia "cosa". La forma real de una URL de
+      // descarga tiene exactamente 5 segmentos.
+      expect(
+        extractStoragePath(
+          "https://firebasestorage.googleapis.com/cualquier/cosa",
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe("expectedBucket", () => {
+    it("sin expectedBucket, no valida el bucket (compat con los tests de arriba)", () => {
+      expect(
+        extractStoragePath(
+          "https://firebasestorage.googleapis.com/v0/b/cualquier-bucket/o/" +
+          "postPhotos%2Fuid1%2Fpost1.jpg",
+        ),
+      ).toBe("postPhotos/uid1/post1.jpg");
+    });
+
+    it("con expectedBucket, devuelve null si el segmento de la URL no coincide", () => {
+      expect(
+        extractStoragePath(
+          "https://firebasestorage.googleapis.com/v0/b/bucket-ajeno/o/" +
+          "postPhotos%2Fuid1%2Fpost1.jpg",
+          "mi-bucket-real",
+        ),
+      ).toBeNull();
+    });
+
+    it("con expectedBucket, deriva el path si el segmento SI coincide", () => {
+      expect(
+        extractStoragePath(
+          "https://firebasestorage.googleapis.com/v0/b/mi-bucket-real/o/" +
+          "postPhotos%2Fuid1%2Fpost1.jpg",
+          "mi-bucket-real",
+        ),
+      ).toBe("postPhotos/uid1/post1.jpg");
+    });
   });
 });
 

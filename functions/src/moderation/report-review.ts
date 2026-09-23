@@ -57,7 +57,9 @@
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import {
+  FieldValue, getFirestore, type Firestore,
+} from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { logger } from "firebase-functions";
 import { HttpsError, onCall, type CallableRequest } from
@@ -481,12 +483,27 @@ async function enqueueWarningMailOrThrow(
  * `/o/` (`https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}`).
  *
  * Devuelve `null` para cualquier URL que no tenga exactamente esa forma —
- * nunca inventa un path a partir de otra cosa. `photoUrl` y `mediaUrl` en
- * este repo siempre vienen de `getDownloadURL()` (`post_photo_upload_service`,
- * `chat_media_upload_service`), asi que en el caso real esto deriva; el
- * `null` es para lo inesperado.
+ * nunca inventa un path a partir de otra cosa. Pero OJO con lo que ese
+ * `null` cubre y lo que no: `photoUrl` y `mediaUrl` NO son un dato de
+ * confianza que "siempre venga de `getDownloadURL()`" — viajan tal como los
+ * escribe el CLIENTE al crear el post/mensaje, y `firestore.rules:1399`
+ * (posts, `optStrMaxLen(photoUrl, 600)`) y `firestore.rules:2542-2544`
+ * (mensajes, `mediaUrl is string && mediaUrl.size() > 0`) solo validan forma
+ * y largo — ninguna de las dos ata el valor a un objeto que efectivamente
+ * exista en Storage, y mucho menos al contenido reportado. Que esta funcion
+ * devuelva un path no-null solo dice "la URL tiene la forma de una URL de
+ * descarga real"; NO dice "el path es del dueno del contenido que se esta
+ * moderando" — esa segunda garantia es responsabilidad de quien llama (ver
+ * `expectedMediaPathPrefix` y el PASO 1 de `resolveReportHandler`).
  *
- * ## Dos debilidades que tenia la primera version
+ * Si se pasa `expectedBucket`, tambien exige que el segmento `{bucket}` de
+ * la URL coincida EXACTO con el nombre pasado. Opcional porque las pruebas
+ * unitarias de mas abajo ejercitan la extraccion pelada, sin un bucket real
+ * de por medio; quien borra de Storage DE VERDAD si lo tiene que pasar (ver
+ * `resolveReportHandler`, PASO 1) — sin ese chequeo, la debilidad 3 de abajo
+ * queda abierta.
+ *
+ * ## Debilidades que tenia la primera version
  *
  * 1. `hostname.includes(...)` — lo marco CodeQL (alerta 29, "Incomplete URL
  *    substring sanitization"). Un host atacante puede llevar ese dominio
@@ -497,11 +514,24 @@ async function enqueueWarningMailOrThrow(
  *    devolvia `cosa` como si fuera un path de objeto. Esa es la §11.1 —
  *    un comentario que tranquiliza sobre algo que el codigo de al lado no
  *    hace. Ahora la forma se valida de verdad.
+ * 3. El segmento `{bucket}` se parseaba (para que la forma cierre en
+ *    `/v0/b/.../o/`) y se descartaba sin comparar contra nada — ver
+ *    `expectedBucket` arriba.
  *
- * El mismo par de debilidades estaba en el original Dart del que se porto
- * esto; van corregidas juntas, porque son el mismo bug en dos lenguajes.
+ * Las primeras DOS debilidades siguen intactas en el Dart del que se porto
+ * esto — `chat_media_upload_service.dart:136` y
+ * `post_photo_upload_service.dart:144` siguen en `host.contains(...)`, y
+ * los `lastWhere` de `:137`/`:145` tienen la misma debilidad 2. NO se
+ * tocaron en este cambio — ahi el impacto es otro (el propio usuario
+ * borrando su propio archivo via `deleteByDownloadUrl`, no un moderador
+ * actuando sobre contenido de un tercero) asi que no bloquea este PR, pero
+ * siguen ABIERTAS: es trabajo pendiente, no un "ya esta" — que quede escrito
+ * para quien audite despues.
  */
-export function extractStoragePath(url: string): string | null {
+export function extractStoragePath(
+  url: string,
+  expectedBucket?: string,
+): string | null {
   try {
     const parsed = new URL(url);
     // Comparacion EXACTA, no `includes`: ver la debilidad 1 del docstring.
@@ -513,13 +543,81 @@ export function extractStoragePath(url: string): string | null {
     // no es una URL de descarga y devuelve null.
     const segments = parsed.pathname.split("/").filter((s) => s.length > 0);
     if (segments.length !== 5) return null;
-    const [v0, b, , o, encoded] = segments;
-    if (v0 !== "v0" || b !== "b" || o !== "o" || !encoded) return null;
+    const [v0, b, bucket, o, encoded] = segments;
+    if (v0 !== "v0" || b !== "b" || o !== "o" || !bucket || !encoded) {
+      return null;
+    }
+    // Debilidad 3: antes este segmento se leia (arriba) y se tiraba.
+    if (expectedBucket !== undefined && bucket !== expectedBucket) {
+      return null;
+    }
     return decodeURIComponent(encoded);
   } catch {
     return null;
   }
 }
+
+/**
+ * El prefijo de Storage que le corresponde al dueno REAL del contenido,
+ * segun la superficie — siempre a partir de `derivedOwnerUid` (ver
+ * `deriveContentOwnerUid` y el PASO 1 de `resolveReportHandler`), NUNCA de
+ * `targetOwnerUid`. Usar el declarado reintroduce, una capa mas abajo, el
+ * mismo bug que este chequeo existe para cerrar: el denunciante declara
+ * cualquier uid en el reporte y `resolveReportHandler` terminaria borrando
+ * "lo que ese uid tenga subido" en vez de lo que el contenido reportado
+ * realmente referencia.
+ *
+ * - `post`: `postPhotos/{uid}/` — build path en
+ *   `post_photo_upload_service.dart:130-136`.
+ * - `message`: `chatMedia/{chatId}/{uid}/` — build path en
+ *   `chat_media_upload_service.dart:116-125`. El `chatId` se recalcula con
+ *   la MISMA formula deterministica que `resolveContentPath` ya uso para
+ *   ubicar el documento que se leyo como `contenido`: a esta altura ya se
+ *   leyo un mensaje real en esa ruta, asi que esto no es confiar en un dato
+ *   mas del reporte, es nombrar de donde salio el documento que ya se uso.
+ *
+ * Devuelve `null` para cualquier otra superficie — nunca deberia pasar en
+ * la practica (`contentRemoved` ya rechaza `profile`, y `review` no tiene
+ * campo de media en `REDACTABLE_MEDIA_FIELD`), pero un `null` aca hace que
+ * el path jamas matchee ningun prefijo, asi que el default ante lo
+ * inesperado es NO borrar, no borrar-igual.
+ */
+function expectedMediaPathPrefix(
+  targetKind: string,
+  derivedOwnerUid: string,
+  reporterUid: string,
+  targetOwnerUid: string,
+): string | null {
+  switch (targetKind) {
+  case "post":
+    return `postPhotos/${derivedOwnerUid}/`;
+  case "message": {
+    const chatId = [reporterUid, targetOwnerUid].sort().join("_");
+    return `chatMedia/${chatId}/${derivedOwnerUid}/`;
+  }
+  default:
+    return null;
+  }
+}
+
+/**
+ * Cuanto puede vivir un claim del PASO 0 de `resolveReportHandler` sin que
+ * se lo considere abandonado.
+ *
+ * Sin este techo, un reporte reclamado por un handler que se cae DESPUES
+ * del PASO 0 y ANTES del PASO 4 —timeout duro, OOM, crash del proceso; los
+ * casos que ningun `catch` de este archivo alcanza a correr— quedaria
+ * trabado para siempre: nadie podria volver a intentarlo. El catch de
+ * `resolveReportHandler` libera el claim en el camino feliz-de-error (una
+ * excepcion ORDINARIA); este TTL es la red de seguridad para cuando ese
+ * catch mismo no llega a ejecutarse.
+ *
+ * Dos minutos: comodamente mas que lo que tarda una resolucion real (unas
+ * pocas escrituras a Firestore, como mucho una llamada a Auth o al mail
+ * queue), asi que no compite con una ejecucion en curso; corto para que un
+ * reporte realmente atascado no quede fuera de circulacion por horas.
+ */
+const CLAIM_TTL_MS = 2 * 60 * 1000;
 
 /**
  * Resuelve un reporte Y EJECUTA la accion elegida.
@@ -593,15 +691,43 @@ export async function resolveReportHandler(
   // suspender a alguien despues de que otro moderador ya habia descartado
   // el reporte.
   //
-  // Esto cierra con certeza el caso descrito: alguien resuelve DESPUES de
-  // que otro ya termino (secuencial, aunque sea segundos despues). Una
-  // doble resolucion verdaderamente simultanea —la misma ventana de
-  // milisegundos— haria falta envolver TODO el handler en una transaccion
-  // (incluidas las llamadas a Auth y al mail queue), y eso no es lo que se
-  // pidio ni lo que este chequeo garantiza.
+  // La transaccion tiene que ESCRIBIR, no solo leer: un `tx.get()` sin
+  // escritura no excluye a nadie — dos transacciones concurrentes leen el
+  // mismo `undefined` y las dos pasan, porque el estado que chequean recien
+  // se escribe en el PASO 4. Por eso esta transaccion, ademas de chequear
+  // `status`, escribe `claimedAt`/`claimedBy` en la MISMA transaccion: esa
+  // escritura ES el claim.
+  //
+  // Con eso alcanza tambien para la carrera verdaderamente simultanea —la
+  // misma ventana de milisegundos—: Firestore serializa dos transacciones
+  // que leen y escriben el MISMO documento, asi que de dos que arrancan
+  // juntas solo una puede commitear el claim; la otra reintenta
+  // automaticamente (retry del SDK ante contention), relee el `claimedAt`
+  // ya fresco y tira ACA, antes de tocar Auth o el mail queue. No hace
+  // falta envolver esas dos llamadas en una transaccion mas grande — la
+  // version anterior de este comentario decia que si hacia falta, y esa
+  // afirmacion era falsa: el claim exclusivo ya paso antes de que ninguna
+  // de las dos se ejecute, exactamente porque la escritura del claim vive
+  // en la misma transaccion que el chequeo.
+  //
+  // El claim expira solo (`CLAIM_TTL_MS`) para que un reporte no quede
+  // trabado para siempre si el handler se cae despues de reclamarlo y
+  // antes de terminar. Ver el docstring de `CLAIM_TTL_MS` y el catch de
+  // mas abajo.
   // -------------------------------------------------------------------
+  const reviewRef = db.collection(REVIEWS_COLLECTION).doc(reportId);
+  // Si el claim de abajo CREA el documento (no habia review todavia — ni
+  // resuelto ni "visto" por `markReportViewed`), la liberacion ante un
+  // error tiene que BORRARLO entero, no dejar un doc vacio con `exists:
+  // true` donde antes no habia nada: eso es indistinguible de "ya se
+  // reclamo" para el proximo intento, y de "ya se miro" para
+  // `listPendingReports`/`moderationStats`. Si YA existia (tipicamente
+  // `status: "pending"` + `firstViewedAt` de un `markReportViewed` previo),
+  // liberar tiene que conservar eso y sacar solo el claim.
+  let reviewExistiaAntesDelClaim = false;
   await db.runTransaction(async (tx) => {
-    const rev = await tx.get(db.collection(REVIEWS_COLLECTION).doc(reportId));
+    const rev = await tx.get(reviewRef);
+    reviewExistiaAntesDelClaim = rev.exists;
     const yaResuelto = rev.get("status") as ReportStatus | undefined;
     if (yaResuelto === "actioned" || yaResuelto === "dismissed") {
       throw new HttpsError(
@@ -609,7 +735,67 @@ export async function resolveReportHandler(
         "Otro moderador ya resolvio este reporte.",
       );
     }
+    const claimedAt = rev.get("claimedAt") as { toDate(): Date } | undefined;
+    if (claimedAt && Date.now() - claimedAt.toDate().getTime() < CLAIM_TTL_MS) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Otro moderador esta resolviendo este reporte en este momento.",
+      );
+    }
+    tx.set(
+      reviewRef,
+      { claimedAt: new Date(), claimedBy: moderatorUid },
+      { merge: true },
+    );
   });
+
+  try {
+    await executeClaimedResolution(db, app, moderatorUid, reportId, {
+      status: status as ReportStatus,
+      action: action as ReportAction,
+      note: typeof note === "string" ? note : null,
+    });
+  } catch (err) {
+    // Liberar el claim para que un reintento legitimo no tenga que esperar
+    // el TTL. Best-effort: si esto mismo falla, `CLAIM_TTL_MS` sigue siendo
+    // la red de seguridad.
+    const liberar = reviewExistiaAntesDelClaim
+      ? reviewRef.set(
+        { claimedAt: FieldValue.delete(), claimedBy: FieldValue.delete() },
+        { merge: true },
+      )
+      : reviewRef.delete();
+    await liberar.catch((cleanupErr) => {
+      logger.warn(
+        "resolveReport: no se pudo liberar el claim tras un error — queda " +
+        "el TTL como red de seguridad",
+        { reportId, error: cleanupErr },
+      );
+    });
+    throw err;
+  }
+
+  return { ok: true };
+}
+
+/**
+ * PASO 1 a PASO 4 de `resolveReportHandler`, sobre un reporte YA reclamado
+ * por su PASO 0.
+ *
+ * Separada en su propia funcion para que `resolveReportHandler` pueda
+ * envolver el llamado en un unico try/catch que libera el claim ante
+ * CUALQUIER error, en vez de repetir esa liberacion en cada uno de los
+ * puntos de este cuerpo que puede tirar — y son varios (ver cada uno mas
+ * abajo).
+ */
+async function executeClaimedResolution(
+  db: Firestore,
+  app: App,
+  moderatorUid: string,
+  reportId: string,
+  input: { status: ReportStatus; action: ReportAction; note: string | null },
+): Promise<void> {
+  const { status, action, note } = input;
 
   // Que el reporte exista se verifica ANTES de escribir. Sin esto,
   // `report_reviews` se llena de resoluciones de reportes que no existen —
@@ -632,6 +818,10 @@ export async function resolveReportHandler(
   // -------------------------------------------------------------------
   let removedContent: string | null = null;
   let removedMediaUrl: string | null = null;
+  // Path de Storage ya derivado y ya comparado contra el prefijo del dueno
+  // derivado — el PASO 3 no vuelve a derivar nada, solo lee estas dos.
+  let removedMediaStoragePath: string | null = null;
+  let removedMediaPathTrusted: boolean | null = null;
   let redactPath: string | null = null;
   let redactUpdates: Record<string, string> | null = null;
   let redactUpdateTime: FirebaseFirestore.Timestamp | null = null;
@@ -709,6 +899,28 @@ export async function resolveReportHandler(
     const contentOwner = ownerField ? contenido.get(ownerField) : undefined;
     derivedOwnerUid = typeof contentOwner === "string" && contentOwner.length > 0
       ? contentOwner : null;
+
+    // Path y "confianza" del media a borrar, derivados ACA — antes del
+    // audit_log del PASO 2 — para que la evidencia registre de antemano si
+    // el path confiaba o no, no solo el resultado del borrado despues.
+    // `expectedMediaPathPrefix` arma el prefijo con `derivedOwnerUid`,
+    // NUNCA con `targetOwnerUid`: ese es justo el bug que este bloque
+    // cierra (P2-A) — usar el declarado lo reabriria una capa mas abajo.
+    if (removedMediaUrl) {
+      removedMediaStoragePath = extractStoragePath(
+        removedMediaUrl,
+        getStorage(app).bucket().name,
+      );
+      const prefix = derivedOwnerUid
+        ? expectedMediaPathPrefix(
+          targetKind, derivedOwnerUid, reporterUid, targetOwnerUid,
+        )
+        : null;
+      removedMediaPathTrusted = !!(
+        removedMediaStoragePath && prefix &&
+        removedMediaStoragePath.startsWith(prefix)
+      );
+    }
   } else if (action === "userSuspended" || action === "userWarned") {
     // El uid SALE DEL CONTENIDO, nunca de `targetOwnerUid`: lo declara el
     // denunciante y `firestore.rules:4622-4623` solo valida que sea un
@@ -796,6 +1008,11 @@ export async function resolveReportHandler(
       // hay apelacion posible y la redaccion es irreversible.
       removedContent,
       removedMediaUrl,
+      // `false` (nunca `null` cuando hubo media) es tan senal de reporte
+      // malicioso como el mismatch de uid de arriba: un path que no
+      // matchea el prefijo del dueno derivado se arma para borrar
+      // contenido ajeno. `null` cuando no hubo media que borrar.
+      removedMediaPathTrusted,
       at: new Date(),
     });
   }
@@ -833,34 +1050,56 @@ export async function resolveReportHandler(
     // limpia el campo de arriba —eso es lo que resuelve "la imagen sigue
     // visible"—, asi que esto es defensa en profundidad (la URL vieja, con
     // su token, nunca evalua storage.rules) y su fallo NUNCA aborta la
-    // resolucion.
+    // resolucion. `removedMediaStoragePath`/`removedMediaPathTrusted` ya se
+    // calcularon en el PASO 1 — aca solo se leen.
     if (removedMediaUrl) {
-      const storagePath = extractStoragePath(removedMediaUrl);
-      if (!storagePath) {
+      if (!removedMediaStoragePath) {
+        // Cubre tanto la URL malformada como un bucket que no coincide con
+        // el nuestro (ver `extractStoragePath`, `expectedBucket`): en los
+        // dos casos no hay un path de confianza para borrar.
         logger.warn(
-          "resolveReport: no se pudo derivar el path de Storage de la URL " +
-          "— solo se limpio la referencia en Firestore, el objeto puede " +
-          "seguir en el bucket",
+          "resolveReport: no se pudo derivar un path de Storage propio de " +
+          "la URL — solo se limpio la referencia en Firestore, el objeto " +
+          "puede seguir en el bucket",
           { reportId, mediaUrl: removedMediaUrl },
+        );
+      } else if (!removedMediaPathTrusted) {
+        // El path no pertenece al dueno derivado del contenido: senal de
+        // reporte malicioso (P2-A), igual que el mismatch de uid de mas
+        // arriba. NO se borra — ese path es, por definicion, el de un
+        // objeto ajeno al contenido reportado. La redaccion en Firestore
+        // (arriba) ya saco el media de circulacion en la UI; esto es solo
+        // la limpieza de Storage, y limpiar el objeto equivocado es peor
+        // que no limpiar ninguno.
+        logger.warn(
+          "resolveReport: el path de Storage del media retirado no " +
+          "pertenece al dueno derivado del contenido — NO se borra el " +
+          "objeto, posible reporte malicioso",
+          {
+            reportId, storagePath: removedMediaStoragePath, derivedOwnerUid,
+          },
         );
       } else {
         try {
-          await getStorage(app).bucket().file(storagePath).delete();
+          await getStorage(app).bucket().file(removedMediaStoragePath)
+            .delete();
           logger.info("resolveReport: objeto de Storage borrado", {
-            reportId, storagePath,
+            reportId, storagePath: removedMediaStoragePath,
           });
         } catch (err) {
           const code = (err as { code?: number }).code;
           if (code === 404) {
             logger.info(
               "resolveReport: el objeto de Storage ya no existia",
-              { reportId, storagePath },
+              { reportId, storagePath: removedMediaStoragePath },
             );
           } else {
             logger.warn(
               "resolveReport: no se pudo borrar el objeto de Storage — " +
               "solo se limpio la referencia en Firestore",
-              { reportId, storagePath, error: err },
+              {
+                reportId, storagePath: removedMediaStoragePath, error: err,
+              },
             );
           }
         }
@@ -877,20 +1116,24 @@ export async function resolveReportHandler(
   }
 
   // -------------------------------------------------------------------
-  // PASO 4 — recien aca se marca resuelto.
+  // PASO 4 — recien aca se marca resuelto. Tambien libera el claim del
+  // PASO 0 (`claimedAt`/`claimedBy`): una vez que `status` es "actioned" o
+  // "dismissed", ese mismo valor ya excluye cualquier claim nuevo (primer
+  // chequeo de la transaccion del PASO 0), asi que dejarlos no protege
+  // nada mas — quedarian como metadata muerta sobre un reporte resuelto.
   // -------------------------------------------------------------------
   await db.collection(REVIEWS_COLLECTION).doc(reportId).set(
     {
       status,
       action,
-      note: typeof note === "string" ? note : null,
+      note,
       reviewedBy: moderatorUid,
       resolvedAt: new Date(),
+      claimedAt: FieldValue.delete(),
+      claimedBy: FieldValue.delete(),
     },
     { merge: true },
   );
-
-  return { ok: true };
 }
 
 /**
