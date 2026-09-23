@@ -114,6 +114,22 @@ export type MailKind =
   // `docs/legal/politica-de-privacidad.md` promete que para esas «la oposicion
   // es ABSOLUTA». Sin interruptor, esa linea seria mentira.
   | "athlete-coverage-lost"
+  // ── El ALUMNO que choco un tope del plan free ───────────────────────────
+  //
+  // El hermano del de arriba, y el de mayor INTENCION de los cinco: aquel le
+  // escribe al que PERDIO cobertura, este al que esta chocando contra una
+  // pared MIENTRAS intenta hacer algo. Quiso una cuarta rutina, o una
+  // plantilla paga, y la app le dijo que no.
+  //
+  // Lo produce `free-limit-mail.ts`, leyendo la anotacion que deja
+  // `showFreePlanLimitSheet`. La HOJA no cambia ni una palabra: lo que se
+  // anota es invisible, y un dato que el usuario no ve no es un llamado a
+  // comprar. Un \«te mandamos un mail\» impreso ahi si lo seria.
+  //
+  // Comparte `prefKey` con `athlete-coverage-lost` a proposito: son
+  // comunicacion comercial sobre lo mismo, y apagar uno y seguir recibiendo el
+  // otro seria no haber apagado nada.
+  | "free-limit-reached"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el

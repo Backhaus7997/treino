@@ -937,6 +937,39 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
   // perder acceso sin haber hecho nada, y el miedo razonable es que se le hayan
   // borrado los entrenamientos. Contestar eso ANTES de ofrecer nada es la
   // diferencia entre un aviso y un aprieto.
+  // ── El alumno que choco un tope del plan free ───────────────────────────
+  //
+  // NO NOMBRA EL TOPE CONCRETO, aunque `params.tope` lo trae. El parametro
+  // viaja igual porque sirve para medir cual muerde mas, pero el cuerpo habla
+  // en general: nombrarlo obligaria a un case por cada valor del enum
+  // `FreePlanLimit` de Dart —ocho hoy— y esa lista se desincroniza el dia que
+  // alguien agregue el noveno. Es el mismo pozo que los numeros del plan free,
+  // que ya se separaron una vez entre la constante, firestore.rules y el .arb.
+  //
+  // EMPIEZA RECONOCIENDO EL INTENTO. Quien recibe esto quiso hacer algo y no
+  // pudo: arrancar con la oferta seria pasarle por encima al motivo por el que
+  // esta leyendo.
+  case "free-limit-reached":
+    return build(
+      "Quisiste hacer algo que el plan gratis no te deja", // i18n: email comercial
+      "Hay una forma de sacarte el tope",
+      [
+        ["Te topaste con un limite del plan gratis."],
+        [
+          "Tus entrenamientos, tu historial y tus medidas ",
+          strong("siguen donde estaban"),
+          ": el plan gratis no te saca nada de lo que ya hiciste.",
+        ],
+        [
+          "Lo que limita es lo que podes armar de aca en adelante — cuantas " +
+            "rutinas propias, de que tamaño, y que plantillas podes usar.",
+        ],
+        ["Si eso te queda corto, podes suscribirte por tu cuenta."],
+      ],
+      "VER EL PLAN",
+      ctaUrl,
+    );
+
   case "athlete-coverage-lost":
     return build(
       "Tu lugar en TREINO ya no está cubierto", // i18n: email comercial

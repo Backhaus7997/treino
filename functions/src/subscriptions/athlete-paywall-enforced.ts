@@ -160,7 +160,11 @@ export function linkActivityChanged(
 }
 
 /** Si el alumno tiene algun vinculo ACTIVO con un PF. */
-async function hasActiveTrainerLink(app: App, uid: string): Promise<boolean> {
+// Exportada para `free-limit-mail.ts`: el alumno VINCULADO no paga nunca —su
+// profe paga por el— asi que ofrecerle un plan seria cobrarle dos veces a la
+// misma persona. Es la misma pregunta que se hace este modulo, y duplicar la
+// query era tener dos definiciones de "tiene profe".
+export async function hasActiveTrainerLink(app: App, uid: string): Promise<boolean> {
   const snap = await getFirestore(app)
     .collection("trainer_links")
     .where("athleteId", "==", uid)
