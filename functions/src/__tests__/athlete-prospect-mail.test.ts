@@ -293,7 +293,7 @@ describe("⚠️ el cableado del trigger, que es donde estuvo el bug", () => {
     // mismo segundo del alta.
     const cuerpo = triggerDelUsuario();
     expect(cuerpo).not.toMatch(/avisarAlAlumnoSinCobertura\(\s*app,\s*r,\s*["']/);
-    expect(cuerpo).toContain('before === undefined ? "alta"');
+    expect(cuerpo).toContain("before === undefined ? \"alta\"");
   });
 
   it("el trigger del VINCULO sí manda evento: un link no crea un usuario", () => {
