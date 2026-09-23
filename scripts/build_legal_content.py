@@ -62,6 +62,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import NoReturn
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "legal"
@@ -586,17 +587,39 @@ def _publicado(slug: str, title: str, version: int | None,
 _REGISTRO: dict[str, dict] | None = None
 
 
+def _registro_danado(motivo: str) -> NoReturn:
+    """Aborta explicando que se rompio y como recuperarlo."""
+    sys.exit(f"[!] el registro de fechas esta danado: {motivo}\n"
+             f"      {LANDING_OUT.relative_to(ROOT)}\n\n"
+             "    Ahi vive la fecha de 'Ultima actualizacion' de los documentos\n"
+             "    legales, y es la UNICA copia. Si el generador siguiera, las\n"
+             "    estamparia todas con la de hoy y pisaria el registro: nueve\n"
+             "    textos anunciando una actualizacion que no ocurrio.\n\n"
+             "    Para recuperarlo:\n\n"
+             "        git checkout -- web/legal/legal-content.json")
+
+
 def _registro() -> dict[str, dict]:
     """El registro de fechas —`web/legal/legal-content.json`— indexado por slug.
 
-    Se lee UNA vez por corrida. Si el archivo no existe, el registro queda
-    vacio y los nueve documentos cuentan como nuevos: es el caso de la primera
+    Se lee UNA vez por corrida. Si el archivo NO EXISTE, el registro queda
+    vacio y todos los documentos cuentan como nuevos: es el caso de la primera
     generacion, donde HOY es la respuesta correcta.
 
-    Si existe pero no se puede leer, se ABORTA. Tratar un JSON roto como
-    "registro vacio" volveria a fechar los nueve documentos con la fecha de
-    hoy, en silencio y de una sola vez — exactamente la mentira que este
-    mecanismo existe para evitar, y encima masiva.
+    Si existe, tiene que parecerse a lo que emite este generador, y si no se
+    ABORTA. No alcanza con que sea JSON parseable —esa fue la primera version y
+    la cazo Codex en el #1223 (P2)—: un `{"documents": []}` es JSON
+    perfectamente valido y se leia como "registro vacio", asi que la corrida
+    siguiente estampaba hoy en los NUEVE documentos y pisaba la unica copia de
+    las fechas. Medido: nueve fechas distintas (17, 21, 21, 17, 10, 10, 17, 22,
+    21 de septiembre) quedaron las nueve en "23 de septiembre", con exit 0 y sin
+    una advertencia. El comentario de esta funcion prometia que fallaba cerrado
+    y no era cierto — AGENTS.md §11.1.
+
+    Lo que NO se valida, a proposito: que esten los nueve slugs del ORDER. Un
+    documento legal nuevo entra sin entrada en el registro y tiene que poder
+    fecharse hoy; exigir los nueve convertiria "agregar un documento" en un
+    aborto. La linea esta en la FORMA del archivo, no en su completitud.
     """
     global _REGISTRO
     if _REGISTRO is not None:
@@ -604,18 +627,40 @@ def _registro() -> dict[str, dict]:
     if not LANDING_OUT.exists():
         _REGISTRO = {}
         return _REGISTRO
+
     try:
-        entradas = json.loads(LANDING_OUT.read_text(encoding="utf-8"))["documents"]
-        _REGISTRO = {e["slug"]: e for e in entradas}
-    except (ValueError, LookupError, TypeError) as err:
-        sys.exit(f"[!] no se pudo leer el registro de fechas:\n"
-                 f"      {LANDING_OUT.relative_to(ROOT)}\n"
-                 f"    {type(err).__name__}: {err}\n\n"
-                 "    Ahi vive la fecha de 'Ultima actualizacion' de los nueve\n"
-                 "    documentos. Sin el, el generador las estamparia todas con\n"
-                 "    la de hoy, asi que se aborta en vez de reescribirlas.\n\n"
-                 "    Para recuperarlo:\n\n"
-                 "        git checkout -- web/legal/legal-content.json")
+        crudo = json.loads(LANDING_OUT.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as err:
+        _registro_danado(f"{type(err).__name__}: {err}")
+
+    if not isinstance(crudo, dict):
+        _registro_danado("la raiz no es un objeto JSON")
+    # `sourceSha` lo emite SIEMPRE `emit_landing()`. Que falte significa que el
+    # archivo no salio de este generador, y entonces sus fechas no son un
+    # registro: son texto de origen desconocido.
+    sha = crudo.get("sourceSha")
+    if not isinstance(sha, str) or not sha.strip():
+        _registro_danado("le falta 'sourceSha', asi que no lo emitio este generador")
+    entradas = crudo.get("documents")
+    if not isinstance(entradas, list):
+        _registro_danado("'documents' no es una lista")
+    if not entradas:
+        _registro_danado("'documents' esta vacio; este generador nunca emite cero")
+
+    reg: dict[str, dict] = {}
+    for i, e in enumerate(entradas):
+        if not isinstance(e, dict):
+            _registro_danado(f"la entrada {i} de 'documents' no es un objeto")
+        slug = e.get("slug")
+        if not isinstance(slug, str) or not slug.strip():
+            _registro_danado(f"la entrada {i} de 'documents' no tiene 'slug'")
+        if slug in reg:
+            _registro_danado(f"'{slug}' aparece dos veces; una taparia a la otra")
+        fecha = e.get("lastUpdated")
+        if not isinstance(fecha, str) or not fecha.strip():
+            _registro_danado(f"'{slug}' no tiene 'lastUpdated'")
+        reg[slug] = e
+    _REGISTRO = reg
     return _REGISTRO
 
 
@@ -716,11 +761,11 @@ def fecha_auto(slug: str, title: str, version: int | None,
     """
     registrado = _registro().get(slug)
     if registrado is not None:
-        fecha = registrado.get("lastUpdated")
+        # `lastUpdated` no puede faltar ni venir vacio: `_registro()` aborta
+        # antes si el archivo no tiene la forma que emite este generador.
         sin_fecha = {k: v for k, v in registrado.items() if k != "lastUpdated"}
-        if (isinstance(fecha, str) and fecha.strip()
-                and sin_fecha == _publicado(slug, title, version, secciones)):
-            return fecha
+        if sin_fecha == _publicado(slug, title, version, secciones):
+            return registrado["lastUpdated"]
     return _es_fecha(datetime.date.today().isoformat())
 
 

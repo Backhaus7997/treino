@@ -455,6 +455,82 @@ class GeneradorLegal(unittest.TestCase):
             "legal-content.json", r.stdout + r.stderr,
             "aborto, pero sin decir que archivo hay que recuperar")
 
+    def test_control_negativo_registro_vaciado_aborta(self):
+        """Un `documents: []` aborta: es JSON VALIDO y aun asi es corrupcion.
+
+        Lo cazo Codex en el #1223 (P2), y tenia razon. La primera version de
+        `_registro()` solo atrapaba el JSON ilegible, asi que un
+        `{"documents": []}` —parseable, con su `sourceSha` y todo— se leia como
+        "registro vacio" y la corrida siguiente estampaba hoy en TODOS los
+        documentos, pisando la unica copia de las fechas.
+
+        Medido sobre el repo real antes del fix: nueve fechas distintas (17,
+        21, 21, 17, 10, 10, 17, 22 y 21 de septiembre) quedaron las nueve en
+        "23 de septiembre", con exit 0 y sin una sola advertencia. El
+        comentario de la funcion prometia que fallaba cerrado y no era cierto,
+        que es la §11.1 de AGENTS.md adentro del arreglo.
+        """
+        tmp = self.arbol(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+        })
+        self.sembrar_registro(tmp)
+        reg = tmp / REGISTRO
+        d = json.loads(reg.read_text(encoding="utf-8"))
+        self.assertTrue(d["documents"],
+                        "el fixture ya venia vacio: la mutacion no significa nada")
+        d["documents"] = []
+        reg.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n",
+                       encoding="utf-8")
+
+        r = self.correr(tmp)
+        self.assertNotEqual(
+            r.returncode, 0,
+            "un registro vaciado paso como 'sin entradas' y re-fecho todo.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+
+    def test_un_documento_sin_entrada_se_fecha_hoy(self):
+        """CONTROL del control: la validacion NO puede exigir los nueve slugs.
+
+        Un documento legal nuevo entra sin entrada en el registro. Si el
+        chequeo del test de arriba pidiera completitud, agregar un documento
+        pasaria a ser un aborto — y el fix del P2 habria cambiado un agujero
+        por una traba. Sin este control, "abortar siempre" pasaria los dos.
+
+        Sacar una entrada tiene que dar: ese documento fechado HOY, los demas
+        intactos.
+        """
+        tmp = self.arbol(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+            # El testigo, con el centinela: los fixtures con `FECHA_OK` sacan la
+            # fecha del markdown y nunca miran el registro.
+            "politica-de-privacidad.md": doc(
+                "privacidad", "Política de Privacidad", "kPrivacySections",
+                fecha=FECHA_AUTO),
+        })
+        self.sembrar_registro(tmp)
+        reg = tmp / REGISTRO
+        d = json.loads(reg.read_text(encoding="utf-8"))
+        antes = len(d["documents"])
+        d["documents"] = [x for x in d["documents"] if x["slug"] != "terminos"]
+        self.assertEqual(len(d["documents"]), antes - 1,
+                         "la mutacion no saco nada: el control no mide nada")
+        reg.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n",
+                       encoding="utf-8")
+
+        r = self.correr(tmp)
+        self.assertEqual(
+            r.returncode, 0,
+            "un documento sin entrada en el registro abortó: la validacion "
+            "quedo tan estricta que agregar un documento legal es imposible.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        dart = self.dart_generado(tmp)
+        self.assertIn(f"kTermsLastUpdated = '{hoy_es()}'", dart,
+                      "el documento sin entrada no se fecho hoy")
+        self.assertIn(f"kPrivacyLastUpdated = '{REGISTRADA}'", dart,
+                      "se re-fecho un documento que SI estaba registrado")
+
     # --- tablas ----------------------------------------------------------
 
     def test_la_tabla_conserva_la_etiqueta_de_fila(self):
