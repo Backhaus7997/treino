@@ -82,6 +82,55 @@ function ensureApp(): App {
 /** Coleccion del resultado de moderacion. Cerrada a todo cliente. */
 export const REVIEWS_COLLECTION = "report_reviews";
 
+/**
+ * Que CONTENIDO ya fue retirado por la cola. Un doc por contenido, no por
+ * reporte. Cerrada a todo cliente.
+ *
+ * ## Por que existe
+ *
+ * El id de un reporte es `{targetKind}_{targetId}_{reporterUid}`
+ * (`firestore.rules:4614-4616`), asi que veinte denunciantes sobre el mismo
+ * post son VEINTE documentos. El moderador resuelve el primero con
+ * `contentRemoved`, el texto queda en `""` y la media limpia — y los otros
+ * diecinueve se vuelven imposibles de cerrar: el PASO 1 lee los dos campos
+ * vacios y tira «Este reporte no tiene texto ni contenido multimedia para
+ * retirar».
+ *
+ * Ese mensaje era FALSO, que es exactamente lo que AGENTS.md 11.1 prohibe:
+ * si habia contenido y si se retiro. Y no dejaba salida — el moderador podia
+ * cerrarlos solo como `dismissed`/`none`, o sea registrando «no se acciono»
+ * sobre contenido que se retiro. Dos registros del mismo hecho, y el que
+ * miente es el que queda.
+ *
+ * Lo que falta para distinguir «nunca hubo contenido» de «ya se retiro» es
+ * una pregunta que NINGUNA coleccion de hoy contesta con un solo `get()`:
+ * `audit_log` esta indexado por reporte (`moderation__{reportId}`) y
+ * `report_reviews` tambien. Esta, en cambio, esta indexada por el CONTENIDO.
+ *
+ * ## Por que no es `moderation_quarantine`
+ *
+ * Aquella registra lo que caza el filtro de terminos vetados
+ * (`quarantine-vetted-content.ts`) y su forma lo dice: `verdict`, `field`,
+ * `redacted`. Meter ahi las redacciones del moderador humano le daria a
+ * `verdict` un valor que no significa nada y mezclaria dos preguntas
+ * distintas —«el filtro lo caso» y «un moderador lo retiro»— en una
+ * coleccion que ya tiene duenos y tests propios.
+ */
+export const REMOVALS_COLLECTION = "moderation_removals";
+
+/**
+ * Id del marcador de retiro, derivado del contenido y no del reporte.
+ *
+ * `{targetKind}__{targetId}` y no la ruta del documento (que es lo que usa
+ * `moderation_quarantine`) por los MENSAJES: su ruta lleva el `chatId`, que
+ * se deriva del par `reporterUid`/`targetOwnerUid` — o sea que cambia con
+ * quien denuncia. Un marcador cuyo id depende del denunciante no serviria
+ * para lo unico que este marcador existe para hacer.
+ */
+export function removalDocId(targetKind: string, targetId: string): string {
+  return `${targetKind}__${targetId}`;
+}
+
 export type ReportStatus = "pending" | "actioned" | "dismissed";
 export type ReportAction =
   | "none"
@@ -828,6 +877,10 @@ async function executeClaimedResolution(
   // El dueno REAL del contenido, derivado del documento — nunca de
   // `targetOwnerUid`. Ver `deriveContentOwnerUid`.
   let derivedOwnerUid: string | null = null;
+  // Id del reporte desde el que YA se habia retirado este mismo contenido,
+  // cuando este reporte es uno de los duplicados de aquel. `null` en
+  // cualquier otro caso. Ver `REMOVALS_COLLECTION`.
+  let alreadyRemovedByReportId: string | null = null;
   // Uid efectivamente usado para userSuspended/userWarned. Es
   // `derivedOwnerUid`, nunca `targetOwnerUid` — separado en su propia
   // variable solo para dejar explicito, en el PASO 3, que esas dos acciones
@@ -858,68 +911,119 @@ async function executeClaimedResolution(
       );
     }
 
+    // Un retiro ANTERIOR sobre este mismo contenido, disparado desde otro
+    // reporte. Es lo unico que distingue «nunca hubo contenido» de «ya se
+    // retiro», y sin esa distincion los duplicados de un mismo post no se
+    // pueden cerrar. Ver el docstring de `REMOVALS_COLLECTION`.
+    const retiroPrevio = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId(targetKind, targetId))
+      .get();
+
     const contenido = await db.doc(path).get();
-    if (!contenido.exists) {
+    const mediaField = REDACTABLE_MEDIA_FIELD[targetKind];
+    const textVal = contenido.exists
+      ? String(contenido.get(textField) ?? "")
+      : "";
+    const mediaVal = contenido.exists && mediaField
+      ? String(contenido.get(mediaField) ?? "")
+      : "";
+
+    // Que no haya nada que retirar significa DOS cosas distintas, y hasta
+    // ahora las dos daban el mismo error. El marcador es lo unico que las
+    // separa: si existe, este reporte es uno de los duplicados del que si
+    // acciono (ver `REMOVALS_COLLECTION`).
+    const yaRetirado = !textVal && !mediaVal && retiroPrevio.exists;
+
+    if (!yaRetirado && !contenido.exists) {
       throw new HttpsError(
         "failed-precondition",
         `El contenido reportado ya no existe (${path}).`,
       );
     }
-
-    const mediaField = REDACTABLE_MEDIA_FIELD[targetKind];
-    const textVal = String(contenido.get(textField) ?? "");
-    const mediaVal = mediaField ? String(contenido.get(mediaField) ?? "") : "";
-
-    // Ni texto ni media: no hay nada que retirar. Antes esto "tenia exito"
-    // en silencio sobre un mensaje de solo imagen (text vacio, sin campo de
-    // media mapeado) sin tocar la foto — el mismo bug que este cambio
-    // arregla, visto del otro lado: mejor fallar ruidoso que mentir que se
-    // retiro algo.
-    if (!textVal && !mediaVal) {
+    if (!yaRetirado && !textVal && !mediaVal) {
+      // Ni texto ni media, y nadie lo retiro antes: de verdad no hay nada.
+      // Antes esto "tenia exito" en silencio sobre un mensaje de solo imagen
+      // (text vacio, sin campo de media mapeado) sin tocar la foto — el
+      // mismo bug que este modulo vino a arreglar, visto del otro lado:
+      // mejor fallar ruidoso que mentir que se retiro algo.
       throw new HttpsError(
         "failed-precondition",
         "Este reporte no tiene texto ni contenido multimedia para retirar.",
       );
     }
 
-    removedContent = textVal;
-    removedMediaUrl = mediaVal || null;
-    redactPath = path;
-    const updates: Record<string, string> = { [textField]: "" };
-    if (mediaField && mediaVal) updates[mediaField] = "";
-    redactUpdates = updates;
-    // Precondicion para el PASO 3. Entre este `get` y la redaccion el autor
-    // puede editar su propio contenido —`firestore.rules:4366` deja
-    // actualizar una resena— y entonces `removedContent` guardaria un texto
-    // mientras se redacta otro. El audit_log es lo que se mira en una
-    // apelacion: si miente, miente exactamente donde importa.
-    redactUpdateTime = contenido.updateTime ?? null;
-
+    // El dueno REAL, del documento — nunca `targetOwnerUid`, que lo declara
+    // el denunciante (ver `OWNER_FIELD`). Se deriva para los dos caminos de
+    // abajo porque los dos lo escriben en el audit_log.
     const ownerField = OWNER_FIELD[targetKind];
-    const contentOwner = ownerField ? contenido.get(ownerField) : undefined;
-    derivedOwnerUid = typeof contentOwner === "string" && contentOwner.length > 0
-      ? contentOwner : null;
-
-    // Path y "confianza" del media a borrar, derivados ACA — antes del
-    // audit_log del PASO 2 — para que la evidencia registre de antemano si
-    // el path confiaba o no, no solo el resultado del borrado despues.
-    // `expectedMediaPathPrefix` arma el prefijo con `derivedOwnerUid`,
-    // NUNCA con `targetOwnerUid`: ese es justo el bug que este bloque
-    // cierra (P2-A) — usar el declarado lo reabriria una capa mas abajo.
-    if (removedMediaUrl) {
-      removedMediaStoragePath = extractStoragePath(
-        removedMediaUrl,
-        getStorage(app).bucket().name,
-      );
-      const prefix = derivedOwnerUid
-        ? expectedMediaPathPrefix(
-          targetKind, derivedOwnerUid, reporterUid, targetOwnerUid,
-        )
+    const contentOwner = contenido.exists && ownerField
+      ? contenido.get(ownerField)
+      : undefined;
+    derivedOwnerUid =
+      typeof contentOwner === "string" && contentOwner.length > 0
+        ? contentOwner
         : null;
-      removedMediaPathTrusted = !!(
-        removedMediaStoragePath && prefix &&
-        removedMediaStoragePath.startsWith(prefix)
-      );
+
+    if (yaRetirado) {
+      // DUPLICADO de un reporte ya accionado: no hay nada nuevo que retirar
+      // PORQUE ya se retiro. Se deja cerrar como `contentRemoved` —que es lo
+      // que de verdad paso— apuntando al reporte que lo ejecuto.
+      //
+      // No se redacta nada: `redactPath`/`redactUpdates` quedan en `null` y
+      // el PASO 3 no corre. Y `removedContent` queda en `null` en vez de
+      // `""`: la evidencia del original vive en el `audit_log` de AQUEL
+      // reporte, y escribir aca una copia vacia del mismo campo haria que
+      // una apelacion leyera "el texto retirado era la cadena vacia".
+      const previo = retiroPrevio.get("reportId");
+      alreadyRemovedByReportId =
+        typeof previo === "string" && previo.length > 0 ? previo : null;
+
+      // Si el documento ya no esta, el dueno derivado sale del marcador —
+      // que lo guardo cuando el contenido si existia. Sigue sin salir nunca
+      // de `targetOwnerUid`.
+      if (derivedOwnerUid === null) {
+        const guardado = retiroPrevio.get("derivedOwnerUid");
+        derivedOwnerUid =
+          typeof guardado === "string" && guardado.length > 0
+            ? guardado
+            : null;
+      }
+    } else {
+      removedContent = textVal;
+      removedMediaUrl = mediaVal || null;
+      redactPath = path;
+      const updates: Record<string, string> = { [textField]: "" };
+      if (mediaField && mediaVal) updates[mediaField] = "";
+      redactUpdates = updates;
+      // Precondicion para el PASO 3. Entre este `get` y la redaccion el
+      // autor puede editar su propio contenido —`firestore.rules:4366` deja
+      // actualizar una resena— y entonces `removedContent` guardaria un
+      // texto mientras se redacta otro. El audit_log es lo que se mira en
+      // una apelacion: si miente, miente exactamente donde importa.
+      redactUpdateTime = contenido.updateTime ?? null;
+
+      // Path y "confianza" del media a borrar, derivados ACA — antes del
+      // audit_log del PASO 2 — para que la evidencia registre de antemano si
+      // el path confiaba o no, no solo el resultado del borrado despues.
+      // `expectedMediaPathPrefix` arma el prefijo con `derivedOwnerUid`,
+      // NUNCA con `targetOwnerUid`: ese es justo el bug que este bloque
+      // cierra (P2-A) — usar el declarado lo reabriria una capa mas abajo.
+      if (removedMediaUrl) {
+        removedMediaStoragePath = extractStoragePath(
+          removedMediaUrl,
+          getStorage(app).bucket().name,
+        );
+        const prefix = derivedOwnerUid
+          ? expectedMediaPathPrefix(
+            targetKind, derivedOwnerUid, reporterUid, targetOwnerUid,
+          )
+          : null;
+        removedMediaPathTrusted = !!(
+          removedMediaStoragePath && prefix &&
+          removedMediaStoragePath.startsWith(prefix)
+        );
+      }
     }
   } else if (action === "userSuspended" || action === "userWarned") {
     // El uid SALE DEL CONTENIDO, nunca de `targetOwnerUid`: lo declara el
@@ -1013,6 +1117,12 @@ async function executeClaimedResolution(
       // matchea el prefijo del dueno derivado se arma para borrar
       // contenido ajeno. `null` cuando no hubo media que borrar.
       removedMediaPathTrusted,
+      // Cuando este reporte es un DUPLICADO de otro que ya retiro el mismo
+      // contenido: el id de aquel. `null` en cualquier otro caso. Sin esto,
+      // una apelacion leeria diecinueve entradas `contentRemoved` con
+      // `removedContent: null` y no tendria como saber donde esta el texto
+      // original ni por que estas no lo traen.
+      alreadyRemovedByReportId,
       at: new Date(),
     });
   }
@@ -1021,14 +1131,52 @@ async function executeClaimedResolution(
   // PASO 3 — ejecutar de verdad.
   // -------------------------------------------------------------------
   if (action === "contentRemoved" && redactPath && redactUpdates) {
+    // La redaccion y el marcador de retiro van en UN SOLO batch atomico, no
+    // en dos escrituras seguidas, por el mismo motivo por el que el marcador
+    // existe: si la redaccion entrara y el marcador no, el contenido quedaria
+    // vacio SIN registro de quien lo vacio, y los duplicados volverian a ser
+    // imposibles de cerrar — justo el agujero que este marcador cierra, esta
+    // vez abierto por el propio arreglo.
+    //
+    // Firestore acepta la precondicion `lastUpdateTime` adentro del batch,
+    // asi que la carrera contra una edicion del autor sigue cubierta igual
+    // que antes: si la precondicion falla, no entra NINGUNA de las dos.
+    const lote = db.batch();
+    lote.update(
+      db.doc(redactPath),
+      redactUpdates,
+      redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
+    );
+    lote.set(
+      db.collection(REMOVALS_COLLECTION)
+        .doc(removalDocId(targetKind, targetId)),
+      {
+        targetKind,
+        targetId,
+        // La ruta, para poder leer el marcador a mano sin volver a
+        // derivarla. NO sirve como id: ver `removalDocId`.
+        path: redactPath,
+        // Desde que reporte se ejecuto. Es lo que los duplicados escriben en
+        // su propio audit_log para apuntar a donde esta la evidencia.
+        reportId,
+        moderatorUid,
+        derivedOwnerUid,
+        // El TEXTO NO se guarda. Vive en `audit_log/moderation__{reportId}`,
+        // que es lo que se mira en una apelacion; copiarlo aca seria una
+        // copia mas de datos de terceros. Mismo criterio que
+        // `moderation_quarantine`.
+        removedMedia: removedMediaUrl !== null,
+        at: new Date(),
+      },
+      { merge: true },
+    );
+
     try {
-      await db.doc(redactPath).update(
-        redactUpdates,
-        redactUpdateTime ? { lastUpdateTime: redactUpdateTime } : {},
-      );
+      await lote.commit();
     } catch (err) {
       if ((err as { code?: number }).code === FAILED_PRECONDITION) {
-        // El autor edito el contenido entre el PASO 1 y ahora. No se redacta:
+        // El autor edito el contenido entre el PASO 1 y ahora. No se redacta
+        // —ni se escribe el marcador de retiro, que va en el mismo batch—:
         // el moderador decidio sobre un texto que ya no esta, y el
         // `removedContent` que quedo en audit_log es el de esa version vieja.
         //
