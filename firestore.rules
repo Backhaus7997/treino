@@ -4612,6 +4612,28 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Que CONTENIDO ya retiro la cola de moderacion. UN doc por contenido
+    // —id `{targetKind}__{targetId}`—, no por reporte.
+    //
+    // CERRADA a todo cliente, en las dos direcciones. La escribe el Admin SDK
+    // desde `functions/src/moderation/report-review.ts`, que ignora estas
+    // reglas.
+    //
+    // Existe porque el id de un reporte incluye al denunciante
+    // (`{targetKind}_{targetId}_{reporterUid}`, mas abajo): veinte denuncias
+    // sobre el mismo post son veinte documentos, y despues de retirar el
+    // contenido por la primera, las otras diecinueve leian los campos vacios
+    // y ya no se podian cerrar como "contenido retirado". `audit_log` y
+    // `report_reviews` estan indexadas por REPORTE; esta, por el CONTENIDO.
+    //
+    // Leerla desde el cliente diria que se retiro y que no — el mismo canal
+    // de evasion que cierra `moderation_quarantine`. Y NO guarda el texto
+    // retirado: ese vive en `audit_log`, que es lo que se mira en una
+    // apelacion.
+    match /moderation_removals/{removalId} {
+      allow read, write: if false;
+    }
+
     // Resultado de la moderacion de un reporte. UN doc por reporte, mismo id.
     //
     // CERRADA a todo cliente, en las dos direcciones. La escribe el Admin SDK

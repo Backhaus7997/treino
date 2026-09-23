@@ -20,7 +20,9 @@ import {
   moderationStatsHandler,
   resolveReportHandler,
   extractStoragePath,
+  removalDocId,
   REVIEWS_COLLECTION,
+  REMOVALS_COLLECTION,
 } from "../moderation/report-review";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -61,7 +63,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  for (const c of ["reports", REVIEWS_COLLECTION]) {
+  for (const c of ["reports", REVIEWS_COLLECTION, REMOVALS_COLLECTION]) {
     const snap = await db.collection(c).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
@@ -141,6 +143,11 @@ function dbConCarrera(
     // importar.
     runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
       real.runTransaction(fn),
+    // Igual que `runTransaction`: el PASO 3 de contentRemoved redacta y
+    // escribe el marcador de retiro en UN batch atomico, asi que sin este
+    // passthrough el wrapper rompe con "is not a function" antes de llegar
+    // a lo que el helper simula.
+    batch: () => real.batch(),
   };
   return wrapped as unknown as Firestore;
 }
@@ -177,6 +184,11 @@ function dbConEscrituraDeMailQueFalla(real: Firestore): Firestore {
     },
     runTransaction: <T>(fn: (tx: FirebaseFirestore.Transaction) => Promise<T>) =>
       real.runTransaction(fn),
+    // Igual que `runTransaction`: el PASO 3 de contentRemoved redacta y
+    // escribe el marcador de retiro en UN batch atomico, asi que sin este
+    // passthrough el wrapper rompe con "is not a function" antes de llegar
+    // a lo que el helper simula.
+    batch: () => real.batch(),
   };
   return wrapped as unknown as Firestore;
 }
@@ -1221,5 +1233,214 @@ describe("moderationStats", () => {
     expect(s.pending).toBe(0);
     expect(s.oldestPendingAt).toBeNull();
     expect(s.oldestPendingHours).toBeNull();
+  });
+});
+
+describe("resolveReport — P3-A: los duplicados de un reporte ya accionado", () => {
+  /**
+   * Siembra DOS reportes sobre el mismo post, de denunciantes distintos —
+   * que es lo que pasa de verdad: el id de un reporte incluye al
+   * denunciante (`firestore.rules:4614-4616`), asi que veinte denuncias
+   * sobre el mismo post son veinte documentos.
+   */
+  async function sembrarDosDenunciasDelMismoPost(postId: string) {
+    const owner = `owner-${postId}`;
+    await sembrarReporte("r1", 4 * 3600_000, {
+      targetKind: "post", targetId: postId,
+      targetOwnerUid: owner, reporterUid: "denunciante-1",
+    });
+    await sembrarReporte("r2", 3 * 3600_000, {
+      targetKind: "post", targetId: postId,
+      targetOwnerUid: owner, reporterUid: "denunciante-2",
+    });
+    await db.collection("posts").doc(postId).set({
+      text: "contenido que viola las normas", authorUid: owner,
+    });
+    extraCleanupPaths.push(
+      `posts/${postId}`,
+      "audit_log/moderation__r1",
+      "audit_log/moderation__r2",
+    );
+    return owner;
+  }
+
+  it("el duplicado se cierra como contentRemoved y apunta al reporte que lo ejecuto", async () => {
+    const owner = await sembrarDosDenunciasDelMismoPost("post-p3a-1");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // El segundo: mismo contenido, ya vacio. Antes tiraba "no tiene texto ni
+    // contenido multimedia para retirar" — un mensaje FALSO — y dejaba al
+    // moderador sin forma de cerrarlo salvo como dismissed/none.
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.get("status")).toBe("actioned");
+    expect(rev.get("action")).toBe("contentRemoved");
+
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    expect(audit.get("action")).toBe("contentRemoved");
+    // Apunta a donde esta la evidencia, y NO duplica el texto original con
+    // una copia vacia que leeria como "lo retirado era la cadena vacia".
+    expect(audit.get("alreadyRemovedByReportId")).toBe("r1");
+    expect(audit.get("removedContent")).toBeNull();
+    // El dueno derivado sigue saliendo del contenido, no del reporte.
+    expect(audit.get("derivedOwnerUid")).toBe(owner);
+  });
+
+  it("el retiro deja el marcador indexado por CONTENIDO, no por reporte", async () => {
+    const owner = await sembrarDosDenunciasDelMismoPost("post-p3a-2");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    const marca = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId("post", "post-p3a-2"))
+      .get();
+    expect(marca.exists).toBe(true);
+    expect(marca.get("reportId")).toBe("r1");
+    expect(marca.get("derivedOwnerUid")).toBe(owner);
+    expect(marca.get("path")).toBe("posts/post-p3a-2");
+    expect(marca.get("removedMedia")).toBe(false);
+    // El texto retirado NO se copia aca: vive en el audit_log.
+    expect(marca.get("removedContent")).toBeUndefined();
+  });
+
+  it("el duplicado NO vuelve a tocar el contenido", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-3");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    const despuesDelPrimero =
+      (await db.collection("posts").doc("post-p3a-3").get()).updateTime;
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const post = await db.collection("posts").doc("post-p3a-3").get();
+    expect(post.get("text")).toBe("");
+    // Misma version del documento: el duplicado no escribio nada encima.
+    expect(post.updateTime?.isEqual(despuesDelPrimero!)).toBe(true);
+  });
+
+  it("si el contenido ademas se borro, el duplicado se cierra igual", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-4");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    // El autor borra el post despues de que la moderacion lo retiro. El
+    // hecho de que se retiro no deja de ser cierto porque el documento ya
+    // no este.
+    await db.collection("posts").doc("post-p3a-4").delete();
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.get("action")).toBe("contentRemoved");
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    // El dueno derivado sale del marcador cuando el documento ya no esta.
+    expect(audit.get("derivedOwnerUid")).toBe("owner-post-p3a-4");
+  });
+
+  it("el marcador NO cubre contenido NUEVO: si el autor reescribe, se redacta", async () => {
+    await sembrarDosDenunciasDelMismoPost("post-p3a-5");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+    // El autor reescribe el mismo post. Hay contenido NUEVO: el segundo
+    // reporte tiene que retirarlo de verdad, no cerrarse como duplicado.
+    await db.collection("posts").doc("post-p3a-5").update({
+      text: "lo volvi a escribir igual",
+    });
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r2", status: "actioned", action: "contentRemoved",
+    });
+
+    const post = await db.collection("posts").doc("post-p3a-5").get();
+    expect(post.get("text")).toBe("");
+    const audit = await db.collection("audit_log").doc("moderation__r2").get();
+    expect(audit.get("removedContent")).toBe("lo volvi a escribir igual");
+    expect(audit.get("alreadyRemovedByReportId")).toBeNull();
+  });
+
+  it("si el autor republica antes del cierre, el duplicado aborta", async () => {
+    // El camino del duplicado no escribe sobre el contenido, asi que no
+    // tiene donde poner el `lastUpdateTime` que protege al camino normal.
+    // Sin la revalidacion del PASO 4, el reporte quedaria cerrado como
+    // "contenido retirado" sobre contenido VIVO.
+    await sembrarDosDenunciasDelMismoPost("post-p3a-7");
+
+    await resolveReportHandler(db, app, "mod1", {
+      reportId: "r1", status: "actioned", action: "contentRemoved",
+    });
+
+    // El autor restaura el texto DESPUES de que el PASO 1 del duplicado lo
+    // vio vacio — `dbConCarrera` interfiere en la escritura del audit_log,
+    // que es justo esa ventana.
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3a-7").update({
+        text: "lo republique",
+      }),
+    );
+
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r2", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r2").get();
+    expect(rev.exists).toBe(false);
+    // Y el contenido republicado sigue en pie: el reporte vuelve a la cola
+    // para que lo miren de nuevo, ahora con texto.
+    expect((await db.collection("posts").doc("post-p3a-7").get()).get("text"))
+      .toBe("lo republique");
+  });
+
+  it("la redaccion y el marcador son atomicos: si el autor edita en el medio, no entra ninguno", async () => {
+    const owner = "owner-post-p3a-6";
+    await sembrarReporte("r1", 3600_000, {
+      targetKind: "post", targetId: "post-p3a-6", targetOwnerUid: owner,
+    });
+    await db.collection("posts").doc("post-p3a-6").set({
+      text: "texto original", authorUid: owner,
+    });
+    extraCleanupPaths.push("posts/post-p3a-6", "audit_log/moderation__r1");
+
+    // El autor edita entre el PASO 1 y el PASO 3 — la misma carrera que
+    // cubre el test de `aborted`, mirada desde el marcador.
+    const conCarrera = dbConCarrera(db, () =>
+      db.collection("posts").doc("post-p3a-6").update({ text: "lo edite" }),
+    );
+
+    await expect(
+      resolveReportHandler(conCarrera, app, "mod1", {
+        reportId: "r1", status: "actioned", action: "contentRemoved",
+      }),
+    ).rejects.toThrow(/cambio mientras lo revisabas/i);
+
+    const marca = await db
+      .collection(REMOVALS_COLLECTION)
+      .doc(removalDocId("post", "post-p3a-6"))
+      .get();
+    // Sin esta atomicidad el marcador quedaria diciendo que se retiro algo
+    // que sigue publicado — y habilitaria a cerrar los duplicados sobre
+    // contenido vivo.
+    expect(marca.exists).toBe(false);
+    expect((await db.collection("posts").doc("post-p3a-6").get()).get("text"))
+      .toBe("lo edite");
   });
 });
