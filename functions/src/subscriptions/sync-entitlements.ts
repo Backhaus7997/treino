@@ -63,6 +63,7 @@ import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { toSubscriptionState } from "./subscription-state";
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
+import { resolvePlanLimits } from "./trainer-plan-limits";
 
 /**
  * Lee los millis de un valor que DEBERIA ser un Timestamp, sin confiar en que
@@ -379,12 +380,38 @@ export async function syncTrainerEntitlements(
         blockedReason: FieldValue.delete(),
       });
     }
+    // ── planLimits (limite-ejercicios-pf.md, PR1) ──────────────────────────
+    //
+    // Mismo `sub`, mismo `degraded` y mismo `clock` con los que se calculo el
+    // tope de alumnos arriba: los dos topes tienen que salir del MISMO plan en
+    // el MISMO instante, y esta funcion ya corre en los tres caminos que
+    // importan (trigger de suscripcion, linkLoadReconcile, barrido de 04:00).
+    //
+    // `resolvePlanLimits` devuelve `null` para decir "no tocar" (solo pasa con
+    // `degraded === true`): en ese caso la clave `planLimits` se OMITE del
+    // objeto que se mergea, no se escribe como `{planLimits: null}` — con
+    // `degraded` no se decide nada sobre un documento que sabemos que leimos
+    // mal. Encendido o apagado, `resolvePlanLimits` SIEMPRE devuelve un mapa
+    // (nunca null) cuando `degraded` es false, así que la clave interna
+    // `customExercises` viaja explícita incluso en `null` (apagado) — con
+    // `merge: true`, omitir la clave entera es "no tocar", no "borrar", y un
+    // valor numerico previo quedaria pegado para siempre si no se
+    // sobreescribiera.
+    const planLimits = resolvePlanLimits(sub, degraded, clock);
+    const trainerUpdate: Record<string, unknown> = {
+      weightedLoad,
+      blockedAthleteIds: blockedAthleteIdsNow,
+    };
+    if (planLimits !== null) {
+      trainerUpdate.planLimits = planLimits;
+    }
+
     // `merge: true` con un array REEMPLAZA el array entero, que es justo lo
     // que se quiere: el campo describe un estado completo, no un incremento.
     // Cuando no queda nadie bloqueado se escribe `[]` y el valor viejo muere.
     tx.set(
       db.collection("users").doc(trainerId),
-      { weightedLoad, blockedAthleteIds: blockedAthleteIdsNow },
+      trainerUpdate,
       { merge: true },
     );
 

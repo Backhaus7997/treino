@@ -145,6 +145,11 @@ export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // el limite que cae solo por el paso del tiempo (cancelled + currentPeriodEnd
 // vencido no escribe un solo documento).
 export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptions/entitlement-triggers";
+// limite-ejercicios-pf.md, PR1: mantiene `users/{uid}.customExerciseUsage.count`
+// al dia cuando un PF crea o borra un ejercicio propio. Interruptor
+// TRAINER_EXERCISE_LIMITS_ENABLED (trainer-plan-limits.ts) arranca apagado —
+// ver el encabezado de ese modulo antes de prenderlo.
+export { maintainCustomExerciseCount } from "./subscriptions/custom-exercise-count";
 // Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
 // el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
 // PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen

@@ -26,6 +26,7 @@ import {
   decideSubscriptionMail,
   enqueueSubscriptionMail,
 } from "./subscription-mail";
+import { recountCustomExercises } from "./trainer-plan-limits";
 
 function ensureApp(): App {
   try {
@@ -150,6 +151,24 @@ export async function sweepEntitlementsHandler(
           trainerId: doc.id,
           blocked: r.blocked.length,
           unblocked: r.unblocked.length,
+        });
+      }
+
+      // limite-ejercicios-pf.md, PR1: este barrido ya itera TODO PF
+      // (`role == 'trainer'`), asi que es el lugar barato para curar
+      // cualquier desvio del contador de ejercicios propios — cubre en
+      // particular al PF recien promovido por
+      // `scripts/promote_user_to_trainer.js`, que no dispara ningun trigger
+      // de suscripcion y por lo tanto nunca pasa por `custom-exercise-count.ts`.
+      // Un error acá no aborta la reconciliacion de entitlements de este PF:
+      // va en su propio try para no perder lo que `syncTrainerEntitlements`
+      // ya logro escribir.
+      try {
+        await recountCustomExercises(app, doc.id);
+      } catch (err) {
+        logger.error("sweepEntitlements: error recontando ejercicios propios", {
+          trainerId: doc.id,
+          err,
         });
       }
 
