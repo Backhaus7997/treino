@@ -3,10 +3,15 @@
 **24 de septiembre de 2026.** Escrito contra `origin/main` de `treino` en
 `15f7337e`. Los números de línea son de ese commit y se van a correr.
 
-**Estado:** PR 0 a PR 4 van juntos en un solo PR, todo apagado
-(`TRAINER_EXERCISE_LIMITS_ENABLED = false`). El PR 5 (copy de planes y legales)
-sigue separado y se mergea el día D: publicarlo antes violaría el aviso previo
-de `contrato-entrenador.md` §12.
+**Estado:** PR 0 a PR 4 y el copy del Coach Hub del PR 5 van juntos en un solo
+PR, con el interruptor apagado (`TRAINER_EXERCISE_LIMITS_ENABLED = false`). Los
+legales del PR 5 van en su propia rama, `docs/legal-limite-ejercicios-pf`, y se
+publican antes que el código.
+
+**Todavía no hay entrenadores reales:** todas las cuentas de PF son de prueba.
+Por eso no hay aviso previo del §12 que mandar. La condición que queda es otra:
+**el encendido (§4) tiene que ocurrir antes de dar de alta al primer entrenador
+real.**
 
 ---
 
@@ -41,9 +46,9 @@ si el campo dice `null`, no gatea. Encender o apagar es un deploy de functions,
 no un build de tienda. Es la diferencia más importante con el paywall del
 alumno, donde `kAthletePaywallEnabled` está compilado en el binario.
 
-**Seis PRs y un encendido.** Cada PR entra en el presupuesto de ~400 líneas por
-review. PR 0 a PR 4 se pueden deployar apagados; PR 5 se mergea el día del
-encendido.
+**Seis PRs y un encendido**, en el diseño original. En la práctica, PR 0 a PR 4
+y el copy del Coach Hub van en un solo PR que se deploya apagado. Los legales
+van por separado (ver Estado).
 
 ---
 
@@ -361,9 +366,10 @@ mismo embudo.
 **Deploy:**
 
 - El Coach Hub web sale cuando se mergea.
-- El móvil entra en el próximo build de tienda. **Conviene que salga antes del
-  encendido:** es inerte con el campo en `null`, y un móvil viejo que choque el
-  tope vería el error genérico.
+- El móvil entra en el próximo build de tienda, y **ese build tiene que estar
+  publicado antes del encendido**. El build 52 no tiene el gate. Con el campo en
+  `null` el gate es inerte, pero un móvil sin gate que choque el tope ve el
+  error genérico de la regla.
 
 ### PR 4: el mail
 
@@ -405,7 +411,13 @@ enterarse ahí de dónde se paga. Sin mail no tiene salida. Es la misma lógica 
 - Las cuatro cláusulas de silencio.
 - El template pasa el test de tildes del #1236.
 
-### PR 5: copy de planes y legales (se mergea el día D)
+### PR 5: copy de planes y legales
+
+> **Actualización:** los legales (`contrato-entrenador.md`,
+> `terminos-suscripcion.md` y `web/legal/legal-content.json`) ya están hechos en
+> la rama `docs/legal-limite-ejercicios-pf` (`5ad61525`) y se publican antes que
+> el código. En la rama del feature queda sólo el copy del Coach Hub. Lo que
+> sigue sobre los legales queda como registro de qué se pidió.
 
 **Coach Hub:**
 
@@ -462,14 +474,17 @@ enterarse ahí de dónde se paga. Sin mail no tiene salida. Es la misma lógica 
 
 ## 4. Encendido
 
-**Antes:** PR 0 a PR 4 deployados y observados en producción, y el aviso del §5
-enviado con la antelación definida.
+**Cuándo:** antes de dar de alta al primer entrenador real. Hoy todos los PF son
+cuentas de prueba, así que no hay aviso previo que mandar (§5).
 
-1. **Día D:** merge del PR 5, deploy del Coach Hub y PR de la landing.
-2. `TRAINER_EXERCISE_LIMITS_ENABLED = true` y deploy de functions.
-3. **Correr el barrido a mano**, sin esperar a las 04:00, para que todos los PF
+**Antes:** el PR del feature deployado apagado y observado en producción, los
+legales publicados, y un build de tienda con el gate del PR 3 publicado. El
+build 52 no lo tiene.
+
+1. `TRAINER_EXERCISE_LIMITS_ENABLED = true` y deploy de functions.
+2. **Correr el barrido a mano**, sin esperar a las 04:00, para que todos los PF
    queden con su número de una vez.
-4. **Verificar:**
+3. **Verificar:**
    - Cada PF tiene el número que le corresponde según su plan.
    - Crear en el tope desde la web muestra el aviso con VER PLANES.
    - Crear en el tope desde el teléfono muestra el aviso de estado, sin botón.
@@ -485,37 +500,12 @@ nada que migrar.
 
 ## 5. El aviso a los entrenadores
 
-`contrato-entrenador.md` §12 ya lo exige:
+`contrato-entrenador.md` §12 exige avisar con antelación cuando cambia un límite
+de plan. **Hoy no aplica:** no hay entrenadores reales, todas las cuentas de PF
+son de prueba, y los legales con el límite se publican antes que el código.
 
-> Si el cambio afecta precios, límites de plan o tus obligaciones, te avisamos
-> con antelación y podés dar de baja la suscripción sin penalidad antes de que
-> entre en vigencia.
-
-- **Aplica a todos los PF, Free incluido:** a todos les cambia un límite.
-- **El plazo no está escrito en el contrato.** Definilo con el abogado antes de
-  fijar el día D.
-- Con la base actual de PF alcanza un mail manual desde `treino@gettreino.com`.
-  Los destinatarios salen del PR 0.
-
-**Borrador:**
-
-> **Asunto:** Cambios en los planes de TREINO a partir del <fecha>
->
-> Hola, <nombre>:
->
-> A partir del <fecha>, cada plan de TREINO incluye un límite de ejercicios
-> propios en tu biblioteca: 20 en el plan gratuito, 60 en el Plan 1, 120 en el
-> Plan 2 y sin límite en el Plan 3. Los ejercicios del catálogo de TREINO no
-> cuentan y los seguís usando sin límite.
->
-> Si hoy tenés más de los que incluye tu plan, no perdés ninguno: los
-> conservás, los podés usar, editar y asignar. Sólo se frena la creación de
-> nuevos.
->
-> Si no estás de acuerdo con el cambio, podés dar de baja tu suscripción sin
-> penalidad antes del <fecha>.
->
-> Los términos actualizados van a estar publicados en <URL> desde esa fecha.
+Aplicaría si el encendido se atrasara hasta después del alta del primer
+entrenador real. Esa es justamente la condición del §4.
 
 ---
 
@@ -558,13 +548,12 @@ nada que migrar.
 - [ ] Cinco puntos de entrada por el embudo
 - [ ] Guards de anti-steering en verde sin excepciones nuevas
 - [ ] Ningún `null` renderizado
-- [ ] Build móvil publicado antes del día D
+- [ ] Gate incluido en el build que sale a las tiendas (el build 52 no lo tiene), publicado antes del encendido
 
 **PR 4**
 - [ ] Mail con `prefKey` y enfriamiento de 14 días
 
 **PR 5 y encendido**
-- [ ] Plazo del aviso confirmado con el abogado
-- [ ] Aviso enviado a todos los PF
-- [ ] Legales regenerados y landing sincronizada
-- [ ] Interruptor encendido, barrido corrido y verificación del §4 completa
+- [ ] Copy del Coach Hub (`pricing_screen.dart`, `plan_copy.dart`, `facturacion_tab.dart`)
+- [ ] Legales publicados desde `docs/legal-limite-ejercicios-pf` y landing sincronizada
+- [ ] Interruptor encendido **antes del alta del primer entrenador real**, barrido corrido y verificación del §4 completa
