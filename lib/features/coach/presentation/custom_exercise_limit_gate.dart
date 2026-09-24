@@ -8,7 +8,7 @@ import '../../profile/application/user_providers.dart'
 import '../../profile/domain/user_role.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
-import 'custom_exercise_quota_provider.dart';
+import '../application/custom_exercise_quota_provider.dart';
 
 /// El `kind` que anota [registrarTopeDelPlanPf] cuando el PF choca el tope de
 /// ejercicios propios (docs/limite-ejercicios-pf.md §2). Constante

@@ -15,7 +15,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:treino/features/coach/presentation/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
 import 'package:treino/features/workout/application/custom_exercise_providers.dart'
