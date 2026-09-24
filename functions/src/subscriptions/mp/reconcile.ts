@@ -858,10 +858,49 @@ async function escribirSuscripcionDeAlumno(i: {
   };
 }
 
+/**
+ * La suscripcion leida POR ID, puesta adelante de lo que devolvio la busqueda.
+ *
+ * ── ⚠️ El indice de busqueda de MP llega tarde ──
+ *
+ * `searchPreapprovalsByPlan` sale de un indice que MP actualiza con demora.
+ * Medido el 2026-09-24 contra el sandbox: una suscripcion recien creada NO
+ * aparecia a los 979 ms y SI a los ~93 s. `getPreapproval`, en cambio, lee por
+ * id y la devuelve al instante.
+ *
+ * El webhook llega ~1 s despues del pago, o sea adentro de esa ventana. Sin
+ * esto, la busqueda volvia vacia, el alta salia como `sin-suscripcion`, el
+ * webhook la marcaba procesada y contestaba 200 —MP no reintenta— y el dedupe
+ * se comia los avisos siguientes. **El webhook no acreditaba ninguna alta**:
+ * quien pagaba y cerraba la pestaña esperaba al barrido de las 03:00.
+ *
+ * Si la busqueda SI la trae, igual gana la leida por id: es la mas fresca de
+ * las dos, y es la que MP acaba de confirmar.
+ */
+export function conLaConocidaPrimero(
+  subs: MpPreapproval[],
+  conocida: MpPreapproval | undefined,
+  planId: string,
+): MpPreapproval[] {
+  if (!conocida) return subs;
+  // La de otro plan no se mezcla: escribiria el estado de una suscripcion
+  // ajena sobre el mapeo de este plan.
+  if (conocida.preapproval_plan_id !== planId) return subs;
+  const id = conocida.id;
+  if (typeof id !== "string" || id === "") return subs;
+  return [conocida, ...subs.filter((s) => s.id !== id)];
+}
+
+/**
+ * @param conocida - La suscripcion de ESTE plan, ya leida por id. La pasa el
+ *   webhook, que la tiene en la mano. Ver [conLaConocidaPrimero]: sin ella, un
+ *   alta recien pagada puede no aparecer todavia en la busqueda.
+ */
 export async function reconcileSubscription(
   app: App,
   planId: string,
   deps: ReconcileDeps,
+  conocida?: MpPreapproval,
 ): Promise<ReconcileResult> {
   // ── GUARDA DE REEMPLAZO: lo que dimos de baja nosotros no escribe nada ──
   //
@@ -911,11 +950,15 @@ export async function reconcileSubscription(
     });
     return { planId, outcome: "error-mp" };
   }
+  subs = conLaConocidaPrimero(subs, conocida, planId);
 
   // Cero suscripciones es el estado NORMAL de un plan recien creado: el PF
   // abrio el checkout y todavia no pago, o lo abandono. No es un error y no se
   // logea — con un plan por checkout, la mayoria de los planes viejos van a
   // estar asi para siempre.
+  //
+  // Vale para el BARRIDO. Para el webhook no: MP le acaba de avisar que la
+  // suscripcion existe, y por eso la pasa en `conocida`.
   if (subs.length === 0) {
     return { planId, outcome: "sin-suscripcion" };
   }

@@ -69,6 +69,7 @@ import {
   topicoDelEvento,
 } from "../subscriptions/mp/webhook";
 import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
+import { conLaConocidaPrimero } from "../subscriptions/mp/reconcile";
 
 // ---------------------------------------------------------------------------
 
@@ -238,6 +239,67 @@ describe("runMpWebhook — el camino que acredita el pago", () => {
     expect(store.users.t1.subscription).toBeUndefined();
     // Se marca procesado: reintentar no le va a poner un plan.
     expect(store.mp_webhook_events[SUB_ID].procesadoMs).toBe(AHORA);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ⚠️ El indice de busqueda de MP llega tarde
+//
+// `fakeMp` devuelve la suscripcion en la busqueda al instante, y por eso
+// ningun test de arriba podia ver esto. Medido contra el sandbox el
+// 2026-09-24: una suscripcion recien creada NO aparecia en
+// `/preapproval/search` a los 979 ms y SI a los ~93 s. El webhook llega ~1 s
+// despues del pago. Sin la conocida, el alta salia `sin-suscripcion`, se
+// marcaba procesada, y quien pagaba esperaba al barrido de las 03:00.
+// ---------------------------------------------------------------------------
+describe("⚠️ runMpWebhook — el indice de busqueda de MP llega tarde", () => {
+  /** MP ya creo la suscripcion, pero su buscador todavia devuelve `indice`. */
+  function conIndice(respuesta: MpPreapproval, indice: MpPreapproval[]) {
+    const mp = fakeMp(respuesta);
+    mp.mpClient.searchPreapprovalsByPlan = async () => indice;
+    return mp;
+  }
+
+  it("el alta del PF se acredita aunque la busqueda todavia no la devuelva", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    const mp = conIndice(AUTORIZADA, []);
+
+    const r = await runMpWebhook(app, req(), deps(mp));
+
+    expect(r).toBe("reconciliado");
+    expect((store.users.t1.subscription as Record<string, unknown>).status).toBe("active");
+    expect(store.mp_webhook_events[SUB_ID].outcome).toBe("written");
+  });
+
+  it("y la del alumno tambien", async () => {
+    const { app, store } = fakeApp({
+      users: { a1: { role: "athlete" } },
+      mp_plans: { p1: { uid: "a1", producto: "athlete", cycle: "monthly" } },
+    });
+    const mp = conIndice(
+      { ...AUTORIZADA, external_reference: "a1", auto_recurring: { transaction_amount: 3500 } },
+      [],
+    );
+
+    await runMpWebhook(app, req(), deps(mp));
+
+    expect(store.users.a1.athleteSubscription).toEqual({ status: "active" });
+  });
+
+  it("si la busqueda trae una version vieja, gana la leida por id", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    const mp = conIndice(AUTORIZADA, [{ ...AUTORIZADA, status: "pending" }]);
+
+    await runMpWebhook(app, req(), deps(mp));
+
+    expect((store.users.t1.subscription as Record<string, unknown>).status).toBe("active");
+  });
+
+  it("una conocida de OTRO plan no se mezcla", () => {
+    // Escribiria el estado de una suscripcion ajena sobre el mapeo de este plan.
+    const ajena = { ...AUTORIZADA, preapproval_plan_id: "p2" };
+
+    expect(conLaConocidaPrimero([], ajena, PLAN_ID)).toEqual([]);
   });
 });
 
