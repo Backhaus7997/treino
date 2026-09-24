@@ -29,6 +29,34 @@ const INK_CARD = "#0F1513";
 const MINT = "#2CE5A2";
 const BONE = "#FFFFFF";
 const MUTED = "#9BA8A1";
+// Mint aclarado: el punto medio del brillo del boton "hero". No es un
+// primitivo de la app; existe solo para que el borde respire dentro del mint.
+const MINT_GLOW = "#9FF5D6";
+
+/**
+ * El borde del boton "hero" brilla: va de blanco a mint claro y vuelve.
+ *
+ * Se queda en la familia del mint a proposito. Un violeta contra el relleno
+ * mint chocaba, y ni siquiera era un color de la marca.
+ *
+ * Es una MEJORA PROGRESIVA, no el diseño. Segun caniemail, `@keyframes` anda
+ * en Apple Mail (macOS e iOS) y Samsung Email, y NO en Gmail ni en Outlook:
+ * ahi el `<style>` se descarta y queda el borde fijo en `BONE`, que ya esta
+ * inline. Por eso el color base va inline y no solo en el keyframe: sin eso,
+ * en Gmail no habria borde.
+ *
+ * Detras de `prefers-reduced-motion`: a quien pidio menos movimiento no se le
+ * mueve nada.
+ */
+const CTA_BORDE_ANIMADO = [
+  "<style>",
+  "@media (prefers-reduced-motion: no-preference){",
+  "@keyframes treino-cta-borde{",
+  `0%,100%{border-color:${BONE}}`,
+  `50%{border-color:${MINT_GLOW}}`,
+  "}}",
+  "</style>",
+].join("");
 
 const FONT = "Arial,Helvetica,sans-serif";
 
@@ -169,6 +197,9 @@ export function trainerEntry(dest?: TrainerDestination): string {
  */
 export const LOGO_URL = "https://app.gettreino.com/email/wordmark.png";
 
+/** Tamaño del boton del CTA. Ver `layout()`. */
+type CtaSize = "normal" | "hero";
+
 /**
  * Wraps body markup in the branded shell.
  *
@@ -178,6 +209,10 @@ export const LOGO_URL = "https://app.gettreino.com/email/wordmark.png";
  * @param ctaHref  - Button target. Defaults to the app. The auth mails pass the
  *                   one-time link the Admin SDK minted, which is why this is a
  *                   parameter at all.
+ * @param ctaSize  - "hero" dibuja el boton a todo el ancho, con letra grande y
+ *                   un borde que brilla de blanco a mint. Es para el mail cuyo
+ *                   UNICO trabajo es que toquen el boton (el del tope del plan
+ *                   free); el resto usa "normal".
  */
 function layout(
   heading: string,
@@ -185,6 +220,7 @@ function layout(
   preheader: string,
   ctaLabel?: string,
   ctaHref: string = APP_ENTRY_ATHLETE,
+  ctaSize: CtaSize = "normal",
 ): string {
   // Hace falta la etiqueta Y el destino. Sin destino, `ctaHref` llega como ""
   // —los mails de auth pasan el `actionLink` crudo, y `sendQueuedMail` lo BORRA
@@ -194,9 +230,13 @@ function layout(
     ? [
       "<tr><td style=\"padding:8px 32px 32px 32px;\">",
       `<a href="${esc(ctaHref)}" style="display:inline-block;`,
-      `background:${MINT};color:${INK};font-weight:700;font-size:15px;`,
-      "text-decoration:none;padding:14px 28px;border-radius:8px;",
-      `font-family:${FONT};">${esc(ctaLabel)}</a>`,
+      `background:${MINT};color:${INK};font-weight:700;`,
+      ctaSize === "hero"
+        ? "font-size:22px;letter-spacing:1px;padding:30px 24px;" +
+          "width:100%;box-sizing:border-box;text-align:center;border-radius:14px;" +
+          `border:4px solid ${BONE};animation:treino-cta-borde 2.4s ease-in-out infinite;`
+        : "font-size:15px;padding:14px 28px;border-radius:8px;",
+      `text-decoration:none;font-family:${FONT};">${esc(ctaLabel)}</a>`,
       "</td></tr>",
     ].join("")
     : "";
@@ -206,7 +246,9 @@ function layout(
     "<html lang=\"es-AR\"><head><meta charset=\"utf-8\">",
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
     "<meta name=\"color-scheme\" content=\"dark\">",
-    "<title>TREINO</title></head>",
+    "<title>TREINO</title>",
+    ctaSize === "hero" ? CTA_BORDE_ANIMADO : "",
+    "</head>",
     `<body style="margin:0;padding:0;background:${INK};">`,
     // Preheader: la linea gris que la bandeja muestra al lado del asunto. Sin
     // esto el cliente agarra lo primero que encuentre en el HTML.
@@ -312,6 +354,7 @@ function build(
   lines: Line[],
   ctaLabel?: string,
   ctaHref?: string,
+  ctaSize?: CtaSize,
 ): RenderedMail {
   const bodyHtml = lines
     .map((l) => `<p style="margin:0 0 12px 0;">${lineToHtml(l)}</p>`)
@@ -330,7 +373,7 @@ function build(
 
   return {
     subject,
-    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref),
+    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref, ctaSize),
     text: textLines.join("\n"),
   };
 }
@@ -946,28 +989,27 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
   // alguien agregue el noveno. Es el mismo pozo que los numeros del plan free,
   // que ya se separaron una vez entre la constante, firestore.rules y el .arb.
   //
-  // EMPIEZA RECONOCIENDO EL INTENTO. Quien recibe esto quiso hacer algo y no
-  // pudo: arrancar con la oferta seria pasarle por encima al motivo por el que
-  // esta leyendo.
+  // EL ASUNTO RECONOCE EL INTENTO. Quien recibe esto quiso hacer algo y no
+  // pudo, y lo primero que lee —en la bandeja— nombra eso. El cuerpo no lo
+  // repite: el preheader sale del titulo y completa la frase del asunto.
+  //
+  // NO PROMETE "SIN LIMITES": Pro tambien tiene techo (`kMaxRoutineDays`,
+  // `kMaxRoutineWeeks`).
+  //
+  // NO TIENE CUERPO, a proposito: titulo y boton. La primera version explicaba
+  // en cuatro parrafos que el historial no se pierde y que limita el plan
+  // free; eso le habla a alguien con miedo, y el que choco un tope no perdio
+  // nada: quiere seguir. El mail tiene un solo trabajo —que toque el boton— y
+  // cada palabra alrededor le compite. `ctaUrl` es el checkout, por eso el
+  // boton puede decir "pago" sin mentir.
   case "free-limit-reached":
     return build(
-      "Quisiste hacer algo que el plan gratis no te deja", // i18n: email comercial
-      "Hay una forma de sacarte el tope",
-      [
-        ["Te topaste con un límite del plan gratis."],
-        [
-          "Tus entrenamientos, tu historial y tus medidas ",
-          strong("siguen donde estaban"),
-          ": el plan gratis no te saca nada de lo que ya hiciste.",
-        ],
-        [
-          "Lo que limita es lo que podés armar de acá en adelante — cuántas " +
-            "rutinas propias, de qué tamaño, y qué plantillas podés usar.",
-        ],
-        ["Si eso te queda corto, podés suscribirte por tu cuenta."],
-      ],
-      "VER EL PLAN",
+      "Lo que querías hacer está en TREINO Pro", // i18n: email comercial
+      "Estás a un paso.",
+      [],
+      "CONTINUAR AL PAGO →",
       ctaUrl,
+      "hero",
     );
 
   case "athlete-coverage-lost":
