@@ -178,9 +178,10 @@ function leet(s: string, lectura: Lectura): string {
     // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
     // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
     // texto mas comun que existe, un insulto con signo de exclamacion. Las
-    // otras lecturas —todas menos la estricta— los leen distinto; ver
-    // `checkText`.
-    const ambiguo = VETTED_LEET_ALSO_AT_EDGES.has(ch);
+    // otras lecturas —todas menos la estricta— los leen distinto, salvo la
+    // `@` de un mail; ver `checkText`.
+    const ambiguo =
+      VETTED_LEET_ALSO_AT_EDGES.has(ch) && !esArrobaDeMail(chars, i);
     if (ambiguo && lectura === "total") {
       out += rep;
     } else if (ambiguo && lectura !== "estricta") {
@@ -214,6 +215,24 @@ function isAlnum(ch: string): boolean {
   if (ch.length !== 1) return false;
   const c = ch.charCodeAt(0);
   return (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a);
+}
+
+/**
+ * Si la `@` en `i` es la de un mail: le sigue un dominio (`gmail.com`). ESPEJO
+ * de `_esArrobaDeMail` en `moderation_filter.dart`: esa `@` no se relee, va
+ * con la regla estricta en todas las lecturas (`cul!@r.com` leia `culiar`).
+ */
+function esArrobaDeMail(chars: readonly string[], i: number): boolean {
+  if (chars[i] !== "@") return false;
+  let j = i + 1;
+  while (
+    j < chars.length &&
+    (isAlnum(chars[j]) || chars[j] === "-" || chars[j] === "_")
+  ) {
+    j++;
+  }
+  return j > i + 1 && j + 1 < chars.length && chars[j] === "." &&
+    isAlnum(chars[j + 1]);
 }
 
 /**

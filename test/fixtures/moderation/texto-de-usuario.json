@@ -67,6 +67,11 @@
       "www.clubatleticosanisidro.com.ar/turnos",
       "https://es.wikipedia.org/wiki/Sentadilla"
     ],
+    "correos_con_simbolos": [
+      "cul!@r.com", "ventas$@computo.com", "juan.perez!@gmail.com",
+      "info$@controlo.com.ar", "maria!!@hotmail.com",
+      "mi mail es cul!@r.com, escribime"
+    ],
     "menciones": [
       "@lucas_fit", "@sofi.rodriguez", "@gym.palermo", "@coach_nico",
       "@treino.app", "@maria_gonzalez", "@el.profe.ana", "@crossfit_belgrano",

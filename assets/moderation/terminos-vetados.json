@@ -518,7 +518,7 @@
     {
       "texto": "put@",
       "espera": "block",
-      "por": "`@` al final de palabra. Con solo la forma estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la forma amplia"
+      "por": "`@` al final de palabra. Con solo la lectura estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la lectura sufijo"
     },
     {
       "texto": "@ndate a morir",
@@ -619,6 +619,16 @@
       "texto": "computoputo",
       "espera": "block",
       "por": "lo mismo, del otro lado"
+    },
+    {
+      "texto": "cul!@r.com",
+      "espera": "ok",
+      "por": "un mail con `!` justo antes de la `@`: la lectura adyacente leia `culiar`, porque tomaba el `!` y la `@` como letras y pegaba usuario y dominio. La `@` de un mail —la que tiene un dominio despues— no se relee nunca"
+    },
+    {
+      "texto": "c0nch@s.com",
+      "espera": "block",
+      "por": "y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando"
     },
     {
       "texto": "@c0lg@t3 d3 un @rb0l",

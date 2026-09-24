@@ -198,8 +198,8 @@ Map<String, String> variantes(String termino) {
     // Adornos pegados al termino completo, solos y encima de una
     // sustitucion. Una `@` en el borde a veces es una `a` —`put@`—, a veces
     // un adorno —`pija@`— y a veces las dos —`put@@`—: cada arreglo que
-    // cubrio solo una de las tres paso verde sin estas variantes. Paso dos
-    // veces en este PR.
+    // cubrio solo una de las tres paso verde sin estas variantes. Paso mas de
+    // una vez en este PR.
     'arroba adelante': '@$termino',
     'arroba atras': '$termino@',
     'exclamacion atras': '$termino!',

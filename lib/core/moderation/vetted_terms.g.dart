@@ -112,10 +112,10 @@ const Map<String, String> kVettedLeet = {
 const Set<String> kVettedLeetOnlyBetweenLetters = {'!', '\$', '@'};
 
 /// Los simbolos que el filtro vuelve a leer sin la regla de
-/// [kVettedLeetOnlyBetweenLetters], en las lecturas `adyacente` y `total`.
-/// Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
-/// `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
-/// scripts/build_moderation_list.py.
+/// [kVettedLeetOnlyBetweenLetters], en todas las lecturas menos la estricta
+/// (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+/// `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
 const Set<String> kVettedLeetAlsoAtEdges = {'!', '\$', '@'};
 
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -726,7 +726,7 @@ const List<
     normalizado: 'put@',
     lecturas: ['put@', 'puta'],
     por:
-        '`@` al final de palabra. Con solo la forma estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la forma amplia'
+        '`@` al final de palabra. Con solo la lectura estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la lectura sufijo'
   ),
   (
     texto: '@ndate a morir',
@@ -877,6 +877,22 @@ const List<
     normalizado: 'computoputo',
     lecturas: ['computoputo'],
     por: 'lo mismo, del otro lado'
+  ),
+  (
+    texto: 'cul!@r.com',
+    espera: 'ok',
+    normalizado: 'cul!@r.com',
+    lecturas: ['cul!@r.com', 'culi@r.com'],
+    por:
+        'un mail con `!` justo antes de la `@`: la lectura adyacente leia `culiar`, porque tomaba el `!` y la `@` como letras y pegaba usuario y dominio. La `@` de un mail —la que tiene un dominio despues— no se relee nunca'
+  ),
+  (
+    texto: 'c0nch@s.com',
+    espera: 'block',
+    normalizado: 'conchas.com',
+    lecturas: ['conchas.com'],
+    por:
+        'y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando'
   ),
   (
     texto: '@c0lg@t3 d3 un @rb0l',

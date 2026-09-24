@@ -25,10 +25,10 @@ export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set(["!
 
 /**
  * Los simbolos que el filtro vuelve a leer sin la regla de
- * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en las lecturas `adyacente` y `total`.
- * Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
- * `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
- * scripts/build_moderation_list.py.
+ * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en todas las lecturas menos la estricta
+ * (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+ * `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
  */
 export const VETTED_LEET_ALSO_AT_EDGES: ReadonlySet<string> = new Set(["!", "$", "@"]);
 
@@ -146,7 +146,7 @@ export const VETTED_CASES: readonly {
   { texto: "c u l o", espera: "review", normalizado: "c u l o", lecturas: ["c u l o"], por: "la pasada C respeta la severidad del termino: `culo` es `review` escrito normal y deletreado" },
   { texto: "por no entrenar", espera: "ok", normalizado: "por no entrenar", lecturas: ["por no entrenar"], por: "`por`+`no` pegados dan `porno`. La pasada C pega SOLO tokens de una letra por esto" },
   { texto: "hice 5 x 5 de sentadilla y 3 x 8 de press", espera: "ok", normalizado: "hice s x s de sentadilla y e x 8 de press", lecturas: ["hice s x s de sentadilla y e x 8 de press"], por: "la notacion de series produce letras sueltas legitimas (`s x s`, `y e x 8`): la corrida no contiene ningun termino" },
-  { texto: "put@", espera: "block", normalizado: "put@", lecturas: ["put@", "puta"], por: "`@` al final de palabra. Con solo la forma estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la forma amplia" },
+  { texto: "put@", espera: "block", normalizado: "put@", lecturas: ["put@", "puta"], por: "`@` al final de palabra. Con solo la lectura estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la lectura sufijo" },
   { texto: "@ndate a morir", espera: "block", normalizado: "@ndate a morir", lecturas: ["@ndate a morir", "andate a morir"], por: "`@` al principio de palabra, sin ningun otro termino en la frase que la delate" },
   { texto: "te voy @ matar", espera: "block", normalizado: "te voy @ matar", lecturas: ["te voy @ matar", "te voy a matar"], por: "`@` suelta como preposicion: sin traducirla la frase pierde su `a` y no matchea" },
   { texto: "p1j@", espera: "block", normalizado: "pij@", lecturas: ["pij@", "pija"], por: "digito y `@` final en el mismo termino" },
@@ -167,6 +167,8 @@ export const VETTED_CASES: readonly {
   { texto: "@computo", espera: "ok", normalizado: "@computo", lecturas: ["@computo", "acomputo"], por: "una mencion pegada a una palabra de la allowlist: la lectura adyacente lee `acomputo`" },
   { texto: "putocomputo", espera: "block", normalizado: "putocomputo", lecturas: ["putocomputo"], por: "recortar la allowlist de adentro no puede tapar lo que esta AFUERA de la palabra" },
   { texto: "computoputo", espera: "block", normalizado: "computoputo", lecturas: ["computoputo"], por: "lo mismo, del otro lado" },
+  { texto: "cul!@r.com", espera: "ok", normalizado: "cul!@r.com", lecturas: ["cul!@r.com", "culi@r.com"], por: "un mail con `!` justo antes de la `@`: la lectura adyacente leia `culiar`, porque tomaba el `!` y la `@` como letras y pegaba usuario y dominio. La `@` de un mail —la que tiene un dominio despues— no se relee nunca" },
+  { texto: "c0nch@s.com", espera: "block", normalizado: "conchas.com", lecturas: ["conchas.com"], por: "y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando" },
   { texto: "@c0lg@t3 d3 un @rb0l", espera: "ok", normalizado: "@colgate de un @rbol", lecturas: ["@colgate de un @rbol", "acolgate de un arbol"], por: "HUECO CONOCIDO, fijado a proposito. La lectura de los simbolos se elige para TODO el texto, no palabra por palabra: la primera `@` es adorno en el borde de adelante de `colgate` y la de `@rbol` es letra en el mismo borde. Ninguna lectura acierta las dos. Elegir por palabra rompe el matcheo de frases, que compara tokens alineados. El backstop es la cola de reportes" },
   { texto: "tet@$!", espera: "ok", normalizado: "tet@$!", lecturas: ["tet@$!", "teta$!", "tetasi"], por: "HUECO CONOCIDO, fijado a proposito. Dos sustituciones seguidas en el borde (`@` por `a`, `$` por `s`) MAS un adorno (`!`): la lectura total traduce tambien el adorno y las de borde traducen solo el simbolo pegado a la letra. Mismo backstop" },
   { texto: "mandame el plan a juan@gmail.com", espera: "ok", normalizado: "mandame el plan a juanagmail.com", lecturas: ["mandame el plan a juanagmail.com"], por: "un mail comun. La `@` entre letras se traduce desde siempre y pega usuario y dominio en un token; ver el caso de `ana@controlo.com`" },

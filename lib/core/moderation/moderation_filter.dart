@@ -161,8 +161,9 @@ abstract final class ModerationFilter {
       // `puta` por palabra completa: el leet a lo bruto produce falsos
       // NEGATIVOS sobre el texto mas comun que existe, un insulto con signo
       // de exclamacion. Las otras lecturas —todas menos la estricta— los
-      // leen distinto; ver [check].
-      final ambiguo = kVettedLeetAlsoAtEdges.contains(ch);
+      // leen distinto, salvo la `@` de un mail; ver [check].
+      final ambiguo =
+          kVettedLeetAlsoAtEdges.contains(ch) && !_esArrobaDeMail(chars, i);
       if (ambiguo && lectura == _Lectura.total) {
         out.write(rep);
       } else if (ambiguo && lectura != _Lectura.estricta) {
@@ -198,6 +199,26 @@ abstract final class ModerationFilter {
     if (ch.length != 1) return false;
     final c = ch.codeUnitAt(0);
     return (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a);
+  }
+
+  /// Si la `@` en [i] es la de un mail: le sigue un dominio (`gmail.com`).
+  /// ESPEJO de `_es_arroba_de_mail` en el generador.
+  ///
+  /// Esa `@` no se relee: en todas las lecturas va con la regla estricta.
+  /// Sin esto, `cul!@r.com` leia `culiar` en la lectura adyacente —pegaba el
+  /// usuario con el dominio—. La estricta no cambia, asi que un termino
+  /// escrito con forma de mail (`c0nch@s.com`) se sigue cazando por ahi.
+  static bool _esArrobaDeMail(List<String> chars, int i) {
+    if (chars[i] != '@') return false;
+    var j = i + 1;
+    while (j < chars.length &&
+        (_isAlnum(chars[j]) || chars[j] == '-' || chars[j] == '_')) {
+      j++;
+    }
+    return j > i + 1 &&
+        j + 1 < chars.length &&
+        chars[j] == '.' &&
+        _isAlnum(chars[j + 1]);
   }
 
   /// Si la corrida de simbolos de `kVettedLeetAlsoAtEdges` que contiene a [i]

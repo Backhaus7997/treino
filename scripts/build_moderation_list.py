@@ -290,6 +290,24 @@ def _se_lee_como_letra(chars: list[str], i: int, modo: str) -> bool:
     return j == len(chars) or not _es_alnum(chars[j])
 
 
+def _es_arroba_de_mail(chars: list[str], i: int) -> bool:
+    """Si la `@` en `i` es la de un mail: le sigue un dominio (`gmail.com`).
+
+    Esa `@` no se relee: en todas las lecturas va con la regla estricta. Sin
+    esto, `cul!@r.com` —lo cazo la tercera revision del PR— leia `culiar` en
+    la lectura adyacente: tomaba el `!` y la `@` como letras y pegaba el
+    usuario con el dominio. La estricta no cambia, asi que un termino escrito
+    con forma de mail (`c0nch@s.com`) se sigue cazando por ahi.
+    """
+    if chars[i] != "@":
+        return False
+    j = i + 1
+    while j < len(chars) and (_es_alnum(chars[j]) or chars[j] in "-_"):
+        j += 1
+    return (j > i + 1 and j + 1 < len(chars) and chars[j] == "."
+            and _es_alnum(chars[j + 1]))
+
+
 def _corrida_interna(chars: list[str], i: int) -> bool:
     """Si la corrida de simbolos de `LEET_TAMBIEN_EN_BORDES` que contiene a
     `i` tiene una letra o un digito en cada extremo."""
@@ -325,8 +343,8 @@ def normalizar(texto: str, modo: str = "estricta") -> str:
     s = sin_diacriticos(texto.lower())
 
     # Leet. Los simbolos solo con letra a los DOS lados: ver
-    # LEET_SOLO_ENTRE_LETRAS. Las lecturas `adyacente` y `total` leen distinto
-    # los de LEET_TAMBIEN_EN_BORDES.
+    # LEET_SOLO_ENTRE_LETRAS. Las lecturas que no son la estricta leen
+    # distinto los de LEET_TAMBIEN_EN_BORDES, salvo la `@` de un mail.
     if modo not in LECTURAS:
         raise ValueError(f"modo desconocido: {modo!r}")
     chars = list(s)
@@ -336,9 +354,11 @@ def normalizar(texto: str, modo: str = "estricta") -> str:
         if rep is None:
             fuera.append(ch)
             continue
-        if modo == "total" and ch in LEET_TAMBIEN_EN_BORDES:
+        ambiguo = (ch in LEET_TAMBIEN_EN_BORDES
+                   and not _es_arroba_de_mail(chars, i))
+        if modo == "total" and ambiguo:
             fuera.append(rep)
-        elif modo != "estricta" and ch in LEET_TAMBIEN_EN_BORDES:
+        elif modo != "estricta" and ambiguo:
             fuera.append(rep if _se_lee_como_letra(chars, i, modo) else ch)
         elif ch in LEET_SOLO_ENTRE_LETRAS:
             antes = i > 0 and _es_alnum(chars[i - 1])
@@ -484,8 +504,8 @@ def cargar() -> dict:
     sin_efecto = sorted(LEET_TAMBIEN_EN_BORDES - LEET_SOLO_ENTRE_LETRAS)
     if sin_efecto:
         sys.exit(f"[!] LEET_TAMBIEN_EN_BORDES tiene simbolos que no estan en "
-                 f"LEET_SOLO_ENTRE_LETRAS, asi que la forma amplia no cambia "
-                 f"nada para ellos: {sin_efecto}")
+                 f"LEET_SOLO_ENTRE_LETRAS, asi que las lecturas no estrictas "
+                 f"no cambian nada para ellos: {sin_efecto}")
 
     return {
         "version": data["version"],
@@ -560,10 +580,10 @@ const Map<String, String> kVettedLeet = {{{leet}}};
 const Set<String> kVettedLeetOnlyBetweenLetters = {{{leet_entre}}};
 
 /// Los simbolos que el filtro vuelve a leer sin la regla de
-/// [kVettedLeetOnlyBetweenLetters], en las lecturas `adyacente` y `total`.
-/// Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
-/// `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
-/// scripts/build_moderation_list.py.
+/// [kVettedLeetOnlyBetweenLetters], en todas las lecturas menos la estricta
+/// (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+/// `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
 const Set<String> kVettedLeetAlsoAtEdges = {{{leet_bordes}}};
 
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -663,10 +683,10 @@ export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set({le
 
 /**
  * Los simbolos que el filtro vuelve a leer sin la regla de
- * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en las lecturas `adyacente` y `total`.
- * Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
- * `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
- * scripts/build_moderation_list.py.
+ * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en todas las lecturas menos la estricta
+ * (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+ * `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
  */
 export const VETTED_LEET_ALSO_AT_EDGES: ReadonlySet<string> = new Set({leet_bordes_ts});
 
