@@ -143,7 +143,7 @@ describe("cuando sí manda", () => {
     expect(setMock).toHaveBeenCalledTimes(1);
   });
 
-  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido reintente", async () => {
+  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido lo cuente como fallido", async () => {
     // `enqueueMail` no tira: un `null` sin documento en la cola es una falla.
     // Anotar acá silenciaría al alumno catorce días sin mail alguno.
     enqueueMock.mockResolvedValueOnce(null);

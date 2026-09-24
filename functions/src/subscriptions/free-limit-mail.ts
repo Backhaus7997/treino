@@ -175,7 +175,15 @@ export function decideFreeLimitMail(
  * el enfriamiento en los dos casos, una falla transitoria silenciaría al
  * alumno catorce días sin que exista mail alguno. Por eso, ante un `null`, se
  * mira la cola: si el documento está, se anota; si no, se tira, y el barrido
- * lo cuenta como fallido y lo reintenta mañana dentro de la ventana de 36 h.
+ * lo cuenta como fallido.
+ *
+ * Tirar NO garantiza un reintento. El barrido es diario y la ventana es de
+ * 36 h, así que la corrida de mañana sólo vuelve a ver los topes que hoy
+ * tienen menos de 12 h. Uno más viejo sale de la query y no se reintenta: el
+ * mail llega recién si el alumno vuelve a chocar un tope. Se aceptó así
+ * porque la falla es rara y el mail es comercial; lo que este chequeo sí
+ * garantiza es que ese próximo choque no encuentre un enfriamiento anotado
+ * sobre un mail que nunca salió.
  */
 export async function enqueueFreeLimitMail(
   app: App,
