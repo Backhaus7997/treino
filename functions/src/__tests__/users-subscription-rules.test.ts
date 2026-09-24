@@ -95,6 +95,14 @@ interface UserFixture {
   /// El total de BYTES de media de chat. CF-write-only: lo escribe
   /// `maintainChatMediaQuota*` y lo lee `storage.rules`.
   chatMediaUsage?: Record<string, unknown> | null;
+  /// El tope vigente de ejercicios propios del PF (limite-ejercicios-pf.md,
+  /// PR1). CF-write-only: lo escribe `syncTrainerEntitlements` y lo lee
+  /// `customExerciseQuotaOk`, en el match de `customExercises` mas abajo en
+  /// `firestore.rules`.
+  planLimits?: Record<string, unknown> | null;
+  /// Cuantos ejercicios propios tiene HOY el PF. CF-write-only: lo escribe
+  /// `recountCustomExercises`.
+  customExerciseUsage?: Record<string, unknown> | null;
 }
 
 /** Seed a users/{uid} doc via an Admin-privileged context (rules disabled). */
@@ -983,5 +991,170 @@ describe("users rules — chatMediaUsage: el contador del tope de media de chat"
     const ref = client.firestore().collection(COL_USERS).doc(`${uid}-normal`);
 
     await assertSucceeds(ref.update({ displayName: "Martin" }));
+  });
+});
+
+describe("users rules — planLimits/customExerciseUsage: el tope de ejercicios propios del PF (PR2)", () => {
+  // Hermano de customExerciseVideoUsage/chatMediaUsage y por el mismo motivo:
+  // sin el pin, el bypass es UNA escritura —`{planLimits: {customExercises:
+  // null}}` o `{customExerciseUsage: {count: 0}}`— y el tope que PR1 ya
+  // calcula queda decorativo para quien la mande. Los dos campos LOS LEE
+  // `customExerciseQuotaOk`, en el match de `customExercises` de este mismo
+  // `firestore.rules`.
+  const uid = "trainer-forge-plan-limits";
+
+  it("deniega al dueño escribirse planLimits de la nada (create)", async () => {
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertFails(
+      ref.set({
+        uid,
+        role: "trainer",
+        email: `${uid}@example.test`,
+        createdAt: 0,
+        planLimits: { customExercises: null },
+      }),
+    );
+  });
+
+  it("deniega al dueño escribirse customExerciseUsage de la nada (create)", async () => {
+    const freshUid = `${uid}-usage-create`;
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "trainer",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        customExerciseUsage: { count: 0 },
+      }),
+    );
+  });
+
+  it("deniega al dueño subirse el tope con un update (planLimits)", async () => {
+    const editUid = `${uid}-update`;
+    await seedUser({
+      uid: editUid,
+      role: "trainer",
+      email: `${editUid}@example.test`,
+      createdAt: 0,
+      planLimits: { customExercises: 20 },
+    });
+
+    const client = testEnv.authenticatedContext(editUid);
+    const ref = client.firestore().collection(COL_USERS).doc(editUid);
+
+    // El caso que de verdad importa: un PF en el tope se saca el limite de
+    // encima escribiendose `null` y queda sin tope para siempre.
+    await assertFails(ref.update({ planLimits: { customExercises: null } }));
+  });
+
+  it("deniega al dueño bajarse el contador con un update (customExerciseUsage)", async () => {
+    const editUid = `${uid}-usage-update`;
+    await seedUser({
+      uid: editUid,
+      role: "trainer",
+      email: `${editUid}@example.test`,
+      createdAt: 0,
+      planLimits: { customExercises: 20 },
+      customExerciseUsage: { count: 20 },
+    });
+
+    const client = testEnv.authenticatedContext(editUid);
+    const ref = client.firestore().collection(COL_USERS).doc(editUid);
+
+    await assertFails(ref.update({ customExerciseUsage: { count: 0 } }));
+  });
+
+  it("deniega BORRAR planLimits con el sentinela — el pin es en los dos sentidos", async () => {
+    const delUid = `${uid}-delete`;
+    await seedUser({
+      uid: delUid,
+      role: "trainer",
+      email: `${delUid}@example.test`,
+      createdAt: 0,
+      planLimits: { customExercises: 20 },
+    });
+
+    const client = testEnv.authenticatedContext(delUid);
+    const ref = client.firestore().collection(COL_USERS).doc(delUid);
+
+    await assertFails(
+      ref.update({ planLimits: firebase.firestore.FieldValue.delete() }),
+    );
+  });
+
+  it("el Admin SDK (syncTrainerEntitlements/recountCustomExercises) SI puede escribir los dos campos", async () => {
+    const cfUid = `${uid}-cf`;
+    await seedUser({
+      uid: cfUid,
+      role: "trainer",
+      email: `${cfUid}@example.test`,
+      createdAt: 0,
+    });
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await assertSucceeds(
+        ctx
+          .firestore()
+          .collection(COL_USERS)
+          .doc(cfUid)
+          .update({
+            planLimits: { customExercises: 60 },
+            customExerciseUsage: { count: 12 },
+          }),
+      );
+    });
+  });
+
+  it("deja pasar un update normal del perfil que no los toca", async () => {
+    const normalUid = `${uid}-normal`;
+    await seedUser({
+      uid: normalUid,
+      role: "trainer",
+      email: `${normalUid}@example.test`,
+      createdAt: 0,
+      planLimits: { customExercises: 60 },
+      customExerciseUsage: { count: 12 },
+    });
+
+    const client = testEnv.authenticatedContext(normalUid);
+    const ref = client.firestore().collection(COL_USERS).doc(normalUid);
+
+    await assertSucceeds(ref.update({ displayName: "Coach" }));
+  });
+});
+
+describe("users rules — trainerLimitHitKind/trainerLimitHitAt: SI los escribe el cliente (PR4)", () => {
+  // A diferencia de planLimits/customExerciseUsage, estos dos NO estan
+  // pineados a proposito: el plan (limite-ejercicios-pf.md §2) los define
+  // como escritos por el CLIENTE (`registrarTopeDelPlanPf`, el tramo
+  // siguiente). El update de `users/{uid}` no es un allowlist — es una
+  // conjuncion de pins por campo — asi que un campo sin pin explicito pasa
+  // sin mas. Este test confirma esa lectura contra el emulador real, no la
+  // asume: si algun pin nuevo (o un `hasOnly`) llegara a cerrar el update, el
+  // mail de PR4 se queda sin datos para leer y este test lo avisa primero.
+  const uid = "trainer-registra-tope";
+
+  it("permite al dueño anotarse el tope chocado", async () => {
+    await seedUser({
+      uid,
+      role: "trainer",
+      email: `${uid}@example.test`,
+      createdAt: 0,
+    });
+
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertSucceeds(
+      ref.update({
+        trainerLimitHitKind: "customExercises",
+        trainerLimitHitAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }),
+    );
   });
 });
