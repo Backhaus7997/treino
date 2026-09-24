@@ -895,6 +895,14 @@ const List<
         'y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando'
   ),
   (
+    texto: '\$ido\$o@example.com',
+    espera: 'block',
+    normalizado: '\$idosoaexample.com',
+    lecturas: ['\$idosoaexample.com', 'sidosoaexample.com'],
+    por:
+        'DECISION, fijada a proposito: el usuario de un mail se lee como lo escribio, y `\$ido\$o` es `sidoso` en leet. Lo unico que no se relee es la `@`, que separa usuario y dominio (ver `cul!@r.com`). Gmail solo acepta letras, numeros y puntos en el usuario, y Outlook agrega guiones y guiones bajos: un `\$` o un `!` ahi es leet a proposito, no una direccion comun'
+  ),
+  (
     texto: '@ndate.a.morir',
     espera: 'block',
     normalizado: '@ndate.a.morir',
