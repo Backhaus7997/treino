@@ -123,7 +123,12 @@ class _CustomExerciseLimitSheet extends StatelessWidget {
           top: false,
           bottom: true,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 18),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              AppSpacing.s12,
+              AppSpacing.s20,
+              AppSpacing.s18,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -132,7 +137,7 @@ class _CustomExerciseLimitSheet extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     color: palette.border,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s20),
@@ -220,7 +225,7 @@ class _CustomExerciseLimitDialog extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(AppSpacing.s20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -300,7 +305,7 @@ class _NoticeContent extends StatelessWidget {
             decoration: BoxDecoration(
               color: palette.accent.withValues(alpha: 0.08),
               border: Border.all(color: palette.accent.withValues(alpha: 0.33)),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Icon(TreinoIcon.dumbbell, size: 28, color: palette.accent),
           ),
