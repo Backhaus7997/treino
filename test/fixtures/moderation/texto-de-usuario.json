@@ -1,0 +1,115 @@
+{
+  "_lea_esto": [
+    "Quinta fuente del corpus de vocabulario legitimo: texto del TIPO que escribe",
+    "un usuario. Lo leen las dos suites de lista completa, la de Dart y la de",
+    "TypeScript, y todo lo de aca tiene que dar `ok`.",
+    "",
+    "Existe porque las otras cuatro fuentes (catalogo, plantillas de Explorar,",
+    "ARB, grupos musculares) son contenido PROPIO, y el filtro no corre sobre",
+    "contenido propio: corre sobre chats, bios, posts y resenas. Esa poblacion",
+    "tiene mails, links, arrobas, telefonos y abreviaturas, y ninguna de las",
+    "otras cuatro los tiene. Con solo esas, el corpus daba verde tanto si el",
+    "filtro rompia mails como si no: `juan@computo.com` daba `block` en main y",
+    "el corpus no se enteraba.",
+    "",
+    "`correos` se expande en los tests: cada usuario con cada dominio, solo y",
+    "dentro de una oracion. Los dominios `computo.com` y `controlo.com.ar` estan",
+    "a proposito: la `@` pega usuario y dominio en un solo token, y la palabra",
+    "de la allowlist queda adentro. Son el caso que ya fallaba.",
+    "",
+    "No es texto real de usuarios, y no puede serlo: eso es dato personal de",
+    "produccion. Es texto escrito para parecerse, por forma, a lo que la app",
+    "recibe."
+  ],
+  "correos": {
+    "usuarios": [
+      "juan", "juanperez", "maria.gonzalez", "mgonzalez85", "lucas_fit",
+      "sofi.rodriguez", "caro.perez", "nico.fernandez", "agus_lopez",
+      "flor.martinez", "facu92", "vale.gomez", "tomi.sanchez", "cami.diaz",
+      "santi.romero", "pau.sosa", "fede.torres", "gabi.alvarez", "mati.ruiz",
+      "luli.benitez", "rodri.acosta", "maria.gonzalez+treino", "info",
+      "contacto", "turnos", "ventas", "entrenamientos", "profe.ana",
+      "coach.nico"
+    ],
+    "dominios": [
+      "gmail.com", "hotmail.com", "hotmail.com.ar", "yahoo.com",
+      "yahoo.com.ar", "outlook.com", "outlook.com.ar", "live.com.ar",
+      "icloud.com", "fibertel.com.ar", "speedy.com.ar", "arnet.com.ar",
+      "uolsinectis.com.ar", "ciudad.com.ar", "protonmail.com", "gettreino.com",
+      "fi.uba.ar", "unlp.edu.ar", "buenosaires.gob.ar", "cba.gov.ar",
+      "gimnasiopalermo.com.ar", "estudiocontable.com.ar", "computo.com",
+      "controlo.com.ar"
+    ],
+    "oracion": "Hola! te paso mi mail: {correo}, escribime cuando puedas"
+  },
+  "textos": {
+    "urls": [
+      "https://www.instagram.com/lucas_fit/",
+      "instagram.com/sofi.rodriguez",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://youtu.be/3fumBcKC6RE",
+      "https://maps.app.goo.gl/9Ydp2wLhB7x3Qk6M8",
+      "https://goo.gl/maps/Jx7Qz2PpY4Lm8",
+      "https://wa.me/5491123456789",
+      "https://api.whatsapp.com/send?phone=5491123456789",
+      "https://gettreino.com/es/soporte",
+      "https://app.gettreino.com/",
+      "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=123456789-abcd-ef01",
+      "https://bit.ly/3xYz9Ab",
+      "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view?usp=sharing",
+      "https://open.spotify.com/playlist/37i9dQZF1DX76Wlfdnj7AP",
+      "https://www.tiktok.com/@gym.palermo/video/7291234567890123456",
+      "https://x.com/treino_app/status/1712345678901234567",
+      "https://www.strava.com/activities/10234567890",
+      "https://docs.google.com/forms/d/e/1FAIpQLSf-abc123/viewform",
+      "https://meet.google.com/abc-defg-hij",
+      "https://zoom.us/j/81234567890?pwd=AbCdEf123",
+      "www.clubatleticosanisidro.com.ar/turnos",
+      "https://es.wikipedia.org/wiki/Sentadilla"
+    ],
+    "menciones": [
+      "@lucas_fit", "@sofi.rodriguez", "@gym.palermo", "@coach_nico",
+      "@treino.app", "@maria_gonzalez", "@el.profe.ana", "@crossfit_belgrano",
+      "@running.team.ba", "@nutri.caro",
+      "seguime en ig @lucas_fit, subo los entrenos ahi",
+      "etiqueta a @sofi.rodriguez que tambien viene",
+      "gracias @coach_nico por la rutina!!"
+    ],
+    "telefonos": [
+      "+54 9 11 2345-6789", "11 2345-6789", "1123456789", "(011) 4567-8901",
+      "15-2345-6789", "0351 15-123-4567", "+54 351 123 4567",
+      "WhatsApp: 11 6543 2109", "mi cel es 11-3456-7890",
+      "llamame al 4789-1234", "Mandame un wsp al +54 9 11 6543-2109"
+    ],
+    "abreviaturas_y_notacion": [
+      "xq no vino?", "x fa avisame", "tmb entreno los sabados",
+      "q onda, arrancamos el lunes?", "dsp te paso la rutina", "a las 18hs",
+      "3x10 c/ 90s de pausa", "5x5 @ 100kg", "4x8 al 70% del 1RM",
+      "RPE 8, RIR 2", "AMRAP 12 min", "EMOM 10'", "HIIT 20/10 x 8",
+      "PR en sentadilla: 120kg 🔥", "DNI 30.123.456", "CUIT 20-30123456-7",
+      "Av. Santa Fe 1234, 3° B", "Dr. Pérez, traumatólogo",
+      "Lic. en Nutrición", "p/ej. peso muerto rumano", "c/u 12 reps", "s/n",
+      "etc.", "aprox 45 min", "finde largo 😎", "jajaja", "jsjsjs", "ajajaja",
+      "tqm", "bss", "ntp", "dale!!", "okk", "genial!!!", "vamooos 💪💪",
+      "#legday", "#fitness #gym", "$15.000 por mes", "u$s 50", "USD 100",
+      "20% off", "2x1 en planes", "24/09 a las 7:30", "lun, mié y vie",
+      "1° clase gratis", "N° de socio 1234", "S.A.", "S.R.L.", "a.k.a. el profe",
+      "p. ej. 3 x 8"
+    ],
+    "frases": [
+      "Hola profe! Te paso mi mail: agus_lopez@hotmail.com y mi cel 11 2345-6789 😊",
+      "Me pasas la rutina por mail? juanperez@gmail.com, gracias!!",
+      "Dejo el link del video: https://youtu.be/3fumBcKC6RE",
+      "Turnos: www.clubatleticosanisidro.com.ar/turnos o al 4789-1234",
+      "Hoy 5x5 @ 100kg en sentadilla, RPE 8 🔥",
+      "Nos vemos lun, mié y vie a las 18hs en Av. Santa Fe 1234",
+      "Consultas a info@computo.com o a contacto@controlo.com.ar",
+      "x fa confirma si venis el finde, tqm",
+      "Te mando el comprobante de MercadoPago, fueron $15.000",
+      "Soy Lic. en Nutrición (MN 1234), escribime a nutri.caro@gmail.com",
+      "El martes no puedo, tengo turno con el Dr. Pérez a las 9:30",
+      "Subí la foto a @gym.palermo con #legday",
+      "Mi usuario de Strava es rodri.acosta, sumate al club!"
+    ]
+  }
+}

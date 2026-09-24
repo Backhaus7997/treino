@@ -69,23 +69,47 @@ LEET = {
 # el texto mas comun (un insulto con signo de exclamacion al final).
 LEET_SOLO_ENTRE_LETRAS = {"@", "$", "!"}
 
-# Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion,
-# en una segunda normalizacion (la "amplia"), quedandose con el peor veredicto
-# de las dos.
+# Los simbolos que el filtro vuelve a leer SIN la regla de arriba, en otras
+# lecturas del mismo texto. El filtro evalua todas —ver `LECTURAS`— y se queda
+# con el peor veredicto.
 #
-# Hace falta porque ninguna normalizacion sola sirve. Con la regla de arriba,
-# la forma mas natural de escribir en leet un termino femenino —`put@`,
-# `p1j@`, `c0nch@`— pasa entera: la `@` del final no tiene letra a la derecha,
-# no se traduce, y queda `put`. Lo mismo `@ndate` al principio, y la `@` suelta
-# de `te voy @ matar`, que es la preposicion. Pero traducirla SIEMPRE rompe el
-# caso opuesto: `pija@` queda `pijaa` y `@pija` queda `apija`, y un termino
-# completo con una `@` decorativa pegada pasa (lo cazo la revision del PR:
-# esa fue la primera version de este arreglo). Una `@` en el borde a veces es
-# una `a` y a veces es un adorno, y solo mirando las dos lecturas se cubren
-# las dos.
+# Hace falta porque un simbolo pegado al borde de una palabra es ambiguo, y
+# ninguna lectura sola lo resuelve:
 #
-# `!` no esta: al final de una palabra es puntuacion, no una `i`.
-LEET_TAMBIEN_EN_BORDES = {"@", "$"}
+#   - `put@`, `p1j@`, `!diota`: el simbolo ES una letra. La estricta lo deja
+#     afuera y lee `put`.
+#   - `pija@`, `@pija`, `puta!`: el simbolo es un ADORNO. Traducido, queda
+#     `pijaa` o `putai` y el termino completo pasa. Asi fallo la primera
+#     version de este arreglo, que traducia siempre.
+#   - `put@@`, `put@!`, `@@ndate`: las dos cosas en el MISMO borde.
+#   - `@p1j@`, `$u!c!d@te!`: las dos cosas en bordes OPUESTOS, adorno de un
+#     lado y letra del otro. Estos dos ultimos casos los cazaron las
+#     revisiones del PR, uno por vuelta.
+#
+# Las lecturas, todas sobre los simbolos de este conjunto:
+#
+#   - estricta: la regla de `LEET_SOLO_ENTRE_LETRAS`. Cubre el adorno.
+#   - prefijo: se traduce el simbolo pegado a una letra que tiene A SU
+#     DERECHA (el borde de adelante de una palabra); los del borde de atras
+#     quedan como adorno.
+#   - sufijo: al reves.
+#   - adyacente: los dos bordes.
+#   - total: todos, pegados o no. Cubre varias sustituciones seguidas
+#     (`$!do$o`).
+#
+# En todas menos la estricta, el resto de una corrida de simbolos queda como
+# adorno, y una corrida que no toca ninguna letra —`te voy @ matar`— se lee
+# como una sola letra, la del primero.
+#
+# No es exhaustivo, y no lo pretende. La eleccion es POR TEXTO, no por
+# palabra: si una frase necesita adorno en el borde de adelante de una
+# palabra y letra en el de otra (`@c0lg@t3 d3 un @rb0l`), ninguna lectura
+# acierta las dos. El respaldo de eso es la cola de reportes, no mas
+# lecturas.
+LEET_TAMBIEN_EN_BORDES = {"@", "$", "!"}
+
+# Las lecturas, en el orden en que se emiten al corpus.
+LECTURAS = ("estricta", "prefijo", "sufijo", "adyacente", "total")
 
 # Runs de 3 o mas caracteres iguales colapsan a uno: `putooooo` -> `puto`.
 #
@@ -224,12 +248,67 @@ def solo_letras(s: str) -> str:
     return re.sub(r"[^0-9a-z]", "", sin_diacriticos(s.lower()))
 
 
-def normalizar(texto: str, amplia: bool = False) -> str:
+def lecturas(texto: str) -> list[str]:
+    """Las lecturas DE REFERENCIA de un texto, sin repetidas, en el orden de
+    `LECTURAS`. El filtro evalua cada una y se queda con el peor veredicto."""
+    out: list[str] = []
+    for modo in LECTURAS:
+        forma = normalizar(texto, modo)
+        if forma not in out:
+            out.append(forma)
+    return out
+
+
+def _se_lee_como_letra(chars: list[str], i: int, modo: str) -> bool:
+    """En las lecturas `prefijo`, `sufijo` y `adyacente`, si el simbolo en
+    `i` se traduce. Ver `LEET_TAMBIEN_EN_BORDES`.
+
+    `despues` es que tiene una letra o un digito a la derecha: esta en el
+    borde de ADELANTE de una palabra. `antes`, a la izquierda: borde de
+    ATRAS. Cada lectura traduce el borde que le toca y deja el otro como
+    adorno. Si no toca ninguno, solo se traduce el PRIMERO de una corrida
+    que no toque nada (`te voy @ matar`); el resto es adorno.
+    """
+    antes = i > 0 and _es_alnum(chars[i - 1])
+    despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
+    # Una corrida con letra en los DOS extremos esta ADENTRO de una palabra:
+    # todos sus simbolos son letras (`cul!@r` es `culiar`). El adorno va en
+    # los bordes, no en el medio.
+    if _corrida_interna(chars, i):
+        return True
+    if modo == "prefijo" and (antes or despues):
+        return despues
+    if modo == "sufijo" and (antes or despues):
+        return antes
+    if modo == "adyacente" and (antes or despues):
+        return True
+    if i > 0 and chars[i - 1] in LEET_TAMBIEN_EN_BORDES:
+        return False
+    j = i
+    while j < len(chars) and chars[j] in LEET_TAMBIEN_EN_BORDES:
+        j += 1
+    return j == len(chars) or not _es_alnum(chars[j])
+
+
+def _corrida_interna(chars: list[str], i: int) -> bool:
+    """Si la corrida de simbolos de `LEET_TAMBIEN_EN_BORDES` que contiene a
+    `i` tiene una letra o un digito en cada extremo."""
+    desde = i
+    while desde > 0 and chars[desde - 1] in LEET_TAMBIEN_EN_BORDES:
+        desde -= 1
+    hasta = i
+    while hasta < len(chars) and chars[hasta] in LEET_TAMBIEN_EN_BORDES:
+        hasta += 1
+    return (desde > 0 and _es_alnum(chars[desde - 1])
+            and hasta < len(chars) and _es_alnum(chars[hasta]))
+
+
+def normalizar(texto: str, modo: str = "estricta") -> str:
     """La normalizacion DE REFERENCIA. Dart y TypeScript son puertos de esto.
 
-    Con `amplia=True` los simbolos de `LEET_TAMBIEN_EN_BORDES` se traducen en
-    cualquier posicion. El filtro evalua las dos formas y se queda con el peor
-    veredicto; ver el porque en `LEET_TAMBIEN_EN_BORDES`.
+    `modo` es una de `LECTURAS`. La `estricta` es LA normalizacion; las otras
+    dos solo cambian como se leen los simbolos de `LEET_TAMBIEN_EN_BORDES` —
+    ver el porque ahi.
 
     El corpus guarda la salida de esta funcion para cada caso, y las dos suites
     la comparan ademas del veredicto. Sin eso el corpus solo caza una
@@ -246,8 +325,10 @@ def normalizar(texto: str, amplia: bool = False) -> str:
     s = sin_diacriticos(texto.lower())
 
     # Leet. Los simbolos solo con letra a los DOS lados: ver
-    # LEET_SOLO_ENTRE_LETRAS. En la forma amplia, los de
-    # LEET_TAMBIEN_EN_BORDES se traducen siempre.
+    # LEET_SOLO_ENTRE_LETRAS. Las lecturas `adyacente` y `total` leen distinto
+    # los de LEET_TAMBIEN_EN_BORDES.
+    if modo not in LECTURAS:
+        raise ValueError(f"modo desconocido: {modo!r}")
     chars = list(s)
     fuera = []
     for i, ch in enumerate(chars):
@@ -255,8 +336,10 @@ def normalizar(texto: str, amplia: bool = False) -> str:
         if rep is None:
             fuera.append(ch)
             continue
-        if amplia and ch in LEET_TAMBIEN_EN_BORDES:
+        if modo == "total" and ch in LEET_TAMBIEN_EN_BORDES:
             fuera.append(rep)
+        elif modo != "estricta" and ch in LEET_TAMBIEN_EN_BORDES:
+            fuera.append(rep if _se_lee_como_letra(chars, i, modo) else ch)
         elif ch in LEET_SOLO_ENTRE_LETRAS:
             antes = i > 0 and _es_alnum(chars[i - 1])
             despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
@@ -388,7 +471,7 @@ def cargar() -> dict:
                      f"que no es uno de {sorted(ESPERAS)}")
         casos.append((c["texto"], c["espera"], c.get("por", ""),
                       normalizar(c["texto"]),
-                      normalizar(c["texto"], amplia=True)))
+                      lecturas(c["texto"])))
 
     if not casos:
         sys.exit(f"[!] {SRC.name}: 'cases' esta vacio. El corpus es lo unico "
@@ -440,9 +523,9 @@ def emitir_dart(d: dict) -> str:
 
     casos = ",\n".join(
         f"  (texto: {dart_str(t)}, espera: {dart_str(e)}, "
-        f"normalizado: {dart_str(n)}, normalizadoAmplio: {dart_str(na)}, "
+        f"normalizado: {dart_str(n)}, lecturas: {lista(ls)}, "
         f"por: {dart_str(p)})"
-        for t, e, p, n, na in d["casos"])
+        for t, e, p, n, ls in d["casos"])
 
     fold = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["plegado"].items()))
@@ -476,10 +559,11 @@ const Map<String, String> kVettedLeet = {{{leet}}};
 /// lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
 const Set<String> kVettedLeetOnlyBetweenLetters = {{{leet_entre}}};
 
-/// Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion
-/// (la normalizacion "amplia"), quedandose con el peor veredicto. `put@`
-/// necesita la `@` como `a`; `pija@`, como separador. Ver
-/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+/// Los simbolos que el filtro vuelve a leer sin la regla de
+/// [kVettedLeetOnlyBetweenLetters], en las lecturas `adyacente` y `total`.
+/// Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
+/// `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
+/// scripts/build_moderation_list.py.
 const Set<String> kVettedLeetAlsoAtEdges = {{{leet_bordes}}};
 
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -521,7 +605,7 @@ const Set<String> kVettedAllowlist = {{{", ".join(dart_str(x) for x in d["allowl
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<\n    ({{\n      String texto,\n      String espera,\n      String normalizado,\n      String normalizadoAmplio,\n      String por\n    }})> kVettedCases = [
+const List<\n    ({{\n      String texto,\n      String espera,\n      String normalizado,\n      List<String> lecturas,\n      String por\n    }})> kVettedCases = [
 {casos},
 ];
 '''
@@ -536,9 +620,9 @@ def emitir_ts(d: dict) -> str:
 
     casos = ",\n".join(
         f"  {{ texto: {ts_str(t)}, espera: {ts_str(e)}, "
-        f"normalizado: {ts_str(n)}, normalizadoAmplio: {ts_str(na)}, "
+        f"normalizado: {ts_str(n)}, lecturas: {lista(ls)}, "
         f"por: {ts_str(p)} }}"
-        for t, e, p, n, na in d["casos"])
+        for t, e, p, n, ls in d["casos"])
 
     fold_ts = ", ".join(f"{ts_str(k)}: {ts_str(v)}"
                         for k, v in sorted(d["plegado"].items()))
@@ -578,10 +662,11 @@ export const VETTED_LEET: Readonly<Record<string, string>> = {{{leet_ts}}};
 export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set({leet_entre_ts});
 
 /**
- * Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion
- * (la normalizacion "amplia"), quedandose con el peor veredicto. `put@`
- * necesita la `@` como `a`; `pija@`, como separador. Ver
- * `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+ * Los simbolos que el filtro vuelve a leer sin la regla de
+ * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en las lecturas `adyacente` y `total`.
+ * Gana el peor veredicto de las tres: `put@` necesita la `@` como `a`;
+ * `pija@`, como adorno. Ver `LEET_TAMBIEN_EN_BORDES` en
+ * scripts/build_moderation_list.py.
  */
 export const VETTED_LEET_ALSO_AT_EDGES: ReadonlySet<string> = new Set({leet_bordes_ts});
 
@@ -635,7 +720,7 @@ export const VETTED_ALLOWLIST: ReadonlySet<string> = new Set({lista(d["allowlist
  * casos: si los dos veredictos no coinciden, una de las dos se pone roja.
  * Ninguna de las dos escribe sus expectativas a mano.
  */
-export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  normalizadoAmplio: string;\n  por: string;\n}}[] = [
+export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  lecturas: readonly string[];\n  por: string;\n}}[] = [
 {casos},
 ];
 '''

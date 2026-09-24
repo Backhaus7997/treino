@@ -53,21 +53,20 @@ export type ModerationVerdict = "ok" | "review" | "block";
  * en un oraculo para encontrarle el borde.
  */
 export function checkText(text: string): ModerationVerdict {
-  const estricta = normalize(text);
-  const veredicto = verdictOf(toTokens(estricta));
-  if (veredicto === "block") return veredicto;
-
-  // La segunda lectura: `@` y `$` traducidos en cualquier posicion. `put@` solo
-  // se caza asi, y `pija@` solo con la estricta de arriba —la amplia la lee
-  // `pijaa`—. Se evaluan las dos y gana la peor. Ver
-  // `VETTED_LEET_ALSO_AT_EDGES`.
-  const amplia = normalizeLoose(text);
-  if (amplia === estricta) return veredicto;
-  const otro = verdictOf(toTokens(amplia));
-  return SEVERIDAD[otro] > SEVERIDAD[veredicto] ? otro : veredicto;
+  // Un simbolo pegado al borde de una palabra es ambiguo: en `put@` la `@` es
+  // una `a`, en `pija@` es un adorno, en `put@@` son las dos cosas y en
+  // `@p1j@` es adorno adelante y letra atras. Ninguna lectura sola cubre todo,
+  // asi que se evaluan todas y gana la peor. Ver `VETTED_LEET_ALSO_AT_EDGES`.
+  let peor: ModerationVerdict = "ok";
+  for (const lectura of readings(text)) {
+    const veredicto = verdictOf(toTokens(lectura));
+    if (SEVERIDAD[veredicto] > SEVERIDAD[peor]) peor = veredicto;
+    if (peor === "block") break;
+  }
+  return peor;
 }
 
-/** Orden de severidad, para quedarse con el peor de dos veredictos. */
+/** Orden de severidad, para quedarse con el peor de varios veredictos. */
 const SEVERIDAD: Readonly<Record<ModerationVerdict, number>> = {
   ok: 0,
   review: 1,
@@ -112,16 +111,35 @@ function verdictOf(tokens: readonly string[]): ModerationVerdict {
  * y adivinar.
  */
 export function normalize(text: string): string {
-  return collapse(leet(fold(text.toLowerCase()), false));
+  return normalizar(text, "estricta");
 }
 
 /**
- * Como `normalize`, pero con los simbolos de `VETTED_LEET_ALSO_AT_EDGES`
- * traducidos en cualquier posicion. Es la segunda lectura que hace
- * `checkText`; exportada por el mismo motivo que `normalize`.
+ * Las lecturas de un texto, en el orden del corpus. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en el generador.
  */
-export function normalizeLoose(text: string): string {
-  return collapse(leet(fold(text.toLowerCase()), true));
+type Lectura = "estricta" | "prefijo" | "sufijo" | "adyacente" | "total";
+const LECTURAS: readonly Lectura[] = [
+  "estricta", "prefijo", "sufijo", "adyacente", "total",
+];
+
+/**
+ * Las lecturas que evalua `checkText`, sin repetidas: la estricta —que es
+ * `normalize`—, prefijo, sufijo, adyacente y total. Solo difieren cuando el
+ * texto tiene alguno de `VETTED_LEET_ALSO_AT_EDGES`. Exportada por el mismo
+ * motivo que `normalize`.
+ */
+export function readings(text: string): string[] {
+  const out: string[] = [];
+  for (const lectura of LECTURAS) {
+    const forma = normalizar(text, lectura);
+    if (!out.includes(forma)) out.push(forma);
+  }
+  return out;
+}
+
+function normalizar(text: string, lectura: Lectura): string {
+  return collapse(leet(fold(text.toLowerCase()), lectura));
 }
 
 // -- pasos de la normalizacion --------------------------------------------
@@ -146,7 +164,7 @@ function isCombining(cp: number): boolean {
   return false;
 }
 
-function leet(s: string, amplia: boolean): string {
+function leet(s: string, lectura: Lectura): string {
   const chars = [...s];
   let out = "";
   for (let i = 0; i < chars.length; i++) {
@@ -159,10 +177,13 @@ function leet(s: string, amplia: boolean): string {
     // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS lados.
     // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
     // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
-    // texto mas comun que existe, un insulto con signo de exclamacion. La
-    // lectura amplia traduce `@` y `$` siempre; ver `checkText`.
-    if (amplia && VETTED_LEET_ALSO_AT_EDGES.has(ch)) {
+    // texto mas comun que existe, un insulto con signo de exclamacion. Las
+    // lecturas adyacente y total los leen distinto; ver `checkText`.
+    const ambiguo = VETTED_LEET_ALSO_AT_EDGES.has(ch);
+    if (ambiguo && lectura === "total") {
       out += rep;
+    } else if (ambiguo && lectura !== "estricta") {
+      out += seLeeComoLetra(chars, i, lectura) ? rep : ch;
     } else if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
       const antes = i > 0 && isAlnum(chars[i - 1]);
       const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
@@ -192,6 +213,50 @@ function isAlnum(ch: string): boolean {
   if (ch.length !== 1) return false;
   const c = ch.charCodeAt(0);
   return (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a);
+}
+
+/**
+ * Si la corrida de simbolos de `VETTED_LEET_ALSO_AT_EDGES` que contiene a `i`
+ * tiene una letra o un digito en cada extremo. ESPEJO de `_corridaInterna` en
+ * `moderation_filter.dart`.
+ */
+function corridaInterna(chars: readonly string[], i: number): boolean {
+  let desde = i;
+  while (desde > 0 && VETTED_LEET_ALSO_AT_EDGES.has(chars[desde - 1])) desde--;
+  let hasta = i;
+  while (hasta < chars.length && VETTED_LEET_ALSO_AT_EDGES.has(chars[hasta])) {
+    hasta++;
+  }
+  return desde > 0 && isAlnum(chars[desde - 1]) &&
+    hasta < chars.length && isAlnum(chars[hasta]);
+}
+
+/**
+ * En las lecturas prefijo, sufijo y adyacente, si el simbolo en `i` se
+ * traduce. ESPEJO de `_seLeeComoLetra` en `moderation_filter.dart`: cada
+ * lectura traduce el borde de la palabra que le toca —`despues` es el de
+ * adelante, `antes` el de atras— y deja el otro como adorno; si no toca
+ * ninguna letra, solo el PRIMERO de una corrida que no toca nada.
+ */
+function seLeeComoLetra(
+  chars: readonly string[],
+  i: number,
+  lectura: Lectura,
+): boolean {
+  const antes = i > 0 && isAlnum(chars[i - 1]);
+  const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
+  // Una corrida con letra en los DOS extremos esta ADENTRO de una palabra:
+  // todos sus simbolos son letras (`cul!@r` es `culiar`).
+  if (corridaInterna(chars, i)) return true;
+  if (antes || despues) {
+    if (lectura === "prefijo") return despues;
+    if (lectura === "sufijo") return antes;
+    return true;
+  }
+  if (i > 0 && VETTED_LEET_ALSO_AT_EDGES.has(chars[i - 1])) return false;
+  let j = i;
+  while (j < chars.length && VETTED_LEET_ALSO_AT_EDGES.has(chars[j])) j++;
+  return j === chars.length || !isAlnum(chars[j]);
 }
 
 const SEPARADORES = /[^0-9a-z]+/;
@@ -230,7 +295,7 @@ function hasPhrase(
  * 1. Junta las corridas de tokens de UN caracter. `p u t o` y `p-u-t-o` dan
  *    cuatro tokens de un caracter, y pegados dan `puto`.
  * 2. Busca cada termino de `VETTED_ANTI_EVASION` como subcadena de cada
- *    token, salteando los que estan en `VETTED_ALLOWLIST`.
+ *    token, despues de sacarle las palabras de `VETTED_ALLOWLIST`.
  *
  * Lo que no hace es pegar el texto entero. Esa version —la obvia— bloquea
  * `otro loco`, porque `otroloco` contiene `trolo`. Tambien `otro lote`. Los
@@ -259,19 +324,34 @@ function evades(tokens: readonly string[]): boolean {
       continue;
     }
     cerrarCorrida();
-    // La allowlist no puede aportar letras a un match: `computo` contiene
-    // `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
-    if (!VETTED_ALLOWLIST.has(t)) candidatos.push(t);
+    candidatos.push(t);
     if (corto) corrida.push(t);
   }
   cerrarCorrida();
 
   for (const c of candidatos) {
-    for (const termino of VETTED_ANTI_EVASION) {
-      if (c.includes(termino)) return true;
+    for (const pedazo of sinAllowlist(c)) {
+      for (const termino of VETTED_ANTI_EVASION) {
+        if (pedazo.includes(termino)) return true;
+      }
     }
   }
   return false;
+}
+
+/**
+ * `candidato` partido en lo que queda al sacarle, de ADENTRO, cada palabra de
+ * `VETTED_ALLOWLIST`. ESPEJO de `_sinAllowlist` en `moderation_filter.dart`:
+ * un mail o una mencion pegan la palabra con lo de al lado
+ * (`juan@computo.com` da `juanacomputo`), y saltear solo el token exacto
+ * dejaba que el `puto` de adentro bloqueara una direccion valida.
+ */
+function sinAllowlist(candidato: string): string[] {
+  let pedazos = [candidato];
+  for (const palabra of VETTED_ALLOWLIST) {
+    pedazos = pedazos.flatMap((p) => p.split(palabra));
+  }
+  return pedazos.filter((p) => p.length > 0);
 }
 
 /**

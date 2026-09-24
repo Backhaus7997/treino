@@ -44,6 +44,24 @@ const porSeveridad: [string[], ModerationVerdict][] = [
 ];
 
 /**
+ * Variantes que el filtro NO caza, a sabiendas — el mismo `HUECO CONOCIDO`
+ * que `con-chudo`. ESPEJO de `huecosConocidos` en el test de Dart; ver ahi las
+ * dos clases y por que estan FIJADAS (el test exige que sigan pasando).
+ */
+const HUECOS_CONOCIDOS: Record<string, string[]> = {
+  "colgate de un arbol": ["arroba adelante + leet"],
+  "pro ana": ["arroba adelante + leet"],
+  "ojala te mueras": ["leet + arroba atras", "signos + exclamacion atras"],
+  "manga de inutiles": ["leet + arroba atras"],
+  "muerta de hambre": ["leet + arroba atras", "signos + exclamacion atras"],
+  "vomitar despues de comer": ["signos + exclamacion atras"],
+  "pornografia": ["signos + exclamacion atras"],
+  "promia": ["signos + exclamacion atras"],
+  "tetas": ["signos + exclamacion atras"],
+  "te voy a cagar a trompadas": ["signos + exclamacion atras"],
+};
+
+/**
  * Las variantes de evasion que la normalizacion dice cubrir, aplicadas a UN
  * termino ya normalizado. Mismo algoritmo que `variantes()` en el espejo de
  * Dart: los separadores van ENTRE LAS LETRAS de cada palabra.
@@ -58,6 +76,15 @@ function variantes(termino: string): Record<string, string> {
       .split(" ")
       .map((palabra) => [...palabra].join(separador))
       .join(" ");
+  const leet = termino
+    .replace(/o/g, "0")
+    .replace(/i/g, "1")
+    .replace(/a/g, "@")
+    .replace(/e/g, "3");
+  const signos = termino
+    .replace(/i/g, "!")
+    .replace(/s/g, "$")
+    .replace(/a/g, "@");
 
   return {
     "mayusculas": termino.toUpperCase(),
@@ -69,17 +96,50 @@ function variantes(termino: string): Record<string, string> {
     "espacios entre letras": entreLetras(" "),
     "guiones entre letras": entreLetras("-"),
     "puntos entre letras": entreLetras("."),
-    "leet 0 1 @ 3": termino
-      .replace(/o/g, "0")
-      .replace(/i/g, "1")
-      .replace(/a/g, "@")
-      .replace(/e/g, "3"),
-    // Adornos pegados al termino completo: ver el comentario gemelo en Dart.
+    "leet 0 1 @ 3": leet,
+    "signos ! $ @ por letras": signos,
+    // Adornos pegados al termino completo, solos y encima de una sustitucion:
+    // ver el comentario gemelo en Dart.
     "arroba adelante": `@${termino}`,
     "arroba atras": `${termino}@`,
     "exclamacion atras": `${termino}!`,
+    "leet + arroba atras": `${leet}@`,
+    "arroba adelante + leet": `@${leet}`,
+    "signos + exclamacion atras": `${signos}!`,
     "dentro de una oracion": `mirá vos, ${termino}, te lo digo en serio`,
   };
+}
+
+/**
+ * Texto del TIPO que escribe un usuario —mails, links, arrobas, telefonos,
+ * abreviaturas—, desde `test/fixtures/moderation/texto-de-usuario.json`. Misma
+ * expansion que el espejo de Dart: cada usuario con cada dominio, solo y
+ * dentro de la oracion del fixture.
+ */
+function corpusDeUsuario(): [string, string][] {
+  type Fixture = {
+    correos: { usuarios: string[]; dominios: string[]; oracion: string };
+    textos: Record<string, string[]>;
+  };
+  const fixture = JSON.parse(
+    fs.readFileSync(
+      path.join(RAIZ, "test/fixtures/moderation/texto-de-usuario.json"),
+      "utf8",
+    ),
+  ) as Fixture;
+  const { usuarios, dominios, oracion } = fixture.correos;
+  const textos: [string, string][] = [];
+  for (const usuario of usuarios) {
+    for (const dominio of dominios) {
+      const correo = `${usuario}@${dominio}`;
+      textos.push(["usuario · correo", correo]);
+      textos.push(["usuario · correo", oracion.split("{correo}").join(correo)]);
+    }
+  }
+  for (const [categoria, lista] of Object.entries(fixture.textos)) {
+    for (const texto of lista) textos.push([`usuario · ${categoria}`, texto]);
+  }
+  return textos;
 }
 
 /**
@@ -87,7 +147,7 @@ function variantes(termino: string): Record<string, string> {
  * el espejo de Dart menos `MuscleGroup`, que vive en codigo Dart; sus
  * etiquetas las cubre esa suite.
  */
-function corpusReal(): [string, string][] {
+function corpusPropio(): [string, string][] {
   const textos: [string, string][] = [];
   const agregar = (origen: string, valor: unknown): void => {
     if (typeof valor === "string" && valor.trim() !== "") {
@@ -163,15 +223,33 @@ describe("cada termino de la lista", () => {
 });
 
 describe("cada termino con cada variante de evasion", () => {
+  it("los huecos conocidos nombran terminos y variantes que existen", () => {
+    // Sin esto, un typo en `HUECOS_CONOCIDOS` exime una variante que no
+    // existe —no exime nada— y la lista aparenta documentar algo.
+    const todos = new Set([...block, ...review]);
+    for (const [termino, nombres] of Object.entries(HUECOS_CONOCIDOS)) {
+      expect(todos.has(termino)).toBe(true);
+      expect(Object.keys(variantes(termino))).toEqual(
+        expect.arrayContaining(nombres),
+      );
+    }
+  });
+
   for (const [terminos, esperado] of porSeveridad) {
     for (const termino of terminos) {
       it(`${esperado.padEnd(6)} · "${termino}"`, () => {
         // Todas las variantes de un termino en UN test, juntando las que se
         // escapan: el reporte dice cuales pasaron, no solo la primera.
+        const huecos = new Set(HUECOS_CONOCIDOS[termino] ?? []);
         const escapadas: string[] = [];
+        const huecosCerrados: string[] = [];
         for (const [nombre, texto] of Object.entries(variantes(termino))) {
           const obtenido = checkText(texto);
-          if (obtenido !== esperado) {
+          if (huecos.has(nombre)) {
+            if (obtenido === esperado) {
+              huecosCerrados.push(`${nombre}: "${texto}"`);
+            }
+          } else if (obtenido !== esperado) {
             escapadas.push(
               `${nombre}: "${texto}" dio ${obtenido} ` +
                 `(normalizado: "${normalize(texto)}")`,
@@ -179,25 +257,37 @@ describe("cada termino con cada variante de evasion", () => {
           }
         }
         expect(escapadas).toEqual([]);
+        // Si esto se pone rojo, el filtro ya caza esos huecos conocidos:
+        // sacalos de `HUECOS_CONOCIDOS`.
+        expect(huecosCerrados).toEqual([]);
       });
     }
   }
 });
 
-describe("el vocabulario real del producto pasa entero", () => {
-  const textos = corpusReal();
+describe("el texto legitimo pasa entero", () => {
+  // Dos poblaciones, con piso propio cada una: ver el comentario gemelo en
+  // Dart. El contenido PROPIO solo daba verde aunque el filtro rompiera mails.
+  const fuentes: [string, [string, string][], number][] = [
+    ["contenido propio", corpusPropio(), 6000],
+    ["texto de usuario", corpusDeUsuario(), 1000],
+  ];
 
-  it("el corpus se cargo", () => {
-    // Si un archivo se mueve, el corpus queda vacio y el test de abajo pasa
-    // sin haber mirado nada. Piso muy por debajo de lo que hay hoy, para que
-    // agregar o sacar un ejercicio no lo rompa.
-    expect(textos.length).toBeGreaterThan(6000);
-  });
+  for (const [nombre, textos, piso] of fuentes) {
+    it(`${nombre}: el corpus se cargo`, () => {
+      // Si un archivo se mueve, el corpus queda vacio y el test de abajo pasa
+      // sin haber mirado nada. Piso muy por debajo de lo que hay hoy, para
+      // que agregar o sacar un texto no lo rompa.
+      expect(textos.length).toBeGreaterThan(piso);
+    });
 
-  it(`ninguno de los ${textos.length} textos da block ni review`, () => {
-    const caidos = textos
-      .filter(([, texto]) => checkText(texto) !== "ok")
-      .map(([origen, texto]) => `${checkText(texto)} · ${origen}: "${texto}"`);
-    expect(caidos).toEqual([]);
-  });
+    it(`${nombre}: ninguno de los ${textos.length} textos da block ni review`,
+      () => {
+        const caidos = textos
+          .filter(([, texto]) => checkText(texto) !== "ok")
+          .map(([origen, texto]) =>
+            `${checkText(texto)} · ${origen}: "${texto}"`);
+        expect(caidos).toEqual([]);
+      });
+  }
 });

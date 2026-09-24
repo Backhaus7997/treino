@@ -42,9 +42,9 @@ void main() {
           reason: 'la normalizacion de Dart se separo de la referencia',
         );
         expect(
-          ModerationFilter.normalizeLoose(caso.texto),
-          caso.normalizadoAmplio,
-          reason: 'la lectura amplia de Dart se separo de la referencia',
+          ModerationFilter.readings(caso.texto),
+          caso.lecturas,
+          reason: 'las lecturas de Dart se separaron de la referencia',
         );
         expect(
           ModerationFilter.check(caso.texto),
@@ -85,14 +85,19 @@ void main() {
       expect(ModerationFilter.normalize('and4te'), 'andate');
     });
 
-    test('la lectura amplia traduce @ y \$ en los bordes, y ! no', () {
-      // `check` evalua las dos lecturas y gana la peor: la estricta caza
-      // `pija@` (la `@` queda como separador) y la amplia caza `put@`.
-      expect(ModerationFilter.normalize('put@'), 'put@');
-      expect(ModerationFilter.normalizeLoose('put@'), 'puta');
-      expect(ModerationFilter.normalizeLoose('@ndate'), 'andate');
-      expect(ModerationFilter.normalizeLoose('puta\$'), 'putas');
-      expect(ModerationFilter.normalizeLoose('puta!'), 'puta!');
+    test('un simbolo en el borde se lee de tres formas', () {
+      // `check` evalua todas y gana la peor: la estricta caza `pija@` (la `@`
+      // es adorno), la adyacente caza `put@` y `put@@` (la `@` pegada es una
+      // letra, la de mas es adorno) y la total caza `$!do$o`.
+      expect(ModerationFilter.readings('put@'), ['put@', 'puta']);
+      expect(ModerationFilter.readings('put@@'), ['put@@', 'puta@', 'putaa']);
+      expect(ModerationFilter.readings('pija@'), ['pija@', 'pijaa']);
+      expect(ModerationFilter.readings('puta!'), ['puta!', 'putai']);
+      expect(
+        ModerationFilter.readings('te voy @ matar'),
+        ['te voy @ matar', 'te voy a matar'],
+      );
+      expect(ModerationFilter.readings('hola'), ['hola']);
     });
   });
 

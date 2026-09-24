@@ -558,12 +558,82 @@
     {
       "texto": "@lucas nos vemos el lunes",
       "espera": "ok",
-      "por": "una mencion: la forma amplia lee `alucas`, que no es nada"
+      "por": "una mencion: las lecturas amplias leen `alucas`, que no es nada"
+    },
+    {
+      "texto": "put@@",
+      "espera": "block",
+      "por": "sustitucion Y adorno juntos: la `@` pegada es la `a`, la de mas es adorno. Solo la lectura adyacente lo lee `puta`"
+    },
+    {
+      "texto": "put@!",
+      "espera": "block",
+      "por": "la forma mas comun de lo anterior: leet con signo de exclamacion"
+    },
+    {
+      "texto": "@@ndate a morir",
+      "espera": "block",
+      "por": "lo mismo del lado de adelante: la `@` pegada a la `n` es la letra, la primera es adorno"
+    },
+    {
+      "texto": "pija@@",
+      "espera": "block",
+      "por": "doble adorno sobre el termino completo: lo caza la lectura estricta"
+    },
+    {
+      "texto": "!diota",
+      "espera": "review",
+      "por": "`!` por `i` al principio. La lectura estricta no lo traduce, porque el `!` pide letra a los dos lados"
+    },
+    {
+      "texto": "teta$$",
+      "espera": "review",
+      "por": "`$` por `s` mas un adorno, sobre un termino `review`"
+    },
+    {
+      "texto": "$!do$o",
+      "espera": "block",
+      "por": "varias sustituciones seguidas: solo la lectura total las traduce todas"
+    },
+    {
+      "texto": "escribile a ana@controlo.com",
+      "espera": "ok",
+      "por": "la `@` de un mail pega el usuario con el dominio (`anacontrolo`). La allowlist se recorta de ADENTRO del token, no solo cuando es el token entero: antes esto daba `block` por el `trolo` de `controlo`"
+    },
+    {
+      "texto": "juan@computo.com",
+      "espera": "ok",
+      "por": "mismo caso, con el `puto` de `computo`"
+    },
+    {
+      "texto": "@computo",
+      "espera": "ok",
+      "por": "una mencion pegada a una palabra de la allowlist: la lectura adyacente lee `acomputo`"
+    },
+    {
+      "texto": "putocomputo",
+      "espera": "block",
+      "por": "recortar la allowlist de adentro no puede tapar lo que esta AFUERA de la palabra"
+    },
+    {
+      "texto": "computoputo",
+      "espera": "block",
+      "por": "lo mismo, del otro lado"
+    },
+    {
+      "texto": "@c0lg@t3 d3 un @rb0l",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. La lectura de los simbolos se elige para TODO el texto, no palabra por palabra: la primera `@` es adorno en el borde de adelante de `colgate` y la de `@rbol` es letra en el mismo borde. Ninguna lectura acierta las dos. Elegir por palabra rompe el matcheo de frases, que compara tokens alineados. El backstop es la cola de reportes"
+    },
+    {
+      "texto": "tet@$!",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. Dos sustituciones seguidas en el borde (`@` por `a`, `$` por `s`) MAS un adorno (`!`): la lectura total traduce tambien el adorno y las de borde traducen solo el simbolo pegado a la letra. Mismo backstop"
     },
     {
       "texto": "mandame el plan a juan@gmail.com",
       "espera": "ok",
-      "por": "un mail: la `@` traducida siempre no inventa ningun termino"
+      "por": "un mail comun. La `@` entre letras se traduce desde siempre y pega usuario y dominio en un token; ver el caso de `ana@controlo.com`"
     },
     {
       "texto": "u$s 100 por mes",

@@ -37,6 +37,11 @@ enum ModerationVerdict {
 /// corrida de `scripts/build_moderation_list.py`. Lo unico escrito dos veces
 /// es este algoritmo, y es lo que el corpus de `kVettedCases` vigila: las dos
 /// suites corren los mismos casos y comparan contra las mismas expectativas.
+/// Las lecturas de un texto que evalua [ModerationFilter.check]. Solo
+/// difieren en como leen los simbolos de `kVettedLeetAlsoAtEdges`; ver
+/// `LEET_TAMBIEN_EN_BORDES` en el generador. El orden es el del corpus.
+enum _Lectura { estricta, prefijo, sufijo, adyacente, total }
+
 abstract final class ModerationFilter {
   const ModerationFilter._();
 
@@ -46,18 +51,18 @@ abstract final class ModerationFilter {
   /// filtro en un oraculo: quien quiera evadirlo prueba variantes hasta que
   /// deja de saltar, y el mensaje le dice exactamente cuando lo logro.
   static ModerationVerdict check(String text) {
-    final estricta = normalize(text);
-    final veredicto = _verdict(_tokens(estricta));
-    if (veredicto == ModerationVerdict.block) return veredicto;
-
-    // La segunda lectura: `@` y `$` traducidos en cualquier posicion. `put@`
-    // solo se caza asi, y `pija@` solo se caza con la estricta de arriba —la
-    // amplia la lee `pijaa`—. Se evaluan las dos y gana la peor. Ver
+    // Un simbolo pegado al borde de una palabra es ambiguo: en `put@` la `@`
+    // es una `a`, en `pija@` es un adorno, en `put@@` son las dos cosas y en
+    // `@p1j@` es adorno adelante y letra atras. Ninguna lectura sola cubre
+    // todo, asi que se evaluan todas y gana la peor. Ver
     // `kVettedLeetAlsoAtEdges`.
-    final amplia = normalizeLoose(text);
-    if (amplia == estricta) return veredicto;
-    final otro = _verdict(_tokens(amplia));
-    return otro.index > veredicto.index ? otro : veredicto;
+    var peor = ModerationVerdict.ok;
+    for (final lectura in readings(text)) {
+      final veredicto = _verdict(_tokens(lectura));
+      if (veredicto.index > peor.index) peor = veredicto;
+      if (peor == ModerationVerdict.block) break;
+    }
+    return peor;
   }
 
   /// El veredicto para un texto ya normalizado y partido en tokens.
@@ -98,13 +103,23 @@ abstract final class ModerationFilter {
   /// del corpus falla, saber en que quedo el texto es la diferencia entre
   /// arreglarlo y adivinar.
   static String normalize(String text) =>
-      _collapse(_leet(_fold(text.toLowerCase()), amplia: false));
+      _normalizar(text, _Lectura.estricta);
 
-  /// Como [normalize], pero con los simbolos de `kVettedLeetAlsoAtEdges`
-  /// traducidos en cualquier posicion. Es la segunda lectura que hace
-  /// [check]; publica por el mismo motivo que [normalize].
-  static String normalizeLoose(String text) =>
-      _collapse(_leet(_fold(text.toLowerCase()), amplia: true));
+  /// Las lecturas que evalua [check], sin repetidas: la estricta —que es
+  /// [normalize]—, prefijo, sufijo, adyacente y total. Solo difieren cuando
+  /// el texto tiene alguno de `kVettedLeetAlsoAtEdges`. Publica por el mismo
+  /// motivo que [normalize].
+  static List<String> readings(String text) {
+    final out = <String>[];
+    for (final lectura in _Lectura.values) {
+      final forma = _normalizar(text, lectura);
+      if (!out.contains(forma)) out.add(forma);
+    }
+    return out;
+  }
+
+  static String _normalizar(String text, _Lectura lectura) =>
+      _collapse(_leet(_fold(text.toLowerCase()), lectura));
 
   // -- pasos de la normalizacion ------------------------------------------
 
@@ -132,7 +147,7 @@ abstract final class ModerationFilter {
     return false;
   }
 
-  static String _leet(String s, {required bool amplia}) {
+  static String _leet(String s, _Lectura lectura) {
     final chars = [for (final r in s.runes) String.fromCharCode(r)];
     final out = StringBuffer();
     for (var i = 0; i < chars.length; i++) {
@@ -146,10 +161,13 @@ abstract final class ModerationFilter {
       // lados. Sin esa regla `puta!` normaliza a `putai`, que no matchea
       // `puta` por palabra completa: el leet a lo bruto produce falsos
       // NEGATIVOS sobre el texto mas comun que existe, un insulto con signo
-      // de exclamacion. La lectura amplia traduce `@` y `$` siempre; ver
-      // [check].
-      if (amplia && kVettedLeetAlsoAtEdges.contains(ch)) {
+      // de exclamacion. Las lecturas adyacente y total los leen distinto;
+      // ver [check].
+      final ambiguo = kVettedLeetAlsoAtEdges.contains(ch);
+      if (ambiguo && lectura == _Lectura.total) {
         out.write(rep);
+      } else if (ambiguo && lectura != _Lectura.estricta) {
+        out.write(_seLeeComoLetra(chars, i, lectura) ? rep : ch);
       } else if (kVettedLeetOnlyBetweenLetters.contains(ch)) {
         final antes = i > 0 && _isAlnum(chars[i - 1]);
         final despues = i + 1 < chars.length && _isAlnum(chars[i + 1]);
@@ -183,6 +201,55 @@ abstract final class ModerationFilter {
     return (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a);
   }
 
+  /// Si la corrida de simbolos de `kVettedLeetAlsoAtEdges` que contiene a [i]
+  /// tiene una letra o un digito en cada extremo. ESPEJO de
+  /// `_corrida_interna` en el generador.
+  static bool _corridaInterna(List<String> chars, int i) {
+    var desde = i;
+    while (desde > 0 && kVettedLeetAlsoAtEdges.contains(chars[desde - 1])) {
+      desde--;
+    }
+    var hasta = i;
+    while (hasta < chars.length &&
+        kVettedLeetAlsoAtEdges.contains(chars[hasta])) {
+      hasta++;
+    }
+    return desde > 0 &&
+        _isAlnum(chars[desde - 1]) &&
+        hasta < chars.length &&
+        _isAlnum(chars[hasta]);
+  }
+
+  /// En las lecturas prefijo, sufijo y adyacente, si el simbolo en [i] se
+  /// traduce. ESPEJO de `_se_lee_como_letra` en el generador.
+  ///
+  /// `despues` es que tiene una letra o un digito a la derecha —esta en el
+  /// borde de ADELANTE de una palabra—; `antes`, a la izquierda —borde de
+  /// ATRAS—. Cada lectura traduce el borde que le toca y deja el otro como
+  /// adorno. Si no toca ninguno, solo se traduce el PRIMERO de una corrida
+  /// que no toca nada (`te voy @ matar`); el resto es adorno (`put@@`).
+  static bool _seLeeComoLetra(List<String> chars, int i, _Lectura lectura) {
+    final antes = i > 0 && _isAlnum(chars[i - 1]);
+    final despues = i + 1 < chars.length && _isAlnum(chars[i + 1]);
+    // Una corrida con letra en los DOS extremos esta ADENTRO de una palabra:
+    // todos sus simbolos son letras (`cul!@r` es `culiar`). El adorno va en
+    // los bordes, no en el medio.
+    if (_corridaInterna(chars, i)) return true;
+    if (antes || despues) {
+      return switch (lectura) {
+        _Lectura.prefijo => despues,
+        _Lectura.sufijo => antes,
+        _ => true,
+      };
+    }
+    if (i > 0 && kVettedLeetAlsoAtEdges.contains(chars[i - 1])) return false;
+    var j = i;
+    while (j < chars.length && kVettedLeetAlsoAtEdges.contains(chars[j])) {
+      j++;
+    }
+    return j == chars.length || !_isAlnum(chars[j]);
+  }
+
   static final RegExp _separadores = RegExp(r'[^0-9a-z]+');
 
   static List<String> _tokens(String normalized) =>
@@ -214,7 +281,7 @@ abstract final class ModerationFilter {
   /// 1. Junta las corridas de tokens de UN caracter. `p u t o` y `p-u-t-o`
   ///    dan cuatro tokens de un caracter, y pegados dan `puto`.
   /// 2. Busca cada termino de `kVettedAntiEvasion` como subcadena de cada
-  ///    token, salteando los que estan en `kVettedAllowlist`.
+  ///    token, despues de sacarle las palabras de `kVettedAllowlist`.
   ///
   /// Lo que no hace es pegar el texto entero. Esa version —la obvia— bloquea
   /// `otro loco`, porque `otroloco` contiene `trolo`. Tambien `otro lote`.
@@ -245,19 +312,38 @@ abstract final class ModerationFilter {
         continue;
       }
       cerrarCorrida();
-      // La allowlist no puede aportar letras a un match: `computo` contiene
-      // `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
-      if (!kVettedAllowlist.contains(t)) candidatos.add(t);
+      candidatos.add(t);
       if (corto) corrida.add(t);
     }
     cerrarCorrida();
 
     for (final c in candidatos) {
-      for (final termino in kVettedAntiEvasion) {
-        if (c.contains(termino)) return true;
+      for (final pedazo in _sinAllowlist(c)) {
+        for (final termino in kVettedAntiEvasion) {
+          if (pedazo.contains(termino)) return true;
+        }
       }
     }
     return false;
+  }
+
+  /// [candidato] partido en lo que queda al sacarle, de ADENTRO, cada
+  /// palabra de `kVettedAllowlist`.
+  ///
+  /// La allowlist no puede aportar letras a un match: `computo` contiene
+  /// `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
+  /// Antes solo se salteaba el token que ERA una de esas palabras, y eso no
+  /// alcanza: un mail o una mencion la pegan con lo de al lado
+  /// —`juan@computo.com` da el token `juanacomputo`— y el `puto` de adentro
+  /// bloqueaba una direccion valida. Sacarla de adentro cubre los dos casos,
+  /// y no abre ninguno: lo que queda afuera de la palabra se sigue revisando
+  /// entero (`putocomputo` sigue dando `puto`).
+  static List<String> _sinAllowlist(String candidato) {
+    var pedazos = [candidato];
+    for (final palabra in kVettedAllowlist) {
+      pedazos = [for (final p in pedazos) ...p.split(palabra)];
+    }
+    return [for (final p in pedazos) if (p.isNotEmpty) p];
   }
 
   /// Las frases vetadas sin espacios: `hijo de puta` -> `hijodeputa`. Es la
