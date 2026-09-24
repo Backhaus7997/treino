@@ -4633,4 +4633,52 @@ class AppL10nEn extends AppL10n {
   @override
   String get privacyAnalyticsCrashNote =>
       'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
+
+  @override
+  String get customExerciseLimitNoticeTitle => 'Custom exercise limit';
+
+  @override
+  String customExerciseLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'You reached the $limitString custom exercises included in your plan. You can edit or delete the ones you already have.';
+  }
+
+  @override
+  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toDeleteNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toDelete,
+      locale: localeName,
+      other: 'delete $toDeleteString',
+      one: 'delete 1 exercise',
+    );
+    return 'You have $countString custom exercises and your plan includes $limitString. You keep them all; to create a new one, $_temp0.';
+  }
+
+  @override
+  String get customExerciseLimitDismiss => 'Got it';
+
+  @override
+  String customExerciseCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString of $limitString custom exercises';
+  }
 }

@@ -336,6 +336,23 @@ service cloud.firestore {
                     // contar objetos de un prefijo. Por eso el numero vive aca y
                     // no se calcula alla, y por eso quien lo escriba manda.
                     && request.resource.data.get('customExerciseVideoUsage', null) == null
+                    // planLimits: CF-write-only. Es el mapa de topes vigentes
+                    // del PF (hoy, sólo `customExercises`), que escribe
+                    // `syncTrainerEntitlements` (limite-ejercicios-pf.md,
+                    // PR1). Mismo peso y mismo modo de falla que
+                    // `customExerciseVideoUsage`, dos pins arriba: sin éste,
+                    // el bypass es una sola escritura
+                    // —`{planLimits: {customExercises: null}}`— y el tope de
+                    // ejercicios propios queda decorativo para quien la
+                    // mande. Lo LEE `customExerciseQuotaOk`, más abajo en
+                    // este archivo.
+                    && request.resource.data.get('planLimits', null) == null
+                    // customExerciseUsage: CF-write-only, mismo motivo que
+                    // `planLimits` y pineado junto a él porque los dos viajan
+                    // juntos en la misma decisión de cuota. Es el contador
+                    // denormalizado de cuántos ejercicios propios tiene HOY
+                    // este PF, que escribe `recountCustomExercises`.
+                    && request.resource.data.get('customExerciseUsage', null) == null
                     // chatMediaUsage: CF-write-only, mismo peso y mismo modo de
                     // falla que el de arriba. Es el total de BYTES de media de
                     // chat de este usuario, que escribe `maintainChatMediaQuota*`
@@ -450,6 +467,19 @@ service cloud.firestore {
                     // contar objetos de un prefijo. Por eso el numero vive aca y
                     // no se calcula alla, y por eso quien lo escriba manda.
                     && request.resource.data.get('customExerciseVideoUsage', null) == resource.data.get('customExerciseVideoUsage', null)
+                    // planLimits: CF-write-only, pineado en los DOS verbos por
+                    // la misma razon que el resto — medio pin es peor que
+                    // ninguno: vuelve INDELEBLE lo que se sembro al crear.
+                    //
+                    // Es el tope vigente de ejercicios propios del PF, que
+                    // escribe `syncTrainerEntitlements`. Sin el pin,
+                    // `{planLimits: {customExercises: null}}` desactiva el
+                    // tope entero para quien lo mande, y `customExerciseUsage`
+                    // por debajo viaja junto por el mismo motivo.
+                    && request.resource.data.get('planLimits', null) == resource.data.get('planLimits', null)
+                    // customExerciseUsage: CF-write-only, mismo par que
+                    // `planLimits` de arriba y mismo motivo.
+                    && request.resource.data.get('customExerciseUsage', null) == resource.data.get('customExerciseUsage', null)
                     // chatMediaUsage: CF-write-only, pineado en los DOS verbos
                     // por la misma razon que el resto — medio pin es peor que
                     // ninguno: vuelve INDELEBLE lo que se sembro al crear.
@@ -2844,10 +2874,53 @@ service cloud.firestore {
     // exercise if they knew the trainer's uid + exercise id, but the
     // exercise id is auto-generated and only surfaces through routines the
     // user already has access to, so the practical exposure is bounded.
+    // customExerciseQuotaOk: el tope de ejercicios propios del PF por plan
+    // (limite-ejercicios-pf.md §3 PR2). `u` es el documento de `users/{uid}`
+    // ya leído por el llamador vía `get()` — la única forma de que una regla
+    // sepa cuántos ejercicios propios tiene ya alguien, porque Firestore
+    // Rules no puede contar documentos de una colección (mismo motivo que
+    // `paywallEnforcedFor` más arriba lee un campo denormalizado en vez de
+    // agregar sobre `trainer_links`).
+    //
+    // - Sólo corta al `trainer`: el alumno usa el mismo editor y nunca gatea
+    //   (decisión E4 del plan).
+    // - `planLimits.customExercises` en `null` o AUSENTE es SIN TOPE — falla
+    //   abierta, igual que el resto del interruptor de PR1: cubre el
+    //   apagado global (`TRAINER_EXERCISE_LIMITS_ENABLED = false`) y al PF
+    //   que todavía no tuvo su primer sync.
+    // - `count < limit`, no `<=`: con límite 60 se pueden TENER 60 (decisión
+    //   E6). El create que deja el contador en 60 pasa; el que lo dejaría en
+    //   61, no.
+    //
+    // Si `planLimits.customExercises` no fuera un número (dato corrupto o
+    // forjado a mano, ej. un string), la comparación `<` tira un error de
+    // tipo en tiempo de evaluación y Firestore Rules deniega la regla
+    // completa — falla CERRADO, nunca abierto, y el cliente ve el mismo
+    // `permission-denied` de siempre, no un error distinto. No hace falta un
+    // chequeo de tipo explícito para eso.
+    function customExerciseQuotaOk(u) {
+      return u.get('role', '') != 'trainer'
+          || u.get('planLimits', {}).get('customExercises', null) == null
+          || u.get('customExerciseUsage', {}).get('count', 0)
+               < u.get('planLimits', {}).get('customExercises', null);
+    }
+
     match /users/{uid}/customExercises/{exId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null
-                   && request.auth.uid == uid;
+      // Create: además de dueño, tiene que pasar la cuota. El `get()` es una
+      // lectura facturada por cada create — los ejercicios se crean poco
+      // (§limite-ejercicios-pf.md), así que es barato; no es el mismo
+      // criterio que se aplicaría a una lectura de alto volumen.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && customExerciseQuotaOk(
+                         get(/databases/$(database)/documents/users/$(uid)).data);
+      // Update y delete NO miran la cuota — es lo que hace cumplir E3: bajar
+      // de plan congela la creación y no borra ni bloquea nada de lo que ya
+      // existe. Editar, usar, asignar y borrar siguen permitidos siempre,
+      // incluso por encima del tope.
+      allow update, delete: if request.auth != null
+                            && request.auth.uid == uid;
     }
 
     // Coach Agenda — availability rules (Fase 5 Etapa 6, REQ-027).

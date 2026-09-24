@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 49 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 50 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -185,13 +185,21 @@ test('los 49 scripts que inicializan Firebase pasan por la frontera', () => {
   // `TEST-`. Con el de producción abriría un `preapproval_plan` REAL en la
   // cuenta que factura.
   //
+  // El 50 es `medir_ejercicios_propios.js` (limite-ejercicios-pf.md, PR 0):
+  // mide cuantos ejercicios propios tiene hoy cada PF, para confirmar antes de
+  // encender el tope que nadie actual queda pasado. Entra por `lib/admin`,
+  // imprime el proyecto resuelto en la primera línea, y es de SOLO LECTURA —
+  // no emite un solo write, en ningún proyecto — pero igual trae el guard
+  // `--allow-prod` porque asi lo pide el plan y porque decide una migración de
+  // producto real.
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    49,
+    50,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

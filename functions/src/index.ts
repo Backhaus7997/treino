@@ -145,6 +145,11 @@ export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // el limite que cae solo por el paso del tiempo (cancelled + currentPeriodEnd
 // vencido no escribe un solo documento).
 export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptions/entitlement-triggers";
+// limite-ejercicios-pf.md, PR1: mantiene `users/{uid}.customExerciseUsage.count`
+// al dia cuando un PF crea o borra un ejercicio propio. Interruptor
+// TRAINER_EXERCISE_LIMITS_ENABLED (trainer-plan-limits.ts) arranca apagado —
+// ver el encabezado de ese modulo antes de prenderlo.
+export { maintainCustomExerciseCount } from "./subscriptions/custom-exercise-count";
 // Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
 // el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
 // PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen
@@ -172,6 +177,12 @@ export {
 // Es el unico canal posible: bajo 3.1.3(f) la app no puede decir donde se
 // paga. Ver el encabezado de `free-limit-mail.ts`.
 export { sweepFreeLimitMail } from "./subscriptions/free-limit-mail";
+// El mail al PF que choco el tope de ejercicios propios de su plan
+// (limite-ejercicios-pf.md, PR4). Corre 05:30 ART, media hora despues del
+// barrido de arriba y una hora despues del de las 04:00 que recalcula
+// `planLimits`/`customExerciseUsage` (`sweepEntitlements`) — ver el
+// encabezado de `trainer-limit-mail.ts`, seccion "EL HORARIO".
+export { sweepTrainerLimitMail } from "./subscriptions/trainer-limit-mail";
 // Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
 // (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
 //

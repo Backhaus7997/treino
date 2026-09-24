@@ -612,4 +612,40 @@ void main() {
       expect(profile.displayName, isNull);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // registrarTopeDelPlanPf — docs/limite-ejercicios-pf.md §2 y PR4
+  // ---------------------------------------------------------------------------
+  group('UserRepository.registrarTopeDelPlanPf', () {
+    test('escribe trainerLimitHitKind y trainerLimitHitAt', () async {
+      await seedDoc('trainer-1');
+
+      await repo.registrarTopeDelPlanPf('trainer-1', 'customExercises');
+
+      final snap = await firestore.collection('users').doc('trainer-1').get();
+      expect(snap.data()!['trainerLimitHitKind'], equals('customExercises'));
+      expect(snap.data()!['trainerLimitHitAt'], isA<Timestamp>());
+    });
+
+    test('hace merge: no pisa el resto del documento', () async {
+      await seedDoc('trainer-2');
+
+      await repo.registrarTopeDelPlanPf('trainer-2', 'customExercises');
+
+      final snap = await firestore.collection('users').doc('trainer-2').get();
+      // El seed puso email/role/etc — merge: true no debe haberlos borrado.
+      expect(snap.data()!['email'], equals('seed@test.com'));
+      expect(snap.data()!['role'], equals('athlete'));
+    });
+
+    test('no tira si el doc no existe (set con merge lo crea)', () async {
+      // `registrarTopeTocado` usa `.set(merge: true)`, que no exige que el
+      // doc exista de antes — mismo comportamiento acá, y el catch interno
+      // asegura que ni siquiera un error de Firestore se propague.
+      await expectLater(
+        repo.registrarTopeDelPlanPf('trainer-inexistente', 'customExercises'),
+        completes,
+      );
+    });
+  });
 }

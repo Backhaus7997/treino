@@ -400,6 +400,22 @@ export function cupoLabel(limit: number | null): string {
 }
 
 /**
+ * "60 ejercicios propios" · "1 ejercicio propio".
+ *
+ * Espejo de `cupoLabel`, mismo motivo: singular no cosmético (el tope Free es
+ * 20 hoy, pero un tier de 1 haría que el mail dijera "1 ejercicios propios").
+ *
+ * `exercise-limit-reached` sólo se encola cuando `count >= limit`
+ * (`decideTrainerLimitMail` en `trainer-limit-mail.ts`), así que `limit`
+ * llega siempre como un número real — pero la firma pide `number` a secas y
+ * no `number | null` porque, a diferencia de `cupoLabel`, esta función nunca
+ * tiene que decidir "sin límite": ese caso ni siquiera genera el mail.
+ */
+function ejerciciosLabel(limit: number): string {
+  return limit === 1 ? "1 ejercicio propio" : `${limit} ejercicios propios`; // i18n: email comercial
+}
+
+/**
  * El cupo del plan Free, ya escrito. Se DERIVA de `TIER_WEIGHT_LIMITS` en vez
  * de llegar por params: es una constante del producto, no un dato del PF, y un
  * param mas es un param que el proximo productor se olvida de pasar — con el
@@ -1011,6 +1027,42 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       ctaUrl,
       "hero",
     );
+
+  // ── El PF que chocó el tope de ejercicios propios de su plan ────────────
+  //
+  // limite-ejercicios-pf.md §3 PR4. Hermano de `limit-reached` (alumnos), con
+  // la MISMA regla de fondo: dice el ESTADO —tope, cuántos tiene, qué puede
+  // seguir haciendo— y nunca inventa una causa que el dato no confirma.
+  //
+  // NINGUNA PALABRA DE PERDIDA. E3 del plan es expresamente que bajar de plan
+  // NUNCA borra ni bloquea lo que ya existe: editar, usar, asignar y borrar
+  // siguen permitidos siempre, incluso por encima del tope. Insinuar lo
+  // contrario —aunque sea de pasada— sería la misma mentira cara que evita el
+  // resto de esta capa (`athlete-coverage-lost`, `subscription-downgraded`).
+  //
+  // CON `prefKey`: comunicación comercial, ver `trainer-limit-mail.ts`.
+  case "exercise-limit-reached": {
+    const limit = limitParam(params.limit);
+    const label = typeof limit === "number" ? ejerciciosLabel(limit) : undefined;
+
+    return build(
+      "Llegaste al tope de ejercicios propios de tu plan", // i18n: email comercial
+      "Llegaste al tope",
+      [
+        label
+          ? ["Llegaste al tope de tu plan: ", strong(label), "."]
+          : ["Llegaste al tope de ejercicios propios de tu plan."],
+        [
+          "Conservás todos los que ya tenés: podés seguir usándolos, " +
+            "editarlos, asignarlos y borrarlos.",
+        ],
+        ["Lo único que se frena es crear ejercicios nuevos por encima del límite."],
+        ["Si necesitás más lugar, hay planes más grandes."],
+      ],
+      "VER LOS PLANES",
+      ctaUrl,
+    );
+  }
 
   case "athlete-coverage-lost":
     return build(

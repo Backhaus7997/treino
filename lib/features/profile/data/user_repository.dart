@@ -510,6 +510,39 @@ class UserRepository {
     }
   }
 
+  /// Deja anotado que el PF chocó un tope del PLAN PAGO (no el free del
+  /// alumno — ver [registrarTopeTocado] para ese).
+  ///
+  /// Calcado de [registrarTopeTocado]: misma forma, mismo catch silencioso,
+  /// mismo motivo. Lo lee `sweepTrainerLimitMail` (PR4,
+  /// `functions/src/subscriptions/trainer-limit-mail.ts`) para mandarle al PF
+  /// un mail contándole dónde se paga — la app no puede decírselo desde
+  /// adentro del binario, mismo amparo 3.1.3(f) que documenta
+  /// [registrarTopeTocado].
+  ///
+  /// [kind] tipado como el `String` que ya usa `registrarTopeTocado` — el
+  /// contrato del campo (docs/limite-ejercicios-pf.md §2) es
+  /// `trainerLimitHitKind: string`, y hoy el único valor que existe es
+  /// `'customExercises'`. No se lo angosta a un enum de un solo caso porque
+  /// el próximo tope del PF (plantillas públicas, espacio de archivos) suma
+  /// un valor sin tocar la firma, mismo criterio que `planLimits` como mapa.
+  ///
+  /// Nunca tira: se llama desde el embudo de creación, y la app tiene que
+  /// poder seguir mostrando el aviso aunque la anotación falle.
+  Future<void> registrarTopeDelPlanPf(String uid, String kind) async {
+    try {
+      await _users.doc(uid).set(
+        <String, Object?>{
+          'trainerLimitHitKind': kind,
+          'trainerLimitHitAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      // Ver el dartdoc: el aviso se muestra igual.
+    }
+  }
+
   Future<void> update(
     String uid,
     Map<String, Object?> partial, {

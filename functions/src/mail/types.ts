@@ -130,6 +130,27 @@ export type MailKind =
   // comunicacion comercial sobre lo mismo, y apagar uno y seguir recibiendo el
   // otro seria no haber apagado nada.
   | "free-limit-reached"
+  // ── El PF que choco el tope de ejercicios propios de su plan ────────────
+  //
+  // limite-ejercicios-pf.md, PR4. El equivalente de `limit-reached` (alumnos)
+  // pero para la OTRA cuota del PF: `planLimits.customExercises` /
+  // `customExerciseUsage.count`, que ya escribe PR1 y ya lee la regla de PR2
+  // en `firestore.rules`.
+  //
+  // Lo produce `trainer-limit-mail.ts`, leyendo `trainerLimitHitKind` /
+  // `trainerLimitHitAt`, que anota el CLIENTE (`registrarTopeDelPlanPf`, el
+  // tramo siguiente) cuando un create de `users/{uid}/customExercises`
+  // rebota contra `customExerciseQuotaOk`.
+  //
+  // POR QUE ES UN MAIL: el movil solo informa el ESTADO, sin boton ni "pasa a
+  // un plan" (E8 del plan, mismo criterio que sostiene `plan_limit_paywall.dart`
+  // desde el #1141) — asi que para quien entro por el telefono este mail es el
+  // UNICO canal que dice donde se paga.
+  //
+  // CON `prefKey`: ofrecerle un plan mas grande a quien ya es cliente es
+  // comunicacion comercial, igual razonamiento que `athlete-coverage-lost` y
+  // `free-limit-reached` (los otros dos que SI lo llevan).
+  | "exercise-limit-reached"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_slides.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_gate.dart';
@@ -136,6 +137,8 @@ Future<void> _pumpConRouter(
   required _CapturingUserRepository repo,
   UserProfile? profile,
   Future<void> Function()? alCrearEjercicio,
+  OnboardingSurface surface = OnboardingSurface.customExerciseAthleteMobile,
+  AsyncValue<CustomExerciseQuota>? quota,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 844));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -147,7 +150,7 @@ Future<void> _pumpConRouter(
         path: '/',
         builder: (_, __) => Scaffold(
           body: _Host(
-            surface: OnboardingSurface.customExerciseAthleteMobile,
+            surface: surface,
             alCrearEjercicio: alCrearEjercicio,
           ),
         ),
@@ -166,6 +169,7 @@ Future<void> _pumpConRouter(
       overrides: [
         userRepositoryProvider.overrideWithValue(repo),
         userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+        if (quota != null) customExerciseQuotaProvider.overrideWithValue(quota),
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
@@ -407,6 +411,61 @@ void main() {
       );
 
       expect(llamado, 0);
+    });
+
+    // ── El CTA es un punto de entrada más al embudo del tope ──────────────
+    // (docs/limite-ejercicios-pf.md PR3, entrada #3: "Móvil: onboarding de
+    // ejercicios"). Surface TRAINER porque el tope es exclusivo del PF (E4)
+    // — un alumno con `customExerciseAthleteMobile` ya está cubierto por los
+    // tests de arriba, que pasan con la cuota REAL (no overrideada) porque el
+    // corte por rol pasa primero.
+    testWidgets('PF bajo el tope ⇒ el CTA navega al editor', (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(role: UserRole.trainer),
+        surface: OnboardingSurface.customExerciseTrainerMobile,
+        quota: const AsyncValue.data((limit: 60, count: 1)),
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseTrainerMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      expect(find.text('EDITOR:new'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PF en el tope ⇒ el CTA NO navega y muestra el aviso de sólo-estado',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(role: UserRole.trainer),
+        surface: OnboardingSurface.customExerciseTrainerMobile,
+        quota: const AsyncValue.data((limit: 1, count: 1)),
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseTrainerMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      expect(find.text('EDITOR:new'), findsNothing);
+      expect(
+        find.text('Llegaste a los 1 ejercicios propios de tu plan. Podés '
+            'editar o borrar los que ya tenés.'),
+        findsOneWidget,
+      );
     });
   });
 }
