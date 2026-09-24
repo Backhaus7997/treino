@@ -21,8 +21,9 @@ import {
  * `vetted-terms-filter.test.ts` corre el corpus de conformidad: casos elegidos
  * a mano que prueban el ALGORITMO. Esta suite prueba lo que ese corpus no
  * puede: que CADA termino de la lista da su severidad con cada variante de
- * evasion, y que el contenido real del producto pasa entero. Ver el porque
- * completo en el espejo de Dart.
+ * evasion, y que el texto legitimo —el contenido real del producto y texto
+ * del tipo que escribe un usuario— pasa entero. Ver el porque completo en el
+ * espejo de Dart.
  *
  * Esta es la capa que importa: el cliente se saltea con el SDK directo, y lo
  * que corre en el servidor es este algoritmo.

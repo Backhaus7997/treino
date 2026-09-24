@@ -12,6 +12,11 @@ enum ModerationVerdict {
   block,
 }
 
+/// Las lecturas de un texto que evalua [ModerationFilter.check]. Solo
+/// difieren en como leen los simbolos de `kVettedLeetAlsoAtEdges`; ver
+/// `LEET_TAMBIEN_EN_BORDES` en el generador. El orden es el del corpus.
+enum _Lectura { estricta, prefijo, sufijo, adyacente, total }
+
 /// Filtrado de terminos vetados.
 ///
 /// Cuarto requisito de la App Store Review Guideline 1.2: *"a method for
@@ -37,11 +42,6 @@ enum ModerationVerdict {
 /// corrida de `scripts/build_moderation_list.py`. Lo unico escrito dos veces
 /// es este algoritmo, y es lo que el corpus de `kVettedCases` vigila: las dos
 /// suites corren los mismos casos y comparan contra las mismas expectativas.
-/// Las lecturas de un texto que evalua [ModerationFilter.check]. Solo
-/// difieren en como leen los simbolos de `kVettedLeetAlsoAtEdges`; ver
-/// `LEET_TAMBIEN_EN_BORDES` en el generador. El orden es el del corpus.
-enum _Lectura { estricta, prefijo, sufijo, adyacente, total }
-
 abstract final class ModerationFilter {
   const ModerationFilter._();
 
@@ -102,8 +102,7 @@ abstract final class ModerationFilter {
   /// Publico porque los tests lo miden aparte del veredicto: cuando un caso
   /// del corpus falla, saber en que quedo el texto es la diferencia entre
   /// arreglarlo y adivinar.
-  static String normalize(String text) =>
-      _normalizar(text, _Lectura.estricta);
+  static String normalize(String text) => _normalizar(text, _Lectura.estricta);
 
   /// Las lecturas que evalua [check], sin repetidas: la estricta —que es
   /// [normalize]—, prefijo, sufijo, adyacente y total. Solo difieren cuando
@@ -161,8 +160,8 @@ abstract final class ModerationFilter {
       // lados. Sin esa regla `puta!` normaliza a `putai`, que no matchea
       // `puta` por palabra completa: el leet a lo bruto produce falsos
       // NEGATIVOS sobre el texto mas comun que existe, un insulto con signo
-      // de exclamacion. Las lecturas adyacente y total los leen distinto;
-      // ver [check].
+      // de exclamacion. Las otras lecturas —todas menos la estricta— los
+      // leen distinto; ver [check].
       final ambiguo = kVettedLeetAlsoAtEdges.contains(ch);
       if (ambiguo && lectura == _Lectura.total) {
         out.write(rep);
@@ -210,8 +209,8 @@ abstract final class ModerationFilter {
       desde--;
     }
     var hasta = i;
-    while (hasta < chars.length &&
-        kVettedLeetAlsoAtEdges.contains(chars[hasta])) {
+    while (
+        hasta < chars.length && kVettedLeetAlsoAtEdges.contains(chars[hasta])) {
       hasta++;
     }
     return desde > 0 &&
@@ -343,7 +342,10 @@ abstract final class ModerationFilter {
     for (final palabra in kVettedAllowlist) {
       pedazos = [for (final p in pedazos) ...p.split(palabra)];
     }
-    return [for (final p in pedazos) if (p.isNotEmpty) p];
+    return [
+      for (final p in pedazos)
+        if (p.isNotEmpty) p
+    ];
   }
 
   /// Las frases vetadas sin espacios: `hijo de puta` -> `hijodeputa`. Es la

@@ -178,7 +178,8 @@ function leet(s: string, lectura: Lectura): string {
     // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
     // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
     // texto mas comun que existe, un insulto con signo de exclamacion. Las
-    // lecturas adyacente y total los leen distinto; ver `checkText`.
+    // otras lecturas —todas menos la estricta— los leen distinto; ver
+    // `checkText`.
     const ambiguo = VETTED_LEET_ALSO_AT_EDGES.has(ch);
     if (ambiguo && lectura === "total") {
       out += rep;

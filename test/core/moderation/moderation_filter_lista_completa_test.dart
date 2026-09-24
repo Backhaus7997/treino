@@ -6,8 +6,8 @@ import 'package:treino/core/moderation/moderation_filter.dart';
 import 'package:treino/core/moderation/vetted_terms.g.dart';
 import 'package:treino/features/workout/domain/muscle_group.dart';
 
-/// La lista ENTERA contra el filtro, y el vocabulario REAL del producto
-/// contra el filtro. ESPEJO de
+/// La lista ENTERA contra el filtro, y el texto legitimo contra el filtro.
+/// ESPEJO de
 /// `functions/src/__tests__/vetted-terms-lista-completa.test.ts`.
 ///
 /// `moderation_filter_test.dart` corre el corpus de conformidad: casos
@@ -118,7 +118,8 @@ void main() {
         expect(textos.length, greaterThan(piso));
       });
 
-      test('$nombre: ninguno de los ${textos.length} textos da block ni '
+      test(
+          '$nombre: ninguno de los ${textos.length} textos da block ni '
           'review', () {
         final caidos = [
           for (final (origen, texto) in textos)
