@@ -301,6 +301,17 @@ def _es_arroba_de_mail(chars: list[str], i: int) -> bool:
     """
     if chars[i] != "@":
         return False
+    # Un mail tiene usuario: algo pegado antes de la `@`, con al menos una
+    # letra o digito. Sin esto una MENCION con puntos pasaba por mail, y
+    # `@ndate.a.morir` dejaba de cazarse (lo cazo la cuarta revision).
+    k = i - 1
+    hay_usuario = False
+    while k >= 0 and (_es_alnum(chars[k]) or chars[k] in "._-+"
+                      or chars[k] in LEET_TAMBIEN_EN_BORDES):
+        hay_usuario = hay_usuario or _es_alnum(chars[k])
+        k -= 1
+    if not hay_usuario:
+        return False
     j = i + 1
     while j < len(chars) and (_es_alnum(chars[j]) or chars[j] in "-_"):
         j += 1
@@ -324,8 +335,8 @@ def _corrida_interna(chars: list[str], i: int) -> bool:
 def normalizar(texto: str, modo: str = "estricta") -> str:
     """La normalizacion DE REFERENCIA. Dart y TypeScript son puertos de esto.
 
-    `modo` es una de `LECTURAS`. La `estricta` es LA normalizacion; las otras
-    dos solo cambian como se leen los simbolos de `LEET_TAMBIEN_EN_BORDES` —
+    `modo` es una de `LECTURAS`. La `estricta` es LA normalizacion; las
+    demas solo cambian como se leen los simbolos de `LEET_TAMBIEN_EN_BORDES` —
     ver el porque ahi.
 
     El corpus guarda la salida de esta funcion para cada caso, y las dos suites

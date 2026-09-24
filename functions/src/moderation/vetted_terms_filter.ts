@@ -224,6 +224,20 @@ function isAlnum(ch: string): boolean {
  */
 function esArrobaDeMail(chars: readonly string[], i: number): boolean {
   if (chars[i] !== "@") return false;
+  // Un mail tiene usuario: algo pegado antes de la `@`, con al menos una
+  // letra o digito. Sin esto una MENCION con puntos pasaba por mail, y
+  // `@ndate.a.morir` dejaba de cazarse.
+  let k = i - 1;
+  let hayUsuario = false;
+  while (
+    k >= 0 &&
+    (isAlnum(chars[k]) || "._-+".includes(chars[k]) ||
+      VETTED_LEET_ALSO_AT_EDGES.has(chars[k]))
+  ) {
+    hayUsuario = hayUsuario || isAlnum(chars[k]);
+    k--;
+  }
+  if (!hayUsuario) return false;
   let j = i + 1;
   while (
     j < chars.length &&

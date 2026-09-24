@@ -895,6 +895,14 @@ const List<
         'y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando'
   ),
   (
+    texto: '@ndate.a.morir',
+    espera: 'block',
+    normalizado: '@ndate.a.morir',
+    lecturas: ['@ndate.a.morir', 'andate.a.morir'],
+    por:
+        'una MENCION con puntos no es un mail: sin usuario antes de la `@` la excepcion de mail no aplica, y la `@` se relee como `a`'
+  ),
+  (
     texto: '@c0lg@t3 d3 un @rb0l',
     espera: 'ok',
     normalizado: '@colgate de un @rbol',

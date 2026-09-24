@@ -210,6 +210,19 @@ abstract final class ModerationFilter {
   /// escrito con forma de mail (`c0nch@s.com`) se sigue cazando por ahi.
   static bool _esArrobaDeMail(List<String> chars, int i) {
     if (chars[i] != '@') return false;
+    // Un mail tiene usuario: algo pegado antes de la `@`, con al menos una
+    // letra o digito. Sin esto una MENCION con puntos pasaba por mail, y
+    // `@ndate.a.morir` dejaba de cazarse.
+    var k = i - 1;
+    var hayUsuario = false;
+    while (k >= 0 &&
+        (_isAlnum(chars[k]) ||
+            '._-+'.contains(chars[k]) ||
+            kVettedLeetAlsoAtEdges.contains(chars[k]))) {
+      hayUsuario = hayUsuario || _isAlnum(chars[k]);
+      k--;
+    }
+    if (!hayUsuario) return false;
     var j = i + 1;
     while (j < chars.length &&
         (_isAlnum(chars[j]) || chars[j] == '-' || chars[j] == '_')) {
