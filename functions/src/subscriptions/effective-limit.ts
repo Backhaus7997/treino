@@ -7,6 +7,10 @@
 
 import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "./tier-config";
 
+// Set y no `in`: mismo motivo que `tierLimit` — "toString" vive en el
+// prototipo y `"toString" in TIER_WEIGHT_LIMITS` da `true`.
+const KNOWN_TIERS: ReadonlySet<string> = new Set(Object.keys(TIER_WEIGHT_LIMITS));
+
 /**
  * Runtime list of every valid status. La union se DERIVA de esta lista, no al
  * reves, para que el validador de `subscription-state.ts` no pueda quedar
@@ -297,4 +301,91 @@ export function resolverPisoPrepago(
     if (rc !== rm) return rc > rm ? c : mejor;
     return c.untilMs > mejor.untilMs ? c : mejor;
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// effectiveTier — limite-ejercicios-pf.md, PR1.
+//
+// El tope de ejercicios propios (`TIER_CUSTOM_EXERCISE_LIMITS`) se resuelve
+// contra el TIER del PF, no contra un numero — a diferencia del tope de
+// alumnos, que ES un numero (peso). Por eso hace falta una funcion que
+// devuelva el tier efectivo, no el limite efectivo: `trainer-plan-limits.ts`
+// hace `customExerciseLimitFor(effectiveTier(sub, nowMs))`.
+//
+// NO LLAMA A [effectiveWeightLimit] NI AL REVES. Son dos funciones puras que
+// REPLICAN la misma matriz de casos, a proposito: `effectiveWeightLimit` es
+// el camino de la plata (bloquea/desbloquea alumnos) y esta decision del plan
+// (limite-ejercicios-pf.md, PR1) es explicita en no tocarlo ni compartir
+// codigo forzado con el. La consistencia entre las dos no se garantiza por
+// construccion: se prueba con un test, `effective-tier.test.ts`, que usa
+// `tierLimit(effectiveTier(s)) === effectiveWeightLimit(s)` como oraculo
+// sobre toda la matriz de estados.
+// ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tier efectivo del PF. Nunca undefined, nunca un tier inventado: un tier
+ * desconocido en el mapa degrada a `"free"`, igual que `tierLimit` degrada su
+ * limite.
+ *
+ * El PISO PREPAGO se aplica igual que en `effectiveWeightLimit` —MAXIMO,
+ * nunca reemplazo— pero comparando por RANGO DE TIER en vez de por limite.
+ * Reusa `tierLimit` + `limitRank` (ya exportadas y ya testeadas) para ese
+ * ranking: la escalera de `TIER_CUSTOM_EXERCISE_LIMITS` crece en el MISMO
+ * orden que `TIER_WEIGHT_LIMITS` (free < plan1 < plan2 < plan3, decision E1
+ * del plan), asi que rankear por el limite de peso rankea por tier sin
+ * necesitar una segunda tabla de orden que se pueda desincronizar.
+ */
+export function effectiveTier(
+  sub: SubscriptionState | null | undefined,
+  nowMs: number = Date.now(),
+): SubscriptionTier {
+  if (!sub) return "free";
+  return tierConPisoPrepago(tierDelStatus(sub, nowMs), sub, nowMs);
+}
+
+/** El tier NOMINAL, saneado contra el mapa conocido. Ver `tierLimit`. */
+function tierNominal(tier: SubscriptionTier): SubscriptionTier {
+  return KNOWN_TIERS.has(tier) ? tier : "free";
+}
+
+/**
+ * El tier que sale del status, antes del piso. Mismos cinco casos que
+ * `limiteDelStatus`, con la misma doble garantia de exhaustividad (runtime +
+ * compilacion) — ver el docblock de esa funcion para el porque de cada una.
+ */
+function tierDelStatus(
+  sub: SubscriptionState,
+  nowMs: number,
+): SubscriptionTier {
+  switch (sub.status) {
+  case "active":
+  case "grace":
+    return tierNominal(sub.tier);
+  case "cancelled":
+    return sub.currentPeriodEndMs != null && nowMs < sub.currentPeriodEndMs
+      ? tierNominal(sub.tier)
+      : "free";
+  case "pending":
+  case "paused":
+    return "free";
+  default: {
+    const _exhaustive: never = sub.status;
+    void _exhaustive;
+    return "free";
+  }
+  }
+}
+
+/** El maximo entre el tier del status y el PISO PREPAGO, por rango de tier. */
+function tierConPisoPrepago(
+  base: SubscriptionTier,
+  sub: SubscriptionState,
+  nowMs: number,
+): SubscriptionTier {
+  const { prepaidTier, prepaidUntilMs } = sub;
+  if (prepaidTier == null || prepaidUntilMs == null) return base;
+  if (nowMs >= prepaidUntilMs) return base;
+
+  const piso = tierNominal(prepaidTier);
+  return limitRank(tierLimit(piso)) > limitRank(tierLimit(base)) ? piso : base;
 }

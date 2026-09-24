@@ -10,6 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -17,6 +22,8 @@ import 'package:treino/features/workout/data/custom_exercise_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/presentation/my_exercises_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+class _MockUserRepo extends Mock implements UserRepository {}
 
 class _MockRepo extends Mock implements CustomExerciseRepository {}
 
@@ -31,10 +38,25 @@ CustomExercise _ex(String id, String name) => CustomExercise(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
+UserProfile _profile(UserRole role) {
+  final now = DateTime.utc(2026, 1, 1);
+  return UserProfile(
+    uid: _kUid,
+    email: 'a@b.com',
+    displayName: null,
+    role: role,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
 Future<void> _pump(
   WidgetTester tester, {
   required List<CustomExercise> items,
   CustomExerciseRepository? repo,
+  UserRole role = UserRole.trainer,
+  AsyncValue<CustomExerciseQuota>? quota,
+  UserRepository? userRepo,
 }) async {
   final router = GoRouter(
     initialLocation: '/profile/my-exercises',
@@ -64,6 +86,11 @@ Future<void> _pump(
           customExerciseRepositoryProvider.overrideWithValue(repo),
         customExercisesForTrainerStreamProvider(_kUid)
             .overrideWith((ref) => Stream.value(items)),
+        userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
+        customExerciseQuotaProvider.overrideWithValue(
+          quota ?? AsyncValue.data((limit: null, count: items.length)),
+        ),
+        userRepositoryProvider.overrideWithValue(userRepo ?? _MockUserRepo()),
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
@@ -257,5 +284,102 @@ void main() {
 
     expect(find.text('MIS EJERCICIOS'), findsOneWidget);
     expect(find.text('0 SELECCIONADOS'), findsNothing);
+  });
+
+  // ── Tope de ejercicios propios (docs/limite-ejercicios-pf.md PR3) ────────
+
+  group('contador de ejercicios propios', () {
+    testWidgets('PF con límite numérico ⇒ lo muestra', (tester) async {
+      await _pump(
+        tester,
+        items: [_ex('a', 'A'), _ex('b', 'B')],
+        quota: const AsyncValue.data((limit: 60, count: 2)),
+      );
+
+      expect(find.text('2 de 60 ejercicios propios'), findsOneWidget);
+    });
+
+    testWidgets('límite null (Plan 3 / interruptor apagado) ⇒ lo oculta',
+        (tester) async {
+      await _pump(
+        tester,
+        items: [_ex('a', 'A')],
+        quota: const AsyncValue.data((limit: null, count: 1)),
+      );
+
+      expect(find.textContaining('ejercicios propios'), findsNothing);
+    });
+
+    testWidgets('alumno ⇒ nunca lo muestra, aunque la cuota traiga un límite',
+        (tester) async {
+      await _pump(
+        tester,
+        items: [_ex('a', 'A')],
+        role: UserRole.athlete,
+        // Esto no puede pasar en producción (planLimits.customExercises sólo
+        // lo escribe la CF para role == trainer), pero el widget igual tiene
+        // que cortar por rol y no confiar ciegamente en el dato.
+        quota: const AsyncValue.data((limit: 60, count: 1)),
+      );
+
+      expect(find.textContaining('ejercicios propios'), findsNothing);
+    });
+  });
+
+  group('CTA "+ NUEVO EJERCICIO" — el embudo único', () {
+    testWidgets('PF bajo el tope ⇒ navega al editor', (tester) async {
+      await _pump(
+        tester,
+        items: [_ex('a', 'A')],
+        quota: const AsyncValue.data((limit: 60, count: 1)),
+      );
+
+      await tester.tap(find.text('+ NUEVO EJERCICIO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('nuevo'), findsOneWidget);
+    });
+
+    testWidgets('PF en el tope ⇒ NO navega y muestra el aviso de sólo-estado',
+        (tester) async {
+      final userRepo = _MockUserRepo();
+      when(() => userRepo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      await _pump(
+        tester,
+        items: [_ex('a', 'A')],
+        quota: const AsyncValue.data((limit: 1, count: 1)),
+        userRepo: userRepo,
+      );
+
+      await tester.tap(find.text('+ NUEVO EJERCICIO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('nuevo'), findsNothing);
+      expect(
+        find.text('Llegaste a los 1 ejercicios propios de tu plan. Podés '
+            'editar o borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      // Sin botón de acción: sólo el dismiss de "sólo-estado".
+      expect(find.byKey(const Key('custom_exercise_limit_dismiss')),
+          findsOneWidget);
+    });
+
+    testWidgets('alumno ⇒ navega siempre, aunque la cuota diga tope',
+        (tester) async {
+      await _pump(
+        tester,
+        items: [_ex('a', 'A')],
+        role: UserRole.athlete,
+        quota: const AsyncValue.data((limit: 1, count: 1)),
+      );
+
+      await tester.tap(find.text('+ NUEVO EJERCICIO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('nuevo'), findsOneWidget);
+    });
   });
 }

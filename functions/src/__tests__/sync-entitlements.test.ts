@@ -49,6 +49,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
 import { dobleNamespaced } from "./helpers/modular-from-namespaced";
+import * as trainerPlanLimits from "../subscriptions/trainer-plan-limits";
 
 const app = {} as App;
 
@@ -621,5 +622,94 @@ describe("syncTrainerEntitlements — el aviso de acceptedAt separa lo sano de l
         expect.objectContaining({ linkId: "STR", status: "pending", acceptedAtType: "string" }),
       ],
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planLimits (limite-ejercicios-pf.md, PR1) — el `tx.set` de
+// `users/{trainerId}` tambien tiene que llevar el tope de ejercicios propios,
+// calculado con el MISMO `sub`/`degraded`/`clock` que ya usa el tope de
+// alumnos en esta misma funcion.
+// ---------------------------------------------------------------------------
+
+describe("syncTrainerEntitlements — planLimits", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("con el interruptor apagado (hoy), escribe planLimits.customExercises: null EXPLICITO", async () => {
+    // TRAINER_EXERCISE_LIMITS_ENABLED arranca apagado (limite-ejercicios-pf.md
+    // PR1) y `resolvePlanLimits` con `enabled=false` devuelve `{customExercises:
+    // null}` para TODOS — incluso con `degraded`, porque el apagado manda
+    // primero (cubierto en trainer-plan-limits.test.ts). Sin mockear nada:
+    // este es el comportamiento REAL con el flag como esta hoy en produccion.
+    // La CLAVE tiene que existir en el doc, no estar ausente: con
+    // `merge: true`, omitirla es "no tocar", y un valor numerico previo (de
+    // una corrida futura con el interruptor prendido, o escrito a mano)
+    // quedaria pegado para siempre.
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toEqual({ customExercises: null });
+  });
+
+  // Los siguientes dos tests mockean `resolvePlanLimits` en vez de depender
+  // de `degraded` + el interruptor real: asi se prueba la INTEGRACION (que el
+  // `tx.set` haga lo correcto con lo que `resolvePlanLimits` devuelva) por
+  // separado de la DECISION (que valor corresponde a cada estado, ya cubierta
+  // en trainer-plan-limits.test.ts). Probarlo con el interruptor real
+  // apagado no podria ejercitar la rama "no tocar", porque apagado siempre
+  // devuelve `{customExercises: null}` — nunca `null` — sea cual sea
+  // `degraded`.
+  it("cuando resolvePlanLimits devuelve null (no tocar), la clave planLimits se OMITE del todo", async () => {
+    jest.spyOn(trainerPlanLimits, "resolvePlanLimits").mockReturnValue(null);
+
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toBeUndefined();
+  });
+
+  it("no pisa un planLimits previo cuando resolvePlanLimits dice «no tocar»", async () => {
+    // Si `t1` ya tenia un planLimits escrito por una corrida sana anterior,
+    // una corrida que devuelve "no tocar" no tiene que tocarlo: ni limpiarlo
+    // ni reescribirlo. El fake de Firestore aplica merge semantics (spread
+    // shallow), igual que Firestore real con un valor de mapa completo.
+    jest.spyOn(trainerPlanLimits, "resolvePlanLimits").mockReturnValue(null);
+
+    const state = install({
+      users: {
+        t1: {
+          subscription: { tier: "plan1", status: "active" },
+          planLimits: { customExercises: 60 },
+        },
+      },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toEqual({ customExercises: 60 });
+  });
+
+  it("cuando resolvePlanLimits devuelve un numero, se escribe tal cual", async () => {
+    jest
+      .spyOn(trainerPlanLimits, "resolvePlanLimits")
+      .mockReturnValue({ customExercises: 60 });
+
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toEqual({ customExercises: 60 });
   });
 });

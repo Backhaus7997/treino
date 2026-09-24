@@ -31,6 +31,30 @@ export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number | null> = {
 };
 
 /**
+ * Tope de ejercicios propios (`users/{uid}/customExercises`) por plan del PF
+ * (limite-ejercicios-pf.md, PR1). Mismo criterio y mismo motivo que
+ * `TIER_WEIGHT_LIMITS`: `null` = SIN TOPE (plan3), nunca "sin dato" — con
+ * `??` en vez de un chequeo de propiedad, el plan mas caro devolveria 20 en
+ * vez de ilimitado y compilaria perfecto.
+ *
+ * La escalera CRECE EN EL MISMO ORDEN que `TIER_WEIGHT_LIMITS`
+ * (free < plan1 < plan2 < plan3): `effectiveTier` en `effective-limit.ts`
+ * reusa `tierLimit` + `limitRank` de esa escalera para rankear TIERS al
+ * resolver el piso prepago, y eso solo da la respuesta correcta si las dos
+ * escaleras avanzan juntas. `tier-config.test.ts` lo prueba.
+ *
+ * Debe mantenerse espejada a mano en `kTierCustomExerciseLimits`
+ * (`lib/features/coach/domain/subscription_tier.dart`, PR3) — mismo patron
+ * que `TIER_WEIGHT_LIMITS`/`kTierWeightLimits`.
+ */
+export const TIER_CUSTOM_EXERCISE_LIMITS: Record<SubscriptionTier, number | null> = {
+  free: 20,
+  plan1: 60,
+  plan2: 120,
+  plan3: null, // SIN TOPE — mismo criterio y mismo motivo que TIER_WEIGHT_LIMITS
+};
+
+/**
  * Price table in ARS. Server-authoritative — NEVER trust a client-supplied
  * amount. `free` has no price (never charged).
  *

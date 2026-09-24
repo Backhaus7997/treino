@@ -1972,5 +1972,48 @@
   "privacyAnalyticsTitle": "Usage analytics",
   "privacyAnalyticsSubtitle": "Helps us understand which parts of the app get used.",
   "privacyAnalyticsExplainer": "If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.",
-  "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app."
+  "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.",
+  "customExerciseLimitNoticeTitle": "Custom exercise limit",
+  "@customExerciseLimitNoticeTitle": {},
+  "customExerciseLimitReachedBody": "You reached the {limit} custom exercises included in your plan. You can edit or delete the ones you already have.",
+  "@customExerciseLimitReachedBody": {
+    "placeholders": {
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "customExerciseLimitOverBody": "You have {count} custom exercises and your plan includes {limit}. You keep them all; to create a new one, {toDelete, plural, =1{delete 1 exercise} other{delete {toDelete}}}.",
+  "@customExerciseLimitOverBody": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "toDelete": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "customExerciseLimitDismiss": "Got it",
+  "@customExerciseLimitDismiss": {},
+  "customExerciseCounter": "{count} of {limit} custom exercises",
+  "@customExerciseCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  }
 }

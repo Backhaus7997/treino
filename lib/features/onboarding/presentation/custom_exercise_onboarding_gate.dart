@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/onboarding_providers.dart';
 import '../domain/onboarding_surface.dart';
@@ -176,6 +177,11 @@ Future<void> maybeShowCustomExerciseOnboarding({
     // ahora el llamador web inyecta el diálogo.
     return;
   }
+  // El embudo único (docs/limite-ejercicios-pf.md PR3): el CTA de este
+  // onboarding es UN punto de entrada más a "crear ejercicio propio", así
+  // que pasa por la misma decisión que los otros cuatro antes de navegar.
+  final canCreate = await intentarCrearEjercicioPropio(context, ref);
+  if (!canCreate || !context.mounted) return;
   // `/profile/my-exercises/new` — `'new'` es el centinela que abre el editor
   // en blanco (ver `CustomExerciseEditorScreen.isEditing`).
   context.push('/profile/my-exercises/new');

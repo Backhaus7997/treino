@@ -33,6 +33,7 @@ import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
+import '../../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
 import '../../../../onboarding/domain/onboarding_surface.dart';
@@ -379,7 +380,18 @@ class _RoutineEditorWebScreenState
           // un ejercicio propio en el Coach Hub: acá no hay una ruta para el
           // editor. Antes el botón sólo cerraba el modal.
           alCrearEjercicio: () async {
-            await showCreateCustomExerciseDialog(context);
+            final canCreate = await intentarCrearEjercicioPropio(context, ref);
+            if (!canCreate) return;
+            // El analizador no ata el `context.mounted` de arriba a este
+            // uso: el gap async que ve es el de DENTRO de
+            // `maybeShowCustomExerciseOnboarding` (el `showDialog` del
+            // onboarding, en otra función), no el `await
+            // intentarCrearEjercicioPropio` de acá. El guard de arriba SÍ es
+            // el correcto para este `context`.
+            if (context.mounted) {
+              // ignore: use_build_context_synchronously
+              await showCreateCustomExerciseDialog(context);
+            }
           },
         );
       });

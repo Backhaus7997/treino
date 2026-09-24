@@ -6,10 +6,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/firestore_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart'
     show customExerciseVideoCapsProvider, customExerciseVideoCountProvider;
 import '../application/custom_exercise_providers.dart';
@@ -482,7 +484,18 @@ class _CustomExerciseEditorScreenState
       // sheet can auto-select it. Edits still pop with null (no contract
       // change for the regular library list).
       Navigator.of(context).pop(created);
-    } catch (_) {
+    } catch (error) {
+      if (!context.mounted) return;
+      // El rebote del servidor (docs/limite-ejercicios-pf.md PR3): sólo en
+      // CREATE (nunca en edit — E3 no toca el update) y sólo
+      // `permission-denied`, es la regla `customExerciseQuotaOk` frenando al
+      // PF que ya está en el tope. Mismo aviso que el embudo, no el toast
+      // genérico.
+      if (existing == null &&
+          isPermissionDenied(error) &&
+          await mostrarAvisoTopeEjerciciosPorRebote(context, ref)) {
+        return;
+      }
       if (!context.mounted) return;
       _toast(context, 'No pudimos guardar el ejercicio.');
     } finally {
