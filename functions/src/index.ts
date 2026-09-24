@@ -177,6 +177,12 @@ export {
 // Es el unico canal posible: bajo 3.1.3(f) la app no puede decir donde se
 // paga. Ver el encabezado de `free-limit-mail.ts`.
 export { sweepFreeLimitMail } from "./subscriptions/free-limit-mail";
+// El mail al PF que choco el tope de ejercicios propios de su plan
+// (limite-ejercicios-pf.md, PR4). Corre 05:30 ART, media hora despues del
+// barrido de arriba y una hora despues del de las 04:00 que recalcula
+// `planLimits`/`customExerciseUsage` (`sweepEntitlements`) — ver el
+// encabezado de `trainer-limit-mail.ts`, seccion "EL HORARIO".
+export { sweepTrainerLimitMail } from "./subscriptions/trainer-limit-mail";
 // Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
 // (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
 //

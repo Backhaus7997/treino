@@ -51,6 +51,7 @@ const KINDS: Record<MailKind, true> = {
   "limit-reached": true,
   "athlete-coverage-lost": true,
   "free-limit-reached": true,
+  "exercise-limit-reached": true,
   "inactive-account-notice": true,
 };
 const ALL_KINDS = Object.keys(KINDS) as MailKind[];
@@ -234,7 +235,7 @@ describe("destino del CTA", () => {
       (k) => !conActionLink.includes(k) && !sinBoton.includes(k),
     );
 
-    expect(resto).toHaveLength(16);
+    expect(resto).toHaveLength(17);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
