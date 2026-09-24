@@ -8,6 +8,7 @@ import {
   VETTED_FOLD,
   VETTED_JOIN_MAX_FRAGMENT,
   VETTED_LEET,
+  VETTED_LEET_ALSO_AT_EDGES,
   VETTED_LEET_ONLY_BETWEEN_LETTERS,
   VETTED_REVIEW_PHRASES,
   VETTED_REVIEW_WORDS,
@@ -52,7 +53,28 @@ export type ModerationVerdict = "ok" | "review" | "block";
  * en un oraculo para encontrarle el borde.
  */
 export function checkText(text: string): ModerationVerdict {
-  const tokens = toTokens(normalize(text));
+  // Un simbolo pegado al borde de una palabra es ambiguo: en `put@` la `@` es
+  // una `a`, en `pija@` es un adorno, en `put@@` son las dos cosas y en
+  // `@p1j@` es adorno adelante y letra atras. Ninguna lectura sola cubre todo,
+  // asi que se evaluan todas y gana la peor. Ver `VETTED_LEET_ALSO_AT_EDGES`.
+  let peor: ModerationVerdict = "ok";
+  for (const lectura of readings(text)) {
+    const veredicto = verdictOf(toTokens(lectura));
+    if (SEVERIDAD[veredicto] > SEVERIDAD[peor]) peor = veredicto;
+    if (peor === "block") break;
+  }
+  return peor;
+}
+
+/** Orden de severidad, para quedarse con el peor de varios veredictos. */
+const SEVERIDAD: Readonly<Record<ModerationVerdict, number>> = {
+  ok: 0,
+  review: 1,
+  block: 2,
+};
+
+/** El veredicto para un texto ya normalizado y partido en tokens. */
+function verdictOf(tokens: readonly string[]): ModerationVerdict {
   if (tokens.length === 0) return "ok";
 
   // --- Pasada A: palabra completa ----------------------------------------
@@ -68,13 +90,17 @@ export function checkText(text: string): ModerationVerdict {
   // --- Pasada B: antievasion ---------------------------------------------
   if (evades(tokens)) return "block";
 
+  // --- Pasada C: letras sueltas ------------------------------------------
+  const deletreado = spelledOut(tokens);
+  if (deletreado === "block") return "block";
+
   // --- Pasada A, severidad `review` --------------------------------------
   for (const t of tokens) {
     if (VETTED_REVIEW_WORDS.has(t)) return "review";
   }
   if (hasPhrase(tokens, VETTED_REVIEW_PHRASES)) return "review";
 
-  return "ok";
+  return deletreado ?? "ok";
 }
 
 /**
@@ -85,7 +111,35 @@ export function checkText(text: string): ModerationVerdict {
  * y adivinar.
  */
 export function normalize(text: string): string {
-  return collapse(leet(fold(text.toLowerCase())));
+  return normalizar(text, "estricta");
+}
+
+/**
+ * Las lecturas de un texto, en el orden del corpus. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en el generador.
+ */
+type Lectura = "estricta" | "prefijo" | "sufijo" | "adyacente" | "total";
+const LECTURAS: readonly Lectura[] = [
+  "estricta", "prefijo", "sufijo", "adyacente", "total",
+];
+
+/**
+ * Las lecturas que evalua `checkText`, sin repetidas: la estricta —que es
+ * `normalize`—, prefijo, sufijo, adyacente y total. Solo difieren cuando el
+ * texto tiene alguno de `VETTED_LEET_ALSO_AT_EDGES`. Exportada por el mismo
+ * motivo que `normalize`.
+ */
+export function readings(text: string): string[] {
+  const out: string[] = [];
+  for (const lectura of LECTURAS) {
+    const forma = normalizar(text, lectura);
+    if (!out.includes(forma)) out.push(forma);
+  }
+  return out;
+}
+
+function normalizar(text: string, lectura: Lectura): string {
+  return collapse(leet(fold(text.toLowerCase()), lectura));
 }
 
 // -- pasos de la normalizacion --------------------------------------------
@@ -110,7 +164,7 @@ function isCombining(cp: number): boolean {
   return false;
 }
 
-function leet(s: string): string {
+function leet(s: string, lectura: Lectura): string {
   const chars = [...s];
   let out = "";
   for (let i = 0; i < chars.length; i++) {
@@ -123,8 +177,16 @@ function leet(s: string): string {
     // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS lados.
     // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
     // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
-    // texto mas comun que existe, un insulto con signo de exclamacion.
-    if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
+    // texto mas comun que existe, un insulto con signo de exclamacion. Las
+    // otras lecturas —todas menos la estricta— los leen distinto, salvo la
+    // `@` de un mail; ver `checkText`.
+    const ambiguo =
+      VETTED_LEET_ALSO_AT_EDGES.has(ch) && !esArrobaDeMail(chars, i);
+    if (ambiguo && lectura === "total") {
+      out += rep;
+    } else if (ambiguo && lectura !== "estricta") {
+      out += seLeeComoLetra(chars, i, lectura) ? rep : ch;
+    } else if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
       const antes = i > 0 && isAlnum(chars[i - 1]);
       const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
       out += antes && despues ? rep : ch;
@@ -153,6 +215,82 @@ function isAlnum(ch: string): boolean {
   if (ch.length !== 1) return false;
   const c = ch.charCodeAt(0);
   return (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x7a);
+}
+
+/**
+ * Si la `@` en `i` es la de un mail: le sigue un dominio (`gmail.com`). ESPEJO
+ * de `_esArrobaDeMail` en `moderation_filter.dart`: esa `@` no se relee, va
+ * con la regla estricta en todas las lecturas (`cul!@r.com` leia `culiar`).
+ */
+function esArrobaDeMail(chars: readonly string[], i: number): boolean {
+  if (chars[i] !== "@") return false;
+  // Un mail tiene usuario: algo pegado antes de la `@`, con al menos una
+  // letra o digito. Sin esto una MENCION con puntos pasaba por mail, y
+  // `@ndate.a.morir` dejaba de cazarse.
+  let k = i - 1;
+  let hayUsuario = false;
+  while (
+    k >= 0 &&
+    (isAlnum(chars[k]) || "._-+".includes(chars[k]) ||
+      VETTED_LEET_ALSO_AT_EDGES.has(chars[k]))
+  ) {
+    hayUsuario = hayUsuario || isAlnum(chars[k]);
+    k--;
+  }
+  if (!hayUsuario) return false;
+  let j = i + 1;
+  while (
+    j < chars.length &&
+    (isAlnum(chars[j]) || chars[j] === "-" || chars[j] === "_")
+  ) {
+    j++;
+  }
+  return j > i + 1 && j + 1 < chars.length && chars[j] === "." &&
+    isAlnum(chars[j + 1]);
+}
+
+/**
+ * Si la corrida de simbolos de `VETTED_LEET_ALSO_AT_EDGES` que contiene a `i`
+ * tiene una letra o un digito en cada extremo. ESPEJO de `_corridaInterna` en
+ * `moderation_filter.dart`.
+ */
+function corridaInterna(chars: readonly string[], i: number): boolean {
+  let desde = i;
+  while (desde > 0 && VETTED_LEET_ALSO_AT_EDGES.has(chars[desde - 1])) desde--;
+  let hasta = i;
+  while (hasta < chars.length && VETTED_LEET_ALSO_AT_EDGES.has(chars[hasta])) {
+    hasta++;
+  }
+  return desde > 0 && isAlnum(chars[desde - 1]) &&
+    hasta < chars.length && isAlnum(chars[hasta]);
+}
+
+/**
+ * En las lecturas prefijo, sufijo y adyacente, si el simbolo en `i` se
+ * traduce. ESPEJO de `_seLeeComoLetra` en `moderation_filter.dart`: cada
+ * lectura traduce el borde de la palabra que le toca —`despues` es el de
+ * adelante, `antes` el de atras— y deja el otro como adorno; si no toca
+ * ninguna letra, solo el PRIMERO de una corrida que no toca nada.
+ */
+function seLeeComoLetra(
+  chars: readonly string[],
+  i: number,
+  lectura: Lectura,
+): boolean {
+  const antes = i > 0 && isAlnum(chars[i - 1]);
+  const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
+  // Una corrida con letra en los DOS extremos esta ADENTRO de una palabra:
+  // todos sus simbolos son letras (`cul!@r` es `culiar`).
+  if (corridaInterna(chars, i)) return true;
+  if (antes || despues) {
+    if (lectura === "prefijo") return despues;
+    if (lectura === "sufijo") return antes;
+    return true;
+  }
+  if (i > 0 && VETTED_LEET_ALSO_AT_EDGES.has(chars[i - 1])) return false;
+  let j = i;
+  while (j < chars.length && VETTED_LEET_ALSO_AT_EDGES.has(chars[j])) j++;
+  return j === chars.length || !isAlnum(chars[j]);
 }
 
 const SEPARADORES = /[^0-9a-z]+/;
@@ -191,7 +329,7 @@ function hasPhrase(
  * 1. Junta las corridas de tokens de UN caracter. `p u t o` y `p-u-t-o` dan
  *    cuatro tokens de un caracter, y pegados dan `puto`.
  * 2. Busca cada termino de `VETTED_ANTI_EVASION` como subcadena de cada
- *    token, salteando los que estan en `VETTED_ALLOWLIST`.
+ *    token, despues de sacarle las palabras de `VETTED_ALLOWLIST`.
  *
  * Lo que no hace es pegar el texto entero. Esa version —la obvia— bloquea
  * `otro loco`, porque `otroloco` contiene `trolo`. Tambien `otro lote`. Los
@@ -220,17 +358,88 @@ function evades(tokens: readonly string[]): boolean {
       continue;
     }
     cerrarCorrida();
-    // La allowlist no puede aportar letras a un match: `computo` contiene
-    // `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
-    if (!VETTED_ALLOWLIST.has(t)) candidatos.push(t);
+    candidatos.push(t);
     if (corto) corrida.push(t);
   }
   cerrarCorrida();
 
   for (const c of candidatos) {
-    for (const termino of VETTED_ANTI_EVASION) {
-      if (c.includes(termino)) return true;
+    for (const pedazo of sinAllowlist(c)) {
+      for (const termino of VETTED_ANTI_EVASION) {
+        if (pedazo.includes(termino)) return true;
+      }
     }
   }
   return false;
+}
+
+/**
+ * `candidato` partido en lo que queda al sacarle, de ADENTRO, cada palabra de
+ * `VETTED_ALLOWLIST`. ESPEJO de `_sinAllowlist` en `moderation_filter.dart`:
+ * un mail o una mencion pegan la palabra con lo de al lado
+ * (`juan@computo.com` da `juanacomputo`), y saltear solo el token exacto
+ * dejaba que el `puto` de adentro bloqueara una direccion valida.
+ */
+function sinAllowlist(candidato: string): string[] {
+  let pedazos = [candidato];
+  for (const palabra of VETTED_ALLOWLIST) {
+    pedazos = pedazos.flatMap((p) => p.split(palabra));
+  }
+  return pedazos.filter((p) => p.length > 0);
+}
+
+/**
+ * Las frases vetadas sin espacios: `hijo de puta` -> `hijodeputa`. Es la forma
+ * en que quedan cuando se escriben con todas las letras separadas.
+ */
+const COMPACT_BLOCK_PHRASES = VETTED_BLOCK_PHRASES.map((p) => p.join(""));
+const COMPACT_REVIEW_PHRASES = VETTED_REVIEW_PHRASES.map((p) => p.join(""));
+
+/**
+ * La pasada de las letras sueltas. ESPEJO de `_spelledOut` en
+ * `moderation_filter.dart` — ver ahi el porque completo.
+ *
+ * Corta: `p-i-j-a` da puros tokens de UNA letra; la pasada B los pega pero
+ * solo los compara contra `VETTED_ANTI_EVASION`, que no tiene `pija` ni
+ * `culo` a proposito. Aca se compara contra la lista COMPLETA, por subcadena,
+ * pero solo sobre corridas de tokens de un caracter — el castellano no produce
+ * esas corridas, asi que la subcadena no choca con palabras legitimas. No se
+ * extiende a fragmentos de dos o tres letras: `por no` pegado da `porno`.
+ */
+function spelledOut(tokens: readonly string[]): ModerationVerdict | null {
+  const corridas: string[] = [];
+  let actual = "";
+  let largo = 0;
+
+  const cerrar = (): void => {
+    if (largo > 1) corridas.push(actual);
+    actual = "";
+    largo = 0;
+  };
+
+  for (const t of tokens) {
+    if (t.length === 1) {
+      actual += t;
+      largo++;
+    } else {
+      cerrar();
+    }
+  }
+  cerrar();
+  if (corridas.length === 0) return null;
+
+  const contiene = (terminos: Iterable<string>): boolean => {
+    for (const termino of terminos) {
+      if (corridas.some((c) => c.includes(termino))) return true;
+    }
+    return false;
+  };
+
+  if (contiene(VETTED_BLOCK_WORDS) || contiene(COMPACT_BLOCK_PHRASES)) {
+    return "block";
+  }
+  if (contiene(VETTED_REVIEW_WORDS) || contiene(COMPACT_REVIEW_PHRASES)) {
+    return "review";
+  }
+  return null;
 }

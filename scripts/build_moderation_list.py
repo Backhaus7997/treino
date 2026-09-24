@@ -69,6 +69,48 @@ LEET = {
 # el texto mas comun (un insulto con signo de exclamacion al final).
 LEET_SOLO_ENTRE_LETRAS = {"@", "$", "!"}
 
+# Los simbolos que el filtro vuelve a leer SIN la regla de arriba, en otras
+# lecturas del mismo texto. El filtro evalua todas —ver `LECTURAS`— y se queda
+# con el peor veredicto.
+#
+# Hace falta porque un simbolo pegado al borde de una palabra es ambiguo, y
+# ninguna lectura sola lo resuelve:
+#
+#   - `put@`, `p1j@`, `!diota`: el simbolo ES una letra. La estricta lo deja
+#     afuera y lee `put`.
+#   - `pija@`, `@pija`, `puta!`: el simbolo es un ADORNO. Traducido, queda
+#     `pijaa` o `putai` y el termino completo pasa. Asi fallo la primera
+#     version de este arreglo, que traducia siempre.
+#   - `put@@`, `put@!`, `@@ndate`: las dos cosas en el MISMO borde.
+#   - `@p1j@`, `$u!c!d@te!`: las dos cosas en bordes OPUESTOS, adorno de un
+#     lado y letra del otro. Estos dos ultimos casos los cazaron las
+#     revisiones del PR, uno por vuelta.
+#
+# Las lecturas, todas sobre los simbolos de este conjunto:
+#
+#   - estricta: la regla de `LEET_SOLO_ENTRE_LETRAS`. Cubre el adorno.
+#   - prefijo: se traduce el simbolo pegado a una letra que tiene A SU
+#     DERECHA (el borde de adelante de una palabra); los del borde de atras
+#     quedan como adorno.
+#   - sufijo: al reves.
+#   - adyacente: los dos bordes.
+#   - total: todos, pegados o no. Cubre varias sustituciones seguidas
+#     (`$!do$o`).
+#
+# En todas menos la estricta, el resto de una corrida de simbolos queda como
+# adorno, y una corrida que no toca ninguna letra —`te voy @ matar`— se lee
+# como una sola letra, la del primero.
+#
+# No es exhaustivo, y no lo pretende. La eleccion es POR TEXTO, no por
+# palabra: si una frase necesita adorno en el borde de adelante de una
+# palabra y letra en el de otra (`@c0lg@t3 d3 un @rb0l`), ninguna lectura
+# acierta las dos. El respaldo de eso es la cola de reportes, no mas
+# lecturas.
+LEET_TAMBIEN_EN_BORDES = {"@", "$", "!"}
+
+# Las lecturas, en el orden en que se emiten al corpus.
+LECTURAS = ("estricta", "prefijo", "sufijo", "adyacente", "total")
+
 # Runs de 3 o mas caracteres iguales colapsan a uno: `putooooo` -> `puto`.
 #
 # Tres y no dos: el castellano no tiene triples, pero si dobles (`carro`,
@@ -206,8 +248,96 @@ def solo_letras(s: str) -> str:
     return re.sub(r"[^0-9a-z]", "", sin_diacriticos(s.lower()))
 
 
-def normalizar(texto: str) -> str:
+def lecturas(texto: str) -> list[str]:
+    """Las lecturas DE REFERENCIA de un texto, sin repetidas, en el orden de
+    `LECTURAS`. El filtro evalua cada una y se queda con el peor veredicto."""
+    out: list[str] = []
+    for modo in LECTURAS:
+        forma = normalizar(texto, modo)
+        if forma not in out:
+            out.append(forma)
+    return out
+
+
+def _se_lee_como_letra(chars: list[str], i: int, modo: str) -> bool:
+    """En las lecturas `prefijo`, `sufijo` y `adyacente`, si el simbolo en
+    `i` se traduce. Ver `LEET_TAMBIEN_EN_BORDES`.
+
+    `despues` es que tiene una letra o un digito a la derecha: esta en el
+    borde de ADELANTE de una palabra. `antes`, a la izquierda: borde de
+    ATRAS. Cada lectura traduce el borde que le toca y deja el otro como
+    adorno. Si no toca ninguno, solo se traduce el PRIMERO de una corrida
+    que no toque nada (`te voy @ matar`); el resto es adorno.
+    """
+    antes = i > 0 and _es_alnum(chars[i - 1])
+    despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
+    # Una corrida con letra en los DOS extremos esta ADENTRO de una palabra:
+    # todos sus simbolos son letras (`cul!@r` es `culiar`). El adorno va en
+    # los bordes, no en el medio.
+    if _corrida_interna(chars, i):
+        return True
+    if modo == "prefijo" and (antes or despues):
+        return despues
+    if modo == "sufijo" and (antes or despues):
+        return antes
+    if modo == "adyacente" and (antes or despues):
+        return True
+    if i > 0 and chars[i - 1] in LEET_TAMBIEN_EN_BORDES:
+        return False
+    j = i
+    while j < len(chars) and chars[j] in LEET_TAMBIEN_EN_BORDES:
+        j += 1
+    return j == len(chars) or not _es_alnum(chars[j])
+
+
+def _es_arroba_de_mail(chars: list[str], i: int) -> bool:
+    """Si la `@` en `i` es la de un mail: le sigue un dominio (`gmail.com`).
+
+    Esa `@` no se relee: en todas las lecturas va con la regla estricta. Sin
+    esto, `cul!@r.com` —lo cazo la tercera revision del PR— leia `culiar` en
+    la lectura adyacente: tomaba el `!` y la `@` como letras y pegaba el
+    usuario con el dominio. La estricta no cambia, asi que un termino escrito
+    con forma de mail (`c0nch@s.com`) se sigue cazando por ahi.
+    """
+    if chars[i] != "@":
+        return False
+    # Un mail tiene usuario: algo pegado antes de la `@`, con al menos una
+    # letra o digito. Sin esto una MENCION con puntos pasaba por mail, y
+    # `@ndate.a.morir` dejaba de cazarse (lo cazo la cuarta revision).
+    k = i - 1
+    hay_usuario = False
+    while k >= 0 and (_es_alnum(chars[k]) or chars[k] in "._-+"
+                      or chars[k] in LEET_TAMBIEN_EN_BORDES):
+        hay_usuario = hay_usuario or _es_alnum(chars[k])
+        k -= 1
+    if not hay_usuario:
+        return False
+    j = i + 1
+    while j < len(chars) and (_es_alnum(chars[j]) or chars[j] in "-_"):
+        j += 1
+    return (j > i + 1 and j + 1 < len(chars) and chars[j] == "."
+            and _es_alnum(chars[j + 1]))
+
+
+def _corrida_interna(chars: list[str], i: int) -> bool:
+    """Si la corrida de simbolos de `LEET_TAMBIEN_EN_BORDES` que contiene a
+    `i` tiene una letra o un digito en cada extremo."""
+    desde = i
+    while desde > 0 and chars[desde - 1] in LEET_TAMBIEN_EN_BORDES:
+        desde -= 1
+    hasta = i
+    while hasta < len(chars) and chars[hasta] in LEET_TAMBIEN_EN_BORDES:
+        hasta += 1
+    return (desde > 0 and _es_alnum(chars[desde - 1])
+            and hasta < len(chars) and _es_alnum(chars[hasta]))
+
+
+def normalizar(texto: str, modo: str = "estricta") -> str:
     """La normalizacion DE REFERENCIA. Dart y TypeScript son puertos de esto.
+
+    `modo` es una de `LECTURAS`. La `estricta` es LA normalizacion; las
+    demas solo cambian como se leen los simbolos de `LEET_TAMBIEN_EN_BORDES` —
+    ver el porque ahi.
 
     El corpus guarda la salida de esta funcion para cada caso, y las dos suites
     la comparan ademas del veredicto. Sin eso el corpus solo caza una
@@ -224,7 +354,10 @@ def normalizar(texto: str) -> str:
     s = sin_diacriticos(texto.lower())
 
     # Leet. Los simbolos solo con letra a los DOS lados: ver
-    # LEET_SOLO_ENTRE_LETRAS.
+    # LEET_SOLO_ENTRE_LETRAS. Las lecturas que no son la estricta leen
+    # distinto los de LEET_TAMBIEN_EN_BORDES, salvo la `@` de un mail.
+    if modo not in LECTURAS:
+        raise ValueError(f"modo desconocido: {modo!r}")
     chars = list(s)
     fuera = []
     for i, ch in enumerate(chars):
@@ -232,7 +365,13 @@ def normalizar(texto: str) -> str:
         if rep is None:
             fuera.append(ch)
             continue
-        if ch in LEET_SOLO_ENTRE_LETRAS:
+        ambiguo = (ch in LEET_TAMBIEN_EN_BORDES
+                   and not _es_arroba_de_mail(chars, i))
+        if modo == "total" and ambiguo:
+            fuera.append(rep)
+        elif modo != "estricta" and ambiguo:
+            fuera.append(rep if _se_lee_como_letra(chars, i, modo) else ch)
+        elif ch in LEET_SOLO_ENTRE_LETRAS:
             antes = i > 0 and _es_alnum(chars[i - 1])
             despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
             fuera.append(rep if antes and despues else ch)
@@ -362,12 +501,22 @@ def cargar() -> dict:
             sys.exit(f"[!] {SRC.name}: el caso #{i} espera {c['espera']!r}, "
                      f"que no es uno de {sorted(ESPERAS)}")
         casos.append((c["texto"], c["espera"], c.get("por", ""),
-                      normalizar(c["texto"])))
+                      normalizar(c["texto"]),
+                      lecturas(c["texto"])))
 
     if not casos:
         sys.exit(f"[!] {SRC.name}: 'cases' esta vacio. El corpus es lo unico "
                  "que compara Dart contra TypeScript; sin el, las dos "
                  "implementaciones pueden divergir en silencio.")
+
+    # Un simbolo de LEET_TAMBIEN_EN_BORDES que la forma estricta ya traduce
+    # siempre da dos normalizaciones identicas: la segunda pasada del filtro
+    # no evaluaria nada nuevo, y la constante aparentaria cubrir algo.
+    sin_efecto = sorted(LEET_TAMBIEN_EN_BORDES - LEET_SOLO_ENTRE_LETRAS)
+    if sin_efecto:
+        sys.exit(f"[!] LEET_TAMBIEN_EN_BORDES tiene simbolos que no estan en "
+                 f"LEET_SOLO_ENTRE_LETRAS, asi que las lecturas no estrictas "
+                 f"no cambian nada para ellos: {sin_efecto}")
 
     return {
         "version": data["version"],
@@ -381,6 +530,7 @@ def cargar() -> dict:
         "plegado": _mapa_de_plegado(),
         "leet": LEET,
         "leet_entre_letras": sorted(LEET_SOLO_ENTRE_LETRAS),
+        "leet_bordes": sorted(LEET_TAMBIEN_EN_BORDES),
         "colapso_minimo": COLAPSO_MINIMO,
         "join_max": JOIN_MAX_FRAGMENT,
         "combinantes": _rangos_combinantes(),
@@ -404,14 +554,16 @@ def emitir_dart(d: dict) -> str:
 
     casos = ",\n".join(
         f"  (texto: {dart_str(t)}, espera: {dart_str(e)}, "
-        f"normalizado: {dart_str(n)}, por: {dart_str(p)})"
-        for t, e, p, n in d["casos"])
+        f"normalizado: {dart_str(n)}, lecturas: {lista(ls)}, "
+        f"por: {dart_str(p)})"
+        for t, e, p, n, ls in d["casos"])
 
     fold = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["plegado"].items()))
     leet = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["leet"].items()))
     leet_entre = ", ".join(dart_str(k) for k in d["leet_entre_letras"])
+    leet_bordes = ", ".join(dart_str(k) for k in d["leet_bordes"])
     colapso = d["colapso_minimo"]
     join_max = d["join_max"]
     comb = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
@@ -437,6 +589,13 @@ const Map<String, String> kVettedLeet = {{{leet}}};
 /// Los simbolos de `kVettedLeet` que SOLO se traducen con letra a los dos
 /// lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
 const Set<String> kVettedLeetOnlyBetweenLetters = {{{leet_entre}}};
+
+/// Los simbolos que el filtro vuelve a leer sin la regla de
+/// [kVettedLeetOnlyBetweenLetters], en todas las lecturas menos la estricta
+/// (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+/// `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+const Set<String> kVettedLeetAlsoAtEdges = {{{leet_bordes}}};
 
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
 /// Tres y no dos: el castellano tiene dobles (`carro`, `perro`) pero no
@@ -477,7 +636,7 @@ const Set<String> kVettedAllowlist = {{{", ".join(dart_str(x) for x in d["allowl
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<({{String texto, String espera, String normalizado, String por}})>\n    kVettedCases = [
+const List<\n    ({{\n      String texto,\n      String espera,\n      String normalizado,\n      List<String> lecturas,\n      String por\n    }})> kVettedCases = [
 {casos},
 ];
 '''
@@ -492,8 +651,9 @@ def emitir_ts(d: dict) -> str:
 
     casos = ",\n".join(
         f"  {{ texto: {ts_str(t)}, espera: {ts_str(e)}, "
-        f"normalizado: {ts_str(n)}, por: {ts_str(p)} }}"
-        for t, e, p, n in d["casos"])
+        f"normalizado: {ts_str(n)}, lecturas: {lista(ls)}, "
+        f"por: {ts_str(p)} }}"
+        for t, e, p, n, ls in d["casos"])
 
     fold_ts = ", ".join(f"{ts_str(k)}: {ts_str(v)}"
                         for k, v in sorted(d["plegado"].items()))
@@ -501,6 +661,8 @@ def emitir_ts(d: dict) -> str:
                         for k, v in sorted(d["leet"].items()))
     leet_entre_ts = "[" + ", ".join(ts_str(k)
                                     for k in d["leet_entre_letras"]) + "]"
+    leet_bordes_ts = "[" + ", ".join(ts_str(k)
+                                     for k in d["leet_bordes"]) + "]"
     colapso_ts = d["colapso_minimo"]
     join_max_ts = d["join_max"]
     comb_ts = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
@@ -529,6 +691,15 @@ export const VETTED_LEET: Readonly<Record<string, string>> = {{{leet_ts}}};
  * lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
  */
 export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set({leet_entre_ts});
+
+/**
+ * Los simbolos que el filtro vuelve a leer sin la regla de
+ * `VETTED_LEET_ONLY_BETWEEN_LETTERS`, en todas las lecturas menos la estricta
+ * (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+ * `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+ */
+export const VETTED_LEET_ALSO_AT_EDGES: ReadonlySet<string> = new Set({leet_bordes_ts});
 
 /**
  * Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -580,7 +751,7 @@ export const VETTED_ALLOWLIST: ReadonlySet<string> = new Set({lista(d["allowlist
  * casos: si los dos veredictos no coinciden, una de las dos se pone roja.
  * Ninguna de las dos escribe sus expectativas a mano.
  */
-export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  por: string;\n}}[] = [
+export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  lecturas: readonly string[];\n  por: string;\n}}[] = [
 {casos},
 ];
 '''

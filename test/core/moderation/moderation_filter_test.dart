@@ -42,6 +42,11 @@ void main() {
           reason: 'la normalizacion de Dart se separo de la referencia',
         );
         expect(
+          ModerationFilter.readings(caso.texto),
+          caso.lecturas,
+          reason: 'las lecturas de Dart se separaron de la referencia',
+        );
+        expect(
           ModerationFilter.check(caso.texto),
           esperado,
           reason: caso.por.isEmpty
@@ -78,6 +83,21 @@ void main() {
     test('los digitos se traducen siempre', () {
       expect(ModerationFilter.normalize('p0to'), 'poto');
       expect(ModerationFilter.normalize('and4te'), 'andate');
+    });
+
+    test('un simbolo en el borde se lee de tres formas', () {
+      // `check` evalua todas y gana la peor: la estricta caza `pija@` (la `@`
+      // es adorno), la adyacente caza `put@` y `put@@` (la `@` pegada es una
+      // letra, la de mas es adorno) y la total caza `$!do$o`.
+      expect(ModerationFilter.readings('put@'), ['put@', 'puta']);
+      expect(ModerationFilter.readings('put@@'), ['put@@', 'puta@', 'putaa']);
+      expect(ModerationFilter.readings('pija@'), ['pija@', 'pijaa']);
+      expect(ModerationFilter.readings('puta!'), ['puta!', 'putai']);
+      expect(
+        ModerationFilter.readings('te voy @ matar'),
+        ['te voy @ matar', 'te voy a matar'],
+      );
+      expect(ModerationFilter.readings('hola'), ['hola']);
     });
   });
 

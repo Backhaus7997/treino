@@ -163,10 +163,14 @@
     "app de entrenamiento. Un filtro que la bloquea dura una semana.",
     "",
     "Los dos siguen vetados por la pasada A, que compara por PALABRA",
-    "COMPLETA — ahi `musculo` no es `culo` y no hay conflicto. Lo unico que",
-    "se resigna es cazarlos escritos como `c u l o`, y ese es el precio",
-    "correcto: un falso positivo sobre `musculo` le rompe la app a un",
-    "usuario que no hizo nada."
+    "COMPLETA — ahi `musculo` no es `culo` y no hay conflicto.",
+    "",
+    "Y escritos letra por letra —`c u l o`, `p-u-t-a`— los caza la pasada C,",
+    "que compara la lista COMPLETA por subcadena, pero solo contra corridas",
+    "de tokens de UNA letra. Esa restriccion es la que la hace segura: el",
+    "castellano no produce corridas de letras sueltas, asi que ahi la",
+    "subcadena no tiene contra que chocar. Una version anterior de este texto",
+    "decia que `c u l o` se resignaba; dejo de ser cierto con la pasada C."
   ],
   "antievasion": [
     "puto",
@@ -470,6 +474,191 @@
       "texto": "con-chudo",
       "espera": "ok",
       "por": "HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista"
+    },
+    {
+      "texto": "p i j a",
+      "espera": "block",
+      "por": "letras sueltas de un termino FUERA de `antievasion`: la pasada B lo pegaba y no tenia contra que compararlo. Lo caza la pasada C"
+    },
+    {
+      "texto": "p-i-j-a",
+      "espera": "block",
+      "por": "pasada C, separado por guiones"
+    },
+    {
+      "texto": "p.i.j.a",
+      "espera": "block",
+      "por": "pasada C, separado por puntos"
+    },
+    {
+      "texto": "h.i.j.o d.e p.u.t.a",
+      "espera": "block",
+      "por": "frase deletreada entera: la pasada C compara contra las frases sin espacios (`hijodeputa`)"
+    },
+    {
+      "texto": "y p u t a",
+      "espera": "block",
+      "por": "una letra legitima pegada adelante no la salva: la pasada C compara por subcadena dentro de la corrida"
+    },
+    {
+      "texto": "c u l o",
+      "espera": "review",
+      "por": "la pasada C respeta la severidad del termino: `culo` es `review` escrito normal y deletreado"
+    },
+    {
+      "texto": "por no entrenar",
+      "espera": "ok",
+      "por": "`por`+`no` pegados dan `porno`. La pasada C pega SOLO tokens de una letra por esto"
+    },
+    {
+      "texto": "hice 5 x 5 de sentadilla y 3 x 8 de press",
+      "espera": "ok",
+      "por": "la notacion de series produce letras sueltas legitimas (`s x s`, `y e x 8`): la corrida no contiene ningun termino"
+    },
+    {
+      "texto": "put@",
+      "espera": "block",
+      "por": "`@` al final de palabra. Con solo la lectura estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la lectura sufijo"
+    },
+    {
+      "texto": "@ndate a morir",
+      "espera": "block",
+      "por": "`@` al principio de palabra, sin ningun otro termino en la frase que la delate"
+    },
+    {
+      "texto": "te voy @ matar",
+      "espera": "block",
+      "por": "`@` suelta como preposicion: sin traducirla la frase pierde su `a` y no matchea"
+    },
+    {
+      "texto": "p1j@",
+      "espera": "block",
+      "por": "digito y `@` final en el mismo termino"
+    },
+    {
+      "texto": "pija@",
+      "espera": "block",
+      "por": "`@` DECORATIVA pegada a un termino completo. Traducida queda `pijaa`: por eso la forma estricta se evalua igual, y gana el peor veredicto"
+    },
+    {
+      "texto": "@pija",
+      "espera": "block",
+      "por": "`@` decorativa adelante: traducida queda `apija`"
+    },
+    {
+      "texto": "puta@",
+      "espera": "block",
+      "por": "mismo caso con otro termino"
+    },
+    {
+      "texto": "culo@",
+      "espera": "review",
+      "por": "la `@` decorativa tampoco puede bajarle la severidad a un `review`"
+    },
+    {
+      "texto": "@lucas nos vemos el lunes",
+      "espera": "ok",
+      "por": "una mencion: las lecturas amplias leen `alucas`, que no es nada"
+    },
+    {
+      "texto": "put@@",
+      "espera": "block",
+      "por": "sustitucion Y adorno juntos: la `@` pegada es la `a`, la de mas es adorno. Solo la lectura adyacente lo lee `puta`"
+    },
+    {
+      "texto": "put@!",
+      "espera": "block",
+      "por": "la forma mas comun de lo anterior: leet con signo de exclamacion"
+    },
+    {
+      "texto": "@@ndate a morir",
+      "espera": "block",
+      "por": "lo mismo del lado de adelante: la `@` pegada a la `n` es la letra, la primera es adorno"
+    },
+    {
+      "texto": "pija@@",
+      "espera": "block",
+      "por": "doble adorno sobre el termino completo: lo caza la lectura estricta"
+    },
+    {
+      "texto": "!diota",
+      "espera": "review",
+      "por": "`!` por `i` al principio. La lectura estricta no lo traduce, porque el `!` pide letra a los dos lados"
+    },
+    {
+      "texto": "teta$$",
+      "espera": "review",
+      "por": "`$` por `s` mas un adorno, sobre un termino `review`"
+    },
+    {
+      "texto": "$!do$o",
+      "espera": "block",
+      "por": "varias sustituciones seguidas: solo la lectura total las traduce todas"
+    },
+    {
+      "texto": "escribile a ana@controlo.com",
+      "espera": "ok",
+      "por": "la `@` de un mail pega el usuario con el dominio (`anacontrolo`). La allowlist se recorta de ADENTRO del token, no solo cuando es el token entero: antes esto daba `block` por el `trolo` de `controlo`"
+    },
+    {
+      "texto": "juan@computo.com",
+      "espera": "ok",
+      "por": "mismo caso, con el `puto` de `computo`"
+    },
+    {
+      "texto": "@computo",
+      "espera": "ok",
+      "por": "una mencion pegada a una palabra de la allowlist: la lectura adyacente lee `acomputo`"
+    },
+    {
+      "texto": "putocomputo",
+      "espera": "block",
+      "por": "recortar la allowlist de adentro no puede tapar lo que esta AFUERA de la palabra"
+    },
+    {
+      "texto": "computoputo",
+      "espera": "block",
+      "por": "lo mismo, del otro lado"
+    },
+    {
+      "texto": "cul!@r.com",
+      "espera": "ok",
+      "por": "un mail con `!` justo antes de la `@`: la lectura adyacente leia `culiar`, porque tomaba el `!` y la `@` como letras y pegaba usuario y dominio. La `@` de un mail —la que tiene un dominio despues— no se relee nunca"
+    },
+    {
+      "texto": "c0nch@s.com",
+      "espera": "block",
+      "por": "y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando"
+    },
+    {
+      "texto": "$ido$o@example.com",
+      "espera": "block",
+      "por": "DECISION, fijada a proposito: el usuario de un mail se lee como lo escribio, y `$ido$o` es `sidoso` en leet. Lo unico que no se relee es la `@`, que separa usuario y dominio (ver `cul!@r.com`). Gmail solo acepta letras, numeros y puntos en el usuario, y Outlook agrega guiones y guiones bajos: un `$` o un `!` ahi es leet a proposito, no una direccion comun"
+    },
+    {
+      "texto": "@ndate.a.morir",
+      "espera": "block",
+      "por": "una MENCION con puntos no es un mail: sin usuario antes de la `@` la excepcion de mail no aplica, y la `@` se relee como `a`"
+    },
+    {
+      "texto": "@c0lg@t3 d3 un @rb0l",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. La lectura de los simbolos se elige para TODO el texto, no palabra por palabra: la primera `@` es adorno en el borde de adelante de `colgate` y la de `@rbol` es letra en el mismo borde. Ninguna lectura acierta las dos. Elegir por palabra rompe el matcheo de frases, que compara tokens alineados. El backstop es la cola de reportes"
+    },
+    {
+      "texto": "tet@$!",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. Dos sustituciones seguidas en el borde (`@` por `a`, `$` por `s`) MAS un adorno (`!`): la lectura total traduce tambien el adorno y las de borde traducen solo el simbolo pegado a la letra. Mismo backstop"
+    },
+    {
+      "texto": "mandame el plan a juan@gmail.com",
+      "espera": "ok",
+      "por": "un mail comun. La `@` entre letras se traduce desde siempre y pega usuario y dominio en un token; ver el caso de `ana@controlo.com`"
+    },
+    {
+      "texto": "u$s 100 por mes",
+      "espera": "ok",
+      "por": "`$` entre letras, como se escribe el dolar en Argentina"
     }
   ]
 }

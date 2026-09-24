@@ -2,6 +2,7 @@ import { VETTED_CASES } from "../moderation/vetted_terms.g";
 import {
   checkText,
   normalize,
+  readings,
   type ModerationVerdict,
 } from "../moderation/vetted_terms_filter";
 
@@ -34,6 +35,7 @@ describe("corpus de conformidad (generado, compartido con Dart)", () => {
       // `ok` en `block`: dos normalizaciones distintas que no cruzan ese
       // umbral quedan vivas, con las dos suites en verde.
       expect(normalize(caso.texto)).toBe(caso.normalizado);
+      expect(readings(caso.texto)).toEqual(caso.lecturas);
 
       const obtenido = checkText(caso.texto);
       if (obtenido !== caso.espera) {
@@ -72,6 +74,19 @@ describe("normalizacion", () => {
   it("los digitos se traducen siempre", () => {
     expect(normalize("p0to")).toBe("poto");
     expect(normalize("and4te")).toBe("andate");
+  });
+
+  it("un simbolo en el borde se lee de tres formas", () => {
+    // `checkText` evalua todas y gana la peor: la estricta caza `pija@` (la
+    // `@` es adorno), la adyacente caza `put@` y `put@@` y la total caza
+    // `$!do$o`.
+    expect(readings("put@")).toEqual(["put@", "puta"]);
+    expect(readings("put@@")).toEqual(["put@@", "puta@", "putaa"]);
+    expect(readings("pija@")).toEqual(["pija@", "pijaa"]);
+    expect(readings("puta!")).toEqual(["puta!", "putai"]);
+    expect(readings("te voy @ matar"))
+      .toEqual(["te voy @ matar", "te voy a matar"]);
+    expect(readings("hola")).toEqual(["hola"]);
   });
 });
 

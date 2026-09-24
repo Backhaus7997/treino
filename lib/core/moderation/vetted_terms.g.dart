@@ -111,6 +111,13 @@ const Map<String, String> kVettedLeet = {
 /// lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
 const Set<String> kVettedLeetOnlyBetweenLetters = {'!', '\$', '@'};
 
+/// Los simbolos que el filtro vuelve a leer sin la regla de
+/// [kVettedLeetOnlyBetweenLetters], en todas las lecturas menos la estricta
+/// (la `@` de un mail no se relee nunca). Gana el peor veredicto de todas:
+/// `put@` necesita la `@` como `a`; `pija@`, como adorno. Ver
+/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+const Set<String> kVettedLeetAlsoAtEdges = {'!', '\$', '@'};
+
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
 /// Tres y no dos: el castellano tiene dobles (`carro`, `perro`) pero no
 /// triples.
@@ -291,171 +298,222 @@ const Set<String> kVettedAllowlist = {
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<({String texto, String espera, String normalizado, String por})>
-    kVettedCases = [
+const List<
+    ({
+      String texto,
+      String espera,
+      String normalizado,
+      List<String> lecturas,
+      String por
+    })> kVettedCases = [
   (
     texto: 'computadora',
     espera: 'ok',
     normalizado: 'computadora',
+    lecturas: ['computadora'],
     por: 'contiene `puta`'
   ),
   (
     texto: 'me lo anote en la computadora',
     espera: 'ok',
     normalizado: 'me lo anote en la computadora',
+    lecturas: ['me lo anote en la computadora'],
     por: 'contiene `puta`'
   ),
   (
     texto: 'calculo',
     espera: 'ok',
     normalizado: 'calculo',
+    lecturas: ['calculo'],
     por: 'contiene `culo`'
   ),
   (
     texto: 'cálculo',
     espera: 'ok',
     normalizado: 'calculo',
+    lecturas: ['calculo'],
     por: 'contiene `culo`, con acento'
   ),
   (
     texto: 'disputa',
     espera: 'ok',
     normalizado: 'disputa',
+    lecturas: ['disputa'],
     por: 'contiene `puta`'
   ),
   (
     texto: 'reputación',
     espera: 'ok',
     normalizado: 'reputacion',
+    lecturas: ['reputacion'],
     por: 'contiene `puta`'
   ),
   (
     texto: 'sexteto',
     espera: 'ok',
     normalizado: 'sexteto',
+    lecturas: ['sexteto'],
     por: 'contiene `sex`'
   ),
   (
     texto: 'escocia',
     espera: 'ok',
     normalizado: 'escocia',
+    lecturas: ['escocia'],
     por: 'falso positivo clasico'
   ),
   (
     texto: 'cuatro series para el musculo dorsal',
     espera: 'ok',
     normalizado: 'cuatro series para el musculo dorsal',
+    lecturas: ['cuatro series para el musculo dorsal'],
     por: '`musculo` contiene `culo`: el caso de ESTE producto'
   ),
   (
     texto: 'trabajo de musculacion tres veces por semana',
     espera: 'ok',
     normalizado: 'trabajo de musculacion tres veces por semana',
+    lecturas: ['trabajo de musculacion tres veces por semana'],
     por: 'vocabulario central de la app'
   ),
   (
     texto: 'el computo de las series',
     espera: 'ok',
     normalizado: 'el computo de las series',
+    lecturas: ['el computo de las series'],
     por: 'contiene `puto` — el que obliga a la allowlist'
   ),
   (
     texto: 'me puse el pijama',
     espera: 'ok',
     normalizado: 'me puse el pijama',
+    lecturas: ['me puse el pijama'],
     por: 'contiene `pija`'
   ),
   (
     texto: 'el diputado Vergara',
     espera: 'ok',
     normalizado: 'el diputado vergara',
+    lecturas: ['el diputado vergara'],
     por: 'contiene `puta` y `verga`'
   ),
   (
     texto: 'hoy entrené piernas y me fue bien',
     espera: 'ok',
     normalizado: 'hoy entrene piernas y me fue bien',
+    lecturas: ['hoy entrene piernas y me fue bien'],
     por: 'control: texto normal pasa'
   ),
-  (texto: 'puto', espera: 'block', normalizado: 'puto', por: 'termino directo'),
-  (texto: 'PUTO', espera: 'block', normalizado: 'puto', por: 'mayusculas'),
+  (
+    texto: 'puto',
+    espera: 'block',
+    normalizado: 'puto',
+    lecturas: ['puto'],
+    por: 'termino directo'
+  ),
+  (
+    texto: 'PUTO',
+    espera: 'block',
+    normalizado: 'puto',
+    lecturas: ['puto'],
+    por: 'mayusculas'
+  ),
   (
     texto: 'pÚtO',
     espera: 'block',
     normalizado: 'puto',
+    lecturas: ['puto'],
     por: 'mayusculas mezcladas y acento'
   ),
   (
     texto: 'putooooo',
     espera: 'block',
     normalizado: 'puto',
+    lecturas: ['puto'],
     por: 'caracteres repetidos'
   ),
   (
     texto: 'p u t o',
     espera: 'block',
     normalizado: 'p u t o',
+    lecturas: ['p u t o'],
     por: 'separado por espacios'
   ),
   (
     texto: 'p-u-t-o',
     espera: 'block',
     normalizado: 'p-u-t-o',
+    lecturas: ['p-u-t-o'],
     por: 'separado por guiones'
   ),
   (
     texto: 'p.u.t.o',
     espera: 'block',
     normalizado: 'p.u.t.o',
+    lecturas: ['p.u.t.o'],
     por: 'separado por puntos'
   ),
-  (texto: 'pvto', espera: 'block', normalizado: 'pvto', por: 'v por u'),
+  (
+    texto: 'pvto',
+    espera: 'block',
+    normalizado: 'pvto',
+    lecturas: ['pvto'],
+    por: 'v por u'
+  ),
   (
     texto: 'sos un hijo de puta',
     espera: 'block',
     normalizado: 'sos un hijo de puta',
+    lecturas: ['sos un hijo de puta'],
     por: 'frase de varias palabras'
   ),
   (
     texto: 'hijo  de   PUTA',
     espera: 'block',
     normalizado: 'hijo  de puta',
+    lecturas: ['hijo  de puta'],
     por: 'frase con espacios de mas'
   ),
   (
     texto: 'te voy a matar',
     espera: 'block',
     normalizado: 'te voy a matar',
+    lecturas: ['te voy a matar'],
     por: 'amenaza'
   ),
   (
     texto: 'and4te a morir',
     espera: 'block',
     normalizado: 'andate a morir',
+    lecturas: ['andate a morir'],
     por: 'leet: 4 -> a'
   ),
   (
     texto: 'sos un pelotudo',
     espera: 'review',
     normalizado: 'sos un pelotudo',
+    lecturas: ['sos un pelotudo'],
     por: 'insulto casual rioplatense'
   ),
   (
     texto: 'que gil',
     espera: 'review',
     normalizado: 'que gil',
+    lecturas: ['que gil'],
     por: 'insulto leve'
   ),
   (
     texto: 'thinspo',
     espera: 'review',
     normalizado: 'thinspo',
+    lecturas: ['thinspo'],
     por: 'contenido pro trastorno alimentario'
   ),
   (
     texto: 'cuantos años entrenas por semana',
     espera: 'ok',
     normalizado: 'cuantos anos entrenas por semana',
+    lecturas: ['cuantos anos entrenas por semana'],
     por:
         '`ñ` pliega a `n`: `años` -> `anos`. Vigila que nadie meta `ano` en la lista'
   ),
@@ -463,12 +521,14 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'hace 3 años que entreno',
     espera: 'ok',
     normalizado: 'hace e anos que entreno',
+    lecturas: ['hace e anos que entreno'],
     por: 'leet `3`->`e` sobre un numero real, mas el plegado de la ñ'
   ),
   (
     texto: 'sos un puta!',
     espera: 'block',
     normalizado: 'sos un puta!',
+    lecturas: ['sos un puta!', 'sos un putai'],
     por:
         'el `!` final NO se traduce a `i`: si se tradujera, `putai` no matchearia'
   ),
@@ -476,6 +536,7 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: '10x3 con 90 segundos de pausa',
     espera: 'ok',
     normalizado: 'ioxe con 9o segundos de pausa',
+    lecturas: ['ioxe con 9o segundos de pausa'],
     por:
         'notacion de series: los digitos pasan por leet y no pueden inventar un veto'
   ),
@@ -483,6 +544,7 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'otro loco que entrena a las 6',
     espera: 'ok',
     normalizado: 'otro loco que entrena a las 6',
+    lecturas: ['otro loco que entrena a las 6'],
     por:
         'pegado entero daria `otroloco` -> contiene `trolo`. La pasada B NO pega entre palabras'
   ),
@@ -490,48 +552,56 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'traeme otro lote de bandas',
     espera: 'ok',
     normalizado: 'traeme otro lote de bandas',
+    lecturas: ['traeme otro lote de bandas'],
     por: 'mismo caso: `otrolote` contiene `trolo`'
   ),
   (
     texto: 'pvto',
     espera: 'block',
     normalizado: 'pvto',
+    lecturas: ['pvto'],
     por: 'grafia de evasion explicita, no transformacion'
   ),
   (
     texto: 'holaputo',
     espera: 'block',
     normalizado: 'holaputo',
+    lecturas: ['holaputo'],
     por: 'pegado adentro de un token: la pasada B busca subcadena por token'
   ),
   (
     texto: 'no me controlo con la comida',
     espera: 'ok',
     normalizado: 'no me controlo con la comida',
+    lecturas: ['no me controlo con la comida'],
     por: '`controlo` contiene `trolo` y esta en la allowlist'
   ),
   (
     texto: 'hice press banca con barra',
     espera: 'ok',
     normalizado: 'hice press banca con barra',
+    lecturas: ['hice press banca con barra'],
     por: 'dobles `ss` y `rr`: el colapso arranca en TRES, no en dos'
   ),
   (
     texto: 'el perro del gimnasio se llama Rocco',
     espera: 'ok',
     normalizado: 'el perro del gimnasio se llama rocco',
+    lecturas: ['el perro del gimnasio se llama rocco'],
     por: 'tres dobles seguidas — `rr`, `ll`, `cc`'
   ),
   (
     texto: 'acción correcta en el banco',
     espera: 'ok',
     normalizado: 'accion correcta en el banco',
+    lecturas: ['accion correcta en el banco'],
     por: 'doble con acento arriba: plegado y colapso se tocan'
   ),
   (
     texto: 'pu-to',
     espera: 'block',
     normalizado: 'pu-to',
+    lecturas: ['pu-to'],
     por:
         'fragmentos de 2 y 2. Con la regla vieja —corridas de UN caracter— un separador salteaba la capa entera'
   ),
@@ -539,18 +609,21 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'p-uto',
     espera: 'block',
     normalizado: 'p-uto',
+    lecturas: ['p-uto'],
     por: 'fragmentos de 1 y 3'
   ),
   (
     texto: 'pu to',
     espera: 'block',
     normalizado: 'pu to',
+    lecturas: ['pu to'],
     por: 'mismo caso, separado por espacio'
   ),
   (
     texto: 'púto',
     espera: 'block',
     normalizado: 'puto',
+    lecturas: ['puto'],
     por:
         '`u` + U+0301 descompuesto: se ve identico a `púto` y antes pasaba, porque la marca partia el token en dos'
   ),
@@ -558,12 +631,14 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'mogólico',
     espera: 'block',
     normalizado: 'mogolico',
+    lecturas: ['mogolico'],
     por: 'misma descomposicion sobre otro termino'
   ),
   (
     texto: 'otro lo hizo mejor',
     espera: 'ok',
     normalizado: 'otro lo hizo mejor',
+    lecturas: ['otro lo hizo mejor'],
     por:
         '`otro`+`lo` pegados dan `otrolo`, que contiene `trolo`. La regla pide que los DOS fragmentos sean cortos, y `otro` no lo es'
   ),
@@ -571,6 +646,7 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'dale que va',
     espera: 'ok',
     normalizado: 'dale que va',
+    lecturas: ['dale que va'],
     por:
         'tres fragmentos cortos seguidos se pegan: `dalequeva` no contiene nada, y tiene que seguir siendo asi'
   ),
@@ -578,7 +654,291 @@ const List<({String texto, String espera, String normalizado, String por})>
     texto: 'con-chudo',
     espera: 'ok',
     normalizado: 'con-chudo',
+    lecturas: ['con-chudo'],
     por:
         'HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista'
+  ),
+  (
+    texto: 'p i j a',
+    espera: 'block',
+    normalizado: 'p i j a',
+    lecturas: ['p i j a'],
+    por:
+        'letras sueltas de un termino FUERA de `antievasion`: la pasada B lo pegaba y no tenia contra que compararlo. Lo caza la pasada C'
+  ),
+  (
+    texto: 'p-i-j-a',
+    espera: 'block',
+    normalizado: 'p-i-j-a',
+    lecturas: ['p-i-j-a'],
+    por: 'pasada C, separado por guiones'
+  ),
+  (
+    texto: 'p.i.j.a',
+    espera: 'block',
+    normalizado: 'p.i.j.a',
+    lecturas: ['p.i.j.a'],
+    por: 'pasada C, separado por puntos'
+  ),
+  (
+    texto: 'h.i.j.o d.e p.u.t.a',
+    espera: 'block',
+    normalizado: 'h.i.j.o d.e p.u.t.a',
+    lecturas: ['h.i.j.o d.e p.u.t.a'],
+    por:
+        'frase deletreada entera: la pasada C compara contra las frases sin espacios (`hijodeputa`)'
+  ),
+  (
+    texto: 'y p u t a',
+    espera: 'block',
+    normalizado: 'y p u t a',
+    lecturas: ['y p u t a'],
+    por:
+        'una letra legitima pegada adelante no la salva: la pasada C compara por subcadena dentro de la corrida'
+  ),
+  (
+    texto: 'c u l o',
+    espera: 'review',
+    normalizado: 'c u l o',
+    lecturas: ['c u l o'],
+    por:
+        'la pasada C respeta la severidad del termino: `culo` es `review` escrito normal y deletreado'
+  ),
+  (
+    texto: 'por no entrenar',
+    espera: 'ok',
+    normalizado: 'por no entrenar',
+    lecturas: ['por no entrenar'],
+    por:
+        '`por`+`no` pegados dan `porno`. La pasada C pega SOLO tokens de una letra por esto'
+  ),
+  (
+    texto: 'hice 5 x 5 de sentadilla y 3 x 8 de press',
+    espera: 'ok',
+    normalizado: 'hice s x s de sentadilla y e x 8 de press',
+    lecturas: ['hice s x s de sentadilla y e x 8 de press'],
+    por:
+        'la notacion de series produce letras sueltas legitimas (`s x s`, `y e x 8`): la corrida no contiene ningun termino'
+  ),
+  (
+    texto: 'put@',
+    espera: 'block',
+    normalizado: 'put@',
+    lecturas: ['put@', 'puta'],
+    por:
+        '`@` al final de palabra. Con solo la lectura estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la lectura sufijo'
+  ),
+  (
+    texto: '@ndate a morir',
+    espera: 'block',
+    normalizado: '@ndate a morir',
+    lecturas: ['@ndate a morir', 'andate a morir'],
+    por:
+        '`@` al principio de palabra, sin ningun otro termino en la frase que la delate'
+  ),
+  (
+    texto: 'te voy @ matar',
+    espera: 'block',
+    normalizado: 'te voy @ matar',
+    lecturas: ['te voy @ matar', 'te voy a matar'],
+    por:
+        '`@` suelta como preposicion: sin traducirla la frase pierde su `a` y no matchea'
+  ),
+  (
+    texto: 'p1j@',
+    espera: 'block',
+    normalizado: 'pij@',
+    lecturas: ['pij@', 'pija'],
+    por: 'digito y `@` final en el mismo termino'
+  ),
+  (
+    texto: 'pija@',
+    espera: 'block',
+    normalizado: 'pija@',
+    lecturas: ['pija@', 'pijaa'],
+    por:
+        '`@` DECORATIVA pegada a un termino completo. Traducida queda `pijaa`: por eso la forma estricta se evalua igual, y gana el peor veredicto'
+  ),
+  (
+    texto: '@pija',
+    espera: 'block',
+    normalizado: '@pija',
+    lecturas: ['@pija', 'apija'],
+    por: '`@` decorativa adelante: traducida queda `apija`'
+  ),
+  (
+    texto: 'puta@',
+    espera: 'block',
+    normalizado: 'puta@',
+    lecturas: ['puta@', 'putaa'],
+    por: 'mismo caso con otro termino'
+  ),
+  (
+    texto: 'culo@',
+    espera: 'review',
+    normalizado: 'culo@',
+    lecturas: ['culo@', 'culoa'],
+    por: 'la `@` decorativa tampoco puede bajarle la severidad a un `review`'
+  ),
+  (
+    texto: '@lucas nos vemos el lunes',
+    espera: 'ok',
+    normalizado: '@lucas nos vemos el lunes',
+    lecturas: ['@lucas nos vemos el lunes', 'alucas nos vemos el lunes'],
+    por: 'una mencion: las lecturas amplias leen `alucas`, que no es nada'
+  ),
+  (
+    texto: 'put@@',
+    espera: 'block',
+    normalizado: 'put@@',
+    lecturas: ['put@@', 'puta@', 'putaa'],
+    por:
+        'sustitucion Y adorno juntos: la `@` pegada es la `a`, la de mas es adorno. Solo la lectura adyacente lo lee `puta`'
+  ),
+  (
+    texto: 'put@!',
+    espera: 'block',
+    normalizado: 'put@!',
+    lecturas: ['put@!', 'puta!', 'putai'],
+    por: 'la forma mas comun de lo anterior: leet con signo de exclamacion'
+  ),
+  (
+    texto: '@@ndate a morir',
+    espera: 'block',
+    normalizado: '@@ndate a morir',
+    lecturas: ['@@ndate a morir', '@andate a morir', 'aandate a morir'],
+    por:
+        'lo mismo del lado de adelante: la `@` pegada a la `n` es la letra, la primera es adorno'
+  ),
+  (
+    texto: 'pija@@',
+    espera: 'block',
+    normalizado: 'pija@@',
+    lecturas: ['pija@@', 'pijaa@', 'pija'],
+    por: 'doble adorno sobre el termino completo: lo caza la lectura estricta'
+  ),
+  (
+    texto: '!diota',
+    espera: 'review',
+    normalizado: '!diota',
+    lecturas: ['!diota', 'idiota'],
+    por:
+        '`!` por `i` al principio. La lectura estricta no lo traduce, porque el `!` pide letra a los dos lados'
+  ),
+  (
+    texto: 'teta\$\$',
+    espera: 'review',
+    normalizado: 'teta\$\$',
+    lecturas: ['teta\$\$', 'tetas\$', 'tetass'],
+    por: '`\$` por `s` mas un adorno, sobre un termino `review`'
+  ),
+  (
+    texto: '\$!do\$o',
+    espera: 'block',
+    normalizado: '\$!doso',
+    lecturas: ['\$!doso', '\$idoso', 'sidoso'],
+    por:
+        'varias sustituciones seguidas: solo la lectura total las traduce todas'
+  ),
+  (
+    texto: 'escribile a ana@controlo.com',
+    espera: 'ok',
+    normalizado: 'escribile a anaacontrolo.com',
+    lecturas: ['escribile a anaacontrolo.com'],
+    por:
+        'la `@` de un mail pega el usuario con el dominio (`anacontrolo`). La allowlist se recorta de ADENTRO del token, no solo cuando es el token entero: antes esto daba `block` por el `trolo` de `controlo`'
+  ),
+  (
+    texto: 'juan@computo.com',
+    espera: 'ok',
+    normalizado: 'juanacomputo.com',
+    lecturas: ['juanacomputo.com'],
+    por: 'mismo caso, con el `puto` de `computo`'
+  ),
+  (
+    texto: '@computo',
+    espera: 'ok',
+    normalizado: '@computo',
+    lecturas: ['@computo', 'acomputo'],
+    por:
+        'una mencion pegada a una palabra de la allowlist: la lectura adyacente lee `acomputo`'
+  ),
+  (
+    texto: 'putocomputo',
+    espera: 'block',
+    normalizado: 'putocomputo',
+    lecturas: ['putocomputo'],
+    por:
+        'recortar la allowlist de adentro no puede tapar lo que esta AFUERA de la palabra'
+  ),
+  (
+    texto: 'computoputo',
+    espera: 'block',
+    normalizado: 'computoputo',
+    lecturas: ['computoputo'],
+    por: 'lo mismo, del otro lado'
+  ),
+  (
+    texto: 'cul!@r.com',
+    espera: 'ok',
+    normalizado: 'cul!@r.com',
+    lecturas: ['cul!@r.com', 'culi@r.com'],
+    por:
+        'un mail con `!` justo antes de la `@`: la lectura adyacente leia `culiar`, porque tomaba el `!` y la `@` como letras y pegaba usuario y dominio. La `@` de un mail —la que tiene un dominio despues— no se relee nunca'
+  ),
+  (
+    texto: 'c0nch@s.com',
+    espera: 'block',
+    normalizado: 'conchas.com',
+    lecturas: ['conchas.com'],
+    por:
+        'y eso no abre una evasion: la lectura estricta traduce la `@` entre letras desde siempre, asi que un termino con forma de mail se sigue cazando'
+  ),
+  (
+    texto: '\$ido\$o@example.com',
+    espera: 'block',
+    normalizado: '\$idosoaexample.com',
+    lecturas: ['\$idosoaexample.com', 'sidosoaexample.com'],
+    por:
+        'DECISION, fijada a proposito: el usuario de un mail se lee como lo escribio, y `\$ido\$o` es `sidoso` en leet. Lo unico que no se relee es la `@`, que separa usuario y dominio (ver `cul!@r.com`). Gmail solo acepta letras, numeros y puntos en el usuario, y Outlook agrega guiones y guiones bajos: un `\$` o un `!` ahi es leet a proposito, no una direccion comun'
+  ),
+  (
+    texto: '@ndate.a.morir',
+    espera: 'block',
+    normalizado: '@ndate.a.morir',
+    lecturas: ['@ndate.a.morir', 'andate.a.morir'],
+    por:
+        'una MENCION con puntos no es un mail: sin usuario antes de la `@` la excepcion de mail no aplica, y la `@` se relee como `a`'
+  ),
+  (
+    texto: '@c0lg@t3 d3 un @rb0l',
+    espera: 'ok',
+    normalizado: '@colgate de un @rbol',
+    lecturas: ['@colgate de un @rbol', 'acolgate de un arbol'],
+    por:
+        'HUECO CONOCIDO, fijado a proposito. La lectura de los simbolos se elige para TODO el texto, no palabra por palabra: la primera `@` es adorno en el borde de adelante de `colgate` y la de `@rbol` es letra en el mismo borde. Ninguna lectura acierta las dos. Elegir por palabra rompe el matcheo de frases, que compara tokens alineados. El backstop es la cola de reportes'
+  ),
+  (
+    texto: 'tet@\$!',
+    espera: 'ok',
+    normalizado: 'tet@\$!',
+    lecturas: ['tet@\$!', 'teta\$!', 'tetasi'],
+    por:
+        'HUECO CONOCIDO, fijado a proposito. Dos sustituciones seguidas en el borde (`@` por `a`, `\$` por `s`) MAS un adorno (`!`): la lectura total traduce tambien el adorno y las de borde traducen solo el simbolo pegado a la letra. Mismo backstop'
+  ),
+  (
+    texto: 'mandame el plan a juan@gmail.com',
+    espera: 'ok',
+    normalizado: 'mandame el plan a juanagmail.com',
+    lecturas: ['mandame el plan a juanagmail.com'],
+    por:
+        'un mail comun. La `@` entre letras se traduce desde siempre y pega usuario y dominio en un token; ver el caso de `ana@controlo.com`'
+  ),
+  (
+    texto: 'u\$s 100 por mes',
+    espera: 'ok',
+    normalizado: 'uss ioo por mes',
+    lecturas: ['uss ioo por mes'],
+    por: '`\$` entre letras, como se escribe el dolar en Argentina'
   ),
 ];
