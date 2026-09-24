@@ -79,7 +79,8 @@ import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore"
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 
-import { enqueueMail } from "../mail/enqueue-mail";
+import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { artDateKey } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 
@@ -184,6 +185,13 @@ export function decideTrainerLimitMail(
  * Mismo orden que `enqueueFreeLimitMail` y por el mismo motivo: si el `set`
  * fallara después de encolar, el enfriamiento no quedaría anotado y el PF
  * podría recibir otro mail mañana — encolar dos veces es peor que no anotar.
+ *
+ * `enqueueMail` nunca tira: devuelve `null` tanto si el mail YA estaba en la
+ * cola (reintento del barrido, sano) como si la escritura FALLÓ. Si se anotara
+ * el enfriamiento en los dos casos, una falla transitoria silenciaría al PF
+ * catorce días sin que exista mail alguno. Por eso, ante un `null`, se mira
+ * la cola: si el documento está, se anota; si no, se tira, y el barrido lo
+ * cuenta como fallido y lo reintenta mañana dentro de la ventana de 36 h.
  */
 export async function enqueueTrainerLimitMail(
   app: App,
@@ -191,7 +199,7 @@ export async function enqueueTrainerLimitMail(
   plan: TrainerLimitMailPlan,
   nowMs: number,
 ): Promise<void> {
-  await enqueueMail(app, {
+  const queuedId = await enqueueMail(app, {
     toUid: trainerId,
     kind: plan.kind,
     scope: plan.scope,
@@ -202,6 +210,16 @@ export async function enqueueTrainerLimitMail(
       ctaUrl: trainerEntry({ to: "facturacion" }),
     },
   });
+
+  if (queuedId === null) {
+    const enCola = await getFirestore(app)
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey(plan.kind, plan.scope, trainerId))
+      .get();
+    if (!enCola.exists) {
+      throw new Error("trainer-limit-mail: no se pudo encolar el mail");
+    }
+  }
 
   await getFirestore(app)
     .collection("users")
