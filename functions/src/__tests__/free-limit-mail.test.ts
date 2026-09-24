@@ -36,14 +36,17 @@ import { renderMail, LANDING_URL } from "../mail/templates";
 import type { App } from "firebase-admin/app";
 
 jest.mock("../mail/enqueue-mail", () => ({
+  ...jest.requireActual("../mail/enqueue-mail"),
   enqueueMail: jest.fn(async () => "queued-id"),
 }));
 
 const setMock = jest.fn(async () => undefined);
+let colaExiste = false;
+const getMock = jest.fn(async () => ({ exists: colaExiste }));
 jest.mock("firebase-admin/firestore", () => ({
   ...jest.requireActual("firebase-admin/firestore"),
   getFirestore: () => ({
-    collection: () => ({ doc: () => ({ set: setMock }) }),
+    collection: () => ({ doc: () => ({ set: setMock, get: getMock }) }),
   }),
 }));
 
@@ -63,6 +66,8 @@ const CHOCO_RECIEN = {
 beforeEach(() => {
   enqueueMock.mockClear();
   setMock.mockClear();
+  getMock.mockClear();
+  colaExiste = false;
 });
 
 describe("⚠️ las cuatro cláusulas del silencio", () => {
@@ -135,6 +140,25 @@ describe("cuando sí manda", () => {
     const plan = decideFreeLimitMail(CHOCO_RECIEN, AHORA, false)!;
     await enqueueFreeLimitMail(APP, "a1", plan, AHORA);
     expect(enqueueMock).toHaveBeenCalledTimes(1);
+    expect(setMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido reintente", async () => {
+    // `enqueueMail` no tira: un `null` sin documento en la cola es una falla.
+    // Anotar acá silenciaría al alumno catorce días sin mail alguno.
+    enqueueMock.mockResolvedValueOnce(null);
+    colaExiste = false;
+    const plan = decideFreeLimitMail(CHOCO_RECIEN, AHORA, false)!;
+    await expect(enqueueFreeLimitMail(APP, "a1", plan, AHORA)).rejects.toThrow();
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it("si el mail YA estaba en la cola (reintento), anota el enfriamiento igual", async () => {
+    enqueueMock.mockResolvedValueOnce(null);
+    colaExiste = true;
+    const plan = decideFreeLimitMail(CHOCO_RECIEN, AHORA, false)!;
+    await enqueueFreeLimitMail(APP, "a1", plan, AHORA);
+    expect(getMock).toHaveBeenCalledTimes(1);
     expect(setMock).toHaveBeenCalledTimes(1);
   });
 });
