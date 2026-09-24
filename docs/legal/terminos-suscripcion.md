@@ -41,8 +41,8 @@ sin que se te cobre.
 que podés armarte: rutinas más largas, periodización y todo tu historial. El
 plan gratuito sigue existiendo y sigue alcanzando para entrenar.
 
-**Los entrenadores** requieren una suscripción para atender alumnos por encima
-del límite del plan gratuito.
+**Los entrenadores** requieren una suscripción para atender alumnos o tener
+ejercicios propios por encima de los límites del plan gratuito.
 
 Los pagos entre un alumno y su entrenador **no pasan por TREINO** y no están
 alcanzados por este documento. Ver la sección 7 de los Términos y Condiciones.
@@ -54,15 +54,19 @@ plan anual equivale a diez meses.
 
 ### 2.1 Planes para entrenadores
 
-| Plan | Alumnos | Por mes | Por año |
-|---|---|---|---|
-| Gratuito | 2 | — | — |
-| Plan 1 | 7 | $12.000 | $120.000 |
-| Plan 2 | 15 | $22.000 | $220.000 |
-| Plan 3 | Sin límite | $39.000 | $390.000 |
+| Plan | Alumnos | Ejercicios propios | Por mes | Por año |
+|---|---|---|---|---|
+| Gratuito | 2 | 20 | — | — |
+| Plan 1 | 7 | 60 | $12.000 | $120.000 |
+| Plan 2 | 15 | 120 | $22.000 | $220.000 |
+| Plan 3 | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Un alumno **pausado ocupa media plaza** y uno activo una entera. El detalle está
 en la sección 8.2 de los Términos para Entrenadores.
+
+Los ejercicios propios son los que creás en tu biblioteca. **Los del catálogo de
+TREINO no cuentan** y los usás sin límite. El detalle está en la sección 8.2.bis
+de los Términos para Entrenadores.
 
 ### 2.2 Plan para alumnos que entrenan por su cuenta
 
@@ -222,6 +226,10 @@ vínculos con alumnos quedan bloqueados.
 *Tus alumnos no pierden nada:* conservan sus rutinas, su historial, sus datos y
 su chat. Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
 
+*Tus ejercicios propios tampoco se borran:* si tenés más de los que incluye el
+plan gratuito, los conservás y los seguís usando, pero no vas a poder crear
+nuevos mientras estés por encima del límite de tu plan.
+
 **Si sos alumno**, volvés al plan gratuito: las rutinas que tengas armadas
 quedan como están y podés seguir entrenándolas, pero no vas a poder hacerlas
 más largas mientras el plan no esté al día.
@@ -256,11 +264,11 @@ treino@gettreino.com
 |---|---|---|---|
 | 1 | **Botón de Arrepentimiento** en la home, sin login | ✅ `gettreino.com/es/arrepentimiento` | **Sí, si se cobra** |
 | 2 | Formulario de arrepentimiento | ✅ publicado | **Sí** |
-| 3 | **Correo automático con código dentro de 24 h** | Backend — **falta probarlo de punta a punta** | **Sí** |
+| 3 | **Correo automático con código dentro de 24 h** | ✅ verificado de punta a punta desde los formularios reales el 2026-09-22 | **Sí** |
 | 4 | Baja en línea — el callable | ✅ `cancelMySubscription` (#1174) | **Sí** |
-| 5 | Baja en línea — la pantalla del PF | Coach Hub web | **Sí** |
-| 6 | Baja en línea — la pantalla del alumno | `gettreino.com` | **Sí, para cobrarle al alumno** |
-| 7 | Aviso previo a renovación y a cambio de precio | Backend | Sí |
+| 5 | Baja en línea — la pantalla del PF | ✅ Coach Hub web (#1186) | **Sí** |
+| 6 | Baja en línea — la pantalla del alumno | ✅ `gettreino.com/es/suscripcion/baja` (`treino-app#11`) | **Sí, para cobrarle al alumno** |
+| 7 | Aviso previo a renovación y a cambio de precio o de límites | Backend — **no existe**; hoy se avisa a mano | Sí |
 | 8 | Pantalla de precio final antes de confirmar | Las dos webs | Sí |
 
 Especificación completa del sitio en [`spec-web-legal.md`](./spec-web-legal.md).
@@ -268,9 +276,15 @@ Especificación completa del sitio en [`spec-web-legal.md`](./spec-web-legal.md)
 **El reembolso se opera a mano** desde el panel de la pasarela. La norma exige un
 proceso, no un sistema automatizado, y con el volumen esperado alcanza.
 
-⚠️ El ítem 4 ya no bloquea: el callable existe, sirve a los dos productos, y da
-de baja en Mercado Pago sin tocar el derecho hasta que la baja confirme. Lo que
-bloquea ahora son las dos pantallas que lo llaman.
+⚠️ Los ítems 3 a 6 ya no bloquean (actualizado el 2026-09-24): el correo con
+código se verificó de punta a punta, y el callable de baja existe junto con las
+dos pantallas que lo llaman.
+
+⚠️ **El ítem 7 importa para cualquier cambio de límites.** El contrato del
+entrenador (§12) promete avisar con antelación cualquier cambio de límites de
+plan, y no hay aviso automático. El límite de ejercicios propios no lo necesitó
+porque se publicó antes del primer entrenador real (2026-09-24: todas las
+cuentas de entrenador eran de prueba). El próximo cambio sí.
 
 ## B. Lo que todavía no está resuelto
 
@@ -298,6 +312,13 @@ Para el alumno **es más débil**, y conviene que esté escrito acá y no sólo 
 plan: los ejemplos que da Apple en el texto de la guideline son VoIP, Cloud
 Storage, Email Services y Web Hosting — servicios que se *usan* en la web. Una
 página que sólo cobra no es una herramienta.
+
+**Y hay una segunda guideline que este anexo no miraba** (agregado el
+2026-09-24, texto verificado ese día en developer.apple.com). La 3.1.3(b),
+*Multiplatform Services*, permite dar acceso adentro de la app a suscripciones
+compradas en la web *«provided those items are also available as in-app
+purchases within the app»*. Como el IAP se desarmó (#1201, #1206), el alumno no
+puede apoyarse en 3.1.3(b): depende sólo de 3.1.3(f), que es la débil.
 
 Eso **no bloquea construir el cobro**, porque el paywall del alumno está apagado
 y el riesgo sólo se materializa el día que se encienda y se someta iOS. Pero es
@@ -362,24 +383,35 @@ PRs: #1167, #1168, #1169, #1170, #1171, #1172, #1173, #1174, #1176, #1177.
 Más el cobro del entrenador por Mercado Pago, los límites por plan y el paywall
 (`functions/src/subscriptions/`), que ya estaban.
 
-**Lo que falta, y es lo que bloquea publicar el cobro:**
+**Lo que faltaba para publicar el cobro, cerrado** (actualizado el 2026-09-24):
 
-| # | Qué | Dónde |
+| # | Qué | Estado |
 |---|---|---|
-| 1 | Correo automático con código dentro de 24 h | Backend — **falta probarlo de punta a punta** |
-| 2 | Pantalla de baja del PF | Coach Hub web |
-| 3 | Pantalla de precios, checkout, retorno y baja del alumno | `gettreino.com` (repo `treino-app`) |
-| 4 | Login en la landing | `treino-app` — hoy no tiene Firebase |
+| 1 | Correo automático con código dentro de 24 h | ✅ verificado de punta a punta el 2026-09-22 |
+| 2 | Pantalla de baja del PF | ✅ Coach Hub web (#1186) |
+| 3 | Pantalla de precios, checkout, retorno y baja del alumno | ✅ `treino-app#10`, `#11` y `#12` |
+| 4 | Login en la landing | ✅ `treino-app#6` (Firebase) y `#7` (`/entrar`) |
+
+El cobro del alumno sigue **apagado** detrás de tres interruptores (landing,
+servidor y cliente). La lista de lo que falta para encenderlo vive en
+`lib/features/paywall/domain/athlete_entitlement.dart`, y no en este documento.
+
+**Límite de ejercicios propios del entrenador** (agregado el 2026-09-24): el
+texto de §1, §2.1 y §9 ya lo describe. Plan de implementación en
+`docs/limite-ejercicios-pf.md`. El texto se publica **antes** que el código, a
+propósito: no hay entrenadores reales todavía, y con el interruptor apagado el
+texto describe un límite más estricto que el que se aplica. Lo que no puede
+pasar es que se dé de alta el primer entrenador real sin los límites
+encendidos.
 
 ⚠️ **Lo que decía este anexo y ya no vale:** *«Para el alumno no hace falta nada
 de eso: la tienda gestiona baja y reembolso.»* Con el cobro por web, la baja y el
 reembolso del alumno los gestionamos **nosotros**, con el mismo plazo y el mismo
 alcance que los del entrenador.
 
-⚠️ **El cobro por IAP está previsto para desarmarse.** `purchases_flutter` sigue
-en el binario pero el camino nunca llegó a funcionar —nunca hubo una sola compra
-por RevenueCat— y `store/privacy/privacy-labels.md` declara «sin compras
-in-app», que hoy es falso mientras el SDK esté adentro. Sale cuando el checkout
-web convierta un pago real.
+✅ **El cobro por IAP se desarmó el 2026-09-21**: el SDK salió del binario en el
+#1201 y el backend en el #1206, sin que hubiera pasado nunca una sola compra por
+RevenueCat. Con eso, lo que declara `store/privacy/privacy-labels.md` («sin
+compras in-app») pasó a ser cierto.
 
 Especificación del sitio en [`spec-web-legal.md`](./spec-web-legal.md).
