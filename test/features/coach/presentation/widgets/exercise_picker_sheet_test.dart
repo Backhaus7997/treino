@@ -4,9 +4,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/exercise_asset_image.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/presentation/widgets/exercise_picker_sheet.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -17,6 +23,8 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../fixtures/exercises.dart';
 
+class _MockUserRepo extends Mock implements UserRepository {}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 final _kExercises = [
@@ -25,12 +33,35 @@ final _kExercises = [
   seedExercise('back-squat'), // quads / barra
 ];
 
-List<Override> _overrides({List<Exercise>? exercises}) => [
+UserProfile _profile(UserRole role) {
+  final now = DateTime.utc(2026, 1, 1);
+  return UserProfile(
+    uid: 'u1',
+    email: 'a@b.com',
+    displayName: null,
+    role: role,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
+
+List<Override> _overrides({
+  List<Exercise>? exercises,
+  UserRole role = UserRole.trainer,
+  AsyncValue<CustomExerciseQuota>? quota,
+  UserRepository? userRepo,
+}) =>
+    [
       currentUidProvider.overrideWithValue('u1'),
       exercisesProvider.overrideWith((ref) async => exercises ?? _kExercises),
       customExercisesForTrainerStreamProvider('u1').overrideWith(
         (ref) => Stream<List<CustomExercise>>.value(const []),
       ),
+      userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
+      customExerciseQuotaProvider.overrideWithValue(
+        quota ?? const AsyncValue.data((limit: null, count: 0)),
+      ),
+      userRepositoryProvider.overrideWithValue(userRepo ?? _MockUserRepo()),
     ];
 
 Future<void> _openPicker(
@@ -38,10 +69,18 @@ Future<void> _openPicker(
   List<Exercise>? exercises,
   Set<String> alreadySelectedIds = const {},
   void Function(List<Exercise>?)? onResult,
+  UserRole role = UserRole.trainer,
+  AsyncValue<CustomExerciseQuota>? quota,
+  UserRepository? userRepo,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
-      overrides: _overrides(exercises: exercises),
+      overrides: _overrides(
+        exercises: exercises,
+        role: role,
+        quota: quota,
+        userRepo: userRepo,
+      ),
       child: MaterialApp(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
