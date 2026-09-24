@@ -954,17 +954,17 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "Quisiste hacer algo que el plan gratis no te deja", // i18n: email comercial
       "Hay una forma de sacarte el tope",
       [
-        ["Te topaste con un limite del plan gratis."],
+        ["Te topaste con un límite del plan gratis."],
         [
           "Tus entrenamientos, tu historial y tus medidas ",
           strong("siguen donde estaban"),
           ": el plan gratis no te saca nada de lo que ya hiciste.",
         ],
         [
-          "Lo que limita es lo que podes armar de aca en adelante — cuantas " +
-            "rutinas propias, de que tamaño, y que plantillas podes usar.",
+          "Lo que limita es lo que podés armar de acá en adelante — cuántas " +
+            "rutinas propias, de qué tamaño, y qué plantillas podés usar.",
         ],
-        ["Si eso te queda corto, podes suscribirte por tu cuenta."],
+        ["Si eso te queda corto, podés suscribirte por tu cuenta."],
       ],
       "VER EL PLAN",
       ctaUrl,

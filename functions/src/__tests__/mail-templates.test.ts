@@ -20,21 +20,40 @@ import {
   toDate,
 } from "../mail/format";
 
-const ALL_KINDS: MailKind[] = [
-  "password-reset",
-  "federated-signin-hint",
-  "email-verification",
-  "appointment-confirmed",
-  "appointment-series-created",
-  "appointment-cancelled",
-  "appointment-series-cancelled",
-  "link-requested",
-  "link-accepted",
-  "payment-overdue",
-  "discomfort-reported",
-  "subscription-grace",
-  "subscription-downgraded",
-];
+/**
+ * Todos los `MailKind`, y el COMPILADOR se asegura de que sean todos.
+ *
+ * Antes era un `MailKind[]` escrito a mano, y se quedó en 13 mientras la unión
+ * crecía a 19. Los seis nuevos —los dos comerciales entre ellos— tienen tests
+ * en su propio módulo, pero nunca pasaron por los chequeos que este archivo le
+ * aplica a todos los kinds. Así salió a una casilla real el de
+ * `free-limit-reached` sin una sola tilde.
+ *
+ * Un `Record<MailKind, true>` no compila si falta una clave, así que el kind
+ * número 20 entra acá el mismo día que entra a la unión.
+ */
+const KINDS: Record<MailKind, true> = {
+  "password-reset": true,
+  "federated-signin-hint": true,
+  "email-verification": true,
+  "appointment-confirmed": true,
+  "appointment-series-created": true,
+  "appointment-cancelled": true,
+  "appointment-series-cancelled": true,
+  "link-requested": true,
+  "link-accepted": true,
+  "payment-overdue": true,
+  "discomfort-reported": true,
+  "moderation-report-created": true,
+  "moderation-user-warned": true,
+  "subscription-grace": true,
+  "subscription-downgraded": true,
+  "limit-reached": true,
+  "athlete-coverage-lost": true,
+  "free-limit-reached": true,
+  "inactive-account-notice": true,
+};
+const ALL_KINDS = Object.keys(KINDS) as MailKind[];
 
 /**
  * El href del BOTON del CTA.
@@ -204,16 +223,27 @@ describe("destino del CTA", () => {
   // `password-reset` y `email-verification` quedan afuera A PROPOSITO: su CTA
   // no es un destino nuestro, es el `actionLink` de un solo uso que minta el
   // Admin SDK y que apunta al action handler de Firebase.
+  //
+  // `moderation-report-created` tambien queda afuera, y tambien a proposito: no
+  // dibuja boton hasta que exista la ruta de la cola (ver su `case`). El test
+  // de abajo verifica que siga sin boton, asi la excepcion no esconde nada.
   it("todo CTA que no sea un action link vive bajo /abrir", () => {
     const conActionLink = ["password-reset", "email-verification"];
-    const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
+    const sinBoton = ["moderation-report-created"];
+    const resto = ALL_KINDS.filter(
+      (k) => !conActionLink.includes(k) && !sinBoton.includes(k),
+    );
 
-    expect(resto).toHaveLength(11);
+    expect(resto).toHaveLength(16);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
       expect(href).toMatch(/^https:\/\/app\.gettreino\.com\/abrir\/(alumno|profe)$/);
     }
+  });
+
+  it("el aviso de moderación sigue sin botón mientras no exista la cola", () => {
+    expect(ctaHref(renderMail("moderation-report-created", {}).html)).toBe("");
   });
 
   // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
@@ -691,5 +721,48 @@ describe("mails del paywall del PF", () => {
 
       expect(ctaHref(html)).toBe("https://app.gettreino.com/abrir/profe");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tildes — el copy es castellano rioplatense, con voseo
+// ---------------------------------------------------------------------------
+describe("tildes", () => {
+  /**
+   * Palabras que en el copy de la casa —castellano rioplatense, con voseo—
+   * están mal escritas sin tilde.
+   *
+   * Los comentarios de este repo se escriben sin tildes por costumbre, y ese
+   * hábito se filtró una vez al texto que lee el usuario: el mail de
+   * `free-limit-reached` salió con "podes", "aca", "limite" y "cuantas". Es el
+   * mail que le pide que pague.
+   *
+   * Dos tienen un homógrafo correcto, raro en un mail: "limite" (que el plan
+   * te limite) y "ultima" (del verbo ultimar). Si alguna vez hace falta uno,
+   * reformulá la frase o sacá la palabra de acá con el motivo al lado. Quedan
+   * afuera a propósito "que" y "cuantas": sin tilde son correctas todo el
+   * tiempo, en su otra función.
+   */
+  const SIN_TILDE = [
+    "podes", "tenes", "queres", "sabes", "aca", "alla", "ahi",
+    "limite", "limites", "sesion", "suscripcion", "contrasena",
+    "ultimo", "ultima", "proximo", "proxima", "dias", "tambien", "despues",
+  ];
+
+  it.each(ALL_KINDS)("%s no tiene palabras sin su tilde", (kind) => {
+    const { subject, text } = renderMail(kind, {
+      trainerName: "Jose",
+      athleteName: "Marta",
+      otherName: "Jose",
+      dateLabel: "martes 26 de agosto",
+      timeLabel: "19:00",
+      amountLabel: "$ 25.000",
+      dueLabel: "26/08/2026",
+    });
+    // Las URLs quedan afuera: `/suscripcion/checkout` es una ruta, no copy.
+    const copy = `${subject}\n${text}`.replace(/https?:\/\/\S+/g, "");
+    const palabras = copy.toLowerCase().match(/[a-zñáéíóúü]+/g) ?? [];
+
+    expect(palabras.filter((p) => SIN_TILDE.includes(p))).toEqual([]);
   });
 });
