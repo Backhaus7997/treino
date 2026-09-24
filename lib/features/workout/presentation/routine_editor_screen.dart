@@ -1852,7 +1852,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   /// Hard cap on plan length (REQ-PERIOD-011) — also bounds Firestore doc
   /// size since weeklySets duplicates per-week set data.
-  static const int _kMaxWeeks = 16;
+  static const int _kMaxWeeks = kMaxRoutineWeeks;
 
   /// Client-side cap of the resumen field (#648). MUST stay equal to the
   /// `optStrMaxLen(..., 280)` guard on the two trainer UPDATE paths of
@@ -2001,7 +2001,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   /// A week has at most 7 days, so a plan can't have more (device feedback
   /// 2026-06-11).
-  static const int _kMaxDays = 7;
+  static const int _kMaxDays = kMaxRoutineDays;
 
   void _addDay() {
     if (_days.length >= _kMaxDays) return;

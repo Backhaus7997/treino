@@ -4532,6 +4532,43 @@ class AppL10nEs extends AppL10n {
       'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
 
   @override
+  String get paywallFreePlanLimitProName => 'TREINO Pro';
+
+  @override
+  String get paywallFreePlanLimitProTagline =>
+      'Todo lo que ya usás, sin los topes del plan gratis.';
+
+  @override
+  String paywallFreePlanLimitProBenefitDays(int max) {
+    return 'Rutinas de hasta $max días';
+  }
+
+  @override
+  String paywallFreePlanLimitProBenefitWeeks(int max) {
+    return 'Hasta $max semanas, con periodización';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitTemplates =>
+      'Todas las plantillas del catálogo, de principiante a avanzado';
+
+  @override
+  String get paywallFreePlanLimitProBenefitCustomize =>
+      'Personalizar cualquier plantilla del catálogo';
+
+  @override
+  String paywallFreePlanLimitProBenefitRoutines(int max) {
+    return 'Hasta $max rutinas propias';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitCharts =>
+      'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallFreePlanLimitProMatchTag => 'Lo que buscabas';
+
+  @override
   String get paywallAlumnoTitulo => 'TREINO Pro';
 
   @override
@@ -9218,6 +9255,43 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get paywallFreePlanLimitChartHistoryBody =>
       'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
+
+  @override
+  String get paywallFreePlanLimitProName => 'TREINO Pro';
+
+  @override
+  String get paywallFreePlanLimitProTagline =>
+      'Todo lo que ya usás, sin los topes del plan gratis.';
+
+  @override
+  String paywallFreePlanLimitProBenefitDays(int max) {
+    return 'Rutinas de hasta $max días';
+  }
+
+  @override
+  String paywallFreePlanLimitProBenefitWeeks(int max) {
+    return 'Hasta $max semanas, con periodización';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitTemplates =>
+      'Todas las plantillas del catálogo, de principiante a avanzado';
+
+  @override
+  String get paywallFreePlanLimitProBenefitCustomize =>
+      'Personalizar cualquier plantilla del catálogo';
+
+  @override
+  String paywallFreePlanLimitProBenefitRoutines(int max) {
+    return 'Hasta $max rutinas propias';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitCharts =>
+      'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallFreePlanLimitProMatchTag => 'Lo que buscabas';
 
   @override
   String get paywallAlumnoTitulo => 'TREINO Pro';

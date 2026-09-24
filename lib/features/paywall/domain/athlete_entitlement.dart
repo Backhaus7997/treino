@@ -281,6 +281,21 @@ const int kFreeMaxOwnRoutines = 3;
 /// plan pago.
 const int kMaxOwnRoutines = 10;
 
+/// Tope estructural de días de una rutina propia, para cualquiera — pague o no.
+///
+/// Mismo caso que [kMaxOwnRoutines]: preexistente, acá sólo se le pone nombre.
+/// Vivía como `_kMaxDays` privado del editor ("una semana tiene 7 días"), y la
+/// hoja de plan pago lo necesita para decir qué suma TREINO Pro. Escrito a mano
+/// en el `.arb` habría sido otro número duplicado en una cadena — el mismo pozo
+/// en el que ya cayó [kFreeMaxRoutineDays].
+const int kMaxRoutineDays = 7;
+
+/// Tope estructural de semanas de una rutina propia (REQ-PERIOD-011). Además de
+/// ser el techo del producto acota el tamaño del documento, porque `weeklySets`
+/// duplica las series por semana. Vive acá por el mismo motivo que
+/// [kMaxRoutineDays].
+const int kMaxRoutineWeeks = 16;
+
 /// Semanas máximas de una rutina PROPIA en el plan free.
 ///
 /// Una semana significa: sin periodización. Los campos `weeklySets` y
