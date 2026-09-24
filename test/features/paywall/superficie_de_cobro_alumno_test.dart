@@ -49,9 +49,20 @@
 //
 // De ahi salio el eje de «quien COMPRA», que es el que ahora esta en cero.
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+
+/// Formas de anunciar, desde la hoja de límite, el mail que el barrido manda
+/// después. Ver el test «la hoja de limite no ANUNCIA el mail».
+const _anunciosDelMail = <String>[
+  'mail',
+  'correo',
+  'email',
+  'te escribimos',
+  'te avisamos',
+];
 
 /// APIs que abren algo fuera de la app. Un CTA de compra necesita alguna.
 const _aperturasExternas = <String>[
@@ -325,26 +336,33 @@ void main() {
       );
     });
 
+    // La hoja y TODO lo que dibuja adentro. La tarjeta de TREINO Pro vive en
+    // su propio archivo (`treino_pro_showcase.dart`), y un guard que mirara
+    // sólo `free_plan_limit_sheet.dart` dejaría pasar un CTA —o un «te
+    // mandamos un mail»— escrito en la tarjeta. Por carpeta, y no por lista
+    // de archivos, para que el próximo que se sume quede cubierto solo.
+    const carpetaDeLaHoja = 'lib/features/paywall/presentation';
+
     test('la hoja de limite no ofrece comprar', () {
       // El instante en que el tope muerde es donde mas tienta poner un CTA.
-      final hoja = File(
-        'lib/features/paywall/presentation/free_plan_limit_sheet.dart',
-      );
+      final hoja = File('$carpetaDeLaHoja/free_plan_limit_sheet.dart');
       expect(hoja.existsSync(), isTrue);
 
-      final codigo = _sinComentarios(hoja);
-      expect(
-        codigo.contains('free_plan_limit_upgrade'),
-        isFalse,
-        reason: 'volvio el boton de comprar a la hoja de limite',
-      );
-      expect(
-        codigo.contains('onUpgrade'),
-        isFalse,
-        reason: 'volvio `onUpgrade` a la hoja de limite. Antes de reponerlo: '
-            'eran 8 call sites pasando la misma closure, y cada uno era un '
-            'lugar donde se podia pasar otra.',
-      );
+      for (final f in _dartsDe(carpetaDeLaHoja)) {
+        final codigo = _sinComentarios(f);
+        expect(
+          codigo.contains('free_plan_limit_upgrade'),
+          isFalse,
+          reason: 'volvio el boton de comprar a la hoja de limite (${f.path})',
+        );
+        expect(
+          codigo.contains('onUpgrade'),
+          isFalse,
+          reason: 'volvio `onUpgrade` a la hoja de limite (${f.path}). Antes '
+              'de reponerlo: eran 8 call sites pasando la misma closure, y '
+              'cada uno era un lugar donde se podia pasar otra.',
+        );
+      }
     });
 
     test('la hoja de limite no ANUNCIA el mail', () {
@@ -358,30 +376,68 @@ void main() {
       // exactamente lo que 3.1.3(f) prohibe. La diferencia entre lo que hacemos
       // y una infraccion es que el usuario no se entera por la app.
       //
-      // Se escanea el TEXTO que la hoja puede mostrar: las claves de l10n y los
-      // literales. Los comentarios se sacan —explican por que existe el mail, y
-      // esa prosa tiene que poder nombrarlo—.
-      final hoja = File(
-        'lib/features/paywall/presentation/free_plan_limit_sheet.dart',
-      );
-      final codigo = _sinComentarios(hoja).toLowerCase();
-
-      for (final prohibido in [
-        'mail',
-        'correo',
-        'email',
-        'te escribimos',
-        'te avisamos',
-      ]) {
-        expect(
-          codigo.contains(prohibido),
-          isFalse,
-          reason: 'la hoja nombra «$prohibido». Anotar el tope es invisible y '
-              'esta bien; ANUNCIAR que va a llegar un mail con los planes es '
-              'señalizar la compra desde adentro de la app, y se lleva puesta '
-              'la exencion 3.1.3(f) del ENTRENADOR.',
-        );
+      // Se escanea el CODIGO de la hoja: las claves de l10n y los literales.
+      // Los comentarios se sacan —explican por que existe el mail, y esa prosa
+      // tiene que poder nombrarlo—. El valor de cada clave lo mira el test de
+      // abajo.
+      for (final f in _dartsDe(carpetaDeLaHoja)) {
+        final codigo = _sinComentarios(f).toLowerCase();
+        for (final prohibido in _anunciosDelMail) {
+          expect(
+            codigo.contains(prohibido),
+            isFalse,
+            reason: '${f.path} nombra «$prohibido». Anotar el tope es '
+                'invisible y esta bien; ANUNCIAR que va a llegar un mail con '
+                'los planes es señalizar la compra desde adentro de la app, y '
+                'se lleva puesta la exencion 3.1.3(f) del ENTRENADOR.',
+          );
+        }
       }
+    });
+
+    test('lo que la hoja MUESTRA tampoco anuncia el mail', () {
+      // El agujero del test de arriba, y por que existe este: ese mira el
+      // CODIGO, o sea el NOMBRE de cada clave de l10n. Lo que el alumno lee —y
+      // lo que Apple revisa— es el VALOR, y ese vive en el `.arb`. Una clave
+      // inocente como `paywallFreePlanLimitProTagline` con «te mandamos un
+      // mail» adentro pasaba el guard de arriba en verde.
+      //
+      // Se leen las claves que la carpeta de la hoja realmente usa
+      // (`l10n.<clave>`) y se revisa su texto en el `.arb` plantilla.
+      final arb = jsonDecode(
+        File('lib/l10n/intl_es_AR.arb').readAsStringSync(),
+      ) as Map<String, dynamic>;
+      final usoDeClave = RegExp(r'\bl10n\.(\w+)');
+
+      final claves = <String>{
+        for (final f in _dartsDe(carpetaDeLaHoja))
+          for (final m in usoDeClave.allMatches(_sinComentarios(f)))
+            m.group(1)!,
+      };
+      // Sin esto, un refactor que renombre la variable `l10n` deja el set
+      // vacío y el test pasa sin mirar nada.
+      expect(
+        claves,
+        contains('paywallFreePlanLimitProTagline'),
+        reason: 'el test no encontró las claves que usa la hoja: si se '
+            'renombró la variable `l10n`, ajustá `usoDeClave`',
+      );
+
+      final hallazgos = <String>[
+        for (final clave in claves)
+          if (arb[clave] case final String texto)
+            for (final prohibido in _anunciosDelMail)
+              if (texto.toLowerCase().contains(prohibido))
+                '$clave: «$prohibido» en «$texto»',
+      ];
+      expect(
+        hallazgos,
+        isEmpty,
+        reason: 'la hoja MUESTRA un anuncio del mail:\n'
+            '${hallazgos.join("\n")}\n\n'
+            'El mail existe y está bien que exista; lo que no puede es '
+            'anunciarlo la app. Ver el test de arriba.',
+      );
     });
   });
 

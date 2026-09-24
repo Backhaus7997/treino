@@ -67,10 +67,10 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 257;
+    const allowlistCeiling = 256;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const rawFontSizeDebtCeiling = 1775;
+    const rawFontSizeDebtCeiling = 1773;
 
     /// Allowlist de rutas relativas a `lib/` que todavía tienen `fontSize`
     /// crudo. Es un REGISTRO DE DEUDA, no una licencia.
@@ -239,7 +239,6 @@ void main() {
       'features/onboarding/presentation/widgets/onboarding_nav_bar.dart',
       'features/onboarding/presentation/widgets/onboarding_preview_cards.dart',
       'features/onboarding/presentation/widgets/trainer_preview_kit.dart',
-      'features/paywall/presentation/free_plan_limit_sheet.dart',
       'features/performance/presentation/log_performance_test_screen.dart',
       'features/performance/presentation/widgets/performance_progress_chart.dart',
       'features/profile/presentation/appearance_screen.dart',

@@ -7833,6 +7833,60 @@ abstract class AppL10n {
   /// **'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.'**
   String get paywallFreePlanLimitChartHistoryBody;
 
+  /// Nombre del plan pago del alumno en la tarjeta de la hoja de limite. Es el mismo nombre que usan la landing y los terminos de suscripcion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO Pro'**
+  String get paywallFreePlanLimitProName;
+
+  /// Bajada de la tarjeta TREINO Pro. La tarjeta DESCRIBE el plan y nada mas: no dice donde se consigue, ni cuanto sale, ni que va a llegar algo por otro canal. Bajo la Guideline 3.1.3(f) cualquiera de esas tres cosas es un 'call to action for purchase outside of the app' y se lleva puesta la exencion del ENTRENADOR. Ver superficie_de_cobro_alumno_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todo lo que ya usás, sin los topes del plan gratis.'**
+  String get paywallFreePlanLimitProTagline;
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxRoutineDays: el numero no se escribe a mano en la cadena.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutinas de hasta {max} días'**
+  String paywallFreePlanLimitProBenefitDays(int max);
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxRoutineWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {max} semanas, con periodización'**
+  String paywallFreePlanLimitProBenefitWeeks(int max);
+
+  /// Beneficio de TREINO Pro. El plan gratis sigue solo las de nivel principiante (docs/paywall-alumno-suelto.md §4.1.1).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas las plantillas del catálogo, de principiante a avanzado'**
+  String get paywallFreePlanLimitProBenefitTemplates;
+
+  /// Beneficio de TREINO Pro. Seguir una plantilla tal cual es gratis; copiarla para editarla es lo pago.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar cualquier plantilla del catálogo'**
+  String get paywallFreePlanLimitProBenefitCustomize;
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxOwnRoutines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {max} rutinas propias'**
+  String paywallFreePlanLimitProBenefitRoutines(int max);
+
+  /// Beneficio de TREINO Pro. Los periodos son los nombres de los chips de los graficos, no un tope: por eso van escritos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gráficos de 3 meses y 1 año'**
+  String get paywallFreePlanLimitProBenefitCharts;
+
+  /// Etiqueta sobre el beneficio de TREINO Pro que corresponde al tope que el alumno acaba de tocar. Ese beneficio va primero y resaltado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Lo que buscabas'**
+  String get paywallFreePlanLimitProMatchTag;
+
   /// Titulo del paywall del alumno.
   ///
   /// In es_AR, this message translates to:

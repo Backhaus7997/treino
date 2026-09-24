@@ -4445,6 +4445,39 @@ class AppL10nEn extends AppL10n {
   String get paywallFreePlanLimitChartHistoryBody => '';
 
   @override
+  String get paywallFreePlanLimitProName => '';
+
+  @override
+  String get paywallFreePlanLimitProTagline => '';
+
+  @override
+  String paywallFreePlanLimitProBenefitDays(int max) {
+    return '';
+  }
+
+  @override
+  String paywallFreePlanLimitProBenefitWeeks(int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitTemplates => '';
+
+  @override
+  String get paywallFreePlanLimitProBenefitCustomize => '';
+
+  @override
+  String paywallFreePlanLimitProBenefitRoutines(int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitCharts => '';
+
+  @override
+  String get paywallFreePlanLimitProMatchTag => '';
+
+  @override
   String get paywallAlumnoTitulo => '';
 
   @override
