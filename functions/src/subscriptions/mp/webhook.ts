@@ -519,7 +519,13 @@ export async function runMpWebhook(
 
   // De acá para abajo es el MISMO camino que el barrido de las 03:00. Toda la
   // politica de cuando escribir y cuando no vive ahi, en un solo lugar.
-  const r = await reconcileSubscription(app, planId, deps);
+  //
+  // ⚠️ Con UNA diferencia: se le pasa la suscripcion que acabamos de leer por
+  // id. El reconciliador busca por plan, y el indice de busqueda de MP todavia
+  // no la tiene cuando llega este aviso (~1 s despues del pago). Sin ella el
+  // alta salia `sin-suscripcion`, se marcaba procesada, y no se acreditaba
+  // hasta las 03:00. Ver `conLaConocidaPrimero`.
+  const r = await reconcileSubscription(app, planId, deps, preapproval);
 
   await visto.set({ procesadoMs: deps.nowMs, outcome: r.outcome, planId });
 
