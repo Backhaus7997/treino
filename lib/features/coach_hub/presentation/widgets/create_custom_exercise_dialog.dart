@@ -9,7 +9,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/utils/firestore_error.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -135,8 +137,19 @@ class _CustomExerciseFormDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop(result);
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      // El rebote del servidor (docs/limite-ejercicios-pf.md PR3): sólo en
+      // CREATE (nunca en edit — E3 no toca el update) y sólo
+      // `permission-denied`, es la regla `customExerciseQuotaOk` frenando al
+      // PF que ya está en el tope. Mismo aviso que el embudo, no el error
+      // genérico de este form.
+      if (widget.existing == null &&
+          isPermissionDenied(error) &&
+          await mostrarAvisoTopeEjerciciosPorRebote(context, ref)) {
+        if (mounted) setState(() => _saving = false);
+        return;
+      }
       setState(() {
         _saving = false;
         _error = 'No pudimos guardar el ejercicio.'; // i18n
