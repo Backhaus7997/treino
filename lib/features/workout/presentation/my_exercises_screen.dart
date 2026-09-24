@@ -9,6 +9,10 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach/application/custom_exercise_quota_provider.dart';
+import '../../coach/presentation/custom_exercise_limit_gate.dart';
+import '../../profile/application/user_providers.dart' show userProfileProvider;
+import '../../profile/domain/user_role.dart';
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
@@ -164,6 +168,12 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
     ));
   }
 
+  Future<void> _onCreateNew() async {
+    final canCreate = await intentarCrearEjercicioPropio(context, ref);
+    if (!canCreate || !mounted) return;
+    context.push('/profile/my-exercises/new');
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -173,6 +183,16 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
         ? const AsyncValue<List<CustomExercise>>.data(<CustomExercise>[])
         : ref.watch(customExercisesForTrainerStreamProvider(uid));
     final items = exercisesAsync.valueOrNull ?? const <CustomExercise>[];
+
+    // Contador «N de LÍMITE ejercicios propios» (docs/limite-ejercicios-pf.md
+    // PR3, "El contador visible"). Sólo PF (esta pantalla la reusa también el
+    // alumno — profile_screen.dart) y sólo con límite no-null (Plan 3 e
+    // interruptor apagado no tienen tope que mostrar).
+    final isTrainer =
+        ref.watch(userProfileProvider).valueOrNull?.role == UserRole.trainer;
+    final quotaLimit = isTrainer
+        ? ref.watch(customExerciseQuotaProvider).valueOrNull?.limit
+        : null;
 
     return PopScope(
       // El back del sistema sale del modo selección antes que de la pantalla:
@@ -251,6 +271,17 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
               ],
             ),
           ),
+          if (!_selecting && quotaLimit != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+              child: Text(
+                l10n.customExerciseCounter(items.length, quotaLimit),
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(exercisesAsync.when(
@@ -309,8 +340,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
                         onPressed: () => _deleteSelected(items),
                       )
                     : ElevatedButton(
-                        onPressed: () =>
-                            context.push('/profile/my-exercises/new'),
+                        onPressed: _onCreateNew,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: palette.accent,
                           foregroundColor:
