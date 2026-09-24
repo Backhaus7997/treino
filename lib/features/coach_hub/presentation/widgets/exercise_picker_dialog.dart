@@ -11,6 +11,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../coach/application/custom_exercise_quota_provider.dart';
+import '../../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
 import '../../../workout/application/exercise_providers.dart';
@@ -162,6 +164,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
   }
 
   Future<void> _openCreateNew() async {
+    final canCreate = await intentarCrearEjercicioPropio(context, ref);
+    if (!canCreate || !mounted) return;
     final created = await showCreateCustomExerciseDialog(context);
     if (created == null || !mounted) return;
     // The custom stream (customExercisesForTrainerStreamProvider) is live, so
@@ -242,6 +246,12 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     final customsAsync = uid.isEmpty
         ? const AsyncValue<List<CustomExercise>>.data(<CustomExercise>[])
         : ref.watch(customExercisesForTrainerStreamProvider(uid));
+    // Coach Hub web es sólo-PF (coachHubRedirect manda a cualquier otro rol a
+    // /not-allowed), así que acá alcanza con mirar el límite — sin chequeo de
+    // rol, a diferencia de my_exercises_screen.dart que comparte pantalla con
+    // el alumno.
+    final quotaLimit =
+        ref.watch(customExerciseQuotaProvider).valueOrNull?.limit;
 
     // 10 muscle groups + 13 equipment types wrap into several chip rows at
     // this dialog's width — a fixed height doesn't leave the exercise list
@@ -374,6 +384,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
             palette: palette,
             defaults: defaultsAsync,
             customs: customsAsync,
+            quotaLimit: quotaLimit,
           ),
         ),
         // ── Crear ejercicio nuevo ────────────────────────────────────
@@ -480,6 +491,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     required AppPalette palette,
     required AsyncValue<List<Exercise>> defaults,
     required AsyncValue<List<CustomExercise>> customs,
+    required int? quotaLimit,
   }) {
     if (defaults.isLoading || customs.isLoading) {
       return const CoachHubSkeleton(filas: 6);
@@ -518,7 +530,15 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
       padding: const EdgeInsets.only(bottom: 8),
       children: [
         if (filteredCustoms.isNotEmpty) ...[
-          _SectionHeader('Tus ejercicios', palette: palette), // i18n
+          _SectionHeader(
+            // Contador visible (docs/limite-ejercicios-pf.md PR3, "El
+            // contador visible"): oculto con límite null (Plan 3 o
+            // interruptor apagado).
+            quotaLimit == null
+                ? 'Tus ejercicios' // i18n
+                : 'Tus ejercicios (${customList.length} de $quotaLimit)', // i18n
+            palette: palette,
+          ),
           for (final c in filteredCustoms)
             _ExerciseRow(
               id: c.id,

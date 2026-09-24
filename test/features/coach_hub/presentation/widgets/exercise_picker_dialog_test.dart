@@ -9,8 +9,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/exercise_asset_image.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/presentation/widgets/custom_exercise_limit_notice.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/custom_exercise_video_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -22,6 +27,18 @@ import 'package:treino/features/workout/domain/exercise.dart';
 
 import '../../../../fixtures/exercises.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+
+UserProfile _trainerProfile() {
+  final now = DateTime.utc(2026, 1, 1);
+  return UserProfile(
+    uid: 'u1',
+    email: 'a@b.com',
+    displayName: null,
+    role: UserRole.trainer,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -355,6 +372,71 @@ void main() {
       );
     });
 
+    testWidgets('PF bajo el tope ⇒ tocarlo abre el formulario', (
+      tester,
+    ) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_trainerProfile())),
+          customExerciseQuotaProvider
+              .overrideWithValue(const AsyncValue.data((limit: 60, count: 1))),
+        ],
+      );
+      // `userProfileProvider` (StreamProvider) no lo watchea nadie en el
+      // build de `_ExercisePickerDialog` — sólo lo lee `intentarCrearEjercicioPropio`
+      // dentro del tap. Sin este warm-up, el `ref.read` del tap encuentra el
+      // provider recién inicializado en `AsyncLoading` (el stream override
+      // todavía no tuvo su tick), lee rol `null`, y el embudo deja pasar por
+      // fail-open — no porque el gate haya evaluado el tope, sino porque
+      // nunca llegó a mirarlo. Mismo patrón que
+      // `custom_exercise_limit_gate_test.dart`.
+      ProviderScope.containerOf(
+        tester.element(find.byKey(const Key('create_new_exercise_button'))),
+        listen: false,
+      ).read(userProfileProvider);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo ejercicio'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PF en el tope ⇒ NO abre el formulario y muestra el diálogo del '
+        'tope con VER PLANES', (tester) async {
+      // Seam de test: `kIsWeb` es una constante de compilación que bajo
+      // `flutter test` vale `false` siempre — sin esto el aviso saldría con
+      // la forma MÓVIL (sheet) en un test del picker WEB.
+      debugCustomExerciseLimitNoticeForm = CustomExerciseLimitNoticeForm.dialog;
+      addTearDown(() => debugCustomExerciseLimitNoticeForm = null);
+
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_trainerProfile())),
+          customExerciseQuotaProvider
+              .overrideWithValue(const AsyncValue.data((limit: 1, count: 1))),
+        ],
+      );
+      // Ver el comentario del test anterior — mismo warm-up.
+      ProviderScope.containerOf(
+        tester.element(find.byKey(const Key('create_new_exercise_button'))),
+        listen: false,
+      ).read(userProfileProvider);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo ejercicio'), findsNothing);
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
+    });
+
     testWidgets('sin nombre no llama al repo y muestra el error', (
       tester,
     ) async {
@@ -682,6 +764,43 @@ void main() {
         find.byKey(const Key('create_exercise_video_field')),
       );
       expect(field.controller?.text, 'https://vids.test/existing');
+    });
+  });
+
+  group('ExercisePickerDialog (web) — contador de ejercicios propios', () {
+    testWidgets('límite numérico ⇒ lo suma al encabezado "Tus ejercicios"',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1')
+              .overrideWith((ref) => Stream.value([_customBench])),
+          customExerciseQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: 60, count: 1)),
+          ),
+        ],
+      );
+
+      // `_SectionHeader` pasa el label por `.toUpperCase()`.
+      expect(find.text('TUS EJERCICIOS (1 DE 60)'), findsOneWidget);
+      expect(find.text('TUS EJERCICIOS'), findsNothing);
+    });
+
+    testWidgets('límite null (Plan 3 / interruptor apagado) ⇒ lo oculta',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1')
+              .overrideWith((ref) => Stream.value([_customBench])),
+          customExerciseQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: null, count: 1)),
+          ),
+        ],
+      );
+
+      expect(find.text('TUS EJERCICIOS'), findsOneWidget);
+      expect(find.textContaining('TUS EJERCICIOS ('), findsNothing);
     });
   });
 }
