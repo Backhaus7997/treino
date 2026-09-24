@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,7 +27,7 @@ UserProfile _trainer({TrainerSubscription? subscription}) => UserProfile(
 Widget _harness({
   required List<TrainerLink> links,
   UserProfile? profile,
-  AsyncValue<CustomExerciseQuota>? quota,
+  Stream<CustomExerciseQuota?>? usage,
 }) =>
     ProviderScope(
       overrides: [
@@ -34,7 +36,9 @@ Widget _harness({
         ),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream<List<TrainerLink>>.value(links)),
-        if (quota != null) customExerciseQuotaProvider.overrideWithValue(quota),
+        customExerciseUsageSummaryProvider.overrideWith(
+          (ref) => usage ?? Stream<CustomExerciseQuota?>.value(null),
+        ),
       ],
       child: const MaterialApp(home: Scaffold(body: FacturacionTab())),
     );
@@ -123,7 +127,7 @@ void main() {
     testWidgets('con tope: "Ejercicios propios: 12 de 60"', (tester) async {
       await tester.pumpWidget(_harness(
         links: const [],
-        quota: const AsyncValue.data((limit: 60, count: 12)),
+        usage: Stream.value((limit: 60, count: 12)),
       ));
       await tester.pump();
 
@@ -138,7 +142,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_harness(
         links: const [],
-        quota: const AsyncValue.data((limit: null, count: 12)),
+        usage: Stream.value((limit: null, count: 12)),
       ));
       await tester.pump();
 
@@ -153,7 +157,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_harness(
         links: const [],
-        quota: const AsyncValue.loading(),
+        usage: StreamController<CustomExerciseQuota?>().stream,
       ));
       await tester.pump();
 
@@ -164,7 +168,21 @@ void main() {
     testWidgets('error del provider: no muestra la línea', (tester) async {
       await tester.pumpWidget(_harness(
         links: const [],
-        quota: AsyncValue.error(Exception('boom'), StackTrace.empty),
+        usage: Stream.error(Exception('boom')),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Ejercicios propios'), findsNothing);
+    });
+
+    // El contador todavía no existe en el documento (functions sin deployar,
+    // o un PF sin recontar): el provider dice «no sé» y la línea no aparece.
+    // Un «0» afirmaría un conteo que nadie hizo.
+    testWidgets('contador ausente: no muestra la línea (nunca un 0 inventado)',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        usage: Stream<CustomExerciseQuota?>.value(null),
       ));
       await tester.pump();
 

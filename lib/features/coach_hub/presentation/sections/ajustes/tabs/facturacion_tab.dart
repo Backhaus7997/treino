@@ -223,7 +223,9 @@ class _CurrentPlanCard extends StatelessWidget {
 }
 
 /// «Ejercicios propios: 12 de 60» — línea de uso, calcada de la fila de
-/// ALUMNOS de esta misma card pero para `customExerciseQuotaProvider`.
+/// ALUMNOS de esta misma card. Lee `customExerciseUsageSummaryProvider`: el
+/// tope y el contador del documento del PF, sin bajar la colección entera de
+/// ejercicios sólo para contarla (ver el dartdoc del provider).
 ///
 /// ⚠️ NO usa `tier.customExerciseLimit` (la tabla estática que sí consulta
 /// `pricing_screen.dart` para vender el PLAN). Usa el tope REAL que devuelve
@@ -245,11 +247,12 @@ class _ExerciseUsageLine extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final quota = ref.watch(customExerciseQuotaProvider).valueOrNull;
+    final quota = ref.watch(customExerciseUsageSummaryProvider).valueOrNull;
 
-    // `AsyncLoading` (recién montado) o `AsyncError`: no hay nada confirmado
-    // todavía. No se inventa un número — se oculta la línea entera, y
-    // reaparece sola en el próximo build cuando el provider resuelva.
+    // `AsyncLoading` (recién montado), `AsyncError`, o el contador todavía
+    // ausente en el documento: no hay nada confirmado. No se inventa un
+    // número — se oculta la línea entera, y reaparece sola cuando el
+    // servidor escriba el conteo.
     if (quota == null) return const SizedBox.shrink();
 
     final text = quota.limit == null
