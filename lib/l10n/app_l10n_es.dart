@@ -4730,6 +4730,54 @@ class AppL10nEs extends AppL10n {
   @override
   String get privacyAnalyticsCrashNote =>
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
+
+  @override
+  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
+
+  @override
+  String customExerciseLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toDeleteNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toDelete,
+      locale: localeName,
+      other: 'borrá $toDeleteString',
+      one: 'borrá 1 ejercicio',
+    );
+    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
+  }
+
+  @override
+  String get customExerciseLimitDismiss => 'Entendido';
+
+  @override
+  String customExerciseCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString de $limitString ejercicios propios';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -9455,4 +9503,52 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get privacyAnalyticsCrashNote =>
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
+
+  @override
+  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
+
+  @override
+  String customExerciseLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toDeleteNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toDelete,
+      locale: localeName,
+      other: 'borrá $toDeleteString',
+      one: 'borrá 1 ejercicio',
+    );
+    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
+  }
+
+  @override
+  String get customExerciseLimitDismiss => 'Entendido';
+
+  @override
+  String customExerciseCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString de $limitString ejercicios propios';
+  }
 }

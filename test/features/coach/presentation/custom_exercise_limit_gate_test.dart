@@ -22,6 +22,7 @@ import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 class _RepoFalso extends Mock implements UserRepository {}
 
@@ -59,6 +60,14 @@ Future<bool> _correr(
         userRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp(
+        // El bloqueo real ahora abre el aviso visual
+        // (`showCustomExerciseLimitNotice`), y la forma móvil usa `AppL10n`
+        // — sin delegates acá el `build` de `_CustomExerciseLimitSheet`
+        // revienta con "Null check operator used on a null value" apenas
+        // este test corre junto a otros (Localizations sin resolver).
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
         home: Scaffold(
           body: Consumer(
             builder: (context, ref, _) {

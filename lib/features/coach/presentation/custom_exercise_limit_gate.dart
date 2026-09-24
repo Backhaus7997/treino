@@ -9,6 +9,7 @@ import '../../profile/domain/user_role.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/custom_exercise_quota_provider.dart';
+import 'widgets/custom_exercise_limit_notice.dart';
 
 /// El `kind` que anota [registrarTopeDelPlanPf] cuando el PF choca el tope de
 /// ejercicios propios (docs/limite-ejercicios-pf.md §2). Constante
@@ -46,20 +47,14 @@ const String kTrainerLimitHitKindCustomExercises = 'customExercises';
 /// —no este gate— es la red de verdad (ver "El rebote del servidor",
 /// docs/limite-ejercicios-pf.md PR3).
 ///
-/// ## TODO(entrypoints)
+/// ## El aviso visual
 ///
-/// El aviso visual real —sheet de sólo-estado en el móvil, diálogo con VER
-/// PLANES en la web (docs/limite-ejercicios-pf.md PR3, "Los avisos")— lo
-/// completa el tramo que cablea los cinco puntos de entrada. Esta pieza
-/// fundacional deja el punto de enganche marcado en
-/// [_mostrarAvisoTopeEjerciciosPropios]: mismo patrón que
-/// `showFreePlanLimitSheet` (anotar el tope SIN esperar, apenas se sabe que
-/// se chocó; mostrar el aviso después). A diferencia de aquella, acá la
-/// SUPERFICIE (móvil vs. web) decide qué mostrar — la firma de esta función
-/// no cambia para resolverlo: el siguiente tramo puede ramificar adentro de
-/// [_mostrarAvisoTopeEjerciciosPropios] (por ejemplo con `kIsWeb`, o con lo
-/// que use el resto del Coach Hub para distinguir superficie) sin tocar a
-/// ningún llamador de [intentarCrearEjercicioPropio].
+/// Sheet de sólo-estado en el móvil, diálogo con VER PLANES en la web
+/// (docs/limite-ejercicios-pf.md PR3, "Los avisos") — resuelto por
+/// [showCustomExerciseLimitNotice], que decide la superficie con `kIsWeb`
+/// (mismo seam de test que `plan_limit_paywall.dart`). Mismo patrón que
+/// `showFreePlanLimitSheet`: anotar el tope SIN esperar, apenas se sabe que
+/// se chocó; mostrar el aviso después.
 Future<bool> intentarCrearEjercicioPropio(
   BuildContext context,
   WidgetRef ref,
@@ -101,20 +96,39 @@ Future<bool> intentarCrearEjercicioPropio(
   }
 
   if (context.mounted) {
-    _mostrarAvisoTopeEjerciciosPropios(context);
+    // `quota.limit` no puede ser `null` acá: `isAtOrOverLimit` ya lo exige
+    // (ver su dartdoc en custom_exercise_quota_provider.dart).
+    unawaited(
+      showCustomExerciseLimitNotice(
+        context,
+        limit: quota.limit!,
+        count: quota.count,
+      ),
+    );
   }
 
   return false;
 }
 
-/// Punto de enganche para el aviso visual real.
+/// El rebote del servidor (docs/limite-ejercicios-pf.md PR3, "El rebote del
+/// servidor"): un `permission-denied` en el CREATE de un PF —el contador se
+/// adelantó, o hubo una carrera— muestra el MISMO aviso que
+/// [intentarCrearEjercicioPropio], no el error genérico.
 ///
-/// TODO(entrypoints): hoy es un no-op intencional. El tramo que cablea los
-/// cinco puntos de entrada (docs/limite-ejercicios-pf.md PR3) lo reemplaza
-/// por el sheet de sólo-estado en el móvil (sin botón, sin "web", sin
-/// "pasá a un plan" — `anti_steering_movil_test.dart` y
-/// `superficie_de_cobro_alumno_test.dart` lo cuidan) y por el diálogo con
-/// VER PLANES en la web.
-void _mostrarAvisoTopeEjerciciosPropios(BuildContext context) {
-  // Intencionalmente vacío — ver el TODO de arriba.
+/// Devuelve `true` si mostró el aviso — el call site no debe mostrar
+/// TAMBIÉN su mensaje genérico. Devuelve `false` cuando la cuota todavía no
+/// resolvió un límite concreto: sin un número real, el aviso inventaría un
+/// dato que el servidor no confirmó (AGENTS.md §11.1 — una advertencia que
+/// miente es peor que ninguna), así que el call site cae a su mensaje
+/// genérico existente.
+Future<bool> mostrarAvisoTopeEjerciciosPorRebote(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final quota = ref.read(customExerciseQuotaProvider).valueOrNull;
+  final limit = quota?.limit;
+  if (limit == null || !context.mounted) return false;
+  await showCustomExerciseLimitNotice(context,
+      limit: limit, count: quota!.count);
+  return true;
 }
