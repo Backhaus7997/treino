@@ -65,14 +65,36 @@ Future<bool> intentarCrearEjercicioPropio(
   final quota = ref.read(customExerciseQuotaProvider).valueOrNull;
   if (quota == null || !quota.isAtOrOverLimit) return true;
 
-  // Se anota que este PF chocó el tope. Lo lee el barrido nocturno del PR4
-  // para mandarle un mail contándole dónde se paga — la app no puede
-  // decírselo desde adentro del binario (misma Guideline 3.1.3(f) que
-  // documenta `registrarTopeTocado`).
-  //
-  // Sin `await` a propósito, mismo motivo que `showFreePlanLimitSheet`: el
-  // aviso se muestra ya, no espera a una anotación.
-  //
+  _anotarTopeDelPlan(ref);
+
+  if (context.mounted) {
+    // `quota.limit` no puede ser `null` acá: `isAtOrOverLimit` ya lo exige
+    // (ver su dartdoc en custom_exercise_quota_provider.dart).
+    unawaited(
+      showCustomExerciseLimitNotice(
+        context,
+        limit: quota.limit!,
+        count: quota.count,
+      ),
+    );
+  }
+
+  return false;
+}
+
+/// Anota que este PF chocó el tope. Lo lee el barrido nocturno del PR4 para
+/// mandarle un mail contándole dónde se paga — la app no puede decírselo
+/// desde adentro del binario (misma Guideline 3.1.3(f) que documenta
+/// `registrarTopeTocado`).
+///
+/// La llaman los DOS caminos que muestran el aviso: el embudo y el rebote del
+/// servidor. Si el rebote no anotara, el PF que choca el tope con la cuota
+/// local atrasada (otro dispositivo, caché fría) vería el aviso y nunca
+/// recibiría el mail — y en el móvil el mail es su única salida.
+///
+/// Sin `await` a propósito, mismo motivo que `showFreePlanLimitSheet`: el
+/// aviso se muestra ya, no espera a una anotación.
+void _anotarTopeDelPlan(WidgetRef ref) {
   // ⚠️ El `try` de acá NO es redundante con el que ya tiene
   // `registrarTopeDelPlanPf` adentro — mismo motivo que documenta
   // `showFreePlanLimitSheet`: aquél cubre el fallo ASÍNCRONO de Firestore,
@@ -94,20 +116,6 @@ Future<bool> intentarCrearEjercicioPropio(
   } catch (_) {
     // Ver arriba: el aviso se muestra igual.
   }
-
-  if (context.mounted) {
-    // `quota.limit` no puede ser `null` acá: `isAtOrOverLimit` ya lo exige
-    // (ver su dartdoc en custom_exercise_quota_provider.dart).
-    unawaited(
-      showCustomExerciseLimitNotice(
-        context,
-        limit: quota.limit!,
-        count: quota.count,
-      ),
-    );
-  }
-
-  return false;
 }
 
 /// El rebote del servidor (docs/limite-ejercicios-pf.md PR3, "El rebote del
@@ -125,6 +133,13 @@ Future<bool> mostrarAvisoTopeEjerciciosPorRebote(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  // El servidor ya dijo que no: se anota aunque la cuota local todavía no
+  // tenga un número. El barrido del mail vuelve a mirar `planLimits` y
+  // `customExerciseUsage` antes de mandar nada, así que una anotación de más
+  // no llega a ningún buzón.
+  final role = ref.read(userProfileProvider).valueOrNull?.role;
+  if (role == UserRole.trainer) _anotarTopeDelPlan(ref);
+
   final quota = ref.read(customExerciseQuotaProvider).valueOrNull;
   final limit = quota?.limit;
   if (limit == null || !context.mounted) return false;

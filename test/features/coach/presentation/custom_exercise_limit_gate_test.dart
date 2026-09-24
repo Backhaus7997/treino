@@ -40,14 +40,18 @@ UserProfile _profile(UserRole role) {
   );
 }
 
-/// Monta un botón que corre [intentarCrearEjercicioPropio] y devuelve lo que
-/// resolvió.
-Future<bool> _correr(
+/// Monta un botón que corre [intentarCrearEjercicioPropio] (o, con [rebote],
+/// [mostrarAvisoTopeEjerciciosPorRebote]) y devuelve lo que resolvió.
+///
+/// `null` = todavía no resolvió: el rebote espera a que se cierre el aviso,
+/// así que con el aviso abierto no hay resultado.
+Future<bool?> _correr(
   WidgetTester tester, {
   required UserRole role,
   required AsyncValue<CustomExerciseQuota> quota,
   required UserRepository repo,
   String? uid = _uid,
+  bool rebote = false,
 }) async {
   bool? resultado;
 
@@ -78,10 +82,9 @@ Future<bool> _correr(
               ref.watch(userProfileProvider);
               return ElevatedButton(
                 onPressed: () async {
-                  resultado = await intentarCrearEjercicioPropio(
-                    context,
-                    ref,
-                  );
+                  resultado = rebote
+                      ? await mostrarAvisoTopeEjerciciosPorRebote(context, ref)
+                      : await intentarCrearEjercicioPropio(context, ref);
                 },
                 child: const Text('crear'),
               );
@@ -97,7 +100,7 @@ Future<bool> _correr(
   await tester.tap(find.text('crear'));
   await tester.pumpAndSettle();
 
-  return resultado!;
+  return resultado;
 }
 
 void main() {
@@ -215,6 +218,70 @@ void main() {
       );
 
       expect(ok, isFalse);
+    });
+  });
+
+  group('mostrarAvisoTopeEjerciciosPorRebote — el servidor rechazó el create',
+      () {
+    testWidgets(
+        '⚠️ el PF rebotado queda anotado para el mail, como en el embudo',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final mostro = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+        rebote: true,
+      );
+
+      // El aviso quedó abierto: el rebote todavía lo está esperando.
+      expect(mostro, isNull);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets(
+        '⚠️ con la cuota local cargando, anota igual (el servidor ya decidió) '
+        'y cae al error genérico', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final mostro = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.loading(),
+        repo: repo,
+        rebote: true,
+      );
+
+      expect(mostro, isFalse);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets('un alumno rebotado no se anota', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      await _correr(
+        tester,
+        role: UserRole.athlete,
+        quota: const AsyncValue.data((limit: null, count: 3)),
+        repo: repo,
+        rebote: true,
+      );
+
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
     });
   });
 
