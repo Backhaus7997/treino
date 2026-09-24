@@ -272,10 +272,19 @@ export const syncAthletePaywallOnUser = onDocumentWritten(
           enforced: r.value,
         });
       }
-      // `"evento"`: esto le paso AL USUARIO —su suscripcion vencio— y no al
-      // sistema. Ver `athlete-prospect-mail.ts` para por que esa distincion
-      // decide si el mail sale o no.
-      await avisarAlAlumnoSinCobertura(app, r, "evento", Date.now(), logger);
+      // ESTE es el unico trigger que puede ver un ALTA, y por eso es el unico
+      // que distingue. `before === undefined` es el create, la misma condicion
+      // que `athletePaywallInputChanged` trata como cambio unas lineas arriba.
+      //
+      // Un alumno que se registra sin entrenador resuelve a `enforced: true` en
+      // su primer milisegundo, con un `changed: true` impecable — y sin esta
+      // distincion recibiria «tu lugar ya no esta cubierto» junto con el mail
+      // de bienvenida. Nacer sin algo no es perderlo.
+      //
+      // Todo lo demas es `"evento"`: le paso a esta persona —su suscripcion
+      // vencio— y no al sistema.
+      const origen = before === undefined ? "alta" : "evento";
+      await avisarAlAlumnoSinCobertura(app, r, origen, Date.now(), logger);
     } catch (err) {
       // Catch-and-log sin relanzar, igual que el resto de los triggers de
       // subscriptions: un doc malformado no debe provocar una tormenta de
