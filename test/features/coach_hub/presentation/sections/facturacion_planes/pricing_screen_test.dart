@@ -117,6 +117,20 @@ void main() {
     expect(find.text('8-15'), findsOneWidget);
   });
 
+  // docs/limite-ejercicios-pf.md §PR5: sumar `_tierExercises` junto a
+  // `_tierStudents`. A diferencia de alumnos, acá el número es el tope EXACTO
+  // del tier (20/60/120), no un rango.
+  testWidgets('cada tarjeta muestra el tope de ejercicios propios de su plan',
+      (tester) async {
+    await pumpDesktop(tester);
+
+    expect(find.text('20'), findsOneWidget); // Free
+    expect(find.text('60'), findsOneWidget); // Plan 1
+    expect(find.text('120'), findsOneWidget); // Plan 2
+    expect(find.text('Sin límite'), findsOneWidget); // Plan 3
+    expect(find.text('ejercicios propios'), findsNWidgets(4));
+  });
+
   testWidgets('precios mensuales por default (número sin \$ inline)',
       (tester) async {
     await pumpDesktop(tester);
@@ -343,6 +357,21 @@ void main() {
           reason: 'falta la tarjeta de $tier en el layout móvil',
         );
       }
+    });
+
+    // Layout angosto: el renglón es UNA sola oración de `ejerciciosTexto`
+    // (plan_copy.dart), no el par número/label de la tarjeta ancha.
+    testWidgets('cada tarjeta angosta muestra el tope de ejercicios propios',
+        (tester) async {
+      await pumpMobile(tester);
+
+      expect(find.text('20 ejercicios propios'), findsOneWidget); // Free
+      expect(find.text('60 ejercicios propios'), findsOneWidget); // Plan 1
+      expect(find.text('120 ejercicios propios'), findsOneWidget); // Plan 2
+      expect(
+        find.text('ejercicios propios sin límite'),
+        findsOneWidget,
+      ); // Plan 3
     });
 
     testWidgets('Plan 3 muestra su rango y en ningún lado dice "null"',

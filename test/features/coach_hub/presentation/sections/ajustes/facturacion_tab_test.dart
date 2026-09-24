@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -24,6 +25,7 @@ UserProfile _trainer({TrainerSubscription? subscription}) => UserProfile(
 Widget _harness({
   required List<TrainerLink> links,
   UserProfile? profile,
+  AsyncValue<CustomExerciseQuota>? quota,
 }) =>
     ProviderScope(
       overrides: [
@@ -32,6 +34,7 @@ Widget _harness({
         ),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream<List<TrainerLink>>.value(links)),
+        if (quota != null) customExerciseQuotaProvider.overrideWithValue(quota),
       ],
       child: const MaterialApp(home: Scaffold(body: FacturacionTab())),
     );
@@ -113,5 +116,59 @@ void main() {
 
     // Free límite 2, un solo athlete distinto → 1 / 2.
     expect(find.text('1 / 2'), findsOneWidget);
+  });
+
+  // ── Línea de uso de ejercicios propios (docs/limite-ejercicios-pf.md §PR5) ──
+  group('línea de uso de ejercicios propios', () {
+    testWidgets('con tope: "Ejercicios propios: 12 de 60"', (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        quota: const AsyncValue.data((limit: 60, count: 12)),
+      ));
+      await tester.pump();
+
+      expect(find.text('Ejercicios propios: 12 de 60'), findsOneWidget);
+    });
+
+    // El interruptor del servidor está apagado hoy para TODOS los planes
+    // (no sólo Plan 3): `limit == null` no puede leerse acá como "Plan 3",
+    // así que la línea dice la verdad que el servidor sabe — sin tope — en
+    // vez de inventar el tope estático de la tabla de precios.
+    testWidgets('sin tope (null): "Ejercicios propios: 12 (sin límite)"',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        quota: const AsyncValue.data((limit: null, count: 12)),
+      ));
+      await tester.pump();
+
+      expect(
+        find.text('Ejercicios propios: 12 (sin límite)'),
+        findsOneWidget,
+      );
+    });
+
+    // Mientras carga no se inventa un número — la línea entera se oculta.
+    testWidgets('cargando: no muestra la línea (ningún número inventado)',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        quota: const AsyncValue.loading(),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Ejercicios propios'), findsNothing);
+    });
+
+    // Mismo criterio que "cargando": un error tampoco es un dato confirmado.
+    testWidgets('error del provider: no muestra la línea', (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        quota: AsyncValue.error(Exception('boom'), StackTrace.empty),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Ejercicios propios'), findsNothing);
+    });
   });
 }
