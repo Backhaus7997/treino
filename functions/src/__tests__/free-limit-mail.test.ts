@@ -146,14 +146,15 @@ describe("el texto", () => {
       ctaUrl: `${LANDING_URL}/es/suscripcion/checkout`,
     });
 
-  it("⚠️ empieza reconociendo el intento, no ofreciendo", () => {
-    // Quien recibe esto quiso hacer algo y no pudo. Arrancar con la oferta es
-    // pasarle por encima al motivo por el que está leyendo.
-    const { html } = render();
-    const reconoce = html.indexOf("Te topaste");
-    const ofrece = html.indexOf("suscribirte");
-    expect(reconoce).toBeGreaterThan(-1);
-    expect(ofrece).toBeGreaterThan(reconoce);
+  it("⚠️ el asunto reconoce el intento", () => {
+    // Quien recibe esto quiso hacer algo y no pudo. El asunto es lo primero que
+    // lee, en la bandeja: tiene que nombrar eso antes de ofrecer.
+    expect(render().subject).toMatch(/^Lo que querías hacer/);
+  });
+
+  it("⚠️ no promete «sin límites»: Pro también tiene techo", () => {
+    const { subject, text } = render();
+    expect(`${subject}\n${text}`.toLowerCase()).not.toMatch(/sin (l[ií]mites|topes)/);
   });
 
   it("⚠️ no nombra el tope concreto ni sus números", () => {
@@ -164,7 +165,29 @@ describe("el texto", () => {
     expect(cuerpo).not.toMatch(/\b\d+\s*(rutinas|días|dias|semanas)\b/i);
   });
 
-  it("dice que no se pierde nada de lo ya hecho", () => {
-    expect(render().html).toContain("siguen donde estaban");
+  it("⚠️ no tiene cuerpo: título y el botón grande", () => {
+    // El mail tiene un solo trabajo: que toque el botón. Si alguien vuelve a
+    // sumarle párrafos, este test le recuerda por qué se sacaron.
+    const { html } = render();
+    expect(html).not.toMatch(/<p /);
+    expect(html).toContain("CONTINUAR AL PAGO");
+    expect(html).toMatch(/display:inline-block;[^"]*font-size:22px[^"]*width:100%/);
+  });
+
+  it("⚠️ el borde está inline, no sólo en la animación", () => {
+    // Gmail y Outlook descartan `@keyframes`. Si el color viviera sólo en el
+    // keyframe, ahí el botón quedaría sin borde.
+    const { html } = render();
+    expect(html).toMatch(/<a href="[^"]+" style="[^"]*border:4px solid #FFFFFF/);
+    expect(html).toContain("@keyframes treino-cta-borde");
+    expect(html).toContain("prefers-reduced-motion: no-preference");
+  });
+
+  it("los demás mails no cargan la animación", () => {
+    const { html } = renderMail("athlete-coverage-lost", {
+      ctaUrl: `${LANDING_URL}/es/suscripcion/checkout`,
+    });
+    expect(html).not.toContain("<style>");
+    expect(html).not.toContain("treino-cta-borde");
   });
 });
