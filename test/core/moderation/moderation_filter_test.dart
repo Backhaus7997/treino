@@ -42,6 +42,11 @@ void main() {
           reason: 'la normalizacion de Dart se separo de la referencia',
         );
         expect(
+          ModerationFilter.normalizeLoose(caso.texto),
+          caso.normalizadoAmplio,
+          reason: 'la lectura amplia de Dart se separo de la referencia',
+        );
+        expect(
           ModerationFilter.check(caso.texto),
           esperado,
           reason: caso.por.isEmpty
@@ -78,6 +83,16 @@ void main() {
     test('los digitos se traducen siempre', () {
       expect(ModerationFilter.normalize('p0to'), 'poto');
       expect(ModerationFilter.normalize('and4te'), 'andate');
+    });
+
+    test('la lectura amplia traduce @ y \$ en los bordes, y ! no', () {
+      // `check` evalua las dos lecturas y gana la peor: la estricta caza
+      // `pija@` (la `@` queda como separador) y la amplia caza `put@`.
+      expect(ModerationFilter.normalize('put@'), 'put@');
+      expect(ModerationFilter.normalizeLoose('put@'), 'puta');
+      expect(ModerationFilter.normalizeLoose('@ndate'), 'andate');
+      expect(ModerationFilter.normalizeLoose('puta\$'), 'putas');
+      expect(ModerationFilter.normalizeLoose('puta!'), 'puta!');
     });
   });
 

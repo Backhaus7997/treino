@@ -518,12 +518,12 @@
     {
       "texto": "put@",
       "espera": "block",
-      "por": "`@` al final de palabra. Con la regla vieja —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera"
+      "por": "`@` al final de palabra. Con solo la forma estricta —`@` solo entre letras— la forma mas natural del leet femenino pasaba entera. La caza la forma amplia"
     },
     {
-      "texto": "@nd@te a la concha",
+      "texto": "@ndate a morir",
       "espera": "block",
-      "por": "`@` al principio de palabra"
+      "por": "`@` al principio de palabra, sin ningun otro termino en la frase que la delate"
     },
     {
       "texto": "te voy @ matar",
@@ -534,6 +534,31 @@
       "texto": "p1j@",
       "espera": "block",
       "por": "digito y `@` final en el mismo termino"
+    },
+    {
+      "texto": "pija@",
+      "espera": "block",
+      "por": "`@` DECORATIVA pegada a un termino completo. Traducida queda `pijaa`: por eso la forma estricta se evalua igual, y gana el peor veredicto"
+    },
+    {
+      "texto": "@pija",
+      "espera": "block",
+      "por": "`@` decorativa adelante: traducida queda `apija`"
+    },
+    {
+      "texto": "puta@",
+      "espera": "block",
+      "por": "mismo caso con otro termino"
+    },
+    {
+      "texto": "culo@",
+      "espera": "review",
+      "por": "la `@` decorativa tampoco puede bajarle la severidad a un `review`"
+    },
+    {
+      "texto": "@lucas nos vemos el lunes",
+      "espera": "ok",
+      "por": "una mencion: la forma amplia lee `alucas`, que no es nada"
     },
     {
       "texto": "mandame el plan a juan@gmail.com",

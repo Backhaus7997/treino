@@ -74,6 +74,10 @@ function variantes(termino: string): Record<string, string> {
       .replace(/i/g, "1")
       .replace(/a/g, "@")
       .replace(/e/g, "3"),
+    // Adornos pegados al termino completo: ver el comentario gemelo en Dart.
+    "arroba adelante": `@${termino}`,
+    "arroba atras": `${termino}@`,
+    "exclamacion atras": `${termino}!`,
     "dentro de una oracion": `mirá vos, ${termino}, te lo digo en serio`,
   };
 }

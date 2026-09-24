@@ -8,6 +8,7 @@ import {
   VETTED_FOLD,
   VETTED_JOIN_MAX_FRAGMENT,
   VETTED_LEET,
+  VETTED_LEET_ALSO_AT_EDGES,
   VETTED_LEET_ONLY_BETWEEN_LETTERS,
   VETTED_REVIEW_PHRASES,
   VETTED_REVIEW_WORDS,
@@ -52,7 +53,29 @@ export type ModerationVerdict = "ok" | "review" | "block";
  * en un oraculo para encontrarle el borde.
  */
 export function checkText(text: string): ModerationVerdict {
-  const tokens = toTokens(normalize(text));
+  const estricta = normalize(text);
+  const veredicto = verdictOf(toTokens(estricta));
+  if (veredicto === "block") return veredicto;
+
+  // La segunda lectura: `@` y `$` traducidos en cualquier posicion. `put@` solo
+  // se caza asi, y `pija@` solo con la estricta de arriba —la amplia la lee
+  // `pijaa`—. Se evaluan las dos y gana la peor. Ver
+  // `VETTED_LEET_ALSO_AT_EDGES`.
+  const amplia = normalizeLoose(text);
+  if (amplia === estricta) return veredicto;
+  const otro = verdictOf(toTokens(amplia));
+  return SEVERIDAD[otro] > SEVERIDAD[veredicto] ? otro : veredicto;
+}
+
+/** Orden de severidad, para quedarse con el peor de dos veredictos. */
+const SEVERIDAD: Readonly<Record<ModerationVerdict, number>> = {
+  ok: 0,
+  review: 1,
+  block: 2,
+};
+
+/** El veredicto para un texto ya normalizado y partido en tokens. */
+function verdictOf(tokens: readonly string[]): ModerationVerdict {
   if (tokens.length === 0) return "ok";
 
   // --- Pasada A: palabra completa ----------------------------------------
@@ -89,7 +112,16 @@ export function checkText(text: string): ModerationVerdict {
  * y adivinar.
  */
 export function normalize(text: string): string {
-  return collapse(leet(fold(text.toLowerCase())));
+  return collapse(leet(fold(text.toLowerCase()), false));
+}
+
+/**
+ * Como `normalize`, pero con los simbolos de `VETTED_LEET_ALSO_AT_EDGES`
+ * traducidos en cualquier posicion. Es la segunda lectura que hace
+ * `checkText`; exportada por el mismo motivo que `normalize`.
+ */
+export function normalizeLoose(text: string): string {
+  return collapse(leet(fold(text.toLowerCase()), true));
 }
 
 // -- pasos de la normalizacion --------------------------------------------
@@ -114,7 +146,7 @@ function isCombining(cp: number): boolean {
   return false;
 }
 
-function leet(s: string): string {
+function leet(s: string, amplia: boolean): string {
   const chars = [...s];
   let out = "";
   for (let i = 0; i < chars.length; i++) {
@@ -124,12 +156,14 @@ function leet(s: string): string {
       out += ch;
       continue;
     }
-    // `!` solo se traduce con letra a los DOS lados. Sin esa regla `puta!`
-    // normaliza a `putai`, que no matchea `puta` por palabra completa: el leet
-    // a lo bruto produce falsos NEGATIVOS sobre el texto mas comun que existe,
-    // un insulto con signo de exclamacion. `@` y `$` se traducen siempre — ver
-    // `LEET_SOLO_ENTRE_LETRAS` en el generador.
-    if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
+    // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS lados.
+    // Sin esa regla `puta!` normaliza a `putai`, que no matchea `puta` por
+    // palabra completa: el leet a lo bruto produce falsos NEGATIVOS sobre el
+    // texto mas comun que existe, un insulto con signo de exclamacion. La
+    // lectura amplia traduce `@` y `$` siempre; ver `checkText`.
+    if (amplia && VETTED_LEET_ALSO_AT_EDGES.has(ch)) {
+      out += rep;
+    } else if (VETTED_LEET_ONLY_BETWEEN_LETTERS.has(ch)) {
       const antes = i > 0 && isAlnum(chars[i - 1]);
       const despues = i + 1 < chars.length && isAlnum(chars[i + 1]);
       out += antes && despues ? rep : ch;

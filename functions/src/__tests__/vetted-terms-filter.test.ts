@@ -2,6 +2,7 @@ import { VETTED_CASES } from "../moderation/vetted_terms.g";
 import {
   checkText,
   normalize,
+  normalizeLoose,
   type ModerationVerdict,
 } from "../moderation/vetted_terms_filter";
 
@@ -34,6 +35,7 @@ describe("corpus de conformidad (generado, compartido con Dart)", () => {
       // `ok` en `block`: dos normalizaciones distintas que no cruzan ese
       // umbral quedan vivas, con las dos suites en verde.
       expect(normalize(caso.texto)).toBe(caso.normalizado);
+      expect(normalizeLoose(caso.texto)).toBe(caso.normalizadoAmplio);
 
       const obtenido = checkText(caso.texto);
       if (obtenido !== caso.espera) {
@@ -72,6 +74,16 @@ describe("normalizacion", () => {
   it("los digitos se traducen siempre", () => {
     expect(normalize("p0to")).toBe("poto");
     expect(normalize("and4te")).toBe("andate");
+  });
+
+  it("la lectura amplia traduce @ y $ en los bordes, y ! no", () => {
+    // `checkText` evalua las dos lecturas y gana la peor: la estricta caza
+    // `pija@` (la `@` queda como separador) y la amplia caza `put@`.
+    expect(normalize("put@")).toBe("put@");
+    expect(normalizeLoose("put@")).toBe("puta");
+    expect(normalizeLoose("@ndate")).toBe("andate");
+    expect(normalizeLoose("puta$")).toBe("putas");
+    expect(normalizeLoose("puta!")).toBe("puta!");
   });
 });
 

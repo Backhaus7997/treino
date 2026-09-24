@@ -128,6 +128,13 @@ Map<String, String> variantes(String termino) {
         .replaceAll('i', '1')
         .replaceAll('a', '@')
         .replaceAll('e', '3'),
+    // Adornos pegados al termino completo. Una `@` en el borde a veces es una
+    // `a` —`put@`— y a veces un adorno —`pija@`—: sin estas dos variantes, un
+    // arreglo que cubre la primera lectura y rompe la segunda pasa verde. Ya
+    // paso una vez, en la primera version de este PR.
+    'arroba adelante': '@$termino',
+    'arroba atras': '$termino@',
+    'exclamacion atras': '$termino!',
     'dentro de una oracion': 'mirá vos, $termino, te lo digo en serio',
   };
 }

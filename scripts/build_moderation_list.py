@@ -63,19 +63,29 @@ LEET = {
     "@": "a", "$": "s", "!": "i",
 }
 
-# `!` solo se traduce cuando tiene letra a los DOS lados. Sin esa regla `puta!`
-# normaliza a `putai`, que no matchea `puta` por palabra completa: el leet,
-# puesto a lo bruto, produce falsos NEGATIVOS justo sobre el texto mas comun
-# (un insulto con signo de exclamacion al final).
+# Los simbolos solo se traducen cuando tienen letra a los DOS lados. Sin esa
+# regla `puta!` normaliza a `putai`, que no matchea `puta` por palabra
+# completa: el leet, puesto a lo bruto, produce falsos NEGATIVOS justo sobre
+# el texto mas comun (un insulto con signo de exclamacion al final).
+LEET_SOLO_ENTRE_LETRAS = {"@", "$", "!"}
+
+# Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion,
+# en una segunda normalizacion (la "amplia"), quedandose con el peor veredicto
+# de las dos.
 #
-# `@` y `$` NO estan aca, y antes si estaban. Con la misma regla que `!`, la
-# forma mas natural de escribir en leet un termino femenino —`put@`, `p1j@`,
-# `c0nch@`— pasaba entera: la `@` del final no tiene letra a la derecha, no se
-# traducia, y quedaba `put`. Lo mismo `@ndate` al principio, y la `@` suelta de
-# `te voy @ matar`, que es la preposicion. El motivo de la regla es propio de
-# `!` —es puntuacion, y cierra frases—; `@` y `$` no cierran nada en
-# castellano. Se traducen siempre, igual que los digitos.
-LEET_SOLO_ENTRE_LETRAS = {"!"}
+# Hace falta porque ninguna normalizacion sola sirve. Con la regla de arriba,
+# la forma mas natural de escribir en leet un termino femenino —`put@`,
+# `p1j@`, `c0nch@`— pasa entera: la `@` del final no tiene letra a la derecha,
+# no se traduce, y queda `put`. Lo mismo `@ndate` al principio, y la `@` suelta
+# de `te voy @ matar`, que es la preposicion. Pero traducirla SIEMPRE rompe el
+# caso opuesto: `pija@` queda `pijaa` y `@pija` queda `apija`, y un termino
+# completo con una `@` decorativa pegada pasa (lo cazo la revision del PR:
+# esa fue la primera version de este arreglo). Una `@` en el borde a veces es
+# una `a` y a veces es un adorno, y solo mirando las dos lecturas se cubren
+# las dos.
+#
+# `!` no esta: al final de una palabra es puntuacion, no una `i`.
+LEET_TAMBIEN_EN_BORDES = {"@", "$"}
 
 # Runs de 3 o mas caracteres iguales colapsan a uno: `putooooo` -> `puto`.
 #
@@ -214,8 +224,12 @@ def solo_letras(s: str) -> str:
     return re.sub(r"[^0-9a-z]", "", sin_diacriticos(s.lower()))
 
 
-def normalizar(texto: str) -> str:
+def normalizar(texto: str, amplia: bool = False) -> str:
     """La normalizacion DE REFERENCIA. Dart y TypeScript son puertos de esto.
+
+    Con `amplia=True` los simbolos de `LEET_TAMBIEN_EN_BORDES` se traducen en
+    cualquier posicion. El filtro evalua las dos formas y se queda con el peor
+    veredicto; ver el porque en `LEET_TAMBIEN_EN_BORDES`.
 
     El corpus guarda la salida de esta funcion para cada caso, y las dos suites
     la comparan ademas del veredicto. Sin eso el corpus solo caza una
@@ -231,7 +245,9 @@ def normalizar(texto: str) -> str:
     """
     s = sin_diacriticos(texto.lower())
 
-    # Leet. `!` solo con letra a los DOS lados: ver LEET_SOLO_ENTRE_LETRAS.
+    # Leet. Los simbolos solo con letra a los DOS lados: ver
+    # LEET_SOLO_ENTRE_LETRAS. En la forma amplia, los de
+    # LEET_TAMBIEN_EN_BORDES se traducen siempre.
     chars = list(s)
     fuera = []
     for i, ch in enumerate(chars):
@@ -239,7 +255,9 @@ def normalizar(texto: str) -> str:
         if rep is None:
             fuera.append(ch)
             continue
-        if ch in LEET_SOLO_ENTRE_LETRAS:
+        if amplia and ch in LEET_TAMBIEN_EN_BORDES:
+            fuera.append(rep)
+        elif ch in LEET_SOLO_ENTRE_LETRAS:
             antes = i > 0 and _es_alnum(chars[i - 1])
             despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
             fuera.append(rep if antes and despues else ch)
@@ -369,12 +387,22 @@ def cargar() -> dict:
             sys.exit(f"[!] {SRC.name}: el caso #{i} espera {c['espera']!r}, "
                      f"que no es uno de {sorted(ESPERAS)}")
         casos.append((c["texto"], c["espera"], c.get("por", ""),
-                      normalizar(c["texto"])))
+                      normalizar(c["texto"]),
+                      normalizar(c["texto"], amplia=True)))
 
     if not casos:
         sys.exit(f"[!] {SRC.name}: 'cases' esta vacio. El corpus es lo unico "
                  "que compara Dart contra TypeScript; sin el, las dos "
                  "implementaciones pueden divergir en silencio.")
+
+    # Un simbolo de LEET_TAMBIEN_EN_BORDES que la forma estricta ya traduce
+    # siempre da dos normalizaciones identicas: la segunda pasada del filtro
+    # no evaluaria nada nuevo, y la constante aparentaria cubrir algo.
+    sin_efecto = sorted(LEET_TAMBIEN_EN_BORDES - LEET_SOLO_ENTRE_LETRAS)
+    if sin_efecto:
+        sys.exit(f"[!] LEET_TAMBIEN_EN_BORDES tiene simbolos que no estan en "
+                 f"LEET_SOLO_ENTRE_LETRAS, asi que la forma amplia no cambia "
+                 f"nada para ellos: {sin_efecto}")
 
     return {
         "version": data["version"],
@@ -388,6 +416,7 @@ def cargar() -> dict:
         "plegado": _mapa_de_plegado(),
         "leet": LEET,
         "leet_entre_letras": sorted(LEET_SOLO_ENTRE_LETRAS),
+        "leet_bordes": sorted(LEET_TAMBIEN_EN_BORDES),
         "colapso_minimo": COLAPSO_MINIMO,
         "join_max": JOIN_MAX_FRAGMENT,
         "combinantes": _rangos_combinantes(),
@@ -411,14 +440,16 @@ def emitir_dart(d: dict) -> str:
 
     casos = ",\n".join(
         f"  (texto: {dart_str(t)}, espera: {dart_str(e)}, "
-        f"normalizado: {dart_str(n)}, por: {dart_str(p)})"
-        for t, e, p, n in d["casos"])
+        f"normalizado: {dart_str(n)}, normalizadoAmplio: {dart_str(na)}, "
+        f"por: {dart_str(p)})"
+        for t, e, p, n, na in d["casos"])
 
     fold = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["plegado"].items()))
     leet = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["leet"].items()))
     leet_entre = ", ".join(dart_str(k) for k in d["leet_entre_letras"])
+    leet_bordes = ", ".join(dart_str(k) for k in d["leet_bordes"])
     colapso = d["colapso_minimo"]
     join_max = d["join_max"]
     comb = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
@@ -444,6 +475,12 @@ const Map<String, String> kVettedLeet = {{{leet}}};
 /// Los simbolos de `kVettedLeet` que SOLO se traducen con letra a los dos
 /// lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
 const Set<String> kVettedLeetOnlyBetweenLetters = {{{leet_entre}}};
+
+/// Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion
+/// (la normalizacion "amplia"), quedandose con el peor veredicto. `put@`
+/// necesita la `@` como `a`; `pija@`, como separador. Ver
+/// `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+const Set<String> kVettedLeetAlsoAtEdges = {{{leet_bordes}}};
 
 /// Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
 /// Tres y no dos: el castellano tiene dobles (`carro`, `perro`) pero no
@@ -484,7 +521,7 @@ const Set<String> kVettedAllowlist = {{{", ".join(dart_str(x) for x in d["allowl
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<({{String texto, String espera, String normalizado, String por}})>\n    kVettedCases = [
+const List<\n    ({{\n      String texto,\n      String espera,\n      String normalizado,\n      String normalizadoAmplio,\n      String por\n    }})> kVettedCases = [
 {casos},
 ];
 '''
@@ -499,8 +536,9 @@ def emitir_ts(d: dict) -> str:
 
     casos = ",\n".join(
         f"  {{ texto: {ts_str(t)}, espera: {ts_str(e)}, "
-        f"normalizado: {ts_str(n)}, por: {ts_str(p)} }}"
-        for t, e, p, n in d["casos"])
+        f"normalizado: {ts_str(n)}, normalizadoAmplio: {ts_str(na)}, "
+        f"por: {ts_str(p)} }}"
+        for t, e, p, n, na in d["casos"])
 
     fold_ts = ", ".join(f"{ts_str(k)}: {ts_str(v)}"
                         for k, v in sorted(d["plegado"].items()))
@@ -508,6 +546,8 @@ def emitir_ts(d: dict) -> str:
                         for k, v in sorted(d["leet"].items()))
     leet_entre_ts = "[" + ", ".join(ts_str(k)
                                     for k in d["leet_entre_letras"]) + "]"
+    leet_bordes_ts = "[" + ", ".join(ts_str(k)
+                                     for k in d["leet_bordes"]) + "]"
     colapso_ts = d["colapso_minimo"]
     join_max_ts = d["join_max"]
     comb_ts = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
@@ -536,6 +576,14 @@ export const VETTED_LEET: Readonly<Record<string, string>> = {{{leet_ts}}};
  * lados. Sin esa regla `puta!` normaliza a `putai` y deja de matchear.
  */
 export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set({leet_entre_ts});
+
+/**
+ * Los simbolos que el filtro evalua ADEMAS traducidos en cualquier posicion
+ * (la normalizacion "amplia"), quedandose con el peor veredicto. `put@`
+ * necesita la `@` como `a`; `pija@`, como separador. Ver
+ * `LEET_TAMBIEN_EN_BORDES` en scripts/build_moderation_list.py.
+ */
+export const VETTED_LEET_ALSO_AT_EDGES: ReadonlySet<string> = new Set({leet_bordes_ts});
 
 /**
  * Runs de este largo o mas colapsan a un caracter: `putooooo` -> `puto`.
@@ -587,7 +635,7 @@ export const VETTED_ALLOWLIST: ReadonlySet<string> = new Set({lista(d["allowlist
  * casos: si los dos veredictos no coinciden, una de las dos se pone roja.
  * Ninguna de las dos escribe sus expectativas a mano.
  */
-export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  por: string;\n}}[] = [
+export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  normalizadoAmplio: string;\n  por: string;\n}}[] = [
 {casos},
 ];
 '''

@@ -46,7 +46,22 @@ abstract final class ModerationFilter {
   /// filtro en un oraculo: quien quiera evadirlo prueba variantes hasta que
   /// deja de saltar, y el mensaje le dice exactamente cuando lo logro.
   static ModerationVerdict check(String text) {
-    final tokens = _tokens(normalize(text));
+    final estricta = normalize(text);
+    final veredicto = _verdict(_tokens(estricta));
+    if (veredicto == ModerationVerdict.block) return veredicto;
+
+    // La segunda lectura: `@` y `$` traducidos en cualquier posicion. `put@`
+    // solo se caza asi, y `pija@` solo se caza con la estricta de arriba —la
+    // amplia la lee `pijaa`—. Se evaluan las dos y gana la peor. Ver
+    // `kVettedLeetAlsoAtEdges`.
+    final amplia = normalizeLoose(text);
+    if (amplia == estricta) return veredicto;
+    final otro = _verdict(_tokens(amplia));
+    return otro.index > veredicto.index ? otro : veredicto;
+  }
+
+  /// El veredicto para un texto ya normalizado y partido en tokens.
+  static ModerationVerdict _verdict(List<String> tokens) {
     if (tokens.isEmpty) return ModerationVerdict.ok;
 
     // --- Pasada A: palabra completa -------------------------------------
@@ -83,7 +98,13 @@ abstract final class ModerationFilter {
   /// del corpus falla, saber en que quedo el texto es la diferencia entre
   /// arreglarlo y adivinar.
   static String normalize(String text) =>
-      _collapse(_leet(_fold(text.toLowerCase())));
+      _collapse(_leet(_fold(text.toLowerCase()), amplia: false));
+
+  /// Como [normalize], pero con los simbolos de `kVettedLeetAlsoAtEdges`
+  /// traducidos en cualquier posicion. Es la segunda lectura que hace
+  /// [check]; publica por el mismo motivo que [normalize].
+  static String normalizeLoose(String text) =>
+      _collapse(_leet(_fold(text.toLowerCase()), amplia: true));
 
   // -- pasos de la normalizacion ------------------------------------------
 
@@ -111,7 +132,7 @@ abstract final class ModerationFilter {
     return false;
   }
 
-  static String _leet(String s) {
+  static String _leet(String s, {required bool amplia}) {
     final chars = [for (final r in s.runes) String.fromCharCode(r)];
     final out = StringBuffer();
     for (var i = 0; i < chars.length; i++) {
@@ -121,12 +142,15 @@ abstract final class ModerationFilter {
         out.write(ch);
         continue;
       }
-      // `!` solo se traduce con letra a los DOS lados. Sin esa regla `puta!`
-      // normaliza a `putai`, que no matchea `puta` por palabra completa: el
-      // leet a lo bruto produce falsos NEGATIVOS sobre el texto mas comun que
-      // existe, un insulto con signo de exclamacion. `@` y `$` se traducen
-      // siempre — ver `LEET_SOLO_ENTRE_LETRAS` en el generador.
-      if (kVettedLeetOnlyBetweenLetters.contains(ch)) {
+      // Los simbolos (`@`, `$`, `!`) solo se traducen con letra a los DOS
+      // lados. Sin esa regla `puta!` normaliza a `putai`, que no matchea
+      // `puta` por palabra completa: el leet a lo bruto produce falsos
+      // NEGATIVOS sobre el texto mas comun que existe, un insulto con signo
+      // de exclamacion. La lectura amplia traduce `@` y `$` siempre; ver
+      // [check].
+      if (amplia && kVettedLeetAlsoAtEdges.contains(ch)) {
+        out.write(rep);
+      } else if (kVettedLeetOnlyBetweenLetters.contains(ch)) {
         final antes = i > 0 && _isAlnum(chars[i - 1]);
         final despues = i + 1 < chars.length && _isAlnum(chars[i + 1]);
         out.write(antes && despues ? rep : ch);
