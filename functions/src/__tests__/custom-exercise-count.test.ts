@@ -57,6 +57,8 @@ const db = (): Firestore => getFirestore(testApp);
 const user = (uid: string): DocumentReference => db().collection("users").doc(uid);
 const customExercises = (uid: string) => user(uid).collection("customExercises");
 
+const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function seedTrainer(uid: string, extra: Record<string, unknown> = {}) {
   await user(uid).set({ role: "trainer", ...extra });
 }
@@ -153,6 +155,45 @@ describe("recountCustomExercises — contra el emulador real", () => {
     const snap = await user(UID).get();
     expect(snap.exists).toBe(false);
   });
+
+  it("dos recuentos concurrentes terminan en el valor real (R1)", async () => {
+    // La carrera, escenificada: el contador esta en 1 y hay 2 ejercicios. El
+    // recuento A cuenta 2 y, antes de escribir, se crea el tercero y OTRA
+    // invocacion (B) la cuenta. Sin transaccion B escribe 3 y despues A pisa
+    // con 2: quedan 3 ejercicios con el contador en 2, y la regla dejaria
+    // crear uno de mas. En transaccion, el que escribe ultimo conto despues
+    // del otro.
+    //
+    // B arranca SIN await adentro del hook: A tiene tomado el doc del usuario
+    // (y, segun como bloquee el emulador, la subcoleccion), y esperar a B
+    // desde adentro de A seria esperar a alguien que espera a A. La pausa le
+    // da a B tiempo de terminar si nada lo frena, que es exactamente lo que
+    // pasa sin transaccion.
+    await seedTrainer(UID, { customExerciseUsage: { count: 1 } });
+    await customExercises(UID).doc("e1").set({ name: "Sentadilla" });
+    await customExercises(UID).doc("e2").set({ name: "Press banca" });
+
+    let yaIntercalado = false;
+    let b: Promise<unknown> = Promise.resolve();
+    const a = recountCustomExercises(testApp, UID, {
+      afterCount: async () => {
+        if (yaIntercalado) return; // un reintento de A no vuelve a intercalar
+        yaIntercalado = true;
+        b = customExercises(UID)
+          .doc("e3")
+          .set({ name: "Peso muerto" })
+          .then(() => recountCustomExercises(testApp, UID));
+        await dormir(1500);
+      },
+    });
+
+    await a;
+    await b;
+
+    expect(yaIntercalado).toBe(true);
+    const snap = await user(UID).get();
+    expect(snap.get("customExerciseUsage")).toEqual({ count: 3 });
+  }, 30_000);
 });
 
 describe("handleCustomExerciseWrite — el handler del trigger, end to end contra el emulador", () => {

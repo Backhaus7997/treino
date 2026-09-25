@@ -112,6 +112,18 @@ export interface RecountResult {
   changed: boolean;
 }
 
+/** Solo para el test de la carrera. Ver [recountCustomExercises]. */
+export interface RecountCustomExercisesOptions {
+  /**
+   * Corre despues de contar y antes de escribir. En produccion no se pasa
+   * nunca; existe para que `custom-exercise-count.test.ts` pueda meter OTRA
+   * invocacion justo en la ventana donde la carrera de abajo perdia un
+   * recuento. Adentro de la transaccion puede correr mas de una vez (un
+   * reintento vuelve a ejecutar el cuerpo entero).
+   */
+  afterCount?: () => Promise<void>;
+}
+
 /**
  * Recuenta `users/{uid}/customExercises` y deja el contador al dia. Escribe
  * el valor ABSOLUTO, solo si cambio.
@@ -134,26 +146,50 @@ export interface RecountResult {
  *
  * Sin doc de perfil no hay donde escribir — no se crea uno desde aca, mismo
  * criterio que `reconcileVideoQuota`.
+ *
+ * ─── Por que en TRANSACCION ──────────────────────────────────────────────
+ *
+ * La entrega de Eventarc es at-least-once, y una redelivery ya esta cubierta
+ * arriba (el recuento es idempotente). Lo que NO cubria la version anterior
+ * —contar con `Promise.all` y despues un `update` suelto— es DOS INVOCACIONES
+ * CONCURRENTES: contador en 1; la invocacion A cuenta 2 y se demora antes de
+ * escribir; la invocacion B cuenta 3 y escribe 3; A escribe 2 encima. Quedan
+ * 3 ejercicios con el contador en 2, y la regla deja crear uno de mas hasta
+ * el barrido de las 04:00.
+ *
+ * Adentro de una transaccion, las dos lecturas y la escritura van juntas: si
+ * otro recuento escribio el doc del usuario despues de que este lo leyo, este
+ * commit no pasa y el cuerpo se reintenta, contando de nuevo. El que escribe
+ * ultimo conto despues del otro.
+ *
+ * El doc del usuario se lee PRIMERO y solo despues se cuenta, a proposito: el
+ * orden es lo que garantiza que el conteo del que gana sea posterior a la
+ * escritura del que perdio. Con un `Promise.all` de las dos lecturas, el
+ * conteo podria salir de antes del commit ajeno aunque la lectura del doc
+ * saliera de despues.
  */
 export async function recountCustomExercises(
   app: App,
   uid: string,
+  options: RecountCustomExercisesOptions = {},
 ): Promise<RecountResult> {
   const db = getFirestore(app);
   const userRef = db.collection("users").doc(uid);
+  const customExercises = db.collection(`users/${uid}/customExercises`);
 
-  const [snap, countSnap] = await Promise.all([
-    userRef.get(),
-    db.collection(`users/${uid}/customExercises`).count().get(),
-  ]);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const countSnap = await tx.get(customExercises.count());
+    const count = countSnap.data().count;
+    const prev = snap.get(USAGE_FIELD) as { count?: number } | undefined;
+    const changed = prev?.count !== count;
 
-  const count = countSnap.data().count;
-  const prev = snap.get(USAGE_FIELD) as { count?: number } | undefined;
-  const changed = prev?.count !== count;
+    await options.afterCount?.();
 
-  if (changed && snap.exists) {
-    await userRef.update({ [USAGE_FIELD]: { count } });
-  }
+    if (changed && snap.exists) {
+      tx.update(userRef, { [USAGE_FIELD]: { count } });
+    }
 
-  return { uid, count, changed };
+    return { uid, count, changed };
+  });
 }
