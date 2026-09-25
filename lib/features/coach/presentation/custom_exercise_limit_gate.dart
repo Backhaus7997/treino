@@ -9,7 +9,7 @@ import '../../profile/domain/user_role.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/custom_exercise_quota_provider.dart';
-import 'widgets/custom_exercise_limit_notice.dart';
+import 'widgets/trainer_limit_notice.dart';
 
 /// El `kind` que anota [registrarTopeDelPlanPf] cuando el PF choca el tope de
 /// ejercicios propios (docs/limite-ejercicios-pf.md §2). Constante
@@ -51,7 +51,7 @@ const String kTrainerLimitHitKindCustomExercises = 'customExercises';
 ///
 /// Sheet de sólo-estado en el móvil, diálogo con VER PLANES en la web
 /// (docs/limite-ejercicios-pf.md PR3, "Los avisos") — resuelto por
-/// [showCustomExerciseLimitNotice], que decide la superficie con `kIsWeb`
+/// [showTrainerLimitNotice], que decide la superficie con `kIsWeb`
 /// (mismo seam de test que `plan_limit_paywall.dart`). Mismo patrón que
 /// `showFreePlanLimitSheet`: anotar el tope SIN esperar, apenas se sabe que
 /// se chocó; mostrar el aviso después.
@@ -71,8 +71,9 @@ Future<bool> intentarCrearEjercicioPropio(
     // `quota.limit` no puede ser `null` acá: `isAtOrOverLimit` ya lo exige
     // (ver su dartdoc en custom_exercise_quota_provider.dart).
     unawaited(
-      showCustomExerciseLimitNotice(
+      showTrainerLimitNotice(
         context,
+        kind: TrainerLimitKind.customExercises,
         limit: quota.limit!,
         count: quota.count,
       ),
@@ -143,7 +144,11 @@ Future<bool> mostrarAvisoTopeEjerciciosPorRebote(
   final quota = ref.read(customExerciseQuotaProvider).valueOrNull;
   final limit = quota?.limit;
   if (limit == null || !context.mounted) return false;
-  await showCustomExerciseLimitNotice(context,
-      limit: limit, count: quota!.count);
+  await showTrainerLimitNotice(
+    context,
+    kind: TrainerLimitKind.customExercises,
+    limit: limit,
+    count: quota!.count,
+  );
   return true;
 }

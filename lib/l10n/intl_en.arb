@@ -2015,5 +2015,46 @@
         "format": "decimalPattern"
       }
     }
+  },
+  "templateLimitNoticeTitle": "Template limit",
+  "@templateLimitNoticeTitle": {},
+  "templateLimitReachedBody": "You reached the {limit} templates included in your plan. You can edit, assign, or archive one to make room.",
+  "@templateLimitReachedBody": {
+    "placeholders": {
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "templateLimitOverBody": "You have {count} templates and your plan includes {limit}. You keep them all; to create a new one, {toArchive, plural, =1{archive 1} other{archive {toArchive}}}.",
+  "@templateLimitOverBody": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "toArchive": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "templateCounter": "{count} of {limit} templates",
+  "@templateCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
   }
 }

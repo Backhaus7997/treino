@@ -4778,6 +4778,51 @@ class AppL10nEs extends AppL10n {
 
     return '$countString de $limitString ejercicios propios';
   }
+
+  @override
+  String get templateLimitNoticeTitle => 'Tope de plantillas';
+
+  @override
+  String templateLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
+  }
+
+  @override
+  String templateLimitOverBody(int count, int limit, int toArchive) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toArchiveNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toArchive,
+      locale: localeName,
+      other: 'archivá $toArchiveString',
+      one: 'archivá 1',
+    );
+    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
+  }
+
+  @override
+  String templateCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString de $limitString plantillas';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -9550,5 +9595,50 @@ class AppL10nEsAr extends AppL10nEs {
     final String limitString = limitNumberFormat.format(limit);
 
     return '$countString de $limitString ejercicios propios';
+  }
+
+  @override
+  String get templateLimitNoticeTitle => 'Tope de plantillas';
+
+  @override
+  String templateLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
+  }
+
+  @override
+  String templateLimitOverBody(int count, int limit, int toArchive) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toArchiveNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toArchive,
+      locale: localeName,
+      other: 'archivá $toArchiveString',
+      one: 'archivá 1',
+    );
+    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
+  }
+
+  @override
+  String templateCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString de $limitString plantillas';
   }
 }

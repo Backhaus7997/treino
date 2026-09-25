@@ -14,10 +14,12 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/moderation/moderation_guard.dart';
+import '../../../core/utils/firestore_error.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../coach/presentation/template_limit_gate.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
 import '../../onboarding/domain/onboarding_surface.dart';
 import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
@@ -2971,6 +2973,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         case TrainerTemplating(existingTemplateId: null):
           // Create new trainer template — reusable plantilla, no
           // athlete assignment. Mirrors pre-PR2 isTemplate branch.
+          //
+          // docs/limite-plantillas-pf.md PR3: gatear ANTES de escribir, mismo
+          // molde que el gate de rutinas propias del alumno un poco más
+          // abajo en este mismo switch.
+          if (!await intentarCrearPlantilla(context, ref)) {
+            if (!mounted) return;
+            _isDirty = true;
+            setState(() => _submitting = false);
+            return;
+          }
           final routine = Routine(
             id: '',
             name: _nameController.text.trim(),
@@ -3139,6 +3151,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      // El rebote del servidor (docs/limite-plantillas-pf.md PR3): sólo al
+      // CREAR una plantilla (nunca al editarla — P5 no toca el update) y
+      // sólo `permission-denied`, es la regla `templateQuotaOk` frenando al
+      // PF que ya está en el tope. Mismo aviso que el embudo, no el error
+      // genérico de más abajo. Va ANTES del chequeo de moderación: los dos
+      // son mutuamente excluyentes (el servidor rechaza por uno u otro).
+      if (widget.mode case TrainerTemplating(existingTemplateId: null)) {
+        if (isPermissionDenied(e) &&
+            await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+          if (!mounted) return;
+          _isDirty = true;
+          setState(() => _submitting = false);
+          return;
+        }
+        if (!mounted) return;
+      }
       // El bloqueo del filtro de términos vetados va PRIMERO y no entra al
       // switch de abajo: los tres mensajes de esas ramas invitan a
       // reintentar, y para un bloqueo eso es consejo falso — el mismo texto

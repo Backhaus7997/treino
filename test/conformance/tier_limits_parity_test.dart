@@ -17,11 +17,13 @@
 // reloj: un grep sobre el literal, feo y lo único que de veras cierra el
 // agujero.
 //
-// Cubre las DOS escaleras que hoy tiene `tier-config.ts`:
+// Cubre las TRES escaleras que hoy tiene `tier-config.ts`:
 //   • `TIER_WEIGHT_LIMITS` ↔ `kTierWeightLimits` (alumnos por tier). Hoy se
 //     sincroniza a mano y sin guard — se suma acá de una.
 //   • `TIER_CUSTOM_EXERCISE_LIMITS` ↔ `kTierCustomExerciseLimits` (ejercicios
 //     propios por tier, docs/limite-ejercicios-pf.md PR3).
+//   • `TIER_TEMPLATE_LIMITS` ↔ `kTierTemplateLimits` (plantillas por tier,
+//     docs/limite-plantillas-pf.md PR3).
 
 import 'dart:io';
 
@@ -151,6 +153,42 @@ void main() {
             'reglas); el Dart es sólo para mostrar "N/límite" sin '
             'round-trip. Si divergen, el gate del cliente bloquea (o deja '
             'pasar) en un número distinto del que hace cumplir el servidor.',
+      );
+    });
+  });
+
+  group('TIER_TEMPLATE_LIMITS: Dart y TypeScript dicen lo mismo', () {
+    test('la tabla se puede leer del TypeScript', () {
+      expect(
+        _limitesDelTypeScript(ts.readAsStringSync(), 'TIER_TEMPLATE_LIMITS'),
+        isNotNull,
+        reason: 'no pude leer '
+            '`export const TIER_TEMPLATE_LIMITS: Record<SubscriptionTier, '
+            'number | null> = {...};` en ${ts.path}. Puede ser que cambió de '
+            'forma (otro tipo, otro nombre) o que algún valor no es un '
+            'número ni `null`. Arreglá el regex o el archivo — no borres el '
+            'test.',
+      );
+    });
+
+    test('EL TEST QUE IMPORTA: los dos valen lo mismo', () {
+      final delTs = _limitesDelTypeScript(
+        ts.readAsStringSync(),
+        'TIER_TEMPLATE_LIMITS',
+      )!;
+      final delDart = _mapaDart(kTierTemplateLimits);
+
+      expect(
+        delDart,
+        equals(delTs),
+        reason: 'kTierTemplateLimits (Dart) y '
+            'TIER_TEMPLATE_LIMITS (TypeScript) no coinciden:\n'
+            '  Dart:       $delDart\n'
+            '  TypeScript: $delTs\n\n'
+            'El servidor es la autoridad (planLimits.templates + reglas); el '
+            'Dart es sólo para mostrar "N/límite" sin round-trip. Si '
+            'divergen, el gate del cliente bloquea (o deja pasar) en un '
+            'número distinto del que hace cumplir el servidor.',
       );
     });
   });

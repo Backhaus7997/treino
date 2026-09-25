@@ -22,6 +22,8 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/chat/application/chat_providers.dart'
     show totalUnreadCountProvider;
+import 'package:treino/features/coach/application/template_quota_provider.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
@@ -253,6 +255,36 @@ void main() {
       await tester.tap(find.byKey(const Key('quick_action_crear_rutina')));
       await tester.pumpAndSettle();
       expect(find.text('page:/template-editor'), findsOneWidget);
+    });
+
+    // docs/limite-plantillas-pf.md PR3: gatear ANTES de abrir el editor —
+    // el PF en el tope no llega a armar una plantilla entera para recién
+    // enterarse al guardar.
+    testWidgets(
+        'crear rutina — PF en el tope de plantillas NO navega y muestra el '
+        'aviso', (tester) async {
+      // Seam de test: `kIsWeb` es una constante de compilación que bajo
+      // `flutter test` vale `false` siempre — sin esto el aviso saldría con
+      // la forma MÓVIL (sheet) en un test del Coach Hub (web).
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      await _pumpWithRouter(
+        tester,
+        const DashboardWelcomeCard(),
+        overrides: [
+          ..._welcomeOverrides(),
+          templateQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: 3, count: 3)),
+          ),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('quick_action_crear_rutina')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('page:/template-editor'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     // #569: '/mensajes' no existe en el router y tiraba 404.

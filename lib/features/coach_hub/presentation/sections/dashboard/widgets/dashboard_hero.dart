@@ -15,6 +15,7 @@ import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/dashboard_day_counts.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach/presentation/template_limit_gate.dart';
 import 'package:treino/features/chat/application/chat_providers.dart'
     show totalUnreadCountProvider;
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
@@ -282,7 +283,15 @@ class DashboardWelcomeCard extends ConsumerWidget {
                       label: l10n.dashboardQuickActionCrearRutina,
                       icon: TreinoIcon.sidebarRutinas,
                       // #569: va al editor de plantillas, no al listado de Biblioteca.
-                      onTap: () => context.push('/template-editor'),
+                      // docs/limite-plantillas-pf.md PR3: gatear ANTES de
+                      // abrir el editor, para que el PF no arme una plantilla
+                      // entera y recién al guardar se entere del tope.
+                      onTap: () async {
+                        if (await intentarCrearPlantilla(context, ref) &&
+                            context.mounted) {
+                          context.push('/template-editor');
+                        }
+                      },
                     ),
                     _QuickAction(
                       key: const Key('quick_action_mensajes'),

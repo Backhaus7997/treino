@@ -363,8 +363,7 @@ void main() {
         findsOneWidget,
       );
       // Sin botón de acción: sólo el dismiss de "sólo-estado".
-      expect(find.byKey(const Key('custom_exercise_limit_dismiss')),
-          findsOneWidget);
+      expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
     });
 
     testWidgets('alumno ⇒ navega siempre, aunque la cuota diga tope',

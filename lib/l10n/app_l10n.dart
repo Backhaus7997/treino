@@ -8204,6 +8204,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{count} de {limit} ejercicios propios'**
   String customExerciseCounter(int count, int limit);
+
+  /// Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de plantillas de su plan (docs/limite-plantillas-pf.md PR3, 'El aviso'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que customExerciseLimitNoticeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tope de plantillas'**
+  String get templateLimitNoticeTitle;
+
+  /// Cuerpo del aviso cuando count == limit (P4: archivar libera el lugar; el borde de creacion es count < limit, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart lo cuida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Llegaste a las {limit} plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.'**
+  String templateLimitReachedBody(int limit);
+
+  /// Cuerpo del aviso cuando count > limit (P5: bajar de plan congela la creacion, no borra ni desarchiva nada). {toArchive} = count - limit + 1. La rama '=1' lleva el numero para que no lea pelado en castellano.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {count} plantillas y tu plan incluye {limit}. Conservás todas; para crear una nueva, {toArchive, plural, =1{archivá 1} other{archivá {toArchive}}}.'**
+  String templateLimitOverBody(int count, int limit, int toArchive);
+
+  /// Contador visible en la grilla de rutinas del Hub y en la seccion de plantillas del movil (docs/limite-plantillas-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} de {limit} plantillas'**
+  String templateCounter(int count, int limit);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

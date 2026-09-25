@@ -11,9 +11,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
+import 'package:treino/core/utils/firestore_error.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -66,17 +68,40 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
   ///
   /// Sin esto, el diálogo de archivar prometía algo que el producto no podía
   /// cumplir. El filtro «Archivadas» la muestra; recuperarla no existía.
-  Future<bool> unarchive({
+  ///
+  /// NO usa [_flipStatus] a propósito, a diferencia de [archive]: restaurar
+  /// una PLANTILLA pide lugar en el tope del PF (docs/limite-plantillas-pf.md
+  /// P4, UPDATE path 6), y el call site necesita distinguir ESE
+  /// `permission-denied` de cualquier otro fallo para mostrar el aviso
+  /// correcto — `_flipStatus` colapsa todo a `bool`.
+  ///
+  /// [esPlantilla] SÍ importa para leer el error: sólo el UPDATE path 6 de
+  /// una `trainer-template` mira la cuota (docs/limite-plantillas-pf.md PR2).
+  /// Un plan ASIGNADO nunca pide lugar, así que un `permission-denied` ahí es
+  /// cualquier otra cosa (dueño equivocado, doc borrado) — leerlo como
+  /// «tope de plantillas» le mostraría al PF un aviso que no tiene nada que
+  /// ver con lo que pasó.
+  Future<ResultadoDeRestaurar> unarchive({
     required String routineId,
     required String trainerId,
     required String athleteId,
-  }) async =>
-      _flipStatus(
-        routineId: routineId,
-        trainerId: trainerId,
-        athleteId: athleteId,
-        escribir: (repo) => repo.unarchive(routineId),
-      );
+    required bool esPlantilla,
+  }) async {
+    try {
+      await ref.read(routineRepositoryProvider).unarchive(routineId);
+      ref.invalidate(assignedRoutinesByTrainerProvider(
+        (trainerId: trainerId, athleteId: athleteId),
+      ));
+      ref.invalidate(routinesAuthoredByProvider(trainerId));
+      invalidateRoutineById(ref.container, routineId);
+      return ResultadoDeRestaurar.ok;
+    } catch (error) {
+      if (esPlantilla && isPermissionDenied(error)) {
+        return ResultadoDeRestaurar.topeDePlantillas;
+      }
+      return ResultadoDeRestaurar.falloAlRestaurar;
+    }
+  }
 
   /// Lo común de [archive] y [unarchive]: escribir y después invalidar TODO lo
   /// que mira ese documento.
@@ -225,6 +250,13 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
               assignedBy: trainerId,
               assignedTo: null,
               visibility: RoutineVisibility.private,
+              // R6 (docs/limite-plantillas-pf.md §7): sin esto, publicar un
+              // plan ARCHIVADO heredaba ese status y la plantilla nacía
+              // archivada — invisible en la biblioteca del PF, que nunca
+              // podría recuperarla porque no sabría que existe. `plan` es el
+              // plan asignado del alumno; la plantilla nueva es un documento
+              // propio y arranca activa siempre.
+              status: RoutineStatus.active,
               // Los agregados de la comunidad son del documento publicado, no
               // del plan del que se copió. Mismo criterio que
               // `assignTemplateToAthlete`: `toJson()` ya los excluye del
@@ -238,7 +270,13 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
       // nuevo", y para un bloqueo del filtro de términos vetados eso es
       // consejo falso — el mismo texto va a fallar siempre.
       return ResultadoDePublicar.bloqueadoPorModeracion;
-    } catch (_) {
+    } catch (error) {
+      // docs/limite-plantillas-pf.md PR3: un `permission-denied` acá es
+      // `templateQuotaOk` frenando al PF en el tope — distinto de cualquier
+      // otro fallo, que el call site no puede explicar con el mismo aviso.
+      if (isPermissionDenied(error)) {
+        return ResultadoDePublicar.topeDePlantillas;
+      }
       return ResultadoDePublicar.falloAlCrear;
     }
 
@@ -329,4 +367,26 @@ enum ResultadoDePublicar {
   /// distinto — acá "probá de nuevo" es consejo falso, el mismo contenido va
   /// a fallar siempre.
   bloqueadoPorModeracion,
+
+  /// No se creó: el PF ya está en el tope de plantillas de su plan
+  /// (docs/limite-plantillas-pf.md PR3). Distinto de [falloAlCrear] porque el
+  /// call site tiene que mostrar el aviso del tope, no el error genérico.
+  topeDePlantillas,
+}
+
+/// Cómo terminó [RoutineActionsNotifier.unarchive].
+///
+/// Dos fallos y no uno, por el mismo motivo que [ResultadoDePublicar]: el
+/// call site necesita distinguir «el PF está en el tope de plantillas»
+/// (docs/limite-plantillas-pf.md P4) de cualquier otro error para mostrar el
+/// aviso correcto.
+enum ResultadoDeRestaurar {
+  /// Se restauró.
+  ok,
+
+  /// No se restauró: el PF ya está en el tope de plantillas de su plan.
+  topeDePlantillas,
+
+  /// No se restauró por cualquier otro motivo.
+  falloAlRestaurar,
 }

@@ -11,6 +11,8 @@ import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../coach/application/template_quota_provider.dart';
+import '../coach/presentation/template_limit_gate.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import 'application/routine_providers.dart';
@@ -220,6 +222,12 @@ class _TemplateLibrarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Contador «N de límite plantillas» (docs/limite-plantillas-pf.md PR3,
+    // "El contador visible"). El count sale del MISMO provider que gatea (ya
+    // filtra archivadas) para no mostrar un número que el gate no usa. Con
+    // límite null (Plan 3 o interruptor apagado) no se muestra nada.
+    final quota = ref.watch(templateQuotaProvider).valueOrNull;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -244,7 +252,15 @@ class _TemplateLibrarySection extends ConsumerWidget {
                 ),
               ),
               TextButton.icon(
-                onPressed: () => context.push('/workout/template-editor'),
+                // docs/limite-plantillas-pf.md PR3: gatear ANTES de abrir el
+                // editor, para que el PF no arme una plantilla entera y
+                // recién al guardar se entere del tope.
+                onPressed: () async {
+                  if (await intentarCrearPlantilla(context, ref) &&
+                      context.mounted) {
+                    context.push('/workout/template-editor');
+                  }
+                },
                 icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
                 label: Text(
                   'NUEVA',
@@ -258,6 +274,17 @@ class _TemplateLibrarySection extends ConsumerWidget {
               ),
             ],
           ),
+          if (quota?.limit != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 2),
+              child: Text(
+                AppL10n.of(context).templateCounter(quota!.count, quota.limit!),
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
           const SizedBox(height: 4),
           _SharedToggleRow(
             palette: palette,

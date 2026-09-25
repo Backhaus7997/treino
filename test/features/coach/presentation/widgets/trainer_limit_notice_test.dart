@@ -1,26 +1,28 @@
-// custom_exercise_limit_notice_test.dart — el aviso que
-// [intentarCrearEjercicioPropio] muestra cuando el PF choca el tope
-// (docs/limite-ejercicios-pf.md PR3, "Los avisos").
+// trainer_limit_notice_test.dart — el aviso que
+// [intentarCrearEjercicioPropio] e [intentarCrearPlantilla] muestran cuando
+// el PF choca un tope de su plan (docs/limite-ejercicios-pf.md PR3 y
+// docs/limite-plantillas-pf.md PR3, "Los avisos").
 //
 // Cubre lo que el resto de los tests de entrada NO puede cubrir en detalle:
-// los DOS estados (en el tope / pasado de tope) en las DOS superficies, la
-// pluralización de "borrá N", y que ningún `null` se interpola.
+// los DOS estados (en el tope / pasado de tope) en las DOS superficies, para
+// los DOS `kind`, la pluralización, y que ningún `null` se interpola.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/coach/presentation/widgets/custom_exercise_limit_notice.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 Future<void> _mostrar(
   WidgetTester tester, {
+  required TrainerLimitKind kind,
   required int limit,
   required int count,
-  CustomExerciseLimitNoticeForm? form,
+  TrainerLimitNoticeForm? form,
 }) async {
-  debugCustomExerciseLimitNoticeForm = form;
-  addTearDown(() => debugCustomExerciseLimitNoticeForm = null);
+  debugTrainerLimitNoticeForm = form;
+  addTearDown(() => debugTrainerLimitNoticeForm = null);
 
   await tester.pumpWidget(
     MaterialApp(
@@ -31,8 +33,8 @@ Future<void> _mostrar(
       home: Scaffold(
         body: Builder(
           builder: (context) => ElevatedButton(
-            onPressed: () => showCustomExerciseLimitNotice(context,
-                limit: limit, count: count),
+            onPressed: () => showTrainerLimitNotice(context,
+                kind: kind, limit: limit, count: count),
             child: const Text('abrir'),
           ),
         ),
@@ -44,14 +46,15 @@ Future<void> _mostrar(
 }
 
 void main() {
-  group('móvil (sheet) — sólo estado', () {
+  group('móvil (sheet) — sólo estado — ejercicios propios', () {
     testWidgets('en el tope: el texto exacto del plan, sin botón de acción',
         (tester) async {
       await _mostrar(
         tester,
+        kind: TrainerLimitKind.customExercises,
         limit: 60,
         count: 60,
-        form: CustomExerciseLimitNoticeForm.sheet,
+        form: TrainerLimitNoticeForm.sheet,
       );
 
       expect(
@@ -60,8 +63,7 @@ void main() {
         findsOneWidget,
       );
       // Sólo el dismiss — nada que ofrezca comprar.
-      expect(find.byKey(const Key('custom_exercise_limit_dismiss')),
-          findsOneWidget);
+      expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.text('VER PLANES'), findsNothing);
     });
 
@@ -69,9 +71,10 @@ void main() {
         (tester) async {
       await _mostrar(
         tester,
+        kind: TrainerLimitKind.customExercises,
         limit: 60,
         count: 80,
-        form: CustomExerciseLimitNoticeForm.sheet,
+        form: TrainerLimitNoticeForm.sheet,
       );
 
       // Texto exacto del plan (docs/limite-ejercicios-pf.md PR3, "Los
@@ -90,7 +93,7 @@ void main() {
         (tester) async {
       // No se puede llegar a este texto TAPEANDO el aviso — se prueba la
       // función de l10n directo, como defensa si el día de mañana cambia el
-      // borde de E6 y esta rama se vuelve alcanzable.
+      // borde y esta rama se vuelve alcanzable.
       late String cuerpo;
       await tester.pumpWidget(
         MaterialApp(
@@ -117,9 +120,10 @@ void main() {
     testWidgets('ningún texto visible interpola "null"', (tester) async {
       await _mostrar(
         tester,
+        kind: TrainerLimitKind.customExercises,
         limit: 20,
         count: 20,
-        form: CustomExerciseLimitNoticeForm.sheet,
+        form: TrainerLimitNoticeForm.sheet,
       );
 
       final textos = tester
@@ -130,13 +134,14 @@ void main() {
     });
   });
 
-  group('web (dialog) — con VER PLANES', () {
+  group('web (dialog) — con VER PLANES — ejercicios propios', () {
     testWidgets('en el tope: cuerpo + VER PLANES', (tester) async {
       await _mostrar(
         tester,
+        kind: TrainerLimitKind.customExercises,
         limit: 60,
         count: 60,
-        form: CustomExerciseLimitNoticeForm.dialog,
+        form: TrainerLimitNoticeForm.dialog,
       );
 
       expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
@@ -152,9 +157,10 @@ void main() {
         'más el botón', (tester) async {
       await _mostrar(
         tester,
+        kind: TrainerLimitKind.customExercises,
         limit: 60,
         count: 80,
-        form: CustomExerciseLimitNoticeForm.dialog,
+        form: TrainerLimitNoticeForm.dialog,
       );
 
       expect(
@@ -167,8 +173,8 @@ void main() {
 
     testWidgets('VER PLANES navega a /facturacion/planes y cierra el diálogo',
         (tester) async {
-      debugCustomExerciseLimitNoticeForm = CustomExerciseLimitNoticeForm.dialog;
-      addTearDown(() => debugCustomExerciseLimitNoticeForm = null);
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
 
       final router = GoRouter(
         initialLocation: '/rutinas',
@@ -178,8 +184,9 @@ void main() {
             builder: (context, _) => Scaffold(
               body: Builder(
                 builder: (context) => ElevatedButton(
-                  onPressed: () => showCustomExerciseLimitNotice(
+                  onPressed: () => showTrainerLimitNotice(
                     context,
+                    kind: TrainerLimitKind.customExercises,
                     limit: 60,
                     count: 60,
                   ),
@@ -217,13 +224,116 @@ void main() {
     });
   });
 
+  group('móvil (sheet) — sólo estado — plantillas', () {
+    testWidgets('en el tope: el texto exacto del plan, sin botón de acción',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 3,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(
+        find.text('Llegaste a las 3 plantillas de tu plan. Podés editarlas, '
+            'asignarlas o archivar una para hacer lugar.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
+      expect(find.text('VER PLANES'), findsNothing);
+    });
+
+    testWidgets('pasado de tope: conservás todas, número pelado a archivar',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 5,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      // toArchive = 5 - 3 + 1 = 3.
+      expect(
+        find.text('Tenés 5 plantillas y tu plan incluye 3. Conservás '
+            'todas; para crear una nueva, archivá 3.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('el texto no nombra "web", "mail" ni "pasá a un plan"',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 3,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      final textos = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => (t.data ?? '').toLowerCase())
+          .join('\n');
+      expect(textos.contains('web'), isFalse);
+      expect(textos.contains('mail'), isFalse);
+      expect(textos.contains('pasá a un plan'), isFalse);
+      expect(textos.contains('null'), isFalse);
+    });
+  });
+
+  group('web (dialog) — con VER PLANES — plantillas', () {
+    testWidgets('en el tope: título y cuerpo de plantillas + VER PLANES',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 3,
+        form: TrainerLimitNoticeForm.dialog,
+      );
+
+      expect(find.text('TOPE DE PLANTILLAS'), findsOneWidget);
+      expect(
+        find.text('Tu plan incluye 3 plantillas y ya tenés 3.'),
+        findsOneWidget,
+      );
+      expect(find.text('VER PLANES'), findsOneWidget);
+    });
+
+    // El bug real: "plantillas" es femenino y "ejercicios" masculino — un
+    // texto calcado sin ajustar el género dice "para crear UNO nuevo" sobre
+    // una plantilla, y "conservás TODOS" en vez de "todas".
+    testWidgets('pasado de tope: género correcto ("una nueva", "todas")',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 5,
+        form: TrainerLimitNoticeForm.dialog,
+      );
+
+      expect(
+        find.text('Tenés 5 plantillas y tu plan incluye 3. Conservás '
+            'todas; para crear una nueva, archivá 3.'),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('resolución de superficie sin el seam de test', () {
     testWidgets('sin override, kIsWeb == false bajo flutter test ⇒ sheet',
         (tester) async {
-      await _mostrar(tester, limit: 20, count: 20);
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        count: 20,
+      );
 
-      expect(find.byKey(const Key('custom_exercise_limit_dismiss')),
-          findsOneWidget);
+      expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.text('VER PLANES'), findsNothing);
     });
   });
