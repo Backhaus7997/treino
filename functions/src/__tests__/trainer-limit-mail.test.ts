@@ -195,7 +195,7 @@ describe("cuando sí manda", () => {
     expect(setMock).toHaveBeenCalledTimes(1);
   });
 
-  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido reintente", async () => {
+  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido lo cuente como fallido", async () => {
     enqueueMock.mockResolvedValueOnce(null);
     colaExiste = false;
     const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;

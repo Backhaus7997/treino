@@ -75,7 +75,8 @@ import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore"
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 
-import { enqueueMail } from "../mail/enqueue-mail";
+import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { artDateKey } from "../mail/format";
 import { LANDING_URL } from "../mail/templates";
 import { ATHLETE_PROSPECT_PREF_KEY } from "./athlete-prospect-mail";
@@ -168,6 +169,21 @@ export function decideFreeLimitMail(
  * el enfriamiento no quedaria anotado y el alumno podria recibir otro mail
  * manana. Encolar dos veces es peor que no anotar, asi que el `set` va DESPUES
  * del encolado y ambos estan dentro del mismo `try` del handler.
+ *
+ * `enqueueMail` nunca tira: devuelve `null` tanto si el mail YA estaba en la
+ * cola (reintento del barrido, sano) como si la escritura FALLÓ. Si se anotara
+ * el enfriamiento en los dos casos, una falla transitoria silenciaría al
+ * alumno catorce días sin que exista mail alguno. Por eso, ante un `null`, se
+ * mira la cola: si el documento está, se anota; si no, se tira, y el barrido
+ * lo cuenta como fallido.
+ *
+ * Tirar NO garantiza un reintento. El barrido es diario y la ventana es de
+ * 36 h, así que la corrida de mañana sólo vuelve a ver los topes que hoy
+ * tienen menos de 12 h. Uno más viejo sale de la query y no se reintenta: el
+ * mail llega recién si el alumno vuelve a chocar un tope. Se aceptó así
+ * porque la falla es rara y el mail es comercial; lo que este chequeo sí
+ * garantiza es que ese próximo choque no encuentre un enfriamiento anotado
+ * sobre un mail que nunca salió.
  */
 export async function enqueueFreeLimitMail(
   app: App,
@@ -175,7 +191,7 @@ export async function enqueueFreeLimitMail(
   plan: FreeLimitMailPlan,
   nowMs: number,
 ): Promise<void> {
-  await enqueueMail(app, {
+  const queuedId = await enqueueMail(app, {
     toUid: athleteId,
     kind: plan.kind,
     scope: plan.scope,
@@ -185,6 +201,16 @@ export async function enqueueFreeLimitMail(
       ctaUrl: `${LANDING_URL}/es/suscripcion/checkout`,
     },
   });
+
+  if (queuedId === null) {
+    const enCola = await getFirestore(app)
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey(plan.kind, plan.scope, athleteId))
+      .get();
+    if (!enCola.exists) {
+      throw new Error("free-limit-mail: no se pudo encolar el mail");
+    }
+  }
 
   await getFirestore(app)
     .collection("users")
