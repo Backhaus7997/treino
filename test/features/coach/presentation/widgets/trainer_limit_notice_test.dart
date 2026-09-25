@@ -301,6 +301,26 @@ void main() {
       );
       expect(find.text('VER PLANES'), findsOneWidget);
     });
+
+    // El bug real: "plantillas" es femenino y "ejercicios" masculino — un
+    // texto calcado sin ajustar el género dice "para crear UNO nuevo" sobre
+    // una plantilla, y "conservás TODOS" en vez de "todas".
+    testWidgets('pasado de tope: género correcto ("una nueva", "todas")',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 5,
+        form: TrainerLimitNoticeForm.dialog,
+      );
+
+      expect(
+        find.text('Tenés 5 plantillas y tu plan incluye 3. Conservás '
+            'todas; para crear una nueva, archivá 3.'),
+        findsOneWidget,
+      );
+    });
   });
 
   group('resolución de superficie sin el seam de test', () {

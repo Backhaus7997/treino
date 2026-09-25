@@ -162,6 +162,7 @@ void main() {
                 routineId: 'r1',
                 trainerId: _trainerId,
                 athleteId: _athleteId,
+                esPlantilla: true,
               );
       expect(resultado, ResultadoDeRestaurar.ok);
       verify(() => mockRepo.unarchive('r1')).called(1);
@@ -200,6 +201,7 @@ void main() {
             routineId: 'r1',
             trainerId: _trainerId,
             athleteId: _athleteId,
+            esPlantilla: true,
           );
 
       await container.read(assignedRoutinesByTrainerProvider(_key).future);
@@ -236,6 +238,7 @@ void main() {
             routineId: 'r1',
             trainerId: _trainerId,
             athleteId: _athleteId,
+            esPlantilla: true,
           );
 
       final despues = await container.read(routineByIdProvider('r1').future);
@@ -254,12 +257,14 @@ void main() {
                 routineId: 'r1',
                 trainerId: _trainerId,
                 athleteId: _athleteId,
+                esPlantilla: true,
               );
       expect(resultado, ResultadoDeRestaurar.falloAlRestaurar);
     });
 
-    test('si el repo rechaza por permission-denied devuelve topeDePlantillas',
-        () async {
+    test(
+        'si es plantilla y el repo rechaza por permission-denied devuelve '
+        'topeDePlantillas', () async {
       when(() => mockRepo.unarchive(any())).thenThrow(
         FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
       );
@@ -272,8 +277,33 @@ void main() {
                 routineId: 'r1',
                 trainerId: _trainerId,
                 athleteId: _athleteId,
+                esPlantilla: true,
               );
       expect(resultado, ResultadoDeRestaurar.topeDePlantillas);
+    });
+
+    // EL test de la distinción (docs/limite-plantillas-pf.md P4): sólo la
+    // restauración de una PLANTILLA pide lugar en el tope. Un plan ASIGNADO
+    // nunca lo pide, así que un permission-denied ahí es cualquier otra cosa
+    // — leerlo como «tope de plantillas» le mentiría al PF sobre la causa.
+    test(
+        'si NO es plantilla, un permission-denied es falloAlRestaurar, '
+        'no el tope', () async {
+      when(() => mockRepo.unarchive(any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final resultado =
+          await container.read(routineActionsProvider.notifier).unarchive(
+                routineId: 'r1',
+                trainerId: _trainerId,
+                athleteId: _athleteId,
+                esPlantilla: false,
+              );
+      expect(resultado, ResultadoDeRestaurar.falloAlRestaurar);
     });
   });
 

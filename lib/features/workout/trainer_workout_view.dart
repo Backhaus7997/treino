@@ -222,6 +222,12 @@ class _TemplateLibrarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Contador «N de límite plantillas» (docs/limite-plantillas-pf.md PR3,
+    // "El contador visible"). El count sale del MISMO provider que gatea (ya
+    // filtra archivadas) para no mostrar un número que el gate no usa. Con
+    // límite null (Plan 3 o interruptor apagado) no se muestra nada.
+    final quota = ref.watch(templateQuotaProvider).valueOrNull;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -268,28 +274,17 @@ class _TemplateLibrarySection extends ConsumerWidget {
               ),
             ],
           ),
-          Builder(builder: (context) {
-            // Contador «N de límite plantillas» (docs/limite-plantillas-pf.md
-            // PR3, "El contador visible"). El count sale del MISMO provider
-            // que gatea (ya filtra archivadas) para no mostrar un número que
-            // el gate no usa. Con límite null (Plan 3 o interruptor apagado)
-            // no hay nada que mostrar.
-            final quota = ref.watch(templateQuotaProvider).valueOrNull;
-            if (quota == null || quota.limit == null) {
-              return const SizedBox.shrink();
-            }
-            final l10n = AppL10n.of(context);
-            return Padding(
+          if (quota?.limit != null)
+            Padding(
               padding: const EdgeInsets.only(top: 2, bottom: 2),
               child: Text(
-                l10n.templateCounter(quota.count, quota.limit!),
+                AppL10n.of(context).templateCounter(quota!.count, quota.limit!),
                 style: GoogleFonts.barlow(
                   fontSize: AppTextSize.bodyDense,
                   color: palette.textMuted,
                 ),
               ),
-            );
-          }),
+            ),
           const SizedBox(height: 4),
           _SharedToggleRow(
             palette: palette,

@@ -74,10 +74,18 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
   /// P4, UPDATE path 6), y el call site necesita distinguir ESE
   /// `permission-denied` de cualquier otro fallo para mostrar el aviso
   /// correcto — `_flipStatus` colapsa todo a `bool`.
+  ///
+  /// [esPlantilla] SÍ importa para leer el error: sólo el UPDATE path 6 de
+  /// una `trainer-template` mira la cuota (docs/limite-plantillas-pf.md PR2).
+  /// Un plan ASIGNADO nunca pide lugar, así que un `permission-denied` ahí es
+  /// cualquier otra cosa (dueño equivocado, doc borrado) — leerlo como
+  /// «tope de plantillas» le mostraría al PF un aviso que no tiene nada que
+  /// ver con lo que pasó.
   Future<ResultadoDeRestaurar> unarchive({
     required String routineId,
     required String trainerId,
     required String athleteId,
+    required bool esPlantilla,
   }) async {
     try {
       await ref.read(routineRepositoryProvider).unarchive(routineId);
@@ -88,7 +96,7 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
       invalidateRoutineById(ref.container, routineId);
       return ResultadoDeRestaurar.ok;
     } catch (error) {
-      if (isPermissionDenied(error)) {
+      if (esPlantilla && isPermissionDenied(error)) {
         return ResultadoDeRestaurar.topeDePlantillas;
       }
       return ResultadoDeRestaurar.falloAlRestaurar;

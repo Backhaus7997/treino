@@ -238,6 +238,16 @@ class _TrainerLimitDialog extends StatelessWidget {
       TrainerLimitKind.customExercises => 'ejercicios propios',
       TrainerLimitKind.templates => 'plantillas',
     };
+    // "Uno nuevo/todos" (ejercicios, masculino) vs. "una nueva/todas"
+    // (plantillas, femenino) — el género del sustantivo cambia con el kind.
+    final unoNuevo = switch (kind) {
+      TrainerLimitKind.customExercises => 'uno nuevo',
+      TrainerLimitKind.templates => 'una nueva',
+    };
+    final todos = switch (kind) {
+      TrainerLimitKind.customExercises => 'todos',
+      TrainerLimitKind.templates => 'todas',
+    };
     final verb = switch (kind) {
       TrainerLimitKind.customExercises => 'borrá',
       TrainerLimitKind.templates => 'archivá',
@@ -251,7 +261,7 @@ class _TrainerLimitDialog extends StatelessWidget {
     // el mismo texto de conservación que en el móvil, más el botón").
     final body = overLimit
         ? 'Tenés $count $noun y tu plan incluye $limit. '
-            'Conservás todos; para crear uno nuevo, $verb $toFree.' // i18n: Fase W3
+            'Conservás $todos; para crear $unoNuevo, $verb $toFree.' // i18n: Fase W3
         : 'Tu plan incluye $limit $noun y ya tenés '
             '$limit.'; // i18n: Fase W3
 

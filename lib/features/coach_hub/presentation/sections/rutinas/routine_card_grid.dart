@@ -577,6 +577,7 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
               routineId: r.id,
               trainerId: trainerId,
               athleteId: r.assignedTo ?? '',
+              esPlantilla: esPlantilla,
             );
 
     if (!mounted) return;
