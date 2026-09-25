@@ -166,9 +166,13 @@ describe("recountCustomExercises — contra el emulador real", () => {
     //
     // B arranca SIN await adentro del hook: A tiene tomado el doc del usuario
     // (y, segun como bloquee el emulador, la subcoleccion), y esperar a B
-    // desde adentro de A seria esperar a alguien que espera a A. La pausa le
-    // da a B tiempo de terminar si nada lo frena, que es exactamente lo que
-    // pasa sin transaccion.
+    // desde adentro de A seria esperar a alguien que espera a A. VERIFICADO,
+    // no asumido: cambiar el `dormir` de abajo por `await b` cuelga el test
+    // completo (timeout de 30s) contra el emulador real — B nunca llega a
+    // comitear su transaccion mientras la de A este abierta. La pausa
+    // acotada es la unica forma de intercalar sin deadlock; le da a B tiempo
+    // de terminar si nada lo frena, que es exactamente lo que pasa sin
+    // transaccion.
     await seedTrainer(UID, { customExerciseUsage: { count: 1 } });
     await customExercises(UID).doc("e1").set({ name: "Sentadilla" });
     await customExercises(UID).doc("e2").set({ name: "Press banca" });
