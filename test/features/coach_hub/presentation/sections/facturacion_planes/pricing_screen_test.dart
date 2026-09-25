@@ -127,8 +127,20 @@ void main() {
     expect(find.text('20'), findsOneWidget); // Free
     expect(find.text('60'), findsOneWidget); // Plan 1
     expect(find.text('120'), findsOneWidget); // Plan 2
-    expect(find.text('Sin límite'), findsOneWidget); // Plan 3
+    // "Sin límite" ahora aparece 4 veces: ejercicios de Plan 3 + plantillas
+    // de Plan 1/2/3 (docs/limite-plantillas-pf.md §3 PR5).
+    expect(find.text('Sin límite'), findsNWidgets(4));
     expect(find.text('ejercicios propios'), findsNWidgets(4));
+  });
+
+  // docs/limite-plantillas-pf.md §3 PR5: sumar `_tierTemplates` junto a
+  // `_tierExercises`. Sólo Free tiene tope (3); el resto siempre "Sin límite".
+  testWidgets('cada tarjeta muestra el tope de plantillas de su plan',
+      (tester) async {
+    await pumpDesktop(tester);
+
+    expect(find.text('3'), findsOneWidget); // Free
+    expect(find.text('plantillas'), findsNWidgets(4));
   });
 
   testWidgets('precios mensuales por default (número sin \$ inline)',
@@ -372,6 +384,19 @@ void main() {
         find.text('ejercicios propios sin límite'),
         findsOneWidget,
       ); // Plan 3
+    });
+
+    // Mismo patrón, para plantillas (docs/limite-plantillas-pf.md §3 PR5):
+    // el renglón angosto llama a `plantillasTexto` directo.
+    testWidgets('cada tarjeta angosta muestra el tope de plantillas',
+        (tester) async {
+      await pumpMobile(tester);
+
+      expect(find.text('3 plantillas'), findsOneWidget); // Free
+      expect(
+        find.text('plantillas sin límite'),
+        findsNWidgets(3),
+      ); // Plan 1, 2 y 3
     });
 
     testWidgets('Plan 3 muestra su rango y en ningún lado dice "null"',

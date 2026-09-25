@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
@@ -216,6 +217,20 @@ class _CurrentPlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s8),
           _ExerciseUsageLine(palette: palette),
+          // Plantillas: sólo cuando el TIER tiene tope de plantillas
+          // (docs/limite-plantillas-pf.md §3 PR5). Se deriva de
+          // `tier.templateLimit`, no de `tier == free` a mano: hoy sólo Free
+          // tiene tope, pero si el producto le pone tope a otro plan el día
+          // de mañana, este gate sigue correcto solo — el hardcodeo habría
+          // quedado mudo justo en el plan nuevo.
+          //
+          // A diferencia de ejercicios propios, un plan SIN tope de
+          // plantillas no vale la pena anunciar como "(sin límite)" acá, así
+          // que la línea entera se omite en vez de mostrarla siempre.
+          if (tier.templateLimit != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            _TemplateUsageLine(palette: palette),
+          ],
         ],
       ),
     );
@@ -258,6 +273,39 @@ class _ExerciseUsageLine extends ConsumerWidget {
     final text = quota.limit == null
         ? 'Ejercicios propios: ${quota.count} (sin límite)' // i18n: Fase W3
         : 'Ejercicios propios: ${quota.count} de ${quota.limit}'; // i18n: Fase W3
+
+    return Text(
+      text,
+      style: TextStyle(color: palette.textMuted, fontSize: AppTextSize.caption),
+    );
+  }
+}
+
+/// «Plantillas: 2 de 3» — línea de uso, calcada de [_ExerciseUsageLine] y por
+/// el mismo motivo (docs/limite-plantillas-pf.md §3 PR5). Lee
+/// `templateUsageSummaryProvider`: el CONTADOR DENORMALIZADO que escribe la CF
+/// de PR1, no el stream del gate de PR3 — ver el dartdoc de ese provider.
+///
+/// El caller sólo la monta cuando `tier.templateLimit != null` (hoy, sólo
+/// Free): a diferencia de ejercicios propios, acá NO hay un caso "sin
+/// límite" que valga la pena mostrar en un plan sin tope, así que la línea
+/// entera se omite en vez de aparecer con un límite que nunca aplica.
+class _TemplateUsageLine extends ConsumerWidget {
+  const _TemplateUsageLine({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quota = ref.watch(templateUsageSummaryProvider).valueOrNull;
+
+    // `AsyncLoading`, `AsyncError`, o el contador todavía ausente: no hay
+    // nada confirmado. Se oculta la línea, igual que `_ExerciseUsageLine`.
+    if (quota == null) return const SizedBox.shrink();
+
+    final text = quota.limit == null
+        ? 'Plantillas: ${quota.count} (sin límite)' // i18n: Fase W3
+        : 'Plantillas: ${quota.count} de ${quota.limit}'; // i18n: Fase W3
 
     return Text(
       text,

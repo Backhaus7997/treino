@@ -31,6 +31,22 @@ String ejerciciosTexto(SubscriptionTier tier) {
       : '$limit ejercicios propios'; // i18n: Fase W3
 }
 
+/// El texto del tope de PLANTILLAS de un plan, en UN solo lugar — mismo
+/// motivo y misma promesa que [cupoTexto], y el mismo agujero que existe
+/// para tapar: `tier.templateLimit == null` (todo lo que no sea Free, o el
+/// interruptor del servidor todavía apagado —
+/// docs/limite-plantillas-pf.md §2, "ausente = sin tope") NO es un dato
+/// faltante, es SIN LÍMITE. Interpolarlo directo publica la palabra «null»,
+/// la MISMA clase de bug que [cupoTexto] ya documenta como publicada.
+///
+/// docs/limite-plantillas-pf.md §3 PR5.
+String plantillasTexto(SubscriptionTier tier) {
+  final limit = tier.templateLimit;
+  return limit == null
+      ? 'plantillas sin límite' // i18n: Fase W3
+      : '$limit plantillas'; // i18n: Fase W3
+}
+
 /// El nombre visible de un plan **en prosa**, para cuando aparece dentro de una
 /// oración: «tu Plan 2 incluye…».
 ///
