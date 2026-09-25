@@ -1,20 +1,24 @@
 /**
- * El mail al PF que chocó el tope de ejercicios propios de su plan
- * (limite-ejercicios-pf.md §3 PR4).
+ * El mail al PF que chocó un tope de su plan: ejercicios propios
+ * (limite-ejercicios-pf.md §3 PR4) o plantillas (limite-plantillas-pf.md §3
+ * PR4).
  *
  * ── QUE CUIDA ESTE ARCHIVO ────────────────────────────────────────────────
  *
  * Las mismas cuatro cláusulas que `free-limit-mail.test.ts`, con la 3ª
  * adaptada: acá no hay "¿ya paga?" sino "¿sigue en el tope?", leído de
- * `planLimits.customExercises` / `customExerciseUsage.count` — los MISMOS
- * dos campos que lee `customExerciseQuotaOk` en `firestore.rules`.
+ * `planLimits.<clave>` / `<campo de uso>.count` — los MISMOS dos campos que
+ * lee la regla equivalente en `firestore.rules`.
  *
  *   1. Sin anotación → silencio.
  *   2. Anotación vieja → silencio.
  *   3. Ya no está en el tope (count < limit, o límite null/ausente) → silencio.
  *   4. Enfriamiento de 14 días → silencio.
  *
- * Cada una con su test, y cada test verificado POR MUTACIÓN.
+ * Las cuatro corren UNA VEZ POR TOPE (`describe.each`), porque son el mismo
+ * módulo generalizado por `kind` (`CAMPOS_POR_KIND`) resolviendo la MISMA
+ * lógica sobre datos distintos — un bug en un tope y no en el otro es
+ * exactamente lo que este `describe.each` está para agarrar.
  */
 
 import {
@@ -54,13 +58,39 @@ const AHORA = Date.UTC(2026, 8, 24, 8, 0, 0);
 /** Un `Timestamp` de Firestore, sólo con lo que el módulo le pide. */
 const ts = (ms: number) => ({ toMillis: () => ms });
 
+/**
+ * La tabla que maneja este archivo: un caso por `kind`, con todo lo que
+ * `CAMPOS_POR_KIND` resuelve internamente. Agregar un tope nuevo es agregar
+ * una fila acá.
+ */
+const TOPES = [
+  {
+    nombre: "ejercicios propios",
+    tope: "customExercises",
+    mailKind: "exercise-limit-reached",
+    limitField: "planLimits",
+    limitKey: "customExercises",
+    usageField: "customExerciseUsage",
+  },
+  {
+    nombre: "plantillas",
+    tope: "templates",
+    mailKind: "template-limit-reached",
+    limitField: "planLimits",
+    limitKey: "templates",
+    usageField: "templateUsage",
+  },
+] as const;
+
 /** El PF que chocó el tope hace una hora y sigue exactamente en él. */
-const CHOCO_RECIEN = {
-  [CAMPO_TOPE_AT]: ts(AHORA - 60 * 60 * 1000),
-  [CAMPO_TOPE_KIND]: "customExercises",
-  planLimits: { customExercises: 20 },
-  customExerciseUsage: { count: 20 },
-};
+function chocoRecien(t: (typeof TOPES)[number], limit = 20) {
+  return {
+    [CAMPO_TOPE_AT]: ts(AHORA - 60 * 60 * 1000),
+    [CAMPO_TOPE_KIND]: t.tope,
+    planLimits: { [t.limitKey]: limit },
+    [t.usageField]: { count: limit },
+  };
+}
 
 beforeEach(() => {
   enqueueMock.mockClear();
@@ -69,193 +99,296 @@ beforeEach(() => {
   colaExiste = false;
 });
 
-describe("⚠️ las cuatro cláusulas del silencio", () => {
-  it("sin anotación no manda", () => {
-    expect(
-      decideTrainerLimitMail(
-        { role: "trainer", planLimits: { customExercises: 20 } },
-        AHORA,
-      ),
-    ).toBeNull();
+describe.each(TOPES)("$nombre", (t) => {
+  const CHOCO_RECIEN = chocoRecien(t);
+
+  describe("⚠️ las cuatro cláusulas del silencio", () => {
+    it("sin anotación no manda", () => {
+      expect(
+        decideTrainerLimitMail(
+          { role: "trainer", planLimits: { [t.limitKey]: 20 } },
+          AHORA,
+        ),
+      ).toBeNull();
+    });
+
+    it("⚠️ una anotación vieja no manda", () => {
+      const viejo = { ...CHOCO_RECIEN, [CAMPO_TOPE_AT]: ts(AHORA - VENTANA_MS - 1) };
+      expect(decideTrainerLimitMail(viejo, AHORA)).toBeNull();
+    });
+
+    it("⚠️ quien ya NO está en el tope (bajó el contador) no recibe la oferta", () => {
+      const bajoElTope = {
+        ...CHOCO_RECIEN,
+        [t.usageField]: { count: 19 },
+      };
+      expect(decideTrainerLimitMail(bajoElTope, AHORA)).toBeNull();
+    });
+
+    it("⚠️ quien ya NO tiene tope (subió de plan, límite null) no recibe la oferta", () => {
+      const sinTope = {
+        ...CHOCO_RECIEN,
+        planLimits: { [t.limitKey]: null },
+      };
+      expect(decideTrainerLimitMail(sinTope, AHORA)).toBeNull();
+    });
+
+    it("⚠️ un límite ausente tampoco manda — interruptor apagado o sin primer sync", () => {
+      const sinPlanLimits = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: t.tope,
+        [t.usageField]: { count: 999 },
+      };
+      expect(decideTrainerLimitMail(sinPlanLimits, AHORA)).toBeNull();
+    });
+
+    it("⚠️ el ENFRIAMIENTO: no se le escribe dos veces en catorce días", () => {
+      const yaEscrito = {
+        ...CHOCO_RECIEN,
+        [CAMPO_MAIL_AT]: ts(AHORA - ENFRIAMIENTO_MS + 1),
+      };
+      expect(decideTrainerLimitMail(yaEscrito, AHORA)).toBeNull();
+    });
+
+    it("pasado el enfriamiento sí vuelve a mandar", () => {
+      const viejoMail = {
+        ...CHOCO_RECIEN,
+        [CAMPO_MAIL_AT]: ts(AHORA - ENFRIAMIENTO_MS - 1),
+      };
+      expect(decideTrainerLimitMail(viejoMail, AHORA)).not.toBeNull();
+    });
   });
 
-  it("⚠️ una anotación vieja no manda", () => {
-    const viejo = { ...CHOCO_RECIEN, [CAMPO_TOPE_AT]: ts(AHORA - VENTANA_MS - 1) };
-    expect(decideTrainerLimitMail(viejo, AHORA)).toBeNull();
-  });
+  describe("cuando sí manda", () => {
+    it("el tope tocado, el kind del mail y el límite viajan en el plan", () => {
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA);
+      expect(plan?.kind).toBe(t.mailKind);
+      expect(plan?.tope).toBe(t.tope);
+      expect(plan?.limit).toBe(20);
+      expect(plan?.scope).toMatch(/^tope_/);
+    });
 
-  it("⚠️ quien ya NO está en el tope (bajó el contador) no recibe la oferta", () => {
-    const bajoElTope = {
-      ...CHOCO_RECIEN,
-      customExerciseUsage: { count: 19 },
-    };
-    expect(decideTrainerLimitMail(bajoElTope, AHORA)).toBeNull();
-  });
+    it("exactamente EN el tope (count == limit) manda — E6, no hace falta pasarse", () => {
+      // El create que deja el contador en 20 pasa; el siguiente no. El mail
+      // tiene que dispararse desde ahí, no sólo cuando ya se pasó.
+      expect(decideTrainerLimitMail(CHOCO_RECIEN, AHORA)).not.toBeNull();
+    });
 
-  it("⚠️ quien ya NO tiene tope (subió de plan, límite null) no recibe la oferta", () => {
-    const sinTope = {
-      ...CHOCO_RECIEN,
-      planLimits: { customExercises: null },
-    };
-    expect(decideTrainerLimitMail(sinTope, AHORA)).toBeNull();
-  });
+    it("por ENCIMA del tope (bajó de plan) también manda", () => {
+      const sobreElTope = {
+        ...CHOCO_RECIEN,
+        planLimits: { [t.limitKey]: 20 },
+        [t.usageField]: { count: 35 },
+      };
+      expect(decideTrainerLimitMail(sobreElTope, AHORA)).not.toBeNull();
+    });
 
-  it("⚠️ un límite ausente tampoco manda — interruptor apagado o sin primer sync", () => {
-    const sinPlanLimits = {
-      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
-      customExerciseUsage: { count: 999 },
-    };
-    expect(decideTrainerLimitMail(sinPlanLimits, AHORA)).toBeNull();
-  });
+    it("un límite corrupto (no numérico) no manda — mismo criterio fail-closed que la regla", () => {
+      const corrupto = {
+        ...CHOCO_RECIEN,
+        planLimits: { [t.limitKey]: "20" },
+      };
+      expect(decideTrainerLimitMail(corrupto, AHORA)).toBeNull();
+    });
 
-  it("⚠️ el ENFRIAMIENTO: no se le escribe dos veces en catorce días", () => {
-    const yaEscrito = {
-      ...CHOCO_RECIEN,
-      [CAMPO_MAIL_AT]: ts(AHORA - ENFRIAMIENTO_MS + 1),
-    };
-    expect(decideTrainerLimitMail(yaEscrito, AHORA)).toBeNull();
-  });
+    it("⚠️ lleva prefKey — es comunicación comercial", async () => {
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      expect(enqueueMock.mock.calls[0][1].prefKey).toBe(TRAINER_LIMIT_PREF_KEY);
+      // Mismo valor que el del alumno — ver el encabezado del módulo.
+      expect(TRAINER_LIMIT_PREF_KEY).toBe(ATHLETE_PROSPECT_PREF_KEY);
+    });
 
-  it("pasado el enfriamiento sí vuelve a mandar", () => {
-    const viejoMail = {
-      ...CHOCO_RECIEN,
-      [CAMPO_MAIL_AT]: ts(AHORA - ENFRIAMIENTO_MS - 1),
-    };
-    expect(decideTrainerLimitMail(viejoMail, AHORA)).not.toBeNull();
+    it("⚠️ el CTA va al Coach Hub web, no al App Link de la app", async () => {
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      const url = String(enqueueMock.mock.calls[0][1].params.ctaUrl);
+      expect(url).toBe(trainerWebCheckout());
+      // No es el App Link: en el teléfono abre la app, y la app no vende.
+      expect(url).not.toContain("/abrir/");
+      expect(url).toContain("to=facturacion");
+    });
+
+    it("⚠️ el limite viaja como param para el template", async () => {
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      expect(enqueueMock.mock.calls[0][1].params.limit).toBe(20);
+    });
+
+    it("⚠️ anota que se escribió, DESPUÉS de encolar", async () => {
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      expect(enqueueMock).toHaveBeenCalledTimes(1);
+      expect(setMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido lo cuente como fallido", async () => {
+      enqueueMock.mockResolvedValueOnce(null);
+      colaExiste = false;
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await expect(enqueueTrainerLimitMail(APP, "t1", plan, AHORA)).rejects.toThrow();
+      expect(setMock).not.toHaveBeenCalled();
+    });
+
+    it("si el mail YA estaba en la cola (reintento), anota el enfriamiento igual", async () => {
+      enqueueMock.mockResolvedValueOnce(null);
+      colaExiste = true;
+      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
+      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      expect(getMock).toHaveBeenCalledTimes(1);
+      expect(setMock).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
-describe("cuando sí manda", () => {
-  it("el tope tocado y el límite viajan en el plan", () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA);
-    expect(plan?.kind).toBe("exercise-limit-reached");
-    expect(plan?.tope).toBe("customExercises");
-    expect(plan?.limit).toBe(20);
-    expect(plan?.scope).toMatch(/^tope_/);
-  });
-
-  it("exactamente EN el tope (count == limit) manda — E6, no hace falta pasarse", () => {
-    // El create que deja el contador en 20 pasa; el siguiente no. El mail
-    // tiene que dispararse desde ahí, no sólo cuando ya se pasó.
-    expect(decideTrainerLimitMail(CHOCO_RECIEN, AHORA)).not.toBeNull();
-  });
-
-  it("por ENCIMA del tope (bajó de plan) también manda", () => {
-    const sobreElTope = {
-      ...CHOCO_RECIEN,
-      planLimits: { customExercises: 20 },
-      customExerciseUsage: { count: 35 },
+describe("⚠️ la tabla de kinds", () => {
+  it("un PF que choca los DOS topes en la misma ventana elige el kind que anotó", () => {
+    // El fixture trae planLimits y usage de los dos topes a la vez — lo que
+    // pasaría en producción si un PF está en el tope de ejercicios Y de
+    // plantillas — pero `trainerLimitHitKind` sólo puede decir UNO: el
+    // último que rebotó. `CAMPOS_POR_KIND` tiene que mirar ESE campo, no
+    // "cuál de los dos está peor".
+    const chocoLosDos = {
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      [CAMPO_TOPE_KIND]: "templates",
+      planLimits: { customExercises: 20, templates: 3 },
+      customExerciseUsage: { count: 20 },
+      templateUsage: { count: 3 },
     };
-    expect(decideTrainerLimitMail(sobreElTope, AHORA)).not.toBeNull();
+    const plan = decideTrainerLimitMail(chocoLosDos, AHORA);
+    expect(plan?.kind).toBe("template-limit-reached");
+    expect(plan?.limit).toBe(3);
   });
 
-  it("una anotación sin `kind` no rompe: cae a un valor declarado", () => {
+  // ⚠️ FALLA CERRADO, no adivina. Antes de generalizar por `kind` había un
+  // único tope posible, así que "no sé cuál" y "es el único que existe" eran
+  // lo mismo — el fallback viejo aprovechaba eso. Con DOS topes dejó de
+  // serlo: adivinar `customExercises` para un PF que en realidad chocó
+  // `templates` manda un mail con una afirmación falsa concreta (hallazgo de
+  // la revisión adversarial de Codex, hilo `01a0d934-760f-7763-9948-ba9bb43fe98a`).
+  it("un kind desconocido (dato viejo o corrupto) NO manda — no hay forma de saber qué tope mirar", () => {
+    const kindRaro = {
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      [CAMPO_TOPE_KIND]: "un-tope-que-no-existe",
+      planLimits: { customExercises: 20 },
+      customExerciseUsage: { count: 20 },
+    };
+    expect(decideTrainerLimitMail(kindRaro, AHORA)).toBeNull();
+  });
+
+  it("una anotación sin `kind` tampoco manda — mismo criterio fail-closed", () => {
     const sinKind = {
       [CAMPO_TOPE_AT]: ts(AHORA - 1000),
       planLimits: { customExercises: 20 },
       customExerciseUsage: { count: 20 },
     };
-    expect(decideTrainerLimitMail(sinKind, AHORA)?.tope).toBe("desconocido");
+    expect(decideTrainerLimitMail(sinKind, AHORA)).toBeNull();
   });
 
-  it("un límite corrupto (no numérico) no manda — mismo criterio fail-closed que la regla", () => {
-    const corrupto = {
-      ...CHOCO_RECIEN,
-      planLimits: { customExercises: "20" },
+  it("un kind desconocido no manda aunque el PF SÍ esté en el tope de plantillas", () => {
+    // Control negativo: si el kind sin reconocer igual mirara `templates`
+    // por error (o cualquier otro campo), este fixture mandaría. No debería
+    // mandar NADA sin un kind reconocido, sea cual sea el dato disponible.
+    const kindRaroConDatosDeTemplates = {
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      [CAMPO_TOPE_KIND]: "un-tope-que-no-existe",
+      planLimits: { templates: 3 },
+      templateUsage: { count: 3 },
     };
-    expect(decideTrainerLimitMail(corrupto, AHORA)).toBeNull();
-  });
-
-  it("⚠️ lleva prefKey — es comunicación comercial", async () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-    expect(enqueueMock.mock.calls[0][1].prefKey).toBe(TRAINER_LIMIT_PREF_KEY);
-    // Mismo valor que el del alumno — ver el encabezado del módulo.
-    expect(TRAINER_LIMIT_PREF_KEY).toBe(ATHLETE_PROSPECT_PREF_KEY);
-  });
-
-  it("⚠️ el CTA va al Coach Hub web, no al App Link de la app", async () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-    const url = String(enqueueMock.mock.calls[0][1].params.ctaUrl);
-    expect(url).toBe(trainerWebCheckout());
-    // No es el App Link: en el teléfono abre la app, y la app no vende.
-    expect(url).not.toContain("/abrir/");
-    expect(url).toContain("to=facturacion");
-  });
-
-  it("⚠️ el limite viaja como param para el template", async () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-    expect(enqueueMock.mock.calls[0][1].params.limit).toBe(20);
-  });
-
-  it("⚠️ anota que se escribió, DESPUÉS de encolar", async () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-    expect(enqueueMock).toHaveBeenCalledTimes(1);
-    expect(setMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido lo cuente como fallido", async () => {
-    enqueueMock.mockResolvedValueOnce(null);
-    colaExiste = false;
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await expect(enqueueTrainerLimitMail(APP, "t1", plan, AHORA)).rejects.toThrow();
-    expect(setMock).not.toHaveBeenCalled();
-  });
-
-  it("si el mail YA estaba en la cola (reintento), anota el enfriamiento igual", async () => {
-    enqueueMock.mockResolvedValueOnce(null);
-    colaExiste = true;
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-    await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-    expect(getMock).toHaveBeenCalledTimes(1);
-    expect(setMock).toHaveBeenCalledTimes(1);
+    expect(decideTrainerLimitMail(kindRaroConDatosDeTemplates, AHORA)).toBeNull();
   });
 });
 
 describe("el texto", () => {
-  const render = (limit: number) =>
-    renderMail("exercise-limit-reached", {
-      tope: "customExercises",
-      limit,
-      ctaUrl: trainerWebCheckout(),
+  describe("exercise-limit-reached", () => {
+    const render = (limit: number) =>
+      renderMail("exercise-limit-reached", {
+        tope: "customExercises",
+        limit,
+        ctaUrl: trainerWebCheckout(),
+      });
+
+    it("dice el número del tope", () => {
+      const { html, text } = render(20);
+      expect(html).toContain("20 ejercicios propios");
+      expect(text).toContain("20 ejercicios propios");
     });
 
-  it("dice el número del tope", () => {
-    const { html, text } = render(20);
-    expect(html).toContain("20 ejercicios propios");
-    expect(text).toContain("20 ejercicios propios");
-  });
-
-  it("singular correcto en el borde: 1 ejercicio propio", () => {
-    const { html } = render(1);
-    expect(html).toContain("1 ejercicio propio");
-    expect(html).not.toContain("1 ejercicios propios");
-  });
-
-  it("⚠️ nunca interpola null — sin params, cae a la frase genérica", () => {
-    const { html, text } = renderMail("exercise-limit-reached", {
-      ctaUrl: trainerWebCheckout(),
+    it("singular correcto en el borde: 1 ejercicio propio", () => {
+      const { html } = render(1);
+      expect(html).toContain("1 ejercicio propio");
+      expect(html).not.toContain("1 ejercicios propios");
     });
-    expect(html).not.toContain("null");
-    expect(text).not.toContain("null");
+
+    it("⚠️ nunca interpola null — sin params, cae a la frase genérica", () => {
+      const { html, text } = renderMail("exercise-limit-reached", {
+        ctaUrl: trainerWebCheckout(),
+      });
+      expect(html).not.toContain("null");
+      expect(text).not.toContain("null");
+    });
+
+    it("⚠️ dice que conserva todo y puede editar/borrar — nunca 'perder' ni 'borrar' en negativo", () => {
+      const { text } = render(20);
+      expect(text.toLowerCase()).toContain("conservás");
+      expect(text.toLowerCase()).toMatch(/editarlos/);
+      expect(text.toLowerCase()).toMatch(/borrarlos/);
+      // E3: bajar de plan nunca borra ni bloquea lo que ya existe.
+      expect(text.toLowerCase()).not.toMatch(/perdés|perdes|se borra tu|se eliminan tus/);
+    });
+
+    it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
+      const { html } = render(20);
+      expect(html).toContain("VER LOS PLANES");
+      // A diferencia de free-limit-reached, este SÍ lleva cuerpo — no es hero.
+      expect(html).toMatch(/<p /);
+    });
   });
 
-  it("⚠️ dice que conserva todo y puede editar/borrar — nunca 'perder' ni 'borrar' en negativo", () => {
-    const { text } = render(20);
-    expect(text.toLowerCase()).toContain("conservás");
-    expect(text.toLowerCase()).toMatch(/editarlos/);
-    expect(text.toLowerCase()).toMatch(/borrarlos/);
-    // E3: bajar de plan nunca borra ni bloquea lo que ya existe.
-    expect(text.toLowerCase()).not.toMatch(/perdés|perdes|se borra tu|se eliminan tus/);
-  });
+  describe("template-limit-reached", () => {
+    const render = (limit: number) =>
+      renderMail("template-limit-reached", {
+        tope: "templates",
+        limit,
+        ctaUrl: trainerWebCheckout(),
+      });
 
-  it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
-    const { html } = render(20);
-    expect(html).toContain("VER LOS PLANES");
-    // A diferencia de free-limit-reached, este SÍ lleva cuerpo — no es hero.
-    expect(html).toMatch(/<p /);
+    it("dice el número del tope", () => {
+      const { html, text } = render(3);
+      expect(html).toContain("3 plantillas");
+      expect(text).toContain("3 plantillas");
+    });
+
+    it("singular correcto en el borde: 1 plantilla", () => {
+      const { html } = render(1);
+      expect(html).toContain("1 plantilla");
+      expect(html).not.toContain("1 plantillas");
+    });
+
+    it("⚠️ nunca interpola null — sin params, cae a la frase genérica", () => {
+      const { html, text } = renderMail("template-limit-reached", {
+        ctaUrl: trainerWebCheckout(),
+      });
+      expect(html).not.toContain("null");
+      expect(text).not.toContain("null");
+    });
+
+    it("⚠️ dice que conserva todo y puede seguir usándolas — nunca 'perder' ni 'borrar' en negativo", () => {
+      const { text } = render(3);
+      expect(text.toLowerCase()).toContain("conservás");
+      expect(text.toLowerCase()).toMatch(/editándolas/);
+      expect(text.toLowerCase()).toMatch(/asignándolas/);
+      expect(text.toLowerCase()).toMatch(/publicándolas/);
+      expect(text.toLowerCase()).toMatch(/archivándolas/);
+      // P5/E3: bajar de plan nunca borra ni bloquea lo que ya existe.
+      expect(text.toLowerCase()).not.toMatch(/perdés|perdes|se borra tu|se eliminan tus/);
+    });
+
+    it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
+      const { html } = render(3);
+      expect(html).toContain("VER LOS PLANES");
+      // A diferencia de free-limit-reached, este SÍ lleva cuerpo — no es hero.
+      expect(html).toMatch(/<p /);
+    });
   });
 });
