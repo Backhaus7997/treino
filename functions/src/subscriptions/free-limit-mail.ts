@@ -25,6 +25,25 @@
  * purchase»*.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ *  DOS CAMINOS: AL TOQUE, Y EL BARRIDO COMO RED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * **El camino principal es `sendFreeLimitMailOnHit`**: un trigger sobre
+ * `users/{uid}` que encola apenas la app anota el tope. El mail llega en
+ * segundos, mientras el alumno todavía tiene en la mano lo que quiso hacer.
+ *
+ * Antes era sólo el barrido de las 05:00, con el argumento de que a la mañana
+ * se lee entero y entre series se archiva. Se dio vuelta a propósito
+ * (2026-09-25, pedido de Martín): la intención está AHORA, y a la mañana
+ * siguiente es un recuerdo. El costo aceptado es que muchas veces llegue en
+ * medio del entrenamiento.
+ *
+ * **`sweepFreeLimitMail` se queda, como red.** Si el trigger falla —un
+ * encolado que no entró, una instancia caída—, el barrido lo reintenta al otro
+ * día dentro de la ventana de 36 h. Los dos caminos no se pisan: el que llega
+ * primero anota el enfriamiento, y la cola deduplica por día y por alumno.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  *  POR QUE UNA FUNCION PROPIA Y NO UNA RAMA DEL BARRIDO QUE YA EXISTE
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -73,6 +92,7 @@ import { App } from "firebase-admin/app";
 import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
@@ -279,16 +299,101 @@ export async function barrerTopesTocados(
   return { candidatos: snap.size, enviados };
 }
 
+/** Qué hizo el trigger con una escritura de `users/{uid}`. Para el log. */
+export type ResultadoAlToque =
+  | "sin-tope-nuevo"
+  | "silencio"
+  | "vinculado"
+  | "encolado";
+
 /**
- * 05:00 ART, media hora después de `sweepAthletePaywall`.
+ * Si esta escritura es un tope NUEVO: `freePlanLimitHitAt` aparece o cambia.
  *
- * Después y no antes: aquel resuelve `athletePaywallEnforced`, y correr
+ * ⚠️ **Es lo que evita el loop.** `enqueueFreeLimitMail` escribe
+ * `freePlanLimitMailAt` en el MISMO documento que dispara el trigger. Esa
+ * escritura vuelve a despertarlo, pero deja `freePlanLimitHitAt` igual, así
+ * que sale acá. Lo mismo con cualquier otra escritura del perfil —nombre,
+ * foto, preferencias—, que son la enorme mayoría de las que llegan.
+ */
+export function esToqueNuevo(
+  antes: DocumentData | undefined,
+  despues: DocumentData | undefined,
+): boolean {
+  const despuesMs = msDe(despues?.[CAMPO_TOPE_AT]);
+  if (despuesMs === null) return false;
+  return despuesMs !== msDe(antes?.[CAMPO_TOPE_AT]);
+}
+
+/**
+ * El camino al toque: las mismas cuatro cláusulas y el mismo chequeo de
+ * vínculo que el barrido, para UN alumno, en el momento en que choca el tope.
+ */
+export async function alTocarElTope(
+  app: App,
+  uid: string,
+  antes: DocumentData | undefined,
+  despues: DocumentData | undefined,
+  nowMs: number,
+): Promise<ResultadoAlToque> {
+  if (!esToqueNuevo(antes, despues)) return "sin-tope-nuevo";
+
+  const plan = decideFreeLimitMail(despues, nowMs, hayPlanVigente(despues));
+  if (!plan) return "silencio";
+
+  // Último por la misma razón que en el barrido: es el único chequeo que
+  // cuesta una query.
+  if (await hasActiveTrainerLink(app, uid)) return "vinculado";
+
+  await enqueueFreeLimitMail(app, uid, plan, nowMs);
+  return "encolado";
+}
+
+/**
+ * El mail al toque. Ver «DOS CAMINOS» en el encabezado.
+ *
+ * `onDocumentUpdated` y no `Written`: la anotación sale de
+ * `userRepository.registrarTopeTocado` sobre un `users/{uid}` que ya existe
+ * —la hoja sólo se abre con sesión—, así que un alta nunca trae un tope.
+ *
+ * Un fallo se loguea y no se relanza. Relanzar no reintentaría (el trigger
+ * no tiene `retry`), y la red para ese caso ya existe: el barrido de las 05:00.
+ */
+export const sendFreeLimitMailOnHit = onDocumentUpdated(
+  { document: "users/{uid}", region: "southamerica-east1" },
+  async (event) => {
+    const antes = event.data?.before?.data();
+    const despues = event.data?.after?.data();
+    // Filtro barato ANTES de tocar el app: casi todas las escrituras de
+    // `users/{uid}` no son un tope.
+    if (!esToqueNuevo(antes, despues)) return;
+
+    const { getApp, initializeApp } = await import("firebase-admin/app");
+    let app: App;
+    try {
+      app = getApp();
+    } catch {
+      app = initializeApp();
+    }
+    const uid = event.params.uid;
+    try {
+      const r = await alTocarElTope(app, uid, antes, despues, Date.now());
+      logger.info("sendFreeLimitMailOnHit", { uid, resultado: r });
+    } catch (err) {
+      logger.error("sendFreeLimitMailOnHit: falló; lo reintenta el barrido", {
+        uid,
+        err,
+      });
+    }
+  },
+);
+
+/**
+ * 05:00 ART, media hora después de `sweepAthletePaywall`. **Es la red**, no el
+ * camino principal: ver «DOS CAMINOS» en el encabezado.
+ *
+ * Después y no antes de aquel: resuelve `athletePaywallEnforced`, y correr
  * primero dejaría a este barrido decidiendo sobre el estado de anteayer para
  * quien cambió de situación durante la noche.
- *
- * Y a esa hora nadie está entrenando, que es cuando conviene mandar correo que
- * no es urgente: el que abre el mail a la mañana lo lee entero, el que lo
- * recibe entre series lo archiva.
  */
 export const sweepFreeLimitMail = onSchedule(
   {
