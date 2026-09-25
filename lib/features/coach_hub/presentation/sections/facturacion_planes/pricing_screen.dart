@@ -1085,7 +1085,7 @@ class _PlanCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.hairline),
+          const SizedBox(height: AppSpacing.s8),
           // Plantillas — misma jerarquía secundaria que ejercicios propios.
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -1305,7 +1305,7 @@ class _NarrowPlanCard extends StatelessWidget {
             style: TextStyle(
                 color: palette.textMuted, fontSize: AppTextSize.caption),
           ),
-          const SizedBox(height: AppSpacing.hairline),
+          const SizedBox(height: AppSpacing.s8),
           // Plantillas — mismo criterio que ejercicios propios arriba: una
           // sola oración, `plantillasTexto` de `plan_copy.dart`.
           Text(

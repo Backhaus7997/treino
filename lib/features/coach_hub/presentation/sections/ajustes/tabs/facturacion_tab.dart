@@ -217,13 +217,18 @@ class _CurrentPlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.s8),
           _ExerciseUsageLine(palette: palette),
-          // Plantillas: SÓLO en Free (docs/limite-plantillas-pf.md §3 PR5).
-          // A diferencia de ejercicios propios, el tope de plantillas no
-          // existe para ningún plan pago —ni siquiera como "sin límite" que
-          // valga la pena anunciar—, así que en los planes pagos la línea no
-          // aporta nada y se omite en vez de mostrar "(sin límite)" siempre.
-          if (tier == SubscriptionTier.free) ...[
-            const SizedBox(height: AppSpacing.hairline),
+          // Plantillas: sólo cuando el TIER tiene tope de plantillas
+          // (docs/limite-plantillas-pf.md §3 PR5). Se deriva de
+          // `tier.templateLimit`, no de `tier == free` a mano: hoy sólo Free
+          // tiene tope, pero si el producto le pone tope a otro plan el día
+          // de mañana, este gate sigue correcto solo — el hardcodeo habría
+          // quedado mudo justo en el plan nuevo.
+          //
+          // A diferencia de ejercicios propios, un plan SIN tope de
+          // plantillas no vale la pena anunciar como "(sin límite)" acá, así
+          // que la línea entera se omite en vez de mostrarla siempre.
+          if (tier.templateLimit != null) ...[
+            const SizedBox(height: AppSpacing.s8),
             _TemplateUsageLine(palette: palette),
           ],
         ],
@@ -281,10 +286,10 @@ class _ExerciseUsageLine extends ConsumerWidget {
 /// `templateUsageSummaryProvider`: el CONTADOR DENORMALIZADO que escribe la CF
 /// de PR1, no el stream del gate de PR3 — ver el dartdoc de ese provider.
 ///
-/// Sólo se monta en Free (el caller filtra por `tier`): a diferencia de
-/// ejercicios propios, acá NO hay un caso "sin límite" que valga la pena
-/// mostrar en un plan pago, así que la línea entera se omite en vez de
-/// aparecer con un límite que nunca aplica.
+/// El caller sólo la monta cuando `tier.templateLimit != null` (hoy, sólo
+/// Free): a diferencia de ejercicios propios, acá NO hay un caso "sin
+/// límite" que valga la pena mostrar en un plan sin tope, así que la línea
+/// entera se omite en vez de aparecer con un límite que nunca aplica.
 class _TemplateUsageLine extends ConsumerWidget {
   const _TemplateUsageLine({required this.palette});
 
