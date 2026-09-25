@@ -390,19 +390,29 @@ el Coach Hub web (`pricing_screen.dart`, dartdoc de `PricingScreen`). El PF que
 lee el mail en el teléfono, que es lo normal, **toca VER LOS PLANES y no tiene
 cómo pagar**. Justo el canal que existe porque la app no puede vender.
 
-**Y en la computadora también falla.** Sin la app, `/abrir/profe` sirve
-`web/abrir/profe.html`, que redirige con
-`<meta http-equiv="refresh" content="0;url=https://app.gettreino.com">`
-(L29): un destino fijo, **sin el query string**. El `?to=facturacion` se pierde
-y el PF cae en el inicio del Coach Hub, no en precios. O sea que hoy el link de
-pago no lleva a pagar en ningún dispositivo. Mandar directo a
-`app.gettreino.com/?to=…` esquiva los dos problemas.
+**En la computadora, en cambio, funciona, y eso prueba el destino.** Desde el
+#923, `vercel.json` redirige `/abrir/profe` en el servidor a
+`https://app.gettreino.com/`, y el redirect **conserva el query**. Medido el
+25/09/2026:
 
-**El Coach Hub lo sirve Vercel, no Firebase Hosting.** `app.gettreino.com` sale
-de `vercel.json` (`/abrir/profe` → `/abrir/profe.html`, el resto →
-`/index.html`), según `docs/runbook-dominio-y-email.md:25`. El target
-`coach-hub-dev` de `firebase.json` no es lo que ve el PF: para verificar el ruteo,
-el archivo es `vercel.json`.
+```bash
+curl -sI "https://app.gettreino.com/abrir/profe?to=facturacion" | rg -i '^(HTTP|location)'
+# HTTP/2 307
+# location: https://app.gettreino.com/?to=facturacion
+```
+
+O sea que la URL que propone este PR es exactamente donde el PF de escritorio
+ya aterriza hoy. El arreglo no inventa un camino: saca el desvío por el App Link
+que sólo muerde en el teléfono.
+
+⚠️ No te guíes por `web/abrir/profe.html:29`. Su meta-refresh va a la raíz
+**sin** el query, pero es la red para cuando se saque el redirect: hoy el HTML
+no llega a servirse (#923). Una primera versión de esta revisión lo leyó como
+un bug vivo, y era falso.
+
+**El Coach Hub lo sirve Vercel, no Firebase Hosting.** Para verificar el ruteo de
+`app.gettreino.com`, el archivo es `vercel.json` (los `redirects` corren antes
+que los `rewrites`), no el target `coach-hub-dev` de `firebase.json`.
 
 **El arreglo: que el link de pago no pase por `/abrir`.**
 
@@ -479,12 +489,15 @@ el archivo es `vercel.json`.
 
 **Se parte en dos PRs**, y el primero ya arregla el bug solo:
 
-- **6a, functions:** `trainerWebCheckout`, los cuatro mails, el plan elegido en
-  el mail y el guard. Con esto el link abre el navegador y cae en
-  `/facturacion/planes`. El Coach Hub ignora `plan` y `ciclo` hasta el 6b, así
-  que el PF ve todos los planes sin resaltar ninguno.
-- **6b, Dart:** `DeepLinkDestination`, `_coachHubPathFor` y la preselección en
-  `pricing_screen.dart`.
+- **6a, el link (bugfix):** `trainerWebCheckout()` sin parámetros, los tres
+  sitios que hoy usan `trainerEntry({to: "facturacion"})` y el guard. Con esto
+  el link abre el navegador y cae en `/facturacion/planes`, que es lo que ya
+  pasa en la computadora (R8). Ningún cambio de copy ni de Dart.
+- **6b, el plan elegido (feature):** el parámetro `{plan?, ciclo?}`, el plan y
+  el precio en el cuerpo de los mails, el botón «PASAR AL PLAN 1» y el link
+  «Ver todos los planes», más `DeepLinkDestination`, `_coachHubPathFor` y la
+  preselección en `pricing_screen.dart`. Van juntos porque el plan en el link
+  sin la preselección no le sirve a nadie.
 
 **Antes de la prueba a mano:** mirar en el dashboard de Resend si el *click
 tracking* está prendido (no aparece en `functions/src/mail/`). Si lo está, todo
@@ -658,7 +671,7 @@ sigue. Todo ya está corregido arriba.
 | R5 | PR 1 | Ya existe `quarantineRoutine` sobre `routines/{routineId}`; falta la auditoría anti-loop escrita |
 | R6 | PR 3 | «Publicar como plantilla» hereda el `status` del plan: uno archivado da una plantilla archivada |
 | R7 | PR 5 | La línea de Facturación tiene que leer el contador denormalizado, no escuchar la colección |
-| R8 | PR 6 | El fallback web de `/abrir/profe` también pierde el `?to=` (`web/abrir/profe.html:29`): el link de pago falla en todos los dispositivos, no sólo en el teléfono |
+| R8 | PR 6 | En la computadora el link ya llega a `/?to=facturacion` por el redirect de `vercel.json` (#923), medido con `curl`: el destino del arreglo ya está probado en producción. El meta-refresh de `profe.html:29` no cuenta, porque no se sirve |
 | R9 | PR 6 | El Coach Hub lo sirve Vercel (`vercel.json`), no `firebase.json`. Y falta mirar el *click tracking* de Resend antes de la prueba a mano |
 | R10 | Legales | El JSON se regenera en este repo con `scripts/build_legal_content.py`, más un PR en `treino-app`; no hay bump de versión |
 | R11 | Encendido | El #1244 enciende ejercicios en producción; la condición «no hay entrenadores reales» hay que confirmarla |
