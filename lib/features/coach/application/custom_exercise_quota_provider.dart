@@ -64,6 +64,51 @@ final _customExercisePlanLimitProvider = StreamProvider.autoDispose<int?>(
   },
 );
 
+/// El campo del contador que escribe `recountCustomExercises`:
+/// `users/{uid}.customExerciseUsage.count` (docs/limite-ejercicios-pf.md §2).
+const String kCustomExerciseUsageField = 'customExerciseUsage';
+
+/// Tope y conteo de ejercicios propios leídos SÓLO de `users/{uid}`, para
+/// superficies que muestran el uso y no gatean nada (la línea de Facturación
+/// del Coach Hub).
+///
+/// ## Por qué no [customExerciseQuotaProvider]
+///
+/// Aquél saca el `count` de [customExercisesForTrainerStreamProvider], que
+/// baja la colección ENTERA: tiene sentido en «Mis ejercicios» y en los
+/// pickers, que ya la leen para listarla, pero en Facturación serían hasta
+/// 120 lecturas —o sin techo en Plan 3— por abrir la pestaña, sólo para un
+/// `.length`. Acá alcanza el contador denormalizado: viene ~1 s atrasado, y
+/// para mostrar el uso eso no importa.
+///
+/// ## `null` = «no sé», nunca «cero»
+///
+/// Si `customExerciseUsage.count` no existe todavía (functions sin deployar,
+/// o un PF que el barrido todavía no recontó) devuelve `null` y la superficie
+/// se oculta. Mostrar «0» afirmaría un conteo que nadie hizo.
+final customExerciseUsageSummaryProvider =
+    StreamProvider.autoDispose<CustomExerciseQuota?>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      // Misma guarda de caché fría que [_customExercisePlanLimitProvider].
+      .where((snap) => snap.exists || !snap.metadata.isFromCache)
+      .map((snap) {
+    final data = snap.data();
+    final usage = data?[kCustomExerciseUsageField];
+    final count = usage is Map ? usage['count'] : null;
+    if (count is! int) return null;
+    final limits = data?[kPlanLimitsField];
+    final limit = limits is Map ? limits['customExercises'] : null;
+    return (limit: limit is int ? limit : null, count: count);
+  }).distinct();
+});
+
 /// La cuota de ejercicios propios del PF actual, cruzando el tope del
 /// servidor con el conteo EN VIVO.
 ///

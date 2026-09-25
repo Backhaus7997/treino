@@ -14,6 +14,23 @@ String cupoTexto(SubscriptionTier tier) => tier.isUnlimited
     ? 'alumnos sin límite' // i18n: Fase W3
     : '${tier.weightLimit} alumnos'; // i18n: Fase W3
 
+/// El texto del tope de EJERCICIOS PROPIOS de un plan, en UN solo lugar —
+/// mismo motivo y misma promesa que [cupoTexto], y el mismo agujero que
+/// existe para tapar: `tier.customExerciseLimit == null` (Plan 3, o el
+/// interruptor del servidor todavía apagado — docs/limite-ejercicios-pf.md
+/// §2, "ausente = sin tope") NO es un dato faltante, es SIN LÍMITE.
+/// Interpolarlo directo publica la palabra «null», la MISMA clase de bug que
+/// [cupoTexto] ya documenta como publicada («Hasta null alumnos»).
+///
+/// docs/limite-ejercicios-pf.md §PR5: «Plan 3 dice "ejercicios propios sin
+/// límite", nunca null.»
+String ejerciciosTexto(SubscriptionTier tier) {
+  final limit = tier.customExerciseLimit;
+  return limit == null
+      ? 'ejercicios propios sin límite' // i18n: Fase W3
+      : '$limit ejercicios propios'; // i18n: Fase W3
+}
+
 /// El nombre visible de un plan **en prosa**, para cuando aparece dentro de una
 /// oración: «tu Plan 2 incluye…».
 ///

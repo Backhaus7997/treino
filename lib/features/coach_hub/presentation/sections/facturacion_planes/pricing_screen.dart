@@ -10,6 +10,7 @@ import '../../../../profile/application/user_providers.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
+import 'plan_copy.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
@@ -732,6 +733,29 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.plan3 => ('+15', 'alumnos'), // i18n: Fase W3
     };
 
+/// (numeroEjercicios, labelEjercicios) para el bloque de features de
+/// [_PlanCard] (layout ANCHO), junto a [_tierStudents] — mismo patrón, mismo
+/// motivo de NO reusar `ejerciciosTexto` de `plan_copy.dart` ahí: esa tarjeta
+/// necesita el número y el label SEPARADOS para su tipografía (número grande
+/// + label chico), y `ejerciciosTexto` arma una oración de un solo tirón. Ver
+/// el dartdoc de [tierName] sobre por qué esta pantalla no unifica sus
+/// variantes de copy con las de otras superficies.
+///
+/// [_NarrowPlanCard] (layout angosto) NO usa esta función: ahí el renglón es
+/// una sola línea de texto, así que llama a `ejerciciosTexto(tier)`
+/// directo.
+///
+/// A diferencia de alumnos (que muestra un RANGO — "3-7"), acá se muestra el
+/// tope EXACTO del tier (docs/limite-ejercicios-pf.md §0: 20/60/120), porque
+/// es el número que la tarjeta está VENDIENDO. `customExerciseLimit` es
+/// `null` para Plan 3 — nunca se interpola a mano.
+(String, String) _tierExercises(SubscriptionTier tier) {
+  final limit = tier.customExerciseLimit;
+  return limit == null
+      ? ('Sin límite', 'ejercicios propios') // i18n: Fase W3
+      : ('$limit', 'ejercicios propios'); // i18n: Fase W3
+}
+
 /// Formatea un monto ARS con separador de miles (12.000).
 String _formatArs(int amount) {
   final s = amount.toString();
@@ -903,6 +927,7 @@ class _PlanCard extends StatelessWidget {
     final amount = price == null ? 0 : (annual ? price.annual : price.monthly);
     final cycleLabel = annual ? 'POR AÑO' : 'POR MES'; // i18n: Fase W3
     final (studentsNum, studentsLabel) = _tierStudents(tier);
+    final (exercisesNum, exercisesLabel) = _tierExercises(tier);
 
     final card = Container(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -1013,6 +1038,32 @@ class _PlanCard extends StatelessWidget {
                 studentsLabel,
                 style: TextStyle(
                     color: palette.textMuted, fontSize: AppTextSize.body),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          // Ejercicios propios — feature SECUNDARIA respecto de alumnos: por
+          // eso va en tipografía más chica y siempre en textPrimary (nunca
+          // accent), aunque la tarjeta sea la recomendada.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                exercisesNum,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
+                  color: palette.textPrimary,
+                  fontSize: AppTextSize.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.hairline),
+              Text(
+                exercisesLabel,
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.caption),
               ),
             ],
           ),
@@ -1196,6 +1247,21 @@ class _NarrowPlanCard extends StatelessWidget {
                 palette: palette,
               ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          // Ejercicios propios — a todo el ancho: no entra junto a
+          // `_StudentsBox` sin re-diseñar la fila, y es una feature
+          // SECUNDARIA frente a alumnos, así que una línea chica alcanza.
+          //
+          // Acá SÍ va `ejerciciosTexto` de `plan_copy.dart` (a diferencia de
+          // la tarjeta ancha, que necesita el número separado del label para
+          // su tipografía): este renglón es UNA sola oración, y
+          // `ejerciciosTexto` ya arma «$limit ejercicios propios» / «ejercicios
+          // propios sin límite» sin nunca interpolar el `null` de Plan 3.
+          Text(
+            ejerciciosTexto(tier), // i18n: Fase W3
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
           ),
           const SizedBox(height: 18),
           _PlanCtaButton(

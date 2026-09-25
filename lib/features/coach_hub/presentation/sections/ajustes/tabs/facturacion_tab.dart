@@ -6,6 +6,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
@@ -213,8 +214,54 @@ class _CurrentPlanCard extends StatelessWidget {
             'Cada alumno activo cuenta 1 y cada pausado ½.', // i18n: Fase W3
             style: TextStyle(color: palette.textMuted, fontSize: 12),
           ),
+          const SizedBox(height: AppSpacing.s8),
+          _ExerciseUsageLine(palette: palette),
         ],
       ),
+    );
+  }
+}
+
+/// «Ejercicios propios: 12 de 60» — línea de uso, calcada de la fila de
+/// ALUMNOS de esta misma card. Lee `customExerciseUsageSummaryProvider`: el
+/// tope y el contador del documento del PF, sin bajar la colección entera de
+/// ejercicios sólo para contarla (ver el dartdoc del provider).
+///
+/// ⚠️ NO usa `tier.customExerciseLimit` (la tabla estática que sí consulta
+/// `pricing_screen.dart` para vender el PLAN). Usa el tope REAL que devuelve
+/// el servidor: hoy `TRAINER_EXERCISE_LIMITS_ENABLED` está apagado
+/// (docs/limite-ejercicios-pf.md), así que `planLimits.customExercises` es
+/// `null` para TODOS los planes — no sólo Plan 3. Si esta línea mostrara
+/// «12 de 60» sacado de la tabla estática, afirmaría un tope que hoy no rige
+/// para nadie.
+///
+/// `limit == null` entonces significa DOS cosas indistinguibles desde acá
+/// (Plan 3 real, o el interruptor apagado) y las dos se muestran igual: «N
+/// (sin límite)». Es la MISMA decisión que ya toma el bloque de ALUMNOS de
+/// arriba con `lim == null` («$load / sin límite») — no se oculta la fila,
+/// se dice la verdad que el servidor sí sabe hoy.
+class _ExerciseUsageLine extends ConsumerWidget {
+  const _ExerciseUsageLine({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quota = ref.watch(customExerciseUsageSummaryProvider).valueOrNull;
+
+    // `AsyncLoading` (recién montado), `AsyncError`, o el contador todavía
+    // ausente en el documento: no hay nada confirmado. No se inventa un
+    // número — se oculta la línea entera, y reaparece sola cuando el
+    // servidor escriba el conteo.
+    if (quota == null) return const SizedBox.shrink();
+
+    final text = quota.limit == null
+        ? 'Ejercicios propios: ${quota.count} (sin límite)' // i18n: Fase W3
+        : 'Ejercicios propios: ${quota.count} de ${quota.limit}'; // i18n: Fase W3
+
+    return Text(
+      text,
+      style: TextStyle(color: palette.textMuted, fontSize: AppTextSize.caption),
     );
   }
 }

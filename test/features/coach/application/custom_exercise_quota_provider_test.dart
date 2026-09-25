@@ -81,7 +81,63 @@ Future<AsyncValue<CustomExerciseQuota>> _settle(
   return sub.read();
 }
 
+/// Container con `users/{_uid}` sembrado tal cual se pasa, sin colección de
+/// ejercicios: [customExerciseUsageSummaryProvider] no la tiene que leer.
+Future<ProviderContainer> _containerConDoc(Map<String, Object?> doc) async {
+  final firestore = FakeFirebaseFirestore();
+  await firestore.collection('users').doc(_uid).set({'uid': _uid, ...doc});
+  final container = ProviderContainer(
+    overrides: [
+      firestoreProvider.overrideWithValue(firestore),
+      currentUidProvider.overrideWithValue(_uid),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
+}
+
+Future<CustomExerciseQuota?> _leerResumen(ProviderContainer c) async {
+  final sub = c.listen(customExerciseUsageSummaryProvider, (_, __) {});
+  await Future<void>.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
+  final v = sub.read();
+  expect(v.hasValue, isTrue);
+  return v.valueOrNull;
+}
+
 void main() {
+  group('customExerciseUsageSummaryProvider (sólo el documento del PF)', () {
+    test('tope y contador del documento', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'customExercises': 60},
+        'customExerciseUsage': {'count': 12},
+      });
+      expect(await _leerResumen(c), (limit: 60, count: 12));
+    });
+
+    test('tope null ⇒ sin límite, con el contador igual', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'customExercises': null},
+        'customExerciseUsage': {'count': 7},
+      });
+      expect(await _leerResumen(c), (limit: null, count: 7));
+    });
+
+    test('⚠️ contador ausente ⇒ null («no sé»), nunca count 0', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'customExercises': 60},
+      });
+      expect(await _leerResumen(c), isNull);
+    });
+
+    test('contador con otra forma ⇒ null', () async {
+      final c = await _containerConDoc({
+        'customExerciseUsage': {'count': '12'},
+      });
+      expect(await _leerResumen(c), isNull);
+    });
+  });
+
   group('customExerciseQuotaProvider', () {
     test('planLimits ausente ⇒ limit null (sin tope), cuenta igual', () async {
       final c = await _containerWith(customExercisesCount: 3);
