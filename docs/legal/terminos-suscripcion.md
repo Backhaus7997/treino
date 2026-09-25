@@ -41,8 +41,9 @@ sin que se te cobre.
 que podés armarte: rutinas más largas, periodización y todo tu historial. El
 plan gratuito sigue existiendo y sigue alcanzando para entrenar.
 
-**Los entrenadores** requieren una suscripción para atender alumnos o tener
-ejercicios propios por encima de los límites del plan gratuito.
+**Los entrenadores** requieren una suscripción para atender alumnos, tener
+ejercicios propios o tener plantillas por encima de los límites del plan
+gratuito.
 
 Los pagos entre un alumno y su entrenador **no pasan por TREINO** y no están
 alcanzados por este documento. Ver la sección 7 de los Términos y Condiciones.
@@ -54,12 +55,12 @@ plan anual equivale a diez meses.
 
 ### 2.1 Planes para entrenadores
 
-| Plan | Alumnos | Ejercicios propios | Por mes | Por año |
-|---|---|---|---|---|
-| Gratuito | 2 | 20 | — | — |
-| Plan 1 | 7 | 60 | $12.000 | $120.000 |
-| Plan 2 | 15 | 120 | $22.000 | $220.000 |
-| Plan 3 | Sin límite | Sin límite | $39.000 | $390.000 |
+| Plan | Alumnos | Ejercicios propios | Plantillas | Por mes | Por año |
+|---|---|---|---|---|---|
+| Gratuito | 2 | 20 | 3 | — | — |
+| Plan 1 | 7 | 60 | Sin límite | $12.000 | $120.000 |
+| Plan 2 | 15 | 120 | Sin límite | $22.000 | $220.000 |
+| Plan 3 | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Un alumno **pausado ocupa media plaza** y uno activo una entera. El detalle está
 en la sección 8.2 de los Términos para Entrenadores.
@@ -67,6 +68,10 @@ en la sección 8.2 de los Términos para Entrenadores.
 Los ejercicios propios son los que creás en tu biblioteca. **Los del catálogo de
 TREINO no cuentan** y los usás sin límite. El detalle está en la sección 8.2.bis
 de los Términos para Entrenadores.
+
+Las plantillas cuentan mientras no las archives, estén publicadas o no.
+**Asignarle una plantilla a un alumno no cuenta.** El detalle está en la sección
+8.2.ter de los Términos para Entrenadores.
 
 ### 2.2 Plan para alumnos que entrenan por su cuenta
 
@@ -226,9 +231,10 @@ vínculos con alumnos quedan bloqueados.
 *Tus alumnos no pierden nada:* conservan sus rutinas, su historial, sus datos y
 su chat. Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
 
-*Tus ejercicios propios tampoco se borran:* si tenés más de los que incluye el
-plan gratuito, los conservás y los seguís usando, pero no vas a poder crear
-nuevos mientras estés por encima del límite de tu plan.
+*Tus ejercicios propios y tus plantillas tampoco se borran:* si tenés más de los
+que incluye el plan gratuito, los conservás y los seguís usando, pero no vas a
+poder crear nuevos, ni recuperar plantillas archivadas, hasta quedar por debajo
+del límite de tu plan.
 
 **Si sos alumno**, volvés al plan gratuito: las rutinas que tengas armadas
 quedan como están y podés seguir entrenándolas, pero no vas a poder hacerlas
@@ -284,7 +290,10 @@ dos pantallas que lo llaman.
 entrenador (§12) promete avisar con antelación cualquier cambio de límites de
 plan, y no hay aviso automático. El límite de ejercicios propios no lo necesitó
 porque se publicó antes del primer entrenador real (2026-09-24: todas las
-cuentas de entrenador eran de prueba). El próximo cambio sí.
+cuentas de entrenador eran de prueba). El límite de plantillas tampoco, por lo
+mismo (2026-09-25: el titular confirmó que todas las cuentas de entrenador
+siguen siendo de prueba). El próximo cambio sí, salvo que se vuelva a confirmar
+lo mismo **ese día**: esta condición no se hereda de una fecha a otra.
 
 ## B. Lo que todavía no está resuelto
 
@@ -403,6 +412,15 @@ propósito: no hay entrenadores reales todavía, y con el interruptor apagado el
 texto describe un límite más estricto que el que se aplica. Lo que no puede
 pasar es que se dé de alta el primer entrenador real sin los límites
 encendidos.
+
+**Límite de plantillas del entrenador** (agregado el 2026-09-25): el texto de
+§1, §2.1 y §9 ya lo describe, y el detalle está en §8.2.ter de los Términos para
+Entrenadores. Plan de implementación en `docs/limite-plantillas-pf.md` (al
+escribir esto vivía en la rama `docs/limite-plantillas-pf`, sin mergear). Mismo
+criterio que ejercicios: el texto sale **antes** que el código, con el
+interruptor `TRAINER_TEMPLATE_LIMITS_ENABLED` apagado, así que describe un
+límite más estricto que el que se aplica. Y la misma condición: el límite tiene
+que estar encendido antes de dar de alta al primer entrenador real.
 
 ⚠️ **Lo que decía este anexo y ya no vale:** *«Para el alumno no hace falta nada
 de eso: la tienda gestiona baja y reembolso.»* Con el cobro por web, la baja y el
