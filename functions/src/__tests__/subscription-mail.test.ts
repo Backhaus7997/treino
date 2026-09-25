@@ -19,7 +19,7 @@ import {
 import { SubscriptionState } from "../subscriptions/effective-limit";
 import { MappedSubscription } from "../subscriptions/subscription-state";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { trainerEntry } from "../mail/templates";
+import { trainerWebCheckout } from "../mail/templates";
 
 jest.mock("../mail/enqueue-mail", () => ({
   enqueueMail: jest.fn(async () => "queued-id"),
@@ -304,7 +304,9 @@ describe("enqueueSubscriptionMail", () => {
 
     const arg = enqueueMock.mock.calls[0][1];
     expect(arg.toUid).toBe("pf-1");
-    expect(arg.params.ctaUrl).toBe(trainerEntry({ to: "facturacion" }));
+    expect(arg.params.ctaUrl).toBe(trainerWebCheckout());
+    // No es el App Link: en el teléfono abre la app, y la app no vende.
+    expect(String(arg.params.ctaUrl)).not.toContain("/abrir/");
     // El PF no puede optar por no enterarse de que su servicio se corta.
     expect(arg.prefKey).toBeUndefined();
   });

@@ -62,6 +62,7 @@ import {
 } from "./tier-mapping";
 import { MpClient, createMpClient } from "./client";
 import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
+import { trainerWebCheckout } from "../../mail/templates";
 
 export { MP_CHECKOUTS_COLLECTION } from "./abrir-checkout";
 
@@ -85,26 +86,32 @@ const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
  * O sea: durante toda la vida de esta constante, el PF que pagaba volvia al
  * DASHBOARD. El `/ajustes` era decorativo.
  *
- * ── Por que `/abrir/profe?to=facturacion` SI funciona ──
+ * ── Por que la raiz con `?to=facturacion` SI funciona ──
  *
- * Es la misma entrada que ya usan los mails al PF (`APP_ENTRY_TRAINER` en
- * `mail/templates.ts`), y anda por tres piezas que ya existen y estan probadas:
+ * Es la misma URL que los mails de plata al PF (`trainerWebCheckout` en
+ * `mail/templates.ts`), y anda por dos piezas que ya existen y estan probadas:
  *
- *   1. `vercel.json` redirige `/abrir/profe` a la raiz PRESERVANDO el query
- *      string. Verificado en produccion: queda `/?to=facturacion`.
- *   2. `buildCoachHubRouter` lee `Uri.base.queryParameters` —o sea
+ *   1. `buildCoachHubRouter` lee `Uri.base.queryParameters` —o sea
  *      `location.search`, que el hash no toca— una vez al construir el router.
- *   3. `DeepLinkDestination.fromQuery` ya entiende `to=facturacion`, y
- *      `coachHubRedirect` lo aplica porque la landing es `location == '/'`.
+ *   2. `DeepLinkDestination.fromQuery` ya entiende `to=facturacion`, y
+ *      `coachHubRedirect` lo aplica al aterrizar en la landing.
  *
  * MP le agrega SUS parametros (`collection_status`, etc.) a este mismo query
  * string, sin pisar el nuestro.
  *
+ * ── Por que NO es `/abrir/profe?to=facturacion` ──
+ *
+ * En la computadora daria lo mismo: `vercel.json` redirige `/abrir/profe` a
+ * esta misma URL conservando el query. Pero `/abrir/*` es un App Link, y en un
+ * telefono con la app instalada volver de MP por ahi puede abrir la app en vez
+ * de devolver al PF a la pestaña del Coach Hub donde estaba pagando — que es
+ * donde corre la acreditacion al volver (`acreditacion_al_volver.dart`).
+ *
  * La leccion general, que vale para cualquier link que entre desde afuera —
- * mail, pasarela, QR—: al Coach Hub se entra por `/abrir/profe?to=...`, NUNCA
- * por el path directo.
+ * mail, pasarela, QR—: al Coach Hub se entra por la RAIZ con `?to=...`, NUNCA
+ * por un path directo. Y lo que es plata, tampoco por `/abrir/profe`.
  */
-const BACK_URL = "https://app.gettreino.com/abrir/profe?to=facturacion";
+const BACK_URL = trainerWebCheckout();
 
 export interface CreatePreapprovalRequest {
   tier: SubscriptionTier;

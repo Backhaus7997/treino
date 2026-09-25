@@ -82,7 +82,7 @@ import { logger } from "firebase-functions";
 import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { artDateKey } from "../mail/format";
-import { trainerEntry } from "../mail/templates";
+import { trainerWebCheckout } from "../mail/templates";
 
 /** El campo que anota el cliente al rebotar contra el tope (PR3, plan §2). */
 export const CAMPO_TOPE_AT = "trainerLimitHitAt";
@@ -215,7 +215,7 @@ export async function enqueueTrainerLimitMail(
     params: {
       tope: plan.tope,
       limit: plan.limit,
-      ctaUrl: trainerEntry({ to: "facturacion" }),
+      ctaUrl: trainerWebCheckout(),
     },
   });
 

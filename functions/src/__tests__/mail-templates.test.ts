@@ -9,7 +9,7 @@
  *   - ART rendering of dates, times and amounts
  */
 
-import { renderMail } from "../mail/templates";
+import { renderMail, trainerEntry, trainerWebCheckout } from "../mail/templates";
 import { MailKind } from "../mail/types";
 import {
   artDateKey,
@@ -259,6 +259,31 @@ describe("destino del CTA", () => {
       const out = renderMail(kind, { actionLink: "https://x.test/?oobCode=1" });
       expect(out.html).not.toContain("treino.app");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trainerWebCheckout — los mails de plata del PF NO van por el App Link
+//
+// `/abrir/profe` abre la app en un teléfono, y la app no vende. Estos mails
+// tienen que ir directo al Coach Hub web.
+// ---------------------------------------------------------------------------
+describe("trainerWebCheckout", () => {
+  it("es exactamente la URL del Coach Hub con el destino de facturación", () => {
+    expect(trainerWebCheckout()).toBe("https://app.gettreino.com/?to=facturacion");
+  });
+
+  it("no pasa por el App Link", () => {
+    expect(trainerWebCheckout()).not.toContain("/abrir/");
+  });
+
+  // Guard de compilación: si alguien saca el `Exclude` de `trainerEntry` y
+  // vuelve a habilitar `{ to: "facturacion" }` ahí, ts-jest deja de compilar
+  // este archivo (TS2578, directiva sin usar). Lo protege jest, no el `tsc`
+  // del build: `tsconfig.json` excluye `src/__tests__`.
+  it("trainerEntry ya no acepta el destino de facturación", () => {
+    // @ts-expect-error — "facturacion" está excluido: ese destino va por trainerWebCheckout().
+    expect(() => trainerEntry({ to: "facturacion" })).not.toThrow();
   });
 });
 

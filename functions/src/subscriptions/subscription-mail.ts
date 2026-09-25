@@ -113,7 +113,7 @@ import { App } from "firebase-admin/app";
 
 import { enqueueMail } from "../mail/enqueue-mail";
 import { artDateKey } from "../mail/format";
-import { trainerEntry } from "../mail/templates";
+import { trainerWebCheckout } from "../mail/templates";
 import { MailParams } from "../mail/types";
 import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { MappedSubscription } from "./subscription-state";
@@ -355,12 +355,12 @@ export async function enqueueSubscriptionMail(
   plan: SubscriptionMailPlan,
   blockedCount: number,
 ): Promise<string | null> {
-  // `to: "facturacion"`: las dos ramas de esta funcion (grace y
-  // downgraded) son sobre plata, y las dos se resuelven en la MISMA
-  // pantalla.
+  // Las dos ramas de esta funcion (grace y downgraded) son sobre plata, y las
+  // dos se resuelven en la MISMA pantalla: el Coach Hub web, no la app — ver
+  // `trainerWebCheckout`.
   const params: MailParams = {
     ...plan.params,
-    ctaUrl: trainerEntry({ to: "facturacion" }),
+    ctaUrl: trainerWebCheckout(),
   };
   if (plan.kind === "subscription-downgraded") {
     params.blockedCount = blockedCount;
@@ -493,7 +493,7 @@ export function decideProspectMail(
  * como quedo la cuenta, no que cambio en este evento — un PF con 2 ya afuera
  * que suma un tercero tiene que leer «3», no «1».
  *
- * `to: "facturacion"`: el CTA dice VER LOS PLANES y esa es la pantalla.
+ * El CTA dice VER LOS PLANES y va al Coach Hub web — ver `trainerWebCheckout`.
  *
  * Sin `prefKey`, como sus dos hermanos.
  */
@@ -510,7 +510,7 @@ export async function enqueueProspectMail(
     params: {
       ...plan.params,
       blockedCount,
-      ctaUrl: trainerEntry({ to: "facturacion" }),
+      ctaUrl: trainerWebCheckout(),
     },
   });
 }

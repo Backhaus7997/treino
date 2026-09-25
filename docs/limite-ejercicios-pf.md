@@ -400,7 +400,10 @@ enterarse ahí de dónde se paga. Sin mail no tiene salida. Es la misma lógica 
 
 - **`functions/src/mail/types.ts`:** kind nuevo `"exercise-limit-reached"`.
 - **`functions/src/mail/templates.ts`:** el template.
-  - El CTA es `trainerEntry({to: "facturacion"})`.
+  - El CTA es `trainerWebCheckout()`, el Coach Hub web. Fue
+    `trainerEntry({to: "facturacion"})` hasta que se vio que ese App Link abre
+    la app en el teléfono, y la app no vende (ver el dartdoc de
+    `trainerWebCheckout` en `functions/src/mail/templates.ts`).
   - **Lleva `prefKey`:** ofrecerle un plan más caro a quien ya es cliente es
     comunicación comercial, y la política promete que la oposición a esas es
     absoluta. Mismo razonamiento que `athlete-prospect-mail.ts`.
