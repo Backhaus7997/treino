@@ -756,6 +756,23 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       : ('$limit', 'ejercicios propios'); // i18n: Fase W3
 }
 
+/// (numeroPlantillas, labelPlantillas) para el bloque de features de
+/// [_PlanCard], mismo patrón y mismo motivo que [_tierExercises]: el número y
+/// el label van separados para la tipografía de la tarjeta, y
+/// `plantillasTexto` de `plan_copy.dart` arma una oración de un tirón.
+///
+/// [_NarrowPlanCard] NO usa esta función: llama a `plantillasTexto(tier)`
+/// directo, igual que hace con `ejerciciosTexto`.
+///
+/// docs/limite-plantillas-pf.md §3 PR5. `templateLimit` es `null` para todo
+/// lo que no sea Free — nunca se interpola a mano.
+(String, String) _tierTemplates(SubscriptionTier tier) {
+  final limit = tier.templateLimit;
+  return limit == null
+      ? ('Sin límite', 'plantillas') // i18n: Fase W3
+      : ('$limit', 'plantillas'); // i18n: Fase W3
+}
+
 /// Formatea un monto ARS con separador de miles (12.000).
 String _formatArs(int amount) {
   final s = amount.toString();
@@ -928,6 +945,7 @@ class _PlanCard extends StatelessWidget {
     final cycleLabel = annual ? 'POR AÑO' : 'POR MES'; // i18n: Fase W3
     final (studentsNum, studentsLabel) = _tierStudents(tier);
     final (exercisesNum, exercisesLabel) = _tierExercises(tier);
+    final (templatesNum, templatesLabel) = _tierTemplates(tier);
 
     final card = Container(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -1062,6 +1080,30 @@ class _PlanCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.hairline),
               Text(
                 exercisesLabel,
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.caption),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.hairline),
+          // Plantillas — misma jerarquía secundaria que ejercicios propios.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                templatesNum,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
+                  color: palette.textPrimary,
+                  fontSize: AppTextSize.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.hairline),
+              Text(
+                templatesLabel,
                 style: TextStyle(
                     color: palette.textMuted, fontSize: AppTextSize.caption),
               ),
@@ -1260,6 +1302,14 @@ class _NarrowPlanCard extends StatelessWidget {
           // propios sin límite» sin nunca interpolar el `null` de Plan 3.
           Text(
             ejerciciosTexto(tier), // i18n: Fase W3
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
+          ),
+          const SizedBox(height: AppSpacing.hairline),
+          // Plantillas — mismo criterio que ejercicios propios arriba: una
+          // sola oración, `plantillasTexto` de `plan_copy.dart`.
+          Text(
+            plantillasTexto(tier), // i18n: Fase W3
             style: TextStyle(
                 color: palette.textMuted, fontSize: AppTextSize.caption),
           ),

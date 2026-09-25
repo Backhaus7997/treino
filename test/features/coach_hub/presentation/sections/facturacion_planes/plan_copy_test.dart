@@ -43,4 +43,38 @@ void main() {
       }
     });
   });
+
+  // Mismo eje, para plantillas (docs/limite-plantillas-pf.md §3 PR5):
+  // `tier.templateLimit == null` (todo lo que no sea Free) nunca renderiza
+  // «null».
+  group('plantillasTexto', () {
+    test('Free → "3 plantillas"', () {
+      expect(plantillasTexto(SubscriptionTier.free), '3 plantillas');
+    });
+
+    test('Plan 1 (sin límite) → "plantillas sin límite", nunca null', () {
+      final texto = plantillasTexto(SubscriptionTier.plan1);
+
+      expect(texto, 'plantillas sin límite');
+      expect(texto.toLowerCase().contains('null'), isFalse);
+    });
+
+    test('Plan 2 (sin límite) → "plantillas sin límite"', () {
+      expect(plantillasTexto(SubscriptionTier.plan2), 'plantillas sin límite');
+    });
+
+    test('Plan 3 (sin límite) → "plantillas sin límite"', () {
+      expect(plantillasTexto(SubscriptionTier.plan3), 'plantillas sin límite');
+    });
+
+    test('nunca devuelve un string que contenga "null", para ningún tier', () {
+      for (final tier in SubscriptionTier.values) {
+        expect(
+          plantillasTexto(tier).toLowerCase().contains('null'),
+          isFalse,
+          reason: 'plantillasTexto($tier) publicó la palabra "null"',
+        );
+      }
+    });
+  });
 }
