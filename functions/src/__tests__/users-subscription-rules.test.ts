@@ -1104,6 +1104,10 @@ describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos 
   // `templateQuotaOk` realmente lee.
 
   it("deniega al dueño escribirse planLimits.templates de la nada (create)", async () => {
+    // `role: 'athlete'` a propósito, no 'trainer': el CREATE de users/{uid}
+    // ya exige `role == 'athlete'` (self-registration, AGENTS.md regla 3) —
+    // con 'trainer' esto fallaría por ESE motivo y el test sería vacuo,
+    // sin ejercitar el pin de `planLimits` en absoluto.
     const freshUid = `${uid}-templates-create`;
     const client = testEnv.authenticatedContext(freshUid);
     const ref = client.firestore().collection(COL_USERS).doc(freshUid);
@@ -1111,7 +1115,7 @@ describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos 
     await assertFails(
       ref.set({
         uid: freshUid,
-        role: "trainer",
+        role: "athlete",
         email: `${freshUid}@example.test`,
         createdAt: 0,
         planLimits: { templates: null },
@@ -1120,6 +1124,7 @@ describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos 
   });
 
   it("deniega al dueño escribirse templateUsage de la nada (create)", async () => {
+    // Mismo motivo que el test de arriba: 'athlete', no 'trainer'.
     const freshUid = `${uid}-template-usage-create`;
     const client = testEnv.authenticatedContext(freshUid);
     const ref = client.firestore().collection(COL_USERS).doc(freshUid);
@@ -1127,7 +1132,7 @@ describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos 
     await assertFails(
       ref.set({
         uid: freshUid,
-        role: "trainer",
+        role: "athlete",
         email: `${freshUid}@example.test`,
         createdAt: 0,
         templateUsage: { count: 0 },
@@ -1186,7 +1191,7 @@ describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos 
     );
   });
 
-  it("el Admin SDK (syncTrainerEntitlements/recountCustomExercises/recountTemplates) SI puede escribir los cuatro campos", async () => {
+  it("el Admin SDK (recountCustomExercises/recountTemplates) SI puede escribir los cuatro campos", async () => {
     const cfUid = `${uid}-cf`;
     await seedUser({
       uid: cfUid,

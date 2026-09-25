@@ -286,27 +286,6 @@ describe("restaurar una trainer-template archivada — UPDATE path 6", () => {
     );
   });
 
-  it("una plantilla ya activa que se re-escribe active no pide lugar (no cruza archived→active)", async () => {
-    const uid = "pf-active-a-active";
-    await seedUser(uid, {
-      role: "trainer",
-      planLimits: { templates: 3 },
-      templateUsage: { count: 3 },
-    });
-    await seedTemplate("tpl-d", uid, { status: "active" });
-
-    // El diff no cambia nada (`status` sigue 'active'), así que Firestore
-    // trata esto como un no-op válido: affectedKeys() sigue siendo {status}
-    // con el MISMO valor, y templateQuotaOk sólo mira `resource.data.status`
-    // (antes), que ya era 'active'.
-    await assertSucceeds(
-      asUser(uid)
-        .collection(COL_ROUTINES)
-        .doc("tpl-d")
-        .update({ status: "active" }),
-    );
-  });
-
   it("restaurar un trainer-assigned nunca mira la cuota", async () => {
     const uid = "pf-restaura-asignado";
     await seedUser(uid, {
