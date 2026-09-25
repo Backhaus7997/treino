@@ -34,6 +34,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
 import '../../../../coach/presentation/custom_exercise_limit_gate.dart';
+import '../../../../coach/presentation/template_limit_gate.dart';
 import '../facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
 import '../../../../onboarding/domain/onboarding_surface.dart';
@@ -2179,6 +2180,17 @@ class _RoutineEditorWebScreenState
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
 
+    // docs/limite-plantillas-pf.md PR3: "guardar como copia" y "guardar
+    // plantilla nueva" son las DOS ramas de este método que escriben un
+    // `trainer-template` nuevo (ver el `if`/`else if` más abajo). Gatear ACÁ,
+    // antes de armar nada, para las dos — y reusar el mismo booleano en el
+    // `catch` para el rebote del servidor.
+    final creaPlantillaNueva =
+        modo == _ModoDeGuardado.copia || (!_isEditing && widget.isTemplate);
+    if (creaPlantillaNueva && !await intentarCrearPlantilla(context, ref)) {
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _errorMessage = null;
@@ -2374,6 +2386,16 @@ class _RoutineEditorWebScreenState
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
+        // El rebote del tope de plantillas (docs/limite-plantillas-pf.md
+        // PR3) va ANTES de `_onWriteDenied`: aquél asume que un
+        // permission-denied es el paywall de rutinas por-alumno, y en las
+        // ramas que crean una plantilla el rechazo real es
+        // `templateQuotaOk`, no ese paywall.
+        if (creaPlantillaNueva &&
+            await mostrarAvisoTopeDePlantillasPorRebote(context, ref)) {
+          if (mounted) setState(() => _submitting = false);
+          return;
+        }
         _onWriteDenied(trainerUid: trainerUid, modo: modo);
         return;
       }

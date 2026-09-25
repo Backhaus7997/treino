@@ -2,6 +2,7 @@
 // Hub web (Fase 5, WU-04). Sin widgets: aislado a nivel de ProviderContainer
 // para verificar la llamada al repo + la invalidación del listado.
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -142,10 +143,11 @@ void main() {
   });
 
   group('RoutineActionsNotifier.unarchive', () {
-    // EL test de este grupo. `archive` y `unarchive` comparten `_flipStatus`,
-    // que recibe QUÉ escribir como callback: es una función de un renglón de
-    // distancia entre «recuperar» y «archivar de nuevo». Mismo modo de falla
-    // que el de publicar/despublicar, y por eso mismo el control es el mismo.
+    // EL test de este grupo. `unarchive` YA NO comparte `_flipStatus` con
+    // `archive` (docs/limite-plantillas-pf.md PR3): restaurar una plantilla
+    // pide lugar en el tope, así que necesita distinguir el
+    // `permission-denied` de esa regla de cualquier otro fallo, y `_flipStatus`
+    // colapsa todo a `bool`. `archive` sigue usándolo — no pide nada.
     //
     // Si «Recuperar» archivara, el PF no vería NADA raro: la rutina ya estaba
     // archivada y sigue archivada. El botón sería un no-op perfecto.
@@ -155,13 +157,13 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      final ok =
+      final resultado =
           await container.read(routineActionsProvider.notifier).unarchive(
                 routineId: 'r1',
                 trainerId: _trainerId,
                 athleteId: _athleteId,
               );
-      expect(ok, isTrue);
+      expect(resultado, ResultadoDeRestaurar.ok);
       verify(() => mockRepo.unarchive('r1')).called(1);
       verifyNever(() => mockRepo.archive(any()));
     });
@@ -241,19 +243,37 @@ void main() {
       expect(getByIdCalls, 2);
     });
 
-    test('si el repo falla devuelve false y no propaga', () async {
+    test('si el repo falla devuelve falloAlRestaurar y no propaga', () async {
       when(() => mockRepo.unarchive(any())).thenThrow(Exception('boom'));
 
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      final ok =
+      final resultado =
           await container.read(routineActionsProvider.notifier).unarchive(
                 routineId: 'r1',
                 trainerId: _trainerId,
                 athleteId: _athleteId,
               );
-      expect(ok, isFalse);
+      expect(resultado, ResultadoDeRestaurar.falloAlRestaurar);
+    });
+
+    test('si el repo rechaza por permission-denied devuelve topeDePlantillas',
+        () async {
+      when(() => mockRepo.unarchive(any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final resultado =
+          await container.read(routineActionsProvider.notifier).unarchive(
+                routineId: 'r1',
+                trainerId: _trainerId,
+                athleteId: _athleteId,
+              );
+      expect(resultado, ResultadoDeRestaurar.topeDePlantillas);
     });
   });
 
@@ -482,6 +502,55 @@ void main() {
       expect(creada.source, RoutineSource.trainerTemplate);
       expect(creada.assignedTo, isNull);
       expect(creada.visibility, RoutineVisibility.private);
+    });
+
+    // R6 (docs/limite-plantillas-pf.md §7): sin forzar `status`, publicar un
+    // plan ARCHIVADO heredaba ese status y la plantilla nacía invisible en la
+    // biblioteca del PF.
+    test('la plantilla nace ACTIVA aunque el plan de origen esté archivado',
+        () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan.copyWith(status: RoutineStatus.archived),
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      final creada = verify(() => mockRepo.createTemplate(captureAny()))
+          .captured
+          .single as Routine;
+      expect(creada.status, RoutineStatus.active);
+    });
+
+    // El rebote del tope (docs/limite-plantillas-pf.md PR3): distinto de
+    // `falloAlCrear` porque el call site tiene que mostrar el aviso del tope,
+    // no el error genérico.
+    test('si createTemplate rechaza por permission-denied, dice el tope',
+        () async {
+      when(() => mockRepo.createTemplate(any())).thenThrow(
+        FirebaseException(plugin: 'cloud_firestore', code: 'permission-denied'),
+      );
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final res = await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      expect(res, ResultadoDePublicar.topeDePlantillas);
+      verifyNever(() => mockRepo.publishTemplate(any()));
     });
 
     // El estado del medio, que es el que justifica que esto no devuelva bool:

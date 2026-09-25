@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/tokens.dart';
 import '../../../../../l10n/app_l10n.dart';
+import '../../../../coach/presentation/template_limit_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_source.dart';
@@ -562,10 +563,16 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       if (confirmado != true || !mounted) return;
     }
 
+    // docs/limite-plantillas-pf.md P4: restaurar una PLANTILLA pide lugar en
+    // el tope; un plan asignado (`asignada == true`) nunca es una plantilla,
+    // así que no se gatea.
+    final esPlantilla = r.source == RoutineSource.trainerTemplate;
+    if (esPlantilla && !await intentarCrearPlantilla(context, ref)) return;
+
     setState(() => _ocupado = true);
     final trainerId = ref.read(currentUidProvider) ?? '';
-    final ok = trainerId.isEmpty
-        ? false
+    final resultado = trainerId.isEmpty
+        ? ResultadoDeRestaurar.falloAlRestaurar
         : await ref.read(routineActionsProvider.notifier).unarchive(
               routineId: r.id,
               trainerId: trainerId,
@@ -574,14 +581,19 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (!mounted) return;
     setState(() => _ocupado = false);
-    if (!ok) {
-      _avisar('No se pudo. Probá de nuevo.'); // i18n
-      return;
+    switch (resultado) {
+      case ResultadoDeRestaurar.ok:
+        _avisar(asignada
+            // i18n
+            ? '«${r.name}» vuelve a estar activa${nombre == null ? '' : ' para $nombre'}.'
+            : '«${r.name}» vuelve a tu biblioteca.'); // i18n
+      case ResultadoDeRestaurar.topeDePlantillas:
+        // El contador local se adelantó o hubo una carrera: el mismo aviso
+        // que el embudo, no el mensaje genérico de abajo.
+        await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+      case ResultadoDeRestaurar.falloAlRestaurar:
+        _avisar('No se pudo. Probá de nuevo.'); // i18n
     }
-    _avisar(asignada
-        // i18n
-        ? '«${r.name}» vuelve a estar activa${nombre == null ? '' : ' para $nombre'}.'
-        : '«${r.name}» vuelve a tu biblioteca.'); // i18n
   }
 
   /// Publica el plan de un alumno COMO PLANTILLA.
@@ -596,6 +608,11 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
   /// llamarse por su dueño. Heredarlo en silencio filtraría el nombre de una
   /// clienta a un catálogo público.
   Future<void> _publicarComoPlantilla(Routine r) async {
+    // docs/limite-plantillas-pf.md PR3: gatear ANTES de pedir el nombre —
+    // esto crea una plantilla nueva.
+    if (!await intentarCrearPlantilla(context, ref)) return;
+    if (!mounted) return;
+
     final nombreAlumno = _nombreDelAlumno(ref, r);
     final nombre = await showTreinoDialog<String>(
       context,
@@ -618,6 +635,12 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (!mounted) return;
     setState(() => _ocupado = false);
+    // El tope de plantillas se maneja aparte: es el único caso que muestra el
+    // aviso del embudo (con VER PLANES) y no un snackbar de texto.
+    if (resultado == ResultadoDePublicar.topeDePlantillas) {
+      await mostrarAvisoTopeDePlantillasPorRebote(context, ref);
+      return;
+    }
     _avisar(switch (resultado) {
       // i18n
       ResultadoDePublicar.ok => '«$nombre» ya es pública. El plan de '
@@ -637,6 +660,8 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       // desalinearía si el texto de esa clave cambia.
       ResultadoDePublicar.bloqueadoPorModeracion =>
         AppL10n.of(context).moderationBlockedMessage,
+      ResultadoDePublicar.topeDePlantillas =>
+        throw StateError('manejado arriba'),
     });
   }
 
