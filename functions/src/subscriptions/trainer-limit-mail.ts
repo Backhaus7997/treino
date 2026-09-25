@@ -1,6 +1,14 @@
 /**
- * trainer-limit-mail.ts — el mail al PF que chocó el tope de ejercicios
- * propios de su plan (limite-ejercicios-pf.md, §3 PR4).
+ * trainer-limit-mail.ts — el mail al PF que chocó un tope de su plan:
+ * ejercicios propios (limite-ejercicios-pf.md, §3 PR4) o plantillas
+ * (limite-plantillas-pf.md, §3 PR4).
+ *
+ * GENERALIZADO POR `kind`: cada tope tiene su propia clave de `planLimits`,
+ * su propio campo de uso y su propio `MailKind`, todo en `CAMPOS_POR_KIND`
+ * más abajo. El resto del módulo —las cuatro cláusulas, la ventana, el
+ * enfriamiento— es idéntico para los dos, porque son la MISMA pregunta
+ * ("¿sigue en el tope, y hace cuánto que no le avisamos?") sobre datos
+ * distintos.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  *  POR QUE HACE FALTA UN MAIL
@@ -16,9 +24,10 @@
  * Calcado de `free-limit-mail.ts` (#1149): estructura, horario relativo,
  * ventana de 36 horas y enfriamiento de 14 días. Difiere en UNA cosa: la
  * cláusula 3 no depende de una query aparte ("¿ya paga?") sino de los MISMOS
- * dos campos que la regla de PR2 ya lee — `planLimits.customExercises` y
- * `customExerciseUsage.count` — así que la decisión entera es pura sobre el
- * documento de `users/{uid}`, sin una segunda lectura.
+ * dos campos que la regla equivalente ya lee para cada tope —
+ * `planLimits.<clave>` y `<campo de uso>.count`, ver `CAMPOS_POR_KIND` — así
+ * que la decisión entera es pura sobre el documento de `users/{uid}`, sin una
+ * segunda lectura.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  *  LAS CUATRO CLAUSULAS DEL SILENCIO (idénticas en espíritu a free-limit-mail)
@@ -30,11 +39,11 @@
  *   2. **Anotación vieja → silencio.** El mail vale porque llega CERCA del
  *      intento (ventana de 36 h, igual razón que en `free-limit-mail.ts`).
  *
- *   3. **Ya no está en el tope → silencio.** `count < limit`, o
- *      `planLimits.customExercises` es `null`/ausente (sin tope, interruptor
- *      apagado, o el PF subió de plan y el barrido de las 04:00 ya lo
- *      reflejó). Escribirle "hay una salida" a quien ya la tiene es el
- *      mismo error caro que documenta `free-limit-mail.ts`.
+ *   3. **Ya no está en el tope → silencio.** `count < limit`, o el `planLimits`
+ *      del tope que chocó es `null`/ausente (sin tope, interruptor apagado, o
+ *      el PF subió de plan y el barrido de las 04:00 ya lo reflejó).
+ *      Escribirle "hay una salida" a quien ya la tiene es el mismo error caro
+ *      que documenta `free-limit-mail.ts`.
  *
  *   4. **Enfriamiento de 14 días → silencio.** Un PF que sigue en el tope
  *      todos los días —porque no quiere pagar más, no porque no se dio
@@ -86,10 +95,54 @@ import { trainerWebCheckout } from "../mail/templates";
 
 /** El campo que anota el cliente al rebotar contra el tope (PR3, plan §2). */
 export const CAMPO_TOPE_AT = "trainerLimitHitAt";
-/** Qué tope se tocó. Hoy sólo existe `"customExercises"`. */
+/** Qué tope se tocó: `"customExercises"` o `"templates"`. */
 export const CAMPO_TOPE_KIND = "trainerLimitHitKind";
-/** Cuándo se le escribió por última vez. Lo escribe este módulo. */
+/**
+ * Cuándo se le escribió por última vez. Lo escribe este módulo.
+ *
+ * COMPARTIDO entre los dos topes a propósito (limite-plantillas-pf.md §3
+ * PR4): un PF que choca los dos en la misma ventana recibe UN mail cada 14
+ * días, no uno por tope. El problema que el enfriamiento evita es el spam,
+ * no "qué tope fue".
+ */
 export const CAMPO_MAIL_AT = "trainerLimitMailAt";
+
+/**
+ * Qué mirar en `users/{uid}` para cada valor posible de `trainerLimitHitKind`.
+ *
+ * Un kind que no está acá (ausente, corrupto, o un valor que todavía no
+ * existe) NO cae a `customExercises` — revisado por Codex (hilo
+ * `01a0d934-760f-7763-9948-ba9bb43fe98a`): con UN solo tope posible,
+ * "no sé cuál" y "es el único que existe" eran la misma cosa, pero con DOS
+ * dejaron de serlo. Adivinar `customExercises` para un PF que en realidad
+ * chocó `templates` manda un mail que dice una mentira concreta — "llegaste
+ * al tope de EJERCICIOS"—, y es el mismo error que AGENTS.md §11.1 marca
+ * como peor que no decir nada. `decideTrainerLimitMail` falla CERRADO (sin
+ * mail) para cualquier kind que esta tabla no reconoce.
+ */
+interface CamposDelTope {
+  /** Clave dentro de `planLimits`. */
+  limitField: "customExercises" | "templates";
+  /** Campo del doc del usuario con `{count: number}`. */
+  usageField: "customExerciseUsage" | "templateUsage";
+  /** El `MailKind` que corresponde a este tope. */
+  mailKind: TrainerLimitMailKind;
+}
+
+export type TrainerLimitMailKind = "exercise-limit-reached" | "template-limit-reached";
+
+const CAMPOS_POR_KIND: Record<string, CamposDelTope> = {
+  customExercises: {
+    limitField: "customExercises",
+    usageField: "customExerciseUsage",
+    mailKind: "exercise-limit-reached",
+  },
+  templates: {
+    limitField: "templates",
+    usageField: "templateUsage",
+    mailKind: "template-limit-reached",
+  },
+};
 
 /** Ver el encabezado — "EL prefKey". Mismo valor que `athlete-prospect-mail.ts`. */
 export const TRAINER_LIMIT_PREF_KEY = "novedades_plan";
@@ -101,7 +154,7 @@ export const VENTANA_MS = 36 * 60 * 60 * 1000;
 export const ENFRIAMIENTO_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface TrainerLimitMailPlan {
-  kind: "exercise-limit-reached";
+  kind: TrainerLimitMailKind;
   scope: string;
   tope: string;
   /** El tope numérico vigente. Siempre un número: ver `sigueEnElTope`. */
@@ -119,9 +172,10 @@ function msDe(valor: unknown): number | null {
 /**
  * Si el PF SIGUE en el tope ahora mismo — la cláusula 3.
  *
- * Lee los MISMOS dos campos que `customExerciseQuotaOk` en `firestore.rules`,
- * y con la MISMA semántica: `limit` no numérico (null, ausente, o corrupto)
- * es SIN TOPE — nunca "sigue en el tope". `count < limit` es "ya no está" —
+ * Lee los MISMOS dos campos que la regla equivalente en `firestore.rules`
+ * (`customExerciseQuotaOk` o `templateQuotaOk`, según `campos`), y con la
+ * MISMA semántica: `limit` no numérico (null, ausente, o corrupto) es SIN
+ * TOPE — nunca "sigue en el tope". `count < limit` es "ya no está" —
  * `count >= limit` es lo único que mantiene el mail vivo (E6: en el tope
  * exacto SÍ cuenta como "en el tope", porque ahí es donde el próximo create
  * rebota).
@@ -129,12 +183,16 @@ function msDe(valor: unknown): number | null {
  * Devuelve el límite ya angosto a `number` para que el productor no tenga que
  * repetir el chequeo de tipo.
  */
-function sigueEnElTope(userData: DocumentData | undefined): number | null {
-  const limit = (userData?.planLimits as { customExercises?: unknown } | undefined)
-    ?.customExercises;
+function sigueEnElTope(
+  userData: DocumentData | undefined,
+  campos: CamposDelTope,
+): number | null {
+  const limit = (userData?.planLimits as Record<string, unknown> | undefined)?.[
+    campos.limitField
+  ];
   if (typeof limit !== "number" || !Number.isFinite(limit)) return null;
 
-  const countRaw = (userData?.customExerciseUsage as { count?: unknown } | undefined)
+  const countRaw = (userData?.[campos.usageField] as { count?: unknown } | undefined)
     ?.count;
   const count = typeof countRaw === "number" && Number.isFinite(countRaw) ? countRaw : 0;
 
@@ -162,7 +220,12 @@ export function decideTrainerLimitMail(
   // El mail vale porque llega CERCA del intento. Ver la clausula 2.
   if (nowMs - tocadoMs > VENTANA_MS) return null;
 
-  const limit = sigueEnElTope(userData);
+  const topeRaw = userData?.[CAMPO_TOPE_KIND];
+  const tope = typeof topeRaw === "string" && topeRaw ? topeRaw : "desconocido";
+  const campos = CAMPOS_POR_KIND[tope];
+  if (!campos) return null; // kind sin reconocer: no sabemos que tope mirar
+
+  const limit = sigueEnElTope(userData, campos);
   if (limit === null) return null; // clausula 3
 
   // EL ENFRIAMIENTO. Ver la clausula 4: sin esto, un PF que sigue en el tope
@@ -170,11 +233,10 @@ export function decideTrainerLimitMail(
   const ultimoMs = msDe(userData?.[CAMPO_MAIL_AT]);
   if (ultimoMs !== null && nowMs - ultimoMs < ENFRIAMIENTO_MS) return null;
 
-  const tope = userData?.[CAMPO_TOPE_KIND];
   return {
-    kind: "exercise-limit-reached",
+    kind: campos.mailKind,
     scope: `tope_${artDateKey(nowMs)}`,
-    tope: typeof tope === "string" && tope ? tope : "desconocido",
+    tope,
     limit,
   };
 }
@@ -244,7 +306,9 @@ export interface ResultadoDelBarrido {
 }
 
 /**
- * Le escribe a los PF que chocaron el tope de ejercicios propios y siguen ahí.
+ * Le escribe a los PF que chocaron un tope de su plan —ejercicios propios o
+ * plantillas— y siguen ahí. `decideTrainerLimitMail` decide cuál mirar según
+ * `CAMPO_TOPE_KIND`.
  *
  * ── La query, y por que trae tan poco ──
  *
