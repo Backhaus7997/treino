@@ -1,7 +1,9 @@
 /**
- * trainer-plan-limits.ts — el interruptor y el escritor del tope de
- * ejercicios propios del PF, `users/{uid}.planLimits.customExercises`
- * (limite-ejercicios-pf.md, PR1).
+ * trainer-plan-limits.ts — los interruptores y los escritores de los topes
+ * del PF en `users/{uid}.planLimits`: ejercicios propios
+ * (`customExercises`, limite-ejercicios-pf.md, PR1) y plantillas
+ * (`templates`, limite-plantillas-pf.md, PR1). Las plantillas tienen su
+ * propio encabezado al final de este bloque.
  *
  * ─── Por que existe este campo ──────────────────────────────────────────────
  *
@@ -51,13 +53,25 @@
  * El rollback es el mismo interruptor en `false` y un deploy: en el proximo
  * sync `planLimits` vuelve a `null` y la regla y el cliente dejan de gatear.
  * No hay nada que migrar.
+ *
+ * ─── Plantillas (limite-plantillas-pf.md, PR1) ──────────────────────────────
+ *
+ * El mismo molde con una clave mas: `planLimits.templates` (el tope) y
+ * `templateUsage.count` (plantillas NO archivadas del PF). Con su PROPIO
+ * interruptor, [TRAINER_TEMPLATE_LIMITS_ENABLED], para poder encender las
+ * plantillas sin tocar los ejercicios y al reves: `resolvePlanLimits` resuelve
+ * cada clave con el suyo y ninguno opina sobre la clave del otro.
+ *
+ * El recuento NO esta calcado de `recountCustomExercises`: corre en una
+ * transaccion. Ver el dartdoc de [recountTemplates] para la carrera que eso
+ * cierra y que el de ejercicios todavia tiene.
  */
 
 import { App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
 import { effectiveTier, SubscriptionState } from "./effective-limit";
-import { TIER_CUSTOM_EXERCISE_LIMITS } from "./tier-config";
+import { TIER_CUSTOM_EXERCISE_LIMITS, TIER_TEMPLATE_LIMITS } from "./tier-config";
 
 /** El interruptor. Ver el encabezado antes de tocarlo. */
 export const TRAINER_EXERCISE_LIMITS_ENABLED = false;
@@ -65,10 +79,25 @@ export const TRAINER_EXERCISE_LIMITS_ENABLED = false;
 /** El campo que escribe este modulo, y nadie mas. */
 export const USAGE_FIELD = "customExerciseUsage";
 
+/**
+ * El interruptor del tope de plantillas (limite-plantillas-pf.md, PR1).
+ * Arranca APAGADO por el mismo motivo que el de ejercicios: la plomeria corre
+ * y escribe `{templates: null}` en produccion antes de que importe, y
+ * encenderlo es un cambio de valor. Ver el encabezado antes de tocarlo.
+ */
+export const TRAINER_TEMPLATE_LIMITS_ENABLED = false;
+
+/** El contador de plantillas: lo escribe [recountTemplates], y nadie mas. */
+export const TEMPLATE_USAGE_FIELD = "templateUsage";
+
 /** La forma de `users/{uid}.planLimits`, tal cual la escribe este modulo. */
 export interface TrainerPlanLimits {
   customExercises: number | null;
+  templates: number | null;
 }
+
+/** Un interruptor por clave de `planLimits`. */
+export type PlanLimitSwitches = Record<keyof TrainerPlanLimits, boolean>;
 
 /** El tope de ejercicios propios que le corresponde a un tier. */
 export function customExerciseLimitFor(
@@ -80,30 +109,70 @@ export function customExerciseLimitFor(
 }
 
 /**
- * Que `planLimits` le corresponde a un PF, o `null` para decir «no tocar».
+ * El tope de plantillas que le corresponde a un tier. Calcado de
+ * [customExerciseLimitFor]: `hasOwnProperty` y no `??`, porque `null` es SIN
+ * TOPE y un `??` convertiria el plan mas caro en el mas chico.
+ */
+export function templateLimitFor(
+  tier: SubscriptionState["tier"],
+): number | null {
+  return Object.prototype.hasOwnProperty.call(TIER_TEMPLATE_LIMITS, tier)
+    ? TIER_TEMPLATE_LIMITS[tier]
+    : TIER_TEMPLATE_LIMITS.free;
+}
+
+/**
+ * Que `planLimits` le corresponde a un PF, o `null` para decir «no tocar
+ * nada».
  *
- * `enabled` es parametro y no la constante leida directo, mismo motivo que
+ * `switches` es parametro y no las constantes leidas directo, mismo motivo que
  * `resolveAthletePaywallEnforced`: si no, el camino PRENDIDO se shipearia sin
  * un solo test encima.
  *
- * - Apagado (`enabled === false`): `{customExercises: null}` para TODOS,
- *   incluido un PF de plan3 o uno degradado. La plomeria queda escrita y
- *   observable antes de importar.
- * - `degraded === true`: devuelve `null` (no tocar). Sobre un documento que
- *   sabemos que leimos mal no se decide nada — mismo criterio que el resto de
- *   `subscription-mail.ts` (ver `decideSubscriptionMail`/`decideExpiryMail`,
- *   que tambien cortan temprano con `if (degraded) return null`).
- * - Encendido y sano: `{customExercises: customExerciseLimitFor(effectiveTier(sub, nowMs))}`.
+ * CADA CLAVE SE RESUELVE CON SU INTERRUPTOR, y ninguno opina sobre la clave
+ * del otro:
+ *
+ * - Clave apagada: `null`, para TODOS — incluido un PF de plan3 o uno
+ *   degradado. El valor no depende de nada que se haya podido leer mal, asi
+ *   que la plomeria queda escrita y observable antes de importar.
+ * - Clave prendida y `degraded === true`: la clave se OMITE (no tocar). Sobre
+ *   un documento que sabemos que leimos mal no se decide nada — mismo
+ *   criterio que `decideSubscriptionMail`/`decideExpiryMail`, que cortan con
+ *   `if (degraded) return null`.
+ * - Clave prendida y sana: el tope del tier efectivo.
+ *
+ * Por eso con `degraded` puede salir un mapa PARCIAL (la clave apagada en
+ * `null`, sin la prendida), y `sync-entitlements.ts` lo escribe con
+ * `merge: true`, que en Firestore mergea los mapas anidados campo por campo:
+ * la clave omitida queda como estaba (probado contra el emulador en
+ * `template-count.test.ts`). Resolverlo todo-o-nada seria mas simple, pero
+ * haria que prender las plantillas cambie lo que se escribe en la clave de
+ * ejercicios cuando el doc esta degradado. Si no queda ninguna clave —las dos
+ * prendidas y `degraded`— devuelve `null`, como antes.
+ *
+ * Sano, SIEMPRE devuelve el mapa completo: las dos claves viajan explicitas,
+ * aunque sean `null`, porque con `merge: true` omitirlas es "no tocar" y un
+ * numero viejo quedaria pegado.
  */
 export function resolvePlanLimits(
   sub: SubscriptionState | null | undefined,
   degraded: boolean,
   nowMs: number,
-  enabled: boolean = TRAINER_EXERCISE_LIMITS_ENABLED,
-): TrainerPlanLimits | null {
-  if (!enabled) return { customExercises: null };
-  if (degraded) return null;
-  return { customExercises: customExerciseLimitFor(effectiveTier(sub, nowMs)) };
+  switches: PlanLimitSwitches = {
+    customExercises: TRAINER_EXERCISE_LIMITS_ENABLED,
+    templates: TRAINER_TEMPLATE_LIMITS_ENABLED,
+  },
+): Partial<TrainerPlanLimits> | null {
+  const tier = effectiveTier(sub, nowMs);
+  const limits: Partial<TrainerPlanLimits> = {};
+
+  if (!switches.customExercises) limits.customExercises = null;
+  else if (!degraded) limits.customExercises = customExerciseLimitFor(tier);
+
+  if (!switches.templates) limits.templates = null;
+  else if (!degraded) limits.templates = templateLimitFor(tier);
+
+  return Object.keys(limits).length > 0 ? limits : null;
 }
 
 export interface RecountResult {
@@ -156,4 +225,101 @@ export async function recountCustomExercises(
   }
 
   return { uid, count, changed };
+}
+
+/**
+ * Las plantillas de un PF: `routines` con `assignedBy == uid` y
+ * `source == 'trainer-template'`. Dos igualdades sin `orderBy`, que Firestore
+ * sirve con el merge de los indices automaticos de un campo — no hace falta
+ * un compuesto (limite-plantillas-pf.md §3, PR1: «Indices: ninguno nuevo», y
+ * `docs/firestore-indexes.md`).
+ */
+function templatesOf(app: App, uid: string) {
+  return getFirestore(app)
+    .collection("routines")
+    .where("assignedBy", "==", uid)
+    .where("source", "==", "trainer-template");
+}
+
+/** Solo para el test de la carrera. Ver [recountTemplates]. */
+export interface RecountTemplatesOptions {
+  /**
+   * Corre despues de contar y antes de escribir. En produccion no se pasa
+   * nunca; existe para que `template-count.test.ts` pueda meter OTRA
+   * invocacion justo en la ventana donde la carrera de abajo pierde un
+   * recuento. Adentro de la transaccion puede correr mas de una vez (un
+   * reintento vuelve a ejecutar el cuerpo entero).
+   */
+  afterCount?: () => Promise<void>;
+}
+
+/**
+ * Recuenta las plantillas NO archivadas de un PF y deja
+ * `users/{uid}.templateUsage.count` al dia. Escribe el valor ABSOLUTO, solo si
+ * cambio, y solo en un doc de perfil que exista y sea de un `trainer`.
+ *
+ * Devuelve `null` si no conto nada: sin doc de perfil (no se crea uno desde
+ * aca, mismo criterio que `reconcileVideoQuota`) o con un rol que no es
+ * `trainer` (decision P6: la cuota corta por rol; un alumno con un
+ * `trainer-template` forjado no recibe un contador que no le corresponde).
+ *
+ * ─── Total menos archivadas, no `status == 'active'` ────────────────────────
+ *
+ * `status` tiene default `active` en el modelo «para retro-compat»
+ * (`routine.dart`): una plantilla vieja sin el campo NO matchea
+ * `status == 'active'` y quedaria sin contar. `status == 'archived'` es el
+ * unico valor que libera lugar, asi que se cuenta el total y se le resta eso.
+ *
+ * ─── Por que en TRANSACCION, y no calcado de `recountCustomExercises` ───────
+ *
+ * El recuento de ejercicios cuenta y despues hace un `update` suelto. Eso lo
+ * protege de la redelivery, no de dos invocaciones concurrentes: contador en
+ * 1; el evento A cuenta 2 y se demora; el evento B cuenta 3 y escribe 3; A
+ * escribe 2. Quedan 3 plantillas con el contador en 2, y la regla deja crear
+ * una cuarta hasta el barrido de las 04:00.
+ *
+ * Adentro de una transaccion, las dos lecturas y la escritura van juntas: si
+ * otro recuento escribio el doc del usuario despues de que este lo leyo, este
+ * commit no pasa y el cuerpo se reintenta, contando de nuevo. El que escribe
+ * ultimo conto despues del otro. El SDK de `functions/`
+ * (`@google-cloud/firestore` 7.x) acepta el `AggregateQuery` de `count()` en
+ * `transaction.get()` — verificado en sus tipos, no asumido.
+ *
+ * El doc del usuario se lee PRIMERO y solo despues se cuenta, a proposito: el
+ * orden es lo que garantiza que el conteo del que gana sea posterior a la
+ * escritura del que perdio. Con un `Promise.all` de las tres lecturas, el
+ * conteo podria salir de antes del commit ajeno aunque la lectura del doc
+ * saliera de despues.
+ */
+export async function recountTemplates(
+  app: App,
+  uid: string,
+  options: RecountTemplatesOptions = {},
+): Promise<RecountResult | null> {
+  const db = getFirestore(app);
+  const userRef = db.collection("users").doc(uid);
+  const templates = templatesOf(app, uid);
+
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists || snap.get("role") !== "trainer") return null;
+
+    const [total, archived] = await Promise.all([
+      tx.get(templates.count()),
+      tx.get(templates.where("status", "==", "archived").count()),
+    ]);
+    // Las archivadas son un subconjunto del total y las dos lecturas van en la
+    // misma transaccion, asi que la resta no baja de 0. El piso es defensivo:
+    // el cliente muestra este numero («2 de 3»), y un negativo no tiene
+    // ninguna lectura posible.
+    const count = Math.max(0, total.data().count - archived.data().count);
+
+    await options.afterCount?.();
+
+    const prev = snap.get(TEMPLATE_USAGE_FIELD) as { count?: number } | undefined;
+    const changed = prev?.count !== count;
+    if (changed) tx.update(userRef, { [TEMPLATE_USAGE_FIELD]: { count } });
+
+    return { uid, count, changed };
+  });
 }
