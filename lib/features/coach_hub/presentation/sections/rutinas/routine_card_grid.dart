@@ -568,6 +568,7 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     // así que no se gatea.
     final esPlantilla = r.source == RoutineSource.trainerTemplate;
     if (esPlantilla && !await intentarCrearPlantilla(context, ref)) return;
+    if (!mounted) return;
 
     setState(() => _ocupado = true);
     final trainerId = ref.read(currentUidProvider) ?? '';
