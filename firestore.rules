@@ -353,6 +353,15 @@ service cloud.firestore {
                     // denormalizado de cuántos ejercicios propios tiene HOY
                     // este PF, que escribe `recountCustomExercises`.
                     && request.resource.data.get('customExerciseUsage', null) == null
+                    // templateUsage: CF-write-only, el par de plantillas de
+                    // `customExerciseUsage` (limite-plantillas-pf.md, PR2). Es
+                    // el contador de plantillas NO archivadas del PF, que
+                    // escribe `recountTemplates` y lee `templateQuotaOk`. Sin
+                    // el pin, `{templateUsage: {count: 0}}` le devuelve el
+                    // lugar a quien lo mande. La clave `templates` de
+                    // `planLimits` no necesita pin propio: viaja dentro del
+                    // mapa que ya está pineado arriba.
+                    && request.resource.data.get('templateUsage', null) == null
                     // chatMediaUsage: CF-write-only, mismo peso y mismo modo de
                     // falla que el de arriba. Es el total de BYTES de media de
                     // chat de este usuario, que escribe `maintainChatMediaQuota*`
@@ -480,6 +489,10 @@ service cloud.firestore {
                     // customExerciseUsage: CF-write-only, mismo par que
                     // `planLimits` de arriba y mismo motivo.
                     && request.resource.data.get('customExerciseUsage', null) == resource.data.get('customExerciseUsage', null)
+                    // templateUsage: CF-write-only, mismo par con el mapa
+                    // `planLimits` que el de arriba, para plantillas
+                    // (limite-plantillas-pf.md, PR2).
+                    && request.resource.data.get('templateUsage', null) == resource.data.get('templateUsage', null)
                     // chatMediaUsage: CF-write-only, pineado en los DOS verbos
                     // por la misma razon que el resto — medio pin es peor que
                     // ninguno: vuelve INDELEBLE lo que se sembro al crear.
@@ -705,6 +718,45 @@ service cloud.firestore {
                && esPlantillaDelSistema(data.copiedFrom);
       }
 
+      // templateQuotaOk: el tope de plantillas del PF por plan
+      // (limite-plantillas-pf.md §3 PR2). Calcado de `customExerciseQuotaOk`
+      // (más abajo, en `users/{uid}/customExercises`), con la otra clave de
+      // `planLimits` y el otro contador: las reglas no cuentan documentos,
+      // así que leen el número que deja `recountTemplates` (plantillas NO
+      // archivadas) en `users/{uid}`.
+      //
+      // - Sólo corta al `trainer` (decisión P6). CREATE branch 1 no chequea
+      //   rol y un alumno puede tener un `trainer-template` forjado; la cuota
+      //   no se le aplica, y lo que lo frena al publicarlo es el gate de rol
+      //   del UPDATE path 5.
+      // - SIN DOC DE PERFIL, NO SE APLICA. A diferencia de
+      //   `customExerciseQuotaOk`, que recibe `.data` ya leído, ésta lee sola
+      //   y chequea `null`, con el idioma de `paywallEnforcedFor`: tocarle
+      //   `.data` al `null` de un doc inexistente tira error de evaluación y
+      //   la regla deniega. Crear una plantilla no leía `users/{uid}` antes
+      //   de este tope, así que sin la guarda cualquier creador sin perfil
+      //   pasaría de «puede» a «no puede» por un efecto lateral. Sin doc no
+      //   hay rol `trainer`: la cuota no tiene a quién cortar.
+      // - `planLimits.templates` en `null` o AUSENTE es SIN TOPE — falla
+      //   abierta: cubre el interruptor apagado
+      //   (`TRAINER_TEMPLATE_LIMITS_ENABLED = false`) y al PF sin primer sync.
+      // - `count < limit`: con tope 3 se pueden TENER 3. Crear la tercera pasa;
+      //   la cuarta, no.
+      // - Un `planLimits.templates` que no sea número hace tirar el `<` y la
+      //   regla deniega: falla CERRADO, igual que la de ejercicios.
+      //
+      // Los dos llamadores la ponen DETRÁS de un término barato, para que el
+      // `get()` sólo se cobre cuando la escritura sube el conteo: crear una
+      // plantilla que cuenta, o restaurar una archivada.
+      function templateQuotaOk(uid) {
+        let u = get(/databases/$(database)/documents/users/$(uid));
+        return u == null
+            || u.data.get('role', '') != 'trainer'
+            || u.data.get('planLimits', {}).get('templates', null) == null
+            || u.data.get('templateUsage', {}).get('count', 0)
+                 < u.data.get('planLimits', {}).get('templates', null);
+      }
+
       // Read: público para autenticados si la rutina es `visibility: 'public'`
       // (default histórico — todas las plantillas seedeadas sin el campo
       // explícito caen en este branch). Si la rutina es privada
@@ -830,7 +882,22 @@ service cloud.firestore {
                       // default '') because the key DOES exist.
                       (request.resource.data.source == 'trainer-template'
                         && request.resource.data.visibility == 'private'
-                        && request.resource.data.assignedTo == null)
+                        && request.resource.data.assignedTo == null
+                        // Tope de plantillas del Free
+                        // (limite-plantillas-pf.md §3 PR2). Va ADENTRO de
+                        // esta alternativa y no afuera: crear un plan
+                        // asignado sigue sin lectura extra.
+                        //
+                        // Y sólo si la plantilla creada cuenta. Este create
+                        // no valida `status` y `createTemplate` conserva el
+                        // que recibe: una plantilla creada YA archivada no
+                        // suma al conteo, así que no pide lugar (rechazarla
+                        // sería un rechazo falso). Recuperarla después pasa
+                        // por el UPDATE path 6, que sí pide lugar. Sin
+                        // `status` cuenta como activa, igual que en
+                        // `recountTemplates`.
+                        && (request.resource.data.get('status', 'active') == 'archived'
+                            || templateQuotaOk(request.auth.uid)))
                     );
 
       // CREATE branch 2 (NEW): athlete self-authored — 6 conditions, all must pass.
@@ -1166,14 +1233,30 @@ service cloud.firestore {
       // publicar mete el doc en el catálogo público y un atleta puede tener
       // un `trainer-template` forjado (CREATE branch 1 es anterior a los
       // chequeos de rol). Archivar no expone nada: es estrictamente más débil
-      // que el DELETE de abajo, que ya se permite sin gate de rol. Un `get()`
-      // acá costaría una lectura facturada por archivada, a cambio de nada.
+      // que el DELETE de abajo, que ya se permite sin gate de rol.
+      //
+      // El único `get()` de este path es el del tope de plantillas
+      // (limite-plantillas-pf.md §3 PR2), y sólo al RECUPERAR una plantilla:
+      // archivar libera lugar y recuperar lo vuelve a ocupar, así que sin
+      // gate acá, archivar y recuperar sería la forma de pasarse del tope.
+      // Archivar, y todo lo que toque un plan asignado, sigue sin lectura
+      // extra: las dos guardas baratas cortan antes.
+      //
+      // Se mira el status de ANTES (`resource`) y no el nuevo: recuperar es
+      // salir de `archived`. Con el `in` y el diff de arriba, venir de
+      // `archived` implica ir a `active`, así que para los estados normales
+      // es lo mismo que preguntar por el nuevo. La diferencia es una
+      // plantilla vieja sin `status`, que ya cuenta como activa: ponerle
+      // `active` no sube el conteo y no tiene por qué pedir lugar.
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.assignedBy
                     && resource.data.source in ['trainer-template', 'trainer-assigned']
                     && request.resource.data.diff(resource.data).affectedKeys()
                          == ['status'].toSet()
-                    && request.resource.data.status in ['active', 'archived'];
+                    && request.resource.data.status in ['active', 'archived']
+                    && (resource.data.source != 'trainer-template'
+                        || resource.data.get('status', 'active') != 'archived'
+                        || templateQuotaOk(request.auth.uid));
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`

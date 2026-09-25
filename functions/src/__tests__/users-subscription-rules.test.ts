@@ -103,6 +103,11 @@ interface UserFixture {
   /// Cuantos ejercicios propios tiene HOY el PF. CF-write-only: lo escribe
   /// `recountCustomExercises`.
   customExerciseUsage?: Record<string, unknown> | null;
+  /// Cuantas plantillas NO archivadas tiene HOY el PF
+  /// (limite-plantillas-pf.md, PR1). CF-write-only: lo escribe
+  /// `recountTemplates` y lo lee `templateQuotaOk`, en el match de
+  /// `routines` de `firestore.rules`.
+  templateUsage?: Record<string, unknown> | null;
 }
 
 /** Seed a users/{uid} doc via an Admin-privileged context (rules disabled). */
@@ -994,13 +999,17 @@ describe("users rules — chatMediaUsage: el contador del tope de media de chat"
   });
 });
 
-describe("users rules — planLimits/customExerciseUsage: el tope de ejercicios propios del PF (PR2)", () => {
+describe("users rules — planLimits/customExerciseUsage/templateUsage: los dos topes del PF (PR2)", () => {
   // Hermano de customExerciseVideoUsage/chatMediaUsage y por el mismo motivo:
   // sin el pin, el bypass es UNA escritura —`{planLimits: {customExercises:
   // null}}` o `{customExerciseUsage: {count: 0}}`— y el tope que PR1 ya
-  // calcula queda decorativo para quien la mande. Los dos campos LOS LEE
-  // `customExerciseQuotaOk`, en el match de `customExercises` de este mismo
-  // `firestore.rules`.
+  // calcula queda decorativo para quien la mande. `planLimits` es un mapa
+  // COMPARTIDO por las dos claves (`customExercises` y, desde
+  // limite-plantillas-pf.md, `templates`): pinearlo entero cubre a las dos
+  // sin que la clave nueva necesite su propio pin. `templateUsage` sí es un
+  // campo propio y necesita el suyo, calcado de `customExerciseUsage`. Los
+  // tres campos los LEE `customExerciseQuotaOk`/`templateQuotaOk`, en los
+  // matches de `customExercises` y `routines` de este mismo `firestore.rules`.
   const uid = "trainer-forge-plan-limits";
 
   it("deniega al dueño escribirse planLimits de la nada (create)", async () => {
@@ -1087,7 +1096,102 @@ describe("users rules — planLimits/customExerciseUsage: el tope de ejercicios 
     );
   });
 
-  it("el Admin SDK (syncTrainerEntitlements/recountCustomExercises) SI puede escribir los dos campos", async () => {
+  // ── templateUsage (limite-plantillas-pf.md, PR2) — mismos seis casos,
+  // calcados de customExerciseUsage de arriba. planLimits.templates viaja
+  // DENTRO del mapa `planLimits`, así que ya lo cubren los tests de
+  // `planLimits` de arriba (el pin es sobre el mapa entero, no por clave) —
+  // pero se repite el de create para dejar explícita la clave que
+  // `templateQuotaOk` realmente lee.
+
+  it("deniega al dueño escribirse planLimits.templates de la nada (create)", async () => {
+    // `role: 'athlete'` a propósito, no 'trainer': el CREATE de users/{uid}
+    // ya exige `role == 'athlete'` (self-registration, AGENTS.md regla 3) —
+    // con 'trainer' esto fallaría por ESE motivo y el test sería vacuo,
+    // sin ejercitar el pin de `planLimits` en absoluto.
+    const freshUid = `${uid}-templates-create`;
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        planLimits: { templates: null },
+      }),
+    );
+  });
+
+  it("deniega al dueño escribirse templateUsage de la nada (create)", async () => {
+    // Mismo motivo que el test de arriba: 'athlete', no 'trainer'.
+    const freshUid = `${uid}-template-usage-create`;
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        templateUsage: { count: 0 },
+      }),
+    );
+  });
+
+  it("deniega al dueño subirse el tope de plantillas con un update", async () => {
+    const editUid = `${uid}-templates-update`;
+    await seedUser({
+      uid: editUid,
+      role: "trainer",
+      email: `${editUid}@example.test`,
+      createdAt: 0,
+      planLimits: { templates: 3 },
+    });
+
+    const client = testEnv.authenticatedContext(editUid);
+    const ref = client.firestore().collection(COL_USERS).doc(editUid);
+
+    await assertFails(ref.update({ planLimits: { templates: null } }));
+  });
+
+  it("deniega al dueño bajarse el contador de plantillas con un update", async () => {
+    const editUid = `${uid}-template-usage-update`;
+    await seedUser({
+      uid: editUid,
+      role: "trainer",
+      email: `${editUid}@example.test`,
+      createdAt: 0,
+      planLimits: { templates: 3 },
+      templateUsage: { count: 3 },
+    });
+
+    const client = testEnv.authenticatedContext(editUid);
+    const ref = client.firestore().collection(COL_USERS).doc(editUid);
+
+    await assertFails(ref.update({ templateUsage: { count: 0 } }));
+  });
+
+  it("deniega BORRAR templateUsage con el sentinela", async () => {
+    const delUid = `${uid}-template-usage-delete`;
+    await seedUser({
+      uid: delUid,
+      role: "trainer",
+      email: `${delUid}@example.test`,
+      createdAt: 0,
+      templateUsage: { count: 3 },
+    });
+
+    const client = testEnv.authenticatedContext(delUid);
+    const ref = client.firestore().collection(COL_USERS).doc(delUid);
+
+    await assertFails(
+      ref.update({ templateUsage: firebase.firestore.FieldValue.delete() }),
+    );
+  });
+
+  it("el Admin SDK (recountCustomExercises/recountTemplates) SI puede escribir los cuatro campos", async () => {
     const cfUid = `${uid}-cf`;
     await seedUser({
       uid: cfUid,
@@ -1103,8 +1207,9 @@ describe("users rules — planLimits/customExerciseUsage: el tope de ejercicios 
           .collection(COL_USERS)
           .doc(cfUid)
           .update({
-            planLimits: { customExercises: 60 },
+            planLimits: { customExercises: 60, templates: null },
             customExerciseUsage: { count: 12 },
+            templateUsage: { count: 3 },
           }),
       );
     });
