@@ -229,13 +229,12 @@ class _CurrentPlanCard extends StatelessWidget {
 ///
 /// ⚠️ NO usa `tier.customExerciseLimit` (la tabla estática que sí consulta
 /// `pricing_screen.dart` para vender el PLAN). Usa el tope REAL que devuelve
-/// el servidor: hoy `TRAINER_EXERCISE_LIMITS_ENABLED` está apagado
-/// (docs/limite-ejercicios-pf.md), así que `planLimits.customExercises` es
-/// `null` para TODOS los planes — no sólo Plan 3. Si esta línea mostrara
-/// «12 de 60» sacado de la tabla estática, afirmaría un tope que hoy no rige
-/// para nadie.
+/// el servidor. Si `TRAINER_EXERCISE_LIMITS_ENABLED` se apaga (rollback,
+/// docs/limite-ejercicios-pf.md §4), `planLimits.customExercises` vuelve a
+/// `null` para TODOS los planes — no sólo Plan 3 — y una línea que mostrara
+/// «12 de 60» sacado de la tabla estática afirmaría un tope que no rige.
 ///
-/// `limit == null` entonces significa DOS cosas indistinguibles desde acá
+/// `limit == null` significa entonces DOS cosas indistinguibles desde acá
 /// (Plan 3 real, o el interruptor apagado) y las dos se muestran igual: «N
 /// (sin límite)». Es la MISMA decisión que ya toma el bloque de ALUMNOS de
 /// arriba con `lim == null` («$load / sin límite») — no se oculta la fila,
