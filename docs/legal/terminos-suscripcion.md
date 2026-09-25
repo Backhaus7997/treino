@@ -22,8 +22,10 @@ dart: kSubscriptionSections
 > **Qué falta mirar:** si entrenar con la app cuenta como «efectivamente
 > utilizado o consumido el servicio» a los fines del art. 3 inc. b) de la
 > Disposición 954/2025, y si esa exención recorta además el derecho de fondo del
-> art. 34. La política de 14 días no depende de la respuesta —ser más generoso
-> que la ley se puede siempre— pero el sustento sí.
+> art. 34. La política de 10 días no depende de la respuesta —el contrato los
+> promete igual, y un contrato puede dar más que la ley— pero el sustento sí.
+> Desde el 2026-09-25 el plazo es el piso legal y no uno más largo: ver
+> [ESTADO.md](./ESTADO.md), «Por qué 10 días».
 
 <!-- publish:start -->
 
@@ -94,7 +96,7 @@ baja y reembolso cambian con eso, y conviene tenerlo claro desde el principio.
 | Quién procesa | Mercado Pago | App Store / Google Play |
 | Quién gestiona la baja | **TREINO** | La tienda |
 | Quién gestiona el reembolso | **TREINO** | La tienda |
-| Derecho de arrepentimiento | **14 días, lo aplicamos nosotros** | Según la política de la tienda |
+| Derecho de arrepentimiento | **10 días, lo aplicamos nosotros** | Según la política de la tienda |
 
 Hoy **los dos planes se contratan en la web**: el del entrenador en el Coach Hub
 (`app.gettreino.com`) y el del alumno en `gettreino.com`. La columna de la
@@ -148,16 +150,17 @@ vigencia.
 ## 6. Tu derecho a arrepentirte
 
 **Si contrataste en la web** —el Coach Hub si sos entrenador, `gettreino.com` si
-sos alumno— tenés **14 días corridos desde la contratación para arrepentirte y
-recuperar todo lo pagado**, sin dar explicaciones y sin costo alguno.
+sos alumno— tenés **10 días corridos desde la contratación para arrepentirte y
+recuperar todo lo pagado**, sin dar explicaciones y sin costo alguno. Si el
+último día del plazo cae en un día inhábil, el plazo se extiende hasta el
+primer día hábil siguiente.
 
 Es el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos
 planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.
 
-Adoptamos 14 días **para los dos planes, sin excepciones**. La ley argentina
-exige 10 corridos (art. 34 de la Ley 24.240) y nosotros damos cuatro más,
-porque preferimos que no tengas que fijarte en el calendario para saber si
-llegás.
+El plazo es el que fija la ley argentina —diez días corridos, art. 34 de la Ley
+24.240 y art. 1110 del Código Civil y Comercial de la Nación— y rige **para los
+dos planes, sin excepciones**.
 
 ### Cómo ejercerlo
 
@@ -180,7 +183,8 @@ afecta los derechos que la normativa de tu país te reconozca.
 
 ## 7. Baja fuera del plazo de arrepentimiento
 
-Pasados los 14 días **podés dar de baja cuando quieras**, en línea, sin llamar
+Pasado el plazo de arrepentimiento **podés dar de baja cuando quieras**, en
+línea, sin llamar
 ni escribir a nadie.
 
 **Dónde:** si sos entrenador, en el Coach Hub, en Facturación. Si sos alumno, en
@@ -304,7 +308,7 @@ lo mismo **ese día**: esta condición no se hereda de una fecha a otra.
 | Cobra en | Coach Hub web (Mercado Pago) | `gettreino.com` (Mercado Pago) |
 | Comisión | 6,53% al instante / 3,52% a 18 días | la misma |
 | Baja y reembolso | TREINO | TREINO |
-| Arrepentimiento | 14 días, reembolso total | **igual** |
+| Arrepentimiento | 10 días, reembolso total | **igual** |
 
 Lo que se gana está medido: por IAP, de cada USD 1 de lista el alumno pagaba
 ~ARS 2.318 y a TREINO le llegaban ~ARS 1.282 — el 55% de lo que el alumno gasta.
@@ -361,18 +365,22 @@ incorpora por referencia. Detalle en
 es uno. El tratamiento fiscal pasa a ser tema del contador, junto con las
 cuentas de tienda a nombre personal.
 
-**(c) Se mantienen los 14 días para los dos tickets**, con reembolso operado a
-mano. **Decisión del titular, 2026-09-21.** El piso legal argentino son 10 días
-corridos (art. 34 de la Ley 24.240) y damos cuatro más. El resguardo para el
-ticket bajo no es una cláusula distinta: es que el reembolso manual sostenga el
-volumen. El día que no lo sostenga, se automatiza.
+**(c) El mismo plazo para los dos tickets**, con reembolso operado a mano.
+**Decisión del titular, 2026-09-21:** 14 días, cuatro más que el piso legal.
+**Cambiada por el titular el 2026-09-25: 10 días corridos, el piso legal** (art.
+34 de la Ley 24.240; art. 1110 del CCyC, que además corre el vencimiento al día
+hábil siguiente si cae en un día inhábil). Historia y motivo en
+[ESTADO.md](./ESTADO.md). El resguardo para el ticket bajo no es una cláusula
+distinta: es que el reembolso manual sostenga el volumen. El día que no lo
+sostenga, se automatiza.
 
 **Lo que SÍ sigue siendo pregunta de abogado**, y no se contesta acá: si
 entrenar con la app cuenta como «efectivamente utilizado o consumido el
 servicio» a los fines del **art. 3 inciso b)** de la 954/2025, y si esa exención
 —que lo es de la obligación del botón— recorta además el derecho de fondo del
 art. 34. Va al dictamen con el texto citado. La decisión de arriba no depende de
-la respuesta: ser más generoso que la ley se puede siempre.
+la respuesta: los 10 días están prometidos en el contrato, y si la exención
+alcanzara a TREINO el contrato seguiría dando más que la ley.
 
 ## C. Estado del código
 
