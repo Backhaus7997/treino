@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
-import 'package:treino/features/coach/presentation/widgets/custom_exercise_limit_notice.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/create_custom_exercise_dialog.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -79,15 +79,15 @@ void main() {
   });
 
   setUp(() {
-    // Seam de test (custom_exercise_limit_notice.dart): `kIsWeb` es una
+    // Seam de test (trainer_limit_notice.dart): `kIsWeb` es una
     // constante de compilación que bajo `flutter test` vale `false` siempre
     // — sin esto el aviso saldría con la forma MÓVIL (sheet) en un test del
     // diálogo WEB.
-    debugCustomExerciseLimitNoticeForm = CustomExerciseLimitNoticeForm.dialog;
+    debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
   });
 
   tearDown(() {
-    debugCustomExerciseLimitNoticeForm = null;
+    debugTrainerLimitNoticeForm = null;
   });
 
   group('CREATE — rebote del servidor', () {

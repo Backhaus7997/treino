@@ -4681,4 +4681,49 @@ class AppL10nEn extends AppL10n {
 
     return '$countString of $limitString custom exercises';
   }
+
+  @override
+  String get templateLimitNoticeTitle => 'Template limit';
+
+  @override
+  String templateLimitReachedBody(int limit) {
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return 'You reached the $limitString templates included in your plan. You can edit, assign, or archive one to make room.';
+  }
+
+  @override
+  String templateLimitOverBody(int count, int limit, int toArchive) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+    final intl.NumberFormat toArchiveNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
+
+    String _temp0 = intl.Intl.pluralLogic(
+      toArchive,
+      locale: localeName,
+      other: 'archive $toArchiveString',
+      one: 'archive 1',
+    );
+    return 'You have $countString templates and your plan includes $limitString. You keep them all; to create a new one, $_temp0.';
+  }
+
+  @override
+  String templateCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString of $limitString templates';
+  }
 }

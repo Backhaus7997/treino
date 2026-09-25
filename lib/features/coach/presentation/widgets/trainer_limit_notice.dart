@@ -7,9 +7,18 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 
-/// El aviso que [intentarCrearEjercicioPropio] muestra cuando el PF choca el
-/// tope de ejercicios propios de su plan
-/// (docs/limite-ejercicios-pf.md PR3, "Los avisos").
+/// Los topes del plan del PF que este aviso sabe mostrar
+/// (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3).
+///
+/// Un solo widget para los dos avisos, generalizado por `kind`: son el mismo
+/// layout diciendo lo mismo con otra palabra, y dos copias divergen
+/// (docs/limite-plantillas-pf.md PR3, "El aviso"). Si se suma un tercer tope
+/// de plan, entra acá con su propio caso — no con un tercer archivo.
+enum TrainerLimitKind { customExercises, templates }
+
+/// El aviso que el embudo de cada tope muestra cuando el PF lo choca
+/// (docs/limite-ejercicios-pf.md PR3 y docs/limite-plantillas-pf.md PR3,
+/// "Los avisos").
 ///
 /// **Móvil: SOLO estado.** Sin botón de acción, sin nombrar "web", "mail" ni
 /// "pasá a un plan" — bajo la Guideline 3.1.3(f) cualquiera de esas cosas es
@@ -21,7 +30,7 @@ import '../../../../l10n/app_l10n.dart';
 ///
 /// **Web: con botón VER PLANES** a `/facturacion/planes`. La web sí vende
 /// (E8 — 3.1.3(f) sólo ampara al binario móvil).
-enum CustomExerciseLimitNoticeForm { sheet, dialog }
+enum TrainerLimitNoticeForm { sheet, dialog }
 
 /// Fuerza la forma del aviso. SÓLO para tests — mismo seam que
 /// `debugPlanLimitPaywallForm` en `plan_limit_paywall.dart`, y por el mismo
@@ -29,40 +38,40 @@ enum CustomExerciseLimitNoticeForm { sheet, dialog }
 /// vale `false` siempre, así que sin este seam la rama [dialog] quedaría sin
 /// cobertura.
 @visibleForTesting
-CustomExerciseLimitNoticeForm? debugCustomExerciseLimitNoticeForm;
+TrainerLimitNoticeForm? debugTrainerLimitNoticeForm;
 
-CustomExerciseLimitNoticeForm _resolveForm() =>
-    debugCustomExerciseLimitNoticeForm ??
-    (kIsWeb
-        ? CustomExerciseLimitNoticeForm.dialog
-        : CustomExerciseLimitNoticeForm.sheet);
+TrainerLimitNoticeForm _resolveForm() =>
+    debugTrainerLimitNoticeForm ??
+    (kIsWeb ? TrainerLimitNoticeForm.dialog : TrainerLimitNoticeForm.sheet);
 
-/// Muestra el aviso. [limit] y [count] son los que ya resolvió
-/// [customExerciseQuotaProvider] — acá no se vuelve a mirar la cuota, sólo se
+/// Muestra el aviso de [kind]. [limit] y [count] son los que ya resolvió el
+/// provider de cuota de ese tope (`customExerciseQuotaProvider` /
+/// `templateQuotaProvider`) — acá no se vuelve a mirar la cuota, sólo se
 /// decide qué texto mostrar.
 ///
-/// Dos estados, igual en las dos superficies (docs/limite-ejercicios-pf.md
-/// PR3):
-/// - **En el tope** (`count == limit`): "llegaste al tope, podés editar o
-///   borrar".
-/// - **Por encima** (`count > limit`, E3 — bajó de plan): "conservás todos,
-///   para crear uno nuevo borrá N", con `N = count - limit + 1`.
-Future<void> showCustomExerciseLimitNotice(
+/// Dos estados, igual en las dos superficies:
+/// - **En el tope** (`count == limit`): "llegaste al tope, podés editar,
+///   asignar o [borrar/archivar]".
+/// - **Por encima** (`count > limit`, bajaste de plan): "conservás todos,
+///   para crear uno nuevo [borrá/archivá] N", con `N = count - limit + 1`.
+Future<void> showTrainerLimitNotice(
   BuildContext context, {
+  required TrainerLimitKind kind,
   required int limit,
   required int count,
 }) {
   final overLimit = count > limit;
-  final toDelete = count - limit + 1;
+  final toFree = count - limit + 1;
 
-  if (_resolveForm() == CustomExerciseLimitNoticeForm.dialog) {
+  if (_resolveForm() == TrainerLimitNoticeForm.dialog) {
     return showDialog<void>(
       context: context,
-      builder: (_) => _CustomExerciseLimitDialog(
+      builder: (_) => _TrainerLimitDialog(
+        kind: kind,
         overLimit: overLimit,
         limit: limit,
         count: count,
-        toDelete: toDelete,
+        toFree: toFree,
       ),
     );
   }
@@ -76,35 +85,56 @@ Future<void> showCustomExerciseLimitNotice(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: 0.6),
-    builder: (_) => _CustomExerciseLimitSheet(
+    builder: (_) => _TrainerLimitSheet(
+      kind: kind,
       overLimit: overLimit,
       limit: limit,
       count: count,
-      toDelete: toDelete,
+      toFree: toFree,
     ),
   );
 }
 
 /// Móvil — sheet de sólo estado. Strings vía [AppL10n]: es la convención del
 /// móvil (docs/limite-ejercicios-pf.md PR3, "Convenciones").
-class _CustomExerciseLimitSheet extends StatelessWidget {
-  const _CustomExerciseLimitSheet({
+class _TrainerLimitSheet extends StatelessWidget {
+  const _TrainerLimitSheet({
+    required this.kind,
     required this.overLimit,
     required this.limit,
     required this.count,
-    required this.toDelete,
+    required this.toFree,
   });
 
+  final TrainerLimitKind kind;
   final bool overLimit;
   final int limit;
   final int count;
-  final int toDelete;
+  final int toFree;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
+
+    final title = switch (kind) {
+      TrainerLimitKind.customExercises => l10n.customExerciseLimitNoticeTitle,
+      TrainerLimitKind.templates => l10n.templateLimitNoticeTitle,
+    };
+    final body = overLimit
+        ? switch (kind) {
+            TrainerLimitKind.customExercises =>
+              l10n.customExerciseLimitOverBody(count, limit, toFree),
+            TrainerLimitKind.templates =>
+              l10n.templateLimitOverBody(count, limit, toFree),
+          }
+        : switch (kind) {
+            TrainerLimitKind.customExercises =>
+              l10n.customExerciseLimitReachedBody(limit),
+            TrainerLimitKind.templates =>
+              l10n.templateLimitReachedBody(limit),
+          };
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -145,14 +175,8 @@ class _CustomExerciseLimitSheet extends StatelessWidget {
                   child: SingleChildScrollView(
                     child: _NoticeContent(
                       palette: palette,
-                      title: l10n.customExerciseLimitNoticeTitle.toUpperCase(),
-                      body: overLimit
-                          ? l10n.customExerciseLimitOverBody(
-                              count,
-                              limit,
-                              toDelete,
-                            )
-                          : l10n.customExerciseLimitReachedBody(limit),
+                      title: title.toUpperCase(),
+                      body: body,
                     ),
                   ),
                 ),
@@ -160,7 +184,7 @@ class _CustomExerciseLimitSheet extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    key: const Key('custom_exercise_limit_dismiss'),
+                    key: const Key('trainer_limit_dismiss'),
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: palette.textPrimary,
@@ -191,29 +215,44 @@ class _CustomExerciseLimitSheet extends StatelessWidget {
 
 /// Web (Coach Hub) — dialog con botón VER PLANES. Strings hardcodeadas
 /// marcadas `// i18n: Fase W3`, como el resto del Coach Hub.
-class _CustomExerciseLimitDialog extends StatelessWidget {
-  const _CustomExerciseLimitDialog({
+class _TrainerLimitDialog extends StatelessWidget {
+  const _TrainerLimitDialog({
+    required this.kind,
     required this.overLimit,
     required this.limit,
     required this.count,
-    required this.toDelete,
+    required this.toFree,
   });
 
+  final TrainerLimitKind kind;
   final bool overLimit;
   final int limit;
   final int count;
-  final int toDelete;
+  final int toFree;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+
+    final noun = switch (kind) {
+      TrainerLimitKind.customExercises => 'ejercicios propios',
+      TrainerLimitKind.templates => 'plantillas',
+    };
+    final verb = switch (kind) {
+      TrainerLimitKind.customExercises => 'borrá',
+      TrainerLimitKind.templates => 'archivá',
+    };
+    final title = switch (kind) {
+      TrainerLimitKind.customExercises => 'TOPE DE EJERCICIOS PROPIOS',
+      TrainerLimitKind.templates => 'TOPE DE PLANTILLAS',
+    };
     // El mismo texto de conservación que en el móvil cuando está PASADO de
     // tope (docs/limite-ejercicios-pf.md PR3, "Los avisos": "Pasado de tope:
     // el mismo texto de conservación que en el móvil, más el botón").
     final body = overLimit
-        ? 'Tenés $count ejercicios propios y tu plan incluye $limit. '
-            'Conservás todos; para crear uno nuevo, borrá $toDelete.' // i18n: Fase W3
-        : 'Tu plan incluye $limit ejercicios propios y ya tenés '
+        ? 'Tenés $count $noun y tu plan incluye $limit. '
+            'Conservás todos; para crear uno nuevo, $verb $toFree.' // i18n: Fase W3
+        : 'Tu plan incluye $limit $noun y ya tenés '
             '$limit.'; // i18n: Fase W3
 
     return Dialog(
@@ -232,14 +271,14 @@ class _CustomExerciseLimitDialog extends StatelessWidget {
             children: [
               _NoticeContent(
                 palette: palette,
-                title: 'TOPE DE EJERCICIOS PROPIOS', // i18n: Fase W3
+                title: title,
                 body: body,
               ),
               const SizedBox(height: AppSpacing.s20),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  key: const Key('custom_exercise_limit_ver_planes'),
+                  key: const Key('trainer_limit_ver_planes'),
                   onPressed: () {
                     Navigator.of(context).pop();
                     context.push('/facturacion/planes');
@@ -277,10 +316,10 @@ class _CustomExerciseLimitDialog extends StatelessWidget {
   }
 }
 
-/// Ícono + título + cuerpo. EL MISMO layout en las dos superficies — sólo
-/// cambia el texto del cuerpo (móvil vía [AppL10n], web hardcodeado), mismo
-/// criterio que `_PlanLimitPaywallContent` en `plan_limit_paywall.dart`: un
-/// solo lugar que decide QUÉ dice.
+/// Ícono + título + cuerpo. EL MISMO layout en las dos superficies y en los
+/// dos `kind` — sólo cambia el texto, mismo criterio que
+/// `_PlanLimitPaywallContent` en `plan_limit_paywall.dart`: un solo lugar que
+/// decide QUÉ dice.
 class _NoticeContent extends StatelessWidget {
   const _NoticeContent({
     required this.palette,

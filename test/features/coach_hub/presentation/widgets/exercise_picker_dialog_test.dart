@@ -10,7 +10,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/exercise_asset_image.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
-import 'package:treino/features/coach/presentation/widgets/custom_exercise_limit_notice.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/custom_exercise_video_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -410,8 +410,8 @@ void main() {
       // Seam de test: `kIsWeb` es una constante de compilación que bajo
       // `flutter test` vale `false` siempre — sin esto el aviso saldría con
       // la forma MÓVIL (sheet) en un test del picker WEB.
-      debugCustomExerciseLimitNoticeForm = CustomExerciseLimitNoticeForm.dialog;
-      addTearDown(() => debugCustomExerciseLimitNoticeForm = null);
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
 
       await _openPicker(
         tester,
