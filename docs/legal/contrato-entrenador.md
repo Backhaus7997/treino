@@ -336,8 +336,9 @@ la cuenta de BACKHAUSTIN S.A.S.
 La suscripción **se renueva automáticamente** al final de cada período, con
 aviso previo, salvo que la des de baja antes.
 
-**Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
-todo lo pagado.** Lo ejercés desde el Botón de Arrepentimiento del pie de
+**Tenés 10 días corridos desde la contratación para arrepentirte y recuperar
+todo lo pagado.** Si el último día cae en un día inhábil, el plazo se extiende
+hasta el primer día hábil siguiente. Lo ejercés desde el Botón de Arrepentimiento del pie de
 gettreino.com, sin necesidad de iniciar sesión, y dentro de las 24
 horas recibís un código de identificación de tu pedido.
 

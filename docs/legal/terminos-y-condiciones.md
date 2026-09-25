@@ -24,7 +24,8 @@ version: 3
 > **Qué falta:** nada marcado. El cartel anterior decía que tres cláusulas
 > dependían de decisiones pendientes —edad mínima (D2), ámbito territorial (D3)
 > y suscripciones y reembolsos (D4/D6)—. Las tres están resueltas: 13 años,
-> Argentina (2026-09-17) y 14 días (2026-09-21). No quedan marcadores.
+> Argentina (2026-09-17) y 14 días (2026-09-21), bajados a 10 días corridos —el
+> piso legal— el 2026-09-25. No quedan marcadores.
 
 ---
 
@@ -184,9 +185,11 @@ requieren una suscripción, y existe también una suscripción para atletas.
 **Cómo se cobra depende de dónde contrates:**
 
 - **Entrenadores**, en el Coach Hub web: el pago lo procesa Mercado Pago y
-  liquida a la cuenta de BACKHAUSTIN S.A.S. **Tenés 14 días corridos para
+  liquida a la cuenta de BACKHAUSTIN S.A.S. **Tenés 10 días corridos para
   arrepentirte** y recuperar todo lo pagado, desde el Botón de Arrepentimiento
-  del pie de gettreino.com, sin necesidad de iniciar sesión.
+  del pie de gettreino.com, sin necesidad de iniciar sesión. Si el último día
+  cae en un día inhábil, el plazo se extiende hasta el primer día hábil
+  siguiente.
 - **Atletas**, desde la aplicación móvil: el pago lo procesa App Store o Google
   Play. **La baja y el reembolso los gestiona la tienda**, desde los ajustes de
   suscripciones de tu dispositivo.

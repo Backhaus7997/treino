@@ -20,7 +20,7 @@ class LegalSection {
 }
 
 /// Ultima revision de Términos y Condiciones.
-const String kTermsLastUpdated = '17 de septiembre de 2026';
+const String kTermsLastUpdated = '25 de septiembre de 2026';
 
 /// Ultima revision de Política de Privacidad.
 const String kPrivacyLastUpdated = '21 de septiembre de 2026';
@@ -141,7 +141,7 @@ const List<LegalSection> kTermsSections = <LegalSection>[
     'Usar TREINO como atleta es gratuito en su versión básica. Los entrenadores requieren una suscripción, y existe también una suscripción para atletas.\n'
         '\n'
         'Cómo se cobra depende de dónde contrates:\n'
-        '• Entrenadores, en el Coach Hub web: el pago lo procesa Mercado Pago y liquida a la cuenta de BACKHAUSTIN S.A.S. Tenés 14 días corridos para arrepentirte y recuperar todo lo pagado, desde el Botón de Arrepentimiento del pie de gettreino.com, sin necesidad de iniciar sesión.\n'
+        '• Entrenadores, en el Coach Hub web: el pago lo procesa Mercado Pago y liquida a la cuenta de BACKHAUSTIN S.A.S. Tenés 10 días corridos para arrepentirte y recuperar todo lo pagado, desde el Botón de Arrepentimiento del pie de gettreino.com, sin necesidad de iniciar sesión. Si el último día cae en un día inhábil, el plazo se extiende hasta el primer día hábil siguiente.\n'
         '• Atletas, desde la aplicación móvil: el pago lo procesa App Store o Google Play. La baja y el reembolso los gestiona la tienda, desde los ajustes de suscripciones de tu dispositivo.\n'
         '\n'
         'En los dos casos, pasado el plazo de arrepentimiento podés dar de baja cuando quieras conservando el acceso hasta el final del período pagado.\n'
