@@ -252,16 +252,17 @@ recuperación.
 ## 8. Tu suscripción
 
 El uso profesional de TREINO requiere una suscripción, cuyo plan determina
-cuántos alumnos podés atender simultáneamente.
+cuántos alumnos podés atender simultáneamente y cuántos ejercicios propios podés
+tener en tu biblioteca.
 
 ### 8.1 Planes y límites
 
-| Plan | Límite de carga | Precio mensual | Precio anual |
-|---|---|---|---|
-| Gratuito | 2 | — | — |
-| Plan 1 | 7 | $12.000 | $120.000 |
-| Plan 2 | 15 | $22.000 | $220.000 |
-| Plan 3 | Sin límite | $39.000 | $390.000 |
+| Plan | Límite de carga | Ejercicios propios | Precio mensual | Precio anual |
+|---|---|---|---|---|
+| Gratuito | 2 | 20 | — | — |
+| Plan 1 | 7 | 60 | $12.000 | $120.000 |
+| Plan 2 | 15 | 120 | $22.000 | $220.000 |
+| Plan 3 | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Precios en pesos argentinos. El plan anual equivale a diez meses.
 
@@ -281,6 +282,17 @@ Un alumno pausado **sigue ocupando media plaza**. Con Plan 1, siete alumnos
 activos te dejan sin lugar; seis activos y dos pausados también. El sistema
 bloquea el alta cuando el nuevo vínculo superaría el límite del plan.
 
+### 8.2.bis Cómo se cuentan los ejercicios propios
+
+Cuentan los ejercicios que creaste y tenés hoy en tu biblioteca. **Los del
+catálogo de TREINO no cuentan** y los usás sin límite.
+
+Si borrás un ejercicio propio, liberás su lugar.
+
+Si tu plan baja y quedás por encima del límite, **conservás todos tus
+ejercicios** y podés seguir usándolos, editándolos y asignándolos. Lo único que
+no podés es crear nuevos hasta quedar por debajo del límite de tu plan.
+
 ### 8.3 Si no pagás
 
 Si tu suscripción queda impaga, pasás al límite del plan gratuito y algunos de
@@ -290,6 +302,10 @@ capacidad de gestionarlos.
 **Tus alumnos no pierden nada.** Conservan sus rutinas, su historial, sus datos
 y su chat. La consecuencia recae sobre quien decide no pagar, no sobre quien no
 tuvo nada que ver.
+
+**Tus ejercicios propios tampoco se borran.** Si tenés más de los que incluye el
+plan gratuito, los conservás y los seguís usando; sólo no vas a poder crear
+nuevos mientras estés por encima del límite de tu plan.
 
 Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
 
