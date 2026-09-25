@@ -308,10 +308,10 @@ export async function recountTemplates(
       tx.get(templates.count()),
       tx.get(templates.where("status", "==", "archived").count()),
     ]);
-    // Las archivadas son un subconjunto del total, asi que la resta no deberia
-    // bajar de 0. El piso es por una plantilla creada YA archivada entre los
-    // dos conteos: la veria el segundo y no el primero. El trigger de esa
-    // misma escritura recuenta despues y deja el valor bien.
+    // Las archivadas son un subconjunto del total y las dos lecturas van en la
+    // misma transaccion, asi que la resta no baja de 0. El piso es defensivo:
+    // el cliente muestra este numero («2 de 3»), y un negativo no tiene
+    // ninguna lectura posible.
     const count = Math.max(0, total.data().count - archived.data().count);
 
     await options.afterCount?.();
