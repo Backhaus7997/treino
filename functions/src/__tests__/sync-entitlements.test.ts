@@ -652,7 +652,7 @@ describe("syncTrainerEntitlements — planLimits", () => {
 
     await syncTrainerEntitlements(app, "t1", 5_000);
 
-    expect(state.users.t1.planLimits).toEqual({ customExercises: null });
+    expect(state.users.t1.planLimits).toEqual({ customExercises: null, templates: null });
   });
 
   // Los siguientes dos tests mockean `resolvePlanLimits` en vez de depender

@@ -150,6 +150,13 @@ export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptio
 // TRAINER_EXERCISE_LIMITS_ENABLED (trainer-plan-limits.ts) arranca apagado —
 // ver el encabezado de ese modulo antes de prenderlo.
 export { maintainCustomExerciseCount } from "./subscriptions/custom-exercise-count";
+// limite-plantillas-pf.md, PR1: mantiene `users/{uid}.templateUsage.count` al
+// dia cuando cambia el conjunto de plantillas que cuentan para un PF (crear,
+// borrar, archivar, restaurar). Dispara con toda escritura de `routines` y
+// sale en la guarda sin leer nada — ver el encabezado de template-count.ts.
+// Interruptor TRAINER_TEMPLATE_LIMITS_ENABLED (trainer-plan-limits.ts),
+// arranca apagado.
+export { maintainTemplateCount } from "./subscriptions/template-count";
 // Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
 // el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
 // PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen

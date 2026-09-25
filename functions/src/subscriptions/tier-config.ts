@@ -55,6 +55,29 @@ export const TIER_CUSTOM_EXERCISE_LIMITS: Record<SubscriptionTier, number | null
 };
 
 /**
+ * Tope de plantillas del PF por plan (limite-plantillas-pf.md, PR1): cuentan
+ * los `routines` con `source == 'trainer-template'` y `assignedBy == uid` que
+ * no estan archivados, publicados o no. Mismo criterio de `null` que las dos
+ * de arriba: SIN TOPE, nunca "sin dato".
+ *
+ * Solo el Free tiene tope (decision P2 del plan): la plantilla es la promesa
+ * central del producto para el PF, y topearla en un plan pago pega en lo que
+ * se vende. Por eso la escalera es monotona NO ESTRICTA (3, sin tope, sin
+ * tope, sin tope) — a diferencia de `TIER_CUSTOM_EXERCISE_LIMITS`, que crece
+ * en cada escalon. `tier-config.test.ts` pide lo que esta puede cumplir: que
+ * ningun escalon baje.
+ *
+ * Debe mantenerse espejada a mano en `kTierTemplateLimits`
+ * (`lib/features/coach/domain/subscription_tier.dart`, PR3).
+ */
+export const TIER_TEMPLATE_LIMITS: Record<SubscriptionTier, number | null> = {
+  free: 3,
+  plan1: null,
+  plan2: null,
+  plan3: null,
+};
+
+/**
  * Price table in ARS. Server-authoritative — NEVER trust a client-supplied
  * amount. `free` has no price (never charged).
  *

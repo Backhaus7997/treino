@@ -42,8 +42,20 @@ jest.mock("../subscriptions/sync-entitlements", () => ({
   syncTrainerEntitlements: jest.fn(),
 }));
 
+// Los dos recuentos del barrido corren contra Firestore de verdad (emulador,
+// en `custom-exercise-count.test.ts` y `template-count.test.ts`). Aca solo
+// importa que el barrido los llame y que una falla no lo frene.
+jest.mock("../subscriptions/trainer-plan-limits", () => ({
+  recountCustomExercises: jest.fn(),
+  recountTemplates: jest.fn(),
+}));
+
 import { App } from "firebase-admin/app";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
+import {
+  recountCustomExercises,
+  recountTemplates,
+} from "../subscriptions/trainer-plan-limits";
 import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   subscriptionChanged,
@@ -52,6 +64,12 @@ import {
 
 const mockSync = syncTrainerEntitlements as jest.MockedFunction<
   typeof syncTrainerEntitlements
+>;
+const mockRecountExercises = recountCustomExercises as jest.MockedFunction<
+  typeof recountCustomExercises
+>;
+const mockRecountTemplates = recountTemplates as jest.MockedFunction<
+  typeof recountTemplates
 >;
 
 describe("subscriptionChanged — guarda anti-loop", () => {
@@ -108,7 +126,11 @@ describe("sweepEntitlementsHandler", () => {
     });
   }
 
-  beforeEach(() => mockSync.mockReset());
+  beforeEach(() => {
+    mockSync.mockReset();
+    mockRecountExercises.mockReset();
+    mockRecountTemplates.mockReset();
+  });
 
   it("recorre todos los PF y cuenta los que cambiaron", async () => {
     installUsers(["t1", "t2", "t3"]);
@@ -132,5 +154,51 @@ describe("sweepEntitlementsHandler", () => {
     const r = await sweepEntitlementsHandler({} as App, 1000);
 
     expect(r).toEqual({ scanned: 2, changed: 1 });
+  });
+
+  it("recuenta ejercicios Y plantillas de cada PF (limite-plantillas-pf.md, PR1)", async () => {
+    installUsers(["t1", "t2"]);
+    const sano = {
+      limit: 2,
+      blocked: [],
+      unblocked: [],
+      weightedLoad: 0,
+      blockedAthleteIds: [],
+      subscription: null,
+      degraded: false,
+    };
+    mockSync
+      .mockResolvedValueOnce({ trainerId: "t1", ...sano })
+      .mockResolvedValueOnce({ trainerId: "t2", ...sano });
+
+    await sweepEntitlementsHandler({} as App, 1000);
+
+    expect(mockRecountExercises.mock.calls.map((c) => c[1])).toEqual(["t1", "t2"]);
+    expect(mockRecountTemplates.mock.calls.map((c) => c[1])).toEqual(["t1", "t2"]);
+  });
+
+  it("un recuento de plantillas que falla no frena el barrido ni lo que ya se escribio", async () => {
+    installUsers(["roto", "sano"]);
+    const conBloqueo = (trainerId: string, link: string) => ({
+      trainerId,
+      limit: 2,
+      blocked: [link],
+      unblocked: [],
+      weightedLoad: 2,
+      blockedAthleteIds: ["a1"],
+      subscription: null,
+      degraded: false,
+    });
+    mockSync
+      .mockResolvedValueOnce(conBloqueo("roto", "L1"))
+      .mockResolvedValueOnce(conBloqueo("sano", "L2"));
+    mockRecountTemplates.mockRejectedValueOnce(new Error("contention"));
+
+    const r = await sweepEntitlementsHandler({} as App, 1000);
+
+    // Los dos PF cuentan como cambiados: la falla del recuento de "roto" no
+    // se lleva lo que `syncTrainerEntitlements` ya reconcilio para el.
+    expect(r).toEqual({ scanned: 2, changed: 2 });
+    expect(mockRecountTemplates).toHaveBeenCalledTimes(2);
   });
 });

@@ -392,11 +392,17 @@ export async function syncTrainerEntitlements(
     // objeto que se mergea, no se escribe como `{planLimits: null}` — con
     // `degraded` no se decide nada sobre un documento que sabemos que leimos
     // mal. Encendido o apagado, `resolvePlanLimits` SIEMPRE devuelve un mapa
-    // (nunca null) cuando `degraded` es false, así que la clave interna
-    // `customExercises` viaja explícita incluso en `null` (apagado) — con
-    // `merge: true`, omitir la clave entera es "no tocar", no "borrar", y un
-    // valor numerico previo quedaria pegado para siempre si no se
-    // sobreescribiera.
+    // completo (nunca null) cuando `degraded` es false, así que las claves
+    // internas (`customExercises`, `templates`) viajan explícitas incluso en
+    // `null` (apagado) — con `merge: true`, omitir una clave es "no tocar", no
+    // "borrar", y un valor numerico previo quedaria pegado para siempre si no
+    // se sobreescribiera.
+    //
+    // Con `degraded` y un interruptor prendido y otro apagado, el mapa sale
+    // PARCIAL: la clave apagada en `null` y sin la prendida. `merge: true`
+    // mergea los mapas anidados campo por campo, así que la clave que no viaja
+    // queda como estaba (limite-plantillas-pf.md, PR1; ver el dartdoc de
+    // `resolvePlanLimits`).
     const planLimits = resolvePlanLimits(sub, degraded, clock);
     const trainerUpdate: Record<string, unknown> = {
       weightedLoad,

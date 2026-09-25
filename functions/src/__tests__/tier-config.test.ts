@@ -9,6 +9,7 @@ import {
   SubscriptionTier,
   TIER_CUSTOM_EXERCISE_LIMITS,
   TIER_PRICES_ARS,
+  TIER_TEMPLATE_LIMITS,
   TIER_WEIGHT_LIMITS,
 } from "../subscriptions/tier-config";
 import { limitRank } from "../subscriptions/effective-limit";
@@ -67,6 +68,53 @@ describe("TIER_CUSTOM_EXERCISE_LIMITS", () => {
       const ejerciciosAnterior = limitRank(TIER_CUSTOM_EXERCISE_LIMITS[ORDEN[i - 1]]);
       const ejerciciosActual = limitRank(TIER_CUSTOM_EXERCISE_LIMITS[ORDEN[i]]);
       expect(pesoActual > pesoAnterior).toBe(ejerciciosActual > ejerciciosAnterior);
+    }
+  });
+});
+
+/**
+ * limite-plantillas-pf.md, PR1. A diferencia de la escalera de ejercicios, esta
+ * NO puede ser estrictamente creciente: solo el Free tiene tope (decision P2
+ * del plan), y los tres planes pagos son "sin tope". Lo que si tiene que
+ * cumplir es no BAJAR nunca: un plan mas caro con menos plantillas que uno mas
+ * barato seria el mismo bug que el `?? FREE_LIMIT` de TIER_WEIGHT_LIMITS.
+ * `limitRank` convierte `null` en infinito, asi que "sin tope" = "sin tope"
+ * pasa y "3" despues de "sin tope" no.
+ */
+describe("TIER_TEMPLATE_LIMITS", () => {
+  const ORDEN: SubscriptionTier[] = ["free", "plan1", "plan2", "plan3"];
+
+  it("free=3, los tres pagos sin tope", () => {
+    expect(TIER_TEMPLATE_LIMITS).toEqual({
+      free: 3,
+      plan1: null,
+      plan2: null,
+      plan3: null,
+    });
+  });
+
+  it("la escalera es monotona NO estricta: ningun escalon baja", () => {
+    for (let i = 1; i < ORDEN.length; i++) {
+      const anterior = limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i - 1]]);
+      const actual = limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i]]);
+      expect(actual).toBeGreaterThanOrEqual(anterior);
+    }
+  });
+
+  it("nunca va en contra de TIER_WEIGHT_LIMITS: donde el peso sube, las plantillas no bajan", () => {
+    // `effectiveTier` rankea tiers por la escalera de PESO. Con una escalera
+    // no estricta la condicion de "crecer juntas" de ejercicios no aplica
+    // (plan1→plan2 sube en peso y queda igual en plantillas), pero la que
+    // importa para el piso prepago si: que un tier mejor en peso nunca tenga
+    // MENOS plantillas.
+    for (let i = 1; i < ORDEN.length; i++) {
+      const pesoSube =
+        limitRank(TIER_WEIGHT_LIMITS[ORDEN[i]]) >
+        limitRank(TIER_WEIGHT_LIMITS[ORDEN[i - 1]]);
+      const plantillasBajan =
+        limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i]]) <
+        limitRank(TIER_TEMPLATE_LIMITS[ORDEN[i - 1]]);
+      expect(pesoSube && plantillasBajan).toBe(false);
     }
   });
 });

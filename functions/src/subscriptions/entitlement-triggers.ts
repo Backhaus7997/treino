@@ -26,7 +26,7 @@ import {
   decideSubscriptionMail,
   enqueueSubscriptionMail,
 } from "./subscription-mail";
-import { recountCustomExercises } from "./trainer-plan-limits";
+import { recountCustomExercises, recountTemplates } from "./trainer-plan-limits";
 
 function ensureApp(): App {
   try {
@@ -167,6 +167,19 @@ export async function sweepEntitlementsHandler(
         await recountCustomExercises(app, doc.id);
       } catch (err) {
         logger.error("sweepEntitlements: error recontando ejercicios propios", {
+          trainerId: doc.id,
+          err,
+        });
+      }
+
+      // limite-plantillas-pf.md, PR1: lo mismo para las plantillas, en su
+      // propio try por el mismo motivo. `recountTemplates` corre en
+      // transaccion, asi que no pisa a un trigger que este recontando al mismo
+      // PF en este momento.
+      try {
+        await recountTemplates(app, doc.id);
+      } catch (err) {
+        logger.error("sweepEntitlements: error recontando plantillas", {
           trainerId: doc.id,
           err,
         });
