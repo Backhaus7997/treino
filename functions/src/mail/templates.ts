@@ -201,9 +201,9 @@ export function trainerEntry(
  * donde contrata (`docs/legal/contrato-entrenador.md` §8.4,
  * `docs/legal/terminos-suscripcion.md` §3).
  *
- * El dartdoc de `APP_ENTRY_TRAINER` dice que la app le sirve MÁS al profe que
- * al alumno, y sigue siendo cierto — para todo lo demás. Para pagar, no: es
- * lo único que la app no hace.
+ * El dartdoc de `APP_ENTRY_TRAINER` dice que en el teléfono la app le sirve
+ * más al profe que la web, y sigue siendo cierto para todo lo demás. Para
+ * pagar, no: es lo único que la app no hace.
  *
  * El Coach Hub lee `to` de `Uri.base.queryParameters` en CUALQUIER path y lo
  * aplica DESPUÉS del login (`coachHubRedirect`, `lib/app/coach_hub_router.dart`
@@ -211,8 +211,6 @@ export function trainerEntry(
  * `/facturacion/planes`). Y es el MISMO lugar donde ya aterriza hoy el PF de
  * escritorio: `vercel.json` redirige `/abrir/profe` a la raíz conservando el
  * query (el redirect del #923).
- *
- * SIN parametros por ahora — un PR posterior le suma `{plan?, ciclo?}`.
  */
 export function trainerWebCheckout(): string {
   const to: TrainerDestination["to"] = "facturacion";
