@@ -101,8 +101,7 @@ void main() {
       expect(result.valueOrNull!.count, 2);
     });
 
-    test('planLimits.templates numérico ⇒ tope + conteo del stream',
-        () async {
+    test('planLimits.templates numérico ⇒ tope + conteo del stream', () async {
       final c = await _containerWith(
         planLimits: {'templates': 3},
         templatesCount: 2,

@@ -132,8 +132,7 @@ class _TrainerLimitSheet extends StatelessWidget {
         : switch (kind) {
             TrainerLimitKind.customExercises =>
               l10n.customExerciseLimitReachedBody(limit),
-            TrainerLimitKind.templates =>
-              l10n.templateLimitReachedBody(limit),
+            TrainerLimitKind.templates => l10n.templateLimitReachedBody(limit),
           };
 
     return Padding(
