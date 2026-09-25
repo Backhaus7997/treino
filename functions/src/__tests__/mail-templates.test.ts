@@ -278,8 +278,9 @@ describe("trainerWebCheckout", () => {
   });
 
   // Guard de compilación: si alguien saca el `Exclude` de `trainerEntry` y
-  // vuelve a habilitar `{ to: "facturacion" }` ahí, este archivo deja de
-  // compilar — no sólo este test, el `npx tsc --noEmit` del control negativo.
+  // vuelve a habilitar `{ to: "facturacion" }` ahí, ts-jest deja de compilar
+  // este archivo (TS2578, directiva sin usar). Lo protege jest, no el `tsc`
+  // del build: `tsconfig.json` excluye `src/__tests__`.
   it("trainerEntry ya no acepta el destino de facturación", () => {
     // @ts-expect-error — "facturacion" está excluido: ese destino va por trainerWebCheckout().
     expect(() => trainerEntry({ to: "facturacion" })).not.toThrow();

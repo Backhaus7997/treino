@@ -205,12 +205,14 @@ export function trainerEntry(
  * más al profe que la web, y sigue siendo cierto para todo lo demás. Para
  * pagar, no: es lo único que la app no hace.
  *
- * El Coach Hub lee `to` de `Uri.base.queryParameters` en CUALQUIER path y lo
- * aplica DESPUÉS del login (`coachHubRedirect`, `lib/app/coach_hub_router.dart`
- * ~L159-178; `_coachHubPathFor` ~L212 manda `facturacion` a
- * `/facturacion/planes`). Y es el MISMO lugar donde ya aterriza hoy el PF de
- * escritorio: `vercel.json` redirige `/abrir/profe` a la raíz conservando el
- * query (el redirect del #923).
+ * El Coach Hub lee `to` de `Uri.base.queryParameters` al arrancar y lo aplica
+ * al aterrizar en la landing, DESPUÉS del login (`coachHubRedirect`,
+ * `lib/app/coach_hub_router.dart`; `_coachHubPathFor` manda `facturacion` a
+ * `/facturacion/planes`). Por eso la URL es la RAÍZ: en una ruta protegida el
+ * `to` se ignora a propósito. Y es el MISMO lugar donde ya aterriza hoy el PF
+ * de escritorio: `vercel.json` redirige `/abrir/profe` a la raíz conservando el
+ * query (el redirect del #923). El checkout de MP vuelve a esta misma URL
+ * (`BACK_URL` en `mp/create-preapproval.ts`).
  */
 export function trainerWebCheckout(): string {
   const to: TrainerDestination["to"] = "facturacion";

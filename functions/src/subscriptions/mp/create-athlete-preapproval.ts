@@ -10,8 +10,8 @@
  * Tres cosas que no se pueden compartir sin que alguna quede mintiendo:
  *
  *   1. El gate de rol es el opuesto: `athlete` contra `trainer`.
- *   2. El `BACK_URL` del PF tiene 37 lineas de comentario sobre el hash routing
- *      del Coach Hub, `vercel.json` y `coachHubRedirect`. Nada de eso le aplica
+ *   2. El `BACK_URL` del PF carga un comentario largo sobre el hash routing
+ *      del Coach Hub, el App Link y `coachHubRedirect`. Nada de eso le aplica
  *      al alumno, que vuelve a la landing. Un `BACK_URL` que es funcion del rol
  *      deja ese comentario mintiendole a la mitad de sus lectores.
  *   3. La atestacion registrada de `createPreapproval` dice «el tier y el ciclo
