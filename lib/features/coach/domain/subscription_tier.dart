@@ -60,6 +60,26 @@ const Map<SubscriptionTier, int?> kTierCustomExerciseLimits = {
   SubscriptionTier.plan3: null,
 };
 
+/// Tope de plantillas (`routines` con `source == 'trainer-template'` y
+/// `assignedBy == uid`, sin contar las archivadas) por tier del PF
+/// (docs/limite-plantillas-pf.md, PR3). Espejo a mano de
+/// `TIER_TEMPLATE_LIMITS` en `functions/src/subscriptions/tier-config.ts` —
+/// el servidor es la autoridad real (escribe `planLimits.templates` en
+/// `users/{uid}` y las reglas lo hacen cumplir); este mapa es sólo para
+/// mostrar "N/límite" en la UI sin un round-trip.
+///
+/// Free 3 · Plan 1 SIN LÍMITE · Plan 2 SIN LÍMITE · Plan 3 SIN LÍMITE.
+///
+/// `null` = ilimitado, mismo motivo que [kTierWeightLimits]: con null,
+/// cualquier sitio que compare `count <= límite` y se olvide del caso NO
+/// COMPILA.
+const Map<SubscriptionTier, int?> kTierTemplateLimits = {
+  SubscriptionTier.free: 3,
+  SubscriptionTier.plan1: null,
+  SubscriptionTier.plan2: null,
+  SubscriptionTier.plan3: null,
+};
+
 /// Precios en ARS por tier pago y ciclo. Fuente de verdad para la UI del
 /// paywall (pricing page, cards de plan). DEBE mantenerse en sync con
 /// `TIER_PRICES_ARS` en `functions/src/subscriptions/tier-config.ts` — el
@@ -128,6 +148,10 @@ extension SubscriptionTierX on SubscriptionTier {
   /// Tope de ejercicios propios de este tier.
   /// `null` = sin límite (plan3). El tipo obliga a contemplarlo.
   int? get customExerciseLimit => kTierCustomExerciseLimits[this];
+
+  /// Tope de plantillas de este tier.
+  /// `null` = sin límite. El tipo obliga a contemplarlo.
+  int? get templateLimit => kTierTemplateLimits[this];
 
   /// El siguiente tier hacia arriba, para el upsell del paywall de bloqueo.
   /// Free → Plan 1 → Plan 2 → null (Plan 2 es el tope de la Fase 1; más
