@@ -1,10 +1,11 @@
-// template_quota_provider_test.dart — el gate de UX cruza DOS fuentes (el
-// tope del servidor y el conteo en vivo) y tiene que distinguir "todavía no
-// sé" de "no hay tope", y filtrar las archivadas del conteo.
+// template_quota_provider_test.dart — dos providers, dos ejes:
 //
-// El eje de este archivo es el mismo que
-// `custom_exercise_quota_provider_test.dart`: una fuente que no resolvió NO
-// es una fuente que dijo "no hay tope".
+// - [templateQuotaProvider] (PR3): el gate de UX cruza DOS fuentes (el tope
+//   del servidor y el conteo en vivo) y tiene que distinguir "todavía no sé"
+//   de "no hay tope", y filtrar las archivadas del conteo.
+// - [templateUsageSummaryProvider] (PR5): lee SÓLO el documento del PF,
+//   calcado de `customExerciseUsageSummaryProvider`. El eje es el mismo: "no
+//   sé" (contador ausente) nunca colapsa a "cero".
 
 import 'dart:async';
 
@@ -80,7 +81,88 @@ Future<AsyncValue<TemplateQuota>> _settle(ProviderContainer container) async {
   return sub.read();
 }
 
+/// Container con `users/{_uid}` sembrado tal cual se pasa. Sin colección de
+/// plantillas: [templateUsageSummaryProvider] no la lee — esa es la
+/// diferencia con [templateQuotaProvider].
+Future<ProviderContainer> _containerConDoc(Map<String, Object?> doc) async {
+  final firestore = FakeFirebaseFirestore();
+  await firestore.collection('users').doc(_uid).set({'uid': _uid, ...doc});
+  final container = ProviderContainer(
+    overrides: [
+      firestoreProvider.overrideWithValue(firestore),
+      currentUidProvider.overrideWithValue(_uid),
+    ],
+  );
+  addTearDown(container.dispose);
+  return container;
+}
+
+Future<TemplateQuota?> _leerResumen(ProviderContainer c) async {
+  final sub = c.listen(templateUsageSummaryProvider, (_, __) {});
+  await Future<void>.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
+  final v = sub.read();
+  expect(v.hasValue, isTrue);
+  return v.valueOrNull;
+}
+
 void main() {
+  group('templateUsageSummaryProvider (sólo el documento del PF)', () {
+    test('tope y contador del documento', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'templates': 3},
+        'templateUsage': {'count': 2},
+      });
+      expect(await _leerResumen(c), (limit: 3, count: 2));
+    });
+
+    test('tope null ⇒ sin límite, con el contador igual', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'templates': null},
+        'templateUsage': {'count': 5},
+      });
+      expect(await _leerResumen(c), (limit: null, count: 5));
+    });
+
+    test('tope ausente (interruptor apagado o Plan pago) ⇒ sin límite',
+        () async {
+      final c = await _containerConDoc({
+        'templateUsage': {'count': 1},
+      });
+      expect(await _leerResumen(c), (limit: null, count: 1));
+    });
+
+    test('⚠️ contador ausente ⇒ null («no sé»), nunca count 0', () async {
+      final c = await _containerConDoc({
+        'planLimits': {'templates': 3},
+      });
+      expect(await _leerResumen(c), isNull);
+    });
+
+    test('contador con otra forma ⇒ null', () async {
+      final c = await _containerConDoc({
+        'templateUsage': {'count': '2'},
+      });
+      expect(await _leerResumen(c), isNull);
+    });
+
+    test('sin uid ⇒ null de inmediato, sin round-trip', () async {
+      final firestore = FakeFirebaseFirestore();
+      final container = ProviderContainer(
+        overrides: [
+          firestoreProvider.overrideWithValue(firestore),
+          currentUidProvider.overrideWithValue(null),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final sub = container.listen(templateUsageSummaryProvider, (_, __) {});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(sub.read().valueOrNull, isNull);
+    });
+  });
+
   group('templateQuotaProvider', () {
     test('planLimits ausente ⇒ limit null (sin tope), cuenta igual', () async {
       final c = await _containerWith(templatesCount: 2);

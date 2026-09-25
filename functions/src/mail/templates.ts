@@ -453,6 +453,22 @@ function ejerciciosLabel(limit: number): string {
 }
 
 /**
+ * "3 plantillas" · "1 plantilla".
+ *
+ * Espejo de `ejerciciosLabel`, mismo motivo y misma razón para el singular no
+ * cosmético: el tope Free de plantillas es 3 hoy
+ * (`limite-plantillas-pf.md` §1, P1), pero un tier de 1 haría que el mail
+ * dijera "1 plantillas".
+ *
+ * `template-limit-reached` sólo se encola cuando `count >= limit`, igual que
+ * `exercise-limit-reached` — ver `decideTrainerLimitMail` — así que `limit`
+ * llega siempre como un número real.
+ */
+function plantillasLabel(limit: number): string {
+  return limit === 1 ? "1 plantilla" : `${limit} plantillas`; // i18n: email comercial
+}
+
+/**
  * El cupo del plan Free, ya escrito. Se DERIVA de `TIER_WEIGHT_LIMITS` en vez
  * de llegar por params: es una constante del producto, no un dato del PF, y un
  * param mas es un param que el proximo productor se olvida de pasar — con el
@@ -1094,6 +1110,42 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
             "editarlos, asignarlos y borrarlos.",
         ],
         ["Lo único que se frena es crear ejercicios nuevos por encima del límite."],
+        ["Si necesitás más lugar, hay planes más grandes."],
+      ],
+      "VER LOS PLANES",
+      ctaUrl,
+    );
+  }
+
+  // ── El PF que chocó el tope de plantillas de su plan ────────────────────
+  //
+  // limite-plantillas-pf.md §3 PR4. Hermano de `exercise-limit-reached`, con
+  // la MISMA regla de fondo y la misma razón: E3/P5 de ese plan es que bajar
+  // de plan NUNCA borra ni bloquea una plantilla ya creada — se puede seguir
+  // usando, editando, asignando, publicando y archivando por encima del
+  // límite. Lo único que se frena es crear una nueva o restaurar una
+  // archivada.
+  //
+  // CON `prefKey`: comunicación comercial, ver `trainer-limit-mail.ts`.
+  case "template-limit-reached": {
+    const limit = limitParam(params.limit);
+    const label = typeof limit === "number" ? plantillasLabel(limit) : undefined;
+
+    return build(
+      "Llegaste al tope de plantillas de tu plan", // i18n: email comercial
+      "Llegaste al tope",
+      [
+        label
+          ? ["Llegaste al tope de tu plan: ", strong(label), "."]
+          : ["Llegaste al tope de plantillas de tu plan."],
+        [
+          "Conservás todas las que ya tenés: podés seguir usándolas, " +
+            "editándolas, asignándolas, publicándolas y archivándolas.",
+        ],
+        [
+          "Lo único que se frena es crear plantillas nuevas o restaurar una " +
+            "archivada por encima del límite.",
+        ],
         ["Si necesitás más lugar, hay planes más grandes."],
       ],
       "VER LOS PLANES",

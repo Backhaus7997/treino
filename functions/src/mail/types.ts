@@ -151,6 +151,25 @@ export type MailKind =
   // comunicacion comercial, igual razonamiento que `athlete-coverage-lost` y
   // `free-limit-reached` (los otros dos que SI lo llevan).
   | "exercise-limit-reached"
+  // ── El PF que choco el tope de plantillas de su plan ─────────────────────
+  //
+  // limite-plantillas-pf.md, PR4. El mismo molde que `exercise-limit-reached`
+  // pero para la OTRA cuota nueva del PF: `planLimits.templates` /
+  // `templateUsage.count`, que ya escribe PR1 y ya lee la regla de PR2 en
+  // `firestore.rules` (`templateQuotaOk`).
+  //
+  // Lo produce el MISMO `trainer-limit-mail.ts`, generalizado por
+  // `trainerLimitHitKind` (`CAMPOS_POR_KIND`): cuando ese campo vale
+  // `"templates"`, decide sobre estos dos campos en vez de los de ejercicios.
+  //
+  // POR QUE ES UN MAIL y CON `prefKey`: mismo razonamiento que
+  // `exercise-limit-reached` — el movil solo informa el ESTADO, y ofrecerle
+  // un plan mas grande a quien ya es cliente es comunicacion comercial.
+  //
+  // COMPARTE EL ENFRIAMIENTO con `exercise-limit-reached`
+  // (`trainerLimitMailAt`): un PF que choca los dos topes recibe un solo
+  // mail cada 14 dias, no uno por tope.
+  | "template-limit-reached"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el

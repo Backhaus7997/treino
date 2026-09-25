@@ -60,17 +60,20 @@ const Map<SubscriptionTier, int?> kTierCustomExerciseLimits = {
   SubscriptionTier.plan3: null,
 };
 
-/// Tope de plantillas (`routines` con `source == 'trainer-template'` y
-/// `assignedBy == uid`, sin contar las archivadas) por tier del PF
-/// (docs/limite-plantillas-pf.md, PR3). Espejo a mano de
-/// `TIER_TEMPLATE_LIMITS` en `functions/src/subscriptions/tier-config.ts` —
-/// el servidor es la autoridad real (escribe `planLimits.templates` en
-/// `users/{uid}` y las reglas lo hacen cumplir); este mapa es sólo para
-/// mostrar "N/límite" en la UI sin un round-trip.
+/// Tope de plantillas (`routines` con `source == 'trainer-template'` del PF,
+/// no archivadas) por tier (docs/limite-plantillas-pf.md, PR3). Espejo a
+/// mano de `TIER_TEMPLATE_LIMITS` en
+/// `functions/src/subscriptions/tier-config.ts` — el servidor es la
+/// autoridad real (escribe `planLimits.templates` en `users/{uid}` y las
+/// reglas lo hacen cumplir); este mapa es sólo para mostrar "N/límite" en la
+/// UI sin un round-trip.
 ///
-/// Free 3 · Plan 1 SIN LÍMITE · Plan 2 SIN LÍMITE · Plan 3 SIN LÍMITE.
+/// Free 3 · Plan 1, 2 y 3 SIN LÍMITE. A diferencia de [kTierWeightLimits] y
+/// [kTierCustomExerciseLimits], esta escalera NO es estrictamente creciente
+/// —salta de 3 directo a "sin límite"—, a propósito: sólo el Free tiene tope
+/// (docs/limite-plantillas-pf.md §1, P2).
 ///
-/// `null` = ilimitado, mismo motivo que [kTierWeightLimits]: con null,
+/// `null` = ilimitado, mismo motivo que los otros dos mapas: con null,
 /// cualquier sitio que compare `count <= límite` y se olvide del caso NO
 /// COMPILA.
 const Map<SubscriptionTier, int?> kTierTemplateLimits = {
@@ -150,7 +153,8 @@ extension SubscriptionTierX on SubscriptionTier {
   int? get customExerciseLimit => kTierCustomExerciseLimits[this];
 
   /// Tope de plantillas de este tier.
-  /// `null` = sin límite. El tipo obliga a contemplarlo.
+  /// `null` = sin límite (todo lo que no sea Free). El tipo obliga a
+  /// contemplarlo.
   int? get templateLimit => kTierTemplateLimits[this];
 
   /// El siguiente tier hacia arriba, para el upsell del paywall de bloqueo.

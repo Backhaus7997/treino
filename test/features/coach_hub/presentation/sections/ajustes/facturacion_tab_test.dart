@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -28,6 +29,7 @@ Widget _harness({
   required List<TrainerLink> links,
   UserProfile? profile,
   Stream<CustomExerciseQuota?>? usage,
+  Stream<TemplateQuota?>? templateUsage,
 }) =>
     ProviderScope(
       overrides: [
@@ -38,6 +40,9 @@ Widget _harness({
             .overrideWith((ref) => Stream<List<TrainerLink>>.value(links)),
         customExerciseUsageSummaryProvider.overrideWith(
           (ref) => usage ?? Stream<CustomExerciseQuota?>.value(null),
+        ),
+        templateUsageSummaryProvider.overrideWith(
+          (ref) => templateUsage ?? Stream<TemplateQuota?>.value(null),
         ),
       ],
       child: const MaterialApp(home: Scaffold(body: FacturacionTab())),
@@ -187,6 +192,73 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Ejercicios propios'), findsNothing);
+    });
+  });
+
+  // ── Línea de uso de plantillas (docs/limite-plantillas-pf.md §3 PR5) ──
+  group('línea de uso de plantillas', () {
+    testWidgets('en Free, con tope: "Plantillas: 2 de 3"', (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        templateUsage: Stream.value((limit: 3, count: 2)),
+      ));
+      await tester.pump();
+
+      expect(find.text('Plantillas: 2 de 3'), findsOneWidget);
+    });
+
+    testWidgets('en Free, sin tope (interruptor apagado): "(sin límite)"',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        templateUsage: Stream.value((limit: null, count: 2)),
+      ));
+      await tester.pump();
+
+      expect(find.text('Plantillas: 2 (sin límite)'), findsOneWidget);
+    });
+
+    // El check central de §6 PR5: sólo en Free. Un PF pago no tiene tope de
+    // plantillas — la línea no aporta nada ahí y se omite, aunque el
+    // provider tenga datos.
+    testWidgets('⚠️ en un plan pago NO se muestra, aunque haya datos',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        profile: _trainer(
+          subscription: const TrainerSubscription(
+            tier: SubscriptionTier.plan1,
+            status: SubscriptionStatus.active,
+            weightLimit: 7,
+          ),
+        ),
+        links: const [],
+        templateUsage: Stream.value((limit: 3, count: 2)),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Plantillas'), findsNothing);
+    });
+
+    testWidgets('cargando: no muestra la línea (ningún número inventado)',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        templateUsage: StreamController<TemplateQuota?>().stream,
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Plantillas'), findsNothing);
+    });
+
+    testWidgets('contador ausente: no muestra la línea (nunca un 0 inventado)',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        templateUsage: Stream<TemplateQuota?>.value(null),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Plantillas'), findsNothing);
     });
   });
 }
