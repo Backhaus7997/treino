@@ -169,14 +169,17 @@ export {
   sweepAthletePaywall,
 } from "./subscriptions/athlete-paywall-enforced";
 
-// El mail al alumno que choco un tope del plan free. Corre 05:00 ART, media
-// hora despues del barrido de arriba: aquel resuelve `athletePaywallEnforced`,
-// y correr primero dejaria a este decidiendo sobre el estado de anteayer para
-// quien cambio de situacion durante la noche.
+// El mail al alumno que choco un tope del plan free. Dos caminos:
+// `sendFreeLimitMailOnHit` lo encola AL TOQUE, apenas la app anota el tope en
+// `users/{uid}`; `sweepFreeLimitMail` (05:00 ART, media hora despues del
+// barrido de arriba) queda como red por si el trigger fallo.
 //
 // Es el unico canal posible: bajo 3.1.3(f) la app no puede decir donde se
 // paga. Ver el encabezado de `free-limit-mail.ts`.
-export { sweepFreeLimitMail } from "./subscriptions/free-limit-mail";
+export {
+  sendFreeLimitMailOnHit,
+  sweepFreeLimitMail,
+} from "./subscriptions/free-limit-mail";
 // El mail al PF que choco el tope de ejercicios propios de su plan
 // (limite-ejercicios-pf.md, PR4). Corre 05:30 ART, media hora despues del
 // barrido de arriba y una hora despues del de las 04:00 que recalcula
