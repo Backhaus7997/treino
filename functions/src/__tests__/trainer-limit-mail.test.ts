@@ -29,7 +29,7 @@ import {
 } from "../subscriptions/trainer-limit-mail";
 import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { renderMail, APP_ENTRY_TRAINER } from "../mail/templates";
+import { renderMail, trainerWebCheckout } from "../mail/templates";
 import type { App } from "firebase-admin/app";
 
 jest.mock("../mail/enqueue-mail", () => ({
@@ -174,11 +174,13 @@ describe("cuando sí manda", () => {
     expect(TRAINER_LIMIT_PREF_KEY).toBe(ATHLETE_PROSPECT_PREF_KEY);
   });
 
-  it("⚠️ el CTA va a la entrada del PF con destino facturación", async () => {
+  it("⚠️ el CTA va al Coach Hub web, no al App Link de la app", async () => {
     const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
     await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
     const url = String(enqueueMock.mock.calls[0][1].params.ctaUrl);
-    expect(url.startsWith(APP_ENTRY_TRAINER)).toBe(true);
+    expect(url).toBe(trainerWebCheckout());
+    // No es el App Link: en el teléfono abre la app, y la app no vende.
+    expect(url).not.toContain("/abrir/");
     expect(url).toContain("to=facturacion");
   });
 
@@ -218,7 +220,7 @@ describe("el texto", () => {
     renderMail("exercise-limit-reached", {
       tope: "customExercises",
       limit,
-      ctaUrl: `${APP_ENTRY_TRAINER}?to=facturacion`,
+      ctaUrl: trainerWebCheckout(),
     });
 
   it("dice el número del tope", () => {
@@ -235,7 +237,7 @@ describe("el texto", () => {
 
   it("⚠️ nunca interpola null — sin params, cae a la frase genérica", () => {
     const { html, text } = renderMail("exercise-limit-reached", {
-      ctaUrl: `${APP_ENTRY_TRAINER}?to=facturacion`,
+      ctaUrl: trainerWebCheckout(),
     });
     expect(html).not.toContain("null");
     expect(text).not.toContain("null");

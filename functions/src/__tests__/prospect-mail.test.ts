@@ -26,7 +26,7 @@ import { SubscriptionState } from "../subscriptions/effective-limit";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { linkLoadReconcileHandler } from "../subscriptions/link-load-reconcile";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
-import { trainerEntry } from "../mail/templates";
+import { trainerWebCheckout } from "../mail/templates";
 import { renderMail } from "../mail/templates";
 
 jest.mock("../mail/enqueue-mail", () => ({
@@ -125,7 +125,9 @@ describe("enqueueProspectMail", () => {
     expect(arg.toUid).toBe("pf-1");
     expect(arg.kind).toBe("limit-reached");
     expect(arg.params.blockedCount).toBe(3);
-    expect(arg.params.ctaUrl).toBe(trainerEntry({ to: "facturacion" }));
+    expect(arg.params.ctaUrl).toBe(trainerWebCheckout());
+    // No es el App Link: en el teléfono abre la app, y la app no vende.
+    expect(String(arg.params.ctaUrl)).not.toContain("/abrir/");
     // Sin prefKey: el PF no puede optar por no enterarse de que choco el tope.
     expect(arg.prefKey).toBeUndefined();
   });
@@ -133,7 +135,7 @@ describe("enqueueProspectMail", () => {
 
 describe("el copy", () => {
   const render = (params: Record<string, string | number>) =>
-    renderMail("limit-reached", { ctaUrl: trainerEntry({ to: "facturacion" }), ...params });
+    renderMail("limit-reached", { ctaUrl: trainerWebCheckout(), ...params });
 
   it("NO usa el vocabulario de deuda de sus dos hermanos", () => {
     // Este PF no debe nada. «Regularizá» / «poné al día» / «no pudimos cobrar»
@@ -183,7 +185,7 @@ describe("el copy", () => {
   it("la URL del CTA viaja tambien en el texto plano", () => {
     // Un CTA que solo vive adentro de un <a> no existe para quien lee en texto.
     expect(render({ limit: 2, blockedCount: 1 }).text).toContain(
-      trainerEntry({ to: "facturacion" }),
+      trainerWebCheckout(),
     );
   });
 });

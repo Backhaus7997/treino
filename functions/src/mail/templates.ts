@@ -174,12 +174,49 @@ export type TrainerDestination =
  * Sin destino: la entrada bare, igual que siempre (usa esto
  * `federated-signin-hint` via `entradaSegunRol` — ahi no hay contexto de
  * "para que" entra, asi que no hay destino fino que ofrecer).
+ *
+ * `facturacion` esta EXCLUIDO del tipo del parametro: ese destino no pasa por
+ * acá, va por `trainerWebCheckout()`.
  */
-export function trainerEntry(dest?: TrainerDestination): string {
+export function trainerEntry(
+  dest?: Exclude<TrainerDestination, { to: "facturacion" }>,
+): string {
   if (!dest) return APP_ENTRY_TRAINER;
   const params = new URLSearchParams({ to: dest.to });
   if (dest.to === "alumno") params.set("id", dest.athleteId);
   return `${APP_ENTRY_TRAINER}?${params.toString()}`;
+}
+
+/**
+ * A donde manda el CTA de los mails de PLATA del PF (`subscription-grace`,
+ * `subscription-downgraded`, `limit-reached`, `exercise-limit-reached`): el
+ * Coach Hub web, no la app.
+ *
+ * NO usa `trainerEntry({ to: "facturacion" })` a propósito, aunque el destino
+ * fino sea el mismo. `APP_ENTRY_TRAINER` es un App Link: en un teléfono con la
+ * app instalada, el sistema operativo la abre — y la app no vende
+ * (`resolvePlanCheckout` sólo da punto de compra en el Coach Hub web, bajo
+ * `kIsWeb`; `plan_checkout.dart:240`). El PF que lee uno de estos mails en el
+ * teléfono tocaría el botón y no tendría cómo pagar: el Coach Hub web es
+ * donde contrata (`docs/legal/contrato-entrenador.md` §8.4,
+ * `docs/legal/terminos-suscripcion.md` §3).
+ *
+ * El dartdoc de `APP_ENTRY_TRAINER` dice que la app le sirve MÁS al profe que
+ * al alumno, y sigue siendo cierto — para todo lo demás. Para pagar, no: es
+ * lo único que la app no hace.
+ *
+ * El Coach Hub lee `to` de `Uri.base.queryParameters` en CUALQUIER path y lo
+ * aplica DESPUÉS del login (`coachHubRedirect`, `lib/app/coach_hub_router.dart`
+ * ~L159-178; `_coachHubPathFor` ~L212 manda `facturacion` a
+ * `/facturacion/planes`). Y es el MISMO lugar donde ya aterriza hoy el PF de
+ * escritorio: `vercel.json` redirige `/abrir/profe` a la raíz conservando el
+ * query (el redirect del #923).
+ *
+ * SIN parametros por ahora — un PR posterior le suma `{plan?, ciclo?}`.
+ */
+export function trainerWebCheckout(): string {
+  const to: TrainerDestination["to"] = "facturacion";
+  return `https://app.gettreino.com/?${new URLSearchParams({ to }).toString()}`;
 }
 
 /**
