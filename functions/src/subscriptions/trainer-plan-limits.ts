@@ -80,12 +80,14 @@ export const TRAINER_EXERCISE_LIMITS_ENABLED = false;
 export const USAGE_FIELD = "customExerciseUsage";
 
 /**
- * El interruptor del tope de plantillas (limite-plantillas-pf.md, PR1).
- * Arranca APAGADO por el mismo motivo que el de ejercicios: la plomeria corre
- * y escribe `{templates: null}` en produccion antes de que importe, y
- * encenderlo es un cambio de valor. Ver el encabezado antes de tocarlo.
+ * El interruptor del tope de plantillas (limite-plantillas-pf.md, PR1 y §4).
+ * Arranco APAGADO por el mismo motivo que el de ejercicios: la plomeria corrio
+ * y escribio `{templates: null}` en produccion antes de que importara, asi que
+ * encenderlo fue un cambio de valor y nada mas. Encendido el 2026-09-25,
+ * condicionado (limite-plantillas-pf.md §4) a que todavia no hubiera
+ * entrenadores reales dados de alta. Ver el encabezado antes de tocarlo.
  */
-export const TRAINER_TEMPLATE_LIMITS_ENABLED = false;
+export const TRAINER_TEMPLATE_LIMITS_ENABLED = true;
 
 /** El contador de plantillas: lo escribe [recountTemplates], y nadie mas. */
 export const TEMPLATE_USAGE_FIELD = "templateUsage";
