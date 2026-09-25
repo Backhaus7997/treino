@@ -252,17 +252,17 @@ recuperación.
 ## 8. Tu suscripción
 
 El uso profesional de TREINO requiere una suscripción, cuyo plan determina
-cuántos alumnos podés atender simultáneamente y cuántos ejercicios propios podés
-tener en tu biblioteca.
+cuántos alumnos podés atender simultáneamente, cuántos ejercicios propios podés
+tener en tu biblioteca y cuántas plantillas podés tener activas.
 
 ### 8.1 Planes y límites
 
-| Plan | Límite de carga | Ejercicios propios | Precio mensual | Precio anual |
-|---|---|---|---|---|
-| Gratuito | 2 | 20 | — | — |
-| Plan 1 | 7 | 60 | $12.000 | $120.000 |
-| Plan 2 | 15 | 120 | $22.000 | $220.000 |
-| Plan 3 | Sin límite | Sin límite | $39.000 | $390.000 |
+| Plan | Límite de carga | Ejercicios propios | Plantillas | Precio mensual | Precio anual |
+|---|---|---|---|---|---|
+| Gratuito | 2 | 20 | 3 | — | — |
+| Plan 1 | 7 | 60 | Sin límite | $12.000 | $120.000 |
+| Plan 2 | 15 | 120 | Sin límite | $22.000 | $220.000 |
+| Plan 3 | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
 
 Precios en pesos argentinos. El plan anual equivale a diez meses.
 
@@ -293,6 +293,23 @@ Si tu plan baja y quedás por encima del límite, **conservás todos tus
 ejercicios** y podés seguir usándolos, editándolos y asignándolos. Lo único que
 no podés es crear nuevos hasta quedar por debajo del límite de tu plan.
 
+### 8.2.ter Cómo se cuentan las plantillas
+
+Cuentan las plantillas que creaste y no archivaste, **estén publicadas o no**.
+Asignarle una plantilla a un alumno no cuenta, y tampoco los planes que armás
+directamente para un alumno.
+
+Si archivás una plantilla, liberás su lugar. Si borrás una que estaba activa,
+también lo liberás. Borrar una que ya estaba archivada no te da lugar nuevo: ese
+lugar ya estaba libre desde que la archivaste.
+
+Para recuperar una plantilla archivada tenés que tener lugar en tu plan.
+
+Si tu plan baja y quedás por encima del límite, **conservás todas tus
+plantillas** y podés seguir usándolas, editándolas, asignándolas y
+publicándolas. Lo único que no podés es crear nuevas ni recuperar archivadas
+hasta quedar por debajo del límite de tu plan.
+
 ### 8.3 Si no pagás
 
 Si tu suscripción queda impaga, pasás al límite del plan gratuito y algunos de
@@ -303,9 +320,10 @@ capacidad de gestionarlos.
 y su chat. La consecuencia recae sobre quien decide no pagar, no sobre quien no
 tuvo nada que ver.
 
-**Tus ejercicios propios tampoco se borran.** Si tenés más de los que incluye el
-plan gratuito, los conservás y los seguís usando; sólo no vas a poder crear
-nuevos mientras estés por encima del límite de tu plan.
+**Tus ejercicios propios y tus plantillas tampoco se borran.** Si tenés más de
+los que incluye el plan gratuito, los conservás y los seguís usando; sólo no vas
+a poder crear nuevos, ni recuperar plantillas archivadas, hasta quedar por
+debajo del límite de tu plan.
 
 Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
 
