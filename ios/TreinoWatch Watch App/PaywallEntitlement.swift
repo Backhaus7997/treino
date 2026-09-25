@@ -22,7 +22,7 @@ import Foundation
 /// El orden para encenderlo está en `docs/paywall-watchos-plan.md` §5, y no es
 /// arbitrario: **primero el servidor, después el cliente**. Al revés, el
 /// cliente gatea cosas que el servidor todavía permite.
-let kAthletePaywallEnabled = false
+let kAthletePaywallEnabled = true
 
 /// Lee y cachea `users/{uid}.athletePaywallEnforced`.
 ///

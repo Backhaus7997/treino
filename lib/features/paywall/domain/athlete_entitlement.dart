@@ -206,11 +206,22 @@ enum AthleteEntitlement {
 /// cosas que el servidor todavía permite y el alumno ve un candado que no
 /// corresponde.
 ///
+/// **Prendido en el código el 2026-09-25, para el build 53, y el orden se
+/// sigue respetando.** Un flag del cliente llega a los usuarios recién cuando
+/// el build sale publicado, no cuando se mergea. Así que el día del
+/// lanzamiento va primero el servidor —prender
+/// `ATHLETE_PAYWALL_ENFORCEMENT_ENABLED` en functions y desplegar—, y DESPUÉS
+/// se libera el build aprobado, en las dos tiendas en modo manual. El flag
+/// del servidor NO se prende antes en `main`: cualquier deploy de functions
+/// por otro motivo lo encendería con el build 52 todavía en la calle, y quien
+/// no actualizó recibiría el rechazo de `firestore.rules` sin la hoja que lo
+/// explica, porque la app no tiene actualización obligatoria.
+///
 /// Ojo con la otra mitad del cliente: `kAthletePaywallEnabled` **también existe
 /// en Swift** (`ios/TreinoWatch Watch App/PaywallEntitlement.swift`), porque el
 /// reloj de Apple no puede importar Dart. Hay un test que se pone rojo si los
 /// dos no coinciden — `test/conformance/paywall_flag_parity_test.dart`.
-const bool kAthletePaywallEnabled = false;
+const bool kAthletePaywallEnabled = true;
 
 /// Días máximos de una rutina PROPIA en el plan free.
 ///
