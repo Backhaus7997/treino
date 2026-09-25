@@ -24,14 +24,15 @@
  * mismo bypass de una sola escritura que el pin de `athletePaywallEnforced`
  * documenta.
  *
- * ─── El interruptor, y por que arranca APAGADO ──────────────────────────────
+ * ─── El interruptor: ENCENDIDO desde el 2026-09-25 ──────────────────────────
  *
- * [TRAINER_EXERCISE_LIMITS_ENABLED] arranca en `false`. Con el interruptor
- * apagado esta CF igual corre y escribe `{customExercises: null}` en todos
- * lados: la plomeria queda ejercitada y OBSERVABLE en produccion antes de que
- * cobre importancia, y prender el tope pasa a ser un cambio de valor y nada
- * mas. Apagarlo vuelve a limpiar el campo (a `null`), o sea que el rollback es
- * real y no un deploy de emergencia.
+ * [TRAINER_EXERCISE_LIMITS_ENABLED] arrancó en `false` y se encendió el
+ * 2026-09-25, antes del alta del primer entrenador real
+ * (limite-ejercicios-pf.md §4). Mientras estuvo apagado, esta CF igual corría
+ * y escribía `{customExercises: null}` en todos lados: la plomeria quedó
+ * ejercitada antes de que importara, y prender el tope fue un cambio de valor
+ * y nada mas. Apagarlo vuelve a limpiar el campo (a `null`) en el proximo
+ * sync, o sea que el rollback es real y no un deploy de emergencia.
  *
  * ─── El orden de encendido (limite-ejercicios-pf.md §4) ─────────────────────
  *
@@ -60,7 +61,7 @@ import { effectiveTier, SubscriptionState } from "./effective-limit";
 import { TIER_CUSTOM_EXERCISE_LIMITS } from "./tier-config";
 
 /** El interruptor. Ver el encabezado antes de tocarlo. */
-export const TRAINER_EXERCISE_LIMITS_ENABLED = false;
+export const TRAINER_EXERCISE_LIMITS_ENABLED = true;
 
 /** El campo que escribe este modulo, y nadie mas. */
 export const USAGE_FIELD = "customExerciseUsage";

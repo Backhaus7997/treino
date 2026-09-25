@@ -3,10 +3,10 @@
 **24 de septiembre de 2026.** Escrito contra `origin/main` de `treino` en
 `15f7337e`. Los números de línea son de ese commit y se van a correr.
 
-**Estado:** PR 0 a PR 4 y el copy del Coach Hub del PR 5 van juntos en un solo
-PR, con el interruptor apagado (`TRAINER_EXERCISE_LIMITS_ENABLED = false`). Los
-legales del PR 5 van en su propia rama, `docs/legal-limite-ejercicios-pf`, y se
-publican antes que el código.
+**Estado: ENCENDIDO el 2026-09-25** (`TRAINER_EXERCISE_LIMITS_ENABLED = true`,
+#1244). PR 0 a PR 4 entraron apagados en #1240, el copy del Coach Hub en #1241 y
+los legales en #1243. Ese día se deployaron a producción las reglas de main y
+las cinco functions del tope.
 
 **Todavía no hay entrenadores reales:** todas las cuentas de PF son de prueba.
 Por eso no hay aviso previo del §12 que mandar. La condición que queda es otra:

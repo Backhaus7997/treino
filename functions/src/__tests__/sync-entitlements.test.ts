@@ -635,16 +635,12 @@ describe("syncTrainerEntitlements — el aviso de acceptedAt separa lo sano de l
 describe("syncTrainerEntitlements — planLimits", () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it("con el interruptor apagado (hoy), escribe planLimits.customExercises: null EXPLICITO", async () => {
-    // TRAINER_EXERCISE_LIMITS_ENABLED arranca apagado (limite-ejercicios-pf.md
-    // PR1) y `resolvePlanLimits` con `enabled=false` devuelve `{customExercises:
-    // null}` para TODOS — incluso con `degraded`, porque el apagado manda
-    // primero (cubierto en trainer-plan-limits.test.ts). Sin mockear nada:
-    // este es el comportamiento REAL con el flag como esta hoy en produccion.
-    // La CLAVE tiene que existir en el doc, no estar ausente: con
-    // `merge: true`, omitirla es "no tocar", y un valor numerico previo (de
-    // una corrida futura con el interruptor prendido, o escrito a mano)
-    // quedaria pegado para siempre.
+  it("con el interruptor encendido (hoy), escribe el tope del plan: plan1 → 60", async () => {
+    // TRAINER_EXERCISE_LIMITS_ENABLED se encendió el 2026-09-25
+    // (limite-ejercicios-pf.md §4). Sin mockear nada: este es el
+    // comportamiento REAL con el flag como está hoy en producción. El camino
+    // apagado (`{customExercises: null}` explícito para todos) lo cubre
+    // trainer-plan-limits.test.ts con `enabled=false`.
     const state = install({
       users: { t1: { subscription: { tier: "plan1", status: "active" } } },
       trainer_links: { L1: lnk({ athleteId: "a1" }) },
@@ -652,7 +648,7 @@ describe("syncTrainerEntitlements — planLimits", () => {
 
     await syncTrainerEntitlements(app, "t1", 5_000);
 
-    expect(state.users.t1.planLimits).toEqual({ customExercises: null });
+    expect(state.users.t1.planLimits).toEqual({ customExercises: 60 });
   });
 
   // Los siguientes dos tests mockean `resolvePlanLimits` en vez de depender
