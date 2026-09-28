@@ -226,6 +226,37 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "web active App Check. Va DESPUES de createPreapproval en la cola: aquel " +
       "abre un cobro a nombre propio, este solo cierra uno propio.",
   },
+  "subscriptions/mp/baja-por-mail:solicitarBajaPorMail": {
+    permanence: "decided",
+    reason:
+      "Es el Botón de Baja de Servicio de la Disp. 954/2025 art. 4, que PROHIBE " +
+      "exigir registración previa: no puede pedir sesión, y lo llama el " +
+      "servidor de la landing, que no tiene Firebase ni App Check. Aunque el " +
+      "cliente movil atestara, este flag no aplicaria nunca. La cerradura es " +
+      "otra: solo puede mandarle un mail al DUEÑO del buzón de una cuenta que " +
+      "paga, con throttle de una ventana de 10 minutos por cuenta, y contesta " +
+      "siempre {status:\"ok\"} (anti-enumeracion, mismo contrato que " +
+      "requestPasswordReset). Ver baja-por-mail.ts, bloque de los onCall.",
+  },
+  "subscriptions/mp/baja-por-mail:confirmarBajaPorMail": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de confirmacion de la landing, en el NAVEGADOR y sin " +
+      "sesion por mandato de la 954/2025; la landing no tiene Firebase ni App " +
+      "Check. A diferencia de solicitarBajaPorMail (server a server, donde el " +
+      "flag no aplica nunca) aca SI podria atestarse con reCAPTCHA, por eso es " +
+      "`debt` y no `decided`. " +
+      "Este SI cancela en Mercado Pago (irreversible), y lo que lo cierra es " +
+      "que la unica entrada es un token de 256 bits que solo llego al buzón de " +
+      "la cuenta, de un solo uso (reclamo en transaccion), con vencimiento de " +
+      "72 h, guardado como SHA-256. El uid sale del documento del token, " +
+      "nunca del request. Ver baja-por-mail.ts.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca. Medir antes que la pagina de confirmacion atesta en los " +
+      "navegadores reales: un flag que rompe el boton de baja deja a la " +
+      "persona sin el tramite que la norma obliga a ofrecer.",
+  },
   "profile/ensure-athlete-profile:ensureAthleteProfile": {
     permanence: "debt",
     reason:
@@ -365,6 +396,7 @@ const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
   "cancelMySubscription",
+  "confirmarBajaPorMail",
   "createAthletePreapproval",
   "createPreapproval",
   "deleteAccount",
@@ -380,6 +412,7 @@ const EXPECTED_DEPLOYED = [
   "requestPasswordReset",
   "resolveReport",
   "resumeTrainerLink",
+  "solicitarBajaPorMail",
 ] as const;
 
 const describeCallable = (c: DeployedCallable) =>
@@ -533,6 +566,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/cancel-my-subscription",
       symbol: "cancelMySubscription",
       as: "cancelMySubscription",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/baja-por-mail",
+      symbol: "solicitarBajaPorMail",
+      as: "solicitarBajaPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/baja-por-mail",
+      symbol: "confirmarBajaPorMail",
+      as: "confirmarBajaPorMail",
       attested: false,
     },
     {

@@ -60,6 +60,8 @@ const OTRO = "otro-pf";
 const PLAN = "2c938084";
 /** El id de un evento de webhook ya procesado (= el id del preapproval). */
 const EVENTO = "2c938084726fca480172750000000000";
+/** El id de un link de baja por mail: el SHA-256 del token, nunca el token. */
+const BAJA = "a".repeat(64);
 
 let testEnv: RulesTestEnvironment;
 
@@ -102,6 +104,13 @@ beforeEach(async () => {
       procesadoMs: 1_000_000,
       outcome: "written",
       planId: PLAN,
+    });
+    await db.collection("mp_bajas_por_mail").doc(BAJA).set({
+      uid: TRAINER,
+      code: "BAJA-2026-0A1B2C",
+      createdAt: new Date(1_000_000),
+      expiresAt: new Date(1_000_000 + 72 * 3600 * 1000),
+      usedAt: new Date(1_000_500),
     });
   });
 });
@@ -245,6 +254,49 @@ describe("mp_webhook_events — escribirlo es hacer desaparecer un pago", () => 
     const col = dbDe(TRAINER).collection("mp_webhook_events");
     await assertFails(col.doc(EVENTO).update({ procesadoMs: 9_999_999_999 }));
     await assertFails(col.doc(EVENTO).delete());
+  });
+});
+
+describe("mp_bajas_por_mail — escribirlo es darle de baja a otro", () => {
+  it("nadie lo lee: ni el dueño, ni un tercero, ni un anónimo", async () => {
+    // Dice quién está por darse de baja, y con qué código de trámite.
+    const p = (db: firebase.firestore.Firestore) =>
+      db.collection("mp_bajas_por_mail").doc(BAJA).get();
+    await assertFails(p(dbDe(TRAINER)));
+    await assertFails(p(dbDe(OTRO)));
+    await assertFails(p(anonimo()));
+  });
+
+  it("el listado tampoco", async () => {
+    await assertFails(anonimo().collection("mp_bajas_por_mail").get());
+    await assertFails(dbDe(TRAINER).collection("mp_bajas_por_mail").get());
+  });
+
+  it("nadie planta un link que apunte a la baja de otro", async () => {
+    // El id es el hash de un token que el atacante elige: si pudiera crear el
+    // doc, canjearía su propio token contra la suscripción de TRAINER.
+    await assertFails(
+      anonimo().collection("mp_bajas_por_mail").doc("b".repeat(64)).set({
+        uid: TRAINER,
+        code: null,
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 3600 * 1000),
+        usedAt: null,
+      }),
+    );
+    await assertFails(
+      dbDe(OTRO).collection("mp_bajas_por_mail").doc("c".repeat(64)).set({
+        uid: TRAINER,
+        usedAt: null,
+      }),
+    );
+  });
+
+  it("ni revive uno ya usado, ni le cambia el uid, ni lo borra", async () => {
+    const col = dbDe(TRAINER).collection("mp_bajas_por_mail");
+    await assertFails(col.doc(BAJA).update({ usedAt: null }));
+    await assertFails(col.doc(BAJA).update({ uid: OTRO }));
+    await assertFails(col.doc(BAJA).delete());
   });
 });
 

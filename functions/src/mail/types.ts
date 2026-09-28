@@ -179,7 +179,21 @@ export type MailKind =
   // Sin `prefKey`, como `payment-overdue` y `discomfort-reported`: es un aviso
   // legal sobre la vida de la cuenta, no una notificacion de producto. Que se
   // pueda apagar desde preferencias significaria borrar cuentas sin aviso.
-  | "inactive-account-notice";
+  | "inactive-account-notice"
+  // ── Botón de Baja de Servicio, verificado por mail ──────────────────────
+  //
+  // Los produce `subscriptions/mp/baja-por-mail.ts`. Van a ALUMNOS y a PFs por
+  // igual: la baja no conoce el producto.
+  //
+  // El primero lleva el link de un solo uso en `actionLink` —y no en un param
+  // propio— porque es el nombre que `sendQueuedMail` ya BORRA del documento
+  // apenas envía: el token no queda vivo en la cola. El segundo confirma que
+  // la baja quedó hecha, con la fecha hasta la que conserva el acceso.
+  //
+  // Sin `prefKey` los dos: son la respuesta a un trámite legal que la persona
+  // acaba de iniciar (Disp. 954/2025 art. 4 y 5), no algo que se pueda apagar.
+  | "service-cancel-confirm"
+  | "service-cancel-done";
 
 /**
  * Per-kind template parameters.

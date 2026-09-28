@@ -10,7 +10,7 @@
  */
 
 import { renderMail, trainerEntry, trainerWebCheckout } from "../mail/templates";
-import { MailKind } from "../mail/types";
+import { MailKind, MailParams } from "../mail/types";
 import {
   artDateKey,
   formatArs,
@@ -54,6 +54,8 @@ const KINDS: Record<MailKind, true> = {
   "exercise-limit-reached": true,
   "template-limit-reached": true,
   "inactive-account-notice": true,
+  "service-cancel-confirm": true,
+  "service-cancel-done": true,
 };
 const ALL_KINDS = Object.keys(KINDS) as MailKind[];
 
@@ -229,9 +231,15 @@ describe("destino del CTA", () => {
   // `moderation-report-created` tambien queda afuera, y tambien a proposito: no
   // dibuja boton hasta que exista la ruta de la cola (ver su `case`). El test
   // de abajo verifica que siga sin boton, asi la excepcion no esconde nada.
+  //
+  // `service-cancel-confirm` lleva su link de un solo uso en `actionLink`, igual
+  // que los de auth, y `service-cancel-done` no tiene botón: después de una
+  // baja no hay nada que hacer (ver sus `case`).
   it("todo CTA que no sea un action link vive bajo /abrir", () => {
-    const conActionLink = ["password-reset", "email-verification"];
-    const sinBoton = ["moderation-report-created"];
+    const conActionLink = [
+      "password-reset", "email-verification", "service-cancel-confirm",
+    ];
+    const sinBoton = ["moderation-report-created", "service-cancel-done"];
     const resto = ALL_KINDS.filter(
       (k) => !conActionLink.includes(k) && !sinBoton.includes(k),
     );
@@ -748,6 +756,113 @@ describe("mails del paywall del PF", () => {
 
       expect(ctaHref(html)).toBe("https://app.gettreino.com/abrir/profe");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Botón de Baja de Servicio — los dos mails de `baja-por-mail.ts`
+// ---------------------------------------------------------------------------
+describe("mails de la baja por mail", () => {
+  const LINK =
+    "https://gettreino.com/es/baja-de-servicio/confirmar#t=" + "A".repeat(43);
+  const CODE = "BAJA-2026-0A1B2C";
+
+  describe("service-cancel-confirm", () => {
+    it("pone el código en el asunto y en el cuerpo", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.subject).toBe(`Confirmá la baja de tu suscripción — código ${CODE}`);
+      expect(out.text).toContain(CODE);
+    });
+
+    it("sin código el asunto no queda colgando", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK });
+
+      expect(out.subject).toBe("Confirmá la baja de tu suscripción");
+      expect(out.subject).not.toContain("código");
+      expect(out.text).not.toContain("Código");
+    });
+
+    it("el botón CONFIRMAR BAJA lleva al link, con el token en el fragmento", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.html).toContain("CONFIRMAR BAJA");
+      expect(ctaHref(out.html)).toBe(LINK);
+      // Quien lee en texto plano también tiene que poder confirmar.
+      expect(out.text).toContain(LINK);
+    });
+
+    // `sendQueuedMail` borra `actionLink` al enviar. Re-renderizado sin él, el
+    // mail no puede ofrecer un botón muerto.
+    it("sin link no dibuja botón", () => {
+      const out = renderMail("service-cancel-confirm", { code: CODE });
+
+      expect(ctaHref(out.html)).toBe("");
+      expect(out.html).not.toContain("CONFIRMAR BAJA");
+    });
+
+    it("dice que vence en 72 horas y que si no lo pediste no se cancela nada", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK });
+
+      expect(out.text).toContain("72 horas");
+      expect(out.text).toContain("Si no lo pediste vos, ignorá este mail");
+      expect(out.text).toContain("no se cancela nada");
+    });
+
+    // Lo pudo pedir cualquiera tipeando el correo: el mail no le cuenta nada a
+    // quien no sea el dueño, y tampoco repite la dirección.
+    it("no nombra a la persona ni repite el correo", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.text.replace(LINK, "")).not.toContain("@");
+    });
+  });
+
+  describe("service-cancel-done", () => {
+    // 2026-10-10T02:00Z es todavía el 9 de octubre en Buenos Aires.
+    const ISO = "2026-10-10T02:00:00.000Z";
+
+    it("pone el código en el asunto", () => {
+      const out = renderMail("service-cancel-done", { code: CODE, accesoHastaIso: ISO });
+
+      expect(out.subject).toBe(`Tu baja quedó hecha — código ${CODE}`);
+    });
+
+    it("sin código el asunto no queda colgando", () => {
+      expect(renderMail("service-cancel-done", {}).subject).toBe("Tu baja quedó hecha");
+    });
+
+    it("la fecha de acceso sale en hora de Argentina", () => {
+      const out = renderMail("service-cancel-done", { code: CODE, accesoHastaIso: ISO });
+
+      expect(out.text).toContain("Conservás el acceso hasta el 09/10/2026");
+      expect(out.text).not.toContain("10/10/2026");
+    });
+
+    // Una fecha inventada es peor que ninguna (AGENTS.md §11.1).
+    it("sin fecha, o con una ilegible, omite la frase entera", () => {
+      for (const params of [{}, { accesoHastaIso: "mañana" }] as MailParams[]) {
+        const out = renderMail("service-cancel-done", params);
+
+        expect(out.text).not.toContain("Conservás el acceso");
+        expect(out.text).not.toContain("NaN");
+        expect(out.text).not.toContain("Invalid");
+      }
+    });
+
+    // Espejo de terminos-suscripcion.md §7.
+    it("dice lo que promete el §7 de los términos", () => {
+      const out = renderMail("service-cancel-done", { accesoHastaIso: ISO });
+
+      expect(out.text).toContain("no se te vuelve a cobrar");
+      expect(out.text).toContain("No se reembolsa el período en curso");
+      expect(out.text).toContain("No se borra nada");
+    });
+
+    it("no tiene botón", () => {
+      expect(ctaHref(renderMail("service-cancel-done", { accesoHastaIso: ISO }).html))
+        .toBe("");
+    });
   });
 });
 

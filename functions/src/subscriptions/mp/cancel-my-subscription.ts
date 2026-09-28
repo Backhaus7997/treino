@@ -114,8 +114,15 @@ function ensureApp(): App {
   }
 }
 
-/** Los planes del usuario que todavia pueden estar cobrando. */
-async function planesQueCobran(
+/**
+ * Los planes del usuario que todavia pueden estar cobrando.
+ *
+ * Exportada para `baja-por-mail.ts`, que la usa para decidir si vale la pena
+ * mandar el mail de confirmacion. Es la MISMA consulta y el MISMO filtro que
+ * usa la baja de verdad: si divergieran, el mail podria prometer una baja que
+ * despues contesta «sin suscripcion», o no llegar a quien si tiene que cobrar.
+ */
+export async function planesQueCobran(
   app: App,
   uid: string,
 ): Promise<{ planId: string }[]> {
