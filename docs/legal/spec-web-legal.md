@@ -334,7 +334,7 @@ código:
 |---|---|---|
 | 1 | Link en el pie con el texto literal «Botón de Baja de Servicio» | ✅ `curl https://gettreino.com/es` lo devuelve |
 | 2 | Su página, alcanzable **sin sesión iniciada** | ✅ `/es/baja-de-servicio` → `200` |
-| 3 | Verificación de identidad detrás (habilitada por la 3/2026) | ⬜ **No se puso, a propósito.** El art. 4 prohíbe «otro trámite adicional»; la 3/2026 *permite* verificar, no obliga. Se pide nombre, correo, plan y canal, y la identidad la valida quien procesa |
+| 3 | Verificación de identidad detrás (habilitada por la 3/2026) | 🟡 **Backend hecho, falta la landing** (`openspec/changes/baja-por-mail/`). Al 2026-09-21 decía «⬜ No se puso, a propósito»: la 3/2026 *permite* verificar, no obliga, y con la baja manual la identidad la validaba quien procesaba. Eso cambió al hacerla **automática**: sin verificación, cualquiera le daba de baja la suscripción a otro con sólo saberle el correo. Ahora es un link de un solo uso al correo de la cuenta —el medio más habitual que existe— y la baja se ejecuta al confirmar. Lo que no calza (correo sin cuenta, pagó con otro correo) sigue por la planilla |
 | 4 | Respuesta en **24 h** con código de identificación (art. 5) | ❌ **BLOQUEADO** — ver abajo |
 
 > 🚨 **El punto 4 no funciona, y tampoco funciona el del arrepentimiento.**

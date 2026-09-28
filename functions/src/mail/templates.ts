@@ -22,6 +22,7 @@ import { MailKind, MailParams } from "./types";
 // escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
 // dos copias del mismo numero se separan el dia que alguien mueva el plan.
 import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "../subscriptions/tier-config";
+import { formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
 const INK = "#0A0A0A";
@@ -1211,6 +1212,90 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "ABRIR TREINO",
       ctaUrl,
     );
+
+  // ── Botón de Baja de Servicio: el link de confirmación ──────────────────
+  //
+  // `actionLink` es el link de un solo uso a la página de confirmación de la
+  // landing, con el token en el FRAGMENTO. `sendQueuedMail` lo borra del
+  // documento al enviar; sin él no se dibuja botón (ver `layout`).
+  //
+  // EL COPY NO NOMBRA A LA PERSONA NI AL PLAN. Llega sólo al dueño del buzón,
+  // pero lo pudo haber pedido cualquiera tipeando el correo en la landing: el
+  // mail tiene que servirle al dueño sin contarle nada a nadie más.
+  //
+  // «Si no lo pediste, ignorá este mail» es la línea que hace segura la
+  // verificación: sin tocar el botón no pasa nada, y eso tiene que estar
+  // escrito, porque quien no pidió nada y recibe «confirmá tu baja» se asusta.
+  //
+  // El botón lleva a una PÁGINA con otro botón, no da la baja directo: los
+  // escáneres de correo pre-abren los links. Por eso el copy dice «tocá el
+  // botón» y no «abrí el link».
+  case "service-cancel-confirm": {
+    const code = params.code ? String(params.code) : "";
+    return build(
+      code
+        ? `Confirmá la baja de tu suscripción — código ${code}` // i18n: email transaccional
+        : "Confirmá la baja de tu suscripción",
+      "Confirmá tu baja",
+      [
+        ["Recibimos un pedido para dar de baja tu suscripción a TREINO."],
+        ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+        ["Para hacerla efectiva, tocá el botón y confirmá en la página que se abre."],
+        ["El link vence en 72 horas y se puede usar una sola vez."],
+        [
+          "Si no lo pediste vos, ignorá este mail: no se cancela nada " +
+            "hasta que alguien confirme.",
+        ],
+      ],
+      "CONFIRMAR BAJA",
+      String(params.actionLink ?? ""),
+    );
+  }
+
+  // ── Botón de Baja de Servicio: la baja quedó hecha ──────────────────────
+  //
+  // Espejo de `docs/legal/terminos-suscripcion.md` §7, en el mismo orden de
+  // importancia para quien lo lee: que no le cobran más, hasta cuándo sigue
+  // usando, que no hay reembolso, y que no se borra nada. Si §7 cambia, cambia
+  // esto.
+  //
+  // La fecha se formatea ACÁ, en hora de Argentina, a partir del ISO que guarda
+  // el productor: la cola guarda QUÉ pasó, no prosa. Si no se pudo determinar
+  // —un plan recién creado cuyo `auto_recurring` MP no completó— la frase de la
+  // fecha no se dibuja y el resto sigue siendo cierto. Una fecha inventada no.
+  //
+  // Sin botón: no hay nada que hacer después de una baja, y un «ABRIR TREINO»
+  // acá le habla a un alumno y a un PF con el mismo destino, que no existe.
+  case "service-cancel-done": {
+    const code = params.code ? String(params.code) : "";
+    const iso = params.accesoHastaIso ? String(params.accesoHastaIso) : "";
+    const ms = iso ? Date.parse(iso) : Number.NaN;
+    const hasta = Number.isFinite(ms) ? formatShortDateAR(ms) : "";
+
+    return build(
+      code
+        ? `Tu baja quedó hecha — código ${code}` // i18n: email transaccional
+        : "Tu baja quedó hecha",
+      "Tu baja quedó hecha",
+      [
+        ["Dimos de baja tu suscripción a TREINO: no se te vuelve a cobrar."],
+        ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+        ...(hasta
+          ? [["Conservás el acceso hasta el ", strong(hasta),
+            ", el final del período que ya pagaste."] as Line]
+          : []),
+        ["No se reembolsa el período en curso."],
+        [
+          "No se borra nada: tus rutinas, tu historial y tus datos siguen " +
+            "donde están. Si volvés, está todo.",
+        ],
+        [
+          "La baja es definitiva para esta suscripción: si querés volver, " +
+            "se contrata de nuevo.",
+        ],
+      ],
+    );
+  }
 
   default: {
     // Exhaustiveness guard: adding a MailKind without a template fails to

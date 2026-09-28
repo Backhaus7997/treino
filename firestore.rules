@@ -4662,6 +4662,15 @@ service cloud.firestore {
     match /mp_cancelaciones/{uid} {
       allow read, write: if false;
     }
+    // Los links de baja por mail (`baja-por-mail.ts`). El id es el SHA-256 del
+    // token y el doc dice de QUÉ uid es la baja: escribirlo es plantar un link
+    // que da de baja a otro, y resetear `usedAt` es reusar uno quemado. Leerlo
+    // dice quién está por darse de baja. Mismo límite que el resto de las
+    // `mp_*`: este deny es documentación; lo que protege es
+    // `mp-collections-rules.test.ts`.
+    match /mp_bajas_por_mail/{tokenHash} {
+      allow read, write: if false;
+    }
     // El dedupe del webhook: un doc por evento de Mercado Pago ya procesado.
     // Escribirlo es hacerle creer al sistema que un evento REAL ya se atendio,
     // y como el dedupe corta ANTES de consultarle a MP, eso alcanza para que a

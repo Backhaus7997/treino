@@ -290,6 +290,21 @@ export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
 // Usa el mismo secreto MP_ACCESS_TOKEN.
 export { cancelMySubscription } from "./subscriptions/mp/cancel-my-subscription";
 
+// Botón de Baja de Servicio AUTOMÁTICO (Disp. 954/2025 art. 4), con
+// verificación de identidad por mail (Disp. 3/2026). Dos callables PÚBLICOS,
+// sin sesión y sin App Check, que llama la landing: el primero manda un link de
+// un solo uso al buzón de la cuenta, el segundo lo canjea y ejecuta la MISMA
+// baja que `cancelMySubscription`, con el uid del token y nunca del request.
+// Diseño: openspec/changes/baja-por-mail/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826) y publica dos endpoints sin autenticar,
+// uno de los cuales CANCELA en Mercado Pago (irreversible). OK humano primero,
+// y las reglas antes que las funciones (`mp_bajas_por_mail` cerrada).
+export {
+  solicitarBajaPorMail,
+  confirmarBajaPorMail,
+} from "./subscriptions/mp/baja-por-mail";
+
 // Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
 // endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
 // un trigger de Firestore, esto lo puede POSTear cualquiera.
