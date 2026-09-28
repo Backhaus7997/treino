@@ -54,7 +54,7 @@ mockup de diseño.
 | D3 | **Alcance** | **Mundial** |
 | D4 | **Cobro** | Mixto: entrenador por Mercado Pago en la web, atleta por compra integrada |
 | D5 | **Alumno ↔ PF** | TREINO **no intermedia** esa plata. Sólo registra la deuda |
-| D6 | **Reembolsos** | **14 días corridos** para todo el mundo |
+| D6 | **Reembolsos** | **10 días corridos**, el piso legal, para todo el mundo (2026-09-25; antes 14) |
 
 Más una séptima, posterior:
 
@@ -62,7 +62,43 @@ Más una séptima, posterior:
 sociedad. Decisión del titular con los argumentos en contra sobre la mesa. Se
 cae el trámite del D-U-N-S, que era el de mayor plazo del proyecto.
 
-### Por qué 14 días y no 10
+### Por qué 10 días
+
+**Decisión del titular, 2026-09-25: el plazo de arrepentimiento pasa a ser el
+piso legal, 10 días corridos, para los dos planes.** Reemplaza a la de los 14
+días del 2026-09-21, que queda abajo como historia.
+
+La base, verificada contra las fuentes primarias el 2026-09-25:
+
+- **Ley 24.240, art. 34:** «DIEZ (10) días corridos contados a partir de la
+  fecha en que se entregue el bien o se celebre el contrato».
+- **Código Civil y Comercial, art. 1110:** «dentro de los diez días computados
+  a partir de la celebración del contrato», y si el plazo vence en un día
+  inhábil se prorroga hasta el primer día hábil siguiente.
+
+Esa prórroga **se escribió en los textos** donde se le explica el plazo al
+usuario (Términos de Suscripción §6, Términos y Condiciones §8, Términos para
+Entrenadores §8.4, y la página `/es/arrepentimiento` de la landing). Con 14 días
+no hacía falta decirla —el margen la tapaba—; con el piso exacto, sí.
+
+**Todo lo demás queda igual:** reembolso de todo lo pagado, sin dar
+explicaciones, sin costo, sin excepciones, sin iniciar sesión, desde
+`gettreino.com/es/arrepentimiento`. El derecho sigue siendo irrenunciable.
+
+**A qué contratos aplica.** A los que se celebren desde la fecha de los
+términos nuevos (la «Última actualización» que estampa el generador). Quien
+haya contratado mientras se publicaban 14 días contrató con esa promesa, y lo
+prudente es honrársela. Según las notas del equipo, al 2026-09-24 todavía no se
+había cobrado ninguna suscripción por la web, así que no habría nadie en ese
+caso — **eso no está verificado contra producción al 2026-09-25**. Antes de
+publicar, alguien tiene que mirarlo en Mercado Pago.
+
+**Lo que este cambio NO hizo:** no bumpeó `version` de los Términos y
+Condiciones (el entero que se sella en `acceptedTermsVersion`), así que el
+cambio no dispara una nueva aceptación. Si hace falta que quien ya aceptó vuelva
+a aceptar, es decisión aparte.
+
+### Historia: por qué eran 14 días y no 10 (2026-09-21, reemplazada el 2026-09-25)
 
 **Decisión del titular, 2026-09-21: se mantienen los 14 días para los dos
 planes.** Argentina exige 10 corridos (art. 34 de la Ley 24.240) y damos cuatro
@@ -276,7 +312,9 @@ Las rutas legales viven bajo **`/es/`** en `gettreino.com` (Next.js con
 texto original de la 954/2025.
 
 Lo que sí se sabe: el botón tiene enlace en el pie de la home, texto literal
-«Botón de Arrepentimiento», **formulario sin login**, informa los 14 días y
+«Botón de Arrepentimiento», **formulario sin login**, informa el plazo (decía
+14 días; el paso a 10 va en `treino-app`, rama
+`chore/legal-arrepentimiento-10-dias`, sin desplegar al 2026-09-25) y
 menciona el código de identificación. Esos requisitos siguen vigentes bajo la
 **Disposición 954/2025** (BO 4/9/2025), así que **no hay motivo para creer que
 haya dejado de cumplir por la derogación**.

@@ -493,13 +493,16 @@ def build_story():
 
     for block in resolved(
         6, "Reembolsos y baja",
-        "<b>14 días corridos de arrepentimiento con reembolso total</b>, para "
+        "<b>10 días corridos de arrepentimiento con reembolso total</b>, para "
         "todo el mundo. Fuera de ese plazo, baja cuando se quiera con acceso "
         "hasta el fin del período pagado y sin reembolso.",
-        [["Arrepentimiento", "<b>14 días corridos</b>, reembolso total, sin "
-          "explicaciones"],
-         ["Por qué 14", "Argentina exige 10 y la Unión Europea 14. Con 14 una "
-          "sola regla cumple en todas partes, sin lógica por país"],
+        [["Arrepentimiento", "<b>10 días corridos</b>, reembolso total, sin "
+          "explicaciones. Si el último día es inhábil, se extiende al primer "
+          "día hábil siguiente"],
+         ["Por qué 10", "Es el piso legal: art. 34 de la Ley 24.240 y art. "
+          "1110 del CCyC. Decisión del titular del 2026-09-25; antes eran 14, "
+          "para unificar con la Unión Europea, y ese motivo cayó con el "
+          "lanzamiento acotado a la Argentina"],
          ["Fuera de plazo", "Baja en línea. Acceso hasta el fin del período "
           "pagado. Sin reembolso de ese período"],
          ["Prueba gratuita", "Sí. Es lo que hace que dentro de la ventana de "
@@ -541,7 +544,7 @@ def build_story():
           "antes de construir la integración"]],
         "El proceso que pide la norma es un formulario, un correo y una persona "
         "que atienda: <b>no hace falta construir reembolsos automáticos</b>. Y "
-        "con período de prueba gratuito, dentro de la ventana de 14 días casi "
+        "con período de prueba gratuito, dentro de la ventana de 10 días casi "
         "no hay dinero que devolver — el miedo al botón está puesto en el lugar "
         "equivocado."):
         A(block)

@@ -69,7 +69,7 @@ afirmar sobre el chequeo.)*
 | Sin registración previa ni otro trámite | **Sí** — el formulario no pide iniciar sesión |
 | «A simple vista … y en el primer acceso» | **No, y es una decisión tomada** — sigue en el pie. Ver §3.2 |
 | Formulario con datos de la compra | **Sí** — nombre, correo, fecha, plan y notas |
-| Informa el plazo | **Sí** — 14 días |
+| Informa el plazo | **Sí** — decía 14 días al verificarlo; el paso a 10 (decisión del 2026-09-25) no estaba desplegado al escribir esto |
 | Menciona el código de identificación | **Sí** |
 
 **Lo único que no se puede verificar desde afuera es si el correo automático con
@@ -270,9 +270,12 @@ hace falta automatizarlo.
 
 ### 3.4 Qué explicar en esa página
 
-- Que el plazo es de **14 días** desde la contratación. *(Argentina exige 10 y
-  la Unión Europea 14; se adopta 14 para todos y así una sola regla cumple en
-  todas partes.)*
+- Que el plazo es de **10 días corridos** desde la contratación, y que si el
+  último día cae en un día inhábil se extiende hasta el primer día hábil
+  siguiente. *(Art. 34 de la Ley 24.240 y art. 1110 del CCyC. Decisión del
+  titular del 2026-09-25: el piso legal. Antes decía 14 —«Argentina exige 10 y
+  la Unión Europea 14; se adopta 14 para todos»—; ese motivo cayó con el
+  lanzamiento acotado a la Argentina, ver `ESTADO.md`.)*
 - Que dentro de ese plazo el reembolso es total.
 - Que fuera de ese plazo se puede dar de baja igual, con acceso hasta el fin del
   período pagado, pero sin reembolso.
@@ -435,6 +438,10 @@ Lo que sí queda establecido:
   inciso b) no está resuelta**. Ser más generoso que la ley siempre se puede: la
   decisión de negocio puede quedar igual. Lo que no se sostiene es el razonamiento
   tal como estaba escrito.
+- *(2026-09-25)* El plazo ya no es más generoso que la ley: es el piso, 10 días
+  corridos. La pregunta del inciso b) sigue abierta igual, y ahora pesa sobre si
+  la ley obliga, no sobre el plazo: los 10 días están prometidos en los términos
+  aunque la exención alcanzara a TREINO.
 
 → Va como pregunta al dictamen legal, con el texto citado.
 

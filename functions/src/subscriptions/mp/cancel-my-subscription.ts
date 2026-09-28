@@ -13,8 +13,8 @@
  * recorto el texto en vez de construir el control.
  *
  * Y `docs/legal/terminos-suscripcion.md` §7 sigue prometiendo, publicado, que
- * «pasados los 14 días podés dar de baja cuando quieras, **en línea, sin llamar
- * ni escribir a nadie**». La Resolucion 424/2020 obliga a que se pueda dar de
+ * «pasado el plazo de arrepentimiento podés dar de baja cuando quieras, **en
+ * línea, sin llamar ni escribir a nadie**». La Resolucion 424/2020 obliga a que se pueda dar de
  * baja por el mismo medio por el que se contrato. El PF contrata en la web y
  * hoy no puede darse de baja en la web.
  *
@@ -29,7 +29,7 @@
  * tiene vuelta atras, y por eso el callable no acepta ningun parametro que
  * pueda apuntar a la suscripcion de otro.
  *
- * **2. Esto NO es el boton de arrepentimiento.** Los 14 dias con reembolso
+ * **2. Esto NO es el boton de arrepentimiento.** Los 10 dias con reembolso
  * (`terminos-suscripcion.md` §6) van por `gettreino.com/es/arrepentimiento`,
  * **sin login** —la norma prohibe expresamente pedir registracion previa— y el
  * reembolso se opera a mano. El vocabulario de respuesta de este callable no

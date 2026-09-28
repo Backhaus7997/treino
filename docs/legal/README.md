@@ -26,7 +26,7 @@ encubierta, y ahí el abogado no mejora cláusulas: dice cómo operar).
 | **[ESTADO.md](./ESTADO.md)** | **Empezá por acá.** Todo el contexto, las decisiones tomadas y lo que falta, autocontenido | Vigente |
 | [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 18 hallazgos | Leer primero |
 | [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Publicado — sin revisión legal |
-| [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 14 días y baja | Publicado — sin revisión legal |
+| [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 10 días y baja | Publicado — sin revisión legal |
 | [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, contra el mapa de datos real | Publicado — sin revisión legal |
 | [descargo-medico.md](./descargo-medico.md) | Asunción de riesgo + dónde mostrarlo | Publicado — **sin revisión legal, y es el de mayor exposición** |
 | [contrato-entrenador.md](./contrato-entrenador.md) | Términos para PFs: independencia, datos de alumnos, planes | Publicado — **sin revisión legal, riesgo laboral** |
