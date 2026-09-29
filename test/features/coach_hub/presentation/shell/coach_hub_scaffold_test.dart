@@ -13,6 +13,7 @@ import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
+import 'package:treino/features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
@@ -23,6 +24,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 Future<void> _pumpScaffold(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
+  bool mobileFacturacionAllowed = false,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -31,8 +33,12 @@ Future<void> _pumpScaffold(
     initialLocation: '/dashboard',
     routes: [
       ShellRoute(
-        pageBuilder: (ctx, state, child) =>
-            NoTransitionPage(child: CoachHubScaffold(child: child)),
+        pageBuilder: (ctx, state, child) => NoTransitionPage(
+          child: CoachHubScaffold(
+            mobileFacturacionAllowed: mobileFacturacionAllowed,
+            child: child,
+          ),
+        ),
         routes: [
           GoRoute(
             path: '/dashboard',
@@ -119,6 +125,19 @@ void main() {
       expect(find.byType(MobileBanner), findsOneWidget);
       expect(find.byType(CoachHubSidebar), findsNothing);
       expect(find.byType(CoachHubTopBar), findsNothing);
+    });
+
+    testWidgets(
+        'ancho 600 (mobile) + mobileFacturacionAllowed → '
+        'MobileFacturacionShell, sin MobileBanner ni sidebar', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, mobileFacturacionAllowed: true);
+
+      expect(find.byType(MobileFacturacionShell), findsOneWidget);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+      expect(find.byType(CoachHubTopBar), findsNothing);
+      expect(find.text('CONTENT_SLOT'), findsOneWidget);
     });
 
     testWidgets('ancho 900 (compact, banda tablet 768–1023) → sidebar a 72 px',
