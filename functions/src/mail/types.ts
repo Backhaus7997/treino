@@ -166,10 +166,33 @@ export type MailKind =
   // `exercise-limit-reached` — el movil solo informa el ESTADO, y ofrecerle
   // un plan mas grande a quien ya es cliente es comunicacion comercial.
   //
-  // COMPARTE EL ENFRIAMIENTO con `exercise-limit-reached`
-  // (`trainerLimitMailAt`): un PF que choca los dos topes recibe un solo
-  // mail cada 14 dias, no uno por tope.
+  // ENFRIAMIENTO PROPIO. Antes (#1258) compartia el enfriamiento de 14 dias
+  // con `exercise-limit-reached` — un PF que chocaba los dos topes recibia
+  // un solo mail. Se separó (#1265): cada tope manda su propio aviso cada 14
+  // dias, sin que uno silencie al otro. `trainerLimitMailAt` es ahora un mapa
+  // por `kind`; ver `trainer-limit-mail.ts`.
   | "template-limit-reached"
+  // ── El PF que choco el tope de alumnos de su plan ───────────────────────
+  //
+  // limite-alumnos-pf (paywall Fase 7). El tercer hermano de
+  // `exercise-limit-reached`/`template-limit-reached`, pero con un disparador
+  // distinto: acá NO hay cliente que anote `trainerLimitHitKind` — el tope de
+  // alumnos se decide 100% en el servidor, dentro de `syncTrainerLoad`
+  // (`promote-link.ts`), al aceptar o reanudar un vínculo. Cuando esa
+  // transaccion rebota con `resource-exhausted`, `acceptTrainerLink` /
+  // `resumeTrainerLink` anotan el tope en su `catch` (`registrarTopeDeAlumnos`,
+  // `trainer-limit-mail.ts`) para que este mail tenga algo que disparar.
+  //
+  // POR QUE ES UN MAIL: mismo motivo que sus dos hermanos — el movil solo
+  // informa el ESTADO, sin boton ni "pasa a un plan" (E8 del plan), asi que
+  // para quien entro por el telefono este mail es el UNICO canal que dice
+  // donde se paga.
+  //
+  // CON `prefKey`: comunicacion comercial, mismo criterio que sus hermanos.
+  //
+  // ENFRIAMIENTO PROPIO, no compartido con los otros dos — ver el comentario
+  // de `template-limit-reached` para el porque.
+  | "student-limit-reached"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el

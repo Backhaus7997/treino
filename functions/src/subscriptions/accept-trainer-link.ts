@@ -23,7 +23,8 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
-import { syncTrainerLoad } from "./promote-link";
+import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
+import { esTopeDeAlumnos, registrarTopeDeAlumnos } from "./trainer-limit-mail";
 
 function ensureApp(): App {
   try {
@@ -46,6 +47,13 @@ export interface AcceptTrainerLinkResult {
  * `resource-exhausted` payload (`reason`/`tier`/`limit`/loads) is the contract
  * the Flutter client parses to decide which paywall branch to show, so
  * re-wrapping it here would erase `details` and silently break that branch.
+ *
+ * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
+ * anota `trainerLimitHitKind: "students"` ACÁ, en el `catch` — nunca dentro
+ * de `syncTrainerLoad`, cuyo throw ocurre DENTRO de su propia transacción y
+ * revertiría cualquier escritura hecha ahí. La anotación es BEST-EFFORT: un
+ * fallo se loguea y el error original se relanza igual, para que el cliente
+ * siga viendo el paywall aunque el mail no salga.
  */
 export async function runAcceptTrainerLink(
   app: App,
@@ -56,9 +64,24 @@ export async function runAcceptTrainerLink(
     throw new HttpsError("invalid-argument", "linkId is required.");
   }
 
-  const result = await syncTrainerLoad(app, {
-    promotion: { linkId, callerUid, expectedFromStatus: "pending" },
-  });
+  let result: SyncTrainerLoadResult;
+  try {
+    result = await syncTrainerLoad(app, {
+      promotion: { linkId, callerUid, expectedFromStatus: "pending" },
+    });
+  } catch (err) {
+    if (esTopeDeAlumnos(err)) {
+      try {
+        await registrarTopeDeAlumnos(app, callerUid, Date.now());
+      } catch (anotarErr) {
+        logger.error("acceptTrainerLink: no se pudo anotar el tope de alumnos", {
+          trainerId: callerUid,
+          err: anotarErr,
+        });
+      }
+    }
+    throw err;
+  }
 
   // Adoption metric (M.4): counted against `link-promoted-observed` from the
   // reconciliation trigger. `observed - cf` is exactly the legacy client-side

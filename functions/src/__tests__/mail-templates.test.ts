@@ -53,6 +53,7 @@ const KINDS: Record<MailKind, true> = {
   "free-limit-reached": true,
   "exercise-limit-reached": true,
   "template-limit-reached": true,
+  "student-limit-reached": true,
   "inactive-account-notice": true,
   "service-cancel-confirm": true,
   "service-cancel-done": true,
@@ -260,7 +261,7 @@ describe("destino del CTA", () => {
         !conActionLink.includes(k) && !sinBoton.includes(k) && !aLaLanding.includes(k),
     );
 
-    expect(resto).toHaveLength(18);
+    expect(resto).toHaveLength(19);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
