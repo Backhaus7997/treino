@@ -16,9 +16,9 @@ String cupoTexto(SubscriptionTier tier) => tier.isUnlimited
 
 /// El texto del tope de EJERCICIOS PROPIOS de un plan, en UN solo lugar —
 /// mismo motivo y misma promesa que [cupoTexto], y el mismo agujero que
-/// existe para tapar: `tier.customExerciseLimit == null` (Plan 3, o el
-/// interruptor del servidor todavía apagado — docs/limite-ejercicios-pf.md
-/// §2, "ausente = sin tope") NO es un dato faltante, es SIN LÍMITE.
+/// existe para tapar: `tier.customExerciseLimit == null` (Plan 3 en la tabla
+/// estática, docs/limite-ejercicios-pf.md §0) NO es un dato faltante, es SIN
+/// LÍMITE.
 /// Interpolarlo directo publica la palabra «null», la MISMA clase de bug que
 /// [cupoTexto] ya documenta como publicada («Hasta null alumnos»).
 ///

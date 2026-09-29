@@ -3,10 +3,16 @@
 **24 de septiembre de 2026.** Escrito contra `origin/main` de `treino` en
 `15f7337e`. Los números de línea son de ese commit y se van a correr.
 
-**Estado:** PR 0 a PR 4 y el copy del Coach Hub del PR 5 van juntos en un solo
-PR, con el interruptor apagado (`TRAINER_EXERCISE_LIMITS_ENABLED = false`). Los
-legales del PR 5 van en su propia rama, `docs/legal-limite-ejercicios-pf`, y se
-publican antes que el código.
+**Estado: ENCENDIDO** (`TRAINER_EXERCISE_LIMITS_ENABLED = true`, #1244). PR 0 a
+PR 4 entraron apagados en #1240, el copy del Coach Hub en #1241 y los legales en
+#1243.
+
+El primer encendido (2026-09-25) se deployó desde la rama del #1244 **antes de
+mergearla**, y ese mismo día un deploy de functions desde main —con el
+interruptor todavía en `false`— lo volvió a apagar sin que nadie lo notara: los
+PF quedaron con `planLimits.customExercises: null` hasta el re-encendido del
+2026-09-29. **Un interruptor se deploya siempre desde main, después del merge**:
+si producción corre algo que main no tiene, el próximo deploy ajeno lo revierte.
 
 **Todavía no hay entrenadores reales:** todas las cuentas de PF son de prueba.
 Por eso no hay aviso previo del §12 que mandar. La condición que queda es otra:
