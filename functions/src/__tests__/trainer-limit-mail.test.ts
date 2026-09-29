@@ -34,6 +34,7 @@ import {
   enqueueTrainerLimitMail,
   registrarTopeDeAlumnos,
   incrementoDeAlumnos,
+  esTopeDeAlumnos,
   VENTANA_MS,
   ENFRIAMIENTO_MS,
   CAMPO_TOPE_AT,
@@ -62,25 +63,52 @@ jest.mock("../mail/enqueue-mail", () => ({
  * enteramente — misma garantía que da Firestore de verdad sobre el mismo
  * documento, y lo que hace falta para que el test de la carrera (más abajo)
  * pueda ver a la segunda transacción toparse con la reserva de la primera.
+ *
+ * `trainerLinksStore` es NUEVO (hallazgo P2 sobre #1267): simula
+ * `trainer_links`, que `reservarEnfriamiento` ahora consulta DENTRO de la
+ * transacción —vía `readTrainerLinks`, `promote-link.ts`— para el kind
+ * `students`. `tx.get` distingue una ref de DOCUMENTO (`users/{uid}`) de una
+ * ref de QUERY (`trainer_links.where(...)`) por la forma del `FakeRef`.
  */
 let usersStore: Record<string, Record<string, unknown> | undefined> = {};
+let trainerLinksStore: Record<
+  string,
+  Array<{ athleteId: string; status: string; entitlement?: string }>
+> = {};
 let colaExiste = false;
 const colaGetMock = jest.fn(async () => ({ exists: colaExiste }));
 const DELETE_SENTINEL = Symbol("FieldValue.delete()");
 
-interface FakeRef {
+interface FakeDocRef {
+  kind: "doc";
   uid: string;
 }
+interface FakeQueryRef {
+  kind: "query";
+  trainerId: string;
+}
+type FakeRef = FakeDocRef | FakeQueryRef;
 interface FakeTx {
-  get: (ref: FakeRef) => Promise<{ data: () => Record<string, unknown> | undefined }>;
-  set: (ref: FakeRef, patch: Record<string, unknown>) => void;
-  update: (ref: FakeRef, patch: Record<string, unknown>) => void;
+  get: (
+    ref: FakeRef,
+  ) => Promise<
+    | { data: () => Record<string, unknown> | undefined }
+    | { docs: Array<{ id: string; data: () => Record<string, unknown> }> }
+  >;
+  set: (ref: FakeDocRef, patch: Record<string, unknown>) => void;
+  update: (ref: FakeDocRef, patch: Record<string, unknown>) => void;
 }
 
 let mutex: Promise<unknown> = Promise.resolve();
 const runTransactionMock = jest.fn((fn: (tx: FakeTx) => Promise<unknown>) => {
   const tx: FakeTx = {
-    get: async (ref) => ({ data: () => usersStore[ref.uid] }),
+    get: async (ref) => {
+      if (ref.kind === "query") {
+        const links = trainerLinksStore[ref.trainerId] ?? [];
+        return { docs: links.map((link, i) => ({ id: `link-${i}`, data: () => link })) };
+      }
+      return { data: () => usersStore[ref.uid] };
+    },
     set: (ref, patch) => {
       usersStore[ref.uid] = { ...(usersStore[ref.uid] ?? {}), ...patch };
     },
@@ -114,18 +142,37 @@ jest.mock("firebase-admin/firestore", () => ({
   ...jest.requireActual("firebase-admin/firestore"),
   FieldValue: { delete: () => DELETE_SENTINEL },
   getFirestore: () => ({
-    collection: (name: string) =>
-      name === "users"
-        ? {
+    collection: (name: string) => {
+      if (name === "users") {
+        return {
           doc: (uid: string) => ({
+            kind: "doc",
             uid,
             set: (patch: Record<string, unknown>) => setDirecto(uid, patch),
           }),
-        }
-        : { doc: () => ({ get: colaGetMock }) },
+        };
+      }
+      if (name === "trainer_links") {
+        return {
+          where: (_field: string, _op: string, trainerId: string) => ({
+            kind: "query",
+            trainerId,
+          }),
+        };
+      }
+      return { doc: () => ({ get: colaGetMock }) };
+    },
     runTransaction: runTransactionMock,
   }),
 }));
+
+/** Popula `trainer_links` en vivo para un trainer — ver `trainerLinksStore`. */
+function vinculos(
+  trainerId: string,
+  links: Array<{ athleteId: string; status: string; entitlement?: string }>,
+) {
+  trainerLinksStore[trainerId] = links;
+}
 
 const enqueueMock = enqueueMail as jest.MockedFunction<typeof enqueueMail>;
 const APP = {} as App;
@@ -176,6 +223,7 @@ beforeEach(() => {
   runTransactionMock.mockClear();
   colaExiste = false;
   usersStore = {};
+  trainerLinksStore = {};
   mutex = Promise.resolve();
 });
 
@@ -468,6 +516,121 @@ describe("⚠️ la tabla de kinds", () => {
 });
 
 // ---------------------------------------------------------------------------
+// SUSCRIPCIÓN INACTIVA → silencio, los TRES kinds — hallazgo de Codex sobre
+// #1267 (P1). Ver el encabezado del módulo, cláusula 4 nueva, y
+// `suscripcionInactiva` en `effective-limit.ts` para las reglas exactas.
+// ---------------------------------------------------------------------------
+describe("⚠️ suscripción inactiva → no se manda el upsell (los tres kinds)", () => {
+  describe.each(TOPES)("$nombre", (t) => {
+    const conSubscription = (subscription: Record<string, unknown>) => ({
+      ...chocoRecien(t),
+      subscription,
+    });
+
+    it("suscripción `paused` no manda", () => {
+      expect(
+        decideTrainerLimitMail(conSubscription({ tier: "plan2", status: "paused" }), AHORA, "t1"),
+      ).toBeNull();
+    });
+
+    it("suscripción `active` sí manda — el caso normal no se rompió", () => {
+      expect(
+        decideTrainerLimitMail(conSubscription({ tier: "plan2", status: "active" }), AHORA, "t1"),
+      ).not.toBeNull();
+    });
+
+    it("sin `subscription` (nunca se suscribió) sí manda — Free NO es inactiva", () => {
+      // Ver `suscripcionInactiva`: sin mapa es el PF Free normal, el
+      // destinatario correcto del upsell — no hay ningún cobro que
+      // recuperarle.
+      expect(decideTrainerLimitMail(chocoRecien(t), AHORA, "t1")).not.toBeNull();
+    });
+  });
+
+  // El caso que originó el hallazgo (Codex, sobre #1267): un PF con un plan
+  // pago pero la suscripción no al día chocando el tope de ALUMNOS. Cubre acá
+  // las CUATRO variantes de "inactiva"/"activa" que resuelve
+  // `suscripcionInactiva` — los otros dos kinds ya probaron `paused`/`active`
+  // arriba, así que no hace falta repetir la matriz completa por kind.
+  describe("alumnos", () => {
+    const base = {
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      [CAMPO_TOPE_KIND]: "students",
+    };
+
+    it("suscripción `paused` no manda (aunque la carga en vivo siga en el tope REDUCIDO a Free)", () => {
+      const doc = { ...base, subscription: { tier: "plan1", status: "paused" } };
+      // limite efectivo con `paused` = Free (2). Si la cláusula nueva no
+      // filtrara, esto mandaría igual (2 >= 2) — lo que prueba que es LA
+      // CLÁUSULA DE INACTIVA la que bloquea, no la 3 (sigueEnElTope).
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).toBeNull();
+    });
+
+    it("suscripción `pending` no manda", () => {
+      const doc = { ...base, subscription: { tier: "plan1", status: "pending" } };
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).toBeNull();
+    });
+
+    it("`cancelled` con período YA VENCIDO no manda", () => {
+      const doc = {
+        ...base,
+        subscription: {
+          tier: "plan1",
+          status: "cancelled",
+          currentPeriodEnd: ts(AHORA - 1000),
+        },
+      };
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).toBeNull();
+    });
+
+    it("`cancelled` con período TODAVÍA VIGENTE sí manda — no es CUALQUIER cancelled", () => {
+      const doc = {
+        ...base,
+        subscription: {
+          tier: "plan1",
+          status: "cancelled",
+          currentPeriodEnd: ts(AHORA + 1000),
+        },
+      };
+      // Con `cancelled` vigente el límite efectivo sigue siendo el nominal
+      // de plan1 (7) — carga en vivo 7 para estar exactamente en ESE tope.
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 7)).not.toBeNull();
+    });
+
+    it("suscripción `active` sí manda", () => {
+      const doc = { ...base, subscription: { tier: "plan1", status: "active" } };
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 7)).not.toBeNull();
+    });
+
+    it("suscripción `grace` sí manda — conserva el límite pagado", () => {
+      const doc = { ...base, subscription: { tier: "plan1", status: "grace" } };
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 7)).not.toBeNull();
+    });
+
+    it("sin `subscription` (Free, nunca se suscribió) sí manda", () => {
+      expect(decideTrainerLimitMail(base, AHORA, "t1", undefined, 2)).not.toBeNull();
+    });
+
+    it("⚠️ de punta a punta: un PF `paused` con vínculos en vivo en el tope reducido no recibe el mail", async () => {
+      // Mismo caso que arriba, pero pasando por `enqueueTrainerLimitMail` →
+      // `reservarEnfriamiento`, con la carga en vivo saliendo de verdad de
+      // `trainer_links` (no simulada a mano).
+      usersStore["t1"] = {
+        ...base,
+        subscription: { tier: "plan1", status: "paused" },
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" },
+        { athleteId: "a2", status: "active" },
+      ]); // computeWeightedLoad = 2.0 == límite Free reducido
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan).toBeNull();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // El enfriamiento es POR KIND (#1265) — ver el encabezado del módulo.
 // ---------------------------------------------------------------------------
 describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
@@ -525,7 +688,13 @@ describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
       expect(decideTrainerLimitMail(legado, AHORA, "t1")).toBeNull();
     });
 
-    it("⚠️ el legado NO bloquea el mail de plantillas", () => {
+    it("⚠️ el legado (compartido con ejercicios en su momento) SÍ bloquea el mail de plantillas", () => {
+      // Hallazgo P2 de Codex sobre #1267, verificado contra `43888a21` (el
+      // commit que generalizó este mail por kind y sumó `templates`): el
+      // escalar viejo lo escribían los mails de EJERCICIOS Y DE PLANTILLAS
+      // por igual, nunca fue "sólo de ejercicios". Tratarlo como propio de
+      // un único kind bloqueaba el mail correcto (customExercises) y dejaba
+      // pasar el equivocado (templates) con el MISMO dato viejo.
       const legadoConPlantillas = {
         [CAMPO_TOPE_AT]: ts(AHORA - 1000),
         [CAMPO_TOPE_KIND]: "templates",
@@ -533,7 +702,17 @@ describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
         templateUsage: { count: 3 },
         [CAMPO_MAIL_AT]: ts(AHORA - 1000), // Timestamp SUELTO, recién escrito
       };
-      expect(decideTrainerLimitMail(legadoConPlantillas, AHORA, "t1")).not.toBeNull();
+      expect(decideTrainerLimitMail(legadoConPlantillas, AHORA, "t1")).toBeNull();
+    });
+
+    it("el legado VENCIDO no bloquea nada, ni ejercicios ni plantillas", () => {
+      const vencido = ts(AHORA - ENFRIAMIENTO_MS - 1);
+
+      const conEjercicios = { ...chocoRecien(TOPES[0]), [CAMPO_MAIL_AT]: vencido };
+      expect(decideTrainerLimitMail(conEjercicios, AHORA, "t1")).not.toBeNull();
+
+      const conPlantillas = { ...chocoRecien(TOPES[1]), [CAMPO_MAIL_AT]: vencido };
+      expect(decideTrainerLimitMail(conPlantillas, AHORA, "t1")).not.toBeNull();
     });
 
     it("⚠️ el legado NO bloquea el mail de alumnos", () => {
@@ -541,27 +720,35 @@ describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
         [CAMPO_TOPE_AT]: ts(AHORA - 1000),
         [CAMPO_TOPE_KIND]: "students",
         subscription: { tier: "plan1", status: "active" },
-        weightedLoad: 7,
         [CAMPO_MAIL_AT]: ts(AHORA - 1000), // Timestamp SUELTO, recién escrito
       };
-      expect(decideTrainerLimitMail(legadoConAlumnos, AHORA, "t1")).not.toBeNull();
+      // carga en vivo simulada = 7 (== límite plan1) — ver el bloque "alumnos".
+      expect(
+        decideTrainerLimitMail(legadoConAlumnos, AHORA, "t1", undefined, 7),
+      ).not.toBeNull();
     });
 
-    it("la próxima reserva migra el legado a mapa, preservando su valor bajo customExercises", async () => {
+    it("la próxima reserva migra el legado a mapa, preservando su valor en LAS DOS claves", async () => {
+      // El legado tiene que estar VENCIDO acá: si estuviera reciente,
+      // bloquearía este mismo mail de plantillas (ver el test de arriba) y
+      // no se llegaría a reservar nada que inspeccionar.
+      const legadoVencidoMs = AHORA - ENFRIAMIENTO_MS - 1;
       usersStore["t1"] = {
         ...chocoRecien(TOPES[1]), // choca PLANTILLAS ahora
-        [CAMPO_MAIL_AT]: ts(AHORA - 5000), // legado: enfriamiento viejo de ejercicios
+        [CAMPO_MAIL_AT]: ts(legadoVencidoMs),
       };
       const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
-      expect(plan?.kind).toBe("template-limit-reached"); // el legado no lo bloqueó
+      expect(plan?.kind).toBe("template-limit-reached");
 
-      const mailAt = usersStore["t1"]?.[CAMPO_MAIL_AT];
+      const mailAt = usersStore["t1"]?.[CAMPO_MAIL_AT] as Record<
+        string,
+        { toMillis(): number }
+      >;
       expect(typeof mailAt).toBe("object");
-      expect((mailAt as Record<string, unknown>).customExercises).toBeDefined();
-      expect((mailAt as Record<string, { toMillis(): number }>).customExercises.toMillis()).toBe(
-        AHORA - 5000,
-      );
-      expect((mailAt as Record<string, unknown>).templates).toBeDefined();
+      // customExercises conserva el legado vencido — nadie chocó ESE tope ahora.
+      expect(mailAt.customExercises.toMillis()).toBe(legadoVencidoMs);
+      // templates tiene la reserva FRESCA de este mismo choque.
+      expect(mailAt.templates.toMillis()).toBe(AHORA);
     });
   });
 
@@ -590,99 +777,207 @@ describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
 });
 
 // ---------------------------------------------------------------------------
-// El kind `students` — decide sobre `subscription` + `weightedLoad`, no sobre
-// `planLimits`. El resto del flujo (reserva, encolado, rollback) es el MISMO
-// código genérico que ya cubren los tests de arriba.
+// El kind `students` — decide sobre `subscription` + la carga PONDERADA EN
+// VIVO de `trainer_links`, NUNCA `weightedLoad` persistido (hallazgo de Codex
+// sobre #1267, P2 — ver `leerLimiteDeAlumnos` en el módulo). El resto del
+// flujo (reserva, encolado, rollback) es el MISMO código genérico que ya
+// cubren los tests de arriba.
+//
+// Los describes de acá abajo, salvo el último, llaman a `decideTrainerLimitMail`
+// DIRECTO (sin pasar por Firestore) y simulan la carga en vivo con su 5º
+// parámetro — lo que `reservarEnfriamiento` le pasaría después de calcularla.
+// El último describe SÍ pasa por `enqueueTrainerLimitMail`/`reservarEnfriamiento`
+// de verdad, con `trainer_links` mockeados vía `vinculos(...)`.
 // ---------------------------------------------------------------------------
 describe("alumnos", () => {
   const CHOCO_RECIEN_ALUMNOS = {
     [CAMPO_TOPE_AT]: ts(AHORA - 60 * 60 * 1000),
     [CAMPO_TOPE_KIND]: "students",
     subscription: { tier: "plan1", status: "active" }, // TIER_WEIGHT_LIMITS.plan1 = 7
-    weightedLoad: 7,
   };
 
-  it("en el tope (weightedLoad >= límite efectivo) manda", () => {
-    const plan = decideTrainerLimitMail(CHOCO_RECIEN_ALUMNOS, AHORA, "t1");
+  it("en el tope (carga en vivo >= límite efectivo) manda", () => {
+    const plan = decideTrainerLimitMail(CHOCO_RECIEN_ALUMNOS, AHORA, "t1", undefined, 7);
     expect(plan?.kind).toBe("student-limit-reached");
     expect(plan?.tope).toBe("students");
     expect(plan?.limit).toBe(7);
   });
 
   it("por debajo del tope no manda", () => {
-    const porDebajo = { ...CHOCO_RECIEN_ALUMNOS, weightedLoad: 6 };
-    expect(decideTrainerLimitMail(porDebajo, AHORA, "t1")).toBeNull();
+    expect(decideTrainerLimitMail(CHOCO_RECIEN_ALUMNOS, AHORA, "t1", undefined, 6)).toBeNull();
   });
 
   it("límite null (plan3, sin tope) no manda", () => {
     const sinTope = {
       ...CHOCO_RECIEN_ALUMNOS,
       subscription: { tier: "plan3", status: "active" },
-      weightedLoad: 50,
     };
-    expect(decideTrainerLimitMail(sinTope, AHORA, "t1")).toBeNull();
+    expect(decideTrainerLimitMail(sinTope, AHORA, "t1", undefined, 50)).toBeNull();
   });
 
   it("sin `subscription` (Free) usa el límite Free (2)", () => {
     const free = {
       [CAMPO_TOPE_AT]: ts(AHORA - 1000),
       [CAMPO_TOPE_KIND]: "students",
-      weightedLoad: 2,
     };
-    const plan = decideTrainerLimitMail(free, AHORA, "t1");
+    const plan = decideTrainerLimitMail(free, AHORA, "t1", undefined, 2);
     expect(plan?.limit).toBe(2);
   });
 
-  // ── Hallazgo de Codex sobre #1267 (P1): el gate real rechaza por
-  // `projectedLoad > limit`, no por `weightedLoad >= limit` — `weightedLoad`
-  // es la carga YA aceptada, no la que el intento rechazado hubiera dejado.
-  // Ver `sigueEnElTope`, sección "POR QUÉ `students` NO USA `count >= limit`".
+  // ⚠️ Control del fail-closed que documenta `sigueEnElTope`: nunca debería
+  // pasar en producción (`reservarEnfriamiento` siempre calcula la carga en
+  // vivo para este kind), pero si el 5º parámetro no llega, no manda —igual
+  // que un kind sin reconocer o un límite corrupto, en vez de adivinar.
+  it("⚠️ sin carga en vivo (parámetro ausente) no manda — fail-closed", () => {
+    expect(decideTrainerLimitMail(CHOCO_RECIEN_ALUMNOS, AHORA, "t1")).toBeNull();
+  });
+
+  // ── Hallazgo de Codex sobre #1267 (P1 de esa ronda): el gate real rechaza
+  // por `projectedLoad > limit`, no por `carga >= limit` — la carga
+  // ACEPTADA no es la que el intento rechazado hubiera dejado.
+  // Ver `sigueEnElTope`, sección "1.".
   describe("con incremento — la misma desigualdad estricta que el gate", () => {
-    const conIncremento = (weightedLoad: number, incremento: number) => ({
+    const conIncremento = (incremento: number) => ({
       [CAMPO_TOPE_AT]: ts(AHORA - 1000),
       [CAMPO_TOPE_KIND]: "students",
       // Sin `subscription`: límite Free = 2 (mismo fixture que arriba).
-      weightedLoad,
       [CAMPO_TOPE_INCREMENTO]: incremento,
     });
 
     it("carga 1,5 + incremento 1, límite 2 → manda (2,5 > 2)", () => {
-      const plan = decideTrainerLimitMail(conIncremento(1.5, 1), AHORA, "t1");
+      const plan = decideTrainerLimitMail(conIncremento(1), AHORA, "t1", undefined, 1.5);
       expect(plan?.kind).toBe("student-limit-reached");
       expect(plan?.limit).toBe(2);
     });
 
     it("carga 1 + incremento 1, límite 2 → NO manda (1 + 1 = 2, no > 2)", () => {
-      expect(decideTrainerLimitMail(conIncremento(1, 1), AHORA, "t1")).toBeNull();
+      expect(decideTrainerLimitMail(conIncremento(1), AHORA, "t1", undefined, 1)).toBeNull();
     });
 
     it("⚠️ si la carga FRESCA ya bajó del choque (el PF liberó lugar), no manda", () => {
       // El incremento quedó anotado contra la carga del momento del choque
-      // (1,5), pero `weightedLoad` se releyó fresco y hoy es 0,5 — el PF
+      // (1,5), pero la carga en vivo se releyó fresca y hoy es 0,5 — el PF
       // pausó a alguien después. `sigueEnElTope` nunca guarda la carga vieja,
       // sólo el incremento: 0,5 + 1 = 1,5, no > 2.
-      expect(decideTrainerLimitMail(conIncremento(0.5, 1), AHORA, "t1")).toBeNull();
+      expect(decideTrainerLimitMail(conIncremento(1), AHORA, "t1", undefined, 0.5)).toBeNull();
     });
   });
 
   describe("sin incremento (choque legado, o `details` incompletos)", () => {
-    it("cae al mismo criterio que los otros dos kinds: weightedLoad >= límite → manda", () => {
+    it("cae al mismo criterio que los otros dos kinds: carga en vivo >= límite → manda", () => {
       const legado = {
         [CAMPO_TOPE_AT]: ts(AHORA - 1000),
         [CAMPO_TOPE_KIND]: "students",
-        weightedLoad: 2, // == límite Free (2), sin CAMPO_TOPE_INCREMENTO
+        // == límite Free (2), sin CAMPO_TOPE_INCREMENTO
       };
-      expect(decideTrainerLimitMail(legado, AHORA, "t1")).not.toBeNull();
+      expect(decideTrainerLimitMail(legado, AHORA, "t1", undefined, 2)).not.toBeNull();
     });
 
     it("por debajo del límite no manda, aunque un incremento hipotético lo hubiera pasado", () => {
       const legado = {
         [CAMPO_TOPE_AT]: ts(AHORA - 1000),
         [CAMPO_TOPE_KIND]: "students",
-        weightedLoad: 1.5, // < límite Free (2), sin incremento conocido
+        // < límite Free (2), sin incremento conocido
       };
-      expect(decideTrainerLimitMail(legado, AHORA, "t1")).toBeNull();
+      expect(decideTrainerLimitMail(legado, AHORA, "t1", undefined, 1.5)).toBeNull();
     });
+  });
+
+  // ---------------------------------------------------------------------
+  // LA CARGA EN VIVO, NO PERSISTIDA — hallazgo de Codex sobre #1267 (P2).
+  // El caso real que motiva el fix: `weightedLoad` queda desactualizado
+  // mientras `linkLoadReconcile` (async, dispara por cada escritura de
+  // `trainer_links`) todavía no corrió. Acá SÍ se pasa por
+  // `enqueueTrainerLimitMail` → `reservarEnfriamiento`, que es quien calcula
+  // la carga en vivo DENTRO de la transacción vía `readTrainerLinks` +
+  // `computeWeightedLoad` (`promote-link.ts`/`weighted-load.ts`) — los
+  // vínculos se simulan con `vinculos(...)`.
+  // ---------------------------------------------------------------------
+  describe("⚠️ la carga se recalcula EN VIVO — weightedLoad persistido queda ciego al reconciliador pendiente", () => {
+    it("weightedLoad persistido 1, vínculos en vivo suman 2, incremento 1, límite 2 → manda", async () => {
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1,
+        weightedLoad: 1, // desactualizado — el reconciliador no corrió todavía
+        // Sin `subscription`: límite Free = 2.
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" },
+        { athleteId: "a2", status: "active" },
+      ]); // computeWeightedLoad = 2.0
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan?.kind).toBe("student-limit-reached");
+      expect(plan?.limit).toBe(2);
+    });
+
+    it("vínculos en vivo suman 1, incremento 1, límite 2 → NO manda (1 + 1 = 2, no > 2)", async () => {
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1,
+        weightedLoad: 1,
+      };
+      vinculos("t1", [{ athleteId: "a1", status: "active" }]); // computeWeightedLoad = 1.0
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan).toBeNull();
+    });
+
+    it("⚠️ control: sin vínculos vivos, la carga es 0 — un weightedLoad persistido alto no lo tapa", () => {
+      // Si el código TODAVÍA leyera `weightedLoad`, esto mandaría (11 >= 2).
+      // Con la carga en vivo (0 vínculos = 0), no debe mandar nada.
+      const soloWeightedLoad = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        weightedLoad: 11, // dato viejo — no tiene que importar
+      };
+      // La carga en vivo simulada (0, sin incremento) es lo que
+      // `reservarEnfriamiento` le pasaría con `trainer_links` vacío.
+      expect(decideTrainerLimitMail(soloWeightedLoad, AHORA, "t1", undefined, 0)).toBeNull();
+    });
+  });
+});
+
+// ── Hallazgo de Codex sobre #1267 (P1, mitad "no anotar el choque") ──
+describe("esTopeDeAlumnos", () => {
+  it("⚠️ reason `plan-limit` — SÍ es el tope de alumnos", () => {
+    const err = new HttpsError("resource-exhausted", "x", {
+      reason: "plan-limit",
+      tier: "plan1",
+      limit: 7,
+      currentLoad: 6.5,
+      projectedLoad: 7.5,
+    });
+    expect(esTopeDeAlumnos(err)).toBe(true);
+  });
+
+  it("⚠️ reason `subscription-inactive` — NO es el tope de alumnos, es un problema de cobro", () => {
+    // Antes de #1267 esto daba `true` y `acceptTrainerLink`/`resumeTrainerLink`
+    // anotaban `trainerLimitHitKind: students` igual que con `plan-limit` —
+    // un PF pausado que rebotaba recibía el mail de upsell.
+    const err = new HttpsError("resource-exhausted", "x", {
+      reason: "subscription-inactive",
+      tier: "plan3",
+      limit: 2,
+      currentLoad: 2,
+      projectedLoad: 3,
+    });
+    expect(esTopeDeAlumnos(err)).toBe(false);
+  });
+
+  it("sin `details.reason` (otro resource-exhausted, ej. cuota de Firestore), false", () => {
+    expect(esTopeDeAlumnos(new HttpsError("resource-exhausted", "cuota"))).toBe(false);
+  });
+
+  it("un código que no es resource-exhausted, false", () => {
+    const err = new HttpsError("failed-precondition", "x", { reason: "plan-limit" });
+    expect(esTopeDeAlumnos(err)).toBe(false);
+  });
+
+  it("un error que no es HttpsError, false", () => {
+    expect(esTopeDeAlumnos(new Error("otra cosa"))).toBe(false);
   });
 });
 

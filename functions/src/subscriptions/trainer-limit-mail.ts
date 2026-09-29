@@ -6,7 +6,7 @@
  *
  * GENERALIZADO POR `kind`: cada tope tiene su propia clave de lectura del
  * límite/uso vigente y su propio `MailKind`, todo en `CAMPOS_POR_KIND` más
- * abajo. El resto del módulo —las cuatro cláusulas, la ventana, el
+ * abajo. El resto del módulo —las cinco cláusulas, la ventana, el
  * enfriamiento— es idéntico para los tres, porque son la MISMA pregunta
  * ("¿sigue en el tope, y hace cuánto que no le avisamos POR ESTE TOPE?")
  * sobre datos distintos.
@@ -32,7 +32,7 @@
  * `users/{uid}`, sin una segunda lectura.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- *  LAS CUATRO CLAUSULAS DEL SILENCIO (idénticas en espíritu a free-limit-mail)
+ *  LAS CLAUSULAS DEL SILENCIO (idénticas en espíritu a free-limit-mail)
  * ═══════════════════════════════════════════════════════════════════════════
  *
  *   1. **Sin anotación → silencio.** `trainerLimitHitAt` no existe: el PF
@@ -47,7 +47,16 @@
  *      Escribirle "hay una salida" a quien ya la tiene es el mismo error caro
  *      que documenta `free-limit-mail.ts`.
  *
- *   4. **Enfriamiento de 14 días → silencio.** Un PF que sigue en el tope
+ *   4. **Suscripción inactiva → silencio.** Sumada por el hallazgo de Codex
+ *      sobre #1267 (P1): `pending`/`paused`, o `cancelled` ya vencida —
+ *      MISMO criterio que resuelve el límite efectivo a Free en
+ *      `effective-limit.ts` (`suscripcionInactiva`). Ofrecer "un plan más
+ *      grande" a quien ya pagó uno y sólo tiene el cobro atrasado es la
+ *      misma mentira de producto que la cláusula 3 evita para quien ya no
+ *      está en el tope. Ver `decideTrainerLimitMail` para qué mail SÍ cubre
+ *      ese caso (y para lo que NO cubre ninguno).
+ *
+ *   5. **Enfriamiento de 14 días → silencio.** Un PF que sigue en el tope
  *      todos los días —porque no quiere pagar más, no porque no se dio
  *      cuenta— recibiría un mail diario sobre lo mismo sin esto.
  *
@@ -84,7 +93,7 @@
  * barrido lo reintenta al otro día dentro de la ventana de 36 h. Los dos
  * caminos no se pisan y no pueden producir un mail doble PARA EL MISMO KIND:
  * comparten el enfriamiento de 14 días de ESE kind (`trainerLimitMailAt.<kind>`,
- * cláusula 4), y ESA clave es lo único que impide el doble mail — no la
+ * cláusula 5), y ESA clave es lo único que impide el doble mail — no la
  * dedupe de la cola, que dedupea por `kind` + `scope` + destinatario y con
  * kinds distintos no ve nada en común.
  *
@@ -102,13 +111,27 @@
  * reserva SÓLO su propia clave.
  *
  * **Compatibilidad con el legado.** Ya hay `trainerLimitMailAt` en producción
- * con la forma vieja (un Timestamp suelto). `leerEnfriamiento` lo trata como
- * el enfriamiento de `customExercises` —el único kind que existía cuando ese
- * campo se escribió así— y NUNCA como enfriamiento de otro kind: adivinar ahí
- * bloquearía el mail de plantillas o de alumnos con un dato que nunca les
- * perteneció. La primera reserva que toca ese documento —de cualquier
- * kind— lo migra a la forma de mapa (`migrarMapaDeEnfriamiento`), preservando
- * ese valor legado bajo la clave `customExercises`.
+ * con la forma vieja (un Timestamp suelto). Hasta acá este comentario decía
+ * que `leerEnfriamiento` lo trataba como el enfriamiento de `customExercises`
+ * —"el único kind que existía cuando ese campo se escribió así"— y eso era
+ * FALSO (hallazgo de Codex, P2, sobre #1267): en `43888a21` (PR4, el commit
+ * que generalizó este mail por `kind` y sumó `templates`) el campo YA se
+ * escribía y leía como un escalar COMPARTIDO entre `customExercises` Y
+ * `templates` — `enqueueTrainerLimitMail` hacía
+ * `tx.set(ref, { [CAMPO_MAIL_AT]: Timestamp.fromMillis(nowMs) })` sin mirar
+ * `plan.kind` — y siguió compartido así hasta que ESTA rama lo migró a mapa
+ * (verificado: `git show 43888a21:functions/src/subscriptions/trainer-limit-mail.ts`).
+ * O sea que cualquier `trainerLimitMailAt` legado que exista hoy en
+ * producción puede venir de CUALQUIERA de los dos, nunca sólo de ejercicios.
+ * `students` es distinto: se agregó (`5dd51e2a`) DESPUÉS de que el
+ * enfriamiento ya fuera mapa (`6fed2bc2`), así que nunca escribió el
+ * escalar — el legado no le pertenece.
+ *
+ * `leerEnfriamiento` trata un Timestamp suelto como el enfriamiento de
+ * `customExercises` Y de `templates` a la vez —nunca de `students`—, y la
+ * primera reserva que toca ese documento —de cualquier kind— lo migra a la
+ * forma de mapa (`migrarMapaDeEnfriamiento`), preservando ese valor legado
+ * bajo LAS DOS claves que lo compartían.
  *
  * **La carrera entre kinds YA NO es un problema a evitar.** Con el
  * enfriamiento compartido, dos toques casi simultáneos de kinds DISTINTOS
@@ -148,7 +171,7 @@
  * antes de que `enqueueTrainerLimitMail` toque Firestore— y se lo pasa a
  * `decideTrainerLimitMail`. Adentro de la transacción, lo único que se sigue
  * releyendo FRESCO es lo que tiene que ser fresco PARA ESE KIND: si sigue en
- * el tope (cláusula 3) y su enfriamiento (cláusula 4). El barrido no tiene
+ * el tope (cláusula 3) y su enfriamiento (cláusula 5). El barrido no tiene
  * evento propio — sigue derivando kind/at/incremento del documento, el más
  * reciente, como siempre.
  *
@@ -216,8 +239,10 @@ import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { artDateKey } from "../mail/format";
 import { trainerWebCheckout } from "../mail/templates";
-import { effectiveWeightLimit } from "./effective-limit";
+import { effectiveWeightLimit, suscripcionInactiva } from "./effective-limit";
+import { readTrainerLinks } from "./promote-link";
 import { toSubscriptionState } from "./subscription-state";
+import { WeightedLink, computeWeightedLoad } from "./weighted-load";
 
 /** El campo que anota el cliente o el servidor al rebotar contra el tope (PR3, plan §2). */
 export const CAMPO_TOPE_AT = "trainerLimitHitAt";
@@ -304,33 +329,60 @@ function leerPlanLimitYUso(
 }
 
 /**
- * `leerLimiteYUso` del kind `students`.
+ * `leerLimiteYUso` del kind `students` — sólo el LÍMITE. El `count` que pide
+ * la firma de `CamposDelTope` (para que los tres kinds compartan una sola
+ * interfaz) NO aplica acá y se ignora siempre: ver `sigueEnElTope`, rama
+ * `students`, y el porqué en la sección de abajo.
  *
  * El límite sale de la MISMA función que usa el gate del servidor
  * (`effectiveWeightLimit`, `effective-limit.ts`) sobre el MISMO estado de
  * suscripción (`toSubscriptionState`, `subscription-state.ts`) — no una tabla
  * propia que se pueda desincronizar de la que de verdad bloquea.
  *
- * El uso sale de `weightedLoad`, persistido en `users/{uid}` por
- * `syncTrainerLoad` (`promote-link.ts`) en CADA promoción o reconciliación.
- * `promote-link.ts` documenta que ese campo NUNCA es gate input — el gate
- * siempre recomputa en vivo dentro de su propia transacción — pero para ESTE
- * mail, que es informativo y no bloquea nada, no hace falta esa frescura
- * transaccional: alcanza con el valor ya persistido, sin una query aparte a
- * `trainer_links`.
+ * ── POR QUÉ ALUMNOS NO USA `weightedLoad` (y los otros dos kinds sí usan su
+ *    equivalente, `<campo de uso>.count`) ──
+ *
+ * Hallazgo de Codex sobre #1267 (P2). Hasta acá esta función leía
+ * `userData.weightedLoad` para el uso — el MISMO campo que `promote-link.ts`
+ * documenta, en mayúsculas, que NUNCA es gate input (REQ-PAYWALL-GATE-006):
+ * "el gate siempre recomputa en vivo dentro de su propia transacción, nunca
+ * confía en este campo". Es un valor de DISPLAY: lo escribe `syncTrainerLoad`
+ * en cada promoción/reconciliación, pero `linkLoadReconcile` — el trigger que
+ * dispara esa reconciliación cuando el cambio en `trainer_links` no vino del
+ * propio gate (pausar, terminar, rechazar) — corre ASÍNCRONO sobre cada
+ * escritura de esa colección: hay una ventana entre "el vínculo cambió" y
+ * "`weightedLoad` ya lo refleja".
+ *
+ * Ese desfasaje rompía este mail en el caso exacto que motiva la existencia
+ * del reconciliador: `weightedLoad` persistido en 1 (todavía no reconciliado),
+ * vínculos en vivo que ya suman 2, el PF intenta sumar un tercero (+1) contra
+ * un límite de 2. El GATE (`syncTrainerLoad`) recalcula en vivo dentro de su
+ * transacción — 2 (vínculos) + 1 (intento) = 3 > 2 — y rechaza. Este mail,
+ * leyendo el `weightedLoad` desactualizado, calculaba 1 (persistido) + 1
+ * (intento) = 2, no > 2, y se quedaba mudo justo en el rechazo que se supone
+ * que tiene que anunciar.
+ *
+ * `customExercises`/`templates` NO tienen este problema: su "uso"
+ * (`<campo>.count`) lo recalcula EL MISMO barrido/trigger que escribe
+ * `planLimits` (`trainer-plan-limits.ts`), sin un segundo campo denormalizado
+ * de por medio que pueda quedar atrás — por eso siguen leyendo `userData`
+ * fresco sin más, vía `leerPlanLimitYUso`.
+ *
+ * El arreglo: `sigueEnElTope` (rama `students`) y `reservarEnfriamiento` usan
+ * la carga en vivo, calculada DENTRO de la transacción de la reserva con la
+ * MISMA función que usa el gate (`computeWeightedLoad`, `weighted-load.ts`)
+ * sobre los MISMOS vínculos (`readTrainerLinks`, extraída de `syncTrainerLoad`
+ * en `promote-link.ts` para este propósito) — nunca sobre `weightedLoad`.
  */
-function leerLimiteYUsoDeAlumnos(
+function leerLimiteDeAlumnos(
   userData: DocumentData | undefined,
   trainerId: string,
   nowMs: number,
 ): { limit: number | null; count: number } {
   const { state } = toSubscriptionState(userData, trainerId);
   const limit = effectiveWeightLimit(state, nowMs);
-
-  const countRaw = userData?.weightedLoad;
-  const count = typeof countRaw === "number" && Number.isFinite(countRaw) ? countRaw : 0;
-
-  return { limit, count };
+  // El `count` de esta firma es de los otros dos kinds — ver el docblock.
+  return { limit, count: 0 };
 }
 
 const CAMPOS_POR_KIND: Record<string, CamposDelTope> = {
@@ -343,7 +395,7 @@ const CAMPOS_POR_KIND: Record<string, CamposDelTope> = {
     mailKind: "template-limit-reached",
   },
   students: {
-    leerLimiteYUso: leerLimiteYUsoDeAlumnos,
+    leerLimiteYUso: leerLimiteDeAlumnos,
     mailKind: "student-limit-reached",
   },
 };
@@ -354,7 +406,7 @@ export const TRAINER_LIMIT_PREF_KEY = "novedades_plan";
 /** Ventana de la cláusula 2. Misma razón que `free-limit-mail.ts`. */
 export const VENTANA_MS = 36 * 60 * 60 * 1000;
 
-/** Enfriamiento de la cláusula 4. Mismo valor y mismo motivo que su hermano. */
+/** Enfriamiento de la cláusula 5. Mismo valor y mismo motivo que su hermano. */
 export const ENFRIAMIENTO_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface TrainerLimitMailPlan {
@@ -378,15 +430,20 @@ function msDe(valor: unknown): number | null {
  * compatibilidad para el formato legado.
  *
  * Ver el encabezado del módulo — "Compatibilidad con el legado". Un
- * Timestamp SUELTO (la forma vieja, compartida) se lee como el enfriamiento
- * de `customExercises` y de NINGÚN otro kind — adivinar para `templates` o
- * `students` bloquearía esos mails con un dato que nunca fue de ellos.
+ * Timestamp SUELTO (la forma vieja) se lee como el enfriamiento de
+ * `customExercises` Y de `templates` — los dos kinds que lo compartían
+ * mientras se escribió así (`43888a21`→`6fed2bc2`, verificado en git) — y de
+ * NINGÚN otro kind: adivinar para `students` lo bloquearía con un dato que
+ * nunca le perteneció (se agregó después de que el enfriamiento ya fuera
+ * mapa).
  */
 function leerEnfriamiento(mailAt: unknown, kind: string): number | null {
   if (mailAt == null) return null;
 
   const suelto = msDe(mailAt);
-  if (suelto !== null) return kind === "customExercises" ? suelto : null;
+  if (suelto !== null) {
+    return kind === "customExercises" || kind === "templates" ? suelto : null;
+  }
 
   if (typeof mailAt !== "object") return null;
   return msDe((mailAt as Record<string, unknown>)[kind]);
@@ -397,16 +454,21 @@ function leerEnfriamiento(mailAt: unknown, kind: string): number | null {
  *
  * Lee lo que haya en `trainerLimitMailAt` —mapa nuevo, Timestamp legado, o
  * nada— y devuelve SIEMPRE un mapa `{kind: Timestamp}` con todas las claves
- * vigentes. El legado se migra acá, bajo `customExercises`. Es la pieza que
- * hace que "reescribilo como mapa en la próxima reserva" (ver el
- * encabezado) sea real: cualquier reserva o rollback que pase por acá deja
- * el campo en la forma nueva, sin depender de qué kind disparó la escritura.
+ * vigentes. El legado se migra acá, preservando su valor bajo LAS DOS claves
+ * que lo compartían —`customExercises` y `templates`, ver "Compatibilidad con
+ * el legado" en el encabezado—, nunca bajo `students`. Es la pieza que hace
+ * que "reescribilo como mapa en la próxima reserva" (ver el encabezado) sea
+ * real: cualquier reserva o rollback que pase por acá deja el campo en la
+ * forma nueva, sin depender de qué kind disparó la escritura.
  */
 function migrarMapaDeEnfriamiento(mailAt: unknown): Record<string, Timestamp> {
   if (mailAt == null) return {};
 
   const suelto = msDe(mailAt);
-  if (suelto !== null) return { customExercises: Timestamp.fromMillis(suelto) };
+  if (suelto !== null) {
+    const legado = Timestamp.fromMillis(suelto);
+    return { customExercises: legado, templates: legado };
+  }
 
   if (typeof mailAt !== "object") return {};
 
@@ -427,34 +489,50 @@ function leerIncrementoDeAlumnos(userData: DocumentData | undefined): number | n
 /**
  * Si el PF SIGUE en el tope ahora mismo — la cláusula 3.
  *
- * Delega la lectura del límite/uso a `campos.leerLimiteYUso` (`CAMPOS_POR_KIND`).
- * Para `customExercises`/`templates`: `limit` no numérico (null, ausente, o
- * corrupto) es SIN TOPE — nunca "sigue en el tope". `count < limit` es "ya no
- * está" — `count >= limit` es lo único que mantiene el mail vivo (E6: en el
- * tope exacto SÍ cuenta como "en el tope", porque ahí es donde el próximo
- * intento rebota).
+ * Para `customExercises`/`templates`: delega la lectura del límite/uso a
+ * `campos.leerLimiteYUso` (`CAMPOS_POR_KIND`). `limit` no numérico (null,
+ * ausente, o corrupto) es SIN TOPE — nunca "sigue en el tope". `count <
+ * limit` es "ya no está" — `count >= limit` es lo único que mantiene el mail
+ * vivo (E6: en el tope exacto SÍ cuenta como "en el tope", porque ahí es
+ * donde el próximo intento rebota).
  *
- * ── POR QUÉ `students` NO USA `count >= limit` ──
+ * `students` es la EXCEPCIÓN, en dos sentidos, y tiene su propia rama:
  *
- * Hallazgo de Codex sobre #1267. Para los otros dos kinds, `count` es la
- * MISMA cantidad que el gate compara contra el límite (la cuenta de
- * ejercicios/plantillas ya creados). Para `students`, en cambio, `count` acá
- * es `weightedLoad` — la carga YA PERSISTIDA de los vínculos ACEPTADOS, una
- * cantidad DISTINTA de lo que el gate de verdad evalúa (`projectedLoad`, en
- * `promote-link.ts`): la carga que el intento RECHAZADO hubiera dejado si se
- * aprobaba. Un PF con 1 alumno activo + 1 pausado (`weightedLoad` = 1,5) que
- * intenta aceptar a un tercero contra un límite de 2 rebota
- * (`projectedLoad` = 2,5 > 2) — pero `weightedLoad` SOLO (1,5) nunca llega a
- * `>= 2`, así que con el criterio de los otros dos kinds el mail no salía
- * nunca: quedaba ciego a la mitad de los rechazos reales.
+ * ── 1. NO USA `count >= limit` A SECAS ──
+ *
+ * Hallazgo de Codex sobre #1267 (P1 de esa ronda). Para los otros dos kinds,
+ * `count` es la MISMA cantidad que el gate compara contra el límite (la
+ * cuenta de ejercicios/plantillas ya creados). Para `students`, en cambio,
+ * lo que el gate de verdad evalúa es `projectedLoad` (`promote-link.ts`): la
+ * carga que el intento RECHAZADO hubiera dejado si se aprobaba, no la carga
+ * ya aceptada. Un PF con 1 alumno activo + 1 pausado (carga 1,5) que intenta
+ * aceptar a un tercero contra un límite de 2 rebota (`projectedLoad` = 2,5 >
+ * 2) — pero la carga SOLA (1,5) nunca llega a `>= 2`, así que con el
+ * criterio de los otros dos kinds el mail no salía nunca: quedaba ciego a la
+ * mitad de los rechazos reales.
  *
  * El arreglo usa la MISMA desigualdad estricta que el gate
  * (`projectedLoad > limit`), reconstruyendo `projectedLoad` como
- * `weightedLoad(fresco) + incrementoAlumnos`, donde `incrementoAlumnos` es lo
- * que el intento rechazado quería sumar (`CAMPO_TOPE_INCREMENTO`, anotado por
+ * `carga(fresca) + incrementoAlumnos`, donde `incrementoAlumnos` es lo que
+ * el intento rechazado quería sumar (`CAMPO_TOPE_INCREMENTO`, anotado por
  * `registrarTopeDeAlumnos` — ver esa función y `incrementoDeAlumnos`).
- * "Fresco" importa: si el PF liberó lugar desde el choque (pausó a alguien),
- * `weightedLoad` ya lo refleja y el mail no sale de pedo.
+ * "Fresca" importa: si el PF liberó lugar desde el choque (pausó a alguien),
+ * la carga ya lo refleja y el mail no sale de pedo.
+ *
+ * ── 2. LA "CARGA" NO ES `count` DE `campos.leerLimiteYUso` ──
+ *
+ * Hallazgo de Codex sobre #1267 (P2 de esta ronda, ver el porqué completo en
+ * `leerLimiteDeAlumnos`). Viaja aparte, en `cargaEnVivoDeAlumnos` — calculada
+ * por `reservarEnfriamiento` DENTRO de la transacción de la reserva, con la
+ * MISMA función que usa el gate (`computeWeightedLoad`) sobre los vínculos
+ * EN VIVO, nunca sobre `weightedLoad` persistido. `leerLimiteDeAlumnos`
+ * devuelve `count: 0` a propósito — ese valor NUNCA se lee para este kind.
+ *
+ * `cargaEnVivoDeAlumnos === null` significa "no se pudo calcular" — no
+ * debería pasar en producción (`reservarEnfriamiento` siempre la calcula
+ * para este kind), pero si pasa, MISMO criterio fail-closed que el resto del
+ * archivo: no hay forma confiable de saber si sigue en el tope, así que no
+ * manda. Mandar de más es el error caro; mandar de menos, el aceptado.
  *
  * ── SIN INCREMENTO (choque legado, o `details` incompletos) ──
  *
@@ -462,7 +540,7 @@ function leerIncrementoDeAlumnos(userData: DocumentData | undefined): number | n
  * vieja de este código (compatibilidad, ver "EL TOPE DE ALUMNOS" más abajo),
  * o el caso defensivo donde `incrementoDeAlumnos` no pudo leer
  * `currentLoad`/`projectedLoad` de los `details` del error—, cae al MISMO
- * criterio que los otros dos kinds: `weightedLoad(fresco) >= limit`. Es MENOS
+ * criterio que los otros dos kinds: `carga(fresca) >= limit`. Es MENOS
  * preciso (ciego al caso de arriba) pero MÁS conservador: nunca manda de más,
  * sólo puede mandar de menos — y mandar la oferta a quien YA no está en el
  * tope es el error caro que documenta la cláusula 3 del encabezado. Elegido
@@ -477,13 +555,21 @@ function sigueEnElTope(
   trainerId: string,
   nowMs: number,
   campos: CamposDelTope,
+  tope: string,
   incrementoAlumnos: number | null,
+  cargaEnVivoDeAlumnos: number | null,
 ): number | null {
   const { limit, count } = campos.leerLimiteYUso(userData, trainerId, nowMs);
   if (limit === null) return null;
-  if (incrementoAlumnos !== null) {
-    return count + incrementoAlumnos > limit ? limit : null;
+
+  if (tope === "students") {
+    if (cargaEnVivoDeAlumnos === null) return null; // ver "2." arriba
+    if (incrementoAlumnos !== null) {
+      return cargaEnVivoDeAlumnos + incrementoAlumnos > limit ? limit : null;
+    }
+    return cargaEnVivoDeAlumnos >= limit ? limit : null;
   }
+
   return count >= limit ? limit : null;
 }
 
@@ -535,12 +621,19 @@ function eventoTopeDeSnapshot(despues: DocumentData | undefined): EventoTope {
  * @param evento   - El kind/at/incremento del evento puntual que disparó este
  *                   llamado (camino al toque). `undefined` en el barrido:
  *                   deriva los tres del documento, el más fresco.
+ * @param cargaEnVivoDeAlumnos - SÓLO relevante si el kind es `students`: la
+ *                   carga ponderada EN VIVO, calculada por
+ *                   `reservarEnfriamiento` con `computeWeightedLoad` sobre los
+ *                   vínculos frescos — ver `sigueEnElTope` y
+ *                   `leerLimiteDeAlumnos` para el porqué de no usar
+ *                   `weightedLoad`. Ignorado para los otros dos kinds.
  */
 export function decideTrainerLimitMail(
   userData: DocumentData | undefined,
   nowMs: number,
   trainerId: string,
   evento?: EventoTope,
+  cargaEnVivoDeAlumnos?: number,
 ): TrainerLimitMailPlan | null {
   const tocadoMs = evento ? evento.atMs : msDe(userData?.[CAMPO_TOPE_AT]);
   if (tocadoMs === null) return null; // clausula 1
@@ -563,10 +656,55 @@ export function decideTrainerLimitMail(
         : leerIncrementoDeAlumnos(userData)
       : null;
 
-  const limit = sigueEnElTope(userData, trainerId, nowMs, campos, incrementoAlumnos);
+  const limit = sigueEnElTope(
+    userData,
+    trainerId,
+    nowMs,
+    campos,
+    tope,
+    incrementoAlumnos,
+    tope === "students" ? cargaEnVivoDeAlumnos ?? null : null,
+  );
   if (limit === null) return null; // clausula 3
 
-  // EL ENFRIAMIENTO, POR KIND. Ver la clausula 4: sin esto, un PF que sigue
+  // CLAUSULA NUEVA — SUSCRIPCIÓN INACTIVA. Hallazgo de Codex sobre #1267 (P1).
+  //
+  // Antes de esto, un PF con la suscripción `pending`/`paused`, o `cancelled`
+  // y ya vencida, que chocaba un tope recibía el mismo mail de upsell que
+  // cualquier otro — "VER LOS PLANES", ofreciendo un plan más grande. Para
+  // ESE PF es una mentira de producto: no le falta plan, le falta pago al
+  // día. Un plan3 pausado no tiene "plan más grande" que ofrecerle.
+  //
+  // `suscripcionInactiva` (`effective-limit.ts`) replica, puramente sobre
+  // `status`, la MISMA matriz de casos que ya resuelve `limiteDelStatus` ahí
+  // — por eso "inactiva" acá es EXACTAMENTE lo que hace que el límite
+  // efectivo caiga a Free en vez del nominal, no una definición nueva.
+  // Aplica a LOS TRES kinds: un ejercicio o una plantilla de más también
+  // pueden chocarse con el límite ya degradado a Free por la misma causa.
+  //
+  // `sub === null` (nunca se suscribió) NO entra acá — ver el porqué en
+  // `suscripcionInactiva`: ese PF SÍ es el destinatario del upsell.
+  //
+  // ── QUÉ MAIL CUBRE, EN CAMBIO, "REGULARIZÁ TU PAGO" ──
+  //
+  // `subscription-downgraded`/`subscription-grace` (`subscription-mail.ts`,
+  // disparados por `syncEntitlementsOnSubscription` en el INSTANTE de la
+  // transición a `pending`/`paused`, o por `sweepEntitlements` dentro de la
+  // ventana de 48h del vencimiento de un `cancelled` — `entitlement-triggers.ts`).
+  // Esos SÍ dicen "actualizá tu método de pago"/"tu suscripción se pausó".
+  //
+  // OJO, esto NO es cobertura total y se deja escrito en vez de decir
+  // "cubierto" (AGENTS.md §11.1): esos mails salen por TRANSICIÓN u
+  // vencimiento reciente, una vez. Si el PF sigue inactivo semanas después y
+  // recién ahí choca un tope, no hay ningún mail de ESTE módulo ni de
+  // `subscription-mail.ts` que se lo recuerde en ese momento — silencio total
+  // de este canal hasta que regularice. Aceptado así: inventar un recordatorio
+  // periódico de cobro es un mail nuevo, no un fix de éste.
+  if (suscripcionInactiva(toSubscriptionState(userData, trainerId).state, nowMs)) {
+    return null; // clausula 4
+  }
+
+  // EL ENFRIAMIENTO, POR KIND. Ver la clausula 5: sin esto, un PF que sigue
   // en el tope todos los dias recibe un mail diario sobre lo mismo — y con el
   // enfriamiento compartido de antes, chocar OTRO tope silenciaba el mail de
   // este, que es justo lo que se dejó de querer (ver el encabezado).
@@ -597,17 +735,25 @@ interface Reserva {
  * Esta es la pieza que cierra la carrera DENTRO del mismo kind (ver el
  * encabezado del módulo): dos transacciones sobre el MISMO documento se
  * serializan, así que la segunda de las dos siempre ve la reserva que dejó la
- * primera y sale por la cláusula 4 (`decideTrainerLimitMail` devuelve `null`),
+ * primera y sale por la cláusula 5 (`decideTrainerLimitMail` devuelve `null`),
  * sin importar qué snapshot tenía el llamador al entrar.
  *
  * Devuelve `null` cuando `decideTrainerLimitMail` dice que no corresponde —
- * ninguna de las cuatro cláusulas se cumple, o esta transacción perdió la
+ * ninguna de las cinco cláusulas se cumple, o esta transacción perdió la
  * carrera contra otra del MISMO kind.
  *
  * `evento`, si viene (camino al toque), fija el kind/at/incremento a evaluar
  * — ver `EventoTope` y el encabezado del módulo. `datosFrescos` se sigue
  * releyendo siempre: es lo que `decideTrainerLimitMail` usa para la
  * cláusula 3 y el enfriamiento de ESE kind.
+ *
+ * Para `students`, ADEMÁS lee los vínculos vivos del PF y calcula su carga
+ * ponderada EN VIVO, DENTRO de esta misma transacción — ver
+ * `leerLimiteDeAlumnos` y `sigueEnElTope` para el porqué (hallazgo de Codex
+ * sobre #1267, P2: `weightedLoad` persistido puede estar desactualizado
+ * mientras `linkLoadReconcile` todavía no corrió). El kind se mira ACÁ, antes
+ * de llamar a la función pura, únicamente para decidir SI hace falta esa
+ * query — para los otros dos kinds sería una lectura a Firestore de más.
  */
 async function reservarEnfriamiento(
   app: App,
@@ -615,12 +761,32 @@ async function reservarEnfriamiento(
   nowMs: number,
   evento?: EventoTope,
 ): Promise<Reserva | null> {
-  const ref = getFirestore(app).collection("users").doc(trainerId);
-  return getFirestore(app).runTransaction(async (tx) => {
+  const db = getFirestore(app);
+  const ref = db.collection("users").doc(trainerId);
+  return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const datosFrescos = snap.data();
 
-    const plan = decideTrainerLimitMail(datosFrescos, nowMs, trainerId, evento);
+    // Mismo criterio que dentro de `decideTrainerLimitMail` para elegir el
+    // kind (evento primero, documento fresco si no hay evento) — replicado
+    // acá porque hace falta ANTES de llamar a esa función pura, para saber si
+    // corresponde la query de vínculos. `decideTrainerLimitMail` vuelve a
+    // hacer el mismo cálculo; es una comparación de strings, no una lectura.
+    const topeDeEsteLlamado = evento ? evento.kind : datosFrescos?.[CAMPO_TOPE_KIND];
+    const cargaEnVivoDeAlumnos =
+      topeDeEsteLlamado === "students"
+        ? computeWeightedLoad(
+          (await readTrainerLinks(tx, db, trainerId)) as unknown as WeightedLink[],
+        )
+        : undefined;
+
+    const plan = decideTrainerLimitMail(
+      datosFrescos,
+      nowMs,
+      trainerId,
+      evento,
+      cargaEnVivoDeAlumnos,
+    );
     if (!plan) return null;
 
     const mailAtActual = datosFrescos?.[CAMPO_MAIL_AT];
@@ -682,7 +848,7 @@ async function deshacerReserva(
  *   1. `reservarEnfriamiento` relee el documento FRESCO dentro de una
  *      transacción, decide con `decideTrainerLimitMail`, y si corresponde
  *      mandar, escribe `trainerLimitMailAt.<kind> = nowMs` ahí mismo — la
- *      reserva. Si no corresponde (cualquiera de las cuatro cláusulas,
+ *      reserva. Si no corresponde (cualquiera de las cinco cláusulas,
  *      incluyendo haber perdido la carrera contra otra reserva del MISMO
  *      kind), no hay nada más que hacer.
  *   2. Con la reserva ya firme, se encola con `enqueueMail`. Nunca tira:
@@ -769,7 +935,7 @@ export interface ResultadoDelBarrido {
  * deja de sostenerse — mismo criterio defensivo que
  * `custom-exercise-count.ts` aplica antes de recontar. Se lee del snapshot de
  * la query, no fresco — es sólo un filtro previo; la decisión que importa
- * (las cuatro cláusulas) la hace `enqueueTrainerLimitMail` sobre el documento
+ * (las cinco cláusulas) la hace `enqueueTrainerLimitMail` sobre el documento
  * fresco.
  *
  * ── Un fallo no frena a los demás ──
@@ -831,7 +997,7 @@ export function esToqueNuevo(
 }
 
 /**
- * El camino al toque: las mismas cuatro cláusulas que el barrido, para UN PF,
+ * El camino al toque: las mismas cinco cláusulas que el barrido, para UN PF,
  * en el momento en que choca el tope.
  *
  * El chequeo de `role` va acá y no en la query del trigger (que no existe:
@@ -937,22 +1103,35 @@ export const sweepTrainerLimitMail = onSchedule(
 
 /**
  * Si `err` es el `resource-exhausted` que tira `syncTrainerLoad` al chocar el
- * tope de alumnos (`promote-link.ts`), y no otro `resource-exhausted` — por
- * ejemplo, una cuota de Firestore agotada, que también usa ese código de
- * error pero no trae el `details.reason` que sólo escribe
+ * tope de PLAN de alumnos (`promote-link.ts`), y no otro `resource-exhausted`
+ * — por ejemplo, una cuota de Firestore agotada, que también usa ese código
+ * de error pero no trae el `details.reason` que sólo escribe
  * `promotionDenialReason` (D-2).
  *
- * Los dos valores posibles de `reason` —`"plan-limit"` y
- * `"subscription-inactive"`— cuentan igual acá: los dos representan "el PF
- * quiso sumar un alumno y el servidor lo frenó por el tope", que es
- * exactamente lo que este mail existe para avisar. La DISTINCIÓN entre los
- * dos es asunto del paywall in-app (D-2), no de este mail.
+ * ── HASTA #1267 LOS DOS `reason` POSIBLES CONTABAN IGUAL ACÁ. YA NO. ──
+ *
+ * Hallazgo de Codex sobre #1267 (P1). Este comentario decía que
+ * `"plan-limit"` y `"subscription-inactive"` eran lo mismo para este mail —
+ * "los dos representan que el servidor frenó al PF por el tope" — y eso
+ * llevaba al mail EQUIVOCADO: un PF con un plan pago pero la suscripción
+ * `pending`/`paused`/vencida (`subscription-inactive`, D-2) recibía el mismo
+ * "VER LOS PLANES" que alguien en su tope de verdad, ofreciéndole comprar
+ * algo que YA compró. Ver `promotionDenialReason` — `subscription-inactive`
+ * es "no llegaste a pagar lo suficiente AHORA", un problema de cobro, no de
+ * plan.
+ *
+ * Ahora SÓLO `"plan-limit"` cuenta como tope de alumnos: la MISMA distinción
+ * que ya hace `promotionDenialReason`, no una nueva. `"subscription-inactive"`
+ * no anota nada acá — ese caso lo cubre (parcialmente; ver
+ * `decideTrainerLimitMail`, cláusula "SUSCRIPCIÓN INACTIVA") el canal de
+ * `subscription-mail.ts`, disparado por la transición de `subscription`, no
+ * por el intento de aceptar/reanudar un vínculo.
  */
 export function esTopeDeAlumnos(err: unknown): boolean {
   if (!(err instanceof HttpsError)) return false;
   if (err.code !== "resource-exhausted") return false;
   const details = err.details as { reason?: unknown } | undefined;
-  return details?.reason === "plan-limit" || details?.reason === "subscription-inactive";
+  return details?.reason === "plan-limit";
 }
 
 /**
