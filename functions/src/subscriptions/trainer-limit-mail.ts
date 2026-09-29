@@ -126,6 +126,49 @@
  * los demás kinds.
  *
  * ═══════════════════════════════════════════════════════════════════════════
+ *  EL KIND (Y EL AT, Y EL INCREMENTO) VIAJAN CON EL EVENTO — NO SE ADIVINAN
+ *  DEL DOCUMENTO FRESCO
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Hallazgo de Codex sobre #1267. `reservarEnfriamiento` relee `users/{uid}`
+ * FRESCO dentro de una transacción — necesario para que la cláusula 3 (¿sigue
+ * en el tope?) y la 4 (enfriamiento) vean el dato más actual. El bug: ANTES
+ * de este arreglo, `alTocarElTope` también usaba ESA MISMA relectura para
+ * decidir QUÉ KIND evaluar (`userData[CAMPO_TOPE_KIND]`). Si dos toques de
+ * KINDS DISTINTOS llegan casi juntos —`customExercises` a t0, `students` a
+ * t0+50ms—, para cuando el trigger del PRIMERO hace su relectura, el
+ * documento YA puede tener el kind del SEGUNDO. El primer trigger terminaba
+ * evaluando el kind equivocado —el de OTRO evento— y el mail de SU PROPIO
+ * tope no se mandaba nunca. El test "chocar los dos topes casi al mismo
+ * tiempo" (`trainer-limit-mail-al-toque.test.ts`) medía exactamente este bug
+ * con la aserción invertida: esperaba UN mail donde correspondían DOS.
+ *
+ * El arreglo: `alTocarElTope` arma un `EventoTope` con el kind, el `at` y
+ * (para `students`) el incremento DEL SNAPSHOT `despues` que lo disparó —
+ * antes de que `enqueueTrainerLimitMail` toque Firestore— y se lo pasa a
+ * `decideTrainerLimitMail`. Adentro de la transacción, lo único que se sigue
+ * releyendo FRESCO es lo que tiene que ser fresco PARA ESE KIND: si sigue en
+ * el tope (cláusula 3) y su enfriamiento (cláusula 4). El barrido no tiene
+ * evento propio — sigue derivando kind/at/incremento del documento, el más
+ * reciente, como siempre.
+ *
+ * ── EL RIESGO QUE QUEDA ──
+ *
+ * El barrido de las 05:30 NO tiene esta protección: por diseño sólo ve el
+ * ÚLTIMO kind/at/incremento que quedó escrito en el documento — no hay un
+ * "evento" que leer ahí, sólo el estado actual. Si el trigger AL TOQUE de un
+ * choque falla (la excepción que loguea `sendTrainerLimitMailOnHit` y delega
+ * al barrido como red) Y, ANTES de que corra el barrido de mañana, el PF
+ * choca un tope DISTINTO —que pisa `trainerLimitHitKind`/`trainerLimitHitAt`
+ * con el kind nuevo—, el barrido ya no tiene forma de reconstruir cuál era
+ * el kind del choque perdido: el mail del PRIMER tope no sale nunca. Es una
+ * doble falla (el trigger Y una carrera contra otro choque distinto) y se
+ * acepta así — capturar cada choque individual con su propio evento
+ * persistido sería una cola, no un campo en el perfil, y es más estructura
+ * de la que este mail comercial justifica. Se deja escrito acá en vez de
+ * decir "cubierto" porque no lo está (AGENTS.md §11.1).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
  *  EL ANTI-LOOP DEL CAMINO AL TOQUE
  * ═══════════════════════════════════════════════════════════════════════════
  *
@@ -445,41 +488,80 @@ function sigueEnElTope(
 }
 
 /**
+ * El evento puntual que originó ESTE llamado — el snapshot `despues` de UN
+ * write sobre `users/{uid}`. Sólo lo arma el camino al toque
+ * (`alTocarElTope`, vía `eventoTopeDeSnapshot`); el barrido no tiene un
+ * evento propio y pasa `undefined`, así que sigue derivando kind/at/
+ * incremento del documento FRESCO, el más reciente — ver el encabezado del
+ * módulo, "EL KIND... VIAJAN CON EL EVENTO", incluido "EL RIESGO QUE QUEDA".
+ */
+interface EventoTope {
+  /** `trainerLimitHitKind` de ESTE evento — no el más fresco del documento. */
+  kind: string;
+  /** `trainerLimitHitAt` de ESTE evento, en ms. */
+  atMs: number | null;
+  /** `trainerLimitHitIncrement` de ESTE evento. Sólo se usa para `students`. */
+  incrementoAlumnos: number | null;
+}
+
+/** Arma el `EventoTope` de un snapshot `despues`. Ver `EventoTope`. */
+function eventoTopeDeSnapshot(despues: DocumentData | undefined): EventoTope {
+  const kindRaw = despues?.[CAMPO_TOPE_KIND];
+  return {
+    kind: typeof kindRaw === "string" && kindRaw ? kindRaw : "desconocido",
+    atMs: msDe(despues?.[CAMPO_TOPE_AT]),
+    incrementoAlumnos: leerIncrementoDeAlumnos(despues),
+  };
+}
+
+/**
  * Si corresponde escribirle a este PF, y con qué alcance de dedupe.
  *
- * PURA: no toca Firestore. Sin segunda query — a diferencia de
+ * Releyendo Firestore fresco (via `reservarEnfriamiento`) para lo que tiene
+ * que ser fresco — la cláusula 3 y el enfriamiento — pero SIN adivinar el
+ * kind de ese mismo documento fresco cuando hay un `evento` puntual: ver el
+ * encabezado del módulo. Sin segunda query — a diferencia de
  * `free-limit-mail.ts`, que necesita `hasActiveTrainerLink`, acá no hay nada
- * más que consultar: la cláusula 3 ya está resuelta con lo que trae el
- * documento.
+ * más que consultar.
  *
  * `trainerId` es OBLIGATORIO —igual que en `toSubscriptionState`— porque el
  * kind `students` lo necesita para loguear un `subscription` roto con su uid.
  * Los otros dos kinds lo ignoran, pero la firma es una sola: no hay forma de
  * saber DESDE ACÁ qué kind trae `userData` antes de leerlo.
  *
- * @param userData - El documento de `users/{uid}`.
+ * @param userData - El documento de `users/{uid}` (FRESCO si viene de la transacción).
  * @param nowMs    - Reloj, inyectado.
  * @param trainerId- El uid del documento que se está leyendo.
+ * @param evento   - El kind/at/incremento del evento puntual que disparó este
+ *                   llamado (camino al toque). `undefined` en el barrido:
+ *                   deriva los tres del documento, el más fresco.
  */
 export function decideTrainerLimitMail(
   userData: DocumentData | undefined,
   nowMs: number,
   trainerId: string,
+  evento?: EventoTope,
 ): TrainerLimitMailPlan | null {
-  const tocadoMs = msDe(userData?.[CAMPO_TOPE_AT]);
+  const tocadoMs = evento ? evento.atMs : msDe(userData?.[CAMPO_TOPE_AT]);
   if (tocadoMs === null) return null; // clausula 1
 
   // El mail vale porque llega CERCA del intento. Ver la clausula 2.
   if (nowMs - tocadoMs > VENTANA_MS) return null;
 
-  const topeRaw = userData?.[CAMPO_TOPE_KIND];
+  const topeRaw = evento ? evento.kind : userData?.[CAMPO_TOPE_KIND];
   const tope = typeof topeRaw === "string" && topeRaw ? topeRaw : "desconocido";
   const campos = CAMPOS_POR_KIND[tope];
   if (!campos) return null; // kind sin reconocer: no sabemos que tope mirar
 
-  // Sólo `students` usa un incremento — los otros dos kinds quedan en `null`
-  // a propósito: `sigueEnElTope` no lo mira si el kind no es ese.
-  const incrementoAlumnos = tope === "students" ? leerIncrementoDeAlumnos(userData) : null;
+  // Sólo `students` usa un incremento — para los otros dos kinds queda en
+  // `null` a propósito, aunque el documento tuviera uno colgado de un choque
+  // de alumnos anterior: `sigueEnElTope` no lo mira si el kind no es ese.
+  const incrementoAlumnos =
+    tope === "students"
+      ? evento
+        ? evento.incrementoAlumnos
+        : leerIncrementoDeAlumnos(userData)
+      : null;
 
   const limit = sigueEnElTope(userData, trainerId, nowMs, campos, incrementoAlumnos);
   if (limit === null) return null; // clausula 3
@@ -521,18 +603,24 @@ interface Reserva {
  * Devuelve `null` cuando `decideTrainerLimitMail` dice que no corresponde —
  * ninguna de las cuatro cláusulas se cumple, o esta transacción perdió la
  * carrera contra otra del MISMO kind.
+ *
+ * `evento`, si viene (camino al toque), fija el kind/at/incremento a evaluar
+ * — ver `EventoTope` y el encabezado del módulo. `datosFrescos` se sigue
+ * releyendo siempre: es lo que `decideTrainerLimitMail` usa para la
+ * cláusula 3 y el enfriamiento de ESE kind.
  */
 async function reservarEnfriamiento(
   app: App,
   trainerId: string,
   nowMs: number,
+  evento?: EventoTope,
 ): Promise<Reserva | null> {
   const ref = getFirestore(app).collection("users").doc(trainerId);
   return getFirestore(app).runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const datosFrescos = snap.data();
 
-    const plan = decideTrainerLimitMail(datosFrescos, nowMs, trainerId);
+    const plan = decideTrainerLimitMail(datosFrescos, nowMs, trainerId, evento);
     if (!plan) return null;
 
     const mailAtActual = datosFrescos?.[CAMPO_MAIL_AT];
@@ -613,14 +701,18 @@ async function deshacerReserva(
  * mail llega recién si el PF vuelve a chocar un tope. Se aceptó así porque la
  * falla es rara y el mail es comercial.
  *
+ * `evento`, si viene, se lo pasa sin tocar a `reservarEnfriamiento` — ver
+ * `EventoTope`.
+ *
  * @returns el plan que se mandó, o `null` si no correspondía mandar nada.
  */
 export async function enqueueTrainerLimitMail(
   app: App,
   trainerId: string,
   nowMs: number,
+  evento?: EventoTope,
 ): Promise<TrainerLimitMailPlan | null> {
-  const reserva = await reservarEnfriamiento(app, trainerId, nowMs);
+  const reserva = await reservarEnfriamiento(app, trainerId, nowMs, evento);
   if (!reserva) return null;
   const { plan, anteriorMailAtMs } = reserva;
 
@@ -748,7 +840,13 @@ export function esToqueNuevo(
  * lee de `despues`, el snapshot que trajo el evento — sólo un filtro previo;
  * la decisión que importa la hace `enqueueTrainerLimitMail` releyendo el
  * documento fresco dentro de una transacción. Ver el encabezado — "EL
- * ANTI-LOOP DEL CAMINO AL TOQUE" y "DOS CAMINOS".
+ * ANTI-LOOP DEL CAMINO AL TOQUE", "DOS CAMINOS" y "EL KIND... VIAJAN CON EL
+ * EVENTO".
+ *
+ * El `EventoTope` que arma acá —de `despues`, ANTES de tocar Firestore— es
+ * lo que le fija a `enqueueTrainerLimitMail` cuál es SU kind: sin esto, dos
+ * toques de kinds distintos casi simultáneos pueden hacer que este trigger
+ * termine decidiendo sobre el kind que anotó EL OTRO. Ver el encabezado.
  */
 export async function alTocarElTope(
   app: App,
@@ -760,7 +858,7 @@ export async function alTocarElTope(
   if (!esToqueNuevo(antes, despues)) return "sin-tope-nuevo";
   if (despues?.role !== "trainer") return "no-trainer";
 
-  const plan = await enqueueTrainerLimitMail(app, uid, nowMs);
+  const plan = await enqueueTrainerLimitMail(app, uid, nowMs, eventoTopeDeSnapshot(despues));
   return plan ? "encolado" : "silencio";
 }
 
