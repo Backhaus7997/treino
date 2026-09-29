@@ -158,6 +158,22 @@ describe("runResumeTrainerLink", () => {
       );
     });
 
+    it("⚠️ un rebote por subscription-inactive NO anota — no es un tope, es cobro atrasado", async () => {
+      // Hallazgo de Codex sobre #1267 (P1), mismo criterio que
+      // accept-trainer-link.test.ts: un PF con un plan pago pero la
+      // suscripción `pending`/`paused`/vencida (`subscription-inactive`, D-2
+      // en `promote-link.ts`) no tiene que quedar anotado como si hubiera
+      // chocado el tope de alumnos — el mail de upsell resultante ("VER LOS
+      // PLANES") le mentiría. Ver `esTopeDeAlumnos`.
+      mockSync.mockRejectedValue(denialTope("subscription-inactive"));
+
+      await expect(
+        runResumeTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).not.toHaveBeenCalled();
+    });
+
     it("⚠️ un rechazo por otro motivo (wrong-status) NO anota", async () => {
       mockSync.mockRejectedValue(
         new HttpsError("failed-precondition", "wrong-status"),

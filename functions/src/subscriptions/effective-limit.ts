@@ -205,6 +205,53 @@ function limiteDelStatus(
 }
 
 /**
+ * Si el STATUS de la suscripcion es de los que el servidor resuelve a Free —
+ * hallazgo de Codex sobre #1267 (P1): `promotionDenialReason` (`promote-link.ts`,
+ * D-2) ya distingue "no llegaste a pagar lo suficiente" (`subscription-inactive`)
+ * de "estas exactamente en tu tope pagado" (`plan-limit`), pero esa funcion
+ * compara contra `TIER_WEIGHT_LIMITS` — sirve solo para el tope de ALUMNOS. Los
+ * mails de tope de ejercicios/plantillas (`trainer-limit-mail.ts`) necesitan la
+ * MISMA distincion pero sin comparar contra ninguna tabla de limites numerica en
+ * particular: puramente sobre `status`, para que sirva para cualquier tope del
+ * PF.
+ *
+ * Deliberadamente REPLICA el switch de [limiteDelStatus] en vez de compartirlo
+ * — mismo precedente que `tierDelStatus`/`effectiveTier` mas abajo en este
+ * archivo, que hacen exactamente eso y explican por que: son dos preguntas
+ * puras sobre la MISMA matriz de casos ("que limite aplica" vs "esta al dia"),
+ * y `limiteDelStatus` ya tiene su propia doble garantia de exhaustividad
+ * documentada en su docblock — duplicar el switch acá le da a ESTA pregunta la
+ * misma garantia en vez de pedirle prestada la de otra funcion con otro proposito.
+ *
+ * `sub == null` (sin mapa `subscription`) NO es "inactiva": es el PF Free que
+ * nunca se suscribio, y ESE si es el destinatario correcto del upsell — no hay
+ * ningun cobro que recuperarle. Confundir los dos casos apagaria el upsell para
+ * toda la base Free, que es exactamente a quien esta dirigido.
+ */
+export function suscripcionInactiva(
+  sub: SubscriptionState | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!sub) return false;
+
+  switch (sub.status) {
+  case "pending":
+  case "paused":
+    return true;
+  case "cancelled":
+    return sub.currentPeriodEndMs == null || nowMs >= sub.currentPeriodEndMs;
+  case "active":
+  case "grace":
+    return false;
+  default: {
+    const _exhaustive: never = sub.status;
+    void _exhaustive;
+    return false;
+  }
+  }
+}
+
+/**
  * Que PISO PREPAGO hay que dejar escrito cuando el reconciliador esta por
  * escribir [tierEntrante] encima de [actual].
  *
