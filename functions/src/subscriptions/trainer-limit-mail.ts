@@ -675,10 +675,14 @@ export function decideTrainerLimitMail(
   // ESE PF es una mentira de producto: no le falta plan, le falta pago al
   // día. Un plan3 pausado no tiene "plan más grande" que ofrecerle.
   //
-  // `suscripcionInactiva` (`effective-limit.ts`) replica, puramente sobre
-  // `status`, la MISMA matriz de casos que ya resuelve `limiteDelStatus` ahí
-  // — por eso "inactiva" acá es EXACTAMENTE lo que hace que el límite
-  // efectivo caiga a Free en vez del nominal, no una definición nueva.
+  // `suscripcionInactiva` (`effective-limit.ts`) compara el tier EFECTIVO
+  // (`effectiveTier`, que incluye el PISO PREPAGO) contra el tier NOMINAL de
+  // la suscripción: "inactiva" es que el efectivo cayó por DEBAJO del
+  // nominal. Un PF `pending`/`paused` con un piso prepago vigente del MISMO
+  // plan sigue sostenido en su plan pago y NO es "inactiva" — el upsell le
+  // sale, porque puede chocar (legítimamente) el tope de ESE plan. Hallazgo
+  // de Codex sobre #1267 (P2 de esta ronda) — ver el docblock de
+  // `suscripcionInactiva` para el porqué completo.
   // Aplica a LOS TRES kinds: un ejercicio o una plantilla de más también
   // pueden chocarse con el límite ya degradado a Free por la misma causa.
   //

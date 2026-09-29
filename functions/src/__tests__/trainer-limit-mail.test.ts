@@ -584,6 +584,39 @@ describe("⚠️ suscripción inactiva → no se manda el upsell (los tres kinds
       expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).toBeNull();
     });
 
+    // ── EL PISO PREPAGO — hallazgo de Codex sobre #1267 (P2 de esta ronda) ──
+    // `suscripcionInactiva` ya no mira sólo `status`: un `paused` con un piso
+    // prepago vigente del MISMO plan sigue sostenido en ese plan pago, así
+    // que SÍ puede chocar su tope legítimamente. Ver el docblock de
+    // `suscripcionInactiva` en `effective-limit.ts`.
+    it("`paused` CON piso prepago vigente del mismo plan sí manda — no es inactiva", () => {
+      const doc = {
+        ...base,
+        subscription: {
+          tier: "plan1",
+          status: "paused",
+          prepaidTier: "plan1",
+          prepaidUntil: ts(AHORA + 1000),
+        },
+      };
+      // El límite efectivo con el piso es el de plan1 (7) — carga en vivo 7
+      // para estar exactamente en ESE tope.
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 7)).not.toBeNull();
+    });
+
+    it("`paused` con el piso ya VENCIDO no manda — mismo resultado que sin piso", () => {
+      const doc = {
+        ...base,
+        subscription: {
+          tier: "plan1",
+          status: "paused",
+          prepaidTier: "plan1",
+          prepaidUntil: ts(AHORA - 1000),
+        },
+      };
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).toBeNull();
+    });
+
     it("`cancelled` con período YA VENCIDO no manda", () => {
       const doc = {
         ...base,
