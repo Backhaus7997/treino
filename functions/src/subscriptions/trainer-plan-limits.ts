@@ -28,9 +28,9 @@
  *
  * ─── El interruptor: ENCENDIDO desde el 2026-09-25 ──────────────────────────
  *
- * [TRAINER_EXERCISE_LIMITS_ENABLED] arrancó en `false` y se encendió el
- * 2026-09-25, antes del alta del primer entrenador real
- * (limite-ejercicios-pf.md §4). Mientras estuvo apagado, esta CF igual corría
+ * [TRAINER_EXERCISE_LIMITS_ENABLED] arrancó en `false` y se encendió antes del
+ * alta del primer entrenador real (limite-ejercicios-pf.md §4 y su Estado,
+ * que cuenta por qué el encendido del 2026-09-25 hubo que repetirlo). Mientras estuvo apagado, esta CF igual corría
  * y escribía `{customExercises: null}` en todos lados: la plomeria quedó
  * ejercitada antes de que importara, y prender el tope fue un cambio de valor
  * y nada mas. Apagarlo vuelve a limpiar el campo (a `null`) en el proximo
