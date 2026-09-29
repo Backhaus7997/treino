@@ -306,16 +306,31 @@ decir lo mismo con otra palabra, y dos copias divergen.
 - **El texto del aviso interpola el límite**, no escribe «3» a mano: el número
   vive en `planLimits.templates`.
 
-**Los avisos:**
+**Los avisos** (unificados con el paywall de alumnos desde el 2026-09-29 —
+`plan_limit_shared.dart`: mismo candado, misma caja de upsell con precio,
+mismo botón VER PLANES, mismo link de descarte en los tres avisos del PF):
 
-- **Móvil, estado + VER PLANES:** «Llegaste a las 3 plantillas de tu plan.
-  Podés editarlas, asignarlas o archivar una para hacer lugar.»
+- **El plan que el aviso NOMBRA es el EFECTIVO, no el nominal a ciegas.**
+  Sólo Free tiene tope de plantillas (Plan 1/2/3 son sin límite): si el
+  `limit` que bloqueó es 3 pero el PF nominal es un plan pago, su suscripción
+  no está activa y el efectivo cayó a Free — el aviso lo dice y NO ofrece
+  upsell (`resolveNoticeTier` en `trainer_limit_notice.dart`, mismo
+  mecanismo que el de ejercicios propios). Un `limit` finito que no sea 3 es
+  un tope ajustado a mano: el cuerpo es genérico, sin nombrar un plan.
+- **Móvil — estado, nunca un llamado a comprar** (Guideline 3.1.3(f),
+  decisión del dueño 2026-09-29): «Tu plan Free incluye 3 plantillas. Podés
+  editar o archivar las que ya tenés.» La tarjeta del siguiente plan muestra
+  su NOMBRE, precio y beneficio como información — sin «PASATE A».
   - Botón **VER PLANES** que navega a `/facturacion/planes` (misma pantalla
-    informativa que la web, sin comprar). Sin nombrar «web», sin «mail», sin
-    «pasá a un plan».
-  - Correr `anti_steering_movil_test.dart`. Si se pone rojo, se cambia el texto,
-    no el guard.
-- **Web:** el mismo estado, más el botón **VER PLANES** a facturación.
+    informativa que la web, sin comprar) y link de descarte **«Entendido»**
+    (no «Ahora no»). Sin nombrar «web», sin «mail», sin verbo de compra
+    («subí de plan», «pasate», «reactivá», «regularizá», …).
+  - Correr `anti_steering_movil_test.dart` (dónde se paga) y
+    `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart` (si se llama a
+    pagar). Si alguno se pone rojo, se cambia el texto, no el guard.
+- **Web — upsell completo:** «Tu plan Free incluye 3 plantillas. Para sumar
+  más, subí de plan.» con la tarjeta **«PASATE A PLAN 1»** (precio y
+  beneficio) y botón VER PLANES a facturación.
 
 **El contador visible:** «2 de 3 plantillas» en la grilla de rutinas del Hub
 (`routine_card_grid.dart`) y en la sección de plantillas de
