@@ -10,6 +10,7 @@ import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
 import 'mobile_banner.dart';
+import 'mobile_facturacion_shell.dart';
 import 'navigator_semantics_boundary.dart';
 import 'responsive.dart' as rsp;
 import 'sidebar_item.dart';
@@ -21,7 +22,10 @@ import 'sidebar_item.dart';
 /// [ContentMaxWidth]. Fondo `palette.bg` — dark mode, sin HEX literales.
 ///
 /// Guard responsivo (ADR-CHW-004, REQ-CHW-RESPONSIVE-001/002):
-/// - `< 768 px` → [MobileBanner] reemplaza todo el shell.
+/// - `< 768 px` → [MobileBanner] reemplaza todo el shell — EXCEPTO
+///   [mobileFacturacionAllowed], que cambia el reemplazo por
+///   [MobileFacturacionShell] (ver ese archivo para el porqué: el mail del
+///   tope de plan manda al PF a esta pantalla desde su teléfono).
 /// - `768–1279 px` (compact) → sidebar forzado a colapsado; el provider NO se
 ///   escribe, así el valor guardado se preserva al volver a desktop.
 /// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
@@ -31,6 +35,7 @@ class CoachHubScaffold extends ConsumerWidget {
     required this.child,
     this.itemsOverride,
     this.contentMaxWidth = CoachHubLayoutTokens.contentMaxWidth,
+    this.mobileFacturacionAllowed = false,
   });
 
   final Widget child;
@@ -44,12 +49,22 @@ class CoachHubScaffold extends ConsumerWidget {
   /// wiring real de W1+). Ver [CoachHubSidebar.itemsOverride].
   final List<SidebarItem>? itemsOverride;
 
+  /// `true` cuando la ruta activa es una de [isMobileFacturacionRoute] — lo
+  /// resuelve el router desde `state.uri.path`, mismo patrón que
+  /// [contentMaxWidth]. Con esto en `true`, un viewport `mobile` muestra
+  /// [MobileFacturacionShell] en vez de [MobileBanner].
+  final bool mobileFacturacionAllowed;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final viewport = rsp.viewportFor(MediaQuery.sizeOf(context).width);
 
-    if (viewport == rsp.Viewport.mobile) return const MobileBanner();
+    if (viewport == rsp.Viewport.mobile) {
+      return mobileFacturacionAllowed
+          ? MobileFacturacionShell(child: child)
+          : const MobileBanner();
+    }
 
     final forceCollapsed = viewport == rsp.Viewport.compact;
 

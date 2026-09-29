@@ -29,7 +29,11 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_hub_dashboard_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_login_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
+import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
+import 'package:treino/features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
 import 'package:treino/features/coach_hub/presentation/shell/proximamente_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -79,11 +83,14 @@ Future<GoRouter> _pumpRouter(
   required Override authOverride,
   Override? profileOverride,
   Uri? initialUri,
-}) async {
   // Coach Hub es un layout de escritorio (min 1024px). En el surface default
   // de 800x600 el sidebar (264px) deja muy poco ancho y el dashboard real
-  // desborda. Pumpeamos a un tamaño desktop realista.
-  tester.view.physicalSize = const Size(1400, 900);
+  // desborda. Pumpeamos a un tamaño desktop realista por default; los tests
+  // de la excepción móvil de facturación (ver `mobile_facturacion_shell.dart`)
+  // lo pisan con un tamaño de teléfono.
+  Size size = const Size(1400, 900),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -150,6 +157,24 @@ void main() {
 
         expect(find.byType(CoachHubScaffold), findsNothing);
         expect(find.byType(CoachHubLoginScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      '/login a 390×844 (mismo viewport que la excepción móvil de '
+      'facturación) sin overflow — CoachHubLoginScreen no tiene breakpoints '
+      'responsivos propios (MVP, ver su dartdoc)',
+      (tester) async {
+        await _pumpRouter(
+          tester,
+          size: const Size(390, 844),
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(const AsyncData(null)),
+          ),
+        );
+
+        expect(find.byType(CoachHubLoginScreen), findsOneWidget);
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -318,6 +343,110 @@ void main() {
           router.routerDelegate.currentConfiguration.uri.toString(),
           '/dashboard',
         );
+      },
+    );
+  });
+
+  // La excepción móvil de `/facturacion/planes` (ver
+  // `mobile_facturacion_shell.dart`): el mail del tope de plan manda al PF a
+  // esta ruta y hasta ahora `MobileBanner` la frenaba en el teléfono, sin
+  // forma de pagar. `_kMobileSize` es el mismo viewport que
+  // `pricing_screen_test.dart` usa para el layout angosto del paywall
+  // (iPhone 14/15, 390×844).
+  group('Excepción móvil de facturación (ADR-CHW-004 + mobile paywall)', () {
+    const kMobileSize = Size(390, 844);
+
+    testWidgets(
+      'teléfono + /facturacion/planes → se ve la pantalla de planes, sin '
+      'sidebar ni MobileBanner',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          size: kMobileSize,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+        );
+
+        router.go('/facturacion/planes');
+        await tester.pumpAndSettle();
+
+        expect(find.byType(MobileFacturacionShell), findsOneWidget);
+        expect(find.byType(MobileBanner), findsNothing);
+        expect(find.byType(CoachHubSidebar), findsNothing);
+        expect(find.byType(PricingScreen), findsOneWidget);
+        expect(find.text('PLAN 1'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'teléfono + /dashboard sigue mostrando MobileBanner (la excepción NO '
+      'se filtra al resto del Coach Hub)',
+      (tester) async {
+        await _pumpRouter(
+          tester,
+          size: kMobileSize,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+        );
+
+        expect(find.byType(MobileBanner), findsOneWidget);
+        expect(find.byType(MobileFacturacionShell), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'escritorio + /facturacion/planes → shell normal con sidebar '
+      '(la excepción es sólo para mobile)',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+        );
+
+        router.go('/facturacion/planes');
+        await tester.pumpAndSettle();
+
+        expect(find.byType(CoachHubSidebar), findsOneWidget);
+        expect(find.byType(MobileFacturacionShell), findsNothing);
+        expect(find.byType(PricingScreen), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'teléfono logueado con ?to=facturacion en la URL termina viendo los '
+      'planes, no el MobileBanner intermedio',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          size: kMobileSize,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/?to=facturacion'),
+        );
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/facturacion/planes',
+        );
+        expect(find.byType(MobileFacturacionShell), findsOneWidget);
+        expect(find.byType(MobileBanner), findsNothing);
       },
     );
   });

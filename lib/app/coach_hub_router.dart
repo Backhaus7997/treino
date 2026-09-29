@@ -32,6 +32,7 @@ import '../features/coach_hub/presentation/sections/suplementos/routes.dart';
 import '../features/coach_hub/presentation/sections/templates/routes.dart';
 import '../features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import '../features/coach_hub/presentation/shell/content_max_width.dart';
+import '../features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
 
@@ -299,6 +300,7 @@ GoRouter buildCoachHubRouter({
         pageBuilder: (ctx, state, child) => NoTransitionPage(
           child: CoachHubScaffold(
             contentMaxWidth: contentMaxWidthForRoute(state.uri.path),
+            mobileFacturacionAllowed: isMobileFacturacionRoute(state.uri.path),
             child: child,
           ),
         ),
