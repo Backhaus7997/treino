@@ -507,8 +507,16 @@ void main() {
           'Hasta 7 alumnos',
           'VER PLANES',
         ],
-        propiosMovil: ['PLAN 1', 'Entendido'],
-        propiosWeb: ['PASATE A PLAN 1', 'Ahora no'],
+        propiosMovil: [
+          'PLAN 1',
+          'Entendido',
+          'Tu plan Free incluye 2 alumnos.',
+        ],
+        propiosWeb: [
+          'PASATE A PLAN 1',
+          'Ahora no',
+          'Tu plan Free incluye 2 alumnos. Para sumar más, subí de plan.',
+        ],
       ),
       (
         nombre: 'plan a medida (tope)',
@@ -519,8 +527,15 @@ void main() {
           'PLAN A MEDIDA',
           'CONTACTANOS',
         ],
-        propiosMovil: ['Entendido'],
-        propiosWeb: ['Ahora no'],
+        propiosMovil: [
+          'Entendido',
+          'Tu plan Plan 3 incluye alumnos sin límite.',
+        ],
+        propiosWeb: [
+          'Ahora no',
+          'Tu plan Plan 3 incluye alumnos sin límite. Para sumar más, subí '
+              'de plan.',
+        ],
       ),
       (
         nombre: 'suscripcion suspendida',
@@ -530,8 +545,17 @@ void main() {
           'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA',
           'TU PLAN: PLAN 1',
         ],
-        propiosMovil: ['VER ESTADO', 'Entendido'],
-        propiosWeb: ['REGULARIZAR', 'Ahora no'],
+        propiosMovil: [
+          'VER ESTADO',
+          'Entendido',
+          'No está activa. Mientras tanto, tu cuenta tiene el límite del '
+              'plan Free: 2 alumnos.',
+        ],
+        propiosWeb: [
+          'REGULARIZAR',
+          'Ahora no',
+          'Reactivalo y volvés a tus 7 alumnos al instante.',
+        ],
       ),
     ];
 
