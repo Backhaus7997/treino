@@ -4671,6 +4671,15 @@ service cloud.firestore {
     match /mp_bajas_por_mail/{tokenHash} {
       allow read, write: if false;
     }
+    // Los links de ARREPENTIMIENTO por mail (`arrepentimiento-por-mail.ts`).
+    // Misma forma y mismo límite que el de la baja, en una colección PROPIA a
+    // propósito: así un token emitido para la baja no se puede canjear como
+    // arrepentimiento, ni al revés, sin depender de un campo que alguien podría
+    // olvidarse de chequear. Escribirlo es plantar un link que corta la
+    // suscripción de otro y avisa al equipo que le devuelva la plata.
+    match /mp_arrepentimientos_por_mail/{tokenHash} {
+      allow read, write: if false;
+    }
     // El dedupe del webhook: un doc por evento de Mercado Pago ya procesado.
     // Escribirlo es hacerle creer al sistema que un evento REAL ya se atendio,
     // y como el dedupe corta ANTES de consultarle a MP, eso alcanza para que a

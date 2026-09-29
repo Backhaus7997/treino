@@ -56,7 +56,7 @@
  * baja que no pasó.
  */
 
-import { createHash, randomBytes as cryptoRandomBytes } from "crypto";
+import { randomBytes as cryptoRandomBytes } from "crypto";
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -67,22 +67,25 @@ import { defineSecret } from "firebase-functions/params";
 
 import { MpClient, createMpClient } from "./client";
 import { planesQueCobran, runCancelMySubscription } from "./cancel-my-subscription";
+import {
+  TOKEN_SHAPE,
+  TOKEN_TTL_MS,
+  hashToken,
+  liberarReclamo,
+  reclamarToken,
+} from "./token-un-solo-uso";
 import { dedupeKey, enqueueMail } from "../../mail/enqueue-mail";
 import { LANDING_URL } from "../../mail/templates";
 import { MAIL_QUEUE_COLLECTION } from "../../mail/types";
+
+// El canje del token vive en `token-un-solo-uso.ts`, compartido con el botón de
+// arrepentimiento. Se re-exportan las dos que este módulo siempre exportó.
+export { TOKEN_TTL_MS, hashToken };
 
 const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
 
 /** Colección de los tokens. CF-only: `firestore.rules` la cierra entera. */
 export const BAJAS_POR_MAIL_COLLECTION = "mp_bajas_por_mail";
-
-/**
- * Cuánto vive un link. 72 horas: lo bastante para que quien lo pidió un
- * viernes a la noche lo encuentre el lunes, y lo bastante corto para que un
- * mail viejo olvidado en una casilla compartida no sea un botón de baja
- * permanente.
- */
-export const TOKEN_TTL_MS = 72 * 60 * 60 * 1000;
 
 /**
  * Ventana de throttle, en minutos. Mismo mecanismo que `request-auth-email.ts`:
@@ -113,9 +116,6 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * nuestro dominio.
  */
 const CODE_SHAPE = /^BAJA-\d{4}-[0-9A-F]{6}$/i;
-
-/** 32 bytes en base64url, sin padding: 43 caracteres. */
-const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 
 /** Ruta de la página de confirmación, en la landing. */
 const CONFIRM_PATH = "/es/baja-de-servicio/confirmar";
@@ -164,11 +164,6 @@ function ensureApp(): App {
   } catch {
     return initializeApp();
   }
-}
-
-/** SHA-256 en hex. Es el id del documento: el token crudo nunca se guarda. */
-export function hashToken(token: string): string {
-  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 /** El código si tiene la forma exacta, normalizado a mayúsculas; si no, null. */
@@ -265,11 +260,6 @@ export async function runSolicitarBajaPorMail(
   return OK;
 }
 
-/** Resultado interno del reclamo del token. */
-type Reclamo =
-  | { ok: false; status: "invalido" | "ya-usado" | "vencido" }
-  | { ok: true; uid: string; code: string | null; claimId: string };
-
 /**
  * Canjea el link y da de baja.
  *
@@ -292,31 +282,12 @@ export async function runConfirmarBajaPorMail(
   const ref = db.collection(BAJAS_POR_MAIL_COLLECTION).doc(hashToken(token));
   const claimId = cryptoRandomBytes(8).toString("hex");
 
-  // ── El reclamo, en transacción ──
+  // ── El reclamo, en transacción ── (ver `token-un-solo-uso.ts`)
   //
   // Dos clicks simultáneos (doble tap, dos pestañas) leen `usedAt: null` los
   // dos; la transacción hace que sólo uno escriba. El otro reintenta, ve el
   // reclamo, y contesta `ya-usado`.
-  const reclamo: Reclamo = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return { ok: false, status: "invalido" } as const;
-    const d = snap.data() ?? {};
-    if (d.usedAt != null) return { ok: false, status: "ya-usado" } as const;
-    const vence = (d.expiresAt as { toMillis?: () => number } | undefined)?.toMillis?.();
-    if (typeof vence !== "number" || vence <= deps.nowMs) {
-      return { ok: false, status: "vencido" } as const;
-    }
-    if (typeof d.uid !== "string" || d.uid === "") {
-      return { ok: false, status: "invalido" } as const;
-    }
-    tx.update(ref, { usedAt: Timestamp.fromMillis(deps.nowMs), claimId });
-    return {
-      ok: true,
-      uid: d.uid,
-      code: typeof d.code === "string" ? d.code : null,
-      claimId,
-    } as const;
-  });
+  const reclamo = await reclamarToken(app, ref, deps.nowMs, claimId);
 
   if (!reclamo.ok) return { status: reclamo.status };
   const { uid, code } = reclamo;
@@ -362,34 +333,6 @@ export async function runConfirmarBajaPorMail(
     status: "dada-de-baja",
     ...(resultado.accesoHastaIso ? { accesoHastaIso: resultado.accesoHastaIso } : {}),
   };
-}
-
-/**
- * Devuelve el token a `usedAt: null`, SÓLO si el reclamo sigue siendo el
- * nuestro. El `claimId` es lo que evita la carrera mala: si por algún camino
- * otro request ya hubiera reclamado el token, este no le pisa el reclamo.
- *
- * Nunca tira. Un reclamo que no se pudo liberar deja el link quemado —la
- * persona cae al canal manual— que es peor que liberarlo, pero no peor que
- * reventar la respuesta.
- */
-async function liberarReclamo(
-  app: App,
-  ref: FirebaseFirestore.DocumentReference,
-  claimId: string,
-): Promise<void> {
-  try {
-    await getFirestore(app).runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      if (snap.data()?.claimId !== claimId) return;
-      tx.update(ref, { usedAt: null, claimId: null });
-    });
-  } catch (error: unknown) {
-    logger.warn("bajaPorMail: no se pudo liberar el reclamo", {
-      id: ref.id,
-      error: String(error),
-    });
-  }
 }
 
 // ---------------------------------------------------------------------------

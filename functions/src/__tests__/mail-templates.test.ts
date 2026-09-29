@@ -56,6 +56,10 @@ const KINDS: Record<MailKind, true> = {
   "inactive-account-notice": true,
   "service-cancel-confirm": true,
   "service-cancel-done": true,
+  "withdrawal-confirm": true,
+  "withdrawal-received": true,
+  "withdrawal-expired": true,
+  "withdrawal-team-notice": true,
 };
 const ALL_KINDS = Object.keys(KINDS) as MailKind[];
 
@@ -235,13 +239,25 @@ describe("destino del CTA", () => {
   // `service-cancel-confirm` lleva su link de un solo uso en `actionLink`, igual
   // que los de auth, y `service-cancel-done` no tiene botón: después de una
   // baja no hay nada que hacer (ver sus `case`).
+  //
+  // Los cuatro del arrepentimiento: `withdrawal-confirm` lleva su link de un solo
+  // uso en `actionLink`; `withdrawal-received` no tiene botón (no hay nada que
+  // hacer) y `withdrawal-team-notice` va al equipo, sin pantalla nuestra a la
+  // que mandarlo; `withdrawal-expired` manda a la BAJA, en la landing, que es
+  // lo único que la persona puede hacer después de que venció el plazo.
   it("todo CTA que no sea un action link vive bajo /abrir", () => {
     const conActionLink = [
       "password-reset", "email-verification", "service-cancel-confirm",
+      "withdrawal-confirm",
     ];
-    const sinBoton = ["moderation-report-created", "service-cancel-done"];
+    const sinBoton = [
+      "moderation-report-created", "service-cancel-done",
+      "withdrawal-received", "withdrawal-team-notice",
+    ];
+    const aLaLanding = ["withdrawal-expired"];
     const resto = ALL_KINDS.filter(
-      (k) => !conActionLink.includes(k) && !sinBoton.includes(k),
+      (k) =>
+        !conActionLink.includes(k) && !sinBoton.includes(k) && !aLaLanding.includes(k),
     );
 
     expect(resto).toHaveLength(18);
@@ -906,5 +922,189 @@ describe("tildes", () => {
     const palabras = copy.toLowerCase().match(/[a-zñáéíóúü]+/g) ?? [];
 
     expect(palabras.filter((p) => SIN_TILDE.includes(p))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Botón de Arrepentimiento
+//
+// NO es la baja: la baja conserva el acceso y no devuelve plata; el
+// arrepentimiento devuelve todo, y sólo dentro de los 10 días. Los textos lo
+// tienen que dejar clarísimo, y ninguno puede prometer un plazo de devolución
+// que los términos (§6) no prometen.
+// ---------------------------------------------------------------------------
+describe("Botón de Arrepentimiento", () => {
+  const LINK = "https://gettreino.com/es/arrepentimiento/confirmar#t=abc";
+  const CODE = "ARR-2026-0A1B2C";
+  // 00:00 del 24/09/2026 en Argentina.
+  const ULTIMO_DIA = "2026-09-24T03:00:00.000Z";
+
+  describe("withdrawal-confirm", () => {
+    it("lleva el código en el asunto y el link en el botón", () => {
+      const out = renderMail("withdrawal-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.subject).toBe(`Confirmá tu arrepentimiento — código ${CODE}`);
+      expect(ctaHref(out.html)).toBe(LINK);
+      expect(out.html).toContain("CONFIRMAR ARREPENTIMIENTO");
+    });
+
+    it("sin link no dibuja un botón muerto", () => {
+      const out = renderMail("withdrawal-confirm", { code: CODE });
+
+      expect(out.html).not.toContain("CONFIRMAR ARREPENTIMIENTO");
+      expect(out.html).not.toContain("href=\"\"");
+    });
+
+    it("dice que la confirmación es un click y que el link vence", () => {
+      // Los escáneres de correo pre-abren los links: el copy dice «tocá el botón».
+      const { text } = renderMail("withdrawal-confirm", { actionLink: LINK });
+
+      expect(text).toContain("tocá el botón");
+      expect(text).toContain("72 horas");
+      expect(text).toContain("una sola vez");
+    });
+
+    it("no se confunde con la baja", () => {
+      const { text } = renderMail("withdrawal-confirm", { actionLink: LINK, code: CODE });
+
+      expect(text).not.toMatch(/dar de baja|tu baja/i);
+    });
+  });
+
+  describe("withdrawal-received", () => {
+    it("dentro de plazo: se devuelve lo pagado y no se cobra más", () => {
+      const { text, subject } = renderMail("withdrawal-received", { code: CODE });
+
+      expect(subject).toBe(`Recibimos tu arrepentimiento — código ${CODE}`);
+      expect(text).toContain("dentro del plazo de 10 días");
+      expect(text).toContain("no se te vuelve a cobrar");
+      expect(text).toContain("Te devolvemos lo pagado por el mismo medio de pago");
+      // Se devuelve TODO, así que no queda acceso gratis hasta fin de período.
+      expect(text).toContain("Los beneficios del plan pago terminan ahora");
+    });
+
+    it("⚠️ no promete un plazo de devolución que los términos no prometen", () => {
+      // §6 dice «a continuación te devolvemos el dinero». Un «en 48 horas»
+      // escrito acá sería una promesa nueva, y la cumple una persona a mano.
+      const { text } = renderMail("withdrawal-received", { code: CODE });
+      const sin10Dias = text.replace("10 días", "");
+
+      expect(sin10Dias).not.toMatch(/\b\d+\s*(horas?|hs|d[ií]as?)\b/i);
+    });
+
+    it("⚠️ en revisión NO dice que se canceló ni que se devuelve", () => {
+      // Es la franja donde un feriado pudo correr el plazo: no se tocó nada, y
+      // el texto no puede decir lo contrario.
+      const { text, subject } = renderMail("withdrawal-received", {
+        code: CODE, revision: "1",
+      });
+
+      expect(subject).toBe(`Estamos revisando tu arrepentimiento — código ${CODE}`);
+      expect(text).toContain("Todavía no cancelamos nada");
+      expect(text).not.toMatch(/devolvemos|dada de baja|no se te vuelve a cobrar/i);
+    });
+
+    it("no tiene botón: no hay nada que la persona tenga que hacer", () => {
+      expect(ctaHref(renderMail("withdrawal-received", { code: CODE }).html)).toBe("");
+    });
+  });
+
+  describe("withdrawal-expired", () => {
+    it("dice cuándo venció, en hora de Argentina", () => {
+      const { text } = renderMail("withdrawal-expired", {
+        code: CODE, ultimoDiaIso: ULTIMO_DIA,
+      });
+
+      expect(text).toContain("venció el 24/09/2026");
+    });
+
+    it("sin fecha no inventa una", () => {
+      const { text } = renderMail("withdrawal-expired", { code: CODE });
+
+      expect(text).toContain("ya venció");
+      expect(text).not.toMatch(/venció el/);
+    });
+
+    it("dice que no se devuelve y le muestra lo que SÍ puede hacer: la baja", () => {
+      // Espejo de terminos-suscripcion.md §7.
+      const out = renderMail("withdrawal-expired", { code: CODE, ultimoDiaIso: ULTIMO_DIA });
+
+      expect(out.text).toContain("no podemos devolver lo pagado");
+      expect(out.text).toContain("conservás el acceso hasta el final del período que ya pagaste");
+      expect(ctaHref(out.html)).toBe("https://gettreino.com/es/baja-de-servicio");
+    });
+  });
+
+  describe("withdrawal-team-notice", () => {
+    const DATOS = {
+      estado: "dentro",
+      code: CODE,
+      email: "ana@example.com",
+      uid: "u1",
+      contratoIso: "2026-09-20T15:00:00.000Z",
+      diasTranscurridos: 4,
+      ultimoDiaIso: ULTIMO_DIA,
+      monto: 3500,
+      cobros: 1,
+      suscripciones: "sub1, sub2",
+      canceladas: 1,
+    };
+
+    it("dentro de plazo: dice que hay que DEVOLVER y trae todo para hacerlo", () => {
+      const { subject, text } = renderMail("withdrawal-team-notice", DATOS);
+
+      expect(subject).toBe(`Devolver pago: arrepentimiento ${CODE} dentro de plazo`);
+      expect(text).toContain("Falta devolver el pago");
+      expect(text).toContain("ana@example.com");
+      expect(text).toContain("sub1, sub2");
+      expect(text).toContain("3.500");
+      expect(text).toContain("20/09/2026");
+    });
+
+    it("en el límite: dice REVISAR y que NO se canceló nada", () => {
+      const { subject, text } = renderMail("withdrawal-team-notice", {
+        ...DATOS, estado: "a-revisar", canceladas: 0,
+      });
+
+      expect(subject).toMatch(/^REVISAR arrepentimiento/);
+      expect(text).toContain("No se canceló nada");
+      expect(text).not.toContain("Falta devolver el pago");
+    });
+
+    it("dentro de plazo dice que el acceso se cortó; en el límite, que sigue igual", () => {
+      expect(renderMail("withdrawal-team-notice", DATOS).text)
+        .toContain("Acceso al plan pago: cortado en el acto");
+      expect(renderMail("withdrawal-team-notice", { ...DATOS, estado: "a-revisar" }).text)
+        .toContain("Acceso al plan pago: sigue igual");
+    });
+
+    it("advierte el resto prepago de un plan anterior, y sólo cuando existe", () => {
+      const con = renderMail("withdrawal-team-notice", {
+        ...DATOS, pisoTier: "plan3", pisoHastaIso: "2026-10-20T15:00:00.000Z",
+      }).text;
+      expect(con).toContain("conserva el resto prepago de un plan anterior (plan3 hasta el 20/10/2026)");
+      expect(con).toContain("quitalo a mano");
+
+      expect(renderMail("withdrawal-team-notice", DATOS).text).not.toContain("resto prepago");
+    });
+
+    it("un dato que falta se dice, no se inventa ni se deja en blanco", () => {
+      const { text } = renderMail("withdrawal-team-notice", { estado: "dentro" });
+
+      expect(text).toContain("Contratación (según Mercado Pago): sin dato");
+    });
+
+    it("escapa el mail de la cuenta: es texto libre de un tercero", () => {
+      const { html } = renderMail("withdrawal-team-notice", {
+        ...DATOS, email: "<img src=x onerror=alert(1)>@x.com",
+      });
+
+      expect(html).not.toContain("<img src=x");
+      expect(html).toContain("&lt;img");
+    });
+
+    it("no tiene botón", () => {
+      expect(ctaHref(renderMail("withdrawal-team-notice", DATOS).html)).toBe("");
+    });
   });
 });

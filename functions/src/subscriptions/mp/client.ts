@@ -138,6 +138,13 @@ export interface MpPreapproval {
    * de ejemplo de `GET /preapproval/{id}` de la referencia oficial.
    */
   preapproval_plan_id?: unknown;
+  /**
+   * ISO 8601 de cuando se CREO la suscripcion, o sea cuando el pagador la
+   * autorizo. Es la fecha de contratacion que cuenta para el arrepentimiento:
+   * el plan se crea antes, al abrir el checkout, y pueden pasar dias hasta que
+   * alguien paga.
+   */
+  date_created?: unknown;
   /** ISO 8601 del proximo cobro programado. */
   next_payment_date?: unknown;
   payer_id?: unknown;

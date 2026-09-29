@@ -22,7 +22,7 @@ import { MailKind, MailParams } from "./types";
 // escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
 // dos copias del mismo numero se separan el dia que alguien mueva el plan.
 import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "../subscriptions/tier-config";
-import { formatShortDateAR } from "./format";
+import { formatArs, formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
 const INK = "#0A0A0A";
@@ -1292,6 +1292,206 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         [
           "La baja es definitiva para esta suscripción: si querés volver, " +
             "se contrata de nuevo.",
+        ],
+      ],
+    );
+  }
+
+  // ── Botón de Arrepentimiento ────────────────────────────────────────────
+  //
+  // NO ES LA BAJA, y los textos lo tienen que dejar clarísimo: la baja conserva
+  // el acceso hasta el fin del período y NO devuelve plata; el arrepentimiento
+  // devuelve todo lo pagado, y sólo dentro de los 10 días corridos
+  // (`docs/legal/terminos-suscripcion.md` §6). Ningún texto de acá promete un
+  // plazo de devolución: los términos dicen «a continuación te devolvemos el
+  // dinero por el mismo medio de pago», y eso es lo único que se puede decir.
+
+  // El link de verificación. Mismo criterio que `service-cancel-confirm`: el copy
+  // dice «tocá el botón» y no «abrí el link», porque los escáneres de correo
+  // pre-abren los links y la confirmación es un click en la página.
+  case "withdrawal-confirm": {
+    const code = params.code ? String(params.code) : "";
+    return build(
+      code
+        ? `Confirmá tu arrepentimiento — código ${code}` // i18n: email transaccional
+        : "Confirmá tu arrepentimiento",
+      "Confirmá tu arrepentimiento",
+      [
+        ["Recibimos un pedido de arrepentimiento de tu suscripción a TREINO."],
+        ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+        [
+          "Para seguir, tocá el botón y confirmá en la página que se abre. " +
+            "Ahí verificamos que estés dentro del plazo de 10 días.",
+        ],
+        ["El link vence en 72 horas y se puede usar una sola vez."],
+        [
+          "Si no lo pediste vos, ignorá este mail: no pasa nada hasta que " +
+            "alguien confirme.",
+        ],
+      ],
+      "CONFIRMAR ARREPENTIMIENTO",
+      String(params.actionLink ?? ""),
+    );
+  }
+
+  // Al usuario, con el pedido verificado. Dos caras del mismo mail:
+  //
+  //   - dentro de plazo: se cortó la suscripción y se le va a devolver la plata.
+  //   - `revision: "1"`: el pedido cayó en la franja del último día donde un
+  //     feriado pudo haber corrido el plazo. NO se canceló nada, y el texto no
+  //     puede decir lo contrario. Ver `plazo-arrepentimiento.ts`.
+  //
+  // Sin botón: no hay nada que la persona tenga que hacer.
+  case "withdrawal-received": {
+    const code = params.code ? String(params.code) : "";
+    const enRevision = String(params.revision ?? "") === "1";
+
+    if (enRevision) {
+      return build(
+        code
+          ? `Estamos revisando tu arrepentimiento — código ${code}` // i18n: email transaccional
+          : "Estamos revisando tu arrepentimiento",
+        "Estamos revisando tu pedido",
+        [
+          ["Recibimos tu pedido de arrepentimiento."],
+          ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+          [
+            "Tu contratación está en el límite del plazo de 10 días, que se " +
+              "corre cuando el último día es inhábil. Por eso lo revisamos " +
+              "a mano antes de darte una respuesta.",
+          ],
+          ["Todavía no cancelamos nada: tu suscripción sigue como estaba."],
+          ["Te respondemos por este medio."],
+        ],
+      );
+    }
+
+    return build(
+      code
+        ? `Recibimos tu arrepentimiento — código ${code}` // i18n: email transaccional
+        : "Recibimos tu arrepentimiento",
+      "Recibimos tu arrepentimiento",
+      [
+        ["Recibimos tu arrepentimiento: estás dentro del plazo de 10 días."],
+        ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+        ["Tu suscripción queda dada de baja: no se te vuelve a cobrar."],
+        [
+          "Los beneficios del plan pago terminan ahora, porque te devolvemos " +
+            "todo lo pagado.",
+        ],
+        ["Te devolvemos lo pagado por el mismo medio de pago."],
+        [
+          "No se borra nada: tus rutinas, tu historial y tus datos siguen " +
+            "donde están.",
+        ],
+      ],
+    );
+  }
+
+  // Al usuario, cuando el plazo venció. Es la respuesta a «no lo debería dejar
+  // y debería avisar que se venció»: dice que no se devuelve, cuándo venció, y
+  // le muestra lo que SÍ puede hacer, que es la baja — espejo de §7.
+  //
+  // La fecha llega como ISO y se formatea ACÁ, en hora de Argentina: la cola
+  // guarda QUÉ pasó, no prosa. Sin fecha, la frase no se dibuja.
+  case "withdrawal-expired": {
+    const code = params.code ? String(params.code) : "";
+    const iso = params.ultimoDiaIso ? String(params.ultimoDiaIso) : "";
+    const ms = iso ? Date.parse(iso) : Number.NaN;
+    const venciO = Number.isFinite(ms) ? formatShortDateAR(ms) : "";
+
+    return build(
+      code
+        ? `Venció el plazo de arrepentimiento — código ${code}` // i18n: email transaccional
+        : "Venció el plazo de arrepentimiento",
+      "Venció el plazo de arrepentimiento",
+      [
+        venciO
+          ? [
+            "Recibimos tu pedido, pero el plazo de 10 días corridos desde la " +
+              "contratación venció el ", strong(venciO), ".",
+          ]
+          : [
+            "Recibimos tu pedido, pero el plazo de 10 días corridos desde la " +
+              "contratación ya venció.",
+          ],
+        ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
+        ["Por eso no podemos devolver lo pagado."],
+        [
+          "Lo que sí podés hacer es dar de baja tu suscripción: conservás el " +
+            "acceso hasta el final del período que ya pagaste y no se te " +
+            "vuelve a cobrar.",
+        ],
+      ],
+      "PEDIR LA BAJA",
+      `${LANDING_URL}/es/baja-de-servicio`,
+    );
+  }
+
+  // Al BUZÓN DEL EQUIPO (`toAddress`), no a un usuario. Es lo que convierte un
+  // pedido verificado en una devolución que alguien tiene que hacer a mano, así
+  // que trae todo lo necesario para hacerla sin abrir nada más: quién, cuándo
+  // contrató según Mercado Pago, cuánto y qué suscripción buscar.
+  //
+  // Sin botón, a propósito: no hay ninguna pantalla nuestra a la que mandar a
+  // quien lo lee, y `build` no dibuja botón si no le pasan uno.
+  case "withdrawal-team-notice": {
+    const enRevision = String(params.estado ?? "") === "a-revisar";
+    const code = params.code ? String(params.code) : "";
+    const fecha = (iso: unknown) => {
+      const ms = typeof iso === "string" && iso ? Date.parse(iso) : Number.NaN;
+      return Number.isFinite(ms) ? formatShortDateAR(ms) : "sin dato";
+    };
+    const dato = (etiqueta: string, valor: string | number | undefined): Line => [
+      `${etiqueta}: `,
+      strong(valor === undefined || valor === "" ? "sin dato" : valor),
+    ];
+    const monto = typeof params.monto === "number" ? formatArs(params.monto) : "";
+
+    return build(
+      enRevision
+        ? `REVISAR arrepentimiento${code ? ` ${code}` : ""} — en el límite del plazo` // i18n: aviso interno
+        : `Devolver pago: arrepentimiento${code ? ` ${code}` : ""} dentro de plazo`,
+      enRevision ? "Arrepentimiento para revisar" : "Arrepentimiento para devolver",
+      [
+        enRevision
+          ? [
+            "Entró un pedido verificado por mail, en el límite del plazo. ",
+            strong("No se canceló nada."),
+            " Decidí a mano: si el último día era feriado, el plazo se corrió (términos §6).",
+          ]
+          : [
+            "Entró un pedido verificado por mail, dentro del plazo. La " +
+              "suscripción ya se canceló y el acceso al plan pago se cortó en el " +
+              "acto. ",
+            strong("Falta devolver el pago."),
+          ],
+        dato("Código", code),
+        dato("Cuenta", String(params.email ?? "")),
+        dato("uid", String(params.uid ?? "")),
+        dato("Contratación (según Mercado Pago)", fecha(params.contratoIso)),
+        dato("Días corridos desde la contratación", params.diasTranscurridos),
+        dato("Último día del plazo", fecha(params.ultimoDiaIso)),
+        dato("Monto de la suscripción", monto),
+        dato("Cobros registrados", params.cobros),
+        dato("Suscripciones en Mercado Pago", String(params.suscripciones ?? "")),
+        dato("Canceladas ahora", params.canceladas),
+        ...(params.pisoTier
+          ? [[
+            "Ojo: conserva el resto prepago de un plan anterior (",
+            strong(String(params.pisoTier)),
+            " hasta el ",
+            strong(fecha(params.pisoHastaIso)),
+            "). No se cortó: es plata ya pagada que este pedido no devuelve. " +
+              "Si devolvés también ese pago, quitalo a mano.",
+          ] as Line]
+          : []),
+        enRevision
+          ? ["Acceso al plan pago: sigue igual, no se canceló nada."]
+          : ["Acceso al plan pago: cortado en el acto."],
+        [
+          "Para devolver: en Mercado Pago, buscá la operación entre los cobros " +
+            "aprobados y usá «Devolver dinero» por el monto total.",
         ],
       ],
     );
