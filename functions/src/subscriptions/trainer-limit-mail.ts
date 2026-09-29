@@ -700,7 +700,14 @@ export function decideTrainerLimitMail(
   // `subscription-mail.ts` que se lo recuerde en ese momento — silencio total
   // de este canal hasta que regularice. Aceptado así: inventar un recordatorio
   // periódico de cobro es un mail nuevo, no un fix de éste.
-  if (suscripcionInactiva(toSubscriptionState(userData, trainerId).state, nowMs)) {
+  // Y si `subscription` no se puede leer (`degraded`: un valor que no es
+  // mapa, un tier desconocido), no se sabe si el PF paga: `state` puede venir
+  // `null` y parecer un Free cualquiera. Mismo criterio que el mapper
+  // (`subscription-state.ts`): sobre un estado pago ilegible no se manda un
+  // mensaje de tope de plan. Falla cerrado, antes de encolar.
+  const suscripcion = toSubscriptionState(userData, trainerId);
+  if (suscripcion.degraded) return null; // clausula 4, ilegible
+  if (suscripcionInactiva(suscripcion.state, nowMs)) {
     return null; // clausula 4
   }
 

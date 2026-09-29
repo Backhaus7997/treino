@@ -1182,7 +1182,11 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
           ? ["Llegaste al tope de tu plan: ", strong(label), "."]
           : ["Llegaste al tope de alumnos de tu plan."],
         [
-          "No pudiste sumar ese alumno nuevo: tus alumnos actuales no " +
+          // «Activar ese vínculo», no «sumar un alumno nuevo»: el mismo mail
+          // sale cuando se rechaza ACEPTAR una solicitud y cuando se rechaza
+          // REANUDAR un vínculo pausado, y en el segundo caso el alumno no es
+          // nuevo.
+          "No se pudo activar ese vínculo: tus alumnos actuales no " +
             "pierden nada, conservan sus rutinas, su historial y el chat.",
         ],
         ["Si querés seguir sumando, hay planes más grandes."],

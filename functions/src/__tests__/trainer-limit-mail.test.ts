@@ -539,6 +539,19 @@ describe("⚠️ suscripción inactiva → no se manda el upsell (los tres kinds
       ).not.toBeNull();
     });
 
+    // Suscripción ILEGIBLE (`degraded` en `toSubscriptionState`): no se sabe
+    // si el PF paga, así que no se le manda un upsell de tope. Hallazgo de
+    // Codex sobre #1267 (tercera ronda).
+    it("⚠️ `subscription` que no es un mapa no manda (falla cerrado)", () => {
+      expect(decideTrainerLimitMail(conSubscription("roto" as unknown as Record<string, unknown>), AHORA, "t1")).toBeNull();
+    });
+
+    it("⚠️ `subscription` con un tier desconocido y status `active` no manda", () => {
+      expect(
+        decideTrainerLimitMail(conSubscription({ tier: "plan9", status: "active" }), AHORA, "t1"),
+      ).toBeNull();
+    });
+
     it("sin `subscription` (nunca se suscribió) sí manda — Free NO es inactiva", () => {
       // Ver `suscripcionInactiva`: sin mapa es el PF Free normal, el
       // destinatario correcto del upsell — no hay ningún cobro que

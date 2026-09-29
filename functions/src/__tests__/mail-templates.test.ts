@@ -294,6 +294,20 @@ describe("destino del CTA", () => {
 // `/abrir/profe` abre la app en un teléfono, y la app no vende. Estos mails
 // tienen que ir directo al Coach Hub web.
 // ---------------------------------------------------------------------------
+describe("plantilla student-limit-reached", () => {
+  // El mismo mail sale cuando se rechaza ACEPTAR una solicitud y cuando se
+  // rechaza REANUDAR un vínculo pausado: en el segundo caso el alumno no es
+  // nuevo, así que el texto no puede decir que lo es (hallazgo de Codex sobre
+  // #1267).
+  it("habla de activar el vínculo, no de un alumno nuevo", () => {
+    const out = renderMail("student-limit-reached", { limit: 2, ctaUrl: "https://app.gettreino.com/?to=facturacion" });
+
+    expect(out.html).toContain("activar ese vínculo");
+    expect(out.html).not.toMatch(/alumno nuevo/i);
+    expect(out.text).not.toMatch(/alumno nuevo/i);
+  });
+});
+
 describe("trainerWebCheckout", () => {
   it("es exactamente la URL del Coach Hub con el destino de facturación", () => {
     expect(trainerWebCheckout()).toBe("https://app.gettreino.com/?to=facturacion");
