@@ -84,7 +84,7 @@
     {
       "slug": "suscripcion",
       "title": "Términos de Suscripción",
-      "lastUpdated": "25 de septiembre de 2026",
+      "lastUpdated": "29 de septiembre de 2026",
       "sections": [
         {
           "heading": "1. QUÉ SE PAGA Y QUÉ NO",
@@ -108,7 +108,7 @@
         },
         {
           "heading": "6. TU DERECHO A ARREPENTIRTE",
-          "body": "Si contrataste en la web —el Coach Hub si sos entrenador, gettreino.com si sos alumno— tenés 10 días corridos desde la contratación para arrepentirte y recuperar todo lo pagado, sin dar explicaciones y sin costo alguno. Si el último día del plazo cae en un día inhábil, el plazo se extiende hasta el primer día hábil siguiente.\n\nEs el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.\n\nEl plazo es el que fija la ley argentina —diez días corridos, art. 34 de la Ley 24.240 y art. 1110 del Código Civil y Comercial de la Nación— y rige para los dos planes, sin excepciones.\n\nCómo ejercerlo\n\nDesde el Botón de Arrepentimiento, disponible en el pie de la página principal de gettreino.com — la dirección es gettreino.com/es/arrepentimiento. No necesitás tener la sesión iniciada ni hacer ningún trámite previo.\n\nDentro de las 24 horas te enviamos por el mismo medio un código de identificación de tu pedido, y a continuación te devolvemos el dinero por el mismo medio de pago.\n\nEste derecho es irrenunciable: nada de lo que digan estos términos puede quitártelo.\n\nSi contrataste desde la aplicación\n\nSi tu suscripción se contrató por App Store o Google Play, el reembolso lo gestiona la tienda y no podemos procesarlo nosotros. Ver la sección 8. Eso no afecta los derechos que la normativa de tu país te reconozca."
+          "body": "Si contrataste en la web —el Coach Hub si sos entrenador, gettreino.com si sos alumno— tenés 10 días corridos desde la contratación para arrepentirte y recuperar todo lo pagado, sin dar explicaciones y sin costo alguno. Si el último día del plazo cae en un día inhábil, el plazo se extiende hasta el primer día hábil siguiente.\n\nCuando confirmás el arrepentimiento dentro de ese plazo, los beneficios del plan pago terminan en ese momento y se te devuelve todo lo pagado. Es la diferencia con la baja (sección 7), que conserva el acceso hasta el final del período ya pagado.\n\nEs el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.\n\nEl plazo es el que fija la ley argentina —diez días corridos, art. 34 de la Ley 24.240 y art. 1110 del Código Civil y Comercial de la Nación— y rige para los dos planes, sin excepciones.\n\nCómo ejercerlo\n\nDesde el Botón de Arrepentimiento, disponible en el pie de la página principal de gettreino.com — la dirección es gettreino.com/es/arrepentimiento. No necesitás tener la sesión iniciada ni hacer ningún trámite previo.\n\nDentro de las 24 horas te enviamos por el mismo medio un código de identificación de tu pedido, y a continuación te devolvemos el dinero por el mismo medio de pago.\n\nEste derecho es irrenunciable: nada de lo que digan estos términos puede quitártelo.\n\nSi contrataste desde la aplicación\n\nSi tu suscripción se contrató por App Store o Google Play, el reembolso lo gestiona la tienda y no podemos procesarlo nosotros. Ver la sección 8. Eso no afecta los derechos que la normativa de tu país te reconozca."
         },
         {
           "heading": "7. BAJA FUERA DEL PLAZO DE ARREPENTIMIENTO",
@@ -447,5 +447,5 @@
       ]
     }
   ],
-  "sourceSha": "259f024667c592bd8751cc6a58788f2ab13d226d35591dff75feca4dc10c7765"
+  "sourceSha": "dc76e246cea0559dc2095f8daba730dfcbf115948141c6e2e24b36e03c194a48"
 }
