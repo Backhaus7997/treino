@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
-import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
+import '../../widgets/treino_interactive_state.dart';
 import 'plan_copy.dart';
 
 /// Piezas visuales COMPARTIDAS por los tres avisos de tope del PF: el
@@ -250,6 +250,16 @@ class PlanLimitCustomTierBox extends StatelessWidget {
 /// El botón principal (pill, fondo accent) de los tres avisos: "VER
 /// PLANES", "REGULARIZAR", "CONTACTANOS". El estilo es UNO solo; lo que
 /// cambia entre llamadores es el label y el `onTap`.
+///
+/// Va sobre [TreinoInteractiveState] (el primitivo de foco/hover/teclado del
+/// kit Coach Hub Web — el mismo que usa `TreinoButton`) y NO sobre
+/// `TreinoTappable` pelado: `TreinoTappable` es sólo un `GestureDetector`,
+/// sin `FocusNode` ni `Actions` — invisible para Tab y para Enter/Espacio.
+/// En el dialog WEB del Coach Hub, quien navega sólo con teclado no podía
+/// llegar a este botón (hallazgo de Codex, 2026-09-29). `TreinoInteractiveState`
+/// envuelve `TreinoTappable` puertas adentro, así que la animación de
+/// presión (`AnimatedScale` a 0.97) se conserva sin costo — no hace falta
+/// elegir entre foco y feedback de presión.
 class PlanLimitAccentButton extends StatelessWidget {
   const PlanLimitAccentButton({
     super.key,
@@ -263,15 +273,26 @@ class PlanLimitAccentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final focus = TreinoFocusTokens.of(context);
 
-    return TreinoTappable(
+    return TreinoInteractiveState(
       onTap: onTap,
-      child: Container(
+      builder: (ctx, states) => Container(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: palette.accent,
           borderRadius: BorderRadius.circular(AppRadius.full),
+          // Mismo anillo que `TreinoButton` (`TreinoFocusTokens`): visible
+          // SÓLO con foco de teclado, nunca con hover/tap de mouse.
+          boxShadow: states.focused
+              ? [
+                  BoxShadow(
+                    color: focus.ring.withValues(alpha: 0.5),
+                    spreadRadius: TreinoFocusTokens.ringWidth,
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
@@ -289,6 +310,10 @@ class PlanLimitAccentButton extends StatelessWidget {
 }
 
 /// El link de descarte ("Ahora no") de los tres avisos.
+///
+/// Mismo motivo que [PlanLimitAccentButton]: [TreinoInteractiveState] en vez
+/// de `TreinoTappable` pelado, para que Tab lo alcance y Enter/Espacio lo
+/// activen.
 class PlanLimitDismissLink extends StatelessWidget {
   const PlanLimitDismissLink({
     super.key,
@@ -302,14 +327,26 @@ class PlanLimitDismissLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final focus = TreinoFocusTokens.of(context);
 
-    return TreinoTappable(
+    return TreinoInteractiveState(
       onTap: onTap,
-      // `s8` y no `hairline`: a diferencia de los gaps ópticos de arriba,
-      // esto es el padding vertical del área tappable — un link de descarte
-      // con menos de 8px de aire es un blanco de toque incómodo.
-      child: Padding(
+      builder: (ctx, states) => Container(
+        // `s8` y no `hairline`: a diferencia de los gaps ópticos de arriba,
+        // esto es el padding vertical del área tappable — un link de
+        // descarte con menos de 8px de aire es un blanco de toque incómodo.
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          boxShadow: states.focused
+              ? [
+                  BoxShadow(
+                    color: focus.ring.withValues(alpha: 0.5),
+                    spreadRadius: TreinoFocusTokens.ringWidth,
+                  ),
+                ]
+              : null,
+        ),
         child: Text(
           label,
           textAlign: TextAlign.center,
