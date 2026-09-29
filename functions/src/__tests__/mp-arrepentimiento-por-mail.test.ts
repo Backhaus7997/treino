@@ -92,7 +92,12 @@ import {
   hashToken,
   runConfirmarBajaPorMail,
 } from "../subscriptions/mp/baja-por-mail";
-import { CANCEL_COOLDOWN_MS } from "../subscriptions/mp/cancel-my-subscription";
+import {
+  CANCEL_COOLDOWN_MS,
+  runCancelMySubscription,
+} from "../subscriptions/mp/cancel-my-subscription";
+import { CAMPO_ARREPENTIDO, reconcileSubscription } from "../subscriptions/mp/reconcile";
+import { effectiveWeightLimit } from "../subscriptions/effective-limit";
 import { Doc, Store, fakeApp } from "./helpers/firestore-en-memoria";
 
 // Miércoles 30/09/2026, 12:00 en Argentina.
@@ -125,10 +130,17 @@ const SUB = (id: string, dias: number, extra: Doc = {}) => ({
 });
 
 function fakeMp(
-  over: { subs?: Record<string, unknown[]>; fallaBusqueda?: boolean; fallaBaja?: boolean } = {},
+  over: {
+    subs?: Record<string, unknown[]>;
+    fallaBusqueda?: boolean;
+    /** La búsqueda tira a partir de la llamada N (1-based). */
+    fallaBusquedaDesde?: number;
+    fallaBaja?: boolean;
+  } = {},
   nowMs = AHORA,
 ) {
   const canceladas: string[] = [];
+  let busquedas = 0;
   const estado: Record<string, Doc[]> = {};
   for (const [plan, subs] of Object.entries(over.subs ?? {})) {
     estado[plan] = subs.map((s) => ({ ...(s as object) }));
@@ -141,7 +153,11 @@ function fakeMp(
         getPreapproval: async () => ({}),
         createPreapprovalPlan: async () => ({}),
         searchPreapprovalsByPlan: async (planId: string) => {
+          busquedas += 1;
           if (over.fallaBusqueda) throw new Error("MP 503");
+          if (over.fallaBusquedaDesde !== undefined && busquedas >= over.fallaBusquedaDesde) {
+            throw new Error("MP 503");
+          }
           return estado[planId] ?? [];
         },
         cancelPreapproval: async (id: string) => {
@@ -395,6 +411,210 @@ describe("confirmarArrepentimientoPorMail — FUERA de plazo", () => {
     const otra = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
 
     expect(otra.status).toBe("ya-usado");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Los beneficios terminan en el momento en que se confirma
+//
+// Es lo que separa el arrepentimiento de la baja: la baja conserva el acceso
+// hasta el fin del período pagado; el arrepentimiento devuelve TODO lo pagado,
+// así que no queda acceso gratis.
+// ---------------------------------------------------------------------------
+describe("confirmarArrepentimientoPorMail — el acceso termina en el acto", () => {
+  /** El PF tal como queda en Firestore, listo para preguntarle su límite. */
+  const limiteDe = (store: Store, nowMs: number) => {
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    const fin = (sub.currentPeriodEnd as { toMillis: () => number } | null)?.toMillis() ?? null;
+    return effectiveWeightLimit(
+      { tier: sub.tier, status: sub.status, currentPeriodEndMs: fin } as never,
+      nowMs,
+    );
+  };
+  const GRATIS = effectiveWeightLimit(null, AHORA);
+
+  it("PF: el fin de período pasa a ser el momento de la confirmación", async () => {
+    const { app, store, mp } = await conLinkPedido(MUNDO());
+    // Antes de arrepentirse el PF tiene su plan: el límite es el del plan2.
+    expect(limiteDe(store, AHORA)).not.toBe(GRATIS);
+
+    await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect(sub.status).toBe("cancelled");
+    expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+    expect(sub.prepaidTier).toBeNull();
+    expect(sub.prepaidUntil).toBeNull();
+    // Y lo que importa: el límite efectivo es el del plan gratis.
+    expect(limiteDe(store, AHORA + 1)).toBe(GRATIS);
+    expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBe(AHORA);
+  });
+
+  it("⚠️ un evento posterior de MP NO le devuelve el acceso", async () => {
+    // Sin el marcador, cada reconciliación —el evento de MP por esta misma
+    // cancelación, el barrido de las 03:00— volvería a calcular «cancelado, con
+    // período hasta el día X» y a devolvérselo.
+    const { app, store, mp } = await conLinkPedido(MUNDO());
+    await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    const despues = { ...mp.deps, nowMs: AHORA + 2 * DIA_MS };
+    await reconcileSubscription(app, "p1", despues);
+    await reconcileSubscription(app, "p1", despues);
+
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+    expect(limiteDe(store, AHORA + 2 * DIA_MS)).toBe(GRATIS);
+  });
+
+  it("alumno: el derecho pasa a expired en el acto y sigue así", async () => {
+    const mundo: Store = {
+      users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },
+      mp_plans: { p1: { producto: "athlete", uid: UID, cycle: "monthly" } },
+    };
+    const { app, store, mp } = await conLinkPedido(
+      mundo,
+      fakeMp({ subs: { p1: [SUB("s1", 3, { auto_recurring: { transaction_amount: 3500 } })] } }),
+    );
+
+    const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(r.status).toBe("recibido");
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "expired" });
+    // Un evento posterior no se lo devuelve.
+    await reconcileSubscription(app, "p1", { ...mp.deps, nowMs: AHORA + DIA_MS });
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "expired" });
+  });
+
+  it("CONTROL: una baja común, en cambio, conserva el acceso hasta el fin del período", async () => {
+    // Es lo que este test protege de mezclarse: la baja NO devuelve plata, y por
+    // eso el alumno sigue teniendo lo que pagó.
+    const mundo: Store = {
+      users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },
+      mp_plans: { p1: { producto: "athlete", uid: UID, cycle: "monthly" } },
+    };
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { p1: [SUB("s1", 3, { auto_recurring: { transaction_amount: 3500 } })] } });
+
+    await runCancelMySubscription(app, UID, mp.deps);
+
+    expect(mp.canceladas).toEqual(["s1"]);
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
+    expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBeUndefined();
+  });
+
+  it("⚠️ el momento es el de la PRIMERA confirmación: un reintento no lo mueve", async () => {
+    // El corte falla porque MP no contesta al reconciliar (búsqueda #4: la 1ª es
+    // la del arrepentimiento, la 2ª y 3ª las de la cancelación). El marcador ya
+    // quedó escrito; el reintento, más tarde, lo termina de aplicar.
+    const { app, store, mp } = await conLinkPedido(
+      MUNDO(),
+      fakeMp({ subs: { p1: [SUB("s1", 3)] }, fallaBusquedaDesde: 4 }),
+    );
+
+    const primero = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(primero.status).toBe("no-disponible");
+    expect(tokens(store)[hashToken(TOKEN)].usedAt).toBeNull();
+    // La obligación ya está registrada, aunque el corte no se aplicó todavía.
+    expect(mails(store, "withdrawal-team-notice")).toHaveLength(1);
+    expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBe(AHORA);
+
+    const reintento = fakeMp({ subs: { p1: [SUB("s1", 3, { status: "cancelled" })] } });
+    const segundo = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, {
+      ...reintento.deps,
+      nowMs: AHORA + CANCEL_COOLDOWN_MS + 1,
+    });
+
+    expect(segundo.status).toBe("recibido");
+    expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBe(AHORA);
+    expect(mails(store, "withdrawal-team-notice")).toHaveLength(1);
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+  });
+
+  it("⚠️ un marcador con la suscripción todavía VIVA no corta: es una cancelación que falló", async () => {
+    // El marcador sólo vale con `cancelled`. Si MP sigue diciendo `authorized`
+    // la suscripción sigue cobrando, y cortarle el acceso a quien está pagando
+    // sería peor que no cortarlo: el reintento la cancela y ahí sí corta.
+    const mundo = MUNDO();
+    mundo.mp_plans.p1[CAMPO_ARREPENTIDO] = AHORA;
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { p1: [SUB("s1", 3)] } });
+
+    await reconcileSubscription(app, "p1", mp.deps);
+
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect(sub.status).toBe("active");
+    expect(limiteDe(store, AHORA)).not.toBe(GRATIS);
+    // Ni mueve el fin de período al momento del marcador: sigue siendo el que
+    // dice Mercado Pago.
+    expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).not.toBe(AHORA);
+  });
+
+  it("⚠️ alumno: un marcador con la suscripción todavía VIVA tampoco corta", async () => {
+    const mundo: Store = {
+      users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },
+      mp_plans: { p1: { producto: "athlete", uid: UID, cycle: "monthly", [CAMPO_ARREPENTIDO]: AHORA } },
+    };
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { p1: [SUB("s1", 3, { auto_recurring: { transaction_amount: 3500 } })] } });
+
+    await reconcileSubscription(app, "p1", mp.deps);
+
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
+  });
+
+  it("⚠️ el resto prepago de un plan ANTERIOR se conserva, y el aviso al equipo lo advierte", async () => {
+    // Es plata YA PAGADA que este arrepentimiento no devuelve (el pedido es del
+    // plan más reciente): quitársela sería revocar algo que sí pagó. Si el equipo
+    // devuelve también ese pago, tiene que quitarlo a mano — por eso el aviso
+    // lo dice.
+    const hasta = AHORA + 20 * DIA_MS;
+    const mundo = MUNDO();
+    mundo.mp_plans.p1.tier = "plan1";
+    mundo.users[UID].subscription = {
+      tier: "plan1",
+      status: "active",
+      prepaidTier: "plan3",
+      prepaidUntil: ts(hasta),
+    };
+    const { app, store, mp } = await conLinkPedido(mundo);
+
+    const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(r.status).toBe("recibido");
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect(sub.prepaidTier).toBe("plan3");
+    expect((sub.prepaidUntil as { toMillis: () => number }).toMillis()).toBe(hasta);
+    const [aviso] = mails(store, "withdrawal-team-notice");
+    expect(aviso.params).toMatchObject({
+      pisoTier: "plan3",
+      pisoHastaIso: new Date(hasta).toISOString(),
+    });
+  });
+
+  it("sin resto prepago, el aviso no inventa uno", async () => {
+    const { app, store, mp } = await conLinkPedido(MUNDO());
+
+    await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    const [aviso] = mails(store, "withdrawal-team-notice");
+    expect(aviso.params.pisoTier).toBeUndefined();
+    expect(aviso.params.pisoHastaIso).toBeUndefined();
+  });
+
+  it("en el límite y fuera de plazo NO se corta nada", async () => {
+    for (const dias of [11, 40]) {
+      const { app, store, mp } = await conLinkPedido(
+        MUNDO(),
+        fakeMp({ subs: { p1: [SUB("s1", dias)] } }),
+      );
+
+      await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+      expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBeUndefined();
+      expect(store.users[UID].subscription).toEqual({ tier: "plan2", status: "active" });
+    }
   });
 });
 

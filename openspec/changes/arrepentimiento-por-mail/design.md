@@ -29,7 +29,7 @@ devolución de la plata, que queda manual**.
 |---|---|---|
 | Cuándo | En cualquier momento | Sólo dentro de los 10 días corridos |
 | Plata | **No** se devuelve | Se devuelve **todo** lo pagado |
-| Acceso | Hasta el fin del período pagado | (ver §9, pregunta abierta) |
+| Acceso | Hasta el fin del período pagado | **Se corta en el acto** (§6.5) |
 | Módulo | `baja-por-mail.ts` | `arrepentimiento-por-mail.ts` |
 | Términos | §7 | §6 |
 
@@ -59,7 +59,7 @@ landing /arrepentimiento (form)
 
 landing /arrepentimiento/confirmar   (un CLICK, no un GET)
    └─ confirmarArrepentimientoPorMail({token})
-        ├─ dentro      → corta la suscripción · avisa al equipo · mail al usuario
+        ├─ dentro      → corta la suscripción Y EL ACCESO · avisa al equipo · mail al usuario
         ├─ a-revisar   → NO cancela · avisa al equipo · mail «lo revisamos»
         └─ fuera       → mail «venció el plazo» + ofrece la BAJA
 ```
@@ -123,6 +123,40 @@ Automatizarla con la API de reembolsos de MP es un cambio posterior, con la
 misma garantía de este: se decide con el registro de MP, no con lo que diga el
 formulario.
 
+### 6.5 Los beneficios terminan en el momento en que se confirma
+
+Decisión de producto (Martín, 2026-09-29): dentro de plazo se devuelve **todo**,
+así que no queda acceso gratis hasta fin de período (que es lo que hace una baja
+común, y lo que promete §7).
+
+Cortar el acceso **una vez** no alcanza: el reconciliador corre de nuevo con cada
+evento de Mercado Pago y con el barrido de las 03:00, y cada vez volvería a
+calcular «cancelado, con período hasta el día X» y a devolvérselo. Por eso el
+corte es un **marcador** en el plan (`mp_plans/{planId}.arrepentidoAtMs`) que
+los dos escritores del reconciliador respetan:
+
+- **Alumno:** `athleteSubscription.status` pasa a `expired`.
+- **PF:** `currentPeriodEnd` pasa a ser el momento de la confirmación, así que
+  `effectiveWeightLimit` da el límite gratis. Como cualquier baja de plan, eso
+  bloquea alumnos por encima del cupo y le manda al PF el mail de degradación.
+- Sólo con `status === "cancelled"`: un marcador con la suscripción todavía viva
+  es una cancelación que falló, y cortarle el acceso a quien está pagando sería
+  peor que no cortarlo.
+- **No pisa un marcador existente**: el momento es el de la PRIMERA confirmación,
+  no el del último reintento.
+
+**Orden:** primero el aviso al equipo (la obligación de devolver), después el
+corte. Si el corte falla —MP no contesta al reconciliar— el marcador ya quedó
+escrito y lo aplica el próximo evento o el barrido; el link se libera para que el
+reintento lo termine.
+
+**Caso conocido — el resto prepago de un plan anterior NO se corta.** Un PF que
+bajó de plan3 a plan1 conserva un «piso» con el resto ya pagado del plan3. Es
+plata que este arrepentimiento (del plan más reciente) no devuelve, y quitársela
+sería revocar algo que sí pagó: lo prohíbe la política de `subscription-state.ts`.
+Si el equipo devuelve también ese pago, tiene que quitarlo a mano; el aviso lo
+advierte con el plan y la fecha cuando existe.
+
 ## 7. Landing (`treino-app`, PR aparte)
 
 - `POST /api/arrepentimiento`: además de mandar al webhook (constancia con
@@ -143,12 +177,13 @@ Orden: `firestore:rules` (`mp_arrepentimientos_por_mail`), luego las functions:
 
 ## 9. Preguntas abiertas
 
-1. **¿Qué pasa con el acceso al arrepentirse?** Hoy la cancelación deja el
-   acceso hasta el fin del período (lo hereda de la baja), aunque se devuelva la
-   plata. Cortarlo en el acto es una decisión de producto que no está tomada.
+1. ~~¿Qué pasa con el acceso al arrepentirse?~~ **Resuelta el 2026-09-29:** los
+   beneficios terminan en el momento en que se confirma (§6.5).
 2. **El buzón del equipo** es `treino@gettreino.com` (`EQUIPO_MAILBOX`), el mismo
    que usa moderación. Si la constancia legal tiene que ir a otra casilla, se
    cambia en una constante.
-3. **Los términos §6** dicen «ningún trámite previo». La verificación por mail
+3. **Los términos §6** no dicen que el acceso termina al confirmar un
+   arrepentimiento; conviene una frase, y hoy no la hay. Además dicen «ningún
+   trámite previo». La verificación por mail
    ocurre **después** de apretar el botón, que es lo que habilita la Disp.
    3/2026, pero conviene que el equipo legal lea si quiere una frase que lo diga.

@@ -1375,6 +1375,10 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         ["Recibimos tu arrepentimiento: estás dentro del plazo de 10 días."],
         ...(code ? [["Código de tu trámite: ", strong(code), "."] as Line] : []),
         ["Tu suscripción queda dada de baja: no se te vuelve a cobrar."],
+        [
+          "Los beneficios del plan pago terminan ahora, porque te devolvemos " +
+            "todo lo pagado.",
+        ],
         ["Te devolvemos lo pagado por el mismo medio de pago."],
         [
           "No se borra nada: tus rutinas, tu historial y tus datos siguen " +
@@ -1458,7 +1462,8 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
           ]
           : [
             "Entró un pedido verificado por mail, dentro del plazo. La " +
-              "suscripción ya se canceló. ",
+              "suscripción ya se canceló y el acceso al plan pago se cortó en el " +
+              "acto. ",
             strong("Falta devolver el pago."),
           ],
         dato("Código", code),
@@ -1471,6 +1476,19 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         dato("Cobros registrados", params.cobros),
         dato("Suscripciones en Mercado Pago", String(params.suscripciones ?? "")),
         dato("Canceladas ahora", params.canceladas),
+        ...(params.pisoTier
+          ? [[
+            "Ojo: conserva el resto prepago de un plan anterior (",
+            strong(String(params.pisoTier)),
+            " hasta el ",
+            strong(fecha(params.pisoHastaIso)),
+            "). No se cortó: es plata ya pagada que este pedido no devuelve. " +
+              "Si devolvés también ese pago, quitalo a mano.",
+          ] as Line]
+          : []),
+        enRevision
+          ? ["Acceso al plan pago: sigue igual, no se canceló nada."]
+          : ["Acceso al plan pago: cortado en el acto."],
         [
           "Para devolver: en Mercado Pago, buscá la operación entre los cobros " +
             "aprobados y usá «Devolver dinero» por el monto total.",

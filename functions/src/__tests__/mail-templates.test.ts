@@ -979,6 +979,8 @@ describe("Botón de Arrepentimiento", () => {
       expect(text).toContain("dentro del plazo de 10 días");
       expect(text).toContain("no se te vuelve a cobrar");
       expect(text).toContain("Te devolvemos lo pagado por el mismo medio de pago");
+      // Se devuelve TODO, así que no queda acceso gratis hasta fin de período.
+      expect(text).toContain("Los beneficios del plan pago terminan ahora");
     });
 
     it("⚠️ no promete un plazo de devolución que los términos no prometen", () => {
@@ -1067,6 +1069,23 @@ describe("Botón de Arrepentimiento", () => {
       expect(subject).toMatch(/^REVISAR arrepentimiento/);
       expect(text).toContain("No se canceló nada");
       expect(text).not.toContain("Falta devolver el pago");
+    });
+
+    it("dentro de plazo dice que el acceso se cortó; en el límite, que sigue igual", () => {
+      expect(renderMail("withdrawal-team-notice", DATOS).text)
+        .toContain("Acceso al plan pago: cortado en el acto");
+      expect(renderMail("withdrawal-team-notice", { ...DATOS, estado: "a-revisar" }).text)
+        .toContain("Acceso al plan pago: sigue igual");
+    });
+
+    it("advierte el resto prepago de un plan anterior, y sólo cuando existe", () => {
+      const con = renderMail("withdrawal-team-notice", {
+        ...DATOS, pisoTier: "plan3", pisoHastaIso: "2026-10-20T15:00:00.000Z",
+      }).text;
+      expect(con).toContain("conserva el resto prepago de un plan anterior (plan3 hasta el 20/10/2026)");
+      expect(con).toContain("quitalo a mano");
+
+      expect(renderMail("withdrawal-team-notice", DATOS).text).not.toContain("resto prepago");
     });
 
     it("un dato que falta se dice, no se inventa ni se deja en blanco", () => {

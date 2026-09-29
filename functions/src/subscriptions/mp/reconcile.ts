@@ -478,6 +478,37 @@ export function puedeSeguirCobrando(datos: Record<string, unknown> | undefined):
 }
 
 /**
+ * Campo de `mp_plans/{planId}` con el momento (ms) en que la persona ejerció el
+ * ARREPENTIMIENTO. Lo escribe `arrepentimiento-por-mail.ts`, y sólo después de
+ * haber cortado la suscripción en Mercado Pago.
+ */
+export const CAMPO_ARREPENTIDO = "arrepentidoAtMs";
+
+/**
+ * Cuándo se arrepintió, o `null` si este plan no pasó por ahí.
+ *
+ * ── Por qué el reconciliador tiene que saberlo ──
+ *
+ * Una baja común conserva el acceso hasta el fin del período pagado: es la
+ * rama `cancelled` de `effectiveWeightLimit` / `athleteStatusDesde`, y es lo que
+ * prometen los términos §7. El arrepentimiento es lo contrario: se devuelve TODO
+ * lo pagado, así que los beneficios terminan en el acto.
+ *
+ * Cortar el acceso una vez no alcanza. Este reconciliador corre de nuevo con
+ * cada evento de Mercado Pago y con el barrido de las 03:00, y cada vez volvería
+ * a calcular «cancelado, con período hasta el día X» y a devolverle el acceso.
+ * Por eso el corte es un dato del plan y no una escritura suelta.
+ *
+ * Sólo cuenta con `status === "cancelled"`: si MP dijera otra cosa la
+ * suscripción sigue viva y cobrando, y ese caso es una cancelación que falló,
+ * no un arrepentimiento.
+ */
+export function arrepentidoAtDe(datos: Record<string, unknown> | undefined): number | null {
+  const v = datos?.[CAMPO_ARREPENTIDO];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
  * Deja escrito que este plan quedo REEMPLAZADO por otro.
  *
  * Se llama ANTES de pedirle la baja a MP — ver el comentario de
@@ -758,11 +789,19 @@ async function escribirSuscripcionDeAlumno(i: {
     planId,
   });
 
-  const athleteStatus = athleteStatusDesde(
-    status,
-    periodEnd === null ? null : periodEnd.toMillis(),
-    deps.nowMs,
-  );
+  // El arrepentimiento corta el acceso en el acto y lo mantiene cortado: sin
+  // esto, el próximo evento de MP volvería a calcular «cancelado, con período
+  // hasta el día X» y a devolvérselo. Ver `arrepentidoAtDe`.
+  const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
+
+  const athleteStatus: AthleteStatus =
+    arrepentidoAt !== null
+      ? "expired"
+      : athleteStatusDesde(
+        status,
+        periodEnd === null ? null : periodEnd.toMillis(),
+        deps.nowMs,
+      );
 
   // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un derecho vigente ──
   //
@@ -854,7 +893,9 @@ async function escribirSuscripcionDeAlumno(i: {
     producto: "athlete",
     status,
     athleteStatus,
-    ...(periodEnd === null ? {} : { accesoHastaMs: periodEnd.toMillis() }),
+    ...(arrepentidoAt !== null
+      ? { accesoHastaMs: arrepentidoAt }
+      : periodEnd === null ? {} : { accesoHastaMs: periodEnd.toMillis() }),
   };
 }
 
@@ -1120,13 +1161,27 @@ export async function reconcileSubscription(
     }
   }
 
-  const periodEnd = resolverFinDePeriodo({
-    deMp: parsePeriodEnd(mp.next_payment_date, planId),
-    yaGuardada: actual?.currentPeriodEnd,
-    autoRecurring: mp.auto_recurring,
-    status,
-    planId,
-  });
+  // El arrepentimiento devuelve TODO lo pagado, así que el acceso de ESTE plan
+  // termina en el momento en que se confirmó: el fin de período es ese instante
+  // (ver `arrepentidoAtDe`). Sin esto, el próximo evento de MP recalcularía
+  // «cancelado, período hasta el día X».
+  //
+  // El piso prepago, más abajo, NO se toca: es el resto YA PAGADO de un plan
+  // anterior, y quitárselo sería revocar algo que este arrepentimiento no
+  // devuelve (política de `subscription-state.ts`). Si el equipo devuelve
+  // también ese pago, tiene que quitarlo a mano — el aviso lo advierte.
+  const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
+
+  const periodEnd =
+    arrepentidoAt !== null
+      ? Timestamp.fromMillis(arrepentidoAt)
+      : resolverFinDePeriodo({
+        deMp: parsePeriodEnd(mp.next_payment_date, planId),
+        yaGuardada: actual?.currentPeriodEnd,
+        autoRecurring: mp.auto_recurring,
+        status,
+        planId,
+      });
 
   // ── EL PISO PREPAGO: lo que el PF ya pago y este write estaba tirando ──
   //

@@ -18,8 +18,10 @@
  *   1. Que quien pide sea el dueño de la cuenta (link al mail de la cuenta).
  *   2. Que esté dentro del plazo, con la fecha de contratación de NUESTRO
  *      registro con Mercado Pago y no la que escribe la persona en el formulario.
- *   3. Cortar la suscripción, para que no se cobre otra cuota mientras se
- *      devuelve la anterior.
+ *   3. Cortar la suscripción Y LOS BENEFICIOS en el acto. Se devuelve TODO lo
+ *      pagado, así que no queda acceso gratis hasta fin de período (que es lo
+ *      que hace una baja común). El corte es un marcador en el plan que el
+ *      reconciliador respeta: ver `arrepentidoAtDe`.
  *   4. Avisar: al usuario con su código, y al equipo con todo lo necesario.
  *
  * **La devolución de la plata queda MANUAL, a propósito.** Es lo único que no se
@@ -27,7 +29,8 @@
  *
  * ── Lo que decide el plazo (ver `plazo-arrepentimiento.ts`) ──
  *
- *   - `dentro`    → se corta la suscripción y se avisa al equipo para devolver.
+ *   - `dentro`    → se corta la suscripción y el acceso, y se avisa al equipo
+ *                   para devolver.
  *   - `a-revisar` → NO se cancela nada; lo decide una persona. Es la franja del
  *                   último día donde un feriado pudo haber corrido el plazo
  *                   (términos §6: el derecho es irrenunciable).
@@ -52,6 +55,7 @@ import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 
 import { MpClient, MpPreapproval, createMpClient } from "./client";
+import { CAMPO_ARREPENTIDO, arrepentidoAtDe, reconcileSubscription } from "./reconcile";
 import { runCancelMySubscription } from "./cancel-my-subscription";
 import { ventanaDeThrottle } from "./baja-por-mail";
 import { Plazo, evaluarPlazo } from "./plazo-arrepentimiento";
@@ -349,6 +353,47 @@ async function avisarAlEquipo(
   }
 }
 
+/** Si esta suscripción llegó a contratarse (no es un checkout abandonado). */
+const esContratada = (s: MpPreapproval): boolean =>
+  typeof s.status === "string" && CONTRATADAS.has(s.status);
+
+/**
+ * Termina los beneficios en el momento: marca los planes como arrepentidos y
+ * reconcilia para que el derecho se escriba ya.
+ *
+ * ── Por qué es un marcador y no una escritura suelta ──
+ *
+ * El reconciliador corre de nuevo con cada evento de Mercado Pago y con el
+ * barrido de las 03:00, y sin marcador cada vez volvería a calcular «cancelado,
+ * con período hasta el día X» y a devolverle el acceso. Ver `arrepentidoAtDe`.
+ *
+ * **No pisa un marcador existente**: el momento del arrepentimiento es el de la
+ * PRIMERA confirmación, no el del último reintento.
+ *
+ * Si MP no contesta al reconciliar, tira: el marcador ya quedó escrito —lo
+ * aplica el próximo evento o el barrido— y el reintento del usuario lo termina
+ * de aplicar.
+ */
+async function cortarElAcceso(
+  app: App,
+  planIds: string[],
+  deps: ConfirmarArrepentimientoDeps,
+): Promise<void> {
+  const db = getFirestore(app);
+  for (const planId of planIds) {
+    const ref = db.collection(MP_PLANS_COLLECTION).doc(planId);
+    if (arrepentidoAtDe((await ref.get()).data()) === null) {
+      await ref.set({ [CAMPO_ARREPENTIDO]: deps.nowMs }, { merge: true });
+    }
+  }
+  for (const planId of planIds) {
+    const r = await reconcileSubscription(app, planId, deps);
+    if (r.outcome === "error-mp") {
+      throw new Error(`no se pudo aplicar el corte al plan ${planId}`);
+    }
+  }
+}
+
 /**
  * Canjea el link y resuelve el arrepentimiento.
  *
@@ -382,9 +427,13 @@ export async function runConfirmarArrepentimientoPorMail(
     // ── 1. Qué contrató, según Mercado Pago ──
     const planes = await planesDeLaCuenta(app, uid);
     const todas: MpPreapproval[] = [];
+    /** Los planes de los que cuelga alguna contratación: los que hay que cortar. */
+    const planesConContrato: string[] = [];
     for (const { planId } of planes) {
       // Secuencial, como el resto: en paralelo son N requests a MP y contesta 429.
-      todas.push(...(await deps.mpClient.searchPreapprovalsByPlan(planId)));
+      const subs = await deps.mpClient.searchPreapprovalsByPlan(planId);
+      todas.push(...subs);
+      if (subs.some(esContratada)) planesConContrato.push(planId);
     }
 
     const contrato = contratoMasReciente(todas);
@@ -403,13 +452,27 @@ export async function runConfirmarArrepentimientoPorMail(
     const contratoIso =
       contrato.contratoMs === null ? "" : new Date(contrato.contratoMs).toISOString();
 
-    const contratadas = todas.filter((s) => typeof s.status === "string" && CONTRATADAS.has(s.status));
+    const contratadas = todas.filter(esContratada);
     const monto = montoDe(contrato.sub);
     const cobros = cobrosDe(contrato.sub);
     const email = await getAuth(app)
       .getUser(uid)
       .then((u) => u.email ?? "")
       .catch(() => "");
+
+    // El resto prepago de un plan anterior NO se corta con el arrepentimiento
+    // (ver `reconcile.ts`): es plata YA PAGADA que este pedido no devuelve. Pero
+    // si el equipo decide devolverla también, tiene que saber que existe.
+    const subActual = (await db.collection("users").doc(uid).get()).data()?.subscription as
+      | { prepaidTier?: unknown; prepaidUntil?: { toMillis?: () => number } }
+      | undefined;
+    const pisoHastaMs = subActual?.prepaidUntil?.toMillis?.();
+    const piso: Record<string, string> =
+      typeof subActual?.prepaidTier === "string" &&
+      typeof pisoHastaMs === "number" &&
+      pisoHastaMs > deps.nowMs
+        ? { pisoTier: subActual.prepaidTier, pisoHastaIso: new Date(pisoHastaMs).toISOString() }
+        : {};
 
     const datosDelAviso = (estado: "dentro" | "a-revisar", canceladas: number) => ({
       estado,
@@ -426,6 +489,7 @@ export async function runConfirmarArrepentimientoPorMail(
         .filter(Boolean)
         .join(", "),
       canceladas,
+      ...piso,
     });
 
     // ── 3a. Venció: se avisa y no se toca nada ──
@@ -461,10 +525,19 @@ export async function runConfirmarArrepentimientoPorMail(
       return await liberar("no-disponible");
     }
 
-    // Después de cancelar: si esto falla, el link se libera y el reintento
-    // encuentra la suscripción ya cancelada (`sin-suscripcion`, no es error) y
-    // vuelve a intentar el aviso. La devolución no se pierde.
+    // ── El orden importa: primero la OBLIGACIÓN, después el corte ──
+    //
+    // 1. El aviso al equipo. Es lo que registra que hay que devolver plata, y es
+    //    lo que no se puede perder: si falla, el link se libera y el reintento
+    //    encuentra la suscripción ya cancelada (`sin-suscripcion`, no es error)
+    //    y vuelve a intentarlo.
+    // 2. El corte del acceso. Los beneficios terminan en el momento en que se
+    //    confirma, porque se devuelve todo lo pagado. Es idempotente y
+    //    reintentable: el marcador queda en el plan y cualquier reconciliación
+    //    posterior —el evento de MP por esta misma cancelación, o el barrido— lo
+    //    respeta.
     await avisarAlEquipo(app, ref.id, uid, datosDelAviso("dentro", baja.canceladas ?? 0), deps.nowMs);
+    await cortarElAcceso(app, planesConContrato, deps);
     await ref
       .update({ resultado: "recibido", canceladas: baja.canceladas ?? 0 })
       .catch(() => undefined);
