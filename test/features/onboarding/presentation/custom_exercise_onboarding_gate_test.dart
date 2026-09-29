@@ -463,10 +463,11 @@ void main() {
       expect(find.text('EDITOR:new'), findsNothing);
       expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
       // El número es el límite REAL con el que bloqueó el gate, no la tabla
-      // estática del tier.
+      // estática del tier. Móvil: sin "para sumar más, subí de plan"
+      // (Guideline 3.1.3(f), decisión del dueño 2026-09-29).
       expect(
-        find.textContaining(
-            'incluye 1 ejercicio propio. Para sumar más, subí de plan.'),
+        find.textContaining('incluye 1 ejercicio propio. Podés editar o '
+            'borrar los que ya tenés.'),
         findsOneWidget,
       );
     });

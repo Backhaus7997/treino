@@ -65,22 +65,27 @@ void main() {
       );
 
       expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      // Móvil, decisión del dueño 2026-09-29: sin "para sumar más, subí de
+      // plan" (Guideline 3.1.3(f)) — ver
+      // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
       expect(
         find.text(
-          'Tu plan Free incluye 20 ejercicios propios. Para sumar más, '
-          'subí de plan.',
+          'Tu plan Free incluye 20 ejercicios propios. Podés editar o '
+          'borrar los que ya tenés.',
         ),
         findsOneWidget,
       );
       // La caja de upsell al siguiente tier, mismo estilo que el paywall de
-      // alumnos.
-      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      // alumnos — sin "PASATE A" en el móvil: sólo el nombre del plan.
+      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('12.000'), findsOneWidget);
       expect(find.text('Hasta 60 ejercicios propios'), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_ver_planes')), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
-      expect(find.text('Ahora no'), findsOneWidget);
+      // "Entendido" y no "Ahora no": no presupone ninguna oferta.
+      expect(find.text('Entendido'), findsOneWidget);
     });
 
     testWidgets('desde Plan 2, el upsell dice "sin límite" y nunca "null"',
@@ -94,7 +99,8 @@ void main() {
         form: TrainerLimitNoticeForm.sheet,
       );
 
-      expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
       expect(find.textContaining('null'), findsNothing);
     });
@@ -298,12 +304,14 @@ void main() {
       );
 
       expect(find.text('TOPE DE PLANTILLAS'), findsOneWidget);
+      // Móvil: sin "para sumar más, subí de plan" (3.1.3(f)).
       expect(
-        find.text('Tu plan Free incluye 3 plantillas. Para sumar más, '
-            'subí de plan.'),
+        find.text('Tu plan Free incluye 3 plantillas. Podés editar o '
+            'archivar las que ya tenés.'),
         findsOneWidget,
       );
-      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.textContaining('PASATE A'), findsNothing);
       // Free → Plan 1 ya es plantillas sin límite (sólo Free tiene tope).
       expect(find.text('Plantillas sin límite'), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);

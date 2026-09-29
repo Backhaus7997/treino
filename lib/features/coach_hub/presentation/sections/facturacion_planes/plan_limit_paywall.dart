@@ -69,18 +69,27 @@ Future<void> showPlanLimitPaywall(
   SubscriptionStatus? subscriptionStatus,
   String? billingRoute,
 }) {
+  final form = _resolveForm();
   // Un solo contenido para las dos envolturas. Si mañana cambia el copy o el
   // CTA, cambia UNA vez: duplicarlo garantiza que tarde o temprano web y móvil
   // digan cosas distintas y nadie se entere hasta que lo reporte un usuario.
+  //
+  // `isWeb` viaja con el contenido, no sólo con la envoltura: desde la
+  // decisión del dueño del 2026-09-29 el COPY también depende de la
+  // superficie —el móvil no puede tener "calls to action for purchase
+  // outside of the app" (Guideline 3.1.3(f))—, así que el mismo booleano que
+  // elige sheet-vs-dialog ahora también elige "vende" vs "informa". Una sola
+  // fuente de verdad, nunca dos `kIsWeb` sueltos que puedan desincronizarse.
   final content = _PlanLimitPaywallContent(
     currentTier: currentTier,
     reason: reason,
     subscriptionStatus: subscriptionStatus,
     billingRoute: billingRoute,
+    isWeb: form == PlanLimitPaywallForm.dialog,
   );
   final barrierColor = Colors.black.withValues(alpha: 0.6);
 
-  if (_resolveForm() == PlanLimitPaywallForm.dialog) {
+  if (form == PlanLimitPaywallForm.dialog) {
     return showDialog<void>(
       context: context,
       barrierColor: barrierColor,
@@ -234,6 +243,7 @@ class _PlanLimitPaywallContent extends StatelessWidget {
     this.reason = PlanLimitReason.planLimit,
     this.subscriptionStatus,
     this.billingRoute,
+    required this.isWeb,
   });
 
   final SubscriptionTier currentTier;
@@ -244,6 +254,12 @@ class _PlanLimitPaywallContent extends StatelessWidget {
   /// app movil no tiene pantalla de facturacion), y entonces el CTA explica
   /// en vez de navegar a una ruta inexistente y morir.
   final String? billingRoute;
+
+  /// `true` = superficie WEB (Coach Hub), que sí vende. `false` = MÓVIL, que
+  /// sólo informa (Guideline 3.1.3(f) — ver el dartdoc de
+  /// [showPlanLimitPaywall]). Decisión del dueño, 2026-09-29: mismo estilo
+  /// visual en las dos, pero sin verbos de compra en el móvil.
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -271,9 +287,15 @@ class _PlanLimitPaywallContent extends StatelessWidget {
               ? 'Mientras tu suscripción no esté al día, tu cuenta '
                   'funciona con el límite del plan Free. Ningún alumno '
                   'se elimina.' // i18n: Fase W3
-              : 'Tu plan ${tierName(currentTier)} incluye '
-                  '${cupoTexto(currentTier)}. Para sumar más, '
-                  'subí de plan.', // i18n: Fase W3
+              : isWeb
+                  ? 'Tu plan ${tierName(currentTier)} incluye '
+                      '${cupoTexto(currentTier)}. Para sumar más, '
+                      'subí de plan.' // i18n: Fase W3
+                  // Móvil, decisión del dueño 2026-09-29: sólo el estado —
+                  // sin "para sumar más, subí de plan" (3.1.3(f)). Guard:
+                  // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+                  : 'Tu plan ${tierName(currentTier)} incluye '
+                      '${cupoTexto(currentTier)}.', // i18n: Fase W3
           textAlign: TextAlign.center,
           style:
               TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
@@ -284,6 +306,7 @@ class _PlanLimitPaywallContent extends StatelessWidget {
             currentTier: currentTier,
             status: subscriptionStatus,
             palette: palette,
+            isWeb: isWeb,
           )
         else if (next != null)
           PlanLimitUpsellBox(
@@ -292,6 +315,7 @@ class _PlanLimitPaywallContent extends StatelessWidget {
                 ? 'Alumnos sin límite' // i18n: Fase W3
                 : 'Hasta ${next.weightLimit} alumnos', // i18n: Fase W3
             palette: palette,
+            sellCta: isWeb,
           )
         else
           PlanLimitCustomTierBox(
@@ -306,9 +330,15 @@ class _PlanLimitPaywallContent extends StatelessWidget {
           isInactive: isInactive,
           billingRoute: billingRoute,
           palette: palette,
+          isWeb: isWeb,
         ),
         const SizedBox(height: 10),
-        PlanLimitDismissLink(onTap: () => Navigator.of(context).pop()),
+        PlanLimitDismissLink(
+          // Móvil: "Entendido" — "Ahora no" presupone una oferta que el
+          // móvil ya no hace (decisión del dueño, 2026-09-29).
+          label: isWeb ? 'Ahora no' : 'Entendido', // i18n: Fase W3
+          onTap: () => Navigator.of(context).pop(),
+        ),
       ],
     );
   }
@@ -322,11 +352,13 @@ class _ReactivateBox extends StatelessWidget {
     required this.currentTier,
     required this.status,
     required this.palette,
+    required this.isWeb,
   });
 
   final SubscriptionTier currentTier;
   final SubscriptionStatus? status;
   final AppPalette palette;
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -351,9 +383,20 @@ class _ReactivateBox extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            // TODO(producto): copy placeholder — pendiente de revisión.
-            'Reactivalo y volvés a tus ${cupoTexto(currentTier)} '
-            'al instante.', // i18n: Fase W3
+            isWeb
+                // TODO(producto): copy placeholder — pendiente de revisión.
+                ? 'Reactivalo y volvés a tus ${cupoTexto(currentTier)} '
+                    'al instante.' // i18n: Fase W3
+                // Móvil, decisión del dueño 2026-09-29: estado neutro, sin
+                // "reactivalo/reactivá/regularizá/pagá" (3.1.3(f)). El
+                // efectivo acá SIEMPRE es Free: `subscriptionInactive` es
+                // justo "lo que pagaste no está al día", y el derecho cae a
+                // Free (mismo criterio que `effectiveWeightLimit` del
+                // servidor). Guard:
+                // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+                : 'No está activa. Mientras tanto, tu cuenta tiene el '
+                    'límite del plan Free: '
+                    '${cupoTexto(SubscriptionTier.free)}.', // i18n: Fase W3
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: palette.textMuted, fontSize: AppTextSize.bodyDense),
@@ -378,18 +421,25 @@ class _PrimaryCta extends StatelessWidget {
     required this.isInactive,
     required this.billingRoute,
     required this.palette,
+    required this.isWeb,
   });
 
   final bool hasNext;
   final bool isInactive;
   final String? billingRoute;
   final AppPalette palette;
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
     if (isInactive) {
       return PlanLimitAccentButton(
-        label: 'REGULARIZAR', // i18n: Fase W3
+        // "REGULARIZAR" es un verbo de pago — en el móvil, con el SnackBar
+        // de abajo ya diciendo el estado, el botón pasa a describir lo que
+        // efectivamente hace ("VER ESTADO") y no lo que Apple prohíbe pedir
+        // (3.1.3(f)). Decisión del dueño, 2026-09-29. Guard:
+        // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+        label: isWeb ? 'REGULARIZAR' : 'VER ESTADO', // i18n: Fase W3
         onTap: () {
           // REACTIVAR ES COBRAR. Este CTA es el otro punto de entrada al pago
           // que se ve DESDE EL TELEFONO (dashboard movil -> aceptar solicitud

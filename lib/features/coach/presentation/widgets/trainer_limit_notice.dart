@@ -70,14 +70,16 @@ TrainerLimitNoticeForm _resolveForm() =>
 /// resolver el upsell al siguiente tier; nunca para decidir si bloquea (eso
 /// ya lo decidió el gate con `limit`/`count`).
 ///
-/// Dos estados, igual en las dos superficies:
-/// - **En el tope** (`count == limit`): mismo tono que el paywall de
-///   alumnos — "tu plan incluye N, para sumar más subí de plan" — con la
-///   caja de upsell al siguiente tier.
+/// Dos estados:
+/// - **En el tope** (`count == limit`): "tu plan incluye N" con la caja de
+///   upsell al siguiente tier. En WEB suma "para sumar más, subí de plan";
+///   en MÓVIL no (Guideline 3.1.3(f) — decisión del dueño, 2026-09-29), y en
+///   su lugar dice qué puede hacer el PF con lo que ya tiene.
 /// - **Por encima** (`count > limit`, bajaste de plan): el texto de
 ///   conservación — "conservás todos, para crear uno nuevo
 ///   [borrá/archivá] N", con `N = count - limit + 1` — sin caja de upsell:
-///   acá el problema no es elegir un plan, es que ya bajó de uno.
+///   acá el problema no es elegir un plan, es que ya bajó de uno. Igual en
+///   las dos superficies: no nombra un tier, así que 3.1.3(f) no lo alcanza.
 Future<void> showTrainerLimitNotice(
   BuildContext context, {
   required TrainerLimitKind kind,
@@ -85,6 +87,7 @@ Future<void> showTrainerLimitNotice(
   required int limit,
   required int count,
 }) {
+  final form = _resolveForm();
   final content = _TrainerLimitContent(
     kind: kind,
     currentTier: currentTier,
@@ -92,9 +95,13 @@ Future<void> showTrainerLimitNotice(
     limit: limit,
     count: count,
     toFree: count - limit + 1,
+    // Mismo booleano que decide sheet-vs-dialog: desde el 2026-09-29 el
+    // COPY también depende de la superficie (3.1.3(f) — ver el dartdoc de
+    // `showPlanLimitPaywall`, mismo criterio acá).
+    isWeb: form == TrainerLimitNoticeForm.dialog,
   );
 
-  if (_resolveForm() == TrainerLimitNoticeForm.dialog) {
+  if (form == TrainerLimitNoticeForm.dialog) {
     return showDialog<void>(
       context: context,
       builder: (_) => PlanLimitDialogShell(content: content),
@@ -126,6 +133,7 @@ class _TrainerLimitContent extends StatelessWidget {
     required this.limit,
     required this.count,
     required this.toFree,
+    required this.isWeb,
   });
 
   final TrainerLimitKind kind;
@@ -134,6 +142,12 @@ class _TrainerLimitContent extends StatelessWidget {
   final int limit;
   final int count;
   final int toFree;
+
+  /// `true` = superficie WEB (Coach Hub), que sí vende. `false` = MÓVIL, que
+  /// sólo informa (Guideline 3.1.3(f) — ver el dartdoc de
+  /// [showPlanLimitPaywall] en `plan_limit_paywall.dart`, mismo criterio
+  /// acá). Decisión del dueño, 2026-09-29.
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -163,14 +177,20 @@ class _TrainerLimitContent extends StatelessWidget {
       TrainerLimitKind.customExercises => 'borrá',
       TrainerLimitKind.templates => 'archivá',
     };
+    // Móvil, "en el tope" (Cambio 1 del 2026-09-29): reemplaza al CTA de
+    // venta por una reafirmación de lo que el PF YA puede hacer con lo que
+    // tiene — mismo tono que el texto de conservación de "pasado de tope".
+    final accionConservar = switch (kind) {
+      TrainerLimitKind.customExercises => 'editar o borrar los que ya tenés',
+      TrainerLimitKind.templates => 'editar o archivar las que ya tenés',
+    };
 
     // "En el tope": mismo tono que `_PlanLimitPaywallContent` — "tu plan
-    // incluye X, para sumar más subí de plan". El número es [limit], el MISMO
-    // que usó el gate para bloquear (`planLimits` del servidor), y NO la
-    // tabla estática del tier: si difieren (el piso prepago sube el plan
-    // efectivo, o un tope ajustado a mano), el aviso diría un tope que no es
-    // el que está frenando al PF. En este aviso [limit] nunca es null: sin
-    // tope no hay aviso.
+    // incluye X". El número es [limit], el MISMO que usó el gate para
+    // bloquear (`planLimits` del servidor), y NO la tabla estática del tier:
+    // si difieren (el piso prepago sube el plan efectivo, o un tope ajustado
+    // a mano), el aviso diría un tope que no es el que está frenando al PF.
+    // En este aviso [limit] nunca es null: sin tope no hay aviso.
     //
     // "Pasado de tope": el texto de conservación que ya tenía este aviso
     // (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3, "Los
@@ -184,8 +204,15 @@ class _TrainerLimitContent extends StatelessWidget {
     final body = overLimit
         ? 'Tenés $count $noun y tu plan incluye $limit. '
             'Conservás $todos; para crear $unoNuevo, $verb $toFree.' // i18n: Fase W3
-        : 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
-            'Para sumar más, subí de plan.'; // i18n: Fase W3
+        : isWeb
+            ? 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
+                'Para sumar más, subí de plan.' // i18n: Fase W3
+            // Móvil, decisión del dueño 2026-09-29: sin "para sumar más,
+            // subí de plan" (3.1.3(f)) — en su lugar, lo que el PF puede
+            // hacer con lo que ya tiene. Guard:
+            // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+            : 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
+                'Podés $accionConservar.'; // i18n: Fase W3
 
     final next = currentTier.nextTier;
 
@@ -219,6 +246,7 @@ class _TrainerLimitContent extends StatelessWidget {
                     : 'Hasta ${next.templateLimit} plantillas', // i18n: Fase W3
               },
               palette: palette,
+              sellCta: isWeb,
             )
           else
             // En la práctica es inalcanzable: Plan 3 no tiene tope de
@@ -244,6 +272,9 @@ class _TrainerLimitContent extends StatelessWidget {
         const SizedBox(height: AppSpacing.s12),
         PlanLimitDismissLink(
           key: const Key('trainer_limit_dismiss'),
+          // Móvil: "Entendido" — "Ahora no" presupone una oferta que el
+          // móvil ya no hace (decisión del dueño, 2026-09-29).
+          label: isWeb ? 'Ahora no' : 'Entendido', // i18n: Fase W3
           onTap: () => Navigator.of(context).pop(),
         ),
       ],

@@ -86,21 +86,33 @@ class PlanLimitHeader extends StatelessWidget {
 /// plata y de un renglón de texto. Mismo motivo que `plan_copy.dart`:
 /// `nextTier` puede ser un tier ilimitado y el texto de beneficio tiene que
 /// resolverlo ANTES de llegar acá, nunca interpolando un `null`.
+///
+/// [sellCta] — decisión del dueño del 2026-09-29: mismo estilo visual en las
+/// tres superficies, pero el encabezado sólo dice "PASATE A X" (llamado a
+/// comprar) cuando `sellCta` es `true` — la WEB, que sí vende. En el MÓVIL
+/// (`sellCta: false`) dice sólo "X": el precio y el beneficio siguen siendo
+/// información (misma lógica que la pantalla de planes del móvil, que
+/// tampoco vende), pero la Guideline 3.1.3(f) prohíbe el llamado a comprar
+/// desde ADENTRO del binario. Guard: `avisos_de_tope_movil_sin_llamado_a_
+/// comprar_test.dart`.
 class PlanLimitUpsellBox extends StatelessWidget {
   const PlanLimitUpsellBox({
     super.key,
     required this.nextTier,
     required this.beneficio,
     required this.palette,
+    required this.sellCta,
   });
 
   final SubscriptionTier nextTier;
   final String beneficio;
   final AppPalette palette;
+  final bool sellCta;
 
   @override
   Widget build(BuildContext context) {
     final price = kTierPricesArs[nextTier]!;
+    final nombre = tierName(nextTier).toUpperCase();
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -112,7 +124,7 @@ class PlanLimitUpsellBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'PASATE A ${tierName(nextTier).toUpperCase()}', // i18n: Fase W3
+            sellCta ? 'PASATE A $nombre' : nombre, // i18n: Fase W3
             style: TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               color: palette.accent,
