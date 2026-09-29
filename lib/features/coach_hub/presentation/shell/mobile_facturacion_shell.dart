@@ -79,7 +79,7 @@ class _MobileFacturacionHeader extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               color: palette.highlight,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w700,
               letterSpacing: 3,
             ),
