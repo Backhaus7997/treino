@@ -187,10 +187,11 @@ export {
   sendFreeLimitMailOnHit,
   sweepFreeLimitMail,
 } from "./subscriptions/free-limit-mail";
-// El mail al PF que choco un tope de su plan (ejercicios propios o
-// plantillas, limite-ejercicios-pf.md y limite-plantillas-pf.md, PR4). Dos
-// caminos, igual que el par de arriba: `sendTrainerLimitMailOnHit` lo encola
-// AL TOQUE, apenas el cliente anota `trainerLimitHitAt` en `users/{uid}`;
+// El mail al PF que choco un tope de su plan (ejercicios propios,
+// plantillas —limite-ejercicios-pf.md y limite-plantillas-pf.md, PR4— o
+// alumnos, paywall Fase 7). Dos caminos, igual que el par de arriba:
+// `sendTrainerLimitMailOnHit` lo encola AL TOQUE, apenas el cliente (o, para
+// alumnos, el servidor) anota `trainerLimitHitAt` en `users/{uid}`;
 // `sweepTrainerLimitMail` (05:30 ART, media hora despues del barrido de
 // arriba y una hora despues del de las 04:00 que recalcula
 // `planLimits`/`customExerciseUsage` con `sweepEntitlements`) queda como red
