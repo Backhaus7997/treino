@@ -6,6 +6,8 @@ import 'package:treino/core/widgets/treino_icon.dart';
 
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
+import 'navigator_semantics_boundary.dart';
+
 /// Rutas que el PF puede ver desde un TELÉFONO, excepción acotada al flujo de
 /// pago (ADR-CHW-004 sólo bloquea, esto abre un agujero angosto adentro).
 ///
@@ -52,7 +54,12 @@ class MobileFacturacionShell extends StatelessWidget {
         child: Column(
           children: [
             _MobileFacturacionHeader(palette: palette),
-            Expanded(child: child),
+            // El `child` es el `Navigator` del `ShellRoute`, y sin esta
+            // frontera su `ModalBarrier` borraba la semántica del
+            // encabezado de acá arriba — mismo mecanismo que
+            // [CoachHubScaffold] en la rama de escritorio. Ver
+            // [NavigatorSemanticsBoundary].
+            Expanded(child: NavigatorSemanticsBoundary(child: child)),
           ],
         ),
       ),
