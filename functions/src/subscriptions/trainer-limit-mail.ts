@@ -69,7 +69,43 @@
  * había fijado sobre el mismo tipo de contenido.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- *  EL HORARIO — 05:30 ART
+ *  DOS CAMINOS: AL TOQUE, Y EL BARRIDO DE LAS 05:30 COMO RED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Calcado de `free-limit-mail.ts` (#1149, y el trigger del 2026-09-25): el
+ * camino principal es `sendTrainerLimitMailOnHit`, un trigger sobre
+ * `users/{uid}` que encola apenas el cliente anota `trainerLimitHitAt`. El
+ * mail sale en segundos, mientras el PF todavía tiene la pantalla del tope
+ * delante.
+ *
+ * **`sweepTrainerLimitMail` se queda, como red.** Si el trigger falla, el
+ * barrido lo reintenta al otro día dentro de la ventana de 36 h. Los dos
+ * caminos no se pisan y no pueden producir un mail doble: comparten el mismo
+ * enfriamiento de 14 días (`trainerLimitMailAt`, cláusula 4) — el que llega
+ * primero lo anota, y el segundo lo ve y sale por la cláusula 4 — y además la
+ * cola de mail dedupea por `kind` + `scope` + destinatario
+ * (`dedupeKey`/`enqueueMail`), así que aunque los dos caminos corrieran en el
+ * mismo instante, el segundo `set` en la cola no crea un documento nuevo.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  EL ANTI-LOOP DEL CAMINO AL TOQUE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `enqueueTrainerLimitMail` escribe `trainerLimitMailAt` en el MISMO documento
+ * que dispara el trigger. Esa escritura lo despertaría de nuevo si no se
+ * filtrara: `esToqueNuevo` (calcado de `free-limit-mail.ts`) sólo devuelve
+ * `true` cuando CAMBIA `trainerLimitHitAt` — la escritura del enfriamiento
+ * deja ese campo igual, así que sale sin encolar nada. Cualquier otra
+ * escritura del perfil (nombre, foto, preferencias) también sale ahí, sin
+ * costo.
+ *
+ * El chequeo de `role == 'trainer'` es una red de más, en memoria: mismo
+ * criterio defensivo que ya usa `barrerLimiteDeEjercicios` para el barrido —
+ * `trainerLimitHitAt` sólo lo escribe el flujo del PF, así que en la práctica
+ * ya es exclusivo de `trainer`, pero el chequeo no cuesta una query extra.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  EL HORARIO DEL BARRIDO — 05:30 ART
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * Después del barrido de las 04:00 (`sweepEntitlements`, que recalcula
@@ -86,6 +122,7 @@ import { App } from "firebase-admin/app";
 import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 import { dedupeKey, enqueueMail } from "../mail/enqueue-mail";
@@ -359,8 +396,99 @@ export async function barrerLimiteDeEjercicios(
   return { candidatos: snap.size, enviados };
 }
 
+/** Qué hizo el trigger con una escritura de `users/{uid}`. Para el log. */
+export type ResultadoAlToque =
+  | "sin-tope-nuevo"
+  | "no-trainer"
+  | "silencio"
+  | "encolado";
+
 /**
- * 05:30 ART. Ver el encabezado — "EL HORARIO".
+ * Si esta escritura es un tope NUEVO: `trainerLimitHitAt` aparece o cambia.
+ *
+ * ⚠️ **Es lo que evita el loop.** `enqueueTrainerLimitMail` escribe
+ * `trainerLimitMailAt` en el MISMO documento que dispara el trigger. Esa
+ * escritura vuelve a despertarlo, pero deja `trainerLimitHitAt` igual, así
+ * que sale acá. Lo mismo con cualquier otra escritura del perfil —nombre,
+ * foto, preferencias—, que son la enorme mayoría de las que llegan. Calcado
+ * de `esToqueNuevo` en `free-limit-mail.ts`.
+ */
+export function esToqueNuevo(
+  antes: DocumentData | undefined,
+  despues: DocumentData | undefined,
+): boolean {
+  const despuesMs = msDe(despues?.[CAMPO_TOPE_AT]);
+  if (despuesMs === null) return false;
+  return despuesMs !== msDe(antes?.[CAMPO_TOPE_AT]);
+}
+
+/**
+ * El camino al toque: las mismas cuatro cláusulas que el barrido, para UN PF,
+ * en el momento en que choca el tope.
+ *
+ * El chequeo de `role` va acá y no en la query del trigger (que no existe:
+ * `onDocumentUpdated` no filtra por campo) — es la misma red defensiva que
+ * `barrerLimiteDeEjercicios` aplica en memoria, sin costo de query extra. Ver
+ * el encabezado — "EL ANTI-LOOP DEL CAMINO AL TOQUE".
+ */
+export async function alTocarElTope(
+  app: App,
+  uid: string,
+  antes: DocumentData | undefined,
+  despues: DocumentData | undefined,
+  nowMs: number,
+): Promise<ResultadoAlToque> {
+  if (!esToqueNuevo(antes, despues)) return "sin-tope-nuevo";
+  if (despues?.role !== "trainer") return "no-trainer";
+
+  const plan = decideTrainerLimitMail(despues, nowMs);
+  if (!plan) return "silencio";
+
+  await enqueueTrainerLimitMail(app, uid, plan, nowMs);
+  return "encolado";
+}
+
+/**
+ * El mail al toque. Ver «DOS CAMINOS» en el encabezado.
+ *
+ * `onDocumentUpdated` y no `Written`: la anotación sale de
+ * `registrarTopeDelPlanPf` sobre un `users/{uid}` que ya existe —el PF ya
+ * tiene sesión—, así que un alta nunca trae un tope.
+ *
+ * Un fallo se loguea y no se relanza. Relanzar no reintentaría (el trigger no
+ * tiene `retry`), y la red para ese caso ya existe: el barrido de las 05:30.
+ */
+export const sendTrainerLimitMailOnHit = onDocumentUpdated(
+  { document: "users/{uid}", region: "southamerica-east1" },
+  async (event) => {
+    const antes = event.data?.before?.data();
+    const despues = event.data?.after?.data();
+    // Filtro barato ANTES de tocar el app: casi todas las escrituras de
+    // `users/{uid}` no son un tope.
+    if (!esToqueNuevo(antes, despues)) return;
+
+    const { getApp, initializeApp } = await import("firebase-admin/app");
+    let app: App;
+    try {
+      app = getApp();
+    } catch {
+      app = initializeApp();
+    }
+    const uid = event.params.uid;
+    try {
+      const r = await alTocarElTope(app, uid, antes, despues, Date.now());
+      logger.info("sendTrainerLimitMailOnHit", { uid, resultado: r });
+    } catch (err) {
+      logger.error(
+        "sendTrainerLimitMailOnHit: falló; lo reintenta el barrido",
+        { uid, err },
+      );
+    }
+  },
+);
+
+/**
+ * 05:30 ART. Ver el encabezado — "EL HORARIO DEL BARRIDO".
  */
 export const sweepTrainerLimitMail = onSchedule(
   {

@@ -187,12 +187,19 @@ export {
   sendFreeLimitMailOnHit,
   sweepFreeLimitMail,
 } from "./subscriptions/free-limit-mail";
-// El mail al PF que choco el tope de ejercicios propios de su plan
-// (limite-ejercicios-pf.md, PR4). Corre 05:30 ART, media hora despues del
-// barrido de arriba y una hora despues del de las 04:00 que recalcula
-// `planLimits`/`customExerciseUsage` (`sweepEntitlements`) — ver el
-// encabezado de `trainer-limit-mail.ts`, seccion "EL HORARIO".
-export { sweepTrainerLimitMail } from "./subscriptions/trainer-limit-mail";
+// El mail al PF que choco un tope de su plan (ejercicios propios o
+// plantillas, limite-ejercicios-pf.md y limite-plantillas-pf.md, PR4). Dos
+// caminos, igual que el par de arriba: `sendTrainerLimitMailOnHit` lo encola
+// AL TOQUE, apenas el cliente anota `trainerLimitHitAt` en `users/{uid}`;
+// `sweepTrainerLimitMail` (05:30 ART, media hora despues del barrido de
+// arriba y una hora despues del de las 04:00 que recalcula
+// `planLimits`/`customExerciseUsage` con `sweepEntitlements`) queda como red
+// si el trigger fallo — ver el encabezado de `trainer-limit-mail.ts`,
+// seccion "DOS CAMINOS".
+export {
+  sendTrainerLimitMailOnHit,
+  sweepTrainerLimitMail,
+} from "./subscriptions/trainer-limit-mail";
 // Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
 // (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
 //
