@@ -8199,6 +8199,12 @@ abstract class AppL10n {
   /// **'Entendido'**
   String get customExerciseLimitDismiss;
 
+  /// CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver planes'**
+  String get trainerLimitNoticeVerPlanes;
+
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///
   /// In es_AR, this message translates to:

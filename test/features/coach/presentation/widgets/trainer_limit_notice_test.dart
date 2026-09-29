@@ -46,8 +46,8 @@ Future<void> _mostrar(
 }
 
 void main() {
-  group('móvil (sheet) — sólo estado — ejercicios propios', () {
-    testWidgets('en el tope: el texto exacto del plan, sin botón de acción',
+  group('móvil (sheet) — estado + VER PLANES — ejercicios propios', () {
+    testWidgets('en el tope: el texto exacto del plan, con VER PLANES',
         (tester) async {
       await _mostrar(
         tester,
@@ -62,9 +62,9 @@ void main() {
             'editar o borrar los que ya tenés.'),
         findsOneWidget,
       );
-      // Sólo el dismiss — nada que ofrezca comprar.
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
-      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.byKey(const Key('trainer_limit_ver_planes')), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     testWidgets('pasado de tope, toDelete > 1: número pelado sin "ejercicio"',
@@ -131,6 +131,62 @@ void main() {
           .map((t) => t.data ?? '')
           .join('\n');
       expect(textos.toLowerCase().contains('null'), isFalse);
+    });
+
+    testWidgets('VER PLANES navega a /facturacion/planes y cierra el sheet',
+        (tester) async {
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.sheet;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      final router = GoRouter(
+        initialLocation: '/rutinas',
+        routes: [
+          GoRoute(
+            path: '/rutinas',
+            builder: (context, _) => Scaffold(
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => showTrainerLimitNotice(
+                    context,
+                    kind: TrainerLimitKind.customExercises,
+                    limit: 60,
+                    count: 60,
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/facturacion/planes',
+            builder: (context, _) => const Scaffold(body: Text('PLANES')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          routerConfig: router,
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('VER PLANES'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Llegaste a los 60 ejercicios propios de tu plan. Podés '
+            'editar o borrar los que ya tenés.'),
+        findsNothing,
+        reason: 'el sheet se cierra antes de navegar',
+      );
+      expect(find.text('PLANES'), findsOneWidget);
     });
   });
 
@@ -224,8 +280,8 @@ void main() {
     });
   });
 
-  group('móvil (sheet) — sólo estado — plantillas', () {
-    testWidgets('en el tope: el texto exacto del plan, sin botón de acción',
+  group('móvil (sheet) — estado + VER PLANES — plantillas', () {
+    testWidgets('en el tope: el texto exacto del plan, con VER PLANES',
         (tester) async {
       await _mostrar(
         tester,
@@ -241,7 +297,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
-      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.byKey(const Key('trainer_limit_ver_planes')), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     testWidgets('pasado de tope: conservás todas, número pelado a archivar',
@@ -280,6 +337,62 @@ void main() {
       expect(textos.contains('mail'), isFalse);
       expect(textos.contains('pasá a un plan'), isFalse);
       expect(textos.contains('null'), isFalse);
+    });
+
+    testWidgets('VER PLANES navega a /facturacion/planes y cierra el sheet',
+        (tester) async {
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.sheet;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      final router = GoRouter(
+        initialLocation: '/rutinas',
+        routes: [
+          GoRoute(
+            path: '/rutinas',
+            builder: (context, _) => Scaffold(
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => showTrainerLimitNotice(
+                    context,
+                    kind: TrainerLimitKind.templates,
+                    limit: 3,
+                    count: 3,
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/facturacion/planes',
+            builder: (context, _) => const Scaffold(body: Text('PLANES')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          routerConfig: router,
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('VER PLANES'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Llegaste a las 3 plantillas de tu plan. Podés editarlas, '
+            'asignarlas o archivar una para hacer lugar.'),
+        findsNothing,
+        reason: 'el sheet se cierra antes de navegar',
+      );
+      expect(find.text('PLANES'), findsOneWidget);
     });
   });
 
@@ -334,7 +447,7 @@ void main() {
       );
 
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
-      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
   });
 }

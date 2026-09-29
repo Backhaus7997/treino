@@ -4671,6 +4671,9 @@ class AppL10nEn extends AppL10n {
   String get customExerciseLimitDismiss => 'Got it';
 
   @override
+  String get trainerLimitNoticeVerPlanes => 'View plans';
+
+  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
