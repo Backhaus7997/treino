@@ -357,9 +357,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('nuevo'), findsNothing);
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      // El número es el límite REAL con el que bloqueó el gate, no la tabla
+      // estática del tier.
       expect(
-        find.text('Llegaste a los 1 ejercicios propios de tu plan. Podés '
-            'editar o borrar los que ya tenés.'),
+        find.textContaining(
+            'incluye 1 ejercicio propio. Para sumar más, subí de plan.'),
         findsOneWidget,
       );
       // Sin botón de acción: sólo el dismiss de "sólo-estado".

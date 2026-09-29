@@ -165,27 +165,27 @@ class _TrainerLimitContent extends StatelessWidget {
     };
 
     // "En el tope": mismo tono que `_PlanLimitPaywallContent` — "tu plan
-    // incluye X, para sumar más subí de plan" — usando los MISMOS helpers de
-    // `plan_copy.dart` que el paywall de alumnos, así que Plan 3
-    // (`customExerciseLimit`/`templateLimit == null`) nunca interpola un
-    // "null": ese fue justo el bug real que documenta `plan_copy.dart`.
+    // incluye X, para sumar más subí de plan". El número es [limit], el MISMO
+    // que usó el gate para bloquear (`planLimits` del servidor), y NO la
+    // tabla estática del tier: si difieren (el piso prepago sube el plan
+    // efectivo, o un tope ajustado a mano), el aviso diría un tope que no es
+    // el que está frenando al PF. En este aviso [limit] nunca es null: sin
+    // tope no hay aviso.
     //
     // "Pasado de tope": el texto de conservación que ya tenía este aviso
     // (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3, "Los
     // avisos") — sin caja de upsell, adaptado sólo al encabezado/CTA nuevos.
+    final nounLimite = limit == 1
+        ? switch (kind) {
+            TrainerLimitKind.customExercises => 'ejercicio propio',
+            TrainerLimitKind.templates => 'plantilla',
+          }
+        : noun;
     final body = overLimit
         ? 'Tenés $count $noun y tu plan incluye $limit. '
             'Conservás $todos; para crear $unoNuevo, $verb $toFree.' // i18n: Fase W3
-        : switch (kind) {
-            TrainerLimitKind.customExercises =>
-              'Tu plan ${tierName(currentTier)} incluye '
-                  '${ejerciciosTexto(currentTier)}. Para sumar más, '
-                  'subí de plan.', // i18n: Fase W3
-            TrainerLimitKind.templates =>
-              'Tu plan ${tierName(currentTier)} incluye '
-                  '${plantillasTexto(currentTier)}. Para sumar más, '
-                  'subí de plan.', // i18n: Fase W3
-          };
+        : 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
+            'Para sumar más, subí de plan.'; // i18n: Fase W3
 
     final next = currentTier.nextTier;
 
