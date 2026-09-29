@@ -308,9 +308,11 @@ decir lo mismo con otra palabra, y dos copias divergen.
 
 **Los avisos:**
 
-- **Móvil, sólo estado:** «Llegaste a las 3 plantillas de tu plan. Podés
-  editarlas, asignarlas o archivar una para hacer lugar.»
-  - Sin botón, sin «web», sin «mail», sin «pasá a un plan».
+- **Móvil, estado + VER PLANES:** «Llegaste a las 3 plantillas de tu plan.
+  Podés editarlas, asignarlas o archivar una para hacer lugar.»
+  - Botón **VER PLANES** que navega a `/facturacion/planes` (misma pantalla
+    informativa que la web, sin comprar). Sin nombrar «web», sin «mail», sin
+    «pasá a un plan».
   - Correr `anti_steering_movil_test.dart`. Si se pone rojo, se cambia el texto,
     no el guard.
 - **Web:** el mismo estado, más el botón **VER PLANES** a facturación.
@@ -349,6 +351,12 @@ tiendas; es inerte mientras el campo esté en `null`.
 **El enfriamiento de 14 días (`trainerLimitMailAt`) queda compartido** entre los
 dos topes. Un PF que choca los dos recibe un solo mail cada 14 días. Es lo que
 se quiere: el problema es el spam, no qué tope fue.
+
+**Dos caminos, no sólo el barrido de las 05:30.** `sendTrainerLimitMailOnHit`
+—un `onDocumentUpdated` en `users/{uid}`— encola el mail AL TOQUE apenas el
+cliente anota `trainerLimitHitAt`, para los dos `kind`. `sweepTrainerLimitMail`
+queda como red diaria si el trigger falló; el enfriamiento compartido y el
+dedupe de la cola de mail evitan que los dos caminos manden un mail doble.
 
 **Tests:** las cuatro cláusulas de silencio para el kind nuevo, la tabla de
 kinds, y el template con el test de tildes del #1236.
@@ -581,7 +589,8 @@ producción y los legales publicados. **Todo antes del primer entrenador real.**
    - Un PF pago tiene `planLimits.templates: null`.
    - En el tope, «Nueva plantilla» en la web muestra el aviso con VER PLANES y no
      abre el editor.
-   - En el tope, desde el teléfono, el aviso de estado, sin botón.
+   - En el tope, desde el teléfono, el aviso de estado con VER PLANES, que
+     navega a la pantalla informativa de planes.
    - En el tope, **asignar una plantilla a un alumno funciona**. Es el control
      negativo más importante.
    - Archivar una libera el lugar; restaurarla con el tope lleno rebota con el
