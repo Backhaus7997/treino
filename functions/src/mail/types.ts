@@ -35,7 +35,7 @@ export type MailKind =
   // tarde. Destinatario: el PF. Sin `prefKey` a proposito — ver `templates.ts`.
   | "discomfort-reported"
   // Aviso interno al buzon del equipo cuando entra un reporte. NO va a un
-  // usuario: es el unico `kind` que viaja con `toAddress` en vez de `toUid`.
+  // usuario: viaja con `toAddress` en vez de `toUid` (como `withdrawal-team-notice`).
   // Sin el, la cola de revision existe pero nadie la mira, y las 24 horas que
   // promete `docs/legal/normas-de-comunidad.md:123` siguen siendo mentira.
   | "moderation-report-created"
@@ -193,7 +193,27 @@ export type MailKind =
   // Sin `prefKey` los dos: son la respuesta a un trámite legal que la persona
   // acaba de iniciar (Disp. 954/2025 art. 4 y 5), no algo que se pueda apagar.
   | "service-cancel-confirm"
-  | "service-cancel-done";
+  | "service-cancel-done"
+  // ── Botón de Arrepentimiento (Ley 24.240 art. 34, Disp. 954/2025) ───────
+  //
+  // Los produce `subscriptions/mp/arrepentimiento-por-mail.ts`. NO es la baja:
+  // acá se devuelve la plata, y sólo dentro de los 10 días corridos.
+  //
+  //  - `withdrawal-confirm`: el link de un solo uso, en `actionLink` (mismo
+  //    motivo que `service-cancel-confirm`: es el nombre que `sendQueuedMail`
+  //    borra de la cola al enviar).
+  //  - `withdrawal-received`: al usuario, dentro de plazo (o, con
+  //    `revision: "1"`, en el límite: se revisa a mano y no se canceló nada).
+  //  - `withdrawal-expired`: al usuario, cuando venció el plazo.
+  //  - `withdrawal-team-notice`: al BUZÓN DEL EQUIPO, con `toAddress`. Es el
+  //    aviso de que hay una devolución para hacer a mano.
+  //
+  // Sin `prefKey` los cuatro: son la respuesta a un trámite legal que la persona
+  // acaba de iniciar, no algo que se pueda apagar.
+  | "withdrawal-confirm"
+  | "withdrawal-received"
+  | "withdrawal-expired"
+  | "withdrawal-team-notice";
 
 /**
  * Per-kind template parameters.
@@ -215,7 +235,9 @@ export interface MailQueueDoc {
   /**
    * Direccion literal, para los mails que NO van a un usuario.
    *
-   * Hoy la usa uno solo: el aviso de reporte nuevo, que va al buzon del equipo.
+   * Hoy la usan dos, los dos avisos internos al buzon del equipo: el reporte
+   * nuevo (`moderation-report-created`) y el arrepentimiento con devolucion
+   * pendiente (`withdrawal-team-notice`).
    * Cuando esta presente, el consumidor la usa tal cual y NO resuelve por uid
    * ni consulta `notificationPrefs` — un buzon de equipo no tiene preferencias
    * de notificacion que consultar, y `resolveAddress` sobre un uid que no

@@ -257,6 +257,37 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "navegadores reales: un flag que rompe el boton de baja deja a la " +
       "persona sin el tramite que la norma obliga a ofrecer.",
   },
+  "subscriptions/mp/arrepentimiento-por-mail:solicitarArrepentimientoPorMail": {
+    permanence: "decided",
+    reason:
+      "Es el Botón de Arrepentimiento de la Ley 24.240 art. 34 y la Disp. " +
+      "954/2025, que PROHIBE exigir registración previa: no puede pedir sesión, " +
+      "y lo llama el servidor de la landing, que no tiene Firebase ni App " +
+      "Check. La cerradura es otra: solo puede mandarle un mail al DUEÑO del " +
+      "buzón de una cuenta que paga, con throttle de una ventana de 10 " +
+      "minutos por cuenta, y contesta siempre {status:\"ok\"} (anti-" +
+      "enumeracion). Mismo contrato que solicitarBajaPorMail. Ver " +
+      "arrepentimiento-por-mail.ts, bloque de los onCall.",
+  },
+  "subscriptions/mp/arrepentimiento-por-mail:confirmarArrepentimientoPorMail": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de confirmacion de la landing, en el NAVEGADOR y sin " +
+      "sesion por mandato de la norma; la landing no tiene Firebase ni App " +
+      "Check. Aca SI podria atestarse con reCAPTCHA, por eso es `debt` y no " +
+      "`decided`. Este CANCELA en Mercado Pago dentro de plazo (irreversible), " +
+      "y lo que lo cierra es que la unica entrada es un token de 256 bits que " +
+      "solo llego al buzón de la cuenta, de un solo uso (reclamo en " +
+      "transaccion), con vencimiento de 72 h, guardado como SHA-256, en una " +
+      "coleccion PROPIA (un token de baja no sirve aca). El uid sale del " +
+      "documento del token, nunca del request. Y la devolucion de la plata es " +
+      "manual: este endpoint no mueve dinero.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca junto con confirmarBajaPorMail. Medir antes que la pagina de " +
+      "confirmacion atesta en los navegadores reales: un flag que rompe el " +
+      "boton deja a la persona sin un derecho irrenunciable.",
+  },
   "profile/ensure-athlete-profile:ensureAthleteProfile": {
     permanence: "debt",
     reason:
@@ -396,6 +427,7 @@ const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
   "cancelMySubscription",
+  "confirmarArrepentimientoPorMail",
   "confirmarBajaPorMail",
   "createAthletePreapproval",
   "createPreapproval",
@@ -412,6 +444,7 @@ const EXPECTED_DEPLOYED = [
   "requestPasswordReset",
   "resolveReport",
   "resumeTrainerLink",
+  "solicitarArrepentimientoPorMail",
   "solicitarBajaPorMail",
 ] as const;
 
@@ -572,6 +605,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/baja-por-mail",
       symbol: "solicitarBajaPorMail",
       as: "solicitarBajaPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/arrepentimiento-por-mail",
+      symbol: "solicitarArrepentimientoPorMail",
+      as: "solicitarArrepentimientoPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/arrepentimiento-por-mail",
+      symbol: "confirmarArrepentimientoPorMail",
+      as: "confirmarArrepentimientoPorMail",
       attested: false,
     },
     {

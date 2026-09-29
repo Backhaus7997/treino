@@ -300,6 +300,51 @@ describe("mp_bajas_por_mail — escribirlo es darle de baja a otro", () => {
   });
 });
 
+describe("mp_arrepentimientos_por_mail — escribirlo es cortarle la suscripción a otro", () => {
+  const COL = "mp_arrepentimientos_por_mail";
+  const ARR = "d".repeat(64);
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection(COL).doc(ARR).set({
+        uid: TRAINER,
+        code: "ARR-2026-0A1B2C",
+        createdAt: new Date(1_000_000),
+        expiresAt: new Date(1_000_000 + 72 * 3600 * 1000),
+        usedAt: null,
+      });
+    });
+  });
+
+  it("nadie lo lee: ni el dueño, ni un tercero, ni un anónimo", async () => {
+    const p = (db: firebase.firestore.Firestore) => db.collection(COL).doc(ARR).get();
+    await assertFails(p(dbDe(TRAINER)));
+    await assertFails(p(dbDe(OTRO)));
+    await assertFails(p(anonimo()));
+  });
+
+  it("el listado tampoco", async () => {
+    await assertFails(anonimo().collection(COL).get());
+    await assertFails(dbDe(TRAINER).collection(COL).get());
+  });
+
+  it("nadie planta un link que apunte al arrepentimiento de otro", async () => {
+    await assertFails(
+      anonimo().collection(COL).doc("e".repeat(64)).set({ uid: TRAINER, usedAt: null }),
+    );
+    await assertFails(
+      dbDe(OTRO).collection(COL).doc("f".repeat(64)).set({ uid: TRAINER, usedAt: null }),
+    );
+  });
+
+  it("ni revive uno ya usado, ni le cambia el uid, ni lo borra", async () => {
+    const col = dbDe(TRAINER).collection(COL);
+    await assertFails(col.doc(ARR).update({ usedAt: null }));
+    await assertFails(col.doc(ARR).update({ uid: OTRO }));
+    await assertFails(col.doc(ARR).delete());
+  });
+});
+
 describe("el Admin SDK sí puede — si no, las Cloud Functions no andarían", () => {
   it("el contexto privilegiado escribe y lee las dos colecciones", async () => {
     // El complemento necesario de todo lo de arriba: un deny que también

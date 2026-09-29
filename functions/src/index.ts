@@ -305,6 +305,21 @@ export {
   confirmarBajaPorMail,
 } from "./subscriptions/mp/baja-por-mail";
 
+// Botón de Arrepentimiento VERIFICADO por mail (Ley 24.240 art. 34, Disp.
+// 954/2025). NO es la baja: éste devuelve la plata, y sólo dentro de los 10
+// días corridos, con la fecha de contratación de NUESTRO registro con Mercado
+// Pago. Dentro de plazo corta la suscripción y avisa al equipo, que devuelve el
+// pago a mano; en el límite no cancela nada y lo decide una persona; fuera de
+// plazo avisa que venció. Dos callables PÚBLICOS, como los de la baja.
+// Diseño: openspec/changes/arrepentimiento-por-mail/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826). `confirmar` CANCELA en Mercado Pago
+// (irreversible). OK humano primero.
+export {
+  solicitarArrepentimientoPorMail,
+  confirmarArrepentimientoPorMail,
+} from "./subscriptions/mp/arrepentimiento-por-mail";
+
 // Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
 // endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
 // un trigger de Firestore, esto lo puede POSTear cualquiera.
