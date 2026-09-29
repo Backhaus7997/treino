@@ -256,6 +256,19 @@ export const CAMPO_TOPE_KIND = "trainerLimitHitKind";
  */
 export const CAMPO_TOPE_INCREMENTO = "trainerLimitHitIncrement";
 /**
+ * El `id` de `trainer_links` que el intento RECHAZADO quería activar. Sólo lo
+ * escribe `registrarTopeDeAlumnos`, y sólo tiene sentido para el kind
+ * `students` — mismo criterio que `CAMPO_TOPE_INCREMENTO`.
+ *
+ * Hallazgo de Codex sobre #1267 (P2 de esta ronda). Sin esto, un reintento
+ * EXITOSO del mismo accept/resume —el PF liberó lugar y el vínculo que había
+ * rebotado ya está `active`— no tiene forma de distinguirse de un vínculo que
+ * sigue en un estado intermedio: `sigueEnElTope` sumaba el incremento sobre
+ * la carga en vivo SIN saber que ese vínculo específico ya estaba adentro de
+ * esa carga, contándolo dos veces. Ver `sigueEnElTope`, sección "EL LINK ID".
+ */
+export const CAMPO_TOPE_LINK_ID = "trainerLimitHitLinkId";
+/**
  * Cuándo se le escribió por última vez, POR KIND. Lo escribe este módulo.
  *
  * Forma nueva: un MAPA `{customExercises?: Timestamp, templates?: Timestamp,
@@ -486,6 +499,12 @@ function leerIncrementoDeAlumnos(userData: DocumentData | undefined): number | n
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
+/** Lee `trainerLimitHitLinkId` validando el tipo. Sólo relevante para `students`. */
+function leerLinkIdDeAlumnos(userData: DocumentData | undefined): string | null {
+  const raw = userData?.[CAMPO_TOPE_LINK_ID];
+  return typeof raw === "string" && raw ? raw : null;
+}
+
 /**
  * Si el PF SIGUE en el tope ahora mismo — la cláusula 3.
  *
@@ -547,6 +566,46 @@ function leerIncrementoDeAlumnos(userData: DocumentData | undefined): number | n
  * así a propósito, no por default: ver el describe "sin incremento" en
  * `trainer-limit-mail.test.ts`.
  *
+ * ── 3. EL LINK ID — NO CONTAR DOS VECES UN VÍNCULO QUE YA SE ACTIVÓ ──
+ *
+ * Hallazgo de Codex sobre #1267 (P2 de esta ronda). Hasta acá, si después del
+ * rechazo el PF liberaba un lugar y reintentaba el MISMO accept/resume CON
+ * ÉXITO —antes de que corriera el trigger o el barrido, que puede tardar
+ * hasta 36 h—, la carga en vivo YA incluía ese vínculo activo (peso 1.0) y
+ * sumarle el incremento (pensado para llevarlo DE pending/paused A activo) lo
+ * contaba dos veces: `carga(con el vínculo ya activo) + incremento > limit`
+ * disparaba un mail que decía "no se pudo activar ese vínculo" siendo falso.
+ *
+ * `vinculoAlumnos` —calculado por `reservarEnfriamiento` sobre los MISMOS
+ * vínculos en vivo que ya lee para la carga— resuelve esto en dos ramas:
+ *
+ *   - **El vínculo YA está `active`**: no manda. Ya no hay "un vínculo que no
+ *     se pudo activar" — el reintento tuvo éxito, y decir lo contrario es la
+ *     misma mentira de producto que la cláusula 3 general evita.
+ *   - **No está activo** (sigue pending/paused, o cambió a otra cosa, o no se
+ *     encuentra): la proyección es la carga en vivo SIN ESE vínculo más el
+ *     incremento — así el peso que ese vínculo aporta HOY (si es que aporta
+ *     alguno) nunca se suma dos veces junto con el incremento que ya lo
+ *     contempla.
+ *
+ * `vinculoAlumnos` es `null`/`undefined` en el choque LEGADO (sin
+ * `trainerLimitHitLinkId` — anotado antes de este fix, o `reservarEnfriamiento`
+ * no lo calculó): cae al comportamiento de ANTES de este fix
+ * (`cargaEnVivoDeAlumnos + incrementoAlumnos`), documentado arriba. No hay
+ * forma de saber CUÁL vínculo excluir sin el id, así que no se inventa una.
+ *
+ * ⚠️ **"sin ese vínculo + incremento" no es exacto cuando el vínculo YA
+ * pesaba algo (`paused`, 0.5) y SIGUE en ese mismo estado** — no se puede
+ * decir "cubierto" sobre esto (AGENTS.md §11.1). El incremento es
+ * `1.0 - pesoEnElMomentoDelRechazo`, no el peso completo hacia activo, así
+ * que restar el peso ACTUAL (igual al de aquel momento, si nada cambió) y
+ * sumar el incremento resta ese peso DOS VECES contra el projectedLoad que
+ * recalcularía el gate ahora mismo: sale más bajo, nunca más alto. Mismo
+ * signo que el resto del archivo — MENOS preciso, MÁS conservador, nunca
+ * manda de más — así que se acepta a propósito: ver el describe "el vínculo
+ * sigue paused" en `trainer-limit-mail.test.ts` para el caso concreto donde
+ * esto haría que un mail que correspondería no salga.
+ *
  * Devuelve el límite ya angosto a `number` para que el productor no tenga que
  * repetir el chequeo de tipo.
  */
@@ -558,12 +617,24 @@ function sigueEnElTope(
   tope: string,
   incrementoAlumnos: number | null,
   cargaEnVivoDeAlumnos: number | null,
+  vinculoAlumnos: VinculoDeAlumnos | null,
 ): number | null {
   const { limit, count } = campos.leerLimiteYUso(userData, trainerId, nowMs);
   if (limit === null) return null;
 
   if (tope === "students") {
     if (cargaEnVivoDeAlumnos === null) return null; // ver "2." arriba
+
+    if (vinculoAlumnos) {
+      if (vinculoAlumnos.activo) return null; // reintento exitoso — ver "3."
+      if (incrementoAlumnos !== null) {
+        return vinculoAlumnos.cargaSinElVinculo + incrementoAlumnos > limit
+          ? limit
+          : null;
+      }
+      return cargaEnVivoDeAlumnos >= limit ? limit : null;
+    }
+
     if (incrementoAlumnos !== null) {
       return cargaEnVivoDeAlumnos + incrementoAlumnos > limit ? limit : null;
     }
@@ -588,6 +659,8 @@ interface EventoTope {
   atMs: number | null;
   /** `trainerLimitHitIncrement` de ESTE evento. Sólo se usa para `students`. */
   incrementoAlumnos: number | null;
+  /** `trainerLimitHitLinkId` de ESTE evento. Sólo se usa para `students`. */
+  linkIdAlumnos: string | null;
 }
 
 /** Arma el `EventoTope` de un snapshot `despues`. Ver `EventoTope`. */
@@ -597,7 +670,26 @@ function eventoTopeDeSnapshot(despues: DocumentData | undefined): EventoTope {
     kind: typeof kindRaw === "string" && kindRaw ? kindRaw : "desconocido",
     atMs: msDe(despues?.[CAMPO_TOPE_AT]),
     incrementoAlumnos: leerIncrementoDeAlumnos(despues),
+    linkIdAlumnos: leerLinkIdDeAlumnos(despues),
   };
+}
+
+/**
+ * El estado DENTRO de la transacción del vínculo puntual que chocó el tope de
+ * alumnos — lo que `sigueEnElTope` necesita para no contarlo dos veces. Ver
+ * esa función, sección "3. EL LINK ID". Lo arma `reservarEnfriamiento` sobre
+ * los vínculos en vivo que ya lee para la carga; `null` cuando no hay
+ * `linkId` (choque legado).
+ */
+export interface VinculoDeAlumnos {
+  /** Si el vínculo YA está `active` ahora mismo — un reintento exitoso. */
+  activo: boolean;
+  /**
+   * La carga en vivo, EXCLUYENDO ese vínculo puntual. Si el vínculo no se
+   * encuentra más entre los vínculos vivos, es la carga en vivo completa —no
+   * hay nada que excluir.
+   */
+  cargaSinElVinculo: number;
 }
 
 /**
@@ -627,6 +719,12 @@ function eventoTopeDeSnapshot(despues: DocumentData | undefined): EventoTope {
  *                   vínculos frescos — ver `sigueEnElTope` y
  *                   `leerLimiteDeAlumnos` para el porqué de no usar
  *                   `weightedLoad`. Ignorado para los otros dos kinds.
+ * @param vinculoAlumnos - SÓLO relevante si el kind es `students`: el estado
+ *                   EN VIVO del vínculo puntual que chocó el tope (por
+ *                   `trainerLimitHitLinkId`) — ver `sigueEnElTope`, sección
+ *                   "3. EL LINK ID", y `VinculoDeAlumnos`. `null`/`undefined`
+ *                   en el choque legado, sin id. Ignorado para los otros dos
+ *                   kinds.
  */
 export function decideTrainerLimitMail(
   userData: DocumentData | undefined,
@@ -634,6 +732,7 @@ export function decideTrainerLimitMail(
   trainerId: string,
   evento?: EventoTope,
   cargaEnVivoDeAlumnos?: number,
+  vinculoAlumnos?: VinculoDeAlumnos | null,
 ): TrainerLimitMailPlan | null {
   const tocadoMs = evento ? evento.atMs : msDe(userData?.[CAMPO_TOPE_AT]);
   if (tocadoMs === null) return null; // clausula 1
@@ -664,6 +763,7 @@ export function decideTrainerLimitMail(
     tope,
     incrementoAlumnos,
     tope === "students" ? cargaEnVivoDeAlumnos ?? null : null,
+    tope === "students" ? vinculoAlumnos ?? null : null,
   );
   if (limit === null) return null; // clausula 3
 
@@ -765,6 +865,14 @@ interface Reserva {
  * mientras `linkLoadReconcile` todavía no corrió). El kind se mira ACÁ, antes
  * de llamar a la función pura, únicamente para decidir SI hace falta esa
  * query — para los otros dos kinds sería una lectura a Firestore de más.
+ *
+ * Sobre esos MISMOS vínculos —sin una segunda query— arma además
+ * `vinculoAlumnos`: busca el `trainerLimitHitLinkId` del evento (o del
+ * documento fresco, si no hay evento) entre los vínculos vivos, para que
+ * `sigueEnElTope` sepa si ESE vínculo puntual ya está `active` (reintento
+ * exitoso, no manda) o cuál es la carga en vivo sin él (hallazgo de Codex
+ * sobre #1267, P2 de esta ronda — ver `sigueEnElTope`, sección "3. EL LINK
+ * ID"). `null` cuando no hay `linkId` (choque legado).
  */
 async function reservarEnfriamiento(
   app: App,
@@ -784,12 +892,26 @@ async function reservarEnfriamiento(
     // corresponde la query de vínculos. `decideTrainerLimitMail` vuelve a
     // hacer el mismo cálculo; es una comparación de strings, no una lectura.
     const topeDeEsteLlamado = evento ? evento.kind : datosFrescos?.[CAMPO_TOPE_KIND];
-    const cargaEnVivoDeAlumnos =
-      topeDeEsteLlamado === "students"
-        ? computeWeightedLoad(
-          (await readTrainerLinks(tx, db, trainerId)) as unknown as WeightedLink[],
-        )
-        : undefined;
+    let cargaEnVivoDeAlumnos: number | undefined;
+    let vinculoAlumnos: VinculoDeAlumnos | null = null;
+    if (topeDeEsteLlamado === "students") {
+      const links = (await readTrainerLinks(tx, db, trainerId)) as unknown as
+        (WeightedLink & { id: string })[];
+      cargaEnVivoDeAlumnos = computeWeightedLoad(links);
+
+      // Ver el docblock de esta función — "vinculoAlumnos" — y `sigueEnElTope`,
+      // sección "3. EL LINK ID". Sin `linkId` (choque legado) queda `null`.
+      const linkId = evento ? evento.linkIdAlumnos : leerLinkIdDeAlumnos(datosFrescos);
+      if (linkId !== null) {
+        const vinculo = links.find((l) => l.id === linkId);
+        vinculoAlumnos = {
+          activo: vinculo?.status === "active",
+          cargaSinElVinculo: computeWeightedLoad(
+            links.filter((l) => l.id !== linkId),
+          ),
+        };
+      }
+    }
 
     const plan = decideTrainerLimitMail(
       datosFrescos,
@@ -797,6 +919,7 @@ async function reservarEnfriamiento(
       trainerId,
       evento,
       cargaEnVivoDeAlumnos,
+      vinculoAlumnos,
     );
     if (!plan) return null;
 
@@ -1176,10 +1299,11 @@ export function incrementoDeAlumnos(err: unknown): number | null {
 
 /**
  * Anota `trainerLimitHitKind: "students"` + `trainerLimitHitAt` (+ el
- * incremento rechazado, si se pudo leer) en `users/{trainerId}` cuando una
- * promoción (`acceptTrainerLink` / `resumeTrainerLink`) rebotó contra el tope
- * de alumnos. Esa escritura dispara `sendTrainerLimitMailOnHit`, igual que la
- * anotación de ejercicios/plantillas dispara ese mismo trigger.
+ * incremento rechazado y el `linkId` del vínculo, si se pudieron leer) en
+ * `users/{trainerId}` cuando una promoción (`acceptTrainerLink` /
+ * `resumeTrainerLink`) rebotó contra el tope de alumnos. Esa escritura
+ * dispara `sendTrainerLimitMailOnHit`, igual que la anotación de
+ * ejercicios/plantillas dispara ese mismo trigger.
  *
  * `incremento`: `projectedLoad - currentLoad` de los `details` del error (ver
  * `incrementoDeAlumnos`) — lo que `sigueEnElTope` necesita para reconstruir
@@ -1189,6 +1313,15 @@ export function incrementoDeAlumnos(err: unknown): number | null {
  * pegado a un `trainerLimitHitAt` nuevo — `sigueEnElTope` cae entonces al
  * criterio conservador documentado ahí, en vez de leer un número que ya no
  * describe a ESTE choque.
+ *
+ * `linkId`: el `id` de `trainer_links` que este intento quiso activar —
+ * siempre lo tiene el llamador (es el mismo `linkId` que recibió el
+ * callable), a diferencia del incremento, que depende de poder leer los
+ * `details` del error. MISMO criterio de limpieza: `null` BORRA la clave, por
+ * la misma razón — un `linkId` de un choque ANTERIOR pegado a un
+ * `trainerLimitHitAt` nuevo haría que `sigueEnElTope` buscara el vínculo
+ * EQUIVOCADO. Ver `sigueEnElTope`, sección "3. EL LINK ID" (hallazgo de Codex
+ * sobre #1267, P2 de esta ronda).
  *
  * DELIBERADAMENTE simple: una escritura, sin transacción propia y sin
  * catch interno. `syncTrainerLoad` tira DENTRO de su propia transacción
@@ -1208,6 +1341,7 @@ export async function registrarTopeDeAlumnos(
   trainerId: string,
   nowMs: number,
   incremento: number | null,
+  linkId: string | null,
 ): Promise<void> {
   await getFirestore(app)
     .collection("users")
@@ -1217,6 +1351,7 @@ export async function registrarTopeDeAlumnos(
         [CAMPO_TOPE_KIND]: "students",
         [CAMPO_TOPE_AT]: Timestamp.fromMillis(nowMs),
         [CAMPO_TOPE_INCREMENTO]: incremento !== null ? incremento : FieldValue.delete(),
+        [CAMPO_TOPE_LINK_ID]: linkId !== null ? linkId : FieldValue.delete(),
       },
       { merge: true },
     );

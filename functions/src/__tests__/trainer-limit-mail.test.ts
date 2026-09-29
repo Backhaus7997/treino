@@ -40,6 +40,7 @@ import {
   CAMPO_TOPE_AT,
   CAMPO_TOPE_KIND,
   CAMPO_TOPE_INCREMENTO,
+  CAMPO_TOPE_LINK_ID,
   CAMPO_MAIL_AT,
   TRAINER_LIMIT_PREF_KEY,
 } from "../subscriptions/trainer-limit-mail";
@@ -984,6 +985,112 @@ describe("alumnos", () => {
       expect(decideTrainerLimitMail(soloWeightedLoad, AHORA, "t1", undefined, 0)).toBeNull();
     });
   });
+
+  // ---------------------------------------------------------------------
+  // EL LINK ID — no contar dos veces un vínculo que ya se activó. Hallazgo
+  // de Codex sobre #1267 (P2 de esta ronda). Ver `sigueEnElTope`, sección
+  // "3. EL LINK ID". Los ids que genera `vinculos(...)` son "link-0",
+  // "link-1", ... en el orden del array (ver el mock de `trainer_links`
+  // arriba del archivo) — por eso cada test comenta a qué id corresponde
+  // cada entrada.
+  // ---------------------------------------------------------------------
+  describe("el linkId — no contar dos veces un vínculo que ya se activó", () => {
+    it("reintento exitoso (el vínculo YA está `active`) → no manda", async () => {
+      // Ejemplo del hallazgo: Free falla con carga 2, el PF libera un lugar,
+      // reintenta y el MISMO vínculo se activa con éxito, volviendo a 2. Con
+      // el criterio VIEJO (carga total + incremento) esto mandaría igual:
+      // 2 + 1 = 3 > 2 — "no se pudo activar" siendo falso.
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1,
+        [CAMPO_TOPE_LINK_ID]: "link-1", // el vínculo por el que chocó
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" }, // link-0
+        { athleteId: "a2", status: "active" }, // link-1 — reintentó y se activó
+      ]);
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan).toBeNull();
+    });
+
+    it("el vínculo sigue `pending` → manda si la proyección (sin él + incremento) supera el límite", async () => {
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1, // pending (0) → active (1) intentado
+        [CAMPO_TOPE_LINK_ID]: "link-2",
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" }, // link-0
+        { athleteId: "a2", status: "active" }, // link-1
+        { athleteId: "a3", status: "pending" }, // link-2 — el que chocó, sigue pendiente
+      ]); // carga sin él = 2 (pending pesa 0 de todos modos) + incremento 1 = 3 > 2
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan?.kind).toBe("student-limit-reached");
+    });
+
+    it("choque legado sin linkId → comportamiento de ANTES de este fix (carga total + incremento)", async () => {
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1,
+        // sin CAMPO_TOPE_LINK_ID — choque anotado antes de este fix
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" },
+        { athleteId: "a2", status: "active" },
+      ]); // carga total 2 + incremento 1 = 3 > 2 → manda, sin poder distinguir
+      // si uno de los dos vínculos es el que reintentó con éxito.
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan?.kind).toBe("student-limit-reached");
+    });
+
+    it("el vínculo ya no está entre los vivos (se terminó) → se trata como no-activo", async () => {
+      usersStore["t1"] = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 1,
+        [CAMPO_TOPE_LINK_ID]: "link-ausente", // no matchea ningún id vivo
+      };
+      vinculos("t1", [
+        { athleteId: "a1", status: "active" },
+        { athleteId: "a2", status: "active" },
+      ]); // "sin él" = carga total igual (no está para excluir) = 2 + incremento 1 = 3 > 2
+
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan?.kind).toBe("student-limit-reached");
+    });
+
+    // ── LA LIMITACIÓN CONOCIDA, documentada en `sigueEnElTope` ──
+    it("⚠️ el vínculo sigue `paused` SIN CAMBIOS: la fórmula conservadora puede no mandar donde el viejo sí", () => {
+      // No se puede decir "cubierto" sobre esto (AGENTS.md §11.1): el
+      // incremento es `1.0 - pesoDelMomento` (acá 0.5, paused), no el peso
+      // completo hacia activo, así que "carga sin él + incremento" resta ese
+      // 0.5 DOS VECES contra lo que el gate recalcularía ahora mismo (2.5).
+      // Se acepta porque es MENOS preciso pero MÁS conservador — nunca manda
+      // de más — mismo criterio que el resto del archivo.
+      const doc = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        [CAMPO_TOPE_INCREMENTO]: 0.5, // paused (0,5) → active (1,0) intentado
+      };
+      // Simula lo que `reservarEnfriamiento` le pasaría: carga total 2,0
+      // (activo 1,0 + pausado-ajeno 0,5 + este vínculo pausado 0,5), y el
+      // vínculo NO está activo, con carga sin él = 1,5.
+      const vinculoAlumnos = { activo: false, cargaSinElVinculo: 1.5 };
+      // Fórmula nueva: 1,5 + 0,5 = 2,0, no > 2 (límite Free) → no manda.
+      expect(
+        decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2, vinculoAlumnos),
+      ).toBeNull();
+      // El criterio VIEJO (sin excluir el vínculo) SÍ mandaba acá: 2,0 (carga
+      // total) + 0,5 = 2,5 > 2. Es la regresión aceptada a propósito.
+      expect(decideTrainerLimitMail(doc, AHORA, "t1", undefined, 2)).not.toBeNull();
+    });
+  });
 });
 
 // ── Hallazgo de Codex sobre #1267 (P1, mitad "no anotar el choque") ──
@@ -1058,19 +1165,27 @@ describe("registrarTopeDeAlumnos", () => {
     usersStore = {};
   });
 
-  it("guarda kind + at + el incremento cuando se lo pasan", async () => {
-    await registrarTopeDeAlumnos(APP, "t1", AHORA, 1.5);
+  it("guarda kind + at + el incremento + el linkId cuando se los pasan", async () => {
+    await registrarTopeDeAlumnos(APP, "t1", AHORA, 1.5, "link-abc");
     expect(usersStore["t1"]).toMatchObject({
       [CAMPO_TOPE_KIND]: "students",
       [CAMPO_TOPE_INCREMENTO]: 1.5,
+      [CAMPO_TOPE_LINK_ID]: "link-abc",
     });
     expect((usersStore["t1"]?.[CAMPO_TOPE_AT] as { toMillis(): number }).toMillis()).toBe(AHORA);
   });
 
   it("⚠️ sin incremento, BORRA cualquier valor de un choque anterior — no lo deja colgado", async () => {
     usersStore["t1"] = { [CAMPO_TOPE_INCREMENTO]: 3 }; // de un choque previo
-    await registrarTopeDeAlumnos(APP, "t1", AHORA, null);
+    await registrarTopeDeAlumnos(APP, "t1", AHORA, null, "link-nuevo");
     expect(usersStore["t1"]?.[CAMPO_TOPE_INCREMENTO]).toBeUndefined();
+  });
+
+  // ── Hallazgo de Codex sobre #1267 (P2 de esta ronda) ──
+  it("⚠️ sin linkId, BORRA cualquier id de un choque anterior — no lo deja colgado", async () => {
+    usersStore["t1"] = { [CAMPO_TOPE_LINK_ID]: "link-viejo" }; // de un choque previo
+    await registrarTopeDeAlumnos(APP, "t1", AHORA, null, null);
+    expect(usersStore["t1"]?.[CAMPO_TOPE_LINK_ID]).toBeUndefined();
   });
 });
 

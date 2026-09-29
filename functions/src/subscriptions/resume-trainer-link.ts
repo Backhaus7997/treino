@@ -50,9 +50,9 @@ export interface ResumeTrainerLinkResult {
  *
  * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
  * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
- * `incrementoDeAlumnos`) ACÁ, en el `catch` — mismo criterio que
- * `acceptTrainerLink`, ver su docstring para el porqué. BEST-EFFORT: un
- * fallo se loguea y el error original se relanza igual.
+ * `incrementoDeAlumnos`, + el `linkId` de ESTE intento) ACÁ, en el `catch` —
+ * mismo criterio que `acceptTrainerLink`, ver su docstring para el porqué.
+ * BEST-EFFORT: un fallo se loguea y el error original se relanza igual.
  */
 export async function runResumeTrainerLink(
   app: App,
@@ -71,7 +71,13 @@ export async function runResumeTrainerLink(
   } catch (err) {
     if (esTopeDeAlumnos(err)) {
       try {
-        await registrarTopeDeAlumnos(app, callerUid, Date.now(), incrementoDeAlumnos(err));
+        await registrarTopeDeAlumnos(
+          app,
+          callerUid,
+          Date.now(),
+          incrementoDeAlumnos(err),
+          linkId,
+        );
       } catch (anotarErr) {
         logger.error("resumeTrainerLink: no se pudo anotar el tope de alumnos", {
           trainerId: callerUid,

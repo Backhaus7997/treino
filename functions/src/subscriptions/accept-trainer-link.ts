@@ -54,8 +54,9 @@ export interface AcceptTrainerLinkResult {
  *
  * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
  * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
- * `incrementoDeAlumnos` sobre los `details` del mismo error — ver
- * `trainer-limit-mail.ts`) ACÁ, en el `catch` — nunca dentro de
+ * `incrementoDeAlumnos` sobre los `details` del mismo error, + el `linkId` de
+ * ESTE intento — ver `trainer-limit-mail.ts`, `registrarTopeDeAlumnos`) ACÁ,
+ * en el `catch` — nunca dentro de
  * `syncTrainerLoad`, cuyo throw ocurre DENTRO de su propia transacción y
  * revertiría cualquier escritura hecha ahí. La anotación es BEST-EFFORT: un
  * fallo se loguea y el error original se relanza igual, para que el cliente
@@ -78,7 +79,13 @@ export async function runAcceptTrainerLink(
   } catch (err) {
     if (esTopeDeAlumnos(err)) {
       try {
-        await registrarTopeDeAlumnos(app, callerUid, Date.now(), incrementoDeAlumnos(err));
+        await registrarTopeDeAlumnos(
+          app,
+          callerUid,
+          Date.now(),
+          incrementoDeAlumnos(err),
+          linkId,
+        );
       } catch (anotarErr) {
         logger.error("acceptTrainerLink: no se pudo anotar el tope de alumnos", {
           trainerId: callerUid,

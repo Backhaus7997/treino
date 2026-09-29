@@ -147,6 +147,7 @@ describe("runAcceptTrainerLink", () => {
         "trainer-1",
         expect.any(Number),
         expect.any(Number),
+        "L1",
       );
     });
 
@@ -163,6 +164,24 @@ describe("runAcceptTrainerLink", () => {
         "trainer-1",
         expect.any(Number),
         1,
+        "L1",
+      );
+    });
+
+    // ── Hallazgo de Codex sobre #1267 (P2 de esta ronda) ──
+    it("⚠️ guarda el linkId del vínculo que se intentó activar, no cualquier otro", async () => {
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "otro-link-99"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).toHaveBeenCalledWith(
+        expect.anything(),
+        "trainer-1",
+        expect.any(Number),
+        expect.any(Number),
+        "otro-link-99",
       );
     });
 
