@@ -8175,59 +8175,11 @@ abstract class AppL10n {
   /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
   String get privacyAnalyticsCrashNote;
 
-  /// Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de ejercicios propios de su plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que paywallFreePlanLimitTitle.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tope de ejercicios propios'**
-  String get customExerciseLimitNoticeTitle;
-
-  /// Cuerpo del aviso cuando count == limit (E6: el borde es count < limit al crear, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart y superficie_de_cobro_alumno_test.dart lo cuidan.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Llegaste a los {limit} ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.'**
-  String customExerciseLimitReachedBody(int limit);
-
-  /// Cuerpo del aviso cuando count > limit (E3: bajar de plan congela la creacion, no borra nada). {toDelete} = count - limit + 1. La rama 'other' es literal la del plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos': 'borrá 21.') sin la palabra 'ejercicios' — la rama '=1' si la lleva ('borrá 1 ejercicio') porque un numero pelado ahi lee mal en castellano.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tenés {count} ejercicios propios y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, {toDelete, plural, =1{borrá 1 ejercicio} other{borrá {toDelete}}}.'**
-  String customExerciseLimitOverBody(int count, int limit, int toDelete);
-
-  /// CTA de cierre del aviso de tope de ejercicios propios en el movil. Mismo texto que paywallFreePlanLimitDismiss a proposito: misma accion, mismo verbo.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Entendido'**
-  String get customExerciseLimitDismiss;
-
-  /// CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site).
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Ver planes'**
-  String get trainerLimitNoticeVerPlanes;
-
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///
   /// In es_AR, this message translates to:
   /// **'{count} de {limit} ejercicios propios'**
   String customExerciseCounter(int count, int limit);
-
-  /// Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de plantillas de su plan (docs/limite-plantillas-pf.md PR3, 'El aviso'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que customExerciseLimitNoticeTitle.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tope de plantillas'**
-  String get templateLimitNoticeTitle;
-
-  /// Cuerpo del aviso cuando count == limit (P4: archivar libera el lugar; el borde de creacion es count < limit, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart lo cuida.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Llegaste a las {limit} plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.'**
-  String templateLimitReachedBody(int limit);
-
-  /// Cuerpo del aviso cuando count > limit (P5: bajar de plan congela la creacion, no borra ni desarchiva nada). {toArchive} = count - limit + 1. La rama '=1' lleva el numero para que no lea pelado en castellano.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tenés {count} plantillas y tu plan incluye {limit}. Conservás todas; para crear una nueva, {toArchive, plural, =1{archivá 1} other{archivá {toArchive}}}.'**
-  String templateLimitOverBody(int count, int limit, int toArchive);
 
   /// Contador visible en la grilla de rutinas del Hub y en la seccion de plantillas del movil (docs/limite-plantillas-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null.
   ///

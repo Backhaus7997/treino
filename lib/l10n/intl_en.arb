@@ -1973,38 +1973,6 @@
   "privacyAnalyticsSubtitle": "Helps us understand which parts of the app get used.",
   "privacyAnalyticsExplainer": "If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.",
   "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.",
-  "customExerciseLimitNoticeTitle": "Custom exercise limit",
-  "@customExerciseLimitNoticeTitle": {},
-  "customExerciseLimitReachedBody": "You reached the {limit} custom exercises included in your plan. You can edit or delete the ones you already have.",
-  "@customExerciseLimitReachedBody": {
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitOverBody": "You have {count} custom exercises and your plan includes {limit}. You keep them all; to create a new one, {toDelete, plural, =1{delete 1 exercise} other{delete {toDelete}}}.",
-  "@customExerciseLimitOverBody": {
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toDelete": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitDismiss": "Got it",
-  "@customExerciseLimitDismiss": {},
-  "trainerLimitNoticeVerPlanes": "View plans",
-  "@trainerLimitNoticeVerPlanes": {},
   "customExerciseCounter": "{count} of {limit} custom exercises",
   "@customExerciseCounter": {
     "placeholders": {
@@ -2013,34 +1981,6 @@
         "format": "decimalPattern"
       },
       "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitNoticeTitle": "Template limit",
-  "@templateLimitNoticeTitle": {},
-  "templateLimitReachedBody": "You reached the {limit} templates included in your plan. You can edit, assign, or archive one to make room.",
-  "@templateLimitReachedBody": {
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitOverBody": "You have {count} templates and your plan includes {limit}. You keep them all; to create a new one, {toArchive, plural, =1{archive 1} other{archive {toArchive}}}.",
-  "@templateLimitOverBody": {
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toArchive": {
         "type": "int",
         "format": "decimalPattern"
       }

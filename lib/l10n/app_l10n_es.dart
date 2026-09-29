@@ -4732,45 +4732,6 @@ class AppL10nEs extends AppL10n {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
-
-  @override
-  String customExerciseLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
-  }
-
-  @override
-  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toDeleteNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toDelete,
-      locale: localeName,
-      other: 'borrá $toDeleteString',
-      one: 'borrá 1 ejercicio',
-    );
-    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
-  }
-
-  @override
-  String get customExerciseLimitDismiss => 'Entendido';
-
-  @override
-  String get trainerLimitNoticeVerPlanes => 'Ver planes';
-
-  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -4780,39 +4741,6 @@ class AppL10nEs extends AppL10n {
     final String limitString = limitNumberFormat.format(limit);
 
     return '$countString de $limitString ejercicios propios';
-  }
-
-  @override
-  String get templateLimitNoticeTitle => 'Tope de plantillas';
-
-  @override
-  String templateLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
-  }
-
-  @override
-  String templateLimitOverBody(int count, int limit, int toArchive) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toArchiveNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toArchive,
-      locale: localeName,
-      other: 'archivá $toArchiveString',
-      one: 'archivá 1',
-    );
-    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
   }
 
   @override
@@ -9553,45 +9481,6 @@ class AppL10nEsAr extends AppL10nEs {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
-
-  @override
-  String customExerciseLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
-  }
-
-  @override
-  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toDeleteNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toDelete,
-      locale: localeName,
-      other: 'borrá $toDeleteString',
-      one: 'borrá 1 ejercicio',
-    );
-    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
-  }
-
-  @override
-  String get customExerciseLimitDismiss => 'Entendido';
-
-  @override
-  String get trainerLimitNoticeVerPlanes => 'Ver planes';
-
-  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -9601,39 +9490,6 @@ class AppL10nEsAr extends AppL10nEs {
     final String limitString = limitNumberFormat.format(limit);
 
     return '$countString de $limitString ejercicios propios';
-  }
-
-  @override
-  String get templateLimitNoticeTitle => 'Tope de plantillas';
-
-  @override
-  String templateLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
-  }
-
-  @override
-  String templateLimitOverBody(int count, int limit, int toArchive) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toArchiveNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toArchive,
-      locale: localeName,
-      other: 'archivá $toArchiveString',
-      one: 'archivá 1',
-    );
-    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
   }
 
   @override

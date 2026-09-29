@@ -3,20 +3,24 @@
 // el PF choca un tope de su plan (docs/limite-ejercicios-pf.md PR3 y
 // docs/limite-plantillas-pf.md PR3, "Los avisos").
 //
-// Cubre lo que el resto de los tests de entrada NO puede cubrir en detalle:
-// los DOS estados (en el tope / pasado de tope) en las DOS superficies, para
-// los DOS `kind`, la pluralización, y que ningún `null` se interpola.
+// Desde la unificación con `plan_limit_paywall.dart` (el paywall de
+// alumnos), este aviso usa el MISMO estilo: candado, "en el tope" con caja
+// de upsell y precio, "pasado de tope" con el texto de conservación, VER
+// PLANES y "Ahora no". Este archivo cubre los DOS estados en las DOS
+// superficies, para los DOS `kind`, la caja de upsell y que ningún `null` se
+// interpola.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
-import 'package:treino/l10n/app_l10n.dart';
 
 Future<void> _mostrar(
   WidgetTester tester, {
   required TrainerLimitKind kind,
+  SubscriptionTier currentTier = SubscriptionTier.free,
   required int limit,
   required int count,
   TrainerLimitNoticeForm? form,
@@ -27,14 +31,16 @@ Future<void> _mostrar(
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.dark(),
-      localizationsDelegates: AppL10n.localizationsDelegates,
-      supportedLocales: AppL10n.supportedLocales,
-      locale: const Locale('es', 'AR'),
       home: Scaffold(
         body: Builder(
           builder: (context) => ElevatedButton(
-            onPressed: () => showTrainerLimitNotice(context,
-                kind: kind, limit: limit, count: count),
+            onPressed: () => showTrainerLimitNotice(
+              context,
+              kind: kind,
+              currentTier: currentTier,
+              limit: limit,
+              count: count,
+            ),
             child: const Text('abrir'),
           ),
         ),
@@ -46,75 +52,72 @@ Future<void> _mostrar(
 }
 
 void main() {
-  group('móvil (sheet) — estado + VER PLANES — ejercicios propios', () {
-    testWidgets('en el tope: el texto exacto del plan, con VER PLANES',
+  group('móvil (sheet) — en el tope — ejercicios propios', () {
+    testWidgets('mismo tono que el paywall de alumnos, con upsell',
         (tester) async {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.customExercises,
-        limit: 60,
-        count: 60,
+        currentTier: SubscriptionTier.free,
+        limit: 20,
+        count: 20,
         form: TrainerLimitNoticeForm.sheet,
       );
 
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
       expect(
-        find.text('Llegaste a los 60 ejercicios propios de tu plan. Podés '
-            'editar o borrar los que ya tenés.'),
+        find.text(
+          'Tu plan Free incluye 20 ejercicios propios. Para sumar más, '
+          'subí de plan.',
+        ),
         findsOneWidget,
       );
+      // La caja de upsell al siguiente tier, mismo estilo que el paywall de
+      // alumnos.
+      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('12.000'), findsOneWidget);
+      expect(find.text('Hasta 60 ejercicios propios'), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_ver_planes')), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
+      expect(find.text('Ahora no'), findsOneWidget);
     });
 
-    testWidgets('pasado de tope, toDelete > 1: número pelado sin "ejercicio"',
+    testWidgets('desde Plan 2, el upsell dice "sin límite" y nunca "null"',
         (tester) async {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan2,
+        limit: 120,
+        count: 120,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+      expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
+      expect(find.textContaining('null'), findsNothing);
+    });
+
+    testWidgets('pasado de tope: conservación, SIN caja de upsell',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
         limit: 60,
         count: 80,
         form: TrainerLimitNoticeForm.sheet,
       );
 
-      // Texto exacto del plan (docs/limite-ejercicios-pf.md PR3, "Los
-      // avisos"): toDelete = 80 - 60 + 1 = 21.
+      // toDelete = 80 - 60 + 1 = 21.
       expect(
         find.text('Tenés 80 ejercicios propios y tu plan incluye 60. '
             'Conservás todos; para crear uno nuevo, borrá 21.'),
         findsOneWidget,
       );
-    });
-
-    testWidgets(
-        'toDelete == 1 (por más que hoy sea inalcanzable desde el widget: '
-        'overLimit exige count > limit, así que toDelete = count - limit + 1 '
-        'nunca baja de 2) ⇒ la cadena ICU igual dice el singular',
-        (tester) async {
-      // No se puede llegar a este texto TAPEANDO el aviso — se prueba la
-      // función de l10n directo, como defensa si el día de mañana cambia el
-      // borde y esta rama se vuelve alcanzable.
-      late String cuerpo;
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppL10n.localizationsDelegates,
-          supportedLocales: AppL10n.supportedLocales,
-          locale: const Locale('es', 'AR'),
-          home: Builder(
-            builder: (context) {
-              cuerpo =
-                  AppL10n.of(context).customExerciseLimitOverBody(61, 60, 1);
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      );
-
-      expect(
-        cuerpo,
-        'Tenés 61 ejercicios propios y tu plan incluye 60. Conservás '
-        'todos; para crear uno nuevo, borrá 1 ejercicio.',
-      );
+      expect(find.textContaining('PASATE A'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     testWidgets('ningún texto visible interpola "null"', (tester) async {
@@ -149,6 +152,7 @@ void main() {
                   onPressed: () => showTrainerLimitNotice(
                     context,
                     kind: TrainerLimitKind.customExercises,
+                    currentTier: SubscriptionTier.free,
                     limit: 60,
                     count: 60,
                   ),
@@ -168,9 +172,6 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
-          localizationsDelegates: AppL10n.localizationsDelegates,
-          supportedLocales: AppL10n.supportedLocales,
-          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -181,8 +182,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Llegaste a los 60 ejercicios propios de tu plan. Podés '
-            'editar o borrar los que ya tenés.'),
+        find.text('TOPE DE EJERCICIOS PROPIOS'),
         findsNothing,
         reason: 'el sheet se cierra antes de navegar',
       );
@@ -191,20 +191,26 @@ void main() {
   });
 
   group('web (dialog) — con VER PLANES — ejercicios propios', () {
-    testWidgets('en el tope: cuerpo + VER PLANES', (tester) async {
+    testWidgets('en el tope: mismo cuerpo que el móvil + VER PLANES',
+        (tester) async {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.customExercises,
-        limit: 60,
-        count: 60,
+        currentTier: SubscriptionTier.free,
+        limit: 20,
+        count: 20,
         form: TrainerLimitNoticeForm.dialog,
       );
 
       expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
       expect(
-        find.text('Tu plan incluye 60 ejercicios propios y ya tenés 60.'),
+        find.text(
+          'Tu plan Free incluye 20 ejercicios propios. Para sumar más, '
+          'subí de plan.',
+        ),
         findsOneWidget,
       );
+      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
 
@@ -214,6 +220,7 @@ void main() {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
         limit: 60,
         count: 80,
         form: TrainerLimitNoticeForm.dialog,
@@ -243,6 +250,7 @@ void main() {
                   onPressed: () => showTrainerLimitNotice(
                     context,
                     kind: TrainerLimitKind.customExercises,
+                    currentTier: SubscriptionTier.free,
                     limit: 60,
                     count: 60,
                   ),
@@ -262,9 +270,6 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
-          localizationsDelegates: AppL10n.localizationsDelegates,
-          supportedLocales: AppL10n.supportedLocales,
-          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -280,22 +285,27 @@ void main() {
     });
   });
 
-  group('móvil (sheet) — estado + VER PLANES — plantillas', () {
-    testWidgets('en el tope: el texto exacto del plan, con VER PLANES',
+  group('móvil (sheet) — plantillas', () {
+    testWidgets('en el tope: mismo tono que alumnos, con upsell',
         (tester) async {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.templates,
+        currentTier: SubscriptionTier.free,
         limit: 3,
         count: 3,
         form: TrainerLimitNoticeForm.sheet,
       );
 
+      expect(find.text('TOPE DE PLANTILLAS'), findsOneWidget);
       expect(
-        find.text('Llegaste a las 3 plantillas de tu plan. Podés editarlas, '
-            'asignarlas o archivar una para hacer lugar.'),
+        find.text('Tu plan Free incluye 3 plantillas. Para sumar más, '
+            'subí de plan.'),
         findsOneWidget,
       );
+      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      // Free → Plan 1 ya es plantillas sin límite (sólo Free tiene tope).
+      expect(find.text('Plantillas sin límite'), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.byKey(const Key('trainer_limit_ver_planes')), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
@@ -306,6 +316,7 @@ void main() {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.templates,
+        currentTier: SubscriptionTier.free,
         limit: 3,
         count: 5,
         form: TrainerLimitNoticeForm.sheet,
@@ -317,6 +328,7 @@ void main() {
             'todas; para crear una nueva, archivá 3.'),
         findsOneWidget,
       );
+      expect(find.textContaining('PASATE A'), findsNothing);
     });
 
     testWidgets('el texto no nombra "web", "mail" ni "pasá a un plan"',
@@ -355,6 +367,7 @@ void main() {
                   onPressed: () => showTrainerLimitNotice(
                     context,
                     kind: TrainerLimitKind.templates,
+                    currentTier: SubscriptionTier.free,
                     limit: 3,
                     count: 3,
                   ),
@@ -374,9 +387,6 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
-          localizationsDelegates: AppL10n.localizationsDelegates,
-          supportedLocales: AppL10n.supportedLocales,
-          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -386,22 +396,19 @@ void main() {
       await tester.tap(find.text('VER PLANES'));
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('Llegaste a las 3 plantillas de tu plan. Podés editarlas, '
-            'asignarlas o archivar una para hacer lugar.'),
-        findsNothing,
-        reason: 'el sheet se cierra antes de navegar',
-      );
+      expect(find.text('TOPE DE PLANTILLAS'), findsNothing,
+          reason: 'el sheet se cierra antes de navegar');
       expect(find.text('PLANES'), findsOneWidget);
     });
   });
 
-  group('web (dialog) — con VER PLANES — plantillas', () {
+  group('web (dialog) — plantillas', () {
     testWidgets('en el tope: título y cuerpo de plantillas + VER PLANES',
         (tester) async {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.templates,
+        currentTier: SubscriptionTier.free,
         limit: 3,
         count: 3,
         form: TrainerLimitNoticeForm.dialog,
@@ -409,7 +416,8 @@ void main() {
 
       expect(find.text('TOPE DE PLANTILLAS'), findsOneWidget);
       expect(
-        find.text('Tu plan incluye 3 plantillas y ya tenés 3.'),
+        find.text('Tu plan Free incluye 3 plantillas. Para sumar más, '
+            'subí de plan.'),
         findsOneWidget,
       );
       expect(find.text('VER PLANES'), findsOneWidget);
@@ -423,6 +431,7 @@ void main() {
       await _mostrar(
         tester,
         kind: TrainerLimitKind.templates,
+        currentTier: SubscriptionTier.free,
         limit: 3,
         count: 5,
         form: TrainerLimitNoticeForm.dialog,

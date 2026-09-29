@@ -4190,46 +4190,6 @@
   "@privacyAnalyticsCrashNote": {
     "description": "Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue."
   },
-  "customExerciseLimitNoticeTitle": "Tope de ejercicios propios",
-  "@customExerciseLimitNoticeTitle": {
-    "description": "Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de ejercicios propios de su plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que paywallFreePlanLimitTitle."
-  },
-  "customExerciseLimitReachedBody": "Llegaste a los {limit} ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.",
-  "@customExerciseLimitReachedBody": {
-    "description": "Cuerpo del aviso cuando count == limit (E6: el borde es count < limit al crear, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart y superficie_de_cobro_alumno_test.dart lo cuidan.",
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitOverBody": "Tenés {count} ejercicios propios y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, {toDelete, plural, =1{borrá 1 ejercicio} other{borrá {toDelete}}}.",
-  "@customExerciseLimitOverBody": {
-    "description": "Cuerpo del aviso cuando count > limit (E3: bajar de plan congela la creacion, no borra nada). {toDelete} = count - limit + 1. La rama 'other' es literal la del plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos': 'borrá 21.') sin la palabra 'ejercicios' — la rama '=1' si la lleva ('borrá 1 ejercicio') porque un numero pelado ahi lee mal en castellano.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toDelete": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitDismiss": "Entendido",
-  "@customExerciseLimitDismiss": {
-    "description": "CTA de cierre del aviso de tope de ejercicios propios en el movil. Mismo texto que paywallFreePlanLimitDismiss a proposito: misma accion, mismo verbo."
-  },
-  "trainerLimitNoticeVerPlanes": "Ver planes",
-  "@trainerLimitNoticeVerPlanes": {
-    "description": "CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site)."
-  },
   "customExerciseCounter": "{count} de {limit} ejercicios propios",
   "@customExerciseCounter": {
     "description": "Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.",
@@ -4239,38 +4199,6 @@
         "format": "decimalPattern"
       },
       "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitNoticeTitle": "Tope de plantillas",
-  "@templateLimitNoticeTitle": {
-    "description": "Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de plantillas de su plan (docs/limite-plantillas-pf.md PR3, 'El aviso'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que customExerciseLimitNoticeTitle."
-  },
-  "templateLimitReachedBody": "Llegaste a las {limit} plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.",
-  "@templateLimitReachedBody": {
-    "description": "Cuerpo del aviso cuando count == limit (P4: archivar libera el lugar; el borde de creacion es count < limit, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart lo cuida.",
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitOverBody": "Tenés {count} plantillas y tu plan incluye {limit}. Conservás todas; para crear una nueva, {toArchive, plural, =1{archivá 1} other{archivá {toArchive}}}.",
-  "@templateLimitOverBody": {
-    "description": "Cuerpo del aviso cuando count > limit (P5: bajar de plan congela la creacion, no borra ni desarchiva nada). {toArchive} = count - limit + 1. La rama '=1' lleva el numero para que no lea pelado en castellano.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toArchive": {
         "type": "int",
         "format": "decimalPattern"
       }
