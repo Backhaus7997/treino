@@ -35,13 +35,58 @@ jest.mock("../mail/enqueue-mail", () => ({
   enqueueMail: jest.fn(async () => "queued-id"),
 }));
 
-const setMock = jest.fn(async () => undefined);
+/**
+ * Mismo fake que `trainer-limit-mail.test.ts` — ver el comentario ahí. Acá
+ * hace falta porque `alTocarElTope` ya no decide sobre `despues`: sólo lo usa
+ * para `esToqueNuevo` y el chequeo de `role`. La decisión de verdad la hace
+ * `enqueueTrainerLimitMail` releyendo `users/{uid}` FRESCO — así que cada
+ * test tiene que sembrar `usersStore[uid]` con lo que "ya está" en Firestore
+ * (normalmente, el mismo `despues` que dispara el trigger).
+ */
+let usersStore: Record<string, Record<string, unknown> | undefined> = {};
+const colaExiste = true;
+const colaGetMock = jest.fn(async () => ({ exists: colaExiste }));
+const DELETE_SENTINEL = Symbol("FieldValue.delete()");
+
+interface FakeRef {
+  uid: string;
+}
+interface FakeTx {
+  get: (ref: FakeRef) => Promise<{ data: () => Record<string, unknown> | undefined }>;
+  set: (ref: FakeRef, patch: Record<string, unknown>) => void;
+  update: (ref: FakeRef, patch: Record<string, unknown>) => void;
+}
+
+let mutex: Promise<unknown> = Promise.resolve();
+const runTransactionMock = jest.fn((fn: (tx: FakeTx) => Promise<unknown>) => {
+  const tx: FakeTx = {
+    get: async (ref) => ({ data: () => usersStore[ref.uid] }),
+    set: (ref, patch) => {
+      usersStore[ref.uid] = { ...(usersStore[ref.uid] ?? {}), ...patch };
+    },
+    update: (ref, patch) => {
+      const next = { ...(usersStore[ref.uid] ?? {}) };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === DELETE_SENTINEL) delete next[k];
+        else next[k] = v;
+      }
+      usersStore[ref.uid] = next;
+    },
+  };
+  const run = mutex.then(() => fn(tx));
+  mutex = run.catch(() => undefined);
+  return run;
+});
+
 jest.mock("firebase-admin/firestore", () => ({
   ...jest.requireActual("firebase-admin/firestore"),
+  FieldValue: { delete: () => DELETE_SENTINEL },
   getFirestore: () => ({
-    collection: () => ({
-      doc: () => ({ set: setMock, get: async () => ({ exists: true }) }),
-    }),
+    collection: (name: string) =>
+      name === "users"
+        ? { doc: (uid: string) => ({ uid }) }
+        : { doc: () => ({ get: colaGetMock }) },
+    runTransaction: runTransactionMock,
   }),
 }));
 
@@ -64,7 +109,10 @@ const CON_TOPE = {
 
 beforeEach(() => {
   enqueueMock.mockClear();
-  setMock.mockClear();
+  colaGetMock.mockClear();
+  runTransactionMock.mockClear();
+  usersStore = {};
+  mutex = Promise.resolve();
 });
 
 describe("esToqueNuevo", () => {
@@ -98,6 +146,7 @@ describe("esToqueNuevo", () => {
 
 describe("alTocarElTope", () => {
   it("el tope nuevo encola el mail y anota el enfriamiento", async () => {
+    usersStore["t1"] = CON_TOPE;
     const r = await alTocarElTope(APP, "t1", PERFIL, CON_TOPE, AHORA);
     expect(r).toBe("encolado");
     expect(enqueueMock).toHaveBeenCalledTimes(1);
@@ -105,11 +154,12 @@ describe("alTocarElTope", () => {
       toUid: "t1",
       kind: "exercise-limit-reached",
     });
-    expect(setMock).toHaveBeenCalledTimes(1);
+    expect(usersStore["t1"]?.[CAMPO_MAIL_AT]).toBeDefined();
   });
 
   it("⚠️ el segundo despertar —el de su propia escritura— no encola nada", async () => {
     const conMail = { ...CON_TOPE, [CAMPO_MAIL_AT]: ts(AHORA) };
+    usersStore["t1"] = conMail;
     const r = await alTocarElTope(APP, "t1", CON_TOPE, conMail, AHORA);
     expect(r).toBe("sin-tope-nuevo");
     expect(enqueueMock).not.toHaveBeenCalled();
@@ -117,6 +167,7 @@ describe("alTocarElTope", () => {
 
   it("⚠️ un alumno con trainerLimitHitAt anotado (dato corrupto o forjado) no recibe el mail del PF", async () => {
     const alumnoConTope = { ...CON_TOPE, role: "athlete" };
+    usersStore["a1"] = alumnoConTope;
     const r = await alTocarElTope(
       APP,
       "a1",
@@ -126,13 +177,14 @@ describe("alTocarElTope", () => {
     );
     expect(r).toBe("no-trainer");
     expect(enqueueMock).not.toHaveBeenCalled();
-    expect(setMock).not.toHaveBeenCalled();
+    expect(runTransactionMock).not.toHaveBeenCalled();
   });
 
   it("⚠️ el enfriamiento corta también al toque", async () => {
     // Choca el tope de nuevo tres días después del último mail.
     const antes = { ...CON_TOPE, [CAMPO_MAIL_AT]: ts(AHORA - 3 * 86_400_000) };
     const despues = { ...antes, [CAMPO_TOPE_AT]: ts(AHORA) };
+    usersStore["t1"] = despues;
     const r = await alTocarElTope(APP, "t1", antes, despues, AHORA);
     expect(r).toBe("silencio");
     expect(enqueueMock).not.toHaveBeenCalled();
@@ -144,6 +196,7 @@ describe("alTocarElTope", () => {
       [CAMPO_MAIL_AT]: ts(AHORA - ENFRIAMIENTO_MS - 1),
     };
     const despues = { ...antes, [CAMPO_TOPE_AT]: ts(AHORA) };
+    usersStore["t1"] = despues;
     expect(await alTocarElTope(APP, "t1", antes, despues, AHORA)).toBe(
       "encolado",
     );
@@ -151,6 +204,7 @@ describe("alTocarElTope", () => {
 
   it("⚠️ quien ya no está en el tope (subió de plan) no recibe el mail", async () => {
     const sinTope = { ...CON_TOPE, planLimits: { customExercises: null } };
+    usersStore["t1"] = sinTope;
     expect(await alTocarElTope(APP, "t1", PERFIL, sinTope, AHORA)).toBe(
       "silencio",
     );
@@ -165,6 +219,7 @@ describe("alTocarElTope", () => {
       planLimits: { templates: 3 },
       templateUsage: { count: 3 },
     };
+    usersStore["t1"] = conTopeDePlantillas;
     const r = await alTocarElTope(
       APP,
       "t1",
@@ -176,5 +231,37 @@ describe("alTocarElTope", () => {
     expect(enqueueMock.mock.calls[0][1]).toMatchObject({
       kind: "template-limit-reached",
     });
+  });
+
+  // Nuevo (#1264, hallazgo P2 de Codex): el mismo PF choca los dos topes casi
+  // al mismo tiempo — dos escrituras de `users/{uid}` con `kind` distinto,
+  // cada una disparando su propio `alTocarElTope`. Antes de la reserva
+  // transaccional, las dos decidían sobre su propio snapshot y las dos
+  // encolaban (kinds distintos, la dedupe de la cola no las veía). Ahora las
+  // dos releen el mismo documento fresco dentro de una transacción, y
+  // Firestore las serializa.
+  it("⚠️ chocar los dos topes casi al mismo tiempo dispara UN solo mail", async () => {
+    const base = {
+      ...PERFIL,
+      [CAMPO_TOPE_AT]: ts(AHORA),
+      planLimits: { customExercises: 20, templates: 3 },
+      customExerciseUsage: { count: 20 },
+      templateUsage: { count: 3 },
+    };
+    // Lo que queda en Firestore es el ÚLTIMO de los dos toques en escribirse
+    // — acá "templates", sin que importe cuál: ninguna de las dos llamadas
+    // concurrentes puede ver un enfriamiento que la otra no haya escrito
+    // todavía, salvo que la transacción se lo muestre.
+    usersStore["t1"] = { ...base, [CAMPO_TOPE_KIND]: "templates" };
+    const despuesEjercicios = { ...base, [CAMPO_TOPE_KIND]: "customExercises" };
+    const despuesPlantillas = usersStore["t1"];
+
+    const [a, b] = await Promise.all([
+      alTocarElTope(APP, "t1", PERFIL, despuesEjercicios, AHORA),
+      alTocarElTope(APP, "t1", PERFIL, despuesPlantillas, AHORA),
+    ]);
+
+    expect([a, b].filter((r) => r === "encolado")).toHaveLength(1);
+    expect(enqueueMock).toHaveBeenCalledTimes(1);
   });
 });

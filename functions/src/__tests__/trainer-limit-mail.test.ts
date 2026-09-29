@@ -41,13 +41,60 @@ jest.mock("../mail/enqueue-mail", () => ({
   enqueueMail: jest.fn(async () => "queued-id"),
 }));
 
-const setMock = jest.fn(async () => undefined);
+/**
+ * Fake de Firestore para `users/{uid}`, compartido entre el `runTransaction`
+ * de la reserva y el chequeo de la cola tras un encolado fallido.
+ *
+ * `runTransactionMock` serializa las transacciones con un mutex: la SEGUNDA
+ * no arranca (ni siquiera su primer `get`) hasta que la PRIMERA terminó
+ * enteramente — misma garantía que da Firestore de verdad sobre el mismo
+ * documento, y lo que hace falta para que el test de la carrera (más abajo)
+ * pueda ver a la segunda transacción toparse con la reserva de la primera.
+ */
+let usersStore: Record<string, Record<string, unknown> | undefined> = {};
 let colaExiste = false;
-const getMock = jest.fn(async () => ({ exists: colaExiste }));
+const colaGetMock = jest.fn(async () => ({ exists: colaExiste }));
+const DELETE_SENTINEL = Symbol("FieldValue.delete()");
+
+interface FakeRef {
+  uid: string;
+}
+interface FakeTx {
+  get: (ref: FakeRef) => Promise<{ data: () => Record<string, unknown> | undefined }>;
+  set: (ref: FakeRef, patch: Record<string, unknown>) => void;
+  update: (ref: FakeRef, patch: Record<string, unknown>) => void;
+}
+
+let mutex: Promise<unknown> = Promise.resolve();
+const runTransactionMock = jest.fn((fn: (tx: FakeTx) => Promise<unknown>) => {
+  const tx: FakeTx = {
+    get: async (ref) => ({ data: () => usersStore[ref.uid] }),
+    set: (ref, patch) => {
+      usersStore[ref.uid] = { ...(usersStore[ref.uid] ?? {}), ...patch };
+    },
+    update: (ref, patch) => {
+      const next = { ...(usersStore[ref.uid] ?? {}) };
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === DELETE_SENTINEL) delete next[k];
+        else next[k] = v;
+      }
+      usersStore[ref.uid] = next;
+    },
+  };
+  const run = mutex.then(() => fn(tx));
+  mutex = run.catch(() => undefined);
+  return run;
+});
+
 jest.mock("firebase-admin/firestore", () => ({
   ...jest.requireActual("firebase-admin/firestore"),
+  FieldValue: { delete: () => DELETE_SENTINEL },
   getFirestore: () => ({
-    collection: () => ({ doc: () => ({ set: setMock, get: getMock }) }),
+    collection: (name: string) =>
+      name === "users"
+        ? { doc: (uid: string) => ({ uid }) }
+        : { doc: () => ({ get: colaGetMock }) },
+    runTransaction: runTransactionMock,
   }),
 }));
 
@@ -94,9 +141,11 @@ function chocoRecien(t: (typeof TOPES)[number], limit = 20) {
 
 beforeEach(() => {
   enqueueMock.mockClear();
-  setMock.mockClear();
-  getMock.mockClear();
+  colaGetMock.mockClear();
+  runTransactionMock.mockClear();
   colaExiste = false;
+  usersStore = {};
+  mutex = Promise.resolve();
 });
 
 describe.each(TOPES)("$nombre", (t) => {
@@ -192,16 +241,16 @@ describe.each(TOPES)("$nombre", (t) => {
     });
 
     it("⚠️ lleva prefKey — es comunicación comercial", async () => {
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      await enqueueTrainerLimitMail(APP, "t1", AHORA);
       expect(enqueueMock.mock.calls[0][1].prefKey).toBe(TRAINER_LIMIT_PREF_KEY);
       // Mismo valor que el del alumno — ver el encabezado del módulo.
       expect(TRAINER_LIMIT_PREF_KEY).toBe(ATHLETE_PROSPECT_PREF_KEY);
     });
 
     it("⚠️ el CTA va al Coach Hub web, no al App Link de la app", async () => {
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      await enqueueTrainerLimitMail(APP, "t1", AHORA);
       const url = String(enqueueMock.mock.calls[0][1].params.ctaUrl);
       expect(url).toBe(trainerWebCheckout());
       // No es el App Link: en el teléfono abre la app, y la app no vende.
@@ -210,34 +259,105 @@ describe.each(TOPES)("$nombre", (t) => {
     });
 
     it("⚠️ el limite viaja como param para el template", async () => {
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      await enqueueTrainerLimitMail(APP, "t1", AHORA);
       expect(enqueueMock.mock.calls[0][1].params.limit).toBe(20);
     });
 
-    it("⚠️ anota que se escribió, DESPUÉS de encolar", async () => {
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
+    it("⚠️ reserva (anota) el enfriamiento ANTES de encolar, no después", async () => {
+      // Antes: `enqueueTrainerLimitMail` encolaba y RECIÉN DESPUÉS anotaba el
+      // enfriamiento. Se invirtió (#1264, hallazgo P2 de Codex) para cerrar
+      // la carrera entre los dos `kind`: ver "DOS CAMINOS" en el encabezado
+      // del módulo. Este test verifica el orden nuevo directamente: en el
+      // momento en que `enqueueMail` es invocado, la reserva ya tiene que
+      // estar escrita en `users/{uid}`.
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      enqueueMock.mockImplementationOnce(async () => {
+        expect(usersStore["t1"]?.[CAMPO_MAIL_AT]).toBeDefined();
+        return "queued-id";
+      });
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan).not.toBeNull();
       expect(enqueueMock).toHaveBeenCalledTimes(1);
-      expect(setMock).toHaveBeenCalledTimes(1);
     });
 
-    it("⚠️ si el encolado FALLÓ, no anota el enfriamiento y tira para que el barrido lo cuente como fallido", async () => {
+    it("⚠️ si el encolado FALLÓ de verdad, deshace la reserva y tira (el barrido lo cuenta como fallido)", async () => {
+      usersStore["t1"] = { ...CHOCO_RECIEN };
       enqueueMock.mockResolvedValueOnce(null);
       colaExiste = false;
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await expect(enqueueTrainerLimitMail(APP, "t1", plan, AHORA)).rejects.toThrow();
-      expect(setMock).not.toHaveBeenCalled();
+      await expect(enqueueTrainerLimitMail(APP, "t1", AHORA)).rejects.toThrow();
+      // la reserva quedó deshecha: no hay enfriamiento anotado sobre un mail
+      // que nunca salió.
+      expect(usersStore["t1"]?.[CAMPO_MAIL_AT]).toBeUndefined();
     });
 
-    it("si el mail YA estaba en la cola (reintento), anota el enfriamiento igual", async () => {
+    it("⚠️ si el rollback llega tarde —otra reserva más nueva ya pisó el campo— no la toca", async () => {
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      enqueueMock.mockResolvedValueOnce(null);
+      colaExiste = false;
+      // Simula otra corrida completa (otro `nowMs`) reservando de nuevo
+      // mientras ésta seguía en el aire, justo antes de que el rollback
+      // corra su propia transacción.
+      colaGetMock.mockImplementationOnce(async () => {
+        usersStore["t1"] = {
+          ...usersStore["t1"],
+          [CAMPO_MAIL_AT]: ts(AHORA + 1000),
+        };
+        return { exists: false };
+      });
+      await expect(enqueueTrainerLimitMail(APP, "t1", AHORA)).rejects.toThrow();
+      const campo = usersStore["t1"]?.[CAMPO_MAIL_AT] as { toMillis(): number };
+      expect(campo.toMillis()).toBe(AHORA + 1000);
+    });
+
+    it("si el mail YA estaba en la cola (reintento), la reserva queda anotada igual", async () => {
+      usersStore["t1"] = { ...CHOCO_RECIEN };
       enqueueMock.mockResolvedValueOnce(null);
       colaExiste = true;
-      const plan = decideTrainerLimitMail(CHOCO_RECIEN, AHORA)!;
-      await enqueueTrainerLimitMail(APP, "t1", plan, AHORA);
-      expect(getMock).toHaveBeenCalledTimes(1);
-      expect(setMock).toHaveBeenCalledTimes(1);
+      const plan = await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(plan).not.toBeNull();
+      expect(colaGetMock).toHaveBeenCalledTimes(1);
+      expect(usersStore["t1"]?.[CAMPO_MAIL_AT]).toBeDefined();
     });
+  });
+});
+
+describe("⚠️ la carrera entre los dos kind (el bug de #1264)", () => {
+  // Antes de la reserva transaccional: un PF que chocaba el tope de
+  // ejercicios Y el de plantillas casi al mismo tiempo, antes de que el
+  // primer trigger alcanzara a escribir `trainerLimitMailAt`, disparaba DOS
+  // llamadas a `enqueueTrainerLimitMail` — cada una decidiendo sobre su
+  // propio snapshot, sin verse una a la otra. Como los `kind` son distintos,
+  // `enqueueMail` tampoco las dedupeaba (dedupea por `kind`+`scope`+`toUid`):
+  // dos mails comerciales en vez de uno cada 14 días.
+  //
+  // Ahora `enqueueTrainerLimitMail` relee `users/{uid}` FRESCO dentro de una
+  // transacción antes de decidir — sin importar qué `kind` disparó cada
+  // llamada, las dos transacciones leen el MISMO documento, y Firestore las
+  // serializa: la segunda ve la reserva de la primera y sale por la
+  // cláusula 4 (enfriamiento).
+  it("dos llamadas concurrentes sobre el mismo PF, sin enfriamiento previo, producen UN solo mail", async () => {
+    usersStore["t1"] = {
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      // El campo sólo puede decir UN kind a la vez — el último que rebotó —
+      // pero la garantía que este test cubre no depende de cuál sea: ninguna
+      // de las dos llamadas concurrentes puede ver un enfriamiento que la
+      // otra todavía no escribió, salvo que la transacción se lo muestre.
+      [CAMPO_TOPE_KIND]: "templates",
+      planLimits: { customExercises: 20, templates: 3 },
+      customExerciseUsage: { count: 20 },
+      templateUsage: { count: 3 },
+    };
+
+    const [a, b] = await Promise.all([
+      enqueueTrainerLimitMail(APP, "t1", AHORA),
+      enqueueTrainerLimitMail(APP, "t1", AHORA),
+    ]);
+
+    const planesEnviados = [a, b].filter((p) => p !== null);
+    expect(planesEnviados).toHaveLength(1);
+    expect(enqueueMock).toHaveBeenCalledTimes(1);
+    expect(usersStore["t1"]?.[CAMPO_MAIL_AT]).toBeDefined();
   });
 });
 

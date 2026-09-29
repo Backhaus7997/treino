@@ -81,11 +81,23 @@
  * **`sweepTrainerLimitMail` se queda, como red.** Si el trigger falla, el
  * barrido lo reintenta al otro día dentro de la ventana de 36 h. Los dos
  * caminos no se pisan y no pueden producir un mail doble: comparten el mismo
- * enfriamiento de 14 días (`trainerLimitMailAt`, cláusula 4) — el que llega
- * primero lo anota, y el segundo lo ve y sale por la cláusula 4 — y además la
- * cola de mail dedupea por `kind` + `scope` + destinatario
- * (`dedupeKey`/`enqueueMail`), así que aunque los dos caminos corrieran en el
- * mismo instante, el segundo `set` en la cola no crea un documento nuevo.
+ * enfriamiento de 14 días (`trainerLimitMailAt`, cláusula 4), y ESE campo es
+ * lo único que impide el doble mail — no la dedupe de la cola, que dedupea
+ * por `kind` + `scope` + destinatario y con DOS `kind` distintos
+ * (`exercise-limit-reached` / `template-limit-reached`) no ve nada en común.
+ * Un PF que choca los dos topes casi al mismo tiempo dispara dos escrituras
+ * de `trainerLimitHitAt`/`trainerLimitHitKind` con `kind` distinto, y si cada
+ * camino DECIDIERA sobre su propio snapshot y anotara el enfriamiento RECIÉN
+ * DESPUÉS de encolar, los dos pasarían las cuatro cláusulas antes de que
+ * cualquiera alcance a escribir `trainerLimitMailAt` — dos mails, no uno.
+ * Por eso `enqueueTrainerLimitMail` no decide sobre el snapshot que trae el
+ * llamador: RELEE `users/{uid}` y decide DENTRO de una transacción de
+ * Firestore, que también hace la reserva (escribe `trainerLimitMailAt`) antes
+ * de encolar. Firestore serializa las transacciones que chocan sobre el mismo
+ * documento, así que la segunda de las dos siempre ve la reserva de la
+ * primera y sale por la cláusula 4. Si el encolado post-transacción falla de
+ * verdad, la reserva se deshace (ver el docstring de `enqueueTrainerLimitMail`)
+ * para no dejar un enfriamiento anotado sin mail alguno atrás.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  *  EL ANTI-LOOP DEL CAMINO AL TOQUE
@@ -119,7 +131,12 @@
  */
 
 import { App } from "firebase-admin/app";
-import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  FieldValue,
+  Timestamp,
+  getFirestore,
+} from "firebase-admin/firestore";
 
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
@@ -278,34 +295,121 @@ export function decideTrainerLimitMail(
   };
 }
 
+/** Lo que devuelve la reserva: el plan a mandar y el enfriamiento previo. */
+interface Reserva {
+  plan: TrainerLimitMailPlan;
+  /** `trainerLimitMailAt` ANTES de esta reserva. `null` si no había. */
+  anteriorMailAtMs: number | null;
+}
+
 /**
- * Encola el mail y anota que se escribió.
+ * Relee `users/{uid}` FRESCO dentro de una transacción, decide, y si
+ * corresponde mandar, RESERVA el enfriamiento ahí mismo (escribe
+ * `trainerLimitMailAt = nowMs`) antes de que nadie encole nada.
  *
- * Mismo orden que `enqueueFreeLimitMail` y por el mismo motivo: si el `set`
- * fallara después de encolar, el enfriamiento no quedaría anotado y el PF
- * podría recibir otro mail mañana — encolar dos veces es peor que no anotar.
+ * Esta es la pieza que cierra la carrera entre los dos `kind` (ver el
+ * encabezado del módulo — "DOS CAMINOS"): dos transacciones sobre el MISMO
+ * documento se serializan, así que la segunda de las dos siempre ve la
+ * reserva que dejó la primera y sale por la cláusula 4 (`decideTrainerLimitMail`
+ * devuelve `null`), sin importar qué snapshot tenía el llamador al entrar.
  *
- * `enqueueMail` nunca tira: devuelve `null` tanto si el mail YA estaba en la
- * cola (reintento del barrido, sano) como si la escritura FALLÓ. Si se anotara
- * el enfriamiento en los dos casos, una falla transitoria silenciaría al PF
- * catorce días sin que exista mail alguno. Por eso, ante un `null`, se mira
- * la cola: si el documento está, se anota; si no, se tira, y el barrido lo
- * cuenta como fallido.
+ * Devuelve `null` cuando `decideTrainerLimitMail` dice que no corresponde —
+ * ninguna de las cuatro cláusulas se cumple, o esta transacción perdió la
+ * carrera contra otra.
+ */
+async function reservarEnfriamiento(
+  app: App,
+  trainerId: string,
+  nowMs: number,
+): Promise<Reserva | null> {
+  const ref = getFirestore(app).collection("users").doc(trainerId);
+  return getFirestore(app).runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const datosFrescos = snap.data();
+
+    const plan = decideTrainerLimitMail(datosFrescos, nowMs);
+    if (!plan) return null;
+
+    const anteriorMailAtMs = msDe(datosFrescos?.[CAMPO_MAIL_AT]);
+    tx.set(ref, { [CAMPO_MAIL_AT]: Timestamp.fromMillis(nowMs) }, { merge: true });
+    return { plan, anteriorMailAtMs };
+  });
+}
+
+/**
+ * Deshace una reserva que quedó sin mail detrás (el encolado falló de
+ * verdad). Vuelve `trainerLimitMailAt` a `anteriorMailAtMs` (o lo borra si no
+ * había ninguno) — PERO sólo si el campo sigue valiendo exactamente `nowMs`,
+ * es decir, sólo si sigue siendo ESTA reserva. Si otra transacción posterior
+ * ya volvió a chocar el tope y reservó de nuevo, `trainerLimitMailAt` ya no es
+ * `nowMs` y este rollback no toca nada — pisar esa reserva más nueva
+ * silenciaría un mail que sí va a salir.
+ */
+async function deshacerReserva(
+  app: App,
+  trainerId: string,
+  nowMs: number,
+  anteriorMailAtMs: number | null,
+): Promise<void> {
+  const ref = getFirestore(app).collection("users").doc(trainerId);
+  await getFirestore(app).runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const actualMs = msDe(snap.data()?.[CAMPO_MAIL_AT]);
+    if (actualMs !== nowMs) return; // ya no es esta reserva, no tocar
+
+    if (anteriorMailAtMs === null) {
+      tx.update(ref, { [CAMPO_MAIL_AT]: FieldValue.delete() });
+    } else {
+      tx.set(
+        ref,
+        { [CAMPO_MAIL_AT]: Timestamp.fromMillis(anteriorMailAtMs) },
+        { merge: true },
+      );
+    }
+  });
+}
+
+/**
+ * El camino común del trigger y del barrido: decide, reserva, encola, y
+ * deshace la reserva si el encolado falló de verdad.
+ *
+ * ORDEN (invertido respecto de una versión anterior de este módulo, que
+ * anotaba el enfriamiento DESPUÉS de encolar — ver "DOS CAMINOS" en el
+ * encabezado para el porqué):
+ *
+ *   1. `reservarEnfriamiento` relee el documento FRESCO dentro de una
+ *      transacción, decide con `decideTrainerLimitMail`, y si corresponde
+ *      mandar, escribe `trainerLimitMailAt = nowMs` ahí mismo — la reserva.
+ *      Si no corresponde (cualquiera de las cuatro cláusulas, incluyendo
+ *      haber perdido la carrera contra otra reserva), no hay nada más que
+ *      hacer.
+ *   2. Con la reserva ya firme, se encola con `enqueueMail`. Nunca tira:
+ *      devuelve `null` tanto si el mail YA estaba en la cola (reintento del
+ *      barrido, sano) como si la escritura FALLÓ. Ante un `null`, se mira la
+ *      cola: si el documento está, todo bien — la reserva queda como está.
+ *   3. Si el documento NO está (el encolado falló de verdad), la reserva
+ *      quedó sin mail detrás: `deshacerReserva` la revierte —para que el
+ *      próximo choque del tope no encuentre un enfriamiento anotado sobre un
+ *      mail que nunca salió— y se tira, para que el barrido lo cuente como
+ *      fallido.
  *
  * Tirar NO garantiza un reintento. El barrido es diario y la ventana es de
  * 36 h, así que la corrida de mañana sólo vuelve a ver los topes que hoy
  * tienen menos de 12 h. Uno más viejo sale de la query y no se reintenta: el
  * mail llega recién si el PF vuelve a chocar un tope. Se aceptó así porque la
- * falla es rara y el mail es comercial; lo que este chequeo sí garantiza es
- * que ese próximo choque no encuentre un enfriamiento anotado sobre un mail
- * que nunca salió.
+ * falla es rara y el mail es comercial.
+ *
+ * @returns el plan que se mandó, o `null` si no correspondía mandar nada.
  */
 export async function enqueueTrainerLimitMail(
   app: App,
   trainerId: string,
-  plan: TrainerLimitMailPlan,
   nowMs: number,
-): Promise<void> {
+): Promise<TrainerLimitMailPlan | null> {
+  const reserva = await reservarEnfriamiento(app, trainerId, nowMs);
+  if (!reserva) return null;
+  const { plan, anteriorMailAtMs } = reserva;
+
   const queuedId = await enqueueMail(app, {
     toUid: trainerId,
     kind: plan.kind,
@@ -324,17 +428,12 @@ export async function enqueueTrainerLimitMail(
       .doc(dedupeKey(plan.kind, plan.scope, trainerId))
       .get();
     if (!enCola.exists) {
+      await deshacerReserva(app, trainerId, nowMs, anteriorMailAtMs);
       throw new Error("trainer-limit-mail: no se pudo encolar el mail");
     }
   }
 
-  await getFirestore(app)
-    .collection("users")
-    .doc(trainerId)
-    .set(
-      { [CAMPO_MAIL_AT]: Timestamp.fromMillis(nowMs) },
-      { merge: true },
-    );
+  return plan;
 }
 
 export interface ResultadoDelBarrido {
@@ -344,8 +443,9 @@ export interface ResultadoDelBarrido {
 
 /**
  * Le escribe a los PF que chocaron un tope de su plan —ejercicios propios o
- * plantillas— y siguen ahí. `decideTrainerLimitMail` decide cuál mirar según
- * `CAMPO_TOPE_KIND`.
+ * plantillas— y siguen ahí. `enqueueTrainerLimitMail` es quien decide —relee
+ * el documento fresco dentro de una transacción— cuál tope mirar según
+ * `CAMPO_TOPE_KIND`; acá sólo se filtra por `role` antes de intentarlo.
  *
  * ── La query, y por que trae tan poco ──
  *
@@ -359,7 +459,10 @@ export interface ResultadoDelBarrido {
  * el tramo siguiente), así que en la práctica el campo es exclusivo de
  * `trainer`. El chequeo es una red de más, en memoria y sin costo de query
  * extra, por si algún día ese supuesto deja de sostenerse — mismo criterio
- * defensivo que `custom-exercise-count.ts` aplica antes de recontar.
+ * defensivo que `custom-exercise-count.ts` aplica antes de recontar. Se lee
+ * del snapshot de la query, no fresco — es sólo un filtro previo; la decisión
+ * que importa (las cuatro cláusulas) la hace `enqueueTrainerLimitMail` sobre
+ * el documento fresco.
  *
  * ── Un fallo no frena a los demás ──
  *
@@ -383,11 +486,8 @@ export async function barrerLimiteDeEjercicios(
       const data = doc.data();
       if (data.role !== "trainer") continue;
 
-      const plan = decideTrainerLimitMail(data, nowMs);
-      if (!plan) continue;
-
-      await enqueueTrainerLimitMail(app, doc.id, plan, nowMs);
-      enviados++;
+      const plan = await enqueueTrainerLimitMail(app, doc.id, nowMs);
+      if (plan) enviados++;
     } catch (err) {
       logger.error("trainer-limit-mail: fallo un PF", { uid: doc.id, err });
     }
@@ -428,8 +528,11 @@ export function esToqueNuevo(
  *
  * El chequeo de `role` va acá y no en la query del trigger (que no existe:
  * `onDocumentUpdated` no filtra por campo) — es la misma red defensiva que
- * `barrerLimiteDeEjercicios` aplica en memoria, sin costo de query extra. Ver
- * el encabezado — "EL ANTI-LOOP DEL CAMINO AL TOQUE".
+ * `barrerLimiteDeEjercicios` aplica en memoria, sin costo de query extra. Se
+ * lee de `despues`, el snapshot que trajo el evento — sólo un filtro previo;
+ * la decisión que importa la hace `enqueueTrainerLimitMail` releyendo el
+ * documento fresco dentro de una transacción. Ver el encabezado — "EL
+ * ANTI-LOOP DEL CAMINO AL TOQUE" y "DOS CAMINOS".
  */
 export async function alTocarElTope(
   app: App,
@@ -441,11 +544,8 @@ export async function alTocarElTope(
   if (!esToqueNuevo(antes, despues)) return "sin-tope-nuevo";
   if (despues?.role !== "trainer") return "no-trainer";
 
-  const plan = decideTrainerLimitMail(despues, nowMs);
-  if (!plan) return "silencio";
-
-  await enqueueTrainerLimitMail(app, uid, plan, nowMs);
-  return "encolado";
+  const plan = await enqueueTrainerLimitMail(app, uid, nowMs);
+  return plan ? "encolado" : "silencio";
 }
 
 /**
