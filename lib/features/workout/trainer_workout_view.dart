@@ -58,8 +58,17 @@ class TrainerWorkoutView extends ConsumerWidget {
       // dentro de SingleChildScrollView scrollea como una sola unidad, sin
       // reciclar Elements por ítem (ver doc de TreinoFadeSlideIn).
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        physics: const ClampingScrollPhysics(),
+        // + bottom inset: el shell usa `Scaffold(extendBody: true)` y la
+        // barra flotante pasa POR ENCIMA del body, así que sin este extra la
+        // última plantilla queda tapada. Mismo patrón que `workout_screen
+        // .dart`, `home_screen.dart` y `trainer_coach_view.dart`.
+        padding: EdgeInsets.fromLTRB(
+          0,
+          20,
+          0,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
