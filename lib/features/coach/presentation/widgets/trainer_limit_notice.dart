@@ -21,6 +21,60 @@ import '../../domain/subscription_tier.dart';
 /// de plan, entra acá con su propio caso — no con un tercer archivo.
 enum TrainerLimitKind { customExercises, templates }
 
+/// Resuelve, a partir del `limit` con el que YA bloqueó el gate —nunca del
+/// tier nominal de `userProfileProvider` directo—, qué tier mostrar en el
+/// aviso.
+///
+/// El bug que esto corrige (hallazgo P1 de Codex, 2026-09-29): los gates
+/// leían el tier NOMINAL (`subscription?.tier`) para el copy, pero el
+/// [limit] que bloquea sale de `planLimits` del servidor, calculado con el
+/// tier EFECTIVO — una suscripción `pending`/`paused`, o `cancelled` ya
+/// vencida, cae a los topes de Free, y un piso prepago puede subir el
+/// efectivo por ENCIMA del nominal. Nombrar el nominal ahí afirma un plan
+/// que no explica el número que el PF tiene enfrente (AGENTS.md §11.1): un
+/// Plan 1 pausado con 3 plantillas veía «Plan 1 incluye…» y el upsell le
+/// ofrecía el Plan 2, cuando Plan 1 no tiene tope de plantillas — el efectivo
+/// era Free.
+///
+/// Devuelve:
+/// - `tier`: el tier cuya tabla estática ([kTierCustomExerciseLimits] /
+///   [kTierTemplateLimits]) explica exactamente ese [limit] — para
+///   ejercicios (20/60/120) es unívoco; para plantillas sólo Free tiene tope,
+///   así que cualquier `limit` finito distinto de 3 ya es un indicio de tope
+///   ajustado a mano. `null` si ningún tier coincide: ahí el aviso NO puede
+///   nombrar un plan sin arriesgarse a mentir, y el llamador cae a un cuerpo
+///   genérico («Tu plan incluye N…», sin nombre).
+/// - `inactive`: `true` cuando el `tier` resuelto es MENOR que [nominalTier]
+///   — el PF pagó un plan más alto, pero su derecho cayó porque la
+///   suscripción no está activa. Ahí no se ofrece el "siguiente" tier: ya
+///   compró uno más caro que el que está usando (mismo criterio que
+///   `PlanLimitReason.subscriptionInactive` en `plan_limit_paywall.dart`).
+///   Sólo puede ser `true` cuando `tier` no es `null`.
+({SubscriptionTier? tier, bool inactive}) resolveNoticeTier({
+  required TrainerLimitKind kind,
+  required int limit,
+  required SubscriptionTier nominalTier,
+}) {
+  final table = switch (kind) {
+    TrainerLimitKind.customExercises => kTierCustomExerciseLimits,
+    TrainerLimitKind.templates => kTierTemplateLimits,
+  };
+
+  // Orden de declaración del enum (free < plan1 < plan2 < plan3): si algún
+  // día dos tiers compartieran el mismo límite, esto se queda con el más
+  // barato de los dos — la lectura más conservadora del dato.
+  SubscriptionTier? efectivo;
+  for (final tier in SubscriptionTier.values) {
+    if (table[tier] == limit) {
+      efectivo = tier;
+      break;
+    }
+  }
+
+  final inactive = efectivo != null && efectivo.index < nominalTier.index;
+  return (tier: efectivo, inactive: inactive);
+}
+
 /// El aviso que el embudo de cada tope muestra cuando el PF lo choca
 /// (docs/limite-ejercicios-pf.md PR3 y docs/limite-plantillas-pf.md PR3,
 /// "Los avisos").
@@ -70,11 +124,20 @@ TrainerLimitNoticeForm _resolveForm() =>
 /// resolver el upsell al siguiente tier; nunca para decidir si bloquea (eso
 /// ya lo decidió el gate con `limit`/`count`).
 ///
-/// Dos estados:
-/// - **En el tope** (`count == limit`): "tu plan incluye N" con la caja de
-///   upsell al siguiente tier. En WEB suma "para sumar más, subí de plan";
-///   en MÓVIL no (Guideline 3.1.3(f) — decisión del dueño, 2026-09-29), y en
-///   su lugar dice qué puede hacer el PF con lo que ya tiene.
+/// El tier que NOMBRA el aviso nunca es [currentTier] a ciegas: se resuelve
+/// desde [limit] (ver [resolveNoticeTier]), porque el nominal puede no
+/// coincidir con el efectivo (suscripción no activa, o piso prepago).
+///
+/// Tres estados:
+/// - **En el tope**, tier efectivo == nominal (el caso normal): "tu plan
+///   incluye N" con la caja de upsell al siguiente tier. En WEB suma "para
+///   sumar más, subí de plan"; en MÓVIL no (Guideline 3.1.3(f) — decisión
+///   del dueño, 2026-09-29), y en su lugar dice qué puede hacer el PF con lo
+///   que ya tiene.
+/// - **En el tope, con la suscripción no activa** (tier efectivo < nominal):
+///   nombra el plan pagado Y el límite efectivo, sin caja de upsell — no se
+///   le ofrece "el siguiente" a quien ya pagó uno más caro (mismo criterio
+///   que `PlanLimitReason.subscriptionInactive` del paywall de alumnos).
 /// - **Por encima** (`count > limit`, bajaste de plan): el texto de
 ///   conservación — "conservás todos, para crear uno nuevo
 ///   [borrá/archivá] N", con `N = count - limit + 1` — sin caja de upsell:
@@ -185,6 +248,19 @@ class _TrainerLimitContent extends StatelessWidget {
       TrainerLimitKind.templates => 'editar o archivar las que ya tenés',
     };
 
+    // El tier a NOMBRAR nunca es el nominal a ciegas: se resuelve desde
+    // [limit] — el mismo número con el que bloqueó el gate — porque una
+    // suscripción no activa puede haber hecho caer el efectivo por debajo
+    // del nominal (o un piso prepago, subirlo por encima). Ver el dartdoc de
+    // [resolveNoticeTier].
+    final resolved = resolveNoticeTier(
+      kind: kind,
+      limit: limit,
+      nominalTier: currentTier,
+    );
+    final effectiveTier = resolved.tier;
+    final inactive = resolved.inactive;
+
     // "En el tope": mismo tono que `_PlanLimitPaywallContent` — "tu plan
     // incluye X". El número es [limit], el MISMO que usó el gate para
     // bloquear (`planLimits` del servidor), y NO la tabla estática del tier:
@@ -195,26 +271,46 @@ class _TrainerLimitContent extends StatelessWidget {
     // "Pasado de tope": el texto de conservación que ya tenía este aviso
     // (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3, "Los
     // avisos") — sin caja de upsell, adaptado sólo al encabezado/CTA nuevos.
+    // No nombra tier, así que el nominal/efectivo no lo afecta.
     final nounLimite = limit == 1
         ? switch (kind) {
             TrainerLimitKind.customExercises => 'ejercicio propio',
             TrainerLimitKind.templates => 'plantilla',
           }
         : noun;
+    // Sin tier resuelto (tope ajustado a mano) no se afirma un nombre de
+    // plan — AGENTS.md §11.1: lo que no se puede verificar, no se dice.
+    final tierPrefix = effectiveTier == null
+        ? 'Tu plan'
+        : 'Tu plan ${tierName(effectiveTier)}';
     final body = overLimit
         ? 'Tenés $count $noun y tu plan incluye $limit. '
             'Conservás $todos; para crear $unoNuevo, $verb $toFree.' // i18n: Fase W3
-        : isWeb
-            ? 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
-                'Para sumar más, subí de plan.' // i18n: Fase W3
-            // Móvil, decisión del dueño 2026-09-29: sin "para sumar más,
-            // subí de plan" (3.1.3(f)) — en su lugar, lo que el PF puede
-            // hacer con lo que ya tiene. Guard:
-            // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
-            : 'Tu plan ${tierName(currentTier)} incluye $limit $nounLimite. '
-                'Podés $accionConservar.'; // i18n: Fase W3
+        : inactive
+            // El [inactive] de `resolveNoticeTier` sólo es `true` con
+            // `effectiveTier` resuelto — el `!` es seguro por contrato.
+            ? 'Tu suscripción a ${tierName(currentTier)} no está activa. '
+                'Mientras tanto, tu plan ${tierName(effectiveTier!)} '
+                'incluye $limit $nounLimite.' // i18n: Fase W3
+            : isWeb
+                ? '$tierPrefix incluye $limit $nounLimite. Para sumar más, '
+                    'subí de plan.' // i18n: Fase W3
+                // Móvil, decisión del dueño 2026-09-29: sin "para sumar más,
+                // subí de plan" (3.1.3(f)) — en su lugar, lo que el PF puede
+                // hacer con lo que ya tiene. Guard:
+                // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+                : '$tierPrefix incluye $limit $nounLimite. Podés '
+                    '$accionConservar.'; // i18n: Fase W3
 
-    final next = currentTier.nextTier;
+    // Sin upsell cuando: ya está sobre el tope (conservación, no venta);
+    // está `inactive` (ofrecerle "el siguiente" a quien ya pagó uno más caro
+    // es el mensaje equivocado — mismo criterio que
+    // `PlanLimitReason.subscriptionInactive`); o no se pudo resolver un tier
+    // (no hay una base cierta desde la cual calcular "el siguiente").
+    final showUpsell = !overLimit && !inactive && effectiveTier != null;
+    // Sin `!`: el analyzer ya promueve `effectiveTier` a no-nulo acá, porque
+    // `showUpsell` lo chequeó en la misma expresión un renglón arriba.
+    final next = showUpsell ? effectiveTier.nextTier : null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -229,9 +325,10 @@ class _TrainerLimitContent extends StatelessWidget {
               TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
         const SizedBox(height: AppSpacing.s18),
-        // Sólo "en el tope" ofrece la caja de upsell: "pasado de tope" ya es
-        // un problema de conservación, no de elegir un plan nuevo.
-        if (!overLimit) ...[
+        // Upsell sólo cuando `showUpsell` — ver su dartdoc arriba: nunca
+        // sobre el tope, nunca con la suscripción inactiva, nunca sin un
+        // tier del que partir.
+        if (showUpsell) ...[
           if (next != null)
             PlanLimitUpsellBox(
               nextTier: next,

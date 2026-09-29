@@ -9,6 +9,10 @@
 // PLANES y "Ahora no". Este archivo cubre los DOS estados en las DOS
 // superficies, para los DOS `kind`, la caja de upsell y que ningún `null` se
 // interpola.
+//
+// Cambio 2 (2026-09-29, hallazgo P1 de Codex): el tier que el aviso NOMBRA
+// se resuelve desde el `limit` del servidor, no del tier nominal a ciegas —
+// ver `resolveNoticeTier` y su grupo de tests acá abajo.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,6 +56,78 @@ Future<void> _mostrar(
 }
 
 void main() {
+  group('resolveNoticeTier — Cambio 2 (P1: nombrar el tier EFECTIVO)', () {
+    test('nominal == efectivo: resuelve el mismo tier, no inactiva', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 60,
+        nominalTier: SubscriptionTier.plan1,
+      );
+      expect(r.tier, SubscriptionTier.plan1);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('Plan 1 pausado con el tope de plantillas de Free ⇒ Free + inactiva',
+        (() {
+      // El caso textual del hallazgo: un Plan 1 pausado con 3 plantillas
+      // (Plan 1 nominal no tiene tope de plantillas — sólo Free lo tiene).
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        nominalTier: SubscriptionTier.plan1,
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isTrue);
+    }));
+
+    test('piso prepago: el efectivo es MAYOR que el nominal, no inactiva', (() {
+      // El nominal es Free pero el limit que bloqueó es el de Plan 2 (120) —
+      // un piso prepago subió el efectivo por encima de lo que el PF pagó.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 120,
+        nominalTier: SubscriptionTier.free,
+      );
+      expect(r.tier, SubscriptionTier.plan2);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('límite que no coincide con ningún tier ⇒ genérico (tier null)', (() {
+      // 45 no es ni 20 (Free) ni 60 (Plan 1) ni 120 (Plan 2): un tope
+      // ajustado a mano. No se puede afirmar qué plan lo explica.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 45,
+        nominalTier: SubscriptionTier.free,
+      );
+      expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('plantillas: sólo Free tiene tope, cualquier otro límite es genérico',
+        (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.templates,
+        limit: 10,
+        nominalTier: SubscriptionTier.free,
+      );
+      expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('inactive nunca es true sin un tier resuelto', (() {
+      // Contrato del dartdoc: `inactive` sólo puede ser `true` cuando `tier`
+      // no es null. Un límite sin match no puede además decir "inactiva".
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 999,
+        nominalTier: SubscriptionTier.free,
+      );
+      expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+  });
+
   group('móvil (sheet) — en el tope — ejercicios propios', () {
     testWidgets('mismo tono que el paywall de alumnos, con upsell',
         (tester) async {
@@ -103,6 +179,83 @@ void main() {
       expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
       expect(find.textContaining('null'), findsNothing);
+    });
+
+    // ── Cambio 2 (P1): el tier que se NOMBRA sale del limit, no del nominal
+    // ─────────────────────────────────────────────────────────────────────
+
+    testWidgets(
+        'suscripción Plan 1 no activa: nombra Free (no Plan 1) y no ofrece '
+        'upsell', (tester) async {
+      // El limit que bloqueó (20) es el de Free — el servidor ya calculó el
+      // efectivo. El nominal (plan1) sólo debe aparecer para decir que ESE
+      // es el que no está activo.
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        limit: 20,
+        count: 20,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(
+        find.text('Tu suscripción a Plan 1 no está activa. Mientras tanto, '
+            'tu plan Free incluye 20 ejercicios propios.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.textContaining('PASATE A'), findsNothing);
+      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
+    });
+
+    testWidgets(
+        'piso prepago: nombra el tier MAYOR (Plan 2, no Free) y ofrece su '
+        'upsell', (tester) async {
+      // Nominal Free, pero el limit que bloqueó (120) es el de Plan 2: un
+      // piso prepago subió el efectivo por encima de lo que el PF pagó.
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 120,
+        count: 120,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(
+        find.text('Tu plan Plan 2 incluye 120 ejercicios propios. Podés '
+            'editar o borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('Ejercicios propios sin límite'), findsOneWidget);
+    });
+
+    testWidgets(
+        'límite ajustado a mano: cuerpo genérico, sin nombrar un plan ni '
+        'ofrecer upsell', (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 45,
+        count: 45,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(
+        find.text('Tu plan incluye 45 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Free incluye'), findsNothing);
+      // Sin caja de upsell: no hay un tier de referencia desde el cual
+      // calcular "el siguiente" sin adivinar.
+      expect(find.text('PLAN 1'), findsNothing);
+      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('PLAN 3'), findsNothing);
+      expect(find.text('PLAN A MEDIDA'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     testWidgets('pasado de tope: conservación, SIN caja de upsell',

@@ -15,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach/presentation/template_limit_gate.dart';
 import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -28,7 +30,7 @@ class _RepoFalso extends Mock implements UserRepository {}
 
 const _uid = 'u1';
 
-UserProfile _profile(UserRole role) {
+UserProfile _profile(UserRole role, {TrainerSubscription? subscription}) {
   final now = DateTime.utc(2026, 1, 1);
   return UserProfile(
     uid: _uid,
@@ -37,6 +39,7 @@ UserProfile _profile(UserRole role) {
     role: role,
     createdAt: now,
     updatedAt: now,
+    subscription: subscription,
   );
 }
 
@@ -45,6 +48,10 @@ UserProfile _profile(UserRole role) {
 ///
 /// `null` = todavía no resolvió: el rebote espera a que se cierre el aviso,
 /// así que con el aviso abierto no hay resultado.
+///
+/// [subscription] es el tier NOMINAL del PF (lo que pagó) — default `null`
+/// (Free, sin backfill). Sirve para el Cambio 2 (P1): probar que el aviso
+/// nombra el tier EFECTIVO (el que explica `quota.limit`), no éste a ciegas.
 Future<bool?> _correr(
   WidgetTester tester, {
   required UserRole role,
@@ -52,13 +59,16 @@ Future<bool?> _correr(
   required UserRepository repo,
   String? uid = _uid,
   bool rebote = false,
+  TrainerSubscription? subscription,
 }) async {
   bool? resultado;
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(role, subscription: subscription)),
+        ),
         templateQuotaProvider.overrideWithValue(quota),
         currentUidProvider.overrideWithValue(uid),
         userRepositoryProvider.overrideWithValue(repo),
@@ -301,6 +311,69 @@ void main() {
 
       expect(ok, isTrue);
       verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group(
+      'intentarCrearPlantilla — Cambio 2 (P1): el aviso nombra el tier '
+      'EFECTIVO, no el nominal a ciegas', () {
+    testWidgets(
+        'el caso del hallazgo: Plan 1 no activo, limit del servidor ya es '
+        'el de Free (3) ⇒ el aviso dice Free e inactiva, no Plan 1',
+        (tester) async {
+      // Plan 1 nominal NO tiene tope de plantillas (kTierTemplateLimits[
+      // plan1] es null) — que el gate haya bloqueado con limit=3 SÓLO puede
+      // explicarse si el efectivo cayó a Free. Antes de este cambio el aviso
+      // decía «Plan 1 incluye…», que no es cierto en ningún mundo.
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.paused,
+        ),
+        quota: const AsyncValue.data((limit: 3, count: 3)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(
+        find.textContaining('Tu suscripción a Plan 1 no está activa'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
+      // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'límite de plantillas que no es el de ningún tier (ajustado a mano) '
+        '⇒ cuerpo genérico, sin nombrar un plan', (tester) async {
+      // Sólo Free tiene tope de plantillas (kTierTemplateLimits): un limit
+      // finito que no sea 3 no puede explicarse por ningún tier conocido.
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 10, count: 10)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(
+        find.text('Tu plan incluye 10 plantillas. Podés editar o archivar '
+            'las que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Free incluye'), findsNothing);
+      expect(find.text('PLAN 1'), findsNothing);
     });
   });
 }
