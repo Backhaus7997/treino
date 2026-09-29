@@ -21,7 +21,11 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
-import { esTopeDeAlumnos, registrarTopeDeAlumnos } from "./trainer-limit-mail";
+import {
+  esTopeDeAlumnos,
+  incrementoDeAlumnos,
+  registrarTopeDeAlumnos,
+} from "./trainer-limit-mail";
 
 function ensureApp(): App {
   try {
@@ -45,8 +49,9 @@ export interface ResumeTrainerLinkResult {
  * pick the paywall branch.
  *
  * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
- * anota `trainerLimitHitKind: "students"` ACÁ, en el `catch` — mismo criterio
- * que `acceptTrainerLink`, ver su docstring para el porqué. BEST-EFFORT: un
+ * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
+ * `incrementoDeAlumnos`) ACÁ, en el `catch` — mismo criterio que
+ * `acceptTrainerLink`, ver su docstring para el porqué. BEST-EFFORT: un
  * fallo se loguea y el error original se relanza igual.
  */
 export async function runResumeTrainerLink(
@@ -66,7 +71,7 @@ export async function runResumeTrainerLink(
   } catch (err) {
     if (esTopeDeAlumnos(err)) {
       try {
-        await registrarTopeDeAlumnos(app, callerUid, Date.now());
+        await registrarTopeDeAlumnos(app, callerUid, Date.now(), incrementoDeAlumnos(err));
       } catch (anotarErr) {
         logger.error("resumeTrainerLink: no se pudo anotar el tope de alumnos", {
           trainerId: callerUid,

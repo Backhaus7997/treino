@@ -24,7 +24,11 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
-import { esTopeDeAlumnos, registrarTopeDeAlumnos } from "./trainer-limit-mail";
+import {
+  esTopeDeAlumnos,
+  incrementoDeAlumnos,
+  registrarTopeDeAlumnos,
+} from "./trainer-limit-mail";
 
 function ensureApp(): App {
   try {
@@ -49,8 +53,10 @@ export interface AcceptTrainerLinkResult {
  * re-wrapping it here would erase `details` and silently break that branch.
  *
  * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
- * anota `trainerLimitHitKind: "students"` ACÁ, en el `catch` — nunca dentro
- * de `syncTrainerLoad`, cuyo throw ocurre DENTRO de su propia transacción y
+ * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
+ * `incrementoDeAlumnos` sobre los `details` del mismo error — ver
+ * `trainer-limit-mail.ts`) ACÁ, en el `catch` — nunca dentro de
+ * `syncTrainerLoad`, cuyo throw ocurre DENTRO de su propia transacción y
  * revertiría cualquier escritura hecha ahí. La anotación es BEST-EFFORT: un
  * fallo se loguea y el error original se relanza igual, para que el cliente
  * siga viendo el paywall aunque el mail no salga.
@@ -72,7 +78,7 @@ export async function runAcceptTrainerLink(
   } catch (err) {
     if (esTopeDeAlumnos(err)) {
       try {
-        await registrarTopeDeAlumnos(app, callerUid, Date.now());
+        await registrarTopeDeAlumnos(app, callerUid, Date.now(), incrementoDeAlumnos(err));
       } catch (anotarErr) {
         logger.error("acceptTrainerLink: no se pudo anotar el tope de alumnos", {
           trainerId: callerUid,

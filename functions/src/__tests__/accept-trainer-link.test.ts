@@ -146,6 +146,23 @@ describe("runAcceptTrainerLink", () => {
         expect.anything(),
         "trainer-1",
         expect.any(Number),
+        expect.any(Number),
+      );
+    });
+
+    it("⚠️ el incremento es projectedLoad - currentLoad de los details (pending → active)", async () => {
+      // denialTope("plan-limit"): currentLoad 7, projectedLoad 8 → incremento 1.
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).toHaveBeenCalledWith(
+        expect.anything(),
+        "trainer-1",
+        expect.any(Number),
+        1,
       );
     });
 

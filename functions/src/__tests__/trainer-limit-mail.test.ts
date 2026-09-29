@@ -32,16 +32,20 @@
 import {
   decideTrainerLimitMail,
   enqueueTrainerLimitMail,
+  registrarTopeDeAlumnos,
+  incrementoDeAlumnos,
   VENTANA_MS,
   ENFRIAMIENTO_MS,
   CAMPO_TOPE_AT,
   CAMPO_TOPE_KIND,
+  CAMPO_TOPE_INCREMENTO,
   CAMPO_MAIL_AT,
   TRAINER_LIMIT_PREF_KEY,
 } from "../subscriptions/trainer-limit-mail";
 import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { renderMail, trainerWebCheckout, cupoLabel } from "../mail/templates";
+import { HttpsError } from "firebase-functions/v2/https";
 import type { App } from "firebase-admin/app";
 
 jest.mock("../mail/enqueue-mail", () => ({
@@ -94,13 +98,30 @@ const runTransactionMock = jest.fn((fn: (tx: FakeTx) => Promise<unknown>) => {
   return run;
 });
 
+/** Mismo merge + sentinel de borrado que usa el `tx.set` de arriba, pero para
+ * escrituras SIN transacción (`registrarTopeDeAlumnos`, deliberadamente sin
+ * `tx` — ver su docstring). */
+function setDirecto(uid: string, patch: Record<string, unknown>) {
+  const next = { ...(usersStore[uid] ?? {}) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === DELETE_SENTINEL) delete next[k];
+    else next[k] = v;
+  }
+  usersStore[uid] = next;
+}
+
 jest.mock("firebase-admin/firestore", () => ({
   ...jest.requireActual("firebase-admin/firestore"),
   FieldValue: { delete: () => DELETE_SENTINEL },
   getFirestore: () => ({
     collection: (name: string) =>
       name === "users"
-        ? { doc: (uid: string) => ({ uid }) }
+        ? {
+          doc: (uid: string) => ({
+            uid,
+            set: (patch: Record<string, unknown>) => setDirecto(uid, patch),
+          }),
+        }
         : { doc: () => ({ get: colaGetMock }) },
     runTransaction: runTransactionMock,
   }),
@@ -610,6 +631,105 @@ describe("alumnos", () => {
     };
     const plan = decideTrainerLimitMail(free, AHORA, "t1");
     expect(plan?.limit).toBe(2);
+  });
+
+  // ── Hallazgo de Codex sobre #1267 (P1): el gate real rechaza por
+  // `projectedLoad > limit`, no por `weightedLoad >= limit` — `weightedLoad`
+  // es la carga YA aceptada, no la que el intento rechazado hubiera dejado.
+  // Ver `sigueEnElTope`, sección "POR QUÉ `students` NO USA `count >= limit`".
+  describe("con incremento — la misma desigualdad estricta que el gate", () => {
+    const conIncremento = (weightedLoad: number, incremento: number) => ({
+      [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+      [CAMPO_TOPE_KIND]: "students",
+      // Sin `subscription`: límite Free = 2 (mismo fixture que arriba).
+      weightedLoad,
+      [CAMPO_TOPE_INCREMENTO]: incremento,
+    });
+
+    it("carga 1,5 + incremento 1, límite 2 → manda (2,5 > 2)", () => {
+      const plan = decideTrainerLimitMail(conIncremento(1.5, 1), AHORA, "t1");
+      expect(plan?.kind).toBe("student-limit-reached");
+      expect(plan?.limit).toBe(2);
+    });
+
+    it("carga 1 + incremento 1, límite 2 → NO manda (1 + 1 = 2, no > 2)", () => {
+      expect(decideTrainerLimitMail(conIncremento(1, 1), AHORA, "t1")).toBeNull();
+    });
+
+    it("⚠️ si la carga FRESCA ya bajó del choque (el PF liberó lugar), no manda", () => {
+      // El incremento quedó anotado contra la carga del momento del choque
+      // (1,5), pero `weightedLoad` se releyó fresco y hoy es 0,5 — el PF
+      // pausó a alguien después. `sigueEnElTope` nunca guarda la carga vieja,
+      // sólo el incremento: 0,5 + 1 = 1,5, no > 2.
+      expect(decideTrainerLimitMail(conIncremento(0.5, 1), AHORA, "t1")).toBeNull();
+    });
+  });
+
+  describe("sin incremento (choque legado, o `details` incompletos)", () => {
+    it("cae al mismo criterio que los otros dos kinds: weightedLoad >= límite → manda", () => {
+      const legado = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        weightedLoad: 2, // == límite Free (2), sin CAMPO_TOPE_INCREMENTO
+      };
+      expect(decideTrainerLimitMail(legado, AHORA, "t1")).not.toBeNull();
+    });
+
+    it("por debajo del límite no manda, aunque un incremento hipotético lo hubiera pasado", () => {
+      const legado = {
+        [CAMPO_TOPE_AT]: ts(AHORA - 1000),
+        [CAMPO_TOPE_KIND]: "students",
+        weightedLoad: 1.5, // < límite Free (2), sin incremento conocido
+      };
+      expect(decideTrainerLimitMail(legado, AHORA, "t1")).toBeNull();
+    });
+  });
+});
+
+describe("incrementoDeAlumnos", () => {
+  it("projectedLoad - currentLoad de los details", () => {
+    const err = new HttpsError("resource-exhausted", "x", {
+      reason: "plan-limit",
+      tier: "plan1",
+      limit: 7,
+      currentLoad: 6.5,
+      projectedLoad: 7.5,
+    });
+    expect(incrementoDeAlumnos(err)).toBe(1);
+  });
+
+  it("sin currentLoad/projectedLoad numéricos, null — fail-closed", () => {
+    const err = new HttpsError("resource-exhausted", "x", {
+      reason: "plan-limit",
+      tier: "plan1",
+      limit: 7,
+    });
+    expect(incrementoDeAlumnos(err)).toBeNull();
+  });
+
+  it("un error que no es HttpsError, null", () => {
+    expect(incrementoDeAlumnos(new Error("otra cosa"))).toBeNull();
+  });
+});
+
+describe("registrarTopeDeAlumnos", () => {
+  beforeEach(() => {
+    usersStore = {};
+  });
+
+  it("guarda kind + at + el incremento cuando se lo pasan", async () => {
+    await registrarTopeDeAlumnos(APP, "t1", AHORA, 1.5);
+    expect(usersStore["t1"]).toMatchObject({
+      [CAMPO_TOPE_KIND]: "students",
+      [CAMPO_TOPE_INCREMENTO]: 1.5,
+    });
+    expect((usersStore["t1"]?.[CAMPO_TOPE_AT] as { toMillis(): number }).toMillis()).toBe(AHORA);
+  });
+
+  it("⚠️ sin incremento, BORRA cualquier valor de un choque anterior — no lo deja colgado", async () => {
+    usersStore["t1"] = { [CAMPO_TOPE_INCREMENTO]: 3 }; // de un choque previo
+    await registrarTopeDeAlumnos(APP, "t1", AHORA, null);
+    expect(usersStore["t1"]?.[CAMPO_TOPE_INCREMENTO]).toBeUndefined();
   });
 });
 

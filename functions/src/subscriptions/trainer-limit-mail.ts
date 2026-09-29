@@ -159,6 +159,7 @@
 import { App } from "firebase-admin/app";
 import {
   DocumentData,
+  FieldValue,
   Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
@@ -179,6 +180,13 @@ import { toSubscriptionState } from "./subscription-state";
 export const CAMPO_TOPE_AT = "trainerLimitHitAt";
 /** Qué tope se tocó: `"customExercises"`, `"templates"` o `"students"`. */
 export const CAMPO_TOPE_KIND = "trainerLimitHitKind";
+/**
+ * El incremento que el intento RECHAZADO quería sumarle a `weightedLoad`.
+ * Sólo lo escribe `registrarTopeDeAlumnos`, y sólo tiene sentido para el
+ * kind `students` — los otros dos kinds nunca lo tocan. Ver `sigueEnElTope`,
+ * sección "POR QUÉ `students` NO USA `count >= limit`", para el porqué.
+ */
+export const CAMPO_TOPE_INCREMENTO = "trainerLimitHitIncrement";
 /**
  * Cuándo se le escribió por última vez, POR KIND. Lo escribe este módulo.
  *
@@ -367,15 +375,56 @@ function migrarMapaDeEnfriamiento(mailAt: unknown): Record<string, Timestamp> {
   return mapa;
 }
 
+/** Lee `trainerLimitHitIncrement` validando el tipo. Sólo relevante para `students`. */
+function leerIncrementoDeAlumnos(userData: DocumentData | undefined): number | null {
+  const raw = userData?.[CAMPO_TOPE_INCREMENTO];
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+}
+
 /**
  * Si el PF SIGUE en el tope ahora mismo — la cláusula 3.
  *
- * Delega la lectura del límite/uso a `campos.leerLimiteYUso` (`CAMPOS_POR_KIND`),
- * con la MISMA semántica en los tres kinds: `limit` no numérico (null,
- * ausente, o corrupto) es SIN TOPE — nunca "sigue en el tope". `count < limit`
- * es "ya no está" — `count >= limit` es lo único que mantiene el mail vivo
- * (E6: en el tope exacto SÍ cuenta como "en el tope", porque ahí es donde el
- * próximo intento rebota).
+ * Delega la lectura del límite/uso a `campos.leerLimiteYUso` (`CAMPOS_POR_KIND`).
+ * Para `customExercises`/`templates`: `limit` no numérico (null, ausente, o
+ * corrupto) es SIN TOPE — nunca "sigue en el tope". `count < limit` es "ya no
+ * está" — `count >= limit` es lo único que mantiene el mail vivo (E6: en el
+ * tope exacto SÍ cuenta como "en el tope", porque ahí es donde el próximo
+ * intento rebota).
+ *
+ * ── POR QUÉ `students` NO USA `count >= limit` ──
+ *
+ * Hallazgo de Codex sobre #1267. Para los otros dos kinds, `count` es la
+ * MISMA cantidad que el gate compara contra el límite (la cuenta de
+ * ejercicios/plantillas ya creados). Para `students`, en cambio, `count` acá
+ * es `weightedLoad` — la carga YA PERSISTIDA de los vínculos ACEPTADOS, una
+ * cantidad DISTINTA de lo que el gate de verdad evalúa (`projectedLoad`, en
+ * `promote-link.ts`): la carga que el intento RECHAZADO hubiera dejado si se
+ * aprobaba. Un PF con 1 alumno activo + 1 pausado (`weightedLoad` = 1,5) que
+ * intenta aceptar a un tercero contra un límite de 2 rebota
+ * (`projectedLoad` = 2,5 > 2) — pero `weightedLoad` SOLO (1,5) nunca llega a
+ * `>= 2`, así que con el criterio de los otros dos kinds el mail no salía
+ * nunca: quedaba ciego a la mitad de los rechazos reales.
+ *
+ * El arreglo usa la MISMA desigualdad estricta que el gate
+ * (`projectedLoad > limit`), reconstruyendo `projectedLoad` como
+ * `weightedLoad(fresco) + incrementoAlumnos`, donde `incrementoAlumnos` es lo
+ * que el intento rechazado quería sumar (`CAMPO_TOPE_INCREMENTO`, anotado por
+ * `registrarTopeDeAlumnos` — ver esa función y `incrementoDeAlumnos`).
+ * "Fresco" importa: si el PF liberó lugar desde el choque (pausó a alguien),
+ * `weightedLoad` ya lo refleja y el mail no sale de pedo.
+ *
+ * ── SIN INCREMENTO (choque legado, o `details` incompletos) ──
+ *
+ * Si no hay `trainerLimitHitIncrement` — un choque anotado por una versión
+ * vieja de este código (compatibilidad, ver "EL TOPE DE ALUMNOS" más abajo),
+ * o el caso defensivo donde `incrementoDeAlumnos` no pudo leer
+ * `currentLoad`/`projectedLoad` de los `details` del error—, cae al MISMO
+ * criterio que los otros dos kinds: `weightedLoad(fresco) >= limit`. Es MENOS
+ * preciso (ciego al caso de arriba) pero MÁS conservador: nunca manda de más,
+ * sólo puede mandar de menos — y mandar la oferta a quien YA no está en el
+ * tope es el error caro que documenta la cláusula 3 del encabezado. Elegido
+ * así a propósito, no por default: ver el describe "sin incremento" en
+ * `trainer-limit-mail.test.ts`.
  *
  * Devuelve el límite ya angosto a `number` para que el productor no tenga que
  * repetir el chequeo de tipo.
@@ -385,9 +434,13 @@ function sigueEnElTope(
   trainerId: string,
   nowMs: number,
   campos: CamposDelTope,
+  incrementoAlumnos: number | null,
 ): number | null {
   const { limit, count } = campos.leerLimiteYUso(userData, trainerId, nowMs);
   if (limit === null) return null;
+  if (incrementoAlumnos !== null) {
+    return count + incrementoAlumnos > limit ? limit : null;
+  }
   return count >= limit ? limit : null;
 }
 
@@ -424,7 +477,11 @@ export function decideTrainerLimitMail(
   const campos = CAMPOS_POR_KIND[tope];
   if (!campos) return null; // kind sin reconocer: no sabemos que tope mirar
 
-  const limit = sigueEnElTope(userData, trainerId, nowMs, campos);
+  // Sólo `students` usa un incremento — los otros dos kinds quedan en `null`
+  // a propósito: `sigueEnElTope` no lo mira si el kind no es ese.
+  const incrementoAlumnos = tope === "students" ? leerIncrementoDeAlumnos(userData) : null;
+
+  const limit = sigueEnElTope(userData, trainerId, nowMs, campos, incrementoAlumnos);
   if (limit === null) return null; // clausula 3
 
   // EL ENFRIAMIENTO, POR KIND. Ver la clausula 4: sin esto, un PF que sigue
@@ -801,11 +858,49 @@ export function esTopeDeAlumnos(err: unknown): boolean {
 }
 
 /**
- * Anota `trainerLimitHitKind: "students"` + `trainerLimitHitAt` en
- * `users/{trainerId}` cuando una promoción (`acceptTrainerLink` /
- * `resumeTrainerLink`) rebotó contra el tope de alumnos. Esa escritura
- * dispara `sendTrainerLimitMailOnHit`, igual que la anotación de
- * ejercicios/plantillas dispara ese mismo trigger.
+ * El incremento que el intento RECHAZADO quería sumarle a `weightedLoad`:
+ * `projectedLoad - currentLoad`, tal como los escribió `syncTrainerLoad` en
+ * los `details` del `resource-exhausted` (`promote-link.ts`). `null` si los
+ * `details` no traen los dos números como números finitos — no debería pasar
+ * en la práctica (`syncTrainerLoad` los escribe juntos, en el mismo throw,
+ * siempre que `esTopeDeAlumnos(err)` es cierto: son la MISMA excepción), pero
+ * es la misma postura fail-closed que `CAMPOS_POR_KIND` — "un kind sin
+ * reconocer no manda": si no se puede leer con confianza, mejor un choque SIN
+ * incremento (cae al criterio conservador de `sigueEnElTope`) que inventar un
+ * número.
+ *
+ * Llamalo DESPUÉS de confirmar `esTopeDeAlumnos(err)` — no repite ese chequeo,
+ * así que sobre un `err` que no es el tope de alumnos también puede devolver
+ * `null` (o, en teoría, un número sin sentido si otro `resource-exhausted`
+ * casualmente trae esos mismos nombres de campo) — el llamador ya filtró eso.
+ */
+export function incrementoDeAlumnos(err: unknown): number | null {
+  if (!(err instanceof HttpsError)) return null;
+  const details = err.details as
+    | { currentLoad?: unknown; projectedLoad?: unknown }
+    | undefined;
+  const current = details?.currentLoad;
+  const projected = details?.projectedLoad;
+  if (typeof current !== "number" || !Number.isFinite(current)) return null;
+  if (typeof projected !== "number" || !Number.isFinite(projected)) return null;
+  return projected - current;
+}
+
+/**
+ * Anota `trainerLimitHitKind: "students"` + `trainerLimitHitAt` (+ el
+ * incremento rechazado, si se pudo leer) en `users/{trainerId}` cuando una
+ * promoción (`acceptTrainerLink` / `resumeTrainerLink`) rebotó contra el tope
+ * de alumnos. Esa escritura dispara `sendTrainerLimitMailOnHit`, igual que la
+ * anotación de ejercicios/plantillas dispara ese mismo trigger.
+ *
+ * `incremento`: `projectedLoad - currentLoad` de los `details` del error (ver
+ * `incrementoDeAlumnos`) — lo que `sigueEnElTope` necesita para reconstruir
+ * `projectedLoad` sin repetir la transacción del gate. `null` cuando no se
+ * pudo leer: esta función BORRA la clave (`FieldValue.delete()`) en vez de
+ * omitirla, para que un incremento de un choque ANTERIOR nunca sobreviva
+ * pegado a un `trainerLimitHitAt` nuevo — `sigueEnElTope` cae entonces al
+ * criterio conservador documentado ahí, en vez de leer un número que ya no
+ * describe a ESTE choque.
  *
  * DELIBERADAMENTE simple: una escritura, sin transacción propia y sin
  * catch interno. `syncTrainerLoad` tira DENTRO de su propia transacción
@@ -824,6 +919,7 @@ export async function registrarTopeDeAlumnos(
   app: App,
   trainerId: string,
   nowMs: number,
+  incremento: number | null,
 ): Promise<void> {
   await getFirestore(app)
     .collection("users")
@@ -832,6 +928,7 @@ export async function registrarTopeDeAlumnos(
       {
         [CAMPO_TOPE_KIND]: "students",
         [CAMPO_TOPE_AT]: Timestamp.fromMillis(nowMs),
+        [CAMPO_TOPE_INCREMENTO]: incremento !== null ? incremento : FieldValue.delete(),
       },
       { merge: true },
     );
