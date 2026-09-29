@@ -15,6 +15,7 @@
 // ver `resolveNoticeTier` y su grupo de tests acá abajo.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -25,6 +26,11 @@ Future<void> _mostrar(
   WidgetTester tester, {
   required TrainerLimitKind kind,
   SubscriptionTier currentTier = SubscriptionTier.free,
+  // Default `active`: la inmensa mayoría de estos tests no está probando el
+  // estado de la suscripción — sólo los del grupo "inactiva por ESTADO" lo
+  // pisan explícitamente.
+  SubscriptionStatus subscriptionStatus = SubscriptionStatus.active,
+  DateTime? currentPeriodEnd,
   required int limit,
   required int count,
   TrainerLimitNoticeForm? form,
@@ -42,6 +48,8 @@ Future<void> _mostrar(
               context,
               kind: kind,
               currentTier: currentTier,
+              subscriptionStatus: subscriptionStatus,
+              currentPeriodEnd: currentPeriodEnd,
               limit: limit,
               count: count,
             ),
@@ -57,27 +65,16 @@ Future<void> _mostrar(
 
 void main() {
   group('resolveNoticeTier — Cambio 2 (P1: nombrar el tier EFECTIVO)', () {
-    test('nominal == efectivo: resuelve el mismo tier, no inactiva', (() {
+    test('nominal == efectivo, activa: resuelve el mismo tier, no inactiva',
+        (() {
       final r = resolveNoticeTier(
         kind: TrainerLimitKind.customExercises,
         limit: 60,
         nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.active,
       );
       expect(r.tier, SubscriptionTier.plan1);
       expect(r.inactive, isFalse);
-    }));
-
-    test('Plan 1 pausado con el tope de plantillas de Free ⇒ Free + inactiva',
-        (() {
-      // El caso textual del hallazgo: un Plan 1 pausado con 3 plantillas
-      // (Plan 1 nominal no tiene tope de plantillas — sólo Free lo tiene).
-      final r = resolveNoticeTier(
-        kind: TrainerLimitKind.templates,
-        limit: 3,
-        nominalTier: SubscriptionTier.plan1,
-      );
-      expect(r.tier, SubscriptionTier.free);
-      expect(r.inactive, isTrue);
     }));
 
     test('piso prepago: el efectivo es MAYOR que el nominal, no inactiva', (() {
@@ -87,6 +84,7 @@ void main() {
         kind: TrainerLimitKind.customExercises,
         limit: 120,
         nominalTier: SubscriptionTier.free,
+        subscriptionStatus: SubscriptionStatus.active,
       );
       expect(r.tier, SubscriptionTier.plan2);
       expect(r.inactive, isFalse);
@@ -99,6 +97,7 @@ void main() {
         kind: TrainerLimitKind.customExercises,
         limit: 45,
         nominalTier: SubscriptionTier.free,
+        subscriptionStatus: SubscriptionStatus.active,
       );
       expect(r.tier, isNull);
       expect(r.inactive, isFalse);
@@ -110,6 +109,7 @@ void main() {
         kind: TrainerLimitKind.templates,
         limit: 10,
         nominalTier: SubscriptionTier.free,
+        subscriptionStatus: SubscriptionStatus.active,
       );
       expect(r.tier, isNull);
       expect(r.inactive, isFalse);
@@ -117,13 +117,116 @@ void main() {
 
     test('inactive nunca es true sin un tier resuelto', (() {
       // Contrato del dartdoc: `inactive` sólo puede ser `true` cuando `tier`
-      // no es null. Un límite sin match no puede además decir "inactiva".
+      // no es null. Un límite sin match no puede además decir "inactiva",
+      // ni siquiera con el estado caído.
       final r = resolveNoticeTier(
         kind: TrainerLimitKind.customExercises,
         limit: 999,
         nominalTier: SubscriptionTier.free,
+        subscriptionStatus: SubscriptionStatus.paused,
       );
       expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+  });
+
+  group(
+      'resolveNoticeTier — inactive por ESTADO, no por comparación de '
+      'límites (segundo hallazgo Codex, 2026-09-29)', () {
+    test('pausada ⇒ inactiva, nombra el efectivo (Free)', (() {
+      // El caso textual del hallazgo: un Plan 1 PAUSADO con 3 plantillas
+      // (Plan 1 nominal no tiene tope de plantillas — sólo Free lo tiene).
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isTrue);
+    }));
+
+    test('pending ⇒ inactiva', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.pending,
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isTrue);
+    }));
+
+    test('cancelled con currentPeriodEnd VENCIDO ⇒ inactiva', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.cancelled,
+        currentPeriodEnd: DateTime.utc(2026, 1, 1),
+        now: DateTime.utc(2026, 2, 1),
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isTrue);
+    }));
+
+    test(
+        'cancelled con currentPeriodEnd VIGENTE + límite ya caído a Free '
+        '⇒ genérico, NUNCA inactiva', (() {
+      // Dentro del período pagado el servidor todavía respeta el tier
+      // nominal (`limiteDelStatus` en effective-limit.ts) — si el `limit`
+      // que bloqueó igual muestra Free es una propagación atrasada, no un
+      // hecho sobre la cancelación. Mismo eje que el caso "activa" de abajo.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.cancelled,
+        currentPeriodEnd: DateTime.utc(2026, 3, 1),
+        now: DateTime.utc(2026, 2, 1),
+      );
+      expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('grace cuenta como activa: nombra el nominal, no inactiva', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 60,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.grace,
+      );
+      expect(r.tier, SubscriptionTier.plan1);
+      expect(r.inactive, isFalse);
+    }));
+
+    test(
+        'EL BUG: activa con el límite todavía en Free (propagación '
+        'pendiente) ⇒ genérico, NUNCA "no está activa"', (() {
+      // Éste es el caso que rompía antes de este fix: comparar límites
+      // (efectivo Free < nominal Plan 1) decía "inactiva" con la
+      // suscripción realmente activa — falso, AGENTS.md §11.1.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.active,
+      );
+      expect(r.tier, isNull);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('piso prepago gana aunque el estado esté caído (pausada)', (() {
+      // Un piso prepago vigente no pasa por el switch de status (mismo
+      // criterio que `conPisoPrepago` del servidor): aunque la suscripción
+      // NUEVA esté pausada, el piso de la VIEJA sigue de pie.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 120,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+      );
+      expect(r.tier, SubscriptionTier.plan2);
       expect(r.inactive, isFalse);
     }));
   });
@@ -185,15 +288,17 @@ void main() {
     // ─────────────────────────────────────────────────────────────────────
 
     testWidgets(
-        'suscripción Plan 1 no activa: nombra Free (no Plan 1) y no ofrece '
+        'suscripción Plan 1 PAUSADA: nombra Free (no Plan 1) y no ofrece '
         'upsell', (tester) async {
       // El limit que bloqueó (20) es el de Free — el servidor ya calculó el
       // efectivo. El nominal (plan1) sólo debe aparecer para decir que ESE
-      // es el que no está activo.
+      // es el que no está activo. El estado (pausada) es lo que autoriza
+      // "inactiva" — no la comparación de límites (segundo hallazgo Codex).
       await _mostrar(
         tester,
         kind: TrainerLimitKind.customExercises,
         currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
         limit: 20,
         count: 20,
         form: TrainerLimitNoticeForm.sheet,
@@ -206,6 +311,35 @@ void main() {
       );
       expect(find.textContaining('Plan 1 incluye'), findsNothing);
       expect(find.textContaining('PASATE A'), findsNothing);
+      expect(find.text('PLAN 2'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Plan 1 ACTIVA con el límite todavía en Free (propagación '
+        'pendiente): genérico, nunca "no está activa"', (tester) async {
+      // Mismo limit/nominal que el test de arriba — la ÚNICA diferencia es
+      // el estado. Antes de este fix, los dos test producían el mismo
+      // resultado ("inactiva"), que es exactamente el bug: comparar límites
+      // no distingue "pausada" de "activa con propagación atrasada".
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.active,
+        limit: 20,
+        count: 20,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(
+        find.text('Tu plan incluye 20 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.textContaining('Free incluye'), findsNothing);
       expect(find.text('PLAN 2'), findsNothing);
       expect(find.text('VER PLANES'), findsOneWidget);
     });
@@ -312,6 +446,7 @@ void main() {
                     context,
                     kind: TrainerLimitKind.customExercises,
                     currentTier: SubscriptionTier.free,
+                    subscriptionStatus: SubscriptionStatus.active,
                     limit: 60,
                     count: 60,
                   ),
@@ -410,6 +545,7 @@ void main() {
                     context,
                     kind: TrainerLimitKind.customExercises,
                     currentTier: SubscriptionTier.free,
+                    subscriptionStatus: SubscriptionStatus.active,
                     limit: 60,
                     count: 60,
                   ),
@@ -441,6 +577,93 @@ void main() {
       expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsNothing,
           reason: 'el diálogo se cierra antes de navegar');
       expect(find.text('PLANES'), findsOneWidget);
+    });
+
+    // ── Segundo hallazgo (Codex, 2026-09-29): foco y activación por teclado
+    // ─────────────────────────────────────────────────────────────────────
+    // Antes, "VER PLANES" y el descarte eran `TreinoTappable` pelado — sin
+    // `FocusNode`, invisibles para Tab y para Enter/Espacio. En el dialog
+    // WEB del Coach Hub, quien navega sólo con teclado no podía llegar a
+    // ninguno de los dos.
+
+    testWidgets('VER PLANES es alcanzable con Tab y se activa con Enter',
+        (tester) async {
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      final router = GoRouter(
+        initialLocation: '/rutinas',
+        routes: [
+          GoRoute(
+            path: '/rutinas',
+            builder: (context, _) => Scaffold(
+              body: Builder(
+                builder: (context) => ElevatedButton(
+                  onPressed: () => showTrainerLimitNotice(
+                    context,
+                    kind: TrainerLimitKind.customExercises,
+                    currentTier: SubscriptionTier.free,
+                    subscriptionStatus: SubscriptionStatus.active,
+                    limit: 60,
+                    count: 60,
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: '/facturacion/planes',
+            builder: (context, _) => const Scaffold(body: Text('PLANES')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          theme: AppTheme.dark(),
+          routerConfig: router,
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      // "VER PLANES" es el primer control enfocable del diálogo (candado y
+      // caja de upsell son puramente informativos, sin foco).
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('TOPE DE EJERCICIOS PROPIOS'),
+        findsNothing,
+        reason: 'el diálogo se cierra antes de navegar',
+      );
+      expect(find.text('PLANES'), findsOneWidget);
+    });
+
+    testWidgets('el descarte cierra el diálogo con Tab, Tab y Enter',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.free,
+        limit: 20,
+        count: 20,
+        form: TrainerLimitNoticeForm.dialog,
+      );
+
+      // VER PLANES primero, "Ahora no" segundo — mismo orden de traversal.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsNothing);
     });
   });
 
@@ -529,6 +752,7 @@ void main() {
                     context,
                     kind: TrainerLimitKind.templates,
                     currentTier: SubscriptionTier.free,
+                    subscriptionStatus: SubscriptionStatus.active,
                     limit: 3,
                     count: 3,
                   ),

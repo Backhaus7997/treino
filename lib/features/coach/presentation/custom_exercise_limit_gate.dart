@@ -76,6 +76,8 @@ Future<bool> intentarCrearEjercicioPropio(
         context,
         kind: TrainerLimitKind.customExercises,
         currentTier: _currentTier(ref),
+        subscriptionStatus: _currentStatus(ref),
+        currentPeriodEnd: _currentPeriodEnd(ref),
         limit: quota.limit!,
         count: quota.count,
       ),
@@ -92,6 +94,20 @@ Future<bool> intentarCrearEjercicioPropio(
 SubscriptionTier _currentTier(WidgetRef ref) =>
     ref.read(userProfileProvider).valueOrNull?.subscription?.tier ??
     SubscriptionTier.free;
+
+/// El ESTADO de la suscripción — decide si el aviso puede afirmar "no está
+/// activa" (ver `resolveNoticeTier` en `trainer_limit_notice.dart`). Sin
+/// `subscription` (nunca pagó) no hay nada "inactivo" que decir: default
+/// `active`, mismo fallback que usa `SubscriptionStatusX.fromJson` para un
+/// status desconocido.
+SubscriptionStatus _currentStatus(WidgetRef ref) =>
+    ref.read(userProfileProvider).valueOrNull?.subscription?.status ??
+    SubscriptionStatus.active;
+
+/// `currentPeriodEnd` de la suscripción — sólo lo usa `resolveNoticeTier`
+/// cuando el status es `cancelled`. `null` en cualquier otro caso.
+DateTime? _currentPeriodEnd(WidgetRef ref) =>
+    ref.read(userProfileProvider).valueOrNull?.subscription?.currentPeriodEnd;
 
 /// Anota que este PF chocó el tope. Lo lee el barrido nocturno del PR4 para
 /// mandarle un mail contándole dónde se paga — la app no puede decírselo
@@ -158,6 +174,8 @@ Future<bool> mostrarAvisoTopeEjerciciosPorRebote(
     context,
     kind: TrainerLimitKind.customExercises,
     currentTier: _currentTier(ref),
+    subscriptionStatus: _currentStatus(ref),
+    currentPeriodEnd: _currentPeriodEnd(ref),
     limit: limit,
     count: quota!.count,
   );

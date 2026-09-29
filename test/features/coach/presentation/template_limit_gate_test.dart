@@ -318,7 +318,7 @@ void main() {
       'intentarCrearPlantilla — Cambio 2 (P1): el aviso nombra el tier '
       'EFECTIVO, no el nominal a ciegas', () {
     testWidgets(
-        'el caso del hallazgo: Plan 1 no activo, limit del servidor ya es '
+        'el caso del hallazgo: Plan 1 PAUSADO, limit del servidor ya es '
         'el de Free (3) ⇒ el aviso dice Free e inactiva, no Plan 1',
         (tester) async {
       // Plan 1 nominal NO tiene tope de plantillas (kTierTemplateLimits[
@@ -347,6 +347,39 @@ void main() {
       );
       expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
       // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'segundo hallazgo (Codex, 2026-09-29): Plan 1 ACTIVO con el límite '
+        'de plantillas todavía en Free (propagación pendiente) ⇒ genérico, '
+        'nunca "no está activa"', (tester) async {
+      // MISMO limit/nominal que el test de arriba — la ÚNICA diferencia es
+      // el status: `active`, no `paused`. Comparar límites no distingue los
+      // dos casos; el estado sí (AGENTS.md §11.1).
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.active,
+        ),
+        quota: const AsyncValue.data((limit: 3, count: 3)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(
+        find.text('Tu plan incluye 3 plantillas. Podés editar o archivar '
+            'las que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
       expect(find.text('PLAN 2'), findsNothing);
     });
 

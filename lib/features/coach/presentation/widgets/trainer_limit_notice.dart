@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/utils/app_clock.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
@@ -23,37 +24,70 @@ enum TrainerLimitKind { customExercises, templates }
 
 /// Resuelve, a partir del `limit` con el que YA bloqueó el gate —nunca del
 /// tier nominal de `userProfileProvider` directo—, qué tier mostrar en el
-/// aviso.
+/// aviso, y si corresponde decir que la suscripción no está activa.
 ///
-/// El bug que esto corrige (hallazgo P1 de Codex, 2026-09-29): los gates
-/// leían el tier NOMINAL (`subscription?.tier`) para el copy, pero el
-/// [limit] que bloquea sale de `planLimits` del servidor, calculado con el
+/// ## Hallazgo P1 (Codex, 2026-09-29) — qué tier se NOMBRA
+///
+/// Los gates leían el tier NOMINAL (`subscription?.tier`) para el copy, pero
+/// el [limit] que bloquea sale de `planLimits` del servidor, calculado con el
 /// tier EFECTIVO — una suscripción `pending`/`paused`, o `cancelled` ya
 /// vencida, cae a los topes de Free, y un piso prepago puede subir el
 /// efectivo por ENCIMA del nominal. Nombrar el nominal ahí afirma un plan
 /// que no explica el número que el PF tiene enfrente (AGENTS.md §11.1): un
 /// Plan 1 pausado con 3 plantillas veía «Plan 1 incluye…» y el upsell le
 /// ofrecía el Plan 2, cuando Plan 1 no tiene tope de plantillas — el efectivo
-/// era Free.
+/// era Free. Se corrige resolviendo `efectivo` desde la TABLA
+/// ([kTierCustomExerciseLimits] / [kTierTemplateLimits]), nunca desde
+/// [nominalTier].
+///
+/// ## Segundo hallazgo (Codex, 2026-09-29) — CUÁNDO se afirma "inactiva"
+///
+/// La primera versión de este fix todavía decidía `inactive` COMPARANDO
+/// límites (`efectivo.index < nominalTier.index`), no mirando el ESTADO real
+/// de la suscripción. Eso miente en la ventana de propagación: cuando un
+/// upgrade se confirma, `subscription` (tier/status) se escribe ANTES de que
+/// `syncEntitlementsOnSubscription` (functions, asíncrono — y si falla NO
+/// reintenta; sólo lo cura el barrido nocturno) termine de recalcular
+/// `planLimits`. En ese intervalo un PF con Plan 1 YA ACTIVO todavía choca
+/// con el límite de Free, y comparar límites decía «tu suscripción no está
+/// activa» — falso: la suscripción SÍ está activa, sólo el número tarda en
+/// llegar (AGENTS.md §11.1 — una advertencia falsa es peor que ninguna).
+///
+/// Ahora `inactive` sale del ESTADO, con las MISMAS reglas que
+/// `limiteDelStatus` en `functions/src/subscriptions/effective-limit.ts`:
+/// `active`/`grace` están al día; `pending`/`paused` no; `cancelled` depende
+/// de si [now] todavía está antes de [currentPeriodEnd]. Ver
+/// [_entitledToNominalTier].
+///
+/// Con el estado resuelto, tres casos posibles (en este orden de prioridad):
+///
+/// 1. **Piso prepago** — `efectivo` > [nominalTier]: es un PISO, nunca un
+///    techo (mismo criterio que `conPisoPrepago` del servidor), así que se
+///    nombra igual, esté la suscripción activa o no.
+/// 2. **Inactiva por estado** — el estado dice que no está al día: `tier` es
+///    el efectivo (típicamente Free) e `inactive` es `true`.
+/// 3. **Activa pero el límite quedó atrás** — `efectivo` < [nominalTier] con
+///    el estado al día: es propagación pendiente o un sync fallido, nunca un
+///    hecho sobre la suscripción. No se nombra NINGÚN tier —ni el nominal,
+///    que no explica el número, ni el efectivo, que contradice un estado
+///    activo— y el llamador cae al cuerpo genérico («Tu plan incluye N…»,
+///    sin upsell; ver `_TrainerLimitContent.build`).
 ///
 /// Devuelve:
-/// - `tier`: el tier cuya tabla estática ([kTierCustomExerciseLimits] /
-///   [kTierTemplateLimits]) explica exactamente ese [limit] — para
-///   ejercicios (20/60/120) es unívoco; para plantillas sólo Free tiene tope,
-///   así que cualquier `limit` finito distinto de 3 ya es un indicio de tope
-///   ajustado a mano. `null` si ningún tier coincide: ahí el aviso NO puede
-///   nombrar un plan sin arriesgarse a mentir, y el llamador cae a un cuerpo
-///   genérico («Tu plan incluye N…», sin nombre).
-/// - `inactive`: `true` cuando el `tier` resuelto es MENOR que [nominalTier]
-///   — el PF pagó un plan más alto, pero su derecho cayó porque la
-///   suscripción no está activa. Ahí no se ofrece el "siguiente" tier: ya
-///   compró uno más caro que el que está usando (mismo criterio que
-///   `PlanLimitReason.subscriptionInactive` en `plan_limit_paywall.dart`).
-///   Sólo puede ser `true` cuando `tier` no es `null`.
+/// - `tier`: el tier a NOMBRAR. `null` = no afirmar ningún plan (tope
+///   ajustado a mano sin match en la tabla, o el caso 3 de arriba) — el
+///   llamador cae al cuerpo genérico.
+/// - `inactive`: `true` sólo en el caso 2 de arriba. Nunca `true` con
+///   `tier: null` — sin un tier verificable no hay nada que afirmar (mismo
+///   criterio que `PlanLimitReason.subscriptionInactive` en
+///   `plan_limit_paywall.dart`, que tampoco se afirma sin dato).
 ({SubscriptionTier? tier, bool inactive}) resolveNoticeTier({
   required TrainerLimitKind kind,
   required int limit,
   required SubscriptionTier nominalTier,
+  required SubscriptionStatus subscriptionStatus,
+  DateTime? currentPeriodEnd,
+  DateTime? now,
 }) {
   final table = switch (kind) {
     TrainerLimitKind.customExercises => kTierCustomExerciseLimits,
@@ -71,9 +105,51 @@ enum TrainerLimitKind { customExercises, templates }
     }
   }
 
-  final inactive = efectivo != null && efectivo.index < nominalTier.index;
-  return (tier: efectivo, inactive: inactive);
+  // Caso 1 — piso prepago, SIN mirar el estado: ver el punto 1 del dartdoc.
+  if (efectivo != null && efectivo.index > nominalTier.index) {
+    return (tier: efectivo, inactive: false);
+  }
+
+  final entitled = _entitledToNominalTier(
+    status: subscriptionStatus,
+    currentPeriodEnd: currentPeriodEnd,
+    now: now ?? AppClock.now(),
+  );
+
+  // Caso 2 — el ESTADO dice que no está al día. Nunca `inactive: true` sin
+  // un tier resuelto (contrato del dartdoc de arriba): si ni el efectivo
+  // matchea una tabla conocida, no hay nada verificable que afirmar.
+  if (!entitled) return (tier: efectivo, inactive: efectivo != null);
+
+  // Caso 3 — activa (o cancelled todavía vigente) pero el límite del
+  // servidor quedó atrás del nominal: ver el punto 3 del dartdoc.
+  if (efectivo != null && efectivo.index < nominalTier.index) {
+    return (tier: null, inactive: false);
+  }
+
+  return (tier: efectivo, inactive: false);
 }
+
+/// Espeja `limiteDelStatus` de `functions/src/subscriptions/
+/// effective-limit.ts`: `true` cuando el ESTADO de la suscripción respeta el
+/// tier nominal (activa, en gracia, o cancelada todavía dentro del período
+/// pagado); `false` cuando el servidor ya la trató como caída a Free por el
+/// ESTADO — sin mirar ningún límite. `grace` cuenta como activa a propósito:
+/// MP reintenta un cobro fallido 7 días antes de cortar, y no se castiga el
+/// primer fallo (mismo comentario en el TS).
+bool _entitledToNominalTier({
+  required SubscriptionStatus status,
+  required DateTime? currentPeriodEnd,
+  required DateTime now,
+}) =>
+    switch (status) {
+      SubscriptionStatus.active || SubscriptionStatus.grace => true,
+      SubscriptionStatus.pending || SubscriptionStatus.paused => false,
+      // Sin `currentPeriodEnd` no hay período pagado que respetar — mismo
+      // caso límite que `limiteDelStatus` resuelve a Free.
+      SubscriptionStatus.cancelled =>
+        currentPeriodEnd != null && now.isBefore(currentPeriodEnd),
+    };
 
 /// El aviso que el embudo de cada tope muestra cuando el PF lo choca
 /// (docs/limite-ejercicios-pf.md PR3 y docs/limite-plantillas-pf.md PR3,
@@ -124,20 +200,36 @@ TrainerLimitNoticeForm _resolveForm() =>
 /// resolver el upsell al siguiente tier; nunca para decidir si bloquea (eso
 /// ya lo decidió el gate con `limit`/`count`).
 ///
+/// [subscriptionStatus] y [currentPeriodEnd] vienen del MISMO
+/// `TrainerSubscription` que [currentTier] (`userProfileProvider`; sin
+/// `subscription` — el PF nunca pagó — el gate pasa `active`, porque no hay
+/// nada "inactivo" que decir de un PF Free). Son los que deciden si el aviso
+/// puede afirmar "tu suscripción no está activa" — ver [resolveNoticeTier].
+/// REQUERIDO y no con default acá adentro a propósito: que el compilador
+/// obligue a cada llamador a pensarlo, en vez de que un default silencioso
+/// vuelva a esconder el mismo bug bajo otra forma.
+///
 /// El tier que NOMBRA el aviso nunca es [currentTier] a ciegas: se resuelve
 /// desde [limit] (ver [resolveNoticeTier]), porque el nominal puede no
-/// coincidir con el efectivo (suscripción no activa, o piso prepago).
+/// coincidir con el efectivo (suscripción no activa, propagación de
+/// entitlements pendiente, o piso prepago).
 ///
-/// Tres estados:
+/// Cuatro estados:
 /// - **En el tope**, tier efectivo == nominal (el caso normal): "tu plan
 ///   incluye N" con la caja de upsell al siguiente tier. En WEB suma "para
 ///   sumar más, subí de plan"; en MÓVIL no (Guideline 3.1.3(f) — decisión
 ///   del dueño, 2026-09-29), y en su lugar dice qué puede hacer el PF con lo
 ///   que ya tiene.
-/// - **En el tope, con la suscripción no activa** (tier efectivo < nominal):
-///   nombra el plan pagado Y el límite efectivo, sin caja de upsell — no se
-///   le ofrece "el siguiente" a quien ya pagó uno más caro (mismo criterio
-///   que `PlanLimitReason.subscriptionInactive` del paywall de alumnos).
+/// - **En el tope, con la suscripción no activa** ([subscriptionStatus]
+///   `pending`/`paused`, o `cancelled` ya vencida): nombra el plan pagado Y
+///   el límite efectivo, sin caja de upsell — no se le ofrece "el
+///   siguiente" a quien ya pagó uno más caro (mismo criterio que
+///   `PlanLimitReason.subscriptionInactive` del paywall de alumnos).
+/// - **En el tope, suscripción activa pero el límite quedó atrás** (tier
+///   efectivo < nominal CON [subscriptionStatus] al día): propagación de
+///   entitlements pendiente o un sync fallido, nunca un problema de la
+///   suscripción — cuerpo genérico sin nombrar ningún plan y sin caja de
+///   upsell (AGENTS.md §11.1: no se afirma lo que no se sabe).
 /// - **Por encima** (`count > limit`, bajaste de plan): el texto de
 ///   conservación — "conservás todos, para crear uno nuevo
 ///   [borrá/archivá] N", con `N = count - limit + 1` — sin caja de upsell:
@@ -147,6 +239,8 @@ Future<void> showTrainerLimitNotice(
   BuildContext context, {
   required TrainerLimitKind kind,
   required SubscriptionTier currentTier,
+  required SubscriptionStatus subscriptionStatus,
+  DateTime? currentPeriodEnd,
   required int limit,
   required int count,
 }) {
@@ -154,6 +248,8 @@ Future<void> showTrainerLimitNotice(
   final content = _TrainerLimitContent(
     kind: kind,
     currentTier: currentTier,
+    subscriptionStatus: subscriptionStatus,
+    currentPeriodEnd: currentPeriodEnd,
     overLimit: count > limit,
     limit: limit,
     count: count,
@@ -192,6 +288,8 @@ class _TrainerLimitContent extends StatelessWidget {
   const _TrainerLimitContent({
     required this.kind,
     required this.currentTier,
+    required this.subscriptionStatus,
+    this.currentPeriodEnd,
     required this.overLimit,
     required this.limit,
     required this.count,
@@ -201,6 +299,8 @@ class _TrainerLimitContent extends StatelessWidget {
 
   final TrainerLimitKind kind;
   final SubscriptionTier currentTier;
+  final SubscriptionStatus subscriptionStatus;
+  final DateTime? currentPeriodEnd;
   final bool overLimit;
   final int limit;
   final int count;
@@ -257,6 +357,8 @@ class _TrainerLimitContent extends StatelessWidget {
       kind: kind,
       limit: limit,
       nominalTier: currentTier,
+      subscriptionStatus: subscriptionStatus,
+      currentPeriodEnd: currentPeriodEnd,
     );
     final effectiveTier = resolved.tier;
     final inactive = resolved.inactive;

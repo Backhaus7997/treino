@@ -339,7 +339,7 @@ void main() {
     });
 
     testWidgets(
-        'suscripción Plan 1 no activa: limit del servidor ya es el de Free '
+        'suscripción Plan 1 PAUSADA: limit del servidor ya es el de Free '
         '⇒ el aviso dice Free e inactiva, no Plan 1', (tester) async {
       final repo = _RepoFalso();
       when(() => repo.registrarTopeDelPlanPf(any(), any()))
@@ -364,6 +364,41 @@ void main() {
       );
       expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
       // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'segundo hallazgo (Codex, 2026-09-29): Plan 1 ACTIVA con el límite '
+        'todavía en Free (propagación pendiente) ⇒ genérico, nunca "no '
+        'está activa"', (tester) async {
+      // MISMO limit/nominal que el test de arriba — la ÚNICA diferencia es
+      // el status: `active`, no `paused`. Antes de este segundo fix,
+      // `resolveNoticeTier` comparaba límites (efectivo Free < nominal
+      // Plan 1) y decía "inactiva" en los dos casos por igual — mintiendo
+      // acá, porque la suscripción SÍ está activa (AGENTS.md §11.1).
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.active,
+        ),
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(
+        find.text('Tu plan incluye 20 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
       expect(find.text('PLAN 2'), findsNothing);
     });
   });

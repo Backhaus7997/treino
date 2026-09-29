@@ -138,6 +138,7 @@ Future<void> _abrirAvisoTrainer(
             context,
             kind: kind,
             currentTier: currentTier,
+            subscriptionStatus: SubscriptionStatus.active,
             limit: limit,
             count: count,
           ),
