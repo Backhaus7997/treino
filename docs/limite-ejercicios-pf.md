@@ -69,7 +69,7 @@ van por separado (ver Estado).
 | E5 | **El plan se resuelve igual que el tope de alumnos** | `active`/`grace` da el plan; `cancelled` da el plan hasta `currentPeriodEnd`; `pending`/`paused` da Free; y el piso prepago del #1203 sube el plan. Alumnos y ejercicios no pueden discrepar sobre el plan de alguien |
 | E6 | **El borde es `count < limit` al crear** | Con límite 60 se pueden tener 60. El create que deja el contador en 60 pasa; el siguiente no |
 | E7 | **Una ráfaga fabricada puede pasarse, y no se borra nada** | Ver §6. El tope de videos borra el excedente porque son bytes; un ejercicio es contenido que el PF armó |
-| E8 | **En la web se vende; en el teléfono sólo se informa** | 3.1.3(f). En el móvil, el mensaje dice el estado y la salida es un mail. Mismo criterio que `plan_limit_paywall.dart` desde el #1141 |
+| E8 | **En la web se vende; en el teléfono sólo se informa** | 3.1.3(f). En el móvil, el mensaje dice el estado y suma un botón VER PLANES a la pantalla informativa de precios y cupos (sin nombrar dónde se paga, precedente `plan_limit_paywall.dart` #1141); la salida real para pagar sigue siendo un mail |
 
 ---
 
@@ -332,14 +332,16 @@ mismo embudo.
 
 **Los avisos:**
 
-- **Móvil, sólo estado:**
+- **Móvil, estado + VER PLANES:**
   - En el tope: «Llegaste a los 60 ejercicios propios de tu plan. Podés editar o
     borrar los que ya tenés.»
   - Pasado de tope: «Tenés 80 ejercicios propios y tu plan incluye 60.
     Conservás todos; para crear uno nuevo, borrá 21.»
-  - **Sin botón, sin «web», sin «mail», sin «pasá a un plan».** Correr
-    `anti_steering_movil_test.dart` y `superficie_de_cobro_alumno_test.dart`. Si
-    alguno se pone rojo, se cambia el texto, no el guard.
+  - Botón **VER PLANES** que navega a `/facturacion/planes` (misma pantalla
+    informativa que la web, sin comprar). **Sin nombrar «web», sin «mail», sin
+    «pasá a un plan».** Correr `anti_steering_movil_test.dart` y
+    `superficie_de_cobro_alumno_test.dart`. Si alguno se pone rojo, se cambia el
+    texto, no el guard.
 - **Web:**
   - En el tope: «Tu plan incluye 60 ejercicios propios y ya tenés 60.» con botón
     **VER PLANES** a facturación.
@@ -392,8 +394,11 @@ enterarse ahí de dónde se paga. Sin mail no tiene salida. Es la misma lógica 
 
 **`functions/src/subscriptions/trainer-limit-mail.ts`** (nuevo):
 
-- `sweepTrainerLimitMail` diario a las **05:30 ART**. Va después del barrido de
-  las 04:00 y no se pisa con los de las 05:00.
+- **Dos caminos, como en `free-limit-mail.ts`.** `sendTrainerLimitMailOnHit`
+  —un `onDocumentUpdated` en `users/{uid}`— encola el mail AL TOQUE, apenas el
+  cliente anota `trainerLimitHitAt`. `sweepTrainerLimitMail`, diario a las
+  **05:30 ART** (después del barrido de las 04:00, y no se pisa con los de las
+  05:00), queda como red por si el trigger falló.
 - Busca por `trainerLimitHitAt` en las últimas **36 h**, por el mismo motivo que
   documenta `free-limit-mail.ts`. No hace falta índice compuesto.
 - Cuatro cláusulas de silencio, las mismas de `free-limit-mail.ts`:
@@ -496,7 +501,8 @@ build 52 no lo tiene.
 3. **Verificar:**
    - Cada PF tiene el número que le corresponde según su plan.
    - Crear en el tope desde la web muestra el aviso con VER PLANES.
-   - Crear en el tope desde el teléfono muestra el aviso de estado, sin botón.
+   - Crear en el tope desde el teléfono muestra el aviso de estado con VER
+     PLANES, que navega a la pantalla informativa de planes.
    - Un alumno crea ejercicios sin fricción. **Es el control negativo.**
    - Un PF de Plan 3 no ve contador ni tope.
    - Al día siguiente sale el mail para quien chocó el tope.

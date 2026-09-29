@@ -2003,6 +2003,8 @@
   },
   "customExerciseLimitDismiss": "Got it",
   "@customExerciseLimitDismiss": {},
+  "trainerLimitNoticeVerPlanes": "View plans",
+  "@trainerLimitNoticeVerPlanes": {},
   "customExerciseCounter": "{count} of {limit} custom exercises",
   "@customExerciseCounter": {
     "placeholders": {

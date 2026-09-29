@@ -4226,6 +4226,10 @@
   "@customExerciseLimitDismiss": {
     "description": "CTA de cierre del aviso de tope de ejercicios propios en el movil. Mismo texto que paywallFreePlanLimitDismiss a proposito: misma accion, mismo verbo."
   },
+  "trainerLimitNoticeVerPlanes": "Ver planes",
+  "@trainerLimitNoticeVerPlanes": {
+    "description": "CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site)."
+  },
   "customExerciseCounter": "{count} de {limit} ejercicios propios",
   "@customExerciseCounter": {
     "description": "Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.",
