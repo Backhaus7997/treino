@@ -20,16 +20,20 @@ enum TrainerLimitKind { customExercises, templates }
 /// (docs/limite-ejercicios-pf.md PR3 y docs/limite-plantillas-pf.md PR3,
 /// "Los avisos").
 ///
-/// **Móvil: SOLO estado.** Sin botón de acción, sin nombrar "web", "mail" ni
-/// "pasá a un plan" — bajo la Guideline 3.1.3(f) cualquiera de esas cosas es
-/// un llamado a comprar afuera, y lo que se arriesga es la exención del
-/// ENTRENADOR (mismo criterio que `free_plan_limit_sheet.dart`). Lo cuidan
-/// `anti_steering_movil_test.dart` y `superficie_de_cobro_alumno_test.dart` —
-/// si alguno se pone rojo por este archivo, se cambia el TEXTO acá, nunca el
-/// guard.
+/// **Móvil: estado + VER PLANES.** El mensaje dice el estado y, debajo, un
+/// botón navega a `/facturacion/planes` — la MISMA pantalla informativa de
+/// precios y cupos que ya viaja en el binario móvil sin vender (precedente:
+/// `showPlanLimitPaywall` en `plan_limit_paywall.dart`, #1141). Lo que sigue
+/// prohibido, bajo la Guideline 3.1.3(f), es nombrar DÓNDE se paga —"web",
+/// "mail", "pasá a un plan", Mercado Pago— o cualquier botón que compre: eso
+/// es lo que arriesga la exención del ENTRENADOR (mismo criterio que
+/// `free_plan_limit_sheet.dart`). Lo cuidan `anti_steering_movil_test.dart` y
+/// `superficie_de_cobro_alumno_test.dart` — si alguno se pone rojo por este
+/// archivo, se cambia el TEXTO acá, nunca el guard.
 ///
 /// **Web: con botón VER PLANES** a `/facturacion/planes`. La web sí vende
-/// (E8 — 3.1.3(f) sólo ampara al binario móvil).
+/// (E8 — 3.1.3(f) sólo ampara al binario móvil); el CTA de las dos
+/// superficies apunta al mismo destino, sólo cambia la envoltura.
 enum TrainerLimitNoticeForm { sheet, dialog }
 
 /// Fuerza la forma del aviso. SÓLO para tests — mismo seam que
@@ -95,8 +99,8 @@ Future<void> showTrainerLimitNotice(
   );
 }
 
-/// Móvil — sheet de sólo estado. Strings vía [AppL10n]: es la convención del
-/// móvil (docs/limite-ejercicios-pf.md PR3, "Convenciones").
+/// Móvil — sheet de estado + VER PLANES. Strings vía [AppL10n]: es la
+/// convención del móvil (docs/limite-ejercicios-pf.md PR3, "Convenciones").
 class _TrainerLimitSheet extends StatelessWidget {
   const _TrainerLimitSheet({
     required this.kind,
@@ -180,6 +184,33 @@ class _TrainerLimitSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.s18),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: const Key('trainer_limit_ver_planes'),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      context.push('/facturacion/planes');
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: palette.accent,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
+                      shape: const StadiumBorder(),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.s14),
+                    ),
+                    child: Text(
+                      l10n.trainerLimitNoticeVerPlanes.toUpperCase(),
+                      style: const TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
+                        fontSize: AppTextSize.body,
+                        fontWeight: AppFonts.w700,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.s12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
