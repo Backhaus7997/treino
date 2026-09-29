@@ -348,15 +348,21 @@ tiendas; es inerte mientras el campo esté en `null`.
   `functions/src/mail/templates.ts` y su tipo en `types.ts`. Mismo CTA a
   facturación y mismo `prefKey` (`novedades_plan`).
 
-**El enfriamiento de 14 días (`trainerLimitMailAt`) queda compartido** entre los
-dos topes. Un PF que choca los dos recibe un solo mail cada 14 días. Es lo que
-se quiere: el problema es el spam, no qué tope fue.
+**El enfriamiento de 14 días (`trainerLimitMailAt`) era compartido** entre los
+dos topes al mergear este PR: un PF que chocaba los dos recibía un solo mail
+cada 14 días. **Ya no.** Se separó por `kind` (#1265, a pedido del dueño del
+producto, y sumando un tercer tope, alumnos): cada restricción manda su propio
+aviso cada 14 días, sin que chocar una silencie el mail de la otra.
+`trainerLimitMailAt` pasó de un Timestamp suelto a un mapa `{kind: Timestamp}`,
+con compatibilidad para el Timestamp legado — ver el encabezado de
+`trainer-limit-mail.ts`.
 
 **Dos caminos, no sólo el barrido de las 05:30.** `sendTrainerLimitMailOnHit`
 —un `onDocumentUpdated` en `users/{uid}`— encola el mail AL TOQUE apenas el
-cliente anota `trainerLimitHitAt`, para los dos `kind`. `sweepTrainerLimitMail`
-queda como red diaria si el trigger falló; el enfriamiento compartido y el
-dedupe de la cola de mail evitan que los dos caminos manden un mail doble.
+cliente (o, para alumnos, el servidor) anota `trainerLimitHitAt`, para
+cualquier `kind`. `sweepTrainerLimitMail` queda como red diaria si el trigger
+falló; el enfriamiento POR KIND y el dedupe de la cola de mail evitan que los
+dos caminos manden un mail doble del MISMO kind.
 
 **Tests:** las cuatro cláusulas de silencio para el kind nuevo, la tabla de
 kinds, y el template con el test de tildes del #1236.
@@ -610,7 +616,7 @@ producción y los legales publicados. **Todo antes del primer entrenador real.**
 | **Una ráfaga fabricada se pasa del tope** | Igual que en ejercicios (E7). Lo frena el camino de la app |
 | **Un alumno puede tener un `trainer-template` forjado** | Ya pasa hoy (CREATE branch 1 no chequea rol). La cuota no lo empeora y el path 5 le impide publicarlo |
 | **Un PF recién promovido queda sin tope hasta el barrido de las 04:00** | Igual que en ejercicios |
-| **El enfriamiento del mail es compartido** | Un solo mail cada 14 días por PF, choque el tope que choque |
+| **El enfriamiento del mail era compartido** | Ya no (#1265): es por `kind`. Un PF que choca dos topes recibe un mail de cada uno, cada 14 días |
 
 ---
 
