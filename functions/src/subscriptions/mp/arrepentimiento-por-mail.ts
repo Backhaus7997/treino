@@ -370,24 +370,42 @@ const esContratada = (s: MpPreapproval): boolean =>
  * **No pisa un marcador existente**: el momento del arrepentimiento es el de la
  * PRIMERA confirmación, no el del último reintento.
  *
- * Si MP no contesta al reconciliar, tira: el marcador ya quedó escrito —lo
- * aplica el próximo evento o el barrido— y el reintento del usuario lo termina
- * de aplicar.
+ * ── ⚠️ El estado se lee POR ID, no por búsqueda ──
+ *
+ * Esto NO andaba en la primera versión, y se vio en producción: el corte quedó
+ * escrito y el alumno siguió `active`. `/preapproval/search` —lo que usa el
+ * reconciliador— devuelve el estado VIEJO justo después de cancelar. Medido en
+ * el sandbox: a los 0 s la búsqueda decía `authorized` y la lectura por id
+ * `cancelled`; recién a los 5 s coincidían. Como el marcador sólo vale con
+ * `status === "cancelled"`, el reconciliador veía una suscripción viva y lo
+ * ignoraba.
+ *
+ * La lectura por id es consistente, y acabamos de cancelar esa suscripción: se
+ * la pasamos al reconciliador como `conocida`, que va primero que lo que traiga
+ * la búsqueda. Mismo mecanismo que el del webhook (ver `conLaConocidaPrimero`).
+ *
+ * Si MP no contesta, tira: el marcador ya quedó escrito y el reintento del
+ * usuario lo termina de aplicar.
  */
 async function cortarElAcceso(
   app: App,
-  planIds: string[],
+  contratadasPorPlan: Map<string, MpPreapproval[]>,
   deps: ConfirmarArrepentimientoDeps,
 ): Promise<void> {
   const db = getFirestore(app);
-  for (const planId of planIds) {
+  for (const planId of contratadasPorPlan.keys()) {
     const ref = db.collection(MP_PLANS_COLLECTION).doc(planId);
     if (arrepentidoAtDe((await ref.get()).data()) === null) {
       await ref.set({ [CAMPO_ARREPENTIDO]: deps.nowMs }, { merge: true });
     }
   }
-  for (const planId of planIds) {
-    const r = await reconcileSubscription(app, planId, deps);
+  for (const [planId, subs] of contratadasPorPlan) {
+    // La más reciente del plan: es la que el reconciliador mira (`subs[0]`).
+    const id = contratoMasReciente(subs)?.sub.id;
+    const fresca =
+      typeof id === "string" && id !== "" ? await deps.mpClient.getPreapproval(id) : undefined;
+
+    const r = await reconcileSubscription(app, planId, deps, fresca);
     if (r.outcome === "error-mp") {
       throw new Error(`no se pudo aplicar el corte al plan ${planId}`);
     }
@@ -427,13 +445,14 @@ export async function runConfirmarArrepentimientoPorMail(
     // ── 1. Qué contrató, según Mercado Pago ──
     const planes = await planesDeLaCuenta(app, uid);
     const todas: MpPreapproval[] = [];
-    /** Los planes de los que cuelga alguna contratación: los que hay que cortar. */
-    const planesConContrato: string[] = [];
+    /** Las contrataciones de cada plan que tiene alguna: es lo que hay que cortar. */
+    const planesConContrato = new Map<string, MpPreapproval[]>();
     for (const { planId } of planes) {
       // Secuencial, como el resto: en paralelo son N requests a MP y contesta 429.
       const subs = await deps.mpClient.searchPreapprovalsByPlan(planId);
       todas.push(...subs);
-      if (subs.some(esContratada)) planesConContrato.push(planId);
+      const contratadasDelPlan = subs.filter(esContratada);
+      if (contratadasDelPlan.length > 0) planesConContrato.set(planId, contratadasDelPlan);
     }
 
     const contrato = contratoMasReciente(todas);

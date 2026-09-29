@@ -136,6 +136,14 @@ function fakeMp(
     /** La búsqueda tira a partir de la llamada N (1-based). */
     fallaBusquedaDesde?: number;
     fallaBaja?: boolean;
+    /**
+     * La búsqueda devuelve SIEMPRE el estado del principio, como hace Mercado
+     * Pago durante unos segundos después de cancelar (medido en el sandbox: a los
+     * 0 s la búsqueda decía `authorized` y la lectura por id `cancelled`).
+     */
+    busquedaVieja?: boolean;
+    /** La lectura por id tira. */
+    fallaPorId?: boolean;
   } = {},
   nowMs = AHORA,
 ) {
@@ -145,12 +153,22 @@ function fakeMp(
   for (const [plan, subs] of Object.entries(over.subs ?? {})) {
     estado[plan] = subs.map((s) => ({ ...(s as object) }));
   }
+  /** Lo que ve la búsqueda cuando está desactualizada: el estado inicial. */
+  const foto: Record<string, Doc[]> = JSON.parse(JSON.stringify(estado));
   return {
     canceladas,
     deps: {
       nowMs,
       mpClient: {
-        getPreapproval: async () => ({}),
+        // La lectura por id es CONSISTENTE: refleja la cancelación al instante.
+        getPreapproval: async (id: string) => {
+          if (over.fallaPorId) throw new Error("MP 503");
+          for (const [planId, subs] of Object.entries(estado)) {
+            const s = subs.find((x) => x.id === id);
+            if (s) return { ...s, preapproval_plan_id: planId };
+          }
+          throw new Error(`MP 404: ${id}`);
+        },
         createPreapprovalPlan: async () => ({}),
         searchPreapprovalsByPlan: async (planId: string) => {
           busquedas += 1;
@@ -158,7 +176,7 @@ function fakeMp(
           if (over.fallaBusquedaDesde !== undefined && busquedas >= over.fallaBusquedaDesde) {
             throw new Error("MP 503");
           }
-          return estado[planId] ?? [];
+          return (over.busquedaVieja ? foto : estado)[planId] ?? [];
         },
         cancelPreapproval: async (id: string) => {
           if (over.fallaBaja) throw new Error("MP 503");
@@ -530,6 +548,61 @@ describe("confirmarArrepentimientoPorMail — el acceso termina en el acto", () 
     expect(mails(store, "withdrawal-team-notice")).toHaveLength(1);
     const sub = store.users[UID].subscription as Record<string, unknown>;
     expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+  });
+
+  it("⚠️ el corte lee la suscripción POR ID: una búsqueda desactualizada no lo desarma (PF)", async () => {
+    // Producción, 2026-09-29: el trámite corrió bien y el alumno siguió `active`.
+    // `/preapproval/search` devuelve el estado viejo justo después de cancelar, y
+    // el marcador sólo vale con `cancelled`: el reconciliador veía una
+    // suscripción viva y lo ignoraba. Con la búsqueda al día este test pasaba —y
+    // pasó, sin ver el bug, hasta que se probó contra Mercado Pago de verdad.
+    const { app, store, mp } = await conLinkPedido(
+      MUNDO(),
+      fakeMp({ subs: { p1: [SUB("s1", 3)] }, busquedaVieja: true }),
+    );
+
+    const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(r.status).toBe("recibido");
+    expect(mp.canceladas).toEqual(["s1"]);
+    const sub = store.users[UID].subscription as Record<string, unknown>;
+    expect(sub.status).toBe("cancelled");
+    expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+    expect(limiteDe(store, AHORA + 1)).toBe(GRATIS);
+  });
+
+  it("⚠️ el corte lee la suscripción POR ID: una búsqueda desactualizada no lo desarma (alumno)", async () => {
+    const mundo: Store = {
+      users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },
+      mp_plans: { p1: { producto: "athlete", uid: UID, cycle: "monthly" } },
+    };
+    const { app, store, mp } = await conLinkPedido(
+      mundo,
+      fakeMp({
+        subs: { p1: [SUB("s1", 3, { auto_recurring: { transaction_amount: 3500 } })] },
+        busquedaVieja: true,
+      }),
+    );
+
+    await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "expired" });
+  });
+
+  it("si MP no contesta la lectura por id, el corte no se aplicó y el link sigue sirviendo", async () => {
+    // El marcador ya quedó escrito y la obligación de devolver ya está avisada;
+    // lo que falta es aplicar el corte, y el reintento lo termina.
+    const { app, store, mp } = await conLinkPedido(
+      MUNDO(),
+      fakeMp({ subs: { p1: [SUB("s1", 3)] }, fallaPorId: true }),
+    );
+
+    const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(r.status).toBe("no-disponible");
+    expect(tokens(store)[hashToken(TOKEN)].usedAt).toBeNull();
+    expect(mails(store, "withdrawal-team-notice")).toHaveLength(1);
+    expect(store.mp_plans.p1[CAMPO_ARREPENTIDO]).toBe(AHORA);
   });
 
   it("⚠️ un marcador con la suscripción todavía VIVA no corta: es una cancelación que falló", async () => {
