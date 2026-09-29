@@ -150,6 +150,18 @@ corte. Si el corte falla —MP no contesta al reconciliar— el marcador ya qued
 escrito y lo aplica el próximo evento o el barrido; el link se libera para que el
 reintento lo termine.
 
+**El estado se lee POR ID, no por búsqueda** (corregido el 2026-09-29, después de
+verlo fallar en producción). `/preapproval/search` —lo que usa el
+reconciliador— devuelve el estado VIEJO justo después de cancelar: medido en el
+sandbox, a los 0 s decía `authorized` y la lectura por id `cancelled`; a los 5 s
+coincidían. Como el marcador sólo vale con `status === "cancelled"`, el
+reconciliador veía una suscripción viva y lo ignoraba: el trámite corría entero
+—link usado, mails enviados, marcador escrito— y el alumno seguía `active`. La
+primera versión pasaba todos sus tests porque el MP falso cambiaba de estado al
+instante. Ahora el corte lee cada suscripción por id (consistente) y se la pasa
+al reconciliador como `conocida`, igual que el webhook (§ `conLaConocidaPrimero`).
+El test usa un MP que reproduce la demora.
+
 **Caso conocido — el resto prepago de un plan anterior NO se corta.** Un PF que
 bajó de plan3 a plan1 conserva un «piso» con el resto ya pagado del plan3. Es
 plata que este arrepentimiento (del plan más reciente) no devuelve, y quitársela
