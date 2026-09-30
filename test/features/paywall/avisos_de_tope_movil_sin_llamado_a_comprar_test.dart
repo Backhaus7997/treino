@@ -342,6 +342,15 @@ final List<({String nombre, _Abrir abrir})> _variantes = [
         count: 20),
   ),
   (
+    nombre: 'ejercicios propios, pausada con el límite del plan (piso prepago)',
+    abrir: (t, l) => _trainer(t, l,
+        kind: TrainerLimitKind.customExercises,
+        tier: SubscriptionTier.plan1,
+        status: SubscriptionStatus.paused,
+        limit: 60,
+        count: 60),
+  ),
+  (
     nombre: 'ejercicios propios, cuerpo genérico (tope a mano)',
     abrir: (t, l) => _trainer(t, l,
         kind: TrainerLimitKind.customExercises, limit: 45, count: 45),

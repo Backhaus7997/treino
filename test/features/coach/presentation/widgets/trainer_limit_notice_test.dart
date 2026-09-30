@@ -241,6 +241,102 @@ void main() {
     }));
   });
 
+  group(
+      'resolveNoticeTier — el ESTADO solo tampoco alcanza: el piso prepago '
+      'no es "inactiva" (tercer hallazgo Codex, PR #1266)', () {
+    // El hueco: `inactive` salía SÓLO del estado. Un PF `pending`/`paused` con
+    // un piso prepago vigente (`prepaidTier`/`prepaidUntil`, `conPisoPrepago`
+    // en effective-limit.ts) conserva el plan pago — el servidor le da ESE
+    // límite — y el aviso le decía «tu suscripción a Plan 1 no está activa;
+    // mientras tanto tu plan Free…»: falso (AGENTS.md §11.1). El límite con el
+    // que bloqueó el gate ya es el resultado de aplicar el piso, así que la
+    // regla es: `inactive` = el estado no está al día Y el límite del servidor
+    // cayó por DEBAJO del nominal.
+
+    test(
+        'paused + límite del plan NOMINAL (prepago) ⇒ no inactiva, nombra el '
+        'nominal', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 60, // el de Plan 1: el piso prepago lo sostiene
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+      );
+      expect(r.tier, SubscriptionTier.plan1);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('paused + límite de Free ⇒ inactiva (el otro lado del MISMO par)',
+        (() {
+      // Mismo nominal, mismo estado: lo único que cambia respecto del test de
+      // arriba es el límite. Ésa es la señal que decide.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 20, // el de Free: nada sostiene el plan pago
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isTrue);
+    }));
+
+    for (final estado in [
+      SubscriptionStatus.pending,
+      SubscriptionStatus.paused,
+    ]) {
+      test('${estado.name} + límite del nominal ⇒ no inactiva (Plan 2)', (() {
+        final r = resolveNoticeTier(
+          kind: TrainerLimitKind.customExercises,
+          limit: 120,
+          nominalTier: SubscriptionTier.plan2,
+          subscriptionStatus: estado,
+        );
+        expect(r.tier, SubscriptionTier.plan2);
+        expect(r.inactive, isFalse);
+      }));
+    }
+
+    test('cancelled VENCIDA + límite del nominal ⇒ no inactiva', (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 60,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.cancelled,
+        currentPeriodEnd: DateTime.utc(2026, 1, 1),
+        now: DateTime.utc(2026, 2, 1),
+      );
+      expect(r.tier, SubscriptionTier.plan1);
+      expect(r.inactive, isFalse);
+    }));
+
+    test(
+        'Free "pausado" con el límite de Free ⇒ no inactiva: no hay plan '
+        'pago que suspender', (() {
+      // Antes: «Tu suscripción a Free no está activa. Mientras tanto, tu plan
+      // Free incluye…» — una oración que se contradice sola.
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        nominalTier: SubscriptionTier.free,
+        subscriptionStatus: SubscriptionStatus.paused,
+      );
+      expect(r.tier, SubscriptionTier.free);
+      expect(r.inactive, isFalse);
+    }));
+
+    test('estado al día + límite del nominal ⇒ igual que siempre (control)',
+        (() {
+      final r = resolveNoticeTier(
+        kind: TrainerLimitKind.customExercises,
+        limit: 60,
+        nominalTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.active,
+      );
+      expect(r.tier, SubscriptionTier.plan1);
+      expect(r.inactive, isFalse);
+    }));
+  });
+
   group('móvil (sheet) — en el tope — ejercicios propios', () {
     testWidgets('mismo tono que el paywall de alumnos, con upsell',
         (tester) async {
@@ -323,6 +419,36 @@ void main() {
       expect(find.textContaining('PASATE A'), findsNothing);
       expect(find.text('PLAN 2'), findsNothing);
       expect(find.text('VER PLANES'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Plan 1 PAUSADA pero con el límite de Plan 1 (piso prepago): el '
+        'aviso NORMAL de Plan 1, nunca "no está activa"', (tester) async {
+      // Tercer hallazgo Codex (PR #1266). Mismo nominal (plan1) y mismo
+      // estado (pausada) que el test de arriba; sólo cambia el límite que
+      // bloqueó: 60 en vez de 20. El servidor le da el límite de Plan 1 —un
+      // piso prepago vigente lo sostiene—, así que decirle «tu suscripción no
+      // está activa; mientras tanto tu plan Free…» es falso.
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+        limit: 60,
+        count: 60,
+        form: TrainerLimitNoticeForm.sheet,
+      );
+
+      expect(
+        find.text('Tu plan Plan 1 incluye 60 ejercicios propios. Podés '
+            'editar o borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(find.textContaining('Free incluye'), findsNothing);
+      // Aviso normal ⇒ caja de upsell al SIGUIENTE de su plan (Plan 2).
+      expect(find.text('PLAN 2'), findsOneWidget);
+      expect(find.text('Hasta 120 ejercicios propios'), findsOneWidget);
     });
 
     testWidgets(
@@ -999,6 +1125,29 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'ejercicios propios, pausada pero con el límite de Plan 1 (piso '
+        'prepago): aviso normal en inglés', (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+        limit: 60,
+        count: 60,
+      );
+
+      expect(
+        find.text(
+          'Your Plan 1 plan includes 60 custom exercises. You can edit or '
+          'delete the ones you already have.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining("isn't active"), findsNothing);
+      expect(find.text('PLAN 2'), findsOneWidget);
     });
 
     testWidgets(

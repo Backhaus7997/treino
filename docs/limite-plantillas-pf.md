@@ -312,11 +312,14 @@ mismo botón VER PLANES, mismo link de descarte en los tres avisos del PF):
 
 - **El plan que el aviso NOMBRA es el EFECTIVO, no el nominal a ciegas.**
   Sólo Free tiene tope de plantillas (Plan 1/2/3 son sin límite): si el
-  `limit` que bloqueó es 3 pero el PF nominal es un plan pago, su suscripción
-  no está activa y el efectivo cayó a Free — el aviso lo dice y NO ofrece
-  upsell (`resolveNoticeTier` en `trainer_limit_notice.dart`, mismo
-  mecanismo que el de ejercicios propios). Un `limit` finito que no sea 3 es
-  un tope ajustado a mano: el cuerpo es genérico, sin nombrar un plan.
+  `limit` que bloqueó es 3 pero el PF nominal es un plan pago con el estado
+  caído (`pending`/`paused`, o `cancelled` vencida), el efectivo cayó a Free —
+  el aviso lo dice y NO ofrece upsell (`resolveNoticeTier` en
+  `trainer_limit_notice.dart`, mismo mecanismo que el de ejercicios propios,
+  donde está la regla completa: «inactiva» exige el estado caído Y el límite
+  por debajo del nominal). Con el estado al día es propagación pendiente:
+  cuerpo genérico. Un `limit` finito que no sea 3 es un tope ajustado a mano:
+  el cuerpo es genérico, sin nombrar un plan.
 - **Móvil — estado, nunca un llamado a comprar** (Guideline 3.1.3(f),
   decisión del dueño 2026-09-29): «Tu plan Free incluye 3 plantillas. Podés
   editar o archivar las que ya tenés.» La tarjeta del siguiente plan muestra

@@ -60,14 +60,34 @@ enum TrainerLimitKind { customExercises, templates }
 /// de si [now] todavía está antes de [currentPeriodEnd]. Ver
 /// [_entitledToNominalTier].
 ///
-/// Con el estado resuelto, tres casos posibles (en este orden de prioridad):
+/// ## Tercer hallazgo (Codex, PR #1266) — el ESTADO solo tampoco alcanza
 ///
-/// 1. **Piso prepago** — `efectivo` > [nominalTier]: es un PISO, nunca un
-///    techo (mismo criterio que `conPisoPrepago` del servidor), así que se
+/// Decidir `inactive` únicamente por el estado también miente (AGENTS.md
+/// §11.1): un PF `pending`/`paused` con un PISO PREPAGO vigente
+/// (`prepaidTier`/`prepaidUntil`, ver `conPisoPrepago` en `effective-limit.ts`)
+/// CONSERVA el plan pago — el servidor calcula su límite con el piso, no con
+/// el estado— y «tu suscripción a Plan 1 no está activa; mientras tanto, tu
+/// plan Free incluye…» le afirma un plan que no es el que lo está frenando.
+/// El modelo Dart no trae `prepaidTier`, y no hace falta: el [limit] con el
+/// que bloqueó el gate YA es el resultado de aplicar el piso. Si el estado
+/// dice «no al día» pero el límite sigue siendo el del plan pago, algo lo
+/// está sosteniendo y el aviso es el normal de ese plan.
+///
+/// Por eso `inactive` exige las DOS cosas a la vez: que el estado no esté al
+/// día Y que el límite del servidor haya caído por DEBAJO del nominal. Con el
+/// `efectivo` (el tier cuya tabla explica [limit]) resuelto, cuatro casos, en
+/// este orden de prioridad:
+///
+/// 1. **Piso prepago mayor** — `efectivo` > [nominalTier]: es un PISO, nunca
+///    un techo (mismo criterio que `conPisoPrepago` del servidor), así que se
 ///    nombra igual, esté la suscripción activa o no.
-/// 2. **Inactiva por estado** — el estado dice que no está al día: `tier` es
-///    el efectivo (típicamente Free) e `inactive` es `true`.
-/// 3. **Activa pero el límite quedó atrás** — `efectivo` < [nominalTier] con
+/// 2. **Límite del plan pago** — `efectivo` == [nominalTier]: el límite es el
+///    del plan que el PF paga, así que se nombra ESE plan y el aviso es el
+///    normal (con upsell al siguiente) — aunque el estado diga que no está al
+///    día. Es el piso prepago del caso 1 sosteniendo el nominal.
+/// 3. **Inactiva** — `efectivo` < [nominalTier] Y el estado no está al día:
+///    `tier` es el efectivo (típicamente Free) e `inactive` es `true`.
+/// 4. **Activa pero el límite quedó atrás** — `efectivo` < [nominalTier] con
 ///    el estado al día: es propagación pendiente o un sync fallido, nunca un
 ///    hecho sobre la suscripción. No se nombra NINGÚN tier —ni el nominal,
 ///    que no explica el número, ni el efectivo, que contradice un estado
@@ -76,9 +96,9 @@ enum TrainerLimitKind { customExercises, templates }
 ///
 /// Devuelve:
 /// - `tier`: el tier a NOMBRAR. `null` = no afirmar ningún plan (tope
-///   ajustado a mano sin match en la tabla, o el caso 3 de arriba) — el
+///   ajustado a mano sin match en la tabla, o el caso 4 de arriba) — el
 ///   llamador cae al cuerpo genérico.
-/// - `inactive`: `true` sólo en el caso 2 de arriba. Nunca `true` con
+/// - `inactive`: `true` sólo en el caso 3 de arriba. Nunca `true` con
 ///   `tier: null` — sin un tier verificable no hay nada que afirmar (mismo
 ///   criterio que `PlanLimitReason.subscriptionInactive` en
 ///   `plan_limit_paywall.dart`, que tampoco se afirma sin dato).
@@ -106,29 +126,30 @@ enum TrainerLimitKind { customExercises, templates }
     }
   }
 
-  // Caso 1 — piso prepago, SIN mirar el estado: ver el punto 1 del dartdoc.
-  if (efectivo != null && efectivo.index > nominalTier.index) {
+  // Casos 1 y 2 — el límite es el del plan pago o el de uno más alto (o no
+  // matchea ningún tier): el ESTADO no se mira, ver los puntos 1 y 2 del
+  // dartdoc. Que el estado diga «pausada» no prueba nada si el servidor igual
+  // le dio el límite de su plan: eso es un piso prepago sosteniéndolo.
+  if (efectivo == null || efectivo.index >= nominalTier.index) {
     return (tier: efectivo, inactive: false);
   }
 
+  // Desde acá el límite quedó POR DEBAJO del nominal, y qué lo explica lo
+  // dice el ESTADO.
   final entitled = _entitledToNominalTier(
     status: subscriptionStatus,
     currentPeriodEnd: currentPeriodEnd,
     now: now ?? AppClock.now(),
   );
 
-  // Caso 2 — el ESTADO dice que no está al día. Nunca `inactive: true` sin
-  // un tier resuelto (contrato del dartdoc de arriba): si ni el efectivo
-  // matchea una tabla conocida, no hay nada verificable que afirmar.
-  if (!entitled) return (tier: efectivo, inactive: efectivo != null);
+  // Caso 3 — el estado no está al día Y el límite cayó: inactiva. `efectivo`
+  // es no-nulo por el guard de arriba, así que `inactive: true` nunca viaja
+  // sin un tier resuelto (contrato del dartdoc).
+  if (!entitled) return (tier: efectivo, inactive: true);
 
-  // Caso 3 — activa (o cancelled todavía vigente) pero el límite del
-  // servidor quedó atrás del nominal: ver el punto 3 del dartdoc.
-  if (efectivo != null && efectivo.index < nominalTier.index) {
-    return (tier: null, inactive: false);
-  }
-
-  return (tier: efectivo, inactive: false);
+  // Caso 4 — activa (o cancelled todavía vigente) pero el límite del
+  // servidor quedó atrás del nominal: ver el punto 4 del dartdoc.
+  return (tier: null, inactive: false);
 }
 
 /// Espeja `limiteDelStatus` de `functions/src/subscriptions/
@@ -222,10 +243,14 @@ TrainerLimitNoticeForm _resolveForm() =>
 ///   del dueño, 2026-09-29), y en su lugar dice qué puede hacer el PF con lo
 ///   que ya tiene.
 /// - **En el tope, con la suscripción no activa** ([subscriptionStatus]
-///   `pending`/`paused`, o `cancelled` ya vencida): nombra el plan pagado Y
-///   el límite efectivo, sin caja de upsell — no se le ofrece "el
-///   siguiente" a quien ya pagó uno más caro (mismo criterio que
-///   `PlanLimitReason.subscriptionInactive` del paywall de alumnos).
+///   `pending`/`paused`, o `cancelled` ya vencida, Y el [limit] del servidor
+///   por DEBAJO del plan nominal): nombra el plan pagado Y el límite
+///   efectivo, sin caja de upsell — no se le ofrece "el siguiente" a quien ya
+///   pagó uno más caro (mismo criterio que
+///   `PlanLimitReason.subscriptionInactive` del paywall de alumnos). Si el
+///   estado dice "no al día" pero el [limit] sigue siendo el del plan
+///   nominal, un piso prepago lo sostiene: para el servidor no está
+///   inactiva, y el aviso es el normal de ese plan (primer estado de arriba).
 /// - **En el tope, suscripción activa pero el límite quedó atrás** (tier
 ///   efectivo < nominal CON [subscriptionStatus] al día): propagación de
 ///   entitlements pendiente o un sync fallido, nunca un problema de la

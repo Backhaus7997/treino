@@ -338,11 +338,16 @@ mismo botón VER PLANES, mismo link de descarte en los tres avisos del PF):
   `limit` que bloqueó ya lo calculó el servidor con el tier efectivo (piso
   prepago, suscripción no activa); nombrar el nominal ahí puede afirmar un
   plan que no explica el número (`resolveNoticeTier` en
-  `trainer_limit_notice.dart`). Si el efectivo es MENOR que el nominal
-  (suscripción no activa), el aviso lo dice y no ofrece upsell — no tiene
-  sentido subir a quien ya pagó más. Si el `limit` no coincide con ningún
-  tier conocido (tope ajustado a mano), el cuerpo es genérico, sin nombrar un
-  plan.
+  `trainer_limit_notice.dart`). Si el efectivo es MENOR que el nominal **Y**
+  el estado de la suscripción no está al día (`pending`/`paused`, o
+  `cancelled` ya vencida), el aviso lo dice y no ofrece upsell — no tiene
+  sentido subir a quien ya pagó más. **El estado solo no alcanza**: un
+  `paused`/`pending` con un piso prepago vigente CONSERVA el plan pago (el
+  `limit` que bloqueó es el del plan nominal), y ahí el aviso es el normal de
+  ese plan — decirle «tu suscripción no está activa» sería falso. Con el
+  estado al día y el `limit` por debajo del nominal (propagación pendiente)
+  el cuerpo es genérico. Si el `limit` no coincide con ningún tier conocido
+  (tope ajustado a mano), el cuerpo es genérico, sin nombrar un plan.
 - **Móvil — estado, nunca un llamado a comprar** (Guideline 3.1.3(f),
   decisión del dueño 2026-09-29):
   - En el tope: «Tu plan Free incluye 20 ejercicios propios. Podés editar o
