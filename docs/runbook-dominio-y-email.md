@@ -21,9 +21,9 @@ Todo cuelga de `gettreino.com`, que ya es tuyo y cuyo DNS ya vive en Vercel
 
 | Nombre | Apunta a | Para qué |
 |---|---|---|
-| `gettreino.com` | Vercel · proyecto `treino-app` | Landing pública (ya anda) |
+| `gettreino.com` | Vercel · proyecto `treino-app` | Landing pública (ya anda). También es dominio de envío en Resend: el remitente visible es `treino@gettreino.com` |
 | `app.gettreino.com` | Vercel · proyecto nuevo | Coach Hub web |
-| `send.gettreino.com` | Resend | Remitente del email |
+| `send.gettreino.com` | Resend | Return-path (MX y SPF) del envío; hasta el 2026-09-30 fue también el remitente |
 | `auth.gettreino.com` | Firebase Hosting | Action handler de reseteo |
 
 **Un subdominio por servicio, a propósito.** Cada uno falla solo. Si algún día
@@ -127,9 +127,21 @@ firebase functions:secrets:set RESEND_API_KEY --project prod
 > comandos de este runbook.
 
 El remitente por defecto ya está en el código
-(`MAIL_FROM = "TREINO <equipo@send.gettreino.com>"`,
-`functions/src/mail/send-queued-mail.ts`). Si querés otro, se sobrescribe con la
-variable de entorno `MAIL_FROM` — no hace falta tocar código.
+(`MAIL_FROM = "TREINO <treino@gettreino.com>"`,
+`functions/src/mail/send-queued-mail.ts`), y `functions/.env.treino-dev` lo
+repite: **ese archivo gana** sobre el default, así que hay que cambiar los dos.
+
+Desde el 2026-09-30 el remitente es `treino@gettreino.com`, un buzón real: las
+respuestas llegan a una persona (antes salía de `equipo@send.gettreino.com`, que
+no tiene buzón). Para eso `gettreino.com` está agregado en Resend además de
+`send.gettreino.com`: su DKIM va en `resend._domainkey`, y el MX y el SPF de
+`send` los comparten. **La raíz no necesita otro SPF**: el SPF se evalúa contra
+el return-path (`send.gettreino.com`), que está alineado con el remitente por
+ser del mismo dominio de organización, y el DKIM también alinea. Sigue valiendo
+lo de arriba: para Resend no toques el TXT de la raíz.
+
+Si querés otro remitente, se sobrescribe con la variable de entorno `MAIL_FROM`,
+y **el dominio tiene que estar verificado en Resend** o cada envío devuelve 403.
 
 ---
 
