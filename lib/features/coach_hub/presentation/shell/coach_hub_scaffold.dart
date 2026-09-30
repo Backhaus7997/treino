@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/coach_hub/application/coach_hub_session_resolving_provider.dart';
 
 import '../onboarding/coach_hub_tour_gate.dart';
 
 import 'content_max_width.dart';
+import 'coach_hub_resolving_view.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
 import 'mobile_banner.dart';
@@ -25,7 +27,11 @@ import 'sidebar_item.dart';
 /// - `< 768 px` → [MobileBanner] reemplaza todo el shell — EXCEPTO
 ///   [mobileFacturacionAllowed], que cambia el reemplazo por
 ///   [MobileFacturacionShell] (ver ese archivo para el porqué: el mail del
-///   tope de plan manda al PF a esta pantalla desde su teléfono).
+///   tope de plan manda al PF a esta pantalla desde su teléfono), y mientras el
+///   Coach Hub no tenga confirmado que quien entró es un PF
+///   ([coachHubSessionResolvingProvider]), que pone [CoachHubResolvingView] en
+///   el lugar del banner: no tiene sentido decirle "usá la app" a quien el
+///   router está por llevar a otra pantalla.
 /// - `768–1279 px` (compact) → sidebar forzado a colapsado; el provider NO se
 ///   escribe, así el valor guardado se preserva al volver a desktop.
 /// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
@@ -61,8 +67,17 @@ class CoachHubScaffold extends ConsumerWidget {
     final viewport = rsp.viewportFor(MediaQuery.sizeOf(context).width);
 
     if (viewport == rsp.Viewport.mobile) {
-      return mobileFacturacionAllowed
-          ? MobileFacturacionShell(child: child)
+      if (mobileFacturacionAllowed) return MobileFacturacionShell(child: child);
+
+      // El banner sólo se muestra con un PF confirmado. Mientras el router
+      // espera la sesión o el perfil se queda en `/dashboard`, y en un teléfono
+      // ese tránsito dibujaba «Coach Hub en escritorio» justo antes de mandar
+      // al PF a la pantalla de planes. Se observa acá, y sólo en esta rama, para
+      // que el escritorio no dependa de auth. Ver
+      // [coachHubSessionResolvingProvider] para por qué es un provider y no un
+      // flag del router como [mobileFacturacionAllowed].
+      return ref.watch(coachHubSessionResolvingProvider)
+          ? const CoachHubResolvingView()
           : const MobileBanner();
     }
 
