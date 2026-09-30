@@ -7,6 +7,8 @@
  * Cascade order (REQ-ACCDEL-CF-012: Auth MUST be last):
  *   1. Validate + anti-spoof (callable wrapper)
  *   2. Trainer role guard
+ *  2b. Cancel live Mercado Pago subscriptions — FAIL-CLOSED: if MP cannot be
+ *      reached the account is NOT touched (see cascade/subscriptions.ts)
  *   3. Audit log: started
  *   4. Sweep follows
  *   5. Delete posts
@@ -29,6 +31,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
 import { sweepFollows } from "./cascade/friendships";
 import { deletePosts } from "./cascade/posts";
@@ -38,6 +41,11 @@ import { deleteAvatar, deleteAthleteStorage } from "./cascade/storage";
 import { deleteAthleteOwnedData } from "./cascade/athlete-data";
 import { deleteAthleteRoutines } from "./cascade/routines";
 import { deleteUserDocs } from "./cascade/users";
+import {
+  CancelarAlEliminarDeps,
+  cancelarSuscripcionesAntesDeEliminar,
+} from "./cascade/subscriptions";
+import { createMpClient } from "./subscriptions/mp/client";
 import {
   DeleteAccountRequest,
   DeleteAccountResponse,
@@ -58,6 +66,25 @@ function ensureApp(): App {
 }
 
 /**
+ * Token de Mercado Pago: solo hace falta para dar de baja la suscripcion de
+ * quien elimina la cuenta. Vive aca y no en el callable para que el default de
+ * `runDeleteAccount` sea el REAL: olvidarse de pasarlo no puede dejar una cuenta
+ * borrada con el cobro vivo.
+ */
+const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
+
+export type DeleteAccountDeps = CancelarAlEliminarDeps;
+
+function depsReales(): DeleteAccountDeps {
+  return {
+    // Perezoso: `createMpClient` tira con el token vacio, y casi ninguna cuenta
+    // tiene planes. Solo se construye si hay algo que cancelar.
+    getMpClient: () => createMpClient(MP_ACCESS_TOKEN.value()),
+    nowMs: Date.now(),
+  };
+}
+
+/**
  * Core deletion logic, extracted for unit-testability.
  * The caller supplies the firebase-admin App so tests can pass a named
  * emulator-backed app without relying on the default app.
@@ -69,7 +96,8 @@ function ensureApp(): App {
 export async function runDeleteAccount(
   app: App,
   uid: string,
-  provider: string
+  provider: string,
+  deps: DeleteAccountDeps = depsReales()
 ): Promise<DeleteAccountResponse> {
   const db = getFirestore(app);
 
@@ -85,11 +113,23 @@ export async function runDeleteAccount(
     }
   }
 
+  // ── Paso 2b: dar de baja las suscripciones de Mercado Pago — FAIL-CLOSED ──
+  // A diferencia de todo lo que sigue, NO acumula el error y sigue: si no se
+  // pudo cancelar, tira y la cuenta queda intacta. Borrarla con el cobro vivo
+  // deja a la persona pagando sin ninguna puerta para darse de baja. Ver
+  // `cascade/subscriptions.ts`. Es una BAJA (sin reembolso), no un arrepentimiento.
+  const suscripcionesCanceladas = await cancelarSuscripcionesAntesDeEliminar(
+    app,
+    uid,
+    deps
+  );
+
   // ── Audit log: started ─────────────────────────────────────────────────
   await writeStarted(app, uid, provider);
 
   const errors: string[] = [];
   const deletedCollections: string[] = [];
+  if (suscripcionesCanceladas > 0) deletedCollections.push("mp-subscriptions");
 
   // ── Step 4: Sweep follows ──────────────────────────────────────────────
   try {
@@ -259,7 +299,7 @@ export const deleteAccountHandler = functions.onCall(
   // `jsonPayload.message:"Callable request verification"` y pedir cero INVALID
   // por plataforma. Hasta entonces esto es deuda, no decision de diseno, y
   // figura como tal en el registry de appcheck-enforcement.test.ts.
-  { region: "southamerica-east1" },
+  { region: "southamerica-east1", secrets: [MP_ACCESS_TOKEN] },
   async (request): Promise<DeleteAccountResponse> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {
