@@ -368,7 +368,7 @@ tiendas; es inerte mientras el campo esté en `null`.
 
 **El enfriamiento de 14 días (`trainerLimitMailAt`) era compartido** entre los
 dos topes al mergear este PR: un PF que chocaba los dos recibía un solo mail
-cada 14 días. **Ya no.** Se separó por `kind` (#1265, a pedido del dueño del
+cada 14 días. **Ya no.** Se separó por `kind` (#1267, a pedido del dueño del
 producto, y sumando un tercer tope, alumnos): cada restricción manda su propio
 aviso cada 14 días, sin que chocar una silencie el mail de la otra.
 `trainerLimitMailAt` pasó de un Timestamp suelto a un mapa `{kind: Timestamp}`,
@@ -634,7 +634,7 @@ producción y los legales publicados. **Todo antes del primer entrenador real.**
 | **Una ráfaga fabricada se pasa del tope** | Igual que en ejercicios (E7). Lo frena el camino de la app |
 | **Un alumno puede tener un `trainer-template` forjado** | Ya pasa hoy (CREATE branch 1 no chequea rol). La cuota no lo empeora y el path 5 le impide publicarlo |
 | **Un PF recién promovido queda sin tope hasta el barrido de las 04:00** | Igual que en ejercicios |
-| **El enfriamiento del mail era compartido** | Ya no (#1265): es por `kind`. Un PF que choca dos topes recibe un mail de cada uno, cada 14 días |
+| **El enfriamiento del mail era compartido** | Ya no (#1267): es por `kind`. Un PF que choca dos topes recibe un mail de cada uno, cada 14 días |
 
 ---
 

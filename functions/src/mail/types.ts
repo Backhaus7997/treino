@@ -168,7 +168,7 @@ export type MailKind =
   //
   // ENFRIAMIENTO PROPIO. Antes (#1258) compartia el enfriamiento de 14 dias
   // con `exercise-limit-reached` — un PF que chocaba los dos topes recibia
-  // un solo mail. Se separó (#1265): cada tope manda su propio aviso cada 14
+  // un solo mail. Se separó (#1267): cada tope manda su propio aviso cada 14
   // dias, sin que uno silencie al otro. `trainerLimitMailAt` es ahora un mapa
   // por `kind`; ver `trainer-limit-mail.ts`.
   | "template-limit-reached"
