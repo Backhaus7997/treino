@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../l10n/app_l10n.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import 'plan_checkout.dart';
 import 'plan_copy.dart';
@@ -268,34 +269,21 @@ class _PlanLimitPaywallContent extends StatelessWidget {
     // `reason` MANDA sobre el tier: un plan2 con la suscripción suspendida
     // necesita regularizar, no el aviso del plan a-medida del tope.
     final next = isInactive ? null : currentTier.nextTier;
-
+    // Dos superficies, dos fuentes de texto (hallazgo Codex, PR #1266). La WEB
+    // sigue con sus strings hardcodeados de siempre (`i18n: Fase W3`, sin
+    // cambios) y el MÓVIL sale de AppL10n, con su traducción al inglés —
+    // antes de este fix el aviso de ALUMNOS ni siquiera pasaba por AppL10n:
+    // estaba en castellano hardcodeado en las dos superficies. Los `AppL10n`
+    // sólo se resuelven en las ramas móviles (`AppL10n.of(context)` revienta
+    // sin delegates; la web no los necesita, y sus tests tampoco).
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlanLimitHeader(
-          title: isInactive
-              ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
-              : 'LLEGASTE AL LÍMITE DE TU PLAN', // i18n: Fase W3
-          palette: palette,
-        ),
+        PlanLimitHeader(title: _title(context, isInactive), palette: palette),
         const SizedBox(height: 8),
         Text(
-          isInactive
-              // TODO(producto): copy placeholder — pendiente de revisión
-              // antes de cerrar el PR (diseño D-2, riesgo residual 4).
-              ? 'Mientras tu suscripción no esté al día, tu cuenta '
-                  'funciona con el límite del plan Free. Ningún alumno '
-                  'se elimina.' // i18n: Fase W3
-              : isWeb
-                  ? 'Tu plan ${tierName(currentTier)} incluye '
-                      '${cupoTexto(currentTier)}. Para sumar más, '
-                      'subí de plan.' // i18n: Fase W3
-                  // Móvil, decisión del dueño 2026-09-29: sólo el estado —
-                  // sin "para sumar más, subí de plan" (3.1.3(f)). Guard:
-                  // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
-                  : 'Tu plan ${tierName(currentTier)} incluye '
-                      '${cupoTexto(currentTier)}.', // i18n: Fase W3
+          _body(context, isInactive),
           textAlign: TextAlign.center,
           style:
               TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
@@ -311,16 +299,22 @@ class _PlanLimitPaywallContent extends StatelessWidget {
         else if (next != null)
           PlanLimitUpsellBox(
             nextTier: next,
-            beneficio: next.isUnlimited
-                ? 'Alumnos sin límite' // i18n: Fase W3
-                : 'Hasta ${next.weightLimit} alumnos', // i18n: Fase W3
+            beneficio: _beneficio(context, next),
+            porMes: isWeb
+                ? '/mes' // i18n: Fase W3
+                : AppL10n.of(context).planLimitPorMes,
             palette: palette,
             sellCta: isWeb,
           )
         else
           PlanLimitCustomTierBox(
-            body: 'Estás en el plan más grande. Para más de 15 alumnos '
-                'estamos preparando un plan a tu medida.', // i18n: Fase W3
+            title: isWeb
+                ? 'PLAN A MEDIDA' // i18n: Fase W3
+                : AppL10n.of(context).planLimitPlanAMedidaTitulo,
+            body: isWeb
+                ? 'Estás en el plan más grande. Para más de 15 alumnos '
+                    'estamos preparando un plan a tu medida.' // i18n: Fase W3
+                : AppL10n.of(context).planLimitAlumnosPlanAMedidaCuerpo,
             palette: palette,
           ),
         const SizedBox(height: 20),
@@ -336,11 +330,67 @@ class _PlanLimitPaywallContent extends StatelessWidget {
         PlanLimitDismissLink(
           // Móvil: "Entendido" — "Ahora no" presupone una oferta que el
           // móvil ya no hace (decisión del dueño, 2026-09-29).
-          label: isWeb ? 'Ahora no' : 'Entendido', // i18n: Fase W3
+          label: isWeb
+              ? 'Ahora no' // i18n: Fase W3
+              : AppL10n.of(context).planLimitEntendido,
           onTap: () => Navigator.of(context).pop(),
         ),
       ],
     );
+  }
+
+  /// Título del aviso.
+  String _title(BuildContext context, bool isInactive) {
+    if (isWeb) {
+      return isInactive
+          ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
+          : 'LLEGASTE AL LÍMITE DE TU PLAN'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    return isInactive
+        ? l10n.planLimitAlumnosTituloInactiva
+        : l10n.planLimitAlumnosTituloTope;
+  }
+
+  /// Cuerpo del aviso, en la superficie que corresponda.
+  String _body(BuildContext context, bool isInactive) {
+    if (isWeb) {
+      if (isInactive) {
+        // TODO(producto): copy placeholder — pendiente de revisión antes de
+        // cerrar el PR (diseño D-2, riesgo residual 4).
+        return 'Mientras tu suscripción no esté al día, tu cuenta '
+            'funciona con el límite del plan Free. Ningún alumno '
+            'se elimina.'; // i18n: Fase W3
+      }
+      return 'Tu plan ${tierName(currentTier)} incluye '
+          '${cupoTexto(currentTier)}. Para sumar más, '
+          'subí de plan.'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    if (isInactive) return l10n.planLimitAlumnosCuerpoInactivaExplicacion;
+    // Móvil, decisión del dueño 2026-09-29: sólo el estado — sin "para sumar
+    // más, subí de plan" (3.1.3(f)). Guard:
+    // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+    final cupo = currentTier.weightLimit;
+    return cupo == null
+        ? l10n.planLimitAlumnosCuerpoTopeMovilIlimitado(tierName(currentTier))
+        : l10n.planLimitAlumnosCuerpoTopeMovilLimitado(
+            tierName(currentTier), cupo);
+  }
+
+  /// El beneficio del siguiente tier ([next]) para la tarjeta de upsell.
+  /// `weightLimit == null` = SIN LÍMITE (Plan 3), nunca se interpola.
+  String _beneficio(BuildContext context, SubscriptionTier next) {
+    if (isWeb) {
+      return next.isUnlimited
+          ? 'Alumnos sin límite' // i18n: Fase W3
+          : 'Hasta ${next.weightLimit} alumnos'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    final cupo = next.weightLimit;
+    return cupo == null
+        ? l10n.planLimitAlumnosBeneficioIlimitado
+        : l10n.planLimitAlumnosBeneficioLimitado(cupo);
   }
 }
 
@@ -372,7 +422,10 @@ class _ReactivateBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'TU PLAN: ${tierName(currentTier).toUpperCase()}', // i18n: Fase W3
+            isWeb
+                ? 'TU PLAN: ${tierName(currentTier).toUpperCase()}' // i18n: Fase W3
+                : AppL10n.of(context).planLimitReactivateTituloMovil(
+                    tierName(currentTier).toUpperCase()),
             style: TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
@@ -394,9 +447,8 @@ class _ReactivateBox extends StatelessWidget {
                 // Free (mismo criterio que `effectiveWeightLimit` del
                 // servidor). Guard:
                 // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
-                : 'No está activa. Mientras tanto, tu cuenta tiene el '
-                    'límite del plan Free: '
-                    '${cupoTexto(SubscriptionTier.free)}.', // i18n: Fase W3
+                : AppL10n.of(context).planLimitReactivateCuerpoMovil(
+                    SubscriptionTier.free.weightLimit!),
             textAlign: TextAlign.center,
             style: TextStyle(
                 color: palette.textMuted, fontSize: AppTextSize.bodyDense),
@@ -404,7 +456,10 @@ class _ReactivateBox extends StatelessWidget {
           if (status != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Estado: ${_statusName(status!)}', // i18n: Fase W3
+              isWeb
+                  ? 'Estado: ${_statusName(status!)}' // i18n: Fase W3
+                  : AppL10n.of(context).planLimitReactivateEstadoMovil(
+                      _statusNameMovil(AppL10n.of(context), status!)),
               style: TextStyle(
                   color: palette.textMuted, fontSize: AppTextSize.caption),
             ),
@@ -433,13 +488,22 @@ class _PrimaryCta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isInactive) {
+      // El texto del SnackBar se resuelve ACÁ y no adentro del `onTap`: ahí
+      // ya se hizo `pop()` del modal y no se vuelve a leer su contexto. La
+      // WEB sigue con el hardcodeado de siempre (`i18n: Fase W3`); el MÓVIL
+      // sale de AppL10n.
+      final pausada = isWeb
+          ? 'Tu suscripción está pausada.' // i18n: Fase W3
+          : AppL10n.of(context).planLimitSuscripcionPausadaMovil;
       return PlanLimitAccentButton(
         // "REGULARIZAR" es un verbo de pago — en el móvil, con el SnackBar
         // de abajo ya diciendo el estado, el botón pasa a describir lo que
         // efectivamente hace ("VER ESTADO") y no lo que Apple prohíbe pedir
         // (3.1.3(f)). Decisión del dueño, 2026-09-29. Guard:
         // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
-        label: isWeb ? 'REGULARIZAR' : 'VER ESTADO', // i18n: Fase W3
+        label: isWeb
+            ? 'REGULARIZAR' // i18n: Fase W3
+            : AppL10n.of(context).planLimitVerEstadoMovil,
         onTap: () {
           // REACTIVAR ES COBRAR. Este CTA es el otro punto de entrada al pago
           // que se ve DESDE EL TELEFONO (dashboard movil -> aceptar solicitud
@@ -484,11 +548,7 @@ class _PrimaryCta extends StatelessWidget {
               // acá: tiene que salir por fuera de la app (un mail), que es lo
               // unico que Apple no gobierna.
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Tu suscripción está pausada.',
-                  ), // i18n: Fase W3
-                ),
+                SnackBar(content: Text(pausada)),
               );
             case PlanCheckoutAvailable():
               if (route == null) {
@@ -497,11 +557,7 @@ class _PrimaryCta extends StatelessWidget {
                 // una ruta inexistente: el modal decia lo correcto y el boton
                 // no hacia nada. Mejor decirlo que fingirlo.
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Tu suscripción está pausada.',
-                    ), // i18n: Fase W3
-                  ),
+                  SnackBar(content: Text(pausada)),
                 );
                 return;
               }
@@ -513,8 +569,23 @@ class _PrimaryCta extends StatelessWidget {
         },
       );
     }
+    // Sin siguiente tier ('CONTACTANOS' + su SnackBar) la rama es inalcanzable
+    // en producción —Plan 3 es ilimitado en alumnos, así que el servidor nunca
+    // bloquea a un PF sin tope; mismo criterio que PLAN A MEDIDA— pero SE
+    // RENDERIZA (los tests la ejercitan), así que la forma móvil tampoco puede
+    // quedar en castellano acá. Resueltos antes del `onTap`, igual que arriba.
+    final contactanos = isWeb
+        ? 'CONTACTANOS' // i18n: Fase W3
+        : AppL10n.of(context).planLimitContactanos;
+    final muyPronto = isWeb
+        ? 'Muy pronto vas a poder tener más de 15 alumnos.' // i18n: Fase W3
+        : AppL10n.of(context).planLimitAlumnosPlanAMedidaSnack;
     return PlanLimitAccentButton(
-      label: hasNext ? 'VER PLANES' : 'CONTACTANOS', // i18n: Fase W3
+      label: !hasNext
+          ? contactanos
+          : (isWeb
+              ? 'VER PLANES' // i18n: Fase W3
+              : AppL10n.of(context).planLimitVerPlanesMovil),
       onTap: () {
         Navigator.of(context).pop();
         if (hasNext) {
@@ -523,11 +594,7 @@ class _PrimaryCta extends StatelessWidget {
         } else {
           // Plan 2 tope: aviso del plan a-medida (mock hasta canal de contacto).
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Muy pronto vas a poder tener más de 15 alumnos.',
-              ), // i18n: Fase W3
-            ),
+            SnackBar(content: Text(muyPronto)),
           );
         }
       },
@@ -535,10 +602,23 @@ class _PrimaryCta extends StatelessWidget {
   }
 }
 
+/// Nombre del estado para la WEB — hardcodeado, sin cambios (i18n: Fase W3).
 String _statusName(SubscriptionStatus status) => switch (status) {
       SubscriptionStatus.active => 'activa', // i18n: Fase W3
       SubscriptionStatus.pending => 'pendiente de pago', // i18n: Fase W3
       SubscriptionStatus.grace => 'con pago pendiente', // i18n: Fase W3
       SubscriptionStatus.paused => 'pausada', // i18n: Fase W3
       SubscriptionStatus.cancelled => 'cancelada', // i18n: Fase W3
+    };
+
+/// Hermano de [_statusName] para el MÓVIL — mismo estado, vía AppL10n
+/// (hallazgo Codex, 2026-09-29: el móvil no tenía forma de decir esto en
+/// inglés).
+String _statusNameMovil(AppL10n l10n, SubscriptionStatus status) =>
+    switch (status) {
+      SubscriptionStatus.active => l10n.planLimitEstadoActiva,
+      SubscriptionStatus.pending => l10n.planLimitEstadoPendiente,
+      SubscriptionStatus.grace => l10n.planLimitEstadoGracia,
+      SubscriptionStatus.paused => l10n.planLimitEstadoPausada,
+      SubscriptionStatus.cancelled => l10n.planLimitEstadoCancelada,
     };

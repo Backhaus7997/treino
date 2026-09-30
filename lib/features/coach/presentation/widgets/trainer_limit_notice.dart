@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/app_clock.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
 // Las envolturas dialog/sheet ([PlanLimitDialogShell], [PlanLimitSheetShell])
 // viven en `plan_limit_paywall.dart` y no en `plan_limit_shared.dart` — ver
@@ -312,16 +313,52 @@ class _TrainerLimitContent extends StatelessWidget {
   /// acá). Decisión del dueño, 2026-09-29.
   final bool isWeb;
 
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
+  // Dos superficies, dos fuentes de texto (hallazgo Codex, PR #1266). La WEB
+  // (Coach Hub) sigue con los strings hardcodeados de siempre —`i18n: Fase
+  // W3`, convención vigente del Coach Hub— y el MÓVIL sale de AppL10n, con su
+  // traducción al inglés: la unificación de los tres avisos había hardcodeado
+  // el castellano del móvil y borrado las claves que ya existían. Cada helper
+  // de abajo es UNA superficie entera (`*Web` o `*Movil`); nunca se mezclan
+  // literales y claves dentro de la misma expresión, para que auditar «el
+  // móvil no tiene castellano hardcodeado» sea leer los `*Movil`.
 
-    final title = switch (kind) {
-      TrainerLimitKind.customExercises =>
-        'TOPE DE EJERCICIOS PROPIOS', // i18n: Fase W3
-      TrainerLimitKind.templates => 'TOPE DE PLANTILLAS', // i18n: Fase W3
+  /// Título del aviso.
+  String _title(BuildContext context) {
+    if (isWeb) {
+      return switch (kind) {
+        TrainerLimitKind.customExercises =>
+          'TOPE DE EJERCICIOS PROPIOS', // i18n: Fase W3
+        TrainerLimitKind.templates => 'TOPE DE PLANTILLAS', // i18n: Fase W3
+      };
+    }
+    final l10n = AppL10n.of(context);
+    return switch (kind) {
+      TrainerLimitKind.customExercises => l10n.planLimitTrainerTituloEjercicios,
+      TrainerLimitKind.templates => l10n.planLimitTrainerTituloPlantillas,
     };
+  }
 
+  /// Cuerpo del aviso: los cuatro estados de [showTrainerLimitNotice], en la
+  /// superficie que corresponda. [effectiveTier] e [inactive] vienen de
+  /// [resolveNoticeTier].
+  String _body(
+    BuildContext context, {
+    required SubscriptionTier? effectiveTier,
+    required bool inactive,
+  }) =>
+      isWeb
+          ? _bodyWeb(effectiveTier: effectiveTier, inactive: inactive)
+          : _bodyMovil(
+              AppL10n.of(context),
+              effectiveTier: effectiveTier,
+              inactive: inactive,
+            );
+
+  /// Cuerpo, WEB: los strings hardcodeados de siempre (`i18n: Fase W3`).
+  String _bodyWeb({
+    required SubscriptionTier? effectiveTier,
+    required bool inactive,
+  }) {
     // "Uno nuevo/todos" (ejercicios, masculino) vs. "una nueva/todas"
     // (plantillas, femenino) — el género del sustantivo cambia con el kind.
     final noun = switch (kind) {
@@ -340,13 +377,117 @@ class _TrainerLimitContent extends StatelessWidget {
       TrainerLimitKind.customExercises => 'borrá',
       TrainerLimitKind.templates => 'archivá',
     };
-    // Móvil, "en el tope" (Cambio 1 del 2026-09-29): reemplaza al CTA de
-    // venta por una reafirmación de lo que el PF YA puede hacer con lo que
-    // tiene — mismo tono que el texto de conservación de "pasado de tope".
-    final accionConservar = switch (kind) {
-      TrainerLimitKind.customExercises => 'editar o borrar los que ya tenés',
-      TrainerLimitKind.templates => 'editar o archivar las que ya tenés',
+    // "En el tope": mismo tono que `_PlanLimitPaywallContent` — "tu plan
+    // incluye X". El número es [limit], el MISMO que usó el gate para
+    // bloquear (`planLimits` del servidor), y NO la tabla estática del tier:
+    // si difieren (el piso prepago sube el plan efectivo, o un tope ajustado
+    // a mano), el aviso diría un tope que no es el que está frenando al PF.
+    // En este aviso [limit] nunca es null: sin tope no hay aviso.
+    final nounLimite = limit == 1
+        ? switch (kind) {
+            TrainerLimitKind.customExercises => 'ejercicio propio',
+            TrainerLimitKind.templates => 'plantilla',
+          }
+        : noun;
+
+    // "Pasado de tope": el texto de conservación que ya tenía este aviso
+    // (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3, "Los
+    // avisos") — sin caja de upsell, adaptado sólo al encabezado/CTA nuevos.
+    // No nombra tier, así que el nominal/efectivo no lo afecta.
+    if (overLimit) {
+      return 'Tenés $count $noun y tu plan incluye $limit. '
+          'Conservás $todos; para crear $unoNuevo, $verb $toFree.'; // i18n: Fase W3
+    }
+    if (inactive) {
+      // El [inactive] de `resolveNoticeTier` sólo es `true` con
+      // `effectiveTier` resuelto — el `!` es seguro por contrato.
+      return 'Tu suscripción a ${tierName(currentTier)} no está activa. '
+          'Mientras tanto, tu plan ${tierName(effectiveTier!)} '
+          'incluye $limit $nounLimite.'; // i18n: Fase W3
+    }
+    // Sin tier resuelto (tope ajustado a mano) no se afirma un nombre de
+    // plan — AGENTS.md §11.1: lo que no se puede verificar, no se dice.
+    final tierPrefix = effectiveTier == null
+        ? 'Tu plan'
+        : 'Tu plan ${tierName(effectiveTier)}';
+    return '$tierPrefix incluye $limit $nounLimite. Para sumar más, '
+        'subí de plan.'; // i18n: Fase W3
+  }
+
+  /// Cuerpo, MÓVIL: todo sale de AppL10n. Decisión del dueño 2026-09-29: sin
+  /// «para sumar más, subí de plan» (3.1.3(f)) — en su lugar, lo que el PF
+  /// puede hacer con lo que ya tiene. Guard:
+  /// `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+  String _bodyMovil(
+    AppL10n l10n, {
+    required SubscriptionTier? effectiveTier,
+    required bool inactive,
+  }) {
+    if (overLimit) {
+      return switch (kind) {
+        TrainerLimitKind.customExercises =>
+          l10n.planLimitTrainerPasadoTopeEjercicios(count, limit, toFree),
+        TrainerLimitKind.templates =>
+          l10n.planLimitTrainerPasadoTopePlantillas(count, limit, toFree),
+      };
+    }
+    if (inactive) {
+      // El [inactive] de `resolveNoticeTier` sólo es `true` con
+      // `effectiveTier` resuelto — el `!` es seguro por contrato.
+      final nominal = tierName(currentTier);
+      final efectivo = tierName(effectiveTier!);
+      return switch (kind) {
+        TrainerLimitKind.customExercises =>
+          l10n.planLimitTrainerInactivaEjercicios(nominal, efectivo, limit),
+        TrainerLimitKind.templates =>
+          l10n.planLimitTrainerInactivaPlantillas(nominal, efectivo, limit),
+      };
+    }
+    // Sin tier resuelto (tope ajustado a mano, o propagación pendiente) no se
+    // afirma un nombre de plan — AGENTS.md §11.1.
+    final plan = effectiveTier == null ? null : tierName(effectiveTier);
+    return switch (kind) {
+      TrainerLimitKind.customExercises => plan == null
+          ? l10n.planLimitTrainerTopeEjerciciosGenerico(limit)
+          : l10n.planLimitTrainerTopeEjerciciosConTier(plan, limit),
+      TrainerLimitKind.templates => plan == null
+          ? l10n.planLimitTrainerTopePlantillasGenerico(limit)
+          : l10n.planLimitTrainerTopePlantillasConTier(plan, limit),
     };
+  }
+
+  /// El beneficio del siguiente tier ([next]) para la tarjeta de upsell.
+  /// `null` en el límite del tier = SIN LÍMITE, nunca se interpola.
+  String _beneficio(BuildContext context, SubscriptionTier next) {
+    if (isWeb) {
+      return switch (kind) {
+        TrainerLimitKind.customExercises => next.customExerciseLimit == null
+            ? 'Ejercicios propios sin límite' // i18n: Fase W3
+            : 'Hasta ${next.customExerciseLimit} ejercicios '
+                'propios', // i18n: Fase W3
+        TrainerLimitKind.templates => next.templateLimit == null
+            ? 'Plantillas sin límite' // i18n: Fase W3
+            : 'Hasta ${next.templateLimit} plantillas', // i18n: Fase W3
+      };
+    }
+    final l10n = AppL10n.of(context);
+    switch (kind) {
+      case TrainerLimitKind.customExercises:
+        final cupo = next.customExerciseLimit;
+        return cupo == null
+            ? l10n.planLimitTrainerBeneficioEjerciciosIlimitado
+            : l10n.planLimitTrainerBeneficioEjerciciosLimitado(cupo);
+      case TrainerLimitKind.templates:
+        final cupo = next.templateLimit;
+        return cupo == null
+            ? l10n.planLimitTrainerBeneficioPlantillasIlimitado
+            : l10n.planLimitTrainerBeneficioPlantillasLimitado(cupo);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
 
     // El tier a NOMBRAR nunca es el nominal a ciegas: se resuelve desde
     // [limit] — el mismo número con el que bloqueó el gate — porque una
@@ -363,47 +504,6 @@ class _TrainerLimitContent extends StatelessWidget {
     final effectiveTier = resolved.tier;
     final inactive = resolved.inactive;
 
-    // "En el tope": mismo tono que `_PlanLimitPaywallContent` — "tu plan
-    // incluye X". El número es [limit], el MISMO que usó el gate para
-    // bloquear (`planLimits` del servidor), y NO la tabla estática del tier:
-    // si difieren (el piso prepago sube el plan efectivo, o un tope ajustado
-    // a mano), el aviso diría un tope que no es el que está frenando al PF.
-    // En este aviso [limit] nunca es null: sin tope no hay aviso.
-    //
-    // "Pasado de tope": el texto de conservación que ya tenía este aviso
-    // (docs/limite-ejercicios-pf.md y docs/limite-plantillas-pf.md, PR3, "Los
-    // avisos") — sin caja de upsell, adaptado sólo al encabezado/CTA nuevos.
-    // No nombra tier, así que el nominal/efectivo no lo afecta.
-    final nounLimite = limit == 1
-        ? switch (kind) {
-            TrainerLimitKind.customExercises => 'ejercicio propio',
-            TrainerLimitKind.templates => 'plantilla',
-          }
-        : noun;
-    // Sin tier resuelto (tope ajustado a mano) no se afirma un nombre de
-    // plan — AGENTS.md §11.1: lo que no se puede verificar, no se dice.
-    final tierPrefix = effectiveTier == null
-        ? 'Tu plan'
-        : 'Tu plan ${tierName(effectiveTier)}';
-    final body = overLimit
-        ? 'Tenés $count $noun y tu plan incluye $limit. '
-            'Conservás $todos; para crear $unoNuevo, $verb $toFree.' // i18n: Fase W3
-        : inactive
-            // El [inactive] de `resolveNoticeTier` sólo es `true` con
-            // `effectiveTier` resuelto — el `!` es seguro por contrato.
-            ? 'Tu suscripción a ${tierName(currentTier)} no está activa. '
-                'Mientras tanto, tu plan ${tierName(effectiveTier!)} '
-                'incluye $limit $nounLimite.' // i18n: Fase W3
-            : isWeb
-                ? '$tierPrefix incluye $limit $nounLimite. Para sumar más, '
-                    'subí de plan.' // i18n: Fase W3
-                // Móvil, decisión del dueño 2026-09-29: sin "para sumar más,
-                // subí de plan" (3.1.3(f)) — en su lugar, lo que el PF puede
-                // hacer con lo que ya tiene. Guard:
-                // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
-                : '$tierPrefix incluye $limit $nounLimite. Podés '
-                    '$accionConservar.'; // i18n: Fase W3
-
     // Sin upsell cuando: ya está sobre el tope (conservación, no venta);
     // está `inactive` (ofrecerle "el siguiente" a quien ya pagó uno más caro
     // es el mensaje equivocado — mismo criterio que
@@ -418,32 +518,26 @@ class _TrainerLimitContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlanLimitHeader(title: title, palette: palette),
+        PlanLimitHeader(title: _title(context), palette: palette),
         const SizedBox(height: AppSpacing.s8),
         Text(
-          body,
+          _body(context, effectiveTier: effectiveTier, inactive: inactive),
           textAlign: TextAlign.center,
           style:
               TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
         const SizedBox(height: AppSpacing.s18),
-        // Upsell sólo cuando `showUpsell` — ver su dartdoc arriba: nunca
+        // Upsell sólo cuando `showUpsell` — ver su comentario arriba: nunca
         // sobre el tope, nunca con la suscripción inactiva, nunca sin un
         // tier del que partir.
         if (showUpsell) ...[
           if (next != null)
             PlanLimitUpsellBox(
               nextTier: next,
-              beneficio: switch (kind) {
-                TrainerLimitKind.customExercises =>
-                  next.customExerciseLimit == null
-                      ? 'Ejercicios propios sin límite' // i18n: Fase W3
-                      : 'Hasta ${next.customExerciseLimit} ejercicios '
-                          'propios', // i18n: Fase W3
-                TrainerLimitKind.templates => next.templateLimit == null
-                    ? 'Plantillas sin límite' // i18n: Fase W3
-                    : 'Hasta ${next.templateLimit} plantillas', // i18n: Fase W3
-              },
+              beneficio: _beneficio(context, next),
+              porMes: isWeb
+                  ? '/mes' // i18n: Fase W3
+                  : AppL10n.of(context).planLimitPorMes,
               palette: palette,
               sellCta: isWeb,
             )
@@ -454,15 +548,22 @@ class _TrainerLimitContent extends StatelessWidget {
             // mismo criterio que el "PLAN A MEDIDA" de alumnos en
             // `plan_limit_paywall.dart`.
             PlanLimitCustomTierBox(
-              body: 'Estás en el plan más grande. Estamos preparando un '
-                  'plan a tu medida.', // i18n: Fase W3
+              title: isWeb
+                  ? 'PLAN A MEDIDA' // i18n: Fase W3
+                  : AppL10n.of(context).planLimitPlanAMedidaTitulo,
+              body: isWeb
+                  ? 'Estás en el plan más grande. Estamos preparando un '
+                      'plan a tu medida.' // i18n: Fase W3
+                  : AppL10n.of(context).planLimitTrainerPlanAMedidaCuerpo,
               palette: palette,
             ),
           const SizedBox(height: AppSpacing.s18),
         ],
         PlanLimitAccentButton(
           key: const Key('trainer_limit_ver_planes'),
-          label: 'VER PLANES', // i18n: Fase W3
+          label: isWeb
+              ? 'VER PLANES' // i18n: Fase W3
+              : AppL10n.of(context).planLimitVerPlanesMovil,
           onTap: () {
             Navigator.of(context).pop();
             context.push('/facturacion/planes');
@@ -473,7 +574,9 @@ class _TrainerLimitContent extends StatelessWidget {
           key: const Key('trainer_limit_dismiss'),
           // Móvil: "Entendido" — "Ahora no" presupone una oferta que el
           // móvil ya no hace (decisión del dueño, 2026-09-29).
-          label: isWeb ? 'Ahora no' : 'Entendido', // i18n: Fase W3
+          label: isWeb
+              ? 'Ahora no' // i18n: Fase W3
+              : AppL10n.of(context).planLimitEntendido,
           onTap: () => Navigator.of(context).pop(),
         ),
       ],

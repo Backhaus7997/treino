@@ -95,17 +95,27 @@ class PlanLimitHeader extends StatelessWidget {
 /// tampoco vende), pero la Guideline 3.1.3(f) prohíbe el llamado a comprar
 /// desde ADENTRO del binario. Guard: `avisos_de_tope_movil_sin_llamado_a_
 /// comprar_test.dart`.
+///
+/// [porMes] — el sufijo del precio («/mes»), con su barra. Lo pasa cada
+/// llamador y NO se lee de acá adentro: la forma MÓVIL sale de AppL10n
+/// (hallazgo Codex, PR #1266: con la app en inglés la tarjeta decía «/mes» al
+/// lado de un beneficio en inglés) y la WEB sigue con el string hardcodeado
+/// de siempre (`i18n: Fase W3`). Requerido y sin default a propósito, mismo
+/// motivo que [beneficio]: que el compilador obligue a cada llamador nuevo a
+/// elegir una fuente, en vez de heredar castellano en silencio.
 class PlanLimitUpsellBox extends StatelessWidget {
   const PlanLimitUpsellBox({
     super.key,
     required this.nextTier,
     required this.beneficio,
+    required this.porMes,
     required this.palette,
     required this.sellCta,
   });
 
   final SubscriptionTier nextTier;
   final String beneficio;
+  final String porMes;
   final AppPalette palette;
   final bool sellCta;
 
@@ -175,7 +185,7 @@ class PlanLimitUpsellBox extends StatelessWidget {
                     left: AppSpacing.hairline,
                   ),
                   child: Text(
-                    '/mes', // i18n: Fase W3
+                    porMes,
                     style: TextStyle(
                         color: palette.textMuted,
                         fontSize: AppTextSize.bodyDense),
@@ -203,15 +213,24 @@ class PlanLimitUpsellBox extends StatelessWidget {
 ///
 /// [body] lo decide cada llamador — alumnos, ejercicios propios y
 /// plantillas dicen cosas distintas acá ("para más de 15 alumnos" no tiene
-/// sentido en ejercicios propios) — pero el título "PLAN A MEDIDA" es el
-/// mismo en los tres.
+/// sentido en ejercicios propios).
+///
+/// [title] («PLAN A MEDIDA») dice lo mismo en los tres avisos, pero tampoco se
+/// lee de acá adentro: la forma MÓVIL lo saca de AppL10n y la WEB lo pasa
+/// hardcodeado (`i18n: Fase W3`) — mismo criterio que
+/// [PlanLimitUpsellBox.porMes]. Esta caja es una red que en producción no se
+/// alcanza (el servidor nunca bloquea a un PF sin tope), pero un texto que
+/// PUEDE renderizarse no puede quedar en castellano dentro de la forma en
+/// inglés.
 class PlanLimitCustomTierBox extends StatelessWidget {
   const PlanLimitCustomTierBox({
     super.key,
+    required this.title,
     required this.body,
     required this.palette,
   });
 
+  final String title;
   final String body;
   final AppPalette palette;
 
@@ -226,7 +245,7 @@ class PlanLimitCustomTierBox extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              'PLAN A MEDIDA', // i18n: Fase W3
+              title,
               style: TextStyle(
                 fontFamily: AppFonts.barlowCondensed,
                 color: palette.textPrimary,

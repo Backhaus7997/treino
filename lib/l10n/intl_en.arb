@@ -1998,5 +1998,189 @@
         "format": "decimalPattern"
       }
     }
-  }
+  },
+  "planLimitVerPlanesMovil": "VIEW PLANS",
+  "planLimitEntendido": "Got it",
+  "planLimitPorMes": "/month",
+  "planLimitPlanAMedidaTitulo": "CUSTOM PLAN",
+  "planLimitContactanos": "CONTACT US",
+  "planLimitAlumnosTituloTope": "YOU REACHED YOUR PLAN LIMIT",
+  "planLimitAlumnosTituloInactiva": "YOUR SUBSCRIPTION IS SUSPENDED",
+  "planLimitAlumnosCuerpoInactivaExplicacion": "While your subscription isn't up to date, your account works with the Free plan limit. No student is removed.",
+  "planLimitAlumnosCuerpoTopeMovilLimitado": "Your {plan} plan includes {limit, plural, =1{1 student} other{{limit} students}}.",
+  "@planLimitAlumnosCuerpoTopeMovilLimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosCuerpoTopeMovilIlimitado": "Your {plan} plan includes unlimited students.",
+  "@planLimitAlumnosCuerpoTopeMovilIlimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitAlumnosPlanAMedidaCuerpo": "You're on the largest plan. For more than 15 students, we're preparing a custom plan for you.",
+  "planLimitAlumnosPlanAMedidaSnack": "Soon you'll be able to have more than 15 students.",
+  "planLimitReactivateTituloMovil": "YOUR PLAN: {plan}",
+  "@planLimitReactivateTituloMovil": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitReactivateCuerpoMovil": "It isn't active. Meanwhile, your account has the Free plan limit: {count, plural, =1{1 student} other{{count} students}}.",
+  "@planLimitReactivateCuerpoMovil": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitVerEstadoMovil": "VIEW STATUS",
+  "planLimitReactivateEstadoMovil": "Status: {estado}",
+  "@planLimitReactivateEstadoMovil": {
+    "placeholders": {
+      "estado": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitEstadoActiva": "active",
+  "planLimitEstadoPendiente": "payment pending",
+  "planLimitEstadoGracia": "payment past due",
+  "planLimitEstadoPausada": "paused",
+  "planLimitEstadoCancelada": "cancelled",
+  "planLimitAlumnosBeneficioLimitado": "Up to {limit, plural, =1{1 student} other{{limit} students}}",
+  "@planLimitAlumnosBeneficioLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosBeneficioIlimitado": "Unlimited students",
+  "planLimitSuscripcionPausadaMovil": "Your subscription is paused.",
+  "planLimitTrainerTituloEjercicios": "CUSTOM EXERCISE LIMIT",
+  "planLimitTrainerTituloPlantillas": "TEMPLATE LIMIT",
+  "planLimitTrainerPasadoTopeEjercicios": "You have {count, plural, =1{1 custom exercise} other{{count} custom exercises}} and your plan includes {limit}. You keep them all; to create a new one, delete {toDelete}.",
+  "@planLimitTrainerPasadoTopeEjercicios": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toDelete": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerPasadoTopePlantillas": "You have {count, plural, =1{1 template} other{{count} templates}} and your plan includes {limit}. You keep them all; to create a new one, archive {toArchive}.",
+  "@planLimitTrainerPasadoTopePlantillas": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toArchive": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaEjercicios": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}.",
+  "@planLimitTrainerInactivaEjercicios": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaPlantillas": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 template} other{{limit} templates}}.",
+  "@planLimitTrainerInactivaPlantillas": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosConTier": "Your {plan} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosGenerico": "Your plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasConTier": "Your {plan} plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasGenerico": "Your plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosLimitado": "Up to {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}",
+  "@planLimitTrainerBeneficioEjerciciosLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosIlimitado": "Unlimited custom exercises",
+  "planLimitTrainerBeneficioPlantillasLimitado": "Up to {limit, plural, =1{1 template} other{{limit} templates}}",
+  "@planLimitTrainerBeneficioPlantillasLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioPlantillasIlimitado": "Unlimited templates",
+  "planLimitTrainerPlanAMedidaCuerpo": "You're on the largest plan. We're preparing a custom plan for you."
 }

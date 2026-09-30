@@ -21,6 +21,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Future<void> _mostrar(
   WidgetTester tester, {
@@ -34,6 +35,9 @@ Future<void> _mostrar(
   required int limit,
   required int count,
   TrainerLimitNoticeForm? form,
+  // Default es_AR: mismo idioma que hoy hablan los strings hardcodeados de
+  // este aviso. El grupo "inglés" de más abajo lo pisa explícitamente.
+  Locale locale = const Locale('es', 'AR'),
 }) async {
   debugTrainerLimitNoticeForm = form;
   addTearDown(() => debugTrainerLimitNoticeForm = null);
@@ -41,6 +45,12 @@ Future<void> _mostrar(
   await tester.pumpWidget(
     MaterialApp(
       theme: AppTheme.dark(),
+      // Sin esto, el `build` de `_TrainerLimitContent` revienta con "Null
+      // check operator used on a null value" apenas toca AppL10n (mismo
+      // motivo que documenta `custom_exercise_limit_gate_test.dart`).
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: locale,
       home: Scaffold(
         body: Builder(
           builder: (context) => ElevatedButton(
@@ -466,6 +476,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
+          // Sin esto, `_TrainerLimitContent` revienta con "Null check
+          // operator used on a null value" apenas toca AppL10n — estos 4
+          // harnesses arman su propio router y no pasan por `_mostrar()`.
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -565,6 +581,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
+          // Sin esto, `_TrainerLimitContent` revienta con "Null check
+          // operator used on a null value" apenas toca AppL10n — estos 4
+          // harnesses arman su propio router y no pasan por `_mostrar()`.
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -623,6 +645,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
+          // Sin esto, `_TrainerLimitContent` revienta con "Null check
+          // operator used on a null value" apenas toca AppL10n — estos 4
+          // harnesses arman su propio router y no pasan por `_mostrar()`.
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -772,6 +800,12 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: AppTheme.dark(),
+          // Sin esto, `_TrainerLimitContent` revienta con "Null check
+          // operator used on a null value" apenas toca AppL10n — estos 4
+          // harnesses arman su propio router y no pasan por `_mostrar()`.
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
           routerConfig: router,
         ),
       );
@@ -842,6 +876,274 @@ void main() {
 
       expect(find.byKey(const Key('trainer_limit_dismiss')), findsOneWidget);
       expect(find.text('VER PLANES'), findsOneWidget);
+    });
+  });
+
+  // ── Inglés (hallazgo Codex, PR #1266) ───────────────────────────────────
+  //
+  // Antes de esta rama, ejercicios propios y plantillas leían sus textos de
+  // AppL10n (con su versión en inglés en `intl_en.arb`); la unificación con el
+  // paywall de alumnos los hardcodeó en castellano y borró esas claves. Este
+  // grupo cubre CADA estado del aviso móvil —en el tope con tier, pasado de
+  // tope, suscripción inactiva, piso prepago y cuerpo genérico— en
+  // Locale('en'), para los dos `kind`.
+  //
+  // Ojo: hoy `resolveLocale` (ADR-I18N-005) fuerza es_AR en producción, así
+  // que estos textos sólo se ven con un Locale explícito como el de acá. El
+  // día que se levante esa traba tienen que estar, y este grupo es lo que
+  // garantiza que estén.
+
+  group('móvil (sheet) — Locale(en)', () {
+    Future<void> mostrarEn(
+      WidgetTester tester, {
+      required TrainerLimitKind kind,
+      SubscriptionTier currentTier = SubscriptionTier.free,
+      SubscriptionStatus subscriptionStatus = SubscriptionStatus.active,
+      required int limit,
+      required int count,
+    }) =>
+        _mostrar(
+          tester,
+          kind: kind,
+          currentTier: currentTier,
+          subscriptionStatus: subscriptionStatus,
+          limit: limit,
+          count: count,
+          form: TrainerLimitNoticeForm.sheet,
+          locale: const Locale('en'),
+        );
+
+    testWidgets(
+        'ejercicios propios, en el tope: título, cuerpo, tarjeta y botones '
+        'en inglés', (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        count: 20,
+      );
+
+      expect(find.text('CUSTOM EXERCISE LIMIT'), findsOneWidget);
+      expect(
+        find.text(
+          'Your Free plan includes 20 custom exercises. You can edit or '
+          'delete the ones you already have.',
+        ),
+        findsOneWidget,
+      );
+      // La tarjeta del siguiente plan: nombre, precio, sufijo y beneficio.
+      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('12.000'), findsOneWidget);
+      expect(find.text('/month'), findsOneWidget);
+      expect(find.text('/mes'), findsNothing);
+      expect(find.text('Up to 60 custom exercises'), findsOneWidget);
+      expect(find.text('VIEW PLANS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.text('Entendido'), findsNothing);
+    });
+
+    testWidgets('ejercicios propios, desde Plan 2: "Unlimited", nunca "null"',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan2,
+        limit: 120,
+        count: 120,
+      );
+
+      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('Unlimited custom exercises'), findsOneWidget);
+      expect(find.textContaining('null'), findsNothing);
+    });
+
+    testWidgets('ejercicios propios, pasado de tope: cuerpo en inglés',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        limit: 60,
+        count: 80,
+      );
+
+      // toDelete = 80 - 60 + 1 = 21.
+      expect(
+        find.text(
+          'You have 80 custom exercises and your plan includes 60. You '
+          'keep them all; to create a new one, delete 21.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'ejercicios propios, suscripción pausada (límite de Free): '
+        'cuerpo en inglés, sin upsell', (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+        limit: 20,
+        count: 20,
+      );
+
+      expect(find.text('CUSTOM EXERCISE LIMIT'), findsOneWidget);
+      expect(
+        find.text(
+          "Your Plan 1 subscription isn't active. Meanwhile, your Free "
+          'plan includes 20 custom exercises.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'ejercicios propios, límite ajustado a mano: cuerpo genérico en '
+        'inglés', (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 45,
+        count: 45,
+      );
+
+      expect(
+        find.text(
+          'Your plan includes 45 custom exercises. You can edit or delete '
+          'the ones you already have.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('ejercicios propios, límite 1: singular ("1 custom exercise")',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 1,
+        count: 1,
+      );
+
+      expect(
+        find.text(
+          'Your plan includes 1 custom exercise. You can edit or delete '
+          'the ones you already have.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('plantillas, en el tope: título, cuerpo y tarjeta en inglés',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 3,
+      );
+
+      expect(find.text('TEMPLATE LIMIT'), findsOneWidget);
+      expect(
+        find.text(
+          'Your Free plan includes 3 templates. You can edit or archive '
+          'the ones you already have.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('/month'), findsOneWidget);
+      expect(find.text('Unlimited templates'), findsOneWidget);
+      expect(find.text('VIEW PLANS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+    });
+
+    testWidgets('plantillas, pasado de tope: cuerpo en inglés', (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 3,
+        count: 5,
+      );
+
+      expect(
+        find.text(
+          'You have 5 templates and your plan includes 3. You keep them '
+          'all; to create a new one, archive 3.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('plantillas, suscripción pausada: cuerpo en inglés',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.templates,
+        currentTier: SubscriptionTier.plan1,
+        subscriptionStatus: SubscriptionStatus.paused,
+        limit: 3,
+        count: 3,
+      );
+
+      expect(find.text('TEMPLATE LIMIT'), findsOneWidget);
+      expect(
+        find.text(
+          "Your Plan 1 subscription isn't active. Meanwhile, your Free "
+          'plan includes 3 templates.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('plantillas, límite ajustado a mano: cuerpo genérico en inglés',
+        (tester) async {
+      await mostrarEn(
+        tester,
+        kind: TrainerLimitKind.templates,
+        limit: 10,
+        count: 10,
+      );
+
+      expect(
+        find.text(
+          'Your plan includes 10 templates. You can edit or archive the '
+          'ones you already have.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    // Control: la WEB no se tradujo — sigue en castellano aunque el Locale
+    // sea inglés (convención vigente del Coach Hub: i18n Fase W3). Si este
+    // test se pusiera rojo, alguien tradujo la web sin querer.
+    testWidgets('control: en WEB con Locale(en) TODO sigue en español',
+        (tester) async {
+      await _mostrar(
+        tester,
+        kind: TrainerLimitKind.customExercises,
+        limit: 20,
+        count: 20,
+        form: TrainerLimitNoticeForm.dialog,
+        locale: const Locale('en'),
+      );
+
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      expect(
+        find.text(
+          'Tu plan Free incluye 20 ejercicios propios. Para sumar más, '
+          'subí de plan.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('/mes'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
+      expect(find.text('Ahora no'), findsOneWidget);
+      expect(find.text('CUSTOM EXERCISE LIMIT'), findsNothing);
+      expect(find.text('/month'), findsNothing);
     });
   });
 }

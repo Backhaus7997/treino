@@ -25,6 +25,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_checkout.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// iPhone 14/15 en puntos logicos.
 const _kMobileSize = Size(390, 844);
@@ -42,6 +43,9 @@ Widget _harness(
   SubscriptionStatus? subscriptionStatus,
   String? billingRoute,
   double textScale = 1.0,
+  // Default es_AR: mismo idioma que hoy hablan los strings hardcodeados de
+  // este paywall. Los tests de inglés lo pisan explícitamente.
+  Locale locale = const Locale('es', 'AR'),
 }) {
   final router = GoRouter(
     initialLocation: '/',
@@ -79,6 +83,12 @@ Widget _harness(
   );
   return MaterialApp.router(
     routerConfig: router,
+    // Sin esto, el `build` de `_PlanLimitPaywallContent` revienta con "Null
+    // check operator used on a null value" apenas toca AppL10n (mismo motivo
+    // que documenta `custom_exercise_limit_gate_test.dart`).
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    locale: locale,
     // `builder` envuelve al Navigator, asi que las rutas (y los popups que
     // cuelgan de el) heredan este MediaQuery. Es la unica forma de forzar el
     // textScaler sin pelearse con el `MediaQuery.fromView` de WidgetsApp.
@@ -697,6 +707,12 @@ void main() {
     late BuildContext contextAnidado;
 
     await tester.pumpWidget(MaterialApp(
+      // Sin esto, `_PlanLimitPaywallContent` revienta con "Null check
+      // operator used on a null value" apenas toca AppL10n — este harness es
+      // el único de este archivo que no pasa por `_harness()`.
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       navigatorObservers: [root],
       home: Navigator(
         observers: [anidado],
@@ -726,5 +742,218 @@ void main() {
       0,
       reason: 'el sheet quedo atrapado en el Navigator anidado',
     );
+  });
+
+  // ── Inglés (hallazgo Codex, PR #1266) ───────────────────────────────────
+  //
+  // El aviso de ALUMNOS nunca pasó por AppL10n — a diferencia de ejercicios
+  // propios/plantillas, acá no hay regresión de una rama anterior, sino un
+  // agujero de siempre: castellano hardcodeado en las dos superficies. Este
+  // grupo cubre TODOS los estados de la forma móvil en Locale('en'), para que
+  // los tres avisos queden parejos.
+  //
+  // Ojo: hoy `resolveLocale` (ADR-I18N-005) fuerza es_AR en producción, así
+  // que estos textos sólo se ven con un Locale explícito como el de acá.
+
+  group('móvil (sheet) — Locale(en)', () {
+    Future<void> abrirEn(
+      WidgetTester tester,
+      SubscriptionTier tier, {
+      PlanLimitReason reason = PlanLimitReason.planLimit,
+      SubscriptionStatus? status,
+    }) async {
+      await tester.pumpWidget(_harness(
+        tier,
+        reason: reason,
+        subscriptionStatus: status,
+        locale: const Locale('en'),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'upsell al siguiente tier: título, cuerpo, tarjeta y botones en '
+        'inglés', (tester) async {
+      await abrirEn(tester, SubscriptionTier.free);
+
+      expect(find.text('YOU REACHED YOUR PLAN LIMIT'), findsOneWidget);
+      expect(
+        find.text('Your Free plan includes 2 students.'),
+        findsOneWidget,
+      );
+      // La tarjeta del siguiente plan: nombre, precio, sufijo y beneficio.
+      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('12.000'), findsOneWidget);
+      expect(find.text('/month'), findsOneWidget);
+      expect(find.text('/mes'), findsNothing);
+      expect(find.text('Up to 7 students'), findsOneWidget);
+      expect(find.text('VIEW PLANS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.text('Entendido'), findsNothing);
+    });
+
+    testWidgets('desde Plan 2, el beneficio es "Unlimited students"',
+        (tester) async {
+      await abrirEn(tester, SubscriptionTier.plan2);
+
+      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('Unlimited students'), findsOneWidget);
+      expect(find.textContaining('null'), findsNothing);
+    });
+
+    testWidgets(
+        'plan a medida (tope real): cuerpo, caja, botón y SnackBar en inglés',
+        (tester) async {
+      await abrirEn(tester, SubscriptionTier.plan3);
+
+      expect(
+        find.text('Your Plan 3 plan includes unlimited students.'),
+        findsOneWidget,
+      );
+      expect(find.text('CUSTOM PLAN'), findsOneWidget);
+      expect(
+        find.text(
+          "You're on the largest plan. For more than 15 students, we're "
+          'preparing a custom plan for you.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('CONTACT US'), findsOneWidget);
+      expect(find.text('PLAN A MEDIDA'), findsNothing);
+      expect(find.text('CONTACTANOS'), findsNothing);
+
+      await tester.tap(find.text('CONTACT US'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text("Soon you'll be able to have more than 15 students."),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'suscripción suspendida: título, cuerpo, caja de estado y SnackBar en '
+        'inglés', (tester) async {
+      await abrirEn(
+        tester,
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        status: SubscriptionStatus.paused,
+      );
+
+      expect(find.text('YOUR SUBSCRIPTION IS SUSPENDED'), findsOneWidget);
+      expect(
+        find.text(
+          "While your subscription isn't up to date, your account works "
+          'with the Free plan limit. No student is removed.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('YOUR PLAN: PLAN 1'), findsOneWidget);
+      expect(
+        find.text(
+          "It isn't active. Meanwhile, your account has the Free plan "
+          'limit: 2 students.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Status: paused'), findsOneWidget);
+      expect(find.text('VIEW STATUS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+      expect(find.text('VER ESTADO'), findsNothing);
+
+      // VER ESTADO sin billingRoute avisa por SnackBar, y el aviso también
+      // sale de AppL10n.
+      await tester.tap(find.text('VIEW STATUS'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your subscription is paused.'), findsOneWidget);
+      expect(find.text('Tu suscripción está pausada.'), findsNothing);
+    });
+
+    // Los cinco estados de la caption «Estado: …» (`planLimitEstado*`): un
+    // `switch` exhaustivo sobre `SubscriptionStatus` que hay que ver entero,
+    // porque el test de arriba sólo ejercita `paused`.
+    const captionEn = {
+      SubscriptionStatus.active: 'Status: active',
+      SubscriptionStatus.pending: 'Status: payment pending',
+      SubscriptionStatus.grace: 'Status: payment past due',
+      SubscriptionStatus.paused: 'Status: paused',
+      SubscriptionStatus.cancelled: 'Status: cancelled',
+    };
+    const captionEs = {
+      SubscriptionStatus.active: 'Estado: activa',
+      SubscriptionStatus.pending: 'Estado: pendiente de pago',
+      SubscriptionStatus.grace: 'Estado: con pago pendiente',
+      SubscriptionStatus.paused: 'Estado: pausada',
+      SubscriptionStatus.cancelled: 'Estado: cancelada',
+    };
+    for (final status in SubscriptionStatus.values) {
+      testWidgets('caption de estado «${status.name}» en inglés',
+          (tester) async {
+        await abrirEn(
+          tester,
+          SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          status: status,
+        );
+        expect(find.text(captionEn[status]!), findsOneWidget);
+        expect(find.text(captionEs[status]!), findsNothing);
+      });
+
+      // El mismo estado en castellano — el castellano del móvil NO cambia.
+      testWidgets('caption de estado «${status.name}» en castellano',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          subscriptionStatus: status,
+        ));
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        expect(find.text(captionEs[status]!), findsOneWidget);
+        expect(find.text(captionEn[status]!), findsNothing);
+      });
+    }
+
+    testWidgets('el castellano del móvil NO cambió: VER ESTADO → SnackBar',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        subscriptionStatus: SubscriptionStatus.paused,
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('VER ESTADO'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tu suscripción está pausada.'), findsOneWidget);
+    });
+
+    // Control: la WEB no se tradujo — sigue en castellano aunque el Locale
+    // sea inglés (convención vigente del Coach Hub: i18n Fase W3). Si este
+    // test se pusiera rojo, alguien tradujo la web sin querer.
+    testWidgets('control: en WEB con Locale(en) TODO sigue en español',
+        (tester) async {
+      debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+      addTearDown(() => debugPlanLimitPaywallForm = null);
+
+      await abrirEn(tester, SubscriptionTier.free);
+
+      expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsOneWidget);
+      expect(
+        find.text(
+          'Tu plan Free incluye 2 alumnos. Para sumar más, subí de plan.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('/mes'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
+      expect(find.text('Ahora no'), findsOneWidget);
+      expect(find.text('YOU REACHED YOUR PLAN LIMIT'), findsNothing);
+      expect(find.text('/month'), findsNothing);
+    });
   });
 }
