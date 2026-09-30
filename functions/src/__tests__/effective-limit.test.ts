@@ -4,6 +4,7 @@
 
 import {
   effectiveWeightLimit,
+  suscripcionInactiva,
   SubscriptionState,
   SubscriptionStatus,
   SUBSCRIPTION_STATUSES,
@@ -237,6 +238,71 @@ describe("effectiveWeightLimit — el piso prepago", () => {
         { tier: "plan1", status: "active", ...patch }, NOW)).toBe(7);
     });
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// suscripcionInactiva — hallazgo de Codex sobre #1267 (P2 de esta ronda): el
+// piso prepago sostiene al PF en su plan pago aunque el `status` diga
+// `pending`/`paused`, así que "inactiva" no puede mirar sólo `status` — tiene
+// que comparar el tier EFECTIVO (con el piso) contra el NOMINAL. Ver el
+// docblock de la función para la definición completa.
+// ─────────────────────────────────────────────────────────────────────────
+describe("suscripcionInactiva — el piso prepago la sostiene en su plan", () => {
+  it("`paused` con piso vigente del MISMO plan no es inactiva — el efectivo no cayó", () => {
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "paused", { tier: "plan1", untilMs: NOW + 1 }),
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("`paused` con el piso VENCIDO sí es inactiva — el efectivo cayó a Free", () => {
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "paused", { tier: "plan1", untilMs: NOW - 1 }),
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
+  it("`paused` sin ningún piso sí es inactiva — mismo resultado que antes de este fix", () => {
+    expect(suscripcionInactiva(conPiso("plan1", "paused", null), NOW)).toBe(true);
+  });
+
+  it("`pending` con piso vigente de un plan MAYOR tampoco es inactiva", () => {
+    // El piso sostiene el efectivo en plan2, por ENCIMA del nominal (plan1) —
+    // el efectivo no cayó por debajo del nominal, así que sigue sin ser
+    // "inactiva" aunque el status diga `pending`.
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "pending", { tier: "plan2", untilMs: NOW + 1 }),
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("`cancelled` con período todavía vigente no es inactiva — conserva el nominal", () => {
+    expect(
+      suscripcionInactiva(conPiso("plan1", "cancelled", null, NOW + 1), NOW),
+    ).toBe(false);
+  });
+
+  it("`cancelled` ya vencido, sin piso, sí es inactiva", () => {
+    expect(
+      suscripcionInactiva(conPiso("plan1", "cancelled", null, NOW - 1), NOW),
+    ).toBe(true);
+  });
+
+  it("`active`/`grace` nunca son inactivas — el efectivo es el nominal por definición", () => {
+    expect(suscripcionInactiva(conPiso("plan2", "active", null), NOW)).toBe(false);
+    expect(suscripcionInactiva(conPiso("plan2", "grace", null), NOW)).toBe(false);
+  });
+
+  it("sin `subscription` (Free, nunca se suscribió) no es inactiva", () => {
+    expect(suscripcionInactiva(null, NOW)).toBe(false);
+    expect(suscripcionInactiva(undefined, NOW)).toBe(false);
+  });
 });
 
 describe("resolverPisoPrepago — que se conserva al cambiar de plan", () => {

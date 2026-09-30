@@ -35,7 +35,15 @@
  */
 
 import { App } from "firebase-admin/app";
-import { DocumentData, DocumentReference, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  DocumentReference,
+  FieldValue,
+  Firestore,
+  Timestamp,
+  Transaction,
+  getFirestore,
+} from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
@@ -97,7 +105,39 @@ export function promotionDenialReason(
   return limit < nominalLimit ? "subscription-inactive" : "plan-limit";
 }
 
-type LinkDoc = WeightedLink & { id: string; status: string };
+export type LinkDoc = WeightedLink & { id: string; status: string };
+
+/**
+ * Lee los `trainer_links` vivos de un PF DENTRO de la transacción dada — la
+ * MISMA query que usa el gate acá abajo, extraída para que
+ * `trainer-limit-mail.ts` pueda pedir la MISMA carga en vivo (hallazgo de
+ * Codex sobre #1267, P2) sin reimplementar el mapeo doc→WeightedLink ni el
+ * filtro/dedupe que ya vive en `computeWeightedLoad` — ver ese módulo, "POR
+ * QUÉ ALUMNOS NO USA `weightedLoad`".
+ *
+ * Exportada en vez de compartida por otro medio a propósito: este archivo
+ * documenta un orden de lecturas "load-bearing" (ver el encabezado, D-1), y
+ * una función que sólo LEE dentro de la `tx` que el llamador ya abrió no le
+ * agrega ningún paso nuevo a ese orden — el llamador decide cuándo invocarla.
+ */
+export async function readTrainerLinks(
+  tx: Transaction,
+  db: Firestore,
+  trainerId: string,
+): Promise<LinkDoc[]> {
+  const linksSnap = await tx.get(
+    db.collection("trainer_links").where("trainerId", "==", trainerId),
+  );
+  return linksSnap.docs.map((doc) => {
+    const data = doc.data() as DocumentData;
+    return {
+      id: doc.id,
+      athleteId: data.athleteId as string,
+      status: data.status as LinkDoc["status"],
+      entitlement: data.entitlement as WeightedLink["entitlement"],
+    };
+  });
+}
 
 export async function syncTrainerLoad(
   app: App,
@@ -147,9 +187,9 @@ export async function syncTrainerLoad(
     }
 
     // ── 3. Reads-before-writes: subscription + full live link set, parallel ──
-    const [trainerSnap, linksSnap] = await Promise.all([
+    const [trainerSnap, currentLinks] = await Promise.all([
       tx.get(db.collection("users").doc(trainerId)),
-      tx.get(db.collection("trainer_links").where("trainerId", "==", trainerId)),
+      readTrainerLinks(tx, db, trainerId),
     ]);
 
     if (!trainerSnap.exists) {
@@ -170,15 +210,6 @@ export async function syncTrainerLoad(
     const { state: sub } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, nowMs);
 
-    const currentLinks: LinkDoc[] = linksSnap.docs.map((doc) => {
-      const data = doc.data() as DocumentData;
-      return {
-        id: doc.id,
-        athleteId: data.athleteId as string,
-        status: data.status as LinkDoc["status"],
-        entitlement: data.entitlement as WeightedLink["entitlement"],
-      };
-    });
     const currentLoad = computeWeightedLoad(currentLinks as unknown as WeightedLink[]);
 
     // ── 4. Project (pure) — force the target link to 'active' unless it's

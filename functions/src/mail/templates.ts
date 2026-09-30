@@ -1154,6 +1154,48 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
     );
   }
 
+  // ── El PF que chocó el tope de alumnos de su plan ───────────────────────
+  //
+  // Hermano de `exercise-limit-reached`/`template-limit-reached`, con la
+  // MISMA regla de fondo, pero con un matiz propio: acá el rechazo pasa
+  // ANTES de que el vínculo se promueva (`syncTrainerLoad` en
+  // `promote-link.ts` frena el `accept`/`resume` en la transacción), así que
+  // no hay "los que ya tenía quedan en solo lectura" como en `limit-reached`
+  // — ese vínculo nunca se activó. Lo único que cambió es que ESE alumno en
+  // particular no pudo sumarse; los que ya estaban activos no pierden nada,
+  // ni siquiera de forma indirecta.
+  //
+  // NO PROMETE que el vínculo se resuelve solo. El PF tiene que volver a
+  // intentar `accept`/`resume` después de subir de plan — el mail no lo hace
+  // por él.
+  //
+  // CON `prefKey`: comunicación comercial, ver `trainer-limit-mail.ts`.
+  case "student-limit-reached": {
+    const limit = limitParam(params.limit);
+    const label = typeof limit === "number" ? cupoLabel(limit) : undefined;
+
+    return build(
+      "Llegaste al tope de alumnos de tu plan", // i18n: email comercial
+      "Llegaste al tope",
+      [
+        label
+          ? ["Llegaste al tope de tu plan: ", strong(label), "."]
+          : ["Llegaste al tope de alumnos de tu plan."],
+        [
+          // «Activar ese vínculo», no «sumar un alumno nuevo»: el mismo mail
+          // sale cuando se rechaza ACEPTAR una solicitud y cuando se rechaza
+          // REANUDAR un vínculo pausado, y en el segundo caso el alumno no es
+          // nuevo.
+          "No se pudo activar ese vínculo: tus alumnos actuales no " +
+            "pierden nada, conservan sus rutinas, su historial y el chat.",
+        ],
+        ["Si querés seguir sumando, hay planes más grandes."],
+      ],
+      "VER LOS PLANES",
+      ctaUrl,
+    );
+  }
+
   case "athlete-coverage-lost":
     return build(
       "Tu lugar en TREINO ya no está cubierto", // i18n: email comercial

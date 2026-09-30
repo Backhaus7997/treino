@@ -20,7 +20,12 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
-import { syncTrainerLoad } from "./promote-link";
+import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
+import {
+  esTopeDeAlumnos,
+  incrementoDeAlumnos,
+  registrarTopeDeAlumnos,
+} from "./trainer-limit-mail";
 
 function ensureApp(): App {
   try {
@@ -42,6 +47,12 @@ export interface ResumeTrainerLinkResult {
  * Pure handler. Throws the helper's typed `HttpsError` UNTOUCHED — the
  * `resource-exhausted` payload is the contract the Flutter client parses to
  * pick the paywall branch.
+ *
+ * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
+ * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
+ * `incrementoDeAlumnos`, + el `linkId` de ESTE intento) ACÁ, en el `catch` —
+ * mismo criterio que `acceptTrainerLink`, ver su docstring para el porqué.
+ * BEST-EFFORT: un fallo se loguea y el error original se relanza igual.
  */
 export async function runResumeTrainerLink(
   app: App,
@@ -52,9 +63,30 @@ export async function runResumeTrainerLink(
     throw new HttpsError("invalid-argument", "linkId is required.");
   }
 
-  const result = await syncTrainerLoad(app, {
-    promotion: { linkId, callerUid, expectedFromStatus: "paused" },
-  });
+  let result: SyncTrainerLoadResult;
+  try {
+    result = await syncTrainerLoad(app, {
+      promotion: { linkId, callerUid, expectedFromStatus: "paused" },
+    });
+  } catch (err) {
+    if (esTopeDeAlumnos(err)) {
+      try {
+        await registrarTopeDeAlumnos(
+          app,
+          callerUid,
+          Date.now(),
+          incrementoDeAlumnos(err),
+          linkId,
+        );
+      } catch (anotarErr) {
+        logger.error("resumeTrainerLink: no se pudo anotar el tope de alumnos", {
+          trainerId: callerUid,
+          err: anotarErr,
+        });
+      }
+    }
+    throw err;
+  }
 
   // Adoption metric (M.4), same event name as acceptTrainerLink: both are
   // counted against `link-promoted-observed` from the reconciliation trigger.

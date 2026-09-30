@@ -205,6 +205,62 @@ function limiteDelStatus(
 }
 
 /**
+ * Si el PF está en un estado donde el upsell de tope MENTIRÍA — hallazgo de
+ * Codex sobre #1267 (P1 de la ronda anterior, REDEFINIDO por el hallazgo P2
+ * de ÉSTA).
+ *
+ * ── LA DEFINICIÓN VIEJA, Y POR QUÉ SE ROMPÍA CON EL PISO PREPAGO ──
+ *
+ * Hasta acá esta función replicaba, puramente sobre `status`, la MISMA
+ * matriz de [limiteDelStatus] — sin mirar el PISO PREPAGO en absoluto. Un PF
+ * `pending`/`paused` con un piso prepago vigente (`prepaidTier`/
+ * `prepaidUntilMs`, ver [conPisoPrepago]) SIGUE en su plan pago para
+ * `effectiveWeightLimit`/[effectiveTier] — el piso es justamente lo que evita
+ * que pierda el remanente que ya pagó (ver [resolverPisoPrepago]). Esta
+ * función decía "inactiva" IGUAL, por mirar sólo `status`, y silenciaba el
+ * upsell de alguien que SÍ puede chocar —legítimamente— el tope de SU plan
+ * pago: un PF `paused` con un piso vigente de plan2 que llega a 15 alumnos
+ * merece el mismo "pasate a plan3" que uno `active`, no el silencio que la
+ * cláusula 4 reserva para quien de verdad tiene el pago atrasado.
+ *
+ * ── LA DEFINICIÓN NUEVA ──
+ *
+ * "Inactiva" = el tier EFECTIVO ([effectiveTier], que YA incluye el piso
+ * prepago) cayó por DEBAJO del tier NOMINAL de la suscripción (`sub.tier`,
+ * saneado por [tierNominal]). Si el piso alcanza para sostenerlo en su plan
+ * pago, el efectivo queda IGUAL al nominal y no es "inactiva" — el upsell
+ * sale. Si no hay piso, o venció, el efectivo cae (a Free, en casi todos los
+ * casos) y sigue siendo "inactiva".
+ *
+ * Deliberadamente USA [effectiveTier] en vez de re-implementar el switch de
+ * [tierDelStatus] a mano: acá la pregunta ("¿el piso lo sostiene en su plan?")
+ * es EXACTAMENTE la misma que ya resuelve `effectiveTier`, a diferencia de
+ * [limiteDelStatus]/[tierDelStatus] entre sí, que sí son dos preguntas puras
+ * DISTINTAS sobre la misma matriz de `status` (ver el docblock de
+ * `effectiveTier` para ese precedente, que sigue aplicando ahí sin cambios).
+ * Compara por RANGO (`tierLimit` + `limitRank`) y no por igualdad de string:
+ * el efectivo nunca puede ser MAYOR al nominal —el piso es un piso, nunca un
+ * techo, ver [conPisoPrepago]— así que "no cayó" y "es igual" son la misma
+ * pregunta.
+ *
+ * `sub == null` (sin mapa `subscription`) sigue sin ser "inactiva": es el PF
+ * Free que nunca se suscribió, y ESE sí es el destinatario correcto del
+ * upsell — no hay ningún cobro que recuperarle. Confundir los dos casos
+ * apagaría el upsell para toda la base Free, que es exactamente a quien está
+ * dirigido.
+ */
+export function suscripcionInactiva(
+  sub: SubscriptionState | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  if (!sub) return false;
+
+  const nominal = tierNominal(sub.tier);
+  const efectivo = effectiveTier(sub, nowMs);
+  return limitRank(tierLimit(efectivo)) < limitRank(tierLimit(nominal));
+}
+
+/**
  * Que PISO PREPAGO hay que dejar escrito cuando el reconciliador esta por
  * escribir [tierEntrante] encima de [actual].
  *

@@ -233,14 +233,23 @@ describe("alTocarElTope", () => {
     });
   });
 
-  // Nuevo (#1264, hallazgo P2 de Codex): el mismo PF choca los dos topes casi
+  // #1264 (P2 de Codex, primera vuelta): el mismo PF choca los dos topes casi
   // al mismo tiempo — dos escrituras de `users/{uid}` con `kind` distinto,
   // cada una disparando su propio `alTocarElTope`. Antes de la reserva
   // transaccional, las dos decidían sobre su propio snapshot y las dos
-  // encolaban (kinds distintos, la dedupe de la cola no las veía). Ahora las
-  // dos releen el mismo documento fresco dentro de una transacción, y
-  // Firestore las serializa.
-  it("⚠️ chocar los dos topes casi al mismo tiempo dispara UN solo mail", async () => {
+  // encolaban (kinds distintos, la dedupe de la cola no las veía).
+  //
+  // #1267 (P2 de Codex, segunda vuelta — el fix de arriba se pasó de
+  // frenada): la reserva transaccional relee `users/{uid}` FRESCO para
+  // decidir, y ANTES de este test —tal como estaba escrito— eso incluía
+  // adivinar el KIND del documento fresco. Con dos toques de kinds distintos
+  // casi juntos, el trigger del PRIMERO terminaba viendo el kind que el
+  // SEGUNDO ya había escrito, y el mail del primero se perdía: exactamente
+  // lo que esta aserción medía como "correcto" (UN solo mail) hasta ahora.
+  // Con `EventoTope` fijando el kind al snapshot que disparó cada trigger
+  // (ver el encabezado del módulo, "EL KIND... VIAJAN CON EL EVENTO"), cada
+  // uno decide sobre SU PROPIO tope: dos kinds distintos, dos mails.
+  it("⚠️ chocar DOS TOPES DISTINTOS casi al mismo tiempo dispara DOS mails, uno por kind", async () => {
     const base = {
       ...PERFIL,
       [CAMPO_TOPE_AT]: ts(AHORA),
@@ -249,9 +258,10 @@ describe("alTocarElTope", () => {
       templateUsage: { count: 3 },
     };
     // Lo que queda en Firestore es el ÚLTIMO de los dos toques en escribirse
-    // — acá "templates", sin que importe cuál: ninguna de las dos llamadas
-    // concurrentes puede ver un enfriamiento que la otra no haya escrito
-    // todavía, salvo que la transacción se lo muestre.
+    // — acá "templates", sin que importe cuál: cada `alTocarElTope` fija su
+    // propio kind desde `despues`, así que lo que haya de fresco en el
+    // documento no decide MÁS que la cláusula 3 y el enfriamiento de ESE
+    // kind puntual.
     usersStore["t1"] = { ...base, [CAMPO_TOPE_KIND]: "templates" };
     const despuesEjercicios = { ...base, [CAMPO_TOPE_KIND]: "customExercises" };
     const despuesPlantillas = usersStore["t1"];
@@ -259,6 +269,35 @@ describe("alTocarElTope", () => {
     const [a, b] = await Promise.all([
       alTocarElTope(APP, "t1", PERFIL, despuesEjercicios, AHORA),
       alTocarElTope(APP, "t1", PERFIL, despuesPlantillas, AHORA),
+    ]);
+
+    expect([a, b].filter((r) => r === "encolado")).toHaveLength(2);
+    expect(enqueueMock).toHaveBeenCalledTimes(2);
+    const kindsEnviados = enqueueMock.mock.calls.map((c) => c[1].kind).sort();
+    expect(kindsEnviados).toEqual(["exercise-limit-reached", "template-limit-reached"]);
+    const mailAt = usersStore["t1"]?.[CAMPO_MAIL_AT] as Record<string, unknown>;
+    expect(mailAt.customExercises).toBeDefined();
+    expect(mailAt.templates).toBeDefined();
+  });
+
+  it("⚠️ chocar el MISMO tope dos veces casi al mismo tiempo dispara UN solo mail", async () => {
+    // Control: dos triggers del MISMO kind, casi juntos (ej. un reintento del
+    // cliente). Acá SÍ tiene que ganar la reserva transaccional — la carrera
+    // que cierra la cláusula 4 (enfriamiento) dentro del MISMO kind, que
+    // "la carrera dentro del MISMO kind" ya cubre para `enqueueTrainerLimitMail`
+    // directo; esto lo confirma también pasando por `alTocarElTope`.
+    const despues = {
+      ...PERFIL,
+      [CAMPO_TOPE_AT]: ts(AHORA),
+      [CAMPO_TOPE_KIND]: "customExercises",
+      planLimits: { customExercises: 20 },
+      customExerciseUsage: { count: 20 },
+    };
+    usersStore["t1"] = despues;
+
+    const [a, b] = await Promise.all([
+      alTocarElTope(APP, "t1", PERFIL, despues, AHORA),
+      alTocarElTope(APP, "t1", PERFIL, despues, AHORA),
     ]);
 
     expect([a, b].filter((r) => r === "encolado")).toHaveLength(1);
