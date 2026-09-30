@@ -52,15 +52,17 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
  * domain makes every send return 403.
  */
 const MAIL_FROM = defineString("MAIL_FROM", {
-  // `equipo@` y no `soporte@` a proposito. El nombre del remitente es una
-  // promesa sobre quien esta del otro lado, y hoy NADIE lee las respuestas:
-  // `send.gettreino.com` no tiene buzon —su MX es el de rebotes de SES— y el
-  // payload que se le manda a Resend todavia no lleva `reply_to`.
+  // `treino@gettreino.com` es un BUZON REAL (Google Workspace): quien responde
+  // un mail de la app le escribe a alguien que lo lee. Antes salia de
+  // `equipo@send.gettreino.com`, un subdominio sin buzon —su MX es el de
+  // rebotes de SES— y cada respuesta se perdia.
   //
-  // `soporte@` es el peor nombre posible con esa deuda abierta: la persona que
-  // no puede entrar a su cuenta le responde pidiendo ayuda y nadie la lee.
-  // Cuanto mas explicita la promesa, mas caro incumplirla.
-  default: "TREINO <equipo@send.gettreino.com>",
+  // Requiere `gettreino.com` verificado en Resend (DKIM en
+  // `resend._domainkey.gettreino.com`); sin eso todo envio devuelve 403.
+  //
+  // Ojo: `functions/.env.treino-dev` define su propio MAIL_FROM y GANA sobre
+  // este default. Cambiar solo uno no cambia lo que sale en produccion.
+  default: "TREINO <treino@gettreino.com>",
 });
 
 /** Past this many attempts a document is declared permanently failed. */
