@@ -75,6 +75,11 @@ String? coachHubRedirect(
   final auth = read(authNotifierProvider);
 
   // Mientras carga auth no redirigimos — evita flicker.
+  //
+  // Ojo: este `return null` deja al router en `/dashboard`, y en un teléfono
+  // eso dibujaba el `MobileBanner`. `coachHubSessionResolvingProvider` espeja
+  // esta espera (y la del perfil, abajo) para que el scaffold ponga una vista
+  // de carga en su lugar: si cambiás cuándo se espera acá, cambialo allá.
   if (auth.isLoading || !auth.hasValue) return null;
 
   final user = auth.valueOrNull;
@@ -95,6 +100,7 @@ String? coachHubRedirect(
   // Authenticated → role gating
   if (loggedIn) {
     final profileAsync = read(userProfileProvider);
+    // Misma espera que `coachHubSessionResolvingProvider` (ver arriba).
     if (profileAsync.isLoading) return null;
     final profile = profileAsync.valueOrNull;
 

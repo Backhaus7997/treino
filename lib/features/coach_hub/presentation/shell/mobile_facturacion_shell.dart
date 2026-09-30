@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_brand_logo.dart';
 
 import 'navigator_semantics_boundary.dart';
 
@@ -67,6 +68,10 @@ class MobileFacturacionShell extends StatelessWidget {
   }
 }
 
+/// Alto del wordmark en el encabezado — el mismo que le da el sidebar de
+/// escritorio, para que la marca no cambie de tamaño entre las dos superficies.
+const double _kBrandLogoSize = 26;
+
 class _MobileFacturacionHeader extends StatelessWidget {
   const _MobileFacturacionHeader({required this.palette});
 
@@ -81,16 +86,11 @@ class _MobileFacturacionHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
       child: Row(
         children: [
-          Text(
-            'TREINO',
-            style: TextStyle(
-              fontFamily: AppFonts.barlowCondensed,
-              color: palette.highlight,
-              fontSize: AppTextSize.body,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 3,
-            ),
-          ),
+          // El wordmark oficial, no la palabra "TREINO" tipeada en Barlow
+          // Condensed. Mismo tamaño que en el sidebar de escritorio
+          // (`coach_hub_sidebar.dart`); el color se resuelve por tema, porque
+          // este shell se ve en claro u oscuro según el sistema.
+          const CoachHubBrandLogo(size: _kBrandLogoSize),
           const Spacer(),
           TreinoIconButton(
             icon: TreinoIcon.signOut,

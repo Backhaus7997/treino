@@ -8,7 +8,9 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/coach_hub/application/coach_hub_session_resolving_provider.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_resolving_view.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
@@ -21,10 +23,16 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 /// Monta el `CoachHubScaffold` dentro de un `ShellRoute`, con el `child`
 /// provisto por la ruta activa (como en producción, ADR-CHW-008). `prefs`
 /// siembra `shared_preferences` (eg. estado colapsado guardado).
+///
+/// [sessionResolving] fija `coachHubSessionResolvingProvider` — el scaffold
+/// sólo lo consulta en un teléfono, donde iría el `MobileBanner`. Se fija con
+/// un override y no con la cadena real de auth para que el test diga
+/// exactamente qué estado ve el scaffold.
 Future<void> _pumpScaffold(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
   bool mobileFacturacionAllowed = false,
+  bool sessionResolving = false,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -55,11 +63,14 @@ Future<void> _pumpScaffold(
         sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
         userProfileProvider
             .overrideWith((ref) => Stream<UserProfile?>.value(null)),
+        coachHubSessionResolvingProvider.overrideWithValue(sessionResolving),
       ],
       child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
     ),
   );
-  await tester.pumpAndSettle();
+  // La vista de carga tiene un indicador que anima para siempre:
+  // `pumpAndSettle` no vuelve. Un `pump` alcanza para montar el árbol.
+  await (sessionResolving ? tester.pump() : tester.pumpAndSettle());
 }
 
 /// Setea el viewport lógico (devicePixelRatio 1.0) y lo resetea en teardown.
@@ -139,6 +150,68 @@ void main() {
       expect(find.byType(CoachHubTopBar), findsNothing);
       expect(find.text('CONTENT_SLOT'), findsOneWidget);
     });
+
+    // El bug: mientras el router espera la sesión se queda en `/dashboard`, y
+    // en un teléfono eso dibujaba «Coach Hub en escritorio» un momento antes de
+    // mandar al PF a la pantalla de planes.
+    testWidgets(
+        'ancho 600 (mobile) + sesión resolviéndose → vista de carga, NO '
+        'MobileBanner', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, sessionResolving: true);
+
+      expect(find.byType(CoachHubResolvingView), findsOneWidget);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.text('Coach Hub en escritorio'), findsNothing);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+      expect(find.byType(CoachHubTopBar), findsNothing);
+      // La sección no se monta mientras no se sabe quién entró.
+      expect(find.text('CONTENT_SLOT'), findsNothing);
+    });
+
+    testWidgets(
+        'ancho 600 (mobile) + sesión resuelta → MobileBanner, sin vista de '
+        'carga', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, sessionResolving: false);
+
+      expect(find.byType(MobileBanner), findsOneWidget);
+      expect(find.byType(CoachHubResolvingView), findsNothing);
+    });
+
+    testWidgets(
+        'ancho 600 (mobile) + facturación + sesión resolviéndose → '
+        'MobileFacturacionShell: la excepción de facturación no se toca',
+        (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(
+        tester,
+        mobileFacturacionAllowed: true,
+        sessionResolving: true,
+      );
+
+      expect(find.byType(MobileFacturacionShell), findsOneWidget);
+      expect(find.byType(CoachHubResolvingView), findsNothing);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.text('CONTENT_SLOT'), findsOneWidget);
+    });
+
+    // Escritorio no cambia: la vista de carga es sólo para el teléfono.
+    for (final width in [900.0, 1400.0]) {
+      testWidgets(
+          'ancho ${width.toInt()} (${width < 1280 ? 'compact' : 'desktop'}) + '
+          'sesión resolviéndose → shell normal, sin vista de carga',
+          (tester) async {
+        _setWidth(tester, width);
+        await _pumpScaffold(tester, sessionResolving: true);
+
+        expect(find.byType(CoachHubSidebar), findsOneWidget);
+        expect(find.byType(CoachHubTopBar), findsOneWidget);
+        expect(find.text('CONTENT_SLOT'), findsOneWidget);
+        expect(find.byType(CoachHubResolvingView), findsNothing);
+        expect(find.byType(MobileBanner), findsNothing);
+      });
+    }
 
     testWidgets('ancho 900 (compact, banda tablet 768–1023) → sidebar a 72 px',
         (tester) async {

@@ -3,10 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/primitives.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/auth_failure.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_brand_logo.dart';
+
+/// Alto del wordmark sobre el título «COACH HUB» (32 px): 1,5× el título, para
+/// que la marca encabece y el nombre del producto no quede chico. El login
+/// móvil usa 56 sobre un titular de 28; acá el título es más grande.
+const double _kBrandLogoSize = 48;
 
 /// Login screen del Coach Hub web.
 ///
@@ -101,16 +108,13 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     Center(
                       child: Column(
                         children: [
-                          Text(
-                            'TREINO',
-                            style: GoogleFonts.barlowCondensed(
-                              color: palette.highlight,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
+                          // El wordmark oficial —el mismo de welcome, login y
+                          // register del móvil y del sidebar—, no la palabra
+                          // "TREINO" tipeada en Barlow Condensed. El color lo
+                          // resuelve por tema: esta pantalla se ve en claro u
+                          // oscuro según el sistema (ver [CoachHubBrandLogo]).
+                          const CoachHubBrandLogo(size: _kBrandLogoSize),
+                          const SizedBox(height: AppSpacing.s12),
                           Text(
                             'COACH HUB',
                             style: GoogleFonts.barlowCondensed(
