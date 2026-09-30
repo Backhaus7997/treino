@@ -155,6 +155,11 @@ recuperar todo lo pagado**, sin dar explicaciones y sin costo alguno. Si el
 último día del plazo cae en un día inhábil, el plazo se extiende hasta el
 primer día hábil siguiente.
 
+Cuando confirmás el arrepentimiento dentro de ese plazo, **los beneficios del
+plan pago terminan en ese momento** y se te devuelve todo lo pagado. Es la
+diferencia con la baja (sección 7), que conserva el acceso hasta el final del
+período ya pagado.
+
 Es el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos
 planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.
 
