@@ -132,6 +132,23 @@ void main() {
           text.contains('proximamente');
     }
 
+    // Eliminar la cuenta NO devuelve plata: es la baja (Términos §7), no el
+    // arrepentimiento (§6). El texto viejo decia «emite los reembolsos
+    // correspondientes» y nadie los emitia.
+    testWidgets('la zona peligrosa no promete reembolsos y explica la baja',
+        (tester) async {
+      final repo = _MockUserRepo();
+      await tester.pumpWidget(
+        _harness(profileStream: Stream.value(_trainer()), repo: repo),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('reembols'), findsNothing);
+      expect(find.textContaining('no devuelve el dinero'), findsOneWidget);
+      expect(find.textContaining('dá de baja tu plan desde Facturación'),
+          findsOneWidget);
+    });
+
     testWidgets(
         'tocar ELIMINAR CUENTA abre un TreinoDialog honesto (no ejecuta '
         'nada)', (tester) async {
