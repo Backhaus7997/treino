@@ -8175,65 +8175,255 @@ abstract class AppL10n {
   /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
   String get privacyAnalyticsCrashNote;
 
-  /// Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de ejercicios propios de su plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que paywallFreePlanLimitTitle.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tope de ejercicios propios'**
-  String get customExerciseLimitNoticeTitle;
-
-  /// Cuerpo del aviso cuando count == limit (E6: el borde es count < limit al crear, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart y superficie_de_cobro_alumno_test.dart lo cuidan.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Llegaste a los {limit} ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.'**
-  String customExerciseLimitReachedBody(int limit);
-
-  /// Cuerpo del aviso cuando count > limit (E3: bajar de plan congela la creacion, no borra nada). {toDelete} = count - limit + 1. La rama 'other' es literal la del plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos': 'borrá 21.') sin la palabra 'ejercicios' — la rama '=1' si la lleva ('borrá 1 ejercicio') porque un numero pelado ahi lee mal en castellano.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tenés {count} ejercicios propios y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, {toDelete, plural, =1{borrá 1 ejercicio} other{borrá {toDelete}}}.'**
-  String customExerciseLimitOverBody(int count, int limit, int toDelete);
-
-  /// CTA de cierre del aviso de tope de ejercicios propios en el movil. Mismo texto que paywallFreePlanLimitDismiss a proposito: misma accion, mismo verbo.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Entendido'**
-  String get customExerciseLimitDismiss;
-
-  /// CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site).
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Ver planes'**
-  String get trainerLimitNoticeVerPlanes;
-
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///
   /// In es_AR, this message translates to:
   /// **'{count} de {limit} ejercicios propios'**
   String customExerciseCounter(int count, int limit);
 
-  /// Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de plantillas de su plan (docs/limite-plantillas-pf.md PR3, 'El aviso'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que customExerciseLimitNoticeTitle.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tope de plantillas'**
-  String get templateLimitNoticeTitle;
-
-  /// Cuerpo del aviso cuando count == limit (P4: archivar libera el lugar; el borde de creacion es count < limit, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart lo cuida.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Llegaste a las {limit} plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.'**
-  String templateLimitReachedBody(int limit);
-
-  /// Cuerpo del aviso cuando count > limit (P5: bajar de plan congela la creacion, no borra ni desarchiva nada). {toArchive} = count - limit + 1. La rama '=1' lleva el numero para que no lea pelado en castellano.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tenés {count} plantillas y tu plan incluye {limit}. Conservás todas; para crear una nueva, {toArchive, plural, =1{archivá 1} other{archivá {toArchive}}}.'**
-  String templateLimitOverBody(int count, int limit, int toArchive);
-
   /// Contador visible en la grilla de rutinas del Hub y en la seccion de plantillas del movil (docs/limite-plantillas-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null.
   ///
   /// In es_AR, this message translates to:
   /// **'{count} de {limit} plantillas'**
   String templateCounter(int count, int limit);
+
+  /// CTA principal de los TRES avisos de tope del PF (alumnos, ejercicios propios, plantillas) en su forma MÓVIL: navega a /facturacion/planes, la pantalla informativa de precios (no compra nada — Guideline 3.1.3(f)). La WEB (Coach Hub) sigue con el string hardcodeado 'VER PLANES' a propósito (i18n Fase W3): no lo unifiques con esta clave.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER PLANES'**
+  String get planLimitVerPlanesMovil;
+
+  /// Link de descarte de los TRES avisos de tope del PF en su forma MÓVIL. 'Entendido' y no 'Ahora no' porque no presupone ninguna oferta (decisión del dueño, 2026-09-29). La WEB sigue diciendo 'Ahora no', hardcodeado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entendido'**
+  String get planLimitEntendido;
+
+  /// Sufijo del precio en la tarjeta del siguiente plan de los avisos de tope (alumnos, ejercicios propios, plantillas), forma MÓVIL. Lleva la barra porque va pegado al monto ($12.000/mes). La WEB sigue con '/mes' hardcodeado (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'/mes'**
+  String get planLimitPorMes;
+
+  /// Título de la caja 'plan a medida' de los avisos de tope, forma MÓVIL: aparece cuando el PF ya está en el plan más grande y no hay siguiente tier. En producción no se alcanza (el servidor nunca bloquea a un PF sin tope), pero está localizada igual: un texto que puede renderizarse no puede quedar en castellano en la forma en inglés. La WEB lo tiene hardcodeado (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN A MEDIDA'**
+  String get planLimitPlanAMedidaTitulo;
+
+  /// CTA del aviso de ALUMNOS cuando no hay siguiente tier, forma MÓVIL. Misma nota de inalcanzable que planLimitPlanAMedidaTitulo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONTACTANOS'**
+  String get planLimitContactanos;
+
+  /// Título del aviso de tope de ALUMNOS (paywall de bloqueo del PF), forma MÓVIL. La WEB sigue con el string hardcodeado idéntico — misma copy, dos fuentes a propósito (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LLEGASTE AL LÍMITE DE TU PLAN'**
+  String get planLimitAlumnosTituloTope;
+
+  /// Título del aviso de ALUMNOS cuando la suscripción del PF no está activa (PlanLimitReason.subscriptionInactive), forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'**
+  String get planLimitAlumnosTituloInactiva;
+
+  /// Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.'**
+  String get planLimitAlumnosCuerpoInactivaExplicacion;
+
+  /// Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier tiene cupo limitado. {plan} es el nombre del tier (tierName, no se traduce — ver plan_copy.dart).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 alumno} other{{limit} alumnos}}.'**
+  String planLimitAlumnosCuerpoTopeMovilLimitado(String plan, int limit);
+
+  /// Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier (Plan 3) no tiene cupo. En la práctica inalcanzable — Plan 3 es ilimitado y el servidor nunca bloquea a un PF sin tope — se mantiene por completitud, mismo criterio que PLAN A MEDIDA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye alumnos sin límite.'**
+  String planLimitAlumnosCuerpoTopeMovilIlimitado(String plan);
+
+  /// Cuerpo de la caja 'plan a medida' del aviso de ALUMNOS, forma MÓVIL. Inalcanzable en producción (ver planLimitPlanAMedidaTitulo). Es el texto hardcodeado de siempre, sin cambios: supone que el plan más grande topea en 15 alumnos, y desde que Plan 3 es ilimitado (kTierWeightLimits) eso ya no es así — revisar con producto antes de que esta caja pueda mostrarse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.'**
+  String get planLimitAlumnosPlanAMedidaCuerpo;
+
+  /// SnackBar que dispara CONTACTANOS en el aviso de ALUMNOS sin siguiente tier, forma MÓVIL (mock hasta que exista un canal de contacto). Inalcanzable en producción, misma nota que planLimitAlumnosPlanAMedidaCuerpo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy pronto vas a poder tener más de 15 alumnos.'**
+  String get planLimitAlumnosPlanAMedidaSnack;
+
+  /// Título de la caja de reactivación del aviso de ALUMNOS inactivo, forma MÓVIL. {plan} ya llega en mayúsculas (tierName(tier).toUpperCase()).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PLAN: {plan}'**
+  String planLimitReactivateTituloMovil(String plan);
+
+  /// Cuerpo de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — estado neutro, sin 'reactivá/regularizá/pagá' (Guideline 3.1.3(f)).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: {count, plural, =1{1 alumno} other{{count} alumnos}}.'**
+  String planLimitReactivateCuerpoMovil(int count);
+
+  /// CTA de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — describe lo que el botón hace (mostrar el SnackBar de estado), no lo que Apple prohíbe pedir. La WEB sigue diciendo 'REGULARIZAR', hardcodeado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER ESTADO'**
+  String get planLimitVerEstadoMovil;
+
+  /// Caption de estado dentro de la caja de reactivación, forma MÓVIL. {estado} sale de una de las cinco claves planLimitEstado*.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estado: {estado}'**
+  String planLimitReactivateEstadoMovil(String estado);
+
+  /// Nombre del SubscriptionStatus.active para la caption 'Estado: …' del aviso de ALUMNOS inactivo, forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'activa'**
+  String get planLimitEstadoActiva;
+
+  /// Nombre del SubscriptionStatus.pending, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'pendiente de pago'**
+  String get planLimitEstadoPendiente;
+
+  /// Nombre del SubscriptionStatus.grace (falló un cobro recurrente y Mercado Pago reintenta), misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'con pago pendiente'**
+  String get planLimitEstadoGracia;
+
+  /// Nombre del SubscriptionStatus.paused, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'pausada'**
+  String get planLimitEstadoPausada;
+
+  /// Nombre del SubscriptionStatus.cancelled, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'cancelada'**
+  String get planLimitEstadoCancelada;
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier tiene cupo limitado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 alumno} other{{limit} alumnos}}'**
+  String planLimitAlumnosBeneficioLimitado(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier no tiene tope.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alumnos sin límite'**
+  String get planLimitAlumnosBeneficioIlimitado;
+
+  /// SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva, forma MÓVIL (PlanCheckoutOnWebOnly — la única superficie de cobro en el móvil es informar el estado). Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción está pausada.'**
+  String get planLimitSuscripcionPausadaMovil;
+
+  /// Título del aviso de tope de EJERCICIOS PROPIOS del PF, forma MÓVIL. La WEB sigue con el string hardcodeado idéntico (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TOPE DE EJERCICIOS PROPIOS'**
+  String get planLimitTrainerTituloEjercicios;
+
+  /// Título del aviso de tope de PLANTILLAS del PF, forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TOPE DE PLANTILLAS'**
+  String get planLimitTrainerTituloPlantillas;
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. {toDelete} = count - limit + 1 (siempre >= 2 acá, porque count > limit): por eso 'borrá {toDelete}' va sin plural.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {count, plural, =1{1 ejercicio propio} other{{count} ejercicios propios}} y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, borrá {toDelete}.'**
+  String planLimitTrainerPasadoTopeEjercicios(
+      int count, int limit, int toDelete);
+
+  /// Cuerpo del aviso de PLANTILLAS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. Género femenino ('todas', 'una nueva', 'archivá') a diferencia de ejercicios. {toArchive} = count - limit + 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {count, plural, =1{1 plantilla} other{{count} plantillas}} y tu plan incluye {limit}. Conservás todas; para crear una nueva, archivá {toArchive}.'**
+  String planLimitTrainerPasadoTopePlantillas(
+      int count, int limit, int toArchive);
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS cuando la suscripción está inactiva (lo decide resolveNoticeTier.inactive; la regla completa está en el dartdoc de esa función), forma MÓVIL. {plan} es el nominal, {planEfectivo} el que realmente aplica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}.'**
+  String planLimitTrainerInactivaEjercicios(
+      String plan, String planEfectivo, int limit);
+
+  /// Igual que planLimitTrainerInactivaEjercicios, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}.'**
+  String planLimitTrainerInactivaPlantillas(
+      String plan, String planEfectivo, int limit);
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS en el tope, forma MÓVIL, cuando se pudo resolver un tier efectivo para nombrar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.'**
+  String planLimitTrainerTopeEjerciciosConTier(String plan, int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosConTier pero sin nombrar ningún tier — límite ajustado a mano sin match en la tabla, o propagación pendiente (AGENTS.md §11.1: no se afirma lo que no se sabe).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.'**
+  String planLimitTrainerTopeEjerciciosGenerico(int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosConTier, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.'**
+  String planLimitTrainerTopePlantillasConTier(String plan, int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosGenerico, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.'**
+  String planLimitTrainerTopePlantillasGenerico(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, con cupo limitado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}'**
+  String planLimitTrainerBeneficioEjerciciosLimitado(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, sin tope.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ejercicios propios sin límite'**
+  String get planLimitTrainerBeneficioEjerciciosIlimitado;
+
+  /// Igual que planLimitTrainerBeneficioEjerciciosLimitado, para PLANTILLAS. Con las tablas de hoy (sólo Free tiene tope de plantillas, y Free nunca es 'el siguiente') la rama no se alcanza; existe para cuando la tabla cambie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 plantilla} other{{limit} plantillas}}'**
+  String planLimitTrainerBeneficioPlantillasLimitado(int limit);
+
+  /// Igual que planLimitTrainerBeneficioEjerciciosIlimitado, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantillas sin límite'**
+  String get planLimitTrainerBeneficioPlantillasIlimitado;
+
+  /// Cuerpo de la caja 'plan a medida' de los avisos de EJERCICIOS PROPIOS y PLANTILLAS, forma MÓVIL. Inalcanzable con las tablas de hoy: para llegar acá el tier efectivo tendría que ser Plan 3, y Plan 3 no tiene un tope finito que resolveNoticeTier pueda matchear. Queda como red por si la tabla cambia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estás en el plan más grande. Estamos preparando un plan a tu medida.'**
+  String get planLimitTrainerPlanAMedidaCuerpo;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -78,6 +78,16 @@ const double _kNarrowBreakpoint = 820;
 /// Recuperarlo no puede ser otro cartel acá — tiene que salir **por fuera de la
 /// app** (un mail al PF con la suscripción vencida), que es lo único que Apple
 /// no gobierna. Eso todavía no existe.
+///
+/// ⚠️ **ACTUALIZACIÓN 2026-09-29: la CAJA también se sacó, no sólo el texto.**
+/// Vaciar estas constantes el 2026-09-15 dejó el widget que las dibuja
+/// (`_PlanCtaButton`, `_WhereToSubscribeNote`) parado igual: una pill con
+/// borde y sin letra en el slot del CTA, y un renglón vacío al pie de la
+/// pantalla. Nadie viola 3.1.1/3.1.3(f) por eso —no hay texto que sea un call
+/// to action—, pero es ruido visual que no dice nada y ocupa un lugar que
+/// antes tenía sentido. Ahora, cuando la constante que corresponde está vacía,
+/// esos dos widgets no dibujan nada (`SizedBox.shrink()`) en vez de la caja
+/// hueca.
 const String _kSubscribeElsewhereShort = ''; // i18n: Fase W3
 
 /// Ver [_kSubscribeElsewhereShort] — misma decisión, mismo motivo.
@@ -1111,6 +1121,7 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _PlanCtaButton(
+            key: ValueKey('plan_cta_${tier.name}'),
             tier: tier,
             annual: annual,
             isCurrent: isCurrent,
@@ -1315,6 +1326,7 @@ class _NarrowPlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           _PlanCtaButton(
+            key: ValueKey('plan_cta_${tier.name}'),
             tier: tier,
             annual: annual,
             isCurrent: isCurrent,
@@ -1440,6 +1452,7 @@ class _PopularBadge extends StatelessWidget {
 /// compra.
 class _PlanCtaButton extends StatelessWidget {
   const _PlanCtaButton({
+    super.key,
     required this.tier,
     required this.annual,
     required this.isCurrent,
@@ -1508,6 +1521,14 @@ class _PlanCtaButton extends StatelessWidget {
       // sellado, y es un punto de venta adentro de la app. Lo que lo ataja es
       // el test «el cartel de la app NO es tappable» del group «guard de
       // superficie»: si envolvés esto, se pone rojo.
+      // Desde el 2026-09-29 esto ya NO dibuja la caja cuando la constante
+      // está vacía: con `_kSubscribeElsewhereShort` en `''` la pill era un
+      // borde sin texto — ruido visual que no decía nada, en vez de "acá no
+      // hay nada que tocar". Si el día de mañana la decisión de producto se
+      // da vuelta y la constante vuelve a llevar texto, la caja reaparece
+      // sola. Ver el dartdoc de la constante para la decisión completa.
+      PlanCheckoutOnWebOnly() when _kSubscribeElsewhereShort.isEmpty =>
+        const SizedBox.shrink(),
       PlanCheckoutOnWebOnly() => _CtaBox(
           minHeight: minHeight,
           borderColor: palette.border,
@@ -1600,6 +1621,13 @@ class _WhereToSubscribeNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (checkout) {
         PlanCheckoutAvailable() => const SizedBox.shrink(),
+        // `_kSubscribeElsewhereLong` está vacía desde el 2026-09-15 (3.1.3f).
+        // Sin este chequeo, un `Text('')` igual reserva la altura de una
+        // línea más los 12px de `padding.bottom` — un hueco vacío al pie de
+        // la pantalla que no dice nada, mismo problema que tenía la pill del
+        // CTA (ver `_PlanCtaButton`).
+        PlanCheckoutOnWebOnly() when _kSubscribeElsewhereLong.isEmpty =>
+          const SizedBox.shrink(),
         PlanCheckoutOnWebOnly() => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(

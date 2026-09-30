@@ -111,9 +111,13 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      // El número es el límite REAL con el que bloqueó el gate, no la tabla
+      // estática del tier. Móvil: sin "para sumar más, subí de plan"
+      // (Guideline 3.1.3(f), decisión del dueño 2026-09-29).
       expect(
-        find.text('Llegaste a los 60 ejercicios propios de tu plan. Podés '
-            'editar o borrar los que ya tenés.'),
+        find.textContaining('incluye 60 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
         findsOneWidget,
       );
       expect(find.text('No pudimos guardar el ejercicio.'), findsNothing);

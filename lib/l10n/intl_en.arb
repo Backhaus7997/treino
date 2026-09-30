@@ -1973,38 +1973,6 @@
   "privacyAnalyticsSubtitle": "Helps us understand which parts of the app get used.",
   "privacyAnalyticsExplainer": "If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.",
   "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.",
-  "customExerciseLimitNoticeTitle": "Custom exercise limit",
-  "@customExerciseLimitNoticeTitle": {},
-  "customExerciseLimitReachedBody": "You reached the {limit} custom exercises included in your plan. You can edit or delete the ones you already have.",
-  "@customExerciseLimitReachedBody": {
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitOverBody": "You have {count} custom exercises and your plan includes {limit}. You keep them all; to create a new one, {toDelete, plural, =1{delete 1 exercise} other{delete {toDelete}}}.",
-  "@customExerciseLimitOverBody": {
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toDelete": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitDismiss": "Got it",
-  "@customExerciseLimitDismiss": {},
-  "trainerLimitNoticeVerPlanes": "View plans",
-  "@trainerLimitNoticeVerPlanes": {},
   "customExerciseCounter": "{count} of {limit} custom exercises",
   "@customExerciseCounter": {
     "placeholders": {
@@ -2013,34 +1981,6 @@
         "format": "decimalPattern"
       },
       "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitNoticeTitle": "Template limit",
-  "@templateLimitNoticeTitle": {},
-  "templateLimitReachedBody": "You reached the {limit} templates included in your plan. You can edit, assign, or archive one to make room.",
-  "@templateLimitReachedBody": {
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitOverBody": "You have {count} templates and your plan includes {limit}. You keep them all; to create a new one, {toArchive, plural, =1{archive 1} other{archive {toArchive}}}.",
-  "@templateLimitOverBody": {
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toArchive": {
         "type": "int",
         "format": "decimalPattern"
       }
@@ -2058,5 +1998,189 @@
         "format": "decimalPattern"
       }
     }
-  }
+  },
+  "planLimitVerPlanesMovil": "VIEW PLANS",
+  "planLimitEntendido": "Got it",
+  "planLimitPorMes": "/month",
+  "planLimitPlanAMedidaTitulo": "CUSTOM PLAN",
+  "planLimitContactanos": "CONTACT US",
+  "planLimitAlumnosTituloTope": "YOU REACHED YOUR PLAN LIMIT",
+  "planLimitAlumnosTituloInactiva": "YOUR SUBSCRIPTION IS SUSPENDED",
+  "planLimitAlumnosCuerpoInactivaExplicacion": "While your subscription isn't up to date, your account works with the Free plan limit. No student is removed.",
+  "planLimitAlumnosCuerpoTopeMovilLimitado": "Your {plan} plan includes {limit, plural, =1{1 student} other{{limit} students}}.",
+  "@planLimitAlumnosCuerpoTopeMovilLimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosCuerpoTopeMovilIlimitado": "Your {plan} plan includes unlimited students.",
+  "@planLimitAlumnosCuerpoTopeMovilIlimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitAlumnosPlanAMedidaCuerpo": "You're on the largest plan. For more than 15 students, we're preparing a custom plan for you.",
+  "planLimitAlumnosPlanAMedidaSnack": "Soon you'll be able to have more than 15 students.",
+  "planLimitReactivateTituloMovil": "YOUR PLAN: {plan}",
+  "@planLimitReactivateTituloMovil": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitReactivateCuerpoMovil": "It isn't active. Meanwhile, your account has the Free plan limit: {count, plural, =1{1 student} other{{count} students}}.",
+  "@planLimitReactivateCuerpoMovil": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitVerEstadoMovil": "VIEW STATUS",
+  "planLimitReactivateEstadoMovil": "Status: {estado}",
+  "@planLimitReactivateEstadoMovil": {
+    "placeholders": {
+      "estado": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitEstadoActiva": "active",
+  "planLimitEstadoPendiente": "payment pending",
+  "planLimitEstadoGracia": "payment past due",
+  "planLimitEstadoPausada": "paused",
+  "planLimitEstadoCancelada": "cancelled",
+  "planLimitAlumnosBeneficioLimitado": "Up to {limit, plural, =1{1 student} other{{limit} students}}",
+  "@planLimitAlumnosBeneficioLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosBeneficioIlimitado": "Unlimited students",
+  "planLimitSuscripcionPausadaMovil": "Your subscription is paused.",
+  "planLimitTrainerTituloEjercicios": "CUSTOM EXERCISE LIMIT",
+  "planLimitTrainerTituloPlantillas": "TEMPLATE LIMIT",
+  "planLimitTrainerPasadoTopeEjercicios": "You have {count, plural, =1{1 custom exercise} other{{count} custom exercises}} and your plan includes {limit}. You keep them all; to create a new one, delete {toDelete}.",
+  "@planLimitTrainerPasadoTopeEjercicios": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toDelete": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerPasadoTopePlantillas": "You have {count, plural, =1{1 template} other{{count} templates}} and your plan includes {limit}. You keep them all; to create a new one, archive {toArchive}.",
+  "@planLimitTrainerPasadoTopePlantillas": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toArchive": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaEjercicios": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}.",
+  "@planLimitTrainerInactivaEjercicios": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaPlantillas": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 template} other{{limit} templates}}.",
+  "@planLimitTrainerInactivaPlantillas": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosConTier": "Your {plan} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosGenerico": "Your plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasConTier": "Your {plan} plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasGenerico": "Your plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosLimitado": "Up to {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}",
+  "@planLimitTrainerBeneficioEjerciciosLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosIlimitado": "Unlimited custom exercises",
+  "planLimitTrainerBeneficioPlantillasLimitado": "Up to {limit, plural, =1{1 template} other{{limit} templates}}",
+  "@planLimitTrainerBeneficioPlantillasLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioPlantillasIlimitado": "Unlimited templates",
+  "planLimitTrainerPlanAMedidaCuerpo": "You're on the largest plan. We're preparing a custom plan for you."
 }

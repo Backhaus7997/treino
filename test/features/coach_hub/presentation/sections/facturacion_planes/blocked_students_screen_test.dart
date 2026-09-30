@@ -26,6 +26,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 UserProfile _trainer({TrainerSubscription? subscription}) => UserProfile(
       uid: 'pf1',
@@ -113,7 +114,16 @@ Widget _harness({
         userPublicProfilesBatchProvider(key)
             .overrideWith((ref) async => profiles),
     ],
-    child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      // Sin esto, el paywall que dispara el CTA revienta con "Null check
+      // operator used on a null value" apenas su forma móvil toca AppL10n
+      // (mismo motivo que documenta `custom_exercise_limit_gate_test.dart`).
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
+      routerConfig: router,
+    ),
   );
 }
 

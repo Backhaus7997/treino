@@ -737,6 +737,39 @@ void main() {
       }
     });
 
+    // Hasta el 2026-09-29 el slot del CTA en móvil dibujaba una pill vacía
+    // (borde + sin texto, `_kSubscribeElsewhereShort == ''`): ruido visual
+    // que no decía nada. Ahora esas tarjetas no dibujan NADA ahí — sin caja,
+    // sin espacio reservado. `TU PLAN ACTUAL` y `GRATIS` (Free, la tarjeta
+    // actual por default) se quedan.
+    testWidgets(
+        'en móvil, una tarjeta de plan no actual no tiene CTA (sin caja)',
+        (tester) async {
+      await pump(tester, _kMobileSize);
+
+      // Free es el tier actual por default de `_trainer()`: su pill sigue
+      // ahí ("GRATIS"), con tamaño real.
+      final free = tester.getSize(find.byKey(const ValueKey('plan_cta_free')));
+      expect(free.height, greaterThan(0),
+          reason: 'la tarjeta actual (Free) perdió su pill "GRATIS"');
+
+      // Plan 1 / 2 / 3: no son el actual y cobran — antes dibujaban la pill
+      // vacía, ahora no dibujan nada.
+      for (final tier in [
+        SubscriptionTier.plan1,
+        SubscriptionTier.plan2,
+        SubscriptionTier.plan3,
+      ]) {
+        final size =
+            tester.getSize(find.byKey(ValueKey('plan_cta_${tier.name}')));
+        expect(
+          size,
+          Size.zero,
+          reason: '$tier todavía reserva espacio para un CTA en móvil',
+        );
+      }
+    });
+
     // El caso que hace que el guard NO pueda ser el breakpoint: una tablet
     // Android a 900pt entra por el layout ANCHO y sigue siendo la app.
     //

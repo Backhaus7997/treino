@@ -4732,45 +4732,6 @@ class AppL10nEs extends AppL10n {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
-
-  @override
-  String customExerciseLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
-  }
-
-  @override
-  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toDeleteNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toDelete,
-      locale: localeName,
-      other: 'borrá $toDeleteString',
-      one: 'borrá 1 ejercicio',
-    );
-    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
-  }
-
-  @override
-  String get customExerciseLimitDismiss => 'Entendido';
-
-  @override
-  String get trainerLimitNoticeVerPlanes => 'Ver planes';
-
-  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -4780,39 +4741,6 @@ class AppL10nEs extends AppL10n {
     final String limitString = limitNumberFormat.format(limit);
 
     return '$countString de $limitString ejercicios propios';
-  }
-
-  @override
-  String get templateLimitNoticeTitle => 'Tope de plantillas';
-
-  @override
-  String templateLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
-  }
-
-  @override
-  String templateLimitOverBody(int count, int limit, int toArchive) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toArchiveNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toArchive,
-      locale: localeName,
-      other: 'archivá $toArchiveString',
-      one: 'archivá 1',
-    );
-    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
   }
 
   @override
@@ -4826,6 +4754,243 @@ class AppL10nEs extends AppL10n {
 
     return '$countString de $limitString plantillas';
   }
+
+  @override
+  String get planLimitVerPlanesMovil => 'VER PLANES';
+
+  @override
+  String get planLimitEntendido => 'Entendido';
+
+  @override
+  String get planLimitPorMes => '/mes';
+
+  @override
+  String get planLimitPlanAMedidaTitulo => 'PLAN A MEDIDA';
+
+  @override
+  String get planLimitContactanos => 'CONTACTANOS';
+
+  @override
+  String get planLimitAlumnosTituloTope => 'LLEGASTE AL LÍMITE DE TU PLAN';
+
+  @override
+  String get planLimitAlumnosTituloInactiva => 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
+
+  @override
+  String get planLimitAlumnosCuerpoInactivaExplicacion =>
+      'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.';
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilLimitado(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit alumnos',
+      one: '1 alumno',
+    );
+    return 'Tu plan $plan incluye $_temp0.';
+  }
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilIlimitado(String plan) {
+    return 'Tu plan $plan incluye alumnos sin límite.';
+  }
+
+  @override
+  String get planLimitAlumnosPlanAMedidaCuerpo =>
+      'Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.';
+
+  @override
+  String get planLimitAlumnosPlanAMedidaSnack =>
+      'Muy pronto vas a poder tener más de 15 alumnos.';
+
+  @override
+  String planLimitReactivateTituloMovil(String plan) {
+    return 'TU PLAN: $plan';
+  }
+
+  @override
+  String planLimitReactivateCuerpoMovil(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count alumnos',
+      one: '1 alumno',
+    );
+    return 'No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: $_temp0.';
+  }
+
+  @override
+  String get planLimitVerEstadoMovil => 'VER ESTADO';
+
+  @override
+  String planLimitReactivateEstadoMovil(String estado) {
+    return 'Estado: $estado';
+  }
+
+  @override
+  String get planLimitEstadoActiva => 'activa';
+
+  @override
+  String get planLimitEstadoPendiente => 'pendiente de pago';
+
+  @override
+  String get planLimitEstadoGracia => 'con pago pendiente';
+
+  @override
+  String get planLimitEstadoPausada => 'pausada';
+
+  @override
+  String get planLimitEstadoCancelada => 'cancelada';
+
+  @override
+  String planLimitAlumnosBeneficioLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit alumnos',
+      one: '1 alumno',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitAlumnosBeneficioIlimitado => 'Alumnos sin límite';
+
+  @override
+  String get planLimitSuscripcionPausadaMovil => 'Tu suscripción está pausada.';
+
+  @override
+  String get planLimitTrainerTituloEjercicios => 'TOPE DE EJERCICIOS PROPIOS';
+
+  @override
+  String get planLimitTrainerTituloPlantillas => 'TOPE DE PLANTILLAS';
+
+  @override
+  String planLimitTrainerPasadoTopeEjercicios(
+      int count, int limit, int toDelete) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tenés $_temp0 y tu plan incluye $limit. Conservás todos; para crear uno nuevo, borrá $toDelete.';
+  }
+
+  @override
+  String planLimitTrainerPasadoTopePlantillas(
+      int count, int limit, int toArchive) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tenés $_temp0 y tu plan incluye $limit. Conservás todas; para crear una nueva, archivá $toArchive.';
+  }
+
+  @override
+  String planLimitTrainerInactivaEjercicios(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu suscripción a $plan no está activa. Mientras tanto, tu plan $planEfectivo incluye $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerInactivaPlantillas(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu suscripción a $plan no está activa. Mientras tanto, tu plan $planEfectivo incluye $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu plan $plan incluye $_temp0. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu plan incluye $_temp0. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu plan $plan incluye $_temp0. Podés editar o archivar las que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu plan incluye $_temp0. Podés editar o archivar las que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerBeneficioEjerciciosLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioEjerciciosIlimitado =>
+      'Ejercicios propios sin límite';
+
+  @override
+  String planLimitTrainerBeneficioPlantillasLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioPlantillasIlimitado =>
+      'Plantillas sin límite';
+
+  @override
+  String get planLimitTrainerPlanAMedidaCuerpo =>
+      'Estás en el plan más grande. Estamos preparando un plan a tu medida.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -9553,45 +9718,6 @@ class AppL10nEsAr extends AppL10nEs {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get customExerciseLimitNoticeTitle => 'Tope de ejercicios propios';
-
-  @override
-  String customExerciseLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a los $limitString ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.';
-  }
-
-  @override
-  String customExerciseLimitOverBody(int count, int limit, int toDelete) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toDeleteNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toDeleteString = toDeleteNumberFormat.format(toDelete);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toDelete,
-      locale: localeName,
-      other: 'borrá $toDeleteString',
-      one: 'borrá 1 ejercicio',
-    );
-    return 'Tenés $countString ejercicios propios y tu plan incluye $limitString. Conservás todos; para crear uno nuevo, $_temp0.';
-  }
-
-  @override
-  String get customExerciseLimitDismiss => 'Entendido';
-
-  @override
-  String get trainerLimitNoticeVerPlanes => 'Ver planes';
-
-  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -9601,39 +9727,6 @@ class AppL10nEsAr extends AppL10nEs {
     final String limitString = limitNumberFormat.format(limit);
 
     return '$countString de $limitString ejercicios propios';
-  }
-
-  @override
-  String get templateLimitNoticeTitle => 'Tope de plantillas';
-
-  @override
-  String templateLimitReachedBody(int limit) {
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-
-    return 'Llegaste a las $limitString plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.';
-  }
-
-  @override
-  String templateLimitOverBody(int count, int limit, int toArchive) {
-    final intl.NumberFormat countNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String countString = countNumberFormat.format(count);
-    final intl.NumberFormat limitNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String limitString = limitNumberFormat.format(limit);
-    final intl.NumberFormat toArchiveNumberFormat =
-        intl.NumberFormat.decimalPattern(localeName);
-    final String toArchiveString = toArchiveNumberFormat.format(toArchive);
-
-    String _temp0 = intl.Intl.pluralLogic(
-      toArchive,
-      locale: localeName,
-      other: 'archivá $toArchiveString',
-      one: 'archivá 1',
-    );
-    return 'Tenés $countString plantillas y tu plan incluye $limitString. Conservás todas; para crear una nueva, $_temp0.';
   }
 
   @override
@@ -9647,4 +9740,241 @@ class AppL10nEsAr extends AppL10nEs {
 
     return '$countString de $limitString plantillas';
   }
+
+  @override
+  String get planLimitVerPlanesMovil => 'VER PLANES';
+
+  @override
+  String get planLimitEntendido => 'Entendido';
+
+  @override
+  String get planLimitPorMes => '/mes';
+
+  @override
+  String get planLimitPlanAMedidaTitulo => 'PLAN A MEDIDA';
+
+  @override
+  String get planLimitContactanos => 'CONTACTANOS';
+
+  @override
+  String get planLimitAlumnosTituloTope => 'LLEGASTE AL LÍMITE DE TU PLAN';
+
+  @override
+  String get planLimitAlumnosTituloInactiva => 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
+
+  @override
+  String get planLimitAlumnosCuerpoInactivaExplicacion =>
+      'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.';
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilLimitado(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit alumnos',
+      one: '1 alumno',
+    );
+    return 'Tu plan $plan incluye $_temp0.';
+  }
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilIlimitado(String plan) {
+    return 'Tu plan $plan incluye alumnos sin límite.';
+  }
+
+  @override
+  String get planLimitAlumnosPlanAMedidaCuerpo =>
+      'Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.';
+
+  @override
+  String get planLimitAlumnosPlanAMedidaSnack =>
+      'Muy pronto vas a poder tener más de 15 alumnos.';
+
+  @override
+  String planLimitReactivateTituloMovil(String plan) {
+    return 'TU PLAN: $plan';
+  }
+
+  @override
+  String planLimitReactivateCuerpoMovil(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count alumnos',
+      one: '1 alumno',
+    );
+    return 'No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: $_temp0.';
+  }
+
+  @override
+  String get planLimitVerEstadoMovil => 'VER ESTADO';
+
+  @override
+  String planLimitReactivateEstadoMovil(String estado) {
+    return 'Estado: $estado';
+  }
+
+  @override
+  String get planLimitEstadoActiva => 'activa';
+
+  @override
+  String get planLimitEstadoPendiente => 'pendiente de pago';
+
+  @override
+  String get planLimitEstadoGracia => 'con pago pendiente';
+
+  @override
+  String get planLimitEstadoPausada => 'pausada';
+
+  @override
+  String get planLimitEstadoCancelada => 'cancelada';
+
+  @override
+  String planLimitAlumnosBeneficioLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit alumnos',
+      one: '1 alumno',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitAlumnosBeneficioIlimitado => 'Alumnos sin límite';
+
+  @override
+  String get planLimitSuscripcionPausadaMovil => 'Tu suscripción está pausada.';
+
+  @override
+  String get planLimitTrainerTituloEjercicios => 'TOPE DE EJERCICIOS PROPIOS';
+
+  @override
+  String get planLimitTrainerTituloPlantillas => 'TOPE DE PLANTILLAS';
+
+  @override
+  String planLimitTrainerPasadoTopeEjercicios(
+      int count, int limit, int toDelete) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tenés $_temp0 y tu plan incluye $limit. Conservás todos; para crear uno nuevo, borrá $toDelete.';
+  }
+
+  @override
+  String planLimitTrainerPasadoTopePlantillas(
+      int count, int limit, int toArchive) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tenés $_temp0 y tu plan incluye $limit. Conservás todas; para crear una nueva, archivá $toArchive.';
+  }
+
+  @override
+  String planLimitTrainerInactivaEjercicios(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu suscripción a $plan no está activa. Mientras tanto, tu plan $planEfectivo incluye $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerInactivaPlantillas(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu suscripción a $plan no está activa. Mientras tanto, tu plan $planEfectivo incluye $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu plan $plan incluye $_temp0. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Tu plan incluye $_temp0. Podés editar o borrar los que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu plan $plan incluye $_temp0. Podés editar o archivar las que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Tu plan incluye $_temp0. Podés editar o archivar las que ya tenés.';
+  }
+
+  @override
+  String planLimitTrainerBeneficioEjerciciosLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit ejercicios propios',
+      one: '1 ejercicio propio',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioEjerciciosIlimitado =>
+      'Ejercicios propios sin límite';
+
+  @override
+  String planLimitTrainerBeneficioPlantillasLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit plantillas',
+      one: '1 plantilla',
+    );
+    return 'Hasta $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioPlantillasIlimitado =>
+      'Plantillas sin límite';
+
+  @override
+  String get planLimitTrainerPlanAMedidaCuerpo =>
+      'Estás en el plan más grande. Estamos preparando un plan a tu medida.';
 }

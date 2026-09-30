@@ -69,7 +69,7 @@ van por separado (ver Estado).
 | E5 | **El plan se resuelve igual que el tope de alumnos** | `active`/`grace` da el plan; `cancelled` da el plan hasta `currentPeriodEnd`; `pending`/`paused` da Free; y el piso prepago del #1203 sube el plan. Alumnos y ejercicios no pueden discrepar sobre el plan de alguien |
 | E6 | **El borde es `count < limit` al crear** | Con límite 60 se pueden tener 60. El create que deja el contador en 60 pasa; el siguiente no |
 | E7 | **Una ráfaga fabricada puede pasarse, y no se borra nada** | Ver §6. El tope de videos borra el excedente porque son bytes; un ejercicio es contenido que el PF armó |
-| E8 | **En la web se vende; en el teléfono sólo se informa** | 3.1.3(f). En el móvil, el mensaje dice el estado y suma un botón VER PLANES a la pantalla informativa de precios y cupos (sin nombrar dónde se paga, precedente `plan_limit_paywall.dart` #1141); la salida real para pagar sigue siendo un mail |
+| E8 | **En la web se vende; en el teléfono sólo se informa** | 3.1.3(f). Los tres avisos de tope del PF (alumnos, ejercicios propios, plantillas) comparten estilo (`plan_limit_shared.dart`): candado, tarjeta del siguiente plan, VER PLANES. En el móvil el cuerpo dice el estado y la tarjeta muestra el plan como información — sin verbo de compra («subí de plan», «pasate», «reactivá»…), no sólo sin nombrar dónde se paga (decisión del dueño, 2026-09-29). La salida real para pagar sigue siendo un mail |
 
 ---
 
@@ -330,21 +330,45 @@ mismo embudo.
 - Un `permission-denied` en el create de un PF muestra **el mismo aviso**, no el
   error genérico. Pasa si el contador se adelantó o si hubo una carrera.
 
-**Los avisos:**
+**Los avisos** (unificados con el paywall de alumnos desde el 2026-09-29 —
+`plan_limit_shared.dart`: mismo candado, misma caja de upsell con precio,
+mismo botón VER PLANES, mismo link de descarte en los tres avisos del PF):
 
-- **Móvil, estado + VER PLANES:**
-  - En el tope: «Llegaste a los 60 ejercicios propios de tu plan. Podés editar o
-    borrar los que ya tenés.»
+- **El plan que el aviso NOMBRA es el EFECTIVO, no el nominal a ciegas.** El
+  `limit` que bloqueó ya lo calculó el servidor con el tier efectivo (piso
+  prepago, suscripción no activa); nombrar el nominal ahí puede afirmar un
+  plan que no explica el número (`resolveNoticeTier` en
+  `trainer_limit_notice.dart`). Si el efectivo es MENOR que el nominal **Y**
+  el estado de la suscripción no está al día (`pending`/`paused`, o
+  `cancelled` ya vencida), el aviso lo dice y no ofrece upsell — no tiene
+  sentido subir a quien ya pagó más. **El estado solo no alcanza**: un
+  `paused`/`pending` con un piso prepago vigente CONSERVA el plan pago (el
+  `limit` que bloqueó es el del plan nominal), y ahí el aviso es el normal de
+  ese plan — decirle «tu suscripción no está activa» sería falso. Con el
+  estado al día y el `limit` por debajo del nominal (propagación pendiente)
+  el cuerpo es genérico. Si el `limit` no coincide con ningún tier conocido
+  (tope ajustado a mano), el cuerpo es genérico, sin nombrar un plan.
+- **Móvil — estado, nunca un llamado a comprar** (Guideline 3.1.3(f),
+  decisión del dueño 2026-09-29):
+  - En el tope: «Tu plan Free incluye 20 ejercicios propios. Podés editar o
+    borrar los que ya tenés.» La tarjeta del siguiente plan muestra su
+    NOMBRE, precio y beneficio como información — sin «PASATE A».
   - Pasado de tope: «Tenés 80 ejercicios propios y tu plan incluye 60.
-    Conservás todos; para crear uno nuevo, borrá 21.»
+    Conservás todos; para crear uno nuevo, borrá 21.» (sin cambios: ya era
+    neutro).
   - Botón **VER PLANES** que navega a `/facturacion/planes` (misma pantalla
-    informativa que la web, sin comprar). **Sin nombrar «web», sin «mail», sin
-    «pasá a un plan».** Correr `anti_steering_movil_test.dart` y
-    `superficie_de_cobro_alumno_test.dart`. Si alguno se pone rojo, se cambia el
-    texto, no el guard.
-- **Web:**
-  - En el tope: «Tu plan incluye 60 ejercicios propios y ya tenés 60.» con botón
-    **VER PLANES** a facturación.
+    informativa que la web, sin comprar) y link de descarte **«Entendido»**
+    (no «Ahora no»: no presupone una oferta). **Sin nombrar «web», sin
+    «mail», sin verbo de compra** («subí de plan», «pasate», «reactivá»,
+    «regularizá», …). Guard dedicado:
+    `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`, además de
+    `anti_steering_movil_test.dart` y `superficie_de_cobro_alumno_test.dart`
+    (cuidan el eje de DÓNDE se paga, no si se llama a pagar). Si alguno se
+    pone rojo, se cambia el texto, no el guard.
+- **Web — upsell completo:**
+  - En el tope: «Tu plan Free incluye 20 ejercicios propios. Para sumar más,
+    subí de plan.» con la tarjeta **«PASATE A PLAN 1»** (precio y beneficio)
+    y botón VER PLANES.
   - Pasado de tope: el mismo texto de conservación que en el móvil, más el
     botón.
 

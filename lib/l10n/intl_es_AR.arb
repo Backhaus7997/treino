@@ -4190,46 +4190,6 @@
   "@privacyAnalyticsCrashNote": {
     "description": "Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue."
   },
-  "customExerciseLimitNoticeTitle": "Tope de ejercicios propios",
-  "@customExerciseLimitNoticeTitle": {
-    "description": "Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de ejercicios propios de su plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que paywallFreePlanLimitTitle."
-  },
-  "customExerciseLimitReachedBody": "Llegaste a los {limit} ejercicios propios de tu plan. Podés editar o borrar los que ya tenés.",
-  "@customExerciseLimitReachedBody": {
-    "description": "Cuerpo del aviso cuando count == limit (E6: el borde es count < limit al crear, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart y superficie_de_cobro_alumno_test.dart lo cuidan.",
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitOverBody": "Tenés {count} ejercicios propios y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, {toDelete, plural, =1{borrá 1 ejercicio} other{borrá {toDelete}}}.",
-  "@customExerciseLimitOverBody": {
-    "description": "Cuerpo del aviso cuando count > limit (E3: bajar de plan congela la creacion, no borra nada). {toDelete} = count - limit + 1. La rama 'other' es literal la del plan (docs/limite-ejercicios-pf.md PR3, 'Los avisos': 'borrá 21.') sin la palabra 'ejercicios' — la rama '=1' si la lleva ('borrá 1 ejercicio') porque un numero pelado ahi lee mal en castellano.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toDelete": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "customExerciseLimitDismiss": "Entendido",
-  "@customExerciseLimitDismiss": {
-    "description": "CTA de cierre del aviso de tope de ejercicios propios en el movil. Mismo texto que paywallFreePlanLimitDismiss a proposito: misma accion, mismo verbo."
-  },
-  "trainerLimitNoticeVerPlanes": "Ver planes",
-  "@trainerLimitNoticeVerPlanes": {
-    "description": "CTA del aviso de tope del PF (ejercicios propios y plantillas) en el movil: navega a /facturacion/planes, la misma pantalla informativa de precios y cupos que ya viaja en el binario sin vender (precedente: showPlanLimitPaywall, #1141). Compartido entre los dos kind a proposito, igual que customExerciseLimitDismiss. Se muestra en mayusculas (.toUpperCase() en el call site)."
-  },
   "customExerciseCounter": "{count} de {limit} ejercicios propios",
   "@customExerciseCounter": {
     "description": "Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.",
@@ -4239,38 +4199,6 @@
         "format": "decimalPattern"
       },
       "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitNoticeTitle": "Tope de plantillas",
-  "@templateLimitNoticeTitle": {
-    "description": "Titulo del aviso de solo-estado que ve el PF en el movil cuando choca el tope de plantillas de su plan (docs/limite-plantillas-pf.md PR3, 'El aviso'). Se muestra en mayusculas (.toUpperCase() en el call site), igual que customExerciseLimitNoticeTitle."
-  },
-  "templateLimitReachedBody": "Llegaste a las {limit} plantillas de tu plan. Podés editarlas, asignarlas o archivar una para hacer lugar.",
-  "@templateLimitReachedBody": {
-    "description": "Cuerpo del aviso cuando count == limit (P4: archivar libera el lugar; el borde de creacion es count < limit, asi que count == limit YA bloquea). No ofrece boton ni nombra 'web'/'mail'/'pasa a un plan' — anti_steering_movil_test.dart lo cuida.",
-    "placeholders": {
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      }
-    }
-  },
-  "templateLimitOverBody": "Tenés {count} plantillas y tu plan incluye {limit}. Conservás todas; para crear una nueva, {toArchive, plural, =1{archivá 1} other{archivá {toArchive}}}.",
-  "@templateLimitOverBody": {
-    "description": "Cuerpo del aviso cuando count > limit (P5: bajar de plan congela la creacion, no borra ni desarchiva nada). {toArchive} = count - limit + 1. La rama '=1' lleva el numero para que no lea pelado en castellano.",
-    "placeholders": {
-      "count": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "limit": {
-        "type": "int",
-        "format": "decimalPattern"
-      },
-      "toArchive": {
         "type": "int",
         "format": "decimalPattern"
       }
@@ -4289,5 +4217,274 @@
         "format": "decimalPattern"
       }
     }
+  },
+  "planLimitVerPlanesMovil": "VER PLANES",
+  "@planLimitVerPlanesMovil": {
+    "description": "CTA principal de los TRES avisos de tope del PF (alumnos, ejercicios propios, plantillas) en su forma MÓVIL: navega a /facturacion/planes, la pantalla informativa de precios (no compra nada — Guideline 3.1.3(f)). La WEB (Coach Hub) sigue con el string hardcodeado 'VER PLANES' a propósito (i18n Fase W3): no lo unifiques con esta clave."
+  },
+  "planLimitEntendido": "Entendido",
+  "@planLimitEntendido": {
+    "description": "Link de descarte de los TRES avisos de tope del PF en su forma MÓVIL. 'Entendido' y no 'Ahora no' porque no presupone ninguna oferta (decisión del dueño, 2026-09-29). La WEB sigue diciendo 'Ahora no', hardcodeado."
+  },
+  "planLimitPorMes": "/mes",
+  "@planLimitPorMes": {
+    "description": "Sufijo del precio en la tarjeta del siguiente plan de los avisos de tope (alumnos, ejercicios propios, plantillas), forma MÓVIL. Lleva la barra porque va pegado al monto ($12.000/mes). La WEB sigue con '/mes' hardcodeado (i18n Fase W3)."
+  },
+  "planLimitPlanAMedidaTitulo": "PLAN A MEDIDA",
+  "@planLimitPlanAMedidaTitulo": {
+    "description": "Título de la caja 'plan a medida' de los avisos de tope, forma MÓVIL: aparece cuando el PF ya está en el plan más grande y no hay siguiente tier. En producción no se alcanza (el servidor nunca bloquea a un PF sin tope), pero está localizada igual: un texto que puede renderizarse no puede quedar en castellano en la forma en inglés. La WEB lo tiene hardcodeado (i18n Fase W3)."
+  },
+  "planLimitContactanos": "CONTACTANOS",
+  "@planLimitContactanos": {
+    "description": "CTA del aviso de ALUMNOS cuando no hay siguiente tier, forma MÓVIL. Misma nota de inalcanzable que planLimitPlanAMedidaTitulo."
+  },
+  "planLimitAlumnosTituloTope": "LLEGASTE AL LÍMITE DE TU PLAN",
+  "@planLimitAlumnosTituloTope": {
+    "description": "Título del aviso de tope de ALUMNOS (paywall de bloqueo del PF), forma MÓVIL. La WEB sigue con el string hardcodeado idéntico — misma copy, dos fuentes a propósito (i18n Fase W3)."
+  },
+  "planLimitAlumnosTituloInactiva": "TU SUSCRIPCIÓN ESTÁ SUSPENDIDA",
+  "@planLimitAlumnosTituloInactiva": {
+    "description": "Título del aviso de ALUMNOS cuando la suscripción del PF no está activa (PlanLimitReason.subscriptionInactive), forma MÓVIL."
+  },
+  "planLimitAlumnosCuerpoInactivaExplicacion": "Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.",
+  "@planLimitAlumnosCuerpoInactivaExplicacion": {
+    "description": "Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés."
+  },
+  "planLimitAlumnosCuerpoTopeMovilLimitado": "Tu plan {plan} incluye {limit, plural, =1{1 alumno} other{{limit} alumnos}}.",
+  "@planLimitAlumnosCuerpoTopeMovilLimitado": {
+    "description": "Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier tiene cupo limitado. {plan} es el nombre del tier (tierName, no se traduce — ver plan_copy.dart).",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosCuerpoTopeMovilIlimitado": "Tu plan {plan} incluye alumnos sin límite.",
+  "@planLimitAlumnosCuerpoTopeMovilIlimitado": {
+    "description": "Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier (Plan 3) no tiene cupo. En la práctica inalcanzable — Plan 3 es ilimitado y el servidor nunca bloquea a un PF sin tope — se mantiene por completitud, mismo criterio que PLAN A MEDIDA.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitAlumnosPlanAMedidaCuerpo": "Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.",
+  "@planLimitAlumnosPlanAMedidaCuerpo": {
+    "description": "Cuerpo de la caja 'plan a medida' del aviso de ALUMNOS, forma MÓVIL. Inalcanzable en producción (ver planLimitPlanAMedidaTitulo). Es el texto hardcodeado de siempre, sin cambios: supone que el plan más grande topea en 15 alumnos, y desde que Plan 3 es ilimitado (kTierWeightLimits) eso ya no es así — revisar con producto antes de que esta caja pueda mostrarse."
+  },
+  "planLimitAlumnosPlanAMedidaSnack": "Muy pronto vas a poder tener más de 15 alumnos.",
+  "@planLimitAlumnosPlanAMedidaSnack": {
+    "description": "SnackBar que dispara CONTACTANOS en el aviso de ALUMNOS sin siguiente tier, forma MÓVIL (mock hasta que exista un canal de contacto). Inalcanzable en producción, misma nota que planLimitAlumnosPlanAMedidaCuerpo."
+  },
+  "planLimitReactivateTituloMovil": "TU PLAN: {plan}",
+  "@planLimitReactivateTituloMovil": {
+    "description": "Título de la caja de reactivación del aviso de ALUMNOS inactivo, forma MÓVIL. {plan} ya llega en mayúsculas (tierName(tier).toUpperCase()).",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitReactivateCuerpoMovil": "No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: {count, plural, =1{1 alumno} other{{count} alumnos}}.",
+  "@planLimitReactivateCuerpoMovil": {
+    "description": "Cuerpo de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — estado neutro, sin 'reactivá/regularizá/pagá' (Guideline 3.1.3(f)).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitVerEstadoMovil": "VER ESTADO",
+  "@planLimitVerEstadoMovil": {
+    "description": "CTA de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — describe lo que el botón hace (mostrar el SnackBar de estado), no lo que Apple prohíbe pedir. La WEB sigue diciendo 'REGULARIZAR', hardcodeado."
+  },
+  "planLimitReactivateEstadoMovil": "Estado: {estado}",
+  "@planLimitReactivateEstadoMovil": {
+    "description": "Caption de estado dentro de la caja de reactivación, forma MÓVIL. {estado} sale de una de las cinco claves planLimitEstado*.",
+    "placeholders": {
+      "estado": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitEstadoActiva": "activa",
+  "@planLimitEstadoActiva": {
+    "description": "Nombre del SubscriptionStatus.active para la caption 'Estado: …' del aviso de ALUMNOS inactivo, forma MÓVIL."
+  },
+  "planLimitEstadoPendiente": "pendiente de pago",
+  "@planLimitEstadoPendiente": {
+    "description": "Nombre del SubscriptionStatus.pending, misma caption."
+  },
+  "planLimitEstadoGracia": "con pago pendiente",
+  "@planLimitEstadoGracia": {
+    "description": "Nombre del SubscriptionStatus.grace (falló un cobro recurrente y Mercado Pago reintenta), misma caption."
+  },
+  "planLimitEstadoPausada": "pausada",
+  "@planLimitEstadoPausada": {
+    "description": "Nombre del SubscriptionStatus.paused, misma caption."
+  },
+  "planLimitEstadoCancelada": "cancelada",
+  "@planLimitEstadoCancelada": {
+    "description": "Nombre del SubscriptionStatus.cancelled, misma caption."
+  },
+  "planLimitAlumnosBeneficioLimitado": "Hasta {limit, plural, =1{1 alumno} other{{limit} alumnos}}",
+  "@planLimitAlumnosBeneficioLimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier tiene cupo limitado.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosBeneficioIlimitado": "Alumnos sin límite",
+  "@planLimitAlumnosBeneficioIlimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier no tiene tope."
+  },
+  "planLimitSuscripcionPausadaMovil": "Tu suscripción está pausada.",
+  "@planLimitSuscripcionPausadaMovil": {
+    "description": "SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva, forma MÓVIL (PlanCheckoutOnWebOnly — la única superficie de cobro en el móvil es informar el estado). Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart."
+  },
+  "planLimitTrainerTituloEjercicios": "TOPE DE EJERCICIOS PROPIOS",
+  "@planLimitTrainerTituloEjercicios": {
+    "description": "Título del aviso de tope de EJERCICIOS PROPIOS del PF, forma MÓVIL. La WEB sigue con el string hardcodeado idéntico (i18n Fase W3)."
+  },
+  "planLimitTrainerTituloPlantillas": "TOPE DE PLANTILLAS",
+  "@planLimitTrainerTituloPlantillas": {
+    "description": "Título del aviso de tope de PLANTILLAS del PF, forma MÓVIL."
+  },
+  "planLimitTrainerPasadoTopeEjercicios": "Tenés {count, plural, =1{1 ejercicio propio} other{{count} ejercicios propios}} y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, borrá {toDelete}.",
+  "@planLimitTrainerPasadoTopeEjercicios": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. {toDelete} = count - limit + 1 (siempre >= 2 acá, porque count > limit): por eso 'borrá {toDelete}' va sin plural.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toDelete": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerPasadoTopePlantillas": "Tenés {count, plural, =1{1 plantilla} other{{count} plantillas}} y tu plan incluye {limit}. Conservás todas; para crear una nueva, archivá {toArchive}.",
+  "@planLimitTrainerPasadoTopePlantillas": {
+    "description": "Cuerpo del aviso de PLANTILLAS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. Género femenino ('todas', 'una nueva', 'archivá') a diferencia de ejercicios. {toArchive} = count - limit + 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toArchive": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaEjercicios": "Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}.",
+  "@planLimitTrainerInactivaEjercicios": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS cuando la suscripción está inactiva (lo decide resolveNoticeTier.inactive; la regla completa está en el dartdoc de esa función), forma MÓVIL. {plan} es el nominal, {planEfectivo} el que realmente aplica.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaPlantillas": "Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}.",
+  "@planLimitTrainerInactivaPlantillas": {
+    "description": "Igual que planLimitTrainerInactivaEjercicios, para PLANTILLAS.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosConTier": "Tu plan {plan} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.",
+  "@planLimitTrainerTopeEjerciciosConTier": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS en el tope, forma MÓVIL, cuando se pudo resolver un tier efectivo para nombrar.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosGenerico": "Tu plan incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.",
+  "@planLimitTrainerTopeEjerciciosGenerico": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosConTier pero sin nombrar ningún tier — límite ajustado a mano sin match en la tabla, o propagación pendiente (AGENTS.md §11.1: no se afirma lo que no se sabe).",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasConTier": "Tu plan {plan} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.",
+  "@planLimitTrainerTopePlantillasConTier": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosConTier, para PLANTILLAS.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasGenerico": "Tu plan incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.",
+  "@planLimitTrainerTopePlantillasGenerico": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosGenerico, para PLANTILLAS.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosLimitado": "Hasta {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}",
+  "@planLimitTrainerBeneficioEjerciciosLimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, con cupo limitado.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosIlimitado": "Ejercicios propios sin límite",
+  "@planLimitTrainerBeneficioEjerciciosIlimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, sin tope."
+  },
+  "planLimitTrainerBeneficioPlantillasLimitado": "Hasta {limit, plural, =1{1 plantilla} other{{limit} plantillas}}",
+  "@planLimitTrainerBeneficioPlantillasLimitado": {
+    "description": "Igual que planLimitTrainerBeneficioEjerciciosLimitado, para PLANTILLAS. Con las tablas de hoy (sólo Free tiene tope de plantillas, y Free nunca es 'el siguiente') la rama no se alcanza; existe para cuando la tabla cambie.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioPlantillasIlimitado": "Plantillas sin límite",
+  "@planLimitTrainerBeneficioPlantillasIlimitado": {
+    "description": "Igual que planLimitTrainerBeneficioEjerciciosIlimitado, para PLANTILLAS."
+  },
+  "planLimitTrainerPlanAMedidaCuerpo": "Estás en el plan más grande. Estamos preparando un plan a tu medida.",
+  "@planLimitTrainerPlanAMedidaCuerpo": {
+    "description": "Cuerpo de la caja 'plan a medida' de los avisos de EJERCICIOS PROPIOS y PLANTILLAS, forma MÓVIL. Inalcanzable con las tablas de hoy: para llegar acá el tier efectivo tendría que ser Plan 3, y Plan 3 no tiene un tope finito que resolveNoticeTier pueda matchear. Queda como red por si la tabla cambia."
   }
 }

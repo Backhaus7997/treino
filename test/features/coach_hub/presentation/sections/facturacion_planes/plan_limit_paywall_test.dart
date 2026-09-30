@@ -1,13 +1,21 @@
-// El paywall tiene DOS formas con el MISMO contenido: dialog centrado en web
-// (Coach Hub, app de escritorio con sidebar) y bottom sheet en movil.
+// El paywall tiene DOS formas: dialog centrado en web (Coach Hub, app de
+// escritorio con sidebar) y bottom sheet en movil.
 //
-// OJO al leer los tests de contenido de mas abajo: `kIsWeb` es una constante de
+// Hasta el 2026-09-15 el CONTENIDO era el mismo en las dos. Desde la decisión
+// del dueño del 2026-09-29 ya no lo es del todo: mismo esqueleto (candado,
+// tarjeta de precio, "VER PLANES") en las dos, pero el llamado a comprar
+// —"PASATE A X", "subí de plan", "REGULARIZAR", "Ahora no"— sólo vive en la
+// WEB. La Guideline 3.1.3(f) prohíbe esos calls to action DENTRO del binario
+// móvil. Ver `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart` para el
+// guard dedicado a esa regla.
+//
+// OJO al leer los tests de mas abajo: `kIsWeb` es una constante de
 // COMPILACION y bajo `flutter test` (VM de Dart) vale `false` SIEMPRE. Sin
-// override, entonces, la forma efectiva en todos estos tests es el SHEET. Los
-// tests de copy que ya existian no cambiaron una linea, pero ahora corren
-// contra la envoltura movil — que es exactamente lo que se quiere: el contenido
-// no depende de la forma. La rama dialog se prueba fijando
-// `debugPlanLimitPaywallForm`, el unico seam honesto que hay para eso.
+// override, entonces, la forma efectiva en todos estos tests es el SHEET
+// (móvil) — de ahí que la mayoría de los tests de copy de este archivo
+// esperen el texto NEUTRO. La rama dialog (web, con el llamado a comprar) se
+// prueba fijando `debugPlanLimitPaywallForm`, el unico seam honesto que hay
+// para eso.
 
 import 'dart:async';
 
@@ -17,6 +25,7 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_checkout.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// iPhone 14/15 en puntos logicos.
 const _kMobileSize = Size(390, 844);
@@ -34,6 +43,9 @@ Widget _harness(
   SubscriptionStatus? subscriptionStatus,
   String? billingRoute,
   double textScale = 1.0,
+  // Default es_AR: mismo idioma que hoy hablan los strings hardcodeados de
+  // este paywall. Los tests de inglés lo pisan explícitamente.
+  Locale locale = const Locale('es', 'AR'),
 }) {
   final router = GoRouter(
     initialLocation: '/',
@@ -71,6 +83,12 @@ Widget _harness(
   );
   return MaterialApp.router(
     routerConfig: router,
+    // Sin esto, el `build` de `_PlanLimitPaywallContent` revienta con "Null
+    // check operator used on a null value" apenas toca AppL10n (mismo motivo
+    // que documenta `custom_exercise_limit_gate_test.dart`).
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    locale: locale,
     // `builder` envuelve al Navigator, asi que las rutas (y los popups que
     // cuelgan de el) heredan este MediaQuery. Es la unica forma de forzar el
     // textScaler sin pelearse con el `MediaQuery.fromView` de WidgetsApp.
@@ -101,11 +119,18 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  // Sin override de forma: bajo `flutter test`, `kIsWeb` es `false`, así que
+  // `open()` renderiza la forma MÓVIL — de ahí que estos tests vean el
+  // encabezado del upsell SIN "PASATE A" (decisión del dueño, 2026-09-29:
+  // 3.1.3(f), el móvil no vende). El equivalente WEB vive en el grupo
+  // "el contenido comparte precio y beneficio, diverge en el CTA" más abajo.
+
   testWidgets('desde Free → upsell a Plan 1 con su precio', (tester) async {
     await open(tester, SubscriptionTier.free);
 
     expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsOneWidget);
-    expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+    expect(find.text('PLAN 1'), findsOneWidget);
+    expect(find.textContaining('PASATE A'), findsNothing);
     expect(find.text('12.000'), findsOneWidget); // precio Plan 1
     expect(find.text('Hasta 7 alumnos'), findsOneWidget);
     expect(find.text('VER PLANES'), findsOneWidget);
@@ -114,7 +139,7 @@ void main() {
   testWidgets('desde Plan 1 → upsell a Plan 2', (tester) async {
     await open(tester, SubscriptionTier.plan1);
 
-    expect(find.text('PASATE A PLAN 2'), findsOneWidget);
+    expect(find.text('PLAN 2'), findsOneWidget);
     expect(find.text('22.000'), findsOneWidget); // precio Plan 2
     expect(find.text('Hasta 15 alumnos'), findsOneWidget);
   });
@@ -124,7 +149,7 @@ void main() {
     // salida para el PF que MAS paga. Con plan3 ya tiene a donde ir.
     await open(tester, SubscriptionTier.plan2);
 
-    expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+    expect(find.text('PLAN 3'), findsOneWidget);
     expect(find.text('39.000'), findsOneWidget);
     expect(find.text('PLAN A MEDIDA'), findsNothing);
   });
@@ -149,10 +174,12 @@ void main() {
     expect(find.text('PRICING'), findsOneWidget);
   });
 
-  testWidgets('"Ahora no" cierra el modal', (tester) async {
+  testWidgets('"Entendido" cierra el modal', (tester) async {
+    // Móvil: "Entendido", no "Ahora no" — no presupone ninguna oferta
+    // (decisión del dueño, 2026-09-29).
     await open(tester, SubscriptionTier.free);
 
-    await tester.tap(find.text('Ahora no'));
+    await tester.tap(find.text('Entendido'));
     await tester.pumpAndSettle();
 
     expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
@@ -171,13 +198,23 @@ void main() {
   testWidgets('el upsell a Plan 3 no dice «null»', (tester) async {
     await open(tester, SubscriptionTier.plan2);
 
-    expect(find.text('PASATE A PLAN 3'), findsOneWidget);
+    expect(find.text('PLAN 3'), findsOneWidget);
     expect(find.text('Alumnos sin límite'), findsOneWidget);
     expect(find.textContaining('null'), findsNothing);
   });
 
-  testWidgets('el aviso de suscripción suspendida en Plan 3 no dice «null»',
+  testWidgets(
+      'el aviso de suscripción suspendida en Plan 3 no dice «null» (web)',
       (tester) async {
+    // Web a propósito: el body de `_ReactivateBox` sólo interpola
+    // `cupoTexto(currentTier)` —el que puede dar «sin límite»— en la rama
+    // WEB. La rama móvil usa `cupoTexto(SubscriptionTier.free)`, que nunca
+    // es ilimitado, así que ahí «sin límite» ya no es el texto esperado; el
+    // barrido de abajo ("NINGUNA rama... no dice null") sigue cubriendo el
+    // móvil para CUALQUIER tier.
+    debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+    addTearDown(() => debugPlanLimitPaywallForm = null);
+
     await tester.pumpWidget(_harness(
       SubscriptionTier.plan3,
       reason: PlanLimitReason.subscriptionInactive,
@@ -205,7 +242,8 @@ void main() {
           reason: 'el paywall renderiza «null» con tier=$tier reason=$reason',
         );
 
-        await tester.tap(find.text('Ahora no'));
+        // Sin override de forma ⇒ móvil bajo flutter test ⇒ "Entendido".
+        await tester.tap(find.text('Entendido'));
         await tester.pumpAndSettle();
       }
     }
@@ -233,11 +271,15 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('subscription-inactive → regularizar, sin upsell ni precio',
+  testWidgets('subscription-inactive → VER ESTADO, sin upsell ni precio',
       (tester) async {
+    // Móvil: "VER ESTADO", no "REGULARIZAR" — un verbo de pago viola
+    // 3.1.3(f) (decisión del dueño, 2026-09-29). El botón sigue mostrando el
+    // estado por SnackBar al tocarlo, ver los tests de abajo.
     await openInactive(tester, SubscriptionTier.plan1);
 
-    expect(find.text('REGULARIZAR'), findsOneWidget);
+    expect(find.text('VER ESTADO'), findsOneWidget);
+    expect(find.text('REGULARIZAR'), findsNothing);
     // Nada de upsell: no se le vende un plan a quien ya pagó uno.
     expect(find.textContaining('PASATE A'), findsNothing);
     // Sin precio-héroe — el precio no es la pregunta acá.
@@ -252,7 +294,7 @@ void main() {
     // manda sobre `currentTier`.
     await openInactive(tester, SubscriptionTier.plan2);
 
-    expect(find.text('REGULARIZAR'), findsOneWidget);
+    expect(find.text('VER ESTADO'), findsOneWidget);
     expect(find.text('PLAN A MEDIDA'), findsNothing);
     expect(find.text('CONTACTANOS'), findsNothing);
   });
@@ -262,7 +304,7 @@ void main() {
   // moria contra una ruta inexistente: el mensaje era correcto y el boton no
   // hacia nada. Ahora la ruta es explicita y su ausencia se explica.
 
-  testWidgets('REGULARIZAR sin billingRoute avisa en vez de navegar',
+  testWidgets('VER ESTADO sin billingRoute avisa en vez de navegar',
       (tester) async {
     await tester.pumpWidget(_harness(
       SubscriptionTier.plan1,
@@ -271,18 +313,26 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('REGULARIZAR'));
+    // El label cambió (REGULARIZAR → VER ESTADO en el móvil), el `onTap` no:
+    // sigue siendo el mismo CTA de reactivación, sólo que ahora se llama por
+    // lo que hace de verdad en esta superficie.
+    await tester.tap(find.text('VER ESTADO'));
     await tester.pumpAndSettle();
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('AJUSTES'), findsNothing);
   });
 
-  testWidgets('REGULARIZAR con billingRoute navega ahi', (tester) async {
+  testWidgets('VER ESTADO con billingRoute navega ahi', (tester) async {
     // Fija la superficie que SI cobra. La combinacion «app movil + ruta de
     // facturacion» no existe en produccion —los tres callsites que pasan
     // `billingRoute` son del Coach Hub— y antes este test la ejercitaba sin
     // querer, porque bajo `flutter test` la superficie real es movil.
+    //
+    // OJO: esto fija la superficie de COBRO (`debugPlanCheckout`), no la de
+    // CONTENIDO (`debugPlanLimitPaywallForm`) — son dos seams distintos. Sin
+    // fijar la segunda, el contenido sigue siendo móvil y el botón dice "VER
+    // ESTADO", no "REGULARIZAR", aunque el checkout esté "disponible".
     debugPlanCheckout = planCheckoutFor(isWeb: true);
     addTearDown(() => debugPlanCheckout = null);
 
@@ -294,7 +344,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('REGULARIZAR'));
+    await tester.tap(find.text('VER ESTADO'));
     await tester.pumpAndSettle();
 
     expect(find.text('AJUSTES'), findsOneWidget);
@@ -312,7 +362,7 @@ void main() {
   // test pinea que lo decide la SUPERFICIE: aunque le pases una ruta de
   // facturacion, en la app no se llega a pagar. Sin el guard en `_PrimaryCta`
   // este test navega y se pone rojo.
-  testWidgets('en la app REGULARIZAR no navega ni con billingRoute',
+  testWidgets('en la app VER ESTADO no navega ni con billingRoute',
       (tester) async {
     // Sin override: la superficie REAL de `flutter test` es la movil.
     expect(debugPlanCheckout, isNull, reason: 'un test anterior no limpio');
@@ -325,7 +375,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('REGULARIZAR'));
+    await tester.tap(find.text('VER ESTADO'));
     await tester.pumpAndSettle();
 
     expect(
@@ -343,8 +393,9 @@ void main() {
     // siguen compilando y renderizando exactamente igual.
     await open(tester, SubscriptionTier.free);
 
-    expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+    expect(find.text('PLAN 1'), findsOneWidget);
     expect(find.text('REGULARIZAR'), findsNothing);
+    expect(find.text('VER ESTADO'), findsNothing);
   });
 
   // ── Forma: sheet en movil, dialog en web ─────────────────────────────────
@@ -424,12 +475,12 @@ void main() {
       );
     });
 
-    testWidgets('"Ahora no" cierra el sheet', (tester) async {
+    testWidgets('"Entendido" cierra el sheet', (tester) async {
       useForm(PlanLimitPaywallForm.sheet);
       await open(tester, SubscriptionTier.free);
       expect(find.byType(BottomSheet), findsOneWidget);
 
-      await tester.tap(find.text('Ahora no'));
+      await tester.tap(find.text('Entendido'));
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsNothing);
@@ -437,60 +488,90 @@ void main() {
     });
   });
 
-  // ── Mismo contenido en las dos formas ────────────────────────────────────
+  // ── Mismo esqueleto en las dos formas, distinto CTA ──────────────────────
   //
   // El punto entero de haber extraido el cuerpo a un widget compartido: si
   // alguien toca el copy en una envoltura y no en la otra, web y movil empiezan
-  // a decir cosas distintas. Este barrido cruza las 3 ramas visuales por las 2
-  // formas y exige los mismos textos.
+  // a decir cosas distintas SIN QUERER. Desde la decisión del dueño del
+  // 2026-09-29, una parte SÍ diverge a propósito (3.1.3(f) — la web vende, el
+  // móvil informa): este barrido separa lo que tiene que ser IGUAL en las dos
+  // formas (título, precio, beneficio, "VER PLANES") de lo que tiene que ser
+  // DISTINTO (el llamado a comprar).
 
-  group('el contenido no depende de la forma', () {
+  group('el contenido comparte precio y beneficio, diverge en el CTA', () {
     final ramas = <({
       String nombre,
       SubscriptionTier tier,
       PlanLimitReason reason,
-      List<String> textos,
+      List<String> comunes,
+      List<String> propiosMovil,
+      List<String> propiosWeb,
     })>[
       (
         nombre: 'upsell al siguiente tier',
         tier: SubscriptionTier.free,
         reason: PlanLimitReason.planLimit,
-        textos: [
+        comunes: [
           'LLEGASTE AL LÍMITE DE TU PLAN',
-          'PASATE A PLAN 1',
           '12.000',
           'Hasta 7 alumnos',
           'VER PLANES',
+        ],
+        propiosMovil: [
+          'PLAN 1',
+          'Entendido',
+          'Tu plan Free incluye 2 alumnos.',
+        ],
+        propiosWeb: [
+          'PASATE A PLAN 1',
           'Ahora no',
+          'Tu plan Free incluye 2 alumnos. Para sumar más, subí de plan.',
         ],
       ),
       (
         nombre: 'plan a medida (tope)',
         tier: SubscriptionTier.plan3,
         reason: PlanLimitReason.planLimit,
-        textos: [
+        comunes: [
           'LLEGASTE AL LÍMITE DE TU PLAN',
           'PLAN A MEDIDA',
           'CONTACTANOS',
+        ],
+        propiosMovil: [
+          'Entendido',
+          'Tu plan Plan 3 incluye alumnos sin límite.',
+        ],
+        propiosWeb: [
           'Ahora no',
+          'Tu plan Plan 3 incluye alumnos sin límite. Para sumar más, subí '
+              'de plan.',
         ],
       ),
       (
         nombre: 'suscripcion suspendida',
         tier: SubscriptionTier.plan1,
         reason: PlanLimitReason.subscriptionInactive,
-        textos: [
+        comunes: [
           'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA',
           'TU PLAN: PLAN 1',
+        ],
+        propiosMovil: [
+          'VER ESTADO',
+          'Entendido',
+          'No está activa. Mientras tanto, tu cuenta tiene el límite del '
+              'plan Free: 2 alumnos.',
+        ],
+        propiosWeb: [
           'REGULARIZAR',
           'Ahora no',
+          'Reactivalo y volvés a tus 7 alumnos al instante.',
         ],
       ),
     ];
 
     for (final rama in ramas) {
       for (final form in PlanLimitPaywallForm.values) {
-        testWidgets('${rama.nombre} dice lo mismo en ${form.name}',
+        testWidgets('${rama.nombre}: comunes + propios de ${form.name}',
             (tester) async {
           debugPlanLimitPaywallForm = form;
           addTearDown(() => debugPlanLimitPaywallForm = null);
@@ -499,11 +580,33 @@ void main() {
           await tester.tap(find.text('open'));
           await tester.pumpAndSettle();
 
-          for (final texto in rama.textos) {
+          for (final texto in rama.comunes) {
             expect(
               find.text(texto),
               findsOneWidget,
               reason: '«$texto» falta en la forma ${form.name}',
+            );
+          }
+
+          final propios = form == PlanLimitPaywallForm.sheet
+              ? rama.propiosMovil
+              : rama.propiosWeb;
+          final ajenos = form == PlanLimitPaywallForm.sheet
+              ? rama.propiosWeb
+              : rama.propiosMovil;
+          for (final texto in propios) {
+            expect(
+              find.text(texto),
+              findsOneWidget,
+              reason: '«$texto» falta en la forma ${form.name}',
+            );
+          }
+          for (final texto in ajenos) {
+            expect(
+              find.text(texto),
+              findsNothing,
+              reason: '«$texto» es de la OTRA forma y apareció en '
+                  '${form.name}',
             );
           }
         });
@@ -513,7 +616,7 @@ void main() {
 
   // ── Accesibilidad: textScale alto ────────────────────────────────────────
   //
-  // Un sheet de altura fija con el texto agrandado se CORTA: el "Ahora no" y
+  // Un sheet de altura fija con el texto agrandado se CORTA: el "Entendido" y
   // el CTA quedan fuera de pantalla y el usuario se come un modal del que no
   // puede salir salvo por el gesto del sistema. El techo de altura + el
   // scroll interno son la diferencia entre eso y una pantalla usable.
@@ -577,9 +680,9 @@ void main() {
         reason: 'el contenido entra sin scrollear — el test no prueba nada',
       );
 
-      await tester.ensureVisible(find.text('Ahora no'));
+      await tester.ensureVisible(find.text('Entendido'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Ahora no'));
+      await tester.tap(find.text('Entendido'));
       await tester.pumpAndSettle();
 
       expect(find.byType(BottomSheet), findsNothing);
@@ -604,6 +707,12 @@ void main() {
     late BuildContext contextAnidado;
 
     await tester.pumpWidget(MaterialApp(
+      // Sin esto, `_PlanLimitPaywallContent` revienta con "Null check
+      // operator used on a null value" apenas toca AppL10n — este harness es
+      // el único de este archivo que no pasa por `_harness()`.
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       navigatorObservers: [root],
       home: Navigator(
         observers: [anidado],
@@ -633,5 +742,218 @@ void main() {
       0,
       reason: 'el sheet quedo atrapado en el Navigator anidado',
     );
+  });
+
+  // ── Inglés (hallazgo Codex, PR #1266) ───────────────────────────────────
+  //
+  // El aviso de ALUMNOS nunca pasó por AppL10n — a diferencia de ejercicios
+  // propios/plantillas, acá no hay regresión de una rama anterior, sino un
+  // agujero de siempre: castellano hardcodeado en las dos superficies. Este
+  // grupo cubre TODOS los estados de la forma móvil en Locale('en'), para que
+  // los tres avisos queden parejos.
+  //
+  // Ojo: hoy `resolveLocale` (ADR-I18N-005) fuerza es_AR en producción, así
+  // que estos textos sólo se ven con un Locale explícito como el de acá.
+
+  group('móvil (sheet) — Locale(en)', () {
+    Future<void> abrirEn(
+      WidgetTester tester,
+      SubscriptionTier tier, {
+      PlanLimitReason reason = PlanLimitReason.planLimit,
+      SubscriptionStatus? status,
+    }) async {
+      await tester.pumpWidget(_harness(
+        tier,
+        reason: reason,
+        subscriptionStatus: status,
+        locale: const Locale('en'),
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'upsell al siguiente tier: título, cuerpo, tarjeta y botones en '
+        'inglés', (tester) async {
+      await abrirEn(tester, SubscriptionTier.free);
+
+      expect(find.text('YOU REACHED YOUR PLAN LIMIT'), findsOneWidget);
+      expect(
+        find.text('Your Free plan includes 2 students.'),
+        findsOneWidget,
+      );
+      // La tarjeta del siguiente plan: nombre, precio, sufijo y beneficio.
+      expect(find.text('PLAN 1'), findsOneWidget);
+      expect(find.text('12.000'), findsOneWidget);
+      expect(find.text('/month'), findsOneWidget);
+      expect(find.text('/mes'), findsNothing);
+      expect(find.text('Up to 7 students'), findsOneWidget);
+      expect(find.text('VIEW PLANS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsNothing);
+      expect(find.text('Entendido'), findsNothing);
+    });
+
+    testWidgets('desde Plan 2, el beneficio es "Unlimited students"',
+        (tester) async {
+      await abrirEn(tester, SubscriptionTier.plan2);
+
+      expect(find.text('PLAN 3'), findsOneWidget);
+      expect(find.text('Unlimited students'), findsOneWidget);
+      expect(find.textContaining('null'), findsNothing);
+    });
+
+    testWidgets(
+        'plan a medida (tope real): cuerpo, caja, botón y SnackBar en inglés',
+        (tester) async {
+      await abrirEn(tester, SubscriptionTier.plan3);
+
+      expect(
+        find.text('Your Plan 3 plan includes unlimited students.'),
+        findsOneWidget,
+      );
+      expect(find.text('CUSTOM PLAN'), findsOneWidget);
+      expect(
+        find.text(
+          "You're on the largest plan. For more than 15 students, we're "
+          'preparing a custom plan for you.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('CONTACT US'), findsOneWidget);
+      expect(find.text('PLAN A MEDIDA'), findsNothing);
+      expect(find.text('CONTACTANOS'), findsNothing);
+
+      await tester.tap(find.text('CONTACT US'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text("Soon you'll be able to have more than 15 students."),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'suscripción suspendida: título, cuerpo, caja de estado y SnackBar en '
+        'inglés', (tester) async {
+      await abrirEn(
+        tester,
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        status: SubscriptionStatus.paused,
+      );
+
+      expect(find.text('YOUR SUBSCRIPTION IS SUSPENDED'), findsOneWidget);
+      expect(
+        find.text(
+          "While your subscription isn't up to date, your account works "
+          'with the Free plan limit. No student is removed.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('YOUR PLAN: PLAN 1'), findsOneWidget);
+      expect(
+        find.text(
+          "It isn't active. Meanwhile, your account has the Free plan "
+          'limit: 2 students.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Status: paused'), findsOneWidget);
+      expect(find.text('VIEW STATUS'), findsOneWidget);
+      expect(find.text('Got it'), findsOneWidget);
+      expect(find.text('VER ESTADO'), findsNothing);
+
+      // VER ESTADO sin billingRoute avisa por SnackBar, y el aviso también
+      // sale de AppL10n.
+      await tester.tap(find.text('VIEW STATUS'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your subscription is paused.'), findsOneWidget);
+      expect(find.text('Tu suscripción está pausada.'), findsNothing);
+    });
+
+    // Los cinco estados de la caption «Estado: …» (`planLimitEstado*`): un
+    // `switch` exhaustivo sobre `SubscriptionStatus` que hay que ver entero,
+    // porque el test de arriba sólo ejercita `paused`.
+    const captionEn = {
+      SubscriptionStatus.active: 'Status: active',
+      SubscriptionStatus.pending: 'Status: payment pending',
+      SubscriptionStatus.grace: 'Status: payment past due',
+      SubscriptionStatus.paused: 'Status: paused',
+      SubscriptionStatus.cancelled: 'Status: cancelled',
+    };
+    const captionEs = {
+      SubscriptionStatus.active: 'Estado: activa',
+      SubscriptionStatus.pending: 'Estado: pendiente de pago',
+      SubscriptionStatus.grace: 'Estado: con pago pendiente',
+      SubscriptionStatus.paused: 'Estado: pausada',
+      SubscriptionStatus.cancelled: 'Estado: cancelada',
+    };
+    for (final status in SubscriptionStatus.values) {
+      testWidgets('caption de estado «${status.name}» en inglés',
+          (tester) async {
+        await abrirEn(
+          tester,
+          SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          status: status,
+        );
+        expect(find.text(captionEn[status]!), findsOneWidget);
+        expect(find.text(captionEs[status]!), findsNothing);
+      });
+
+      // El mismo estado en castellano — el castellano del móvil NO cambia.
+      testWidgets('caption de estado «${status.name}» en castellano',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          subscriptionStatus: status,
+        ));
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+        expect(find.text(captionEs[status]!), findsOneWidget);
+        expect(find.text(captionEn[status]!), findsNothing);
+      });
+    }
+
+    testWidgets('el castellano del móvil NO cambió: VER ESTADO → SnackBar',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        subscriptionStatus: SubscriptionStatus.paused,
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('VER ESTADO'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tu suscripción está pausada.'), findsOneWidget);
+    });
+
+    // Control: la WEB no se tradujo — sigue en castellano aunque el Locale
+    // sea inglés (convención vigente del Coach Hub: i18n Fase W3). Si este
+    // test se pusiera rojo, alguien tradujo la web sin querer.
+    testWidgets('control: en WEB con Locale(en) TODO sigue en español',
+        (tester) async {
+      debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+      addTearDown(() => debugPlanLimitPaywallForm = null);
+
+      await abrirEn(tester, SubscriptionTier.free);
+
+      expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsOneWidget);
+      expect(
+        find.text(
+          'Tu plan Free incluye 2 alumnos. Para sumar más, subí de plan.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('PASATE A PLAN 1'), findsOneWidget);
+      expect(find.text('/mes'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
+      expect(find.text('Ahora no'), findsOneWidget);
+      expect(find.text('YOU REACHED YOUR PLAN LIMIT'), findsNothing);
+      expect(find.text('/month'), findsNothing);
+    });
   });
 }

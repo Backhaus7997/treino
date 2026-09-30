@@ -24,7 +24,7 @@
  * `weightedLoad`, no `planLimits`), así que tiene su propio bloque más abajo.
  *
  * Sección aparte, "el enfriamiento es POR KIND", cubre lo que cambió en
- * #1265: el enfriamiento de 14 días dejó de ser compartido entre topes —
+ * #1267: el enfriamiento de 14 días dejó de ser compartido entre topes —
  * chocar uno ya NO silencia el mail de otro— con su compatibilidad para el
  * `trainerLimitMailAt` legado (un Timestamp suelto, no un mapa).
  */
@@ -678,7 +678,7 @@ describe("⚠️ suscripción inactiva → no se manda el upsell (los tres kinds
 });
 
 // ---------------------------------------------------------------------------
-// El enfriamiento es POR KIND (#1265) — ver el encabezado del módulo.
+// El enfriamiento es POR KIND (#1267) — ver el encabezado del módulo.
 // ---------------------------------------------------------------------------
 describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
   it("chocar ejercicios y, dentro de los 14 días, plantillas — manda DOS mails, uno de cada uno", async () => {
@@ -689,7 +689,7 @@ describe("⚠️ el enfriamiento es POR KIND, no compartido", () => {
     expect(enqueueMock).toHaveBeenCalledTimes(1);
 
     // t0 + 1 día: el MISMO PF choca plantillas. Si el enfriamiento siguiera
-    // compartido, esto no mandaría nada — es justo lo que #1265 corrige.
+    // compartido, esto no mandaría nada — es justo lo que #1267 corrige.
     const unDiaDespues = AHORA + 24 * 60 * 60 * 1000;
     usersStore["t1"] = {
       ...usersStore["t1"],

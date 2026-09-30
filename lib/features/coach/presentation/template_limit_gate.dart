@@ -9,6 +9,7 @@ import '../../profile/domain/user_role.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/template_quota_provider.dart';
+import '../domain/subscription_tier.dart';
 import 'widgets/trainer_limit_notice.dart';
 
 /// El `kind` que anota [registrarTopeDelPlanPf] cuando el PF choca el tope de
@@ -73,6 +74,9 @@ Future<bool> intentarCrearPlantilla(
       showTrainerLimitNotice(
         context,
         kind: TrainerLimitKind.templates,
+        currentTier: _currentTier(ref),
+        subscriptionStatus: _currentStatus(ref),
+        currentPeriodEnd: _currentPeriodEnd(ref),
         limit: quota.limit!,
         count: quota.count,
       ),
@@ -81,6 +85,28 @@ Future<bool> intentarCrearPlantilla(
 
   return false;
 }
+
+/// El tier vigente del PF, para el copy "en el tope" del aviso — mismo
+/// fallback que `pricing_screen.dart`: sin `subscription` (nunca pagó) es
+/// Free. El BLOQUEO ya lo decidió `quota.isAtOrOverLimit` con el `limit` del
+/// servidor; esto es sólo para elegir qué texto mostrar.
+SubscriptionTier _currentTier(WidgetRef ref) =>
+    ref.read(userProfileProvider).valueOrNull?.subscription?.tier ??
+    SubscriptionTier.free;
+
+/// El ESTADO de la suscripción — decide si el aviso puede afirmar "no está
+/// activa" (ver `resolveNoticeTier` en `trainer_limit_notice.dart`). Sin
+/// `subscription` (nunca pagó) no hay nada "inactivo" que decir: default
+/// `active`, mismo fallback que usa `SubscriptionStatusX.fromJson` para un
+/// status desconocido.
+SubscriptionStatus _currentStatus(WidgetRef ref) =>
+    ref.read(userProfileProvider).valueOrNull?.subscription?.status ??
+    SubscriptionStatus.active;
+
+/// `currentPeriodEnd` de la suscripción — sólo lo usa `resolveNoticeTier`
+/// cuando el status es `cancelled`. `null` en cualquier otro caso.
+DateTime? _currentPeriodEnd(WidgetRef ref) =>
+    ref.read(userProfileProvider).valueOrNull?.subscription?.currentPeriodEnd;
 
 /// Anota que este PF chocó el tope de plantillas. Lo lee el barrido nocturno
 /// del PR4 para mandarle un mail contándole dónde se paga — la app no puede
@@ -140,6 +166,9 @@ Future<bool> mostrarAvisoTopeDePlantillasPorRebote(
   await showTrainerLimitNotice(
     context,
     kind: TrainerLimitKind.templates,
+    currentTier: _currentTier(ref),
+    subscriptionStatus: _currentStatus(ref),
+    currentPeriodEnd: _currentPeriodEnd(ref),
     limit: limit,
     count: quota!.count,
   );

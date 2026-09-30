@@ -15,6 +15,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach/presentation/custom_exercise_limit_gate.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -28,7 +30,7 @@ class _RepoFalso extends Mock implements UserRepository {}
 
 const _uid = 'u1';
 
-UserProfile _profile(UserRole role) {
+UserProfile _profile(UserRole role, {TrainerSubscription? subscription}) {
   final now = DateTime.utc(2026, 1, 1);
   return UserProfile(
     uid: _uid,
@@ -37,6 +39,7 @@ UserProfile _profile(UserRole role) {
     role: role,
     createdAt: now,
     updatedAt: now,
+    subscription: subscription,
   );
 }
 
@@ -45,6 +48,10 @@ UserProfile _profile(UserRole role) {
 ///
 /// `null` = todavía no resolvió: el rebote espera a que se cierre el aviso,
 /// así que con el aviso abierto no hay resultado.
+///
+/// [subscription] es el tier NOMINAL del PF (lo que pagó) — default `null`
+/// (Free, sin backfill). Sirve para el Cambio 2 (P1): probar que el aviso
+/// nombra el tier EFECTIVO (el que explica `quota.limit`), no éste a ciegas.
 Future<bool?> _correr(
   WidgetTester tester, {
   required UserRole role,
@@ -52,13 +59,16 @@ Future<bool?> _correr(
   required UserRepository repo,
   String? uid = _uid,
   bool rebote = false,
+  TrainerSubscription? subscription,
 }) async {
   bool? resultado;
 
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(role, subscription: subscription)),
+        ),
         customExerciseQuotaProvider.overrideWithValue(quota),
         currentUidProvider.overrideWithValue(uid),
         userRepositoryProvider.overrideWithValue(repo),
@@ -301,6 +311,95 @@ void main() {
 
       expect(ok, isTrue);
       verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group(
+      'intentarCrearEjercicioPropio — Cambio 2 (P1): el aviso nombra el '
+      'tier EFECTIVO, no el nominal a ciegas', () {
+    testWidgets(
+        'piso prepago: nominal Free, limit del servidor ya es el de Plan 2 '
+        '⇒ el aviso nombra Plan 2', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        // Sin `subscription`: nominal es Free. El límite que bloqueó (120)
+        // es el de Plan 2 — un piso prepago subió el efectivo por encima.
+        quota: const AsyncValue.data((limit: 120, count: 120)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('Tu plan Plan 2 incluye'), findsOneWidget);
+      expect(find.textContaining('Tu plan Free incluye'), findsNothing);
+    });
+
+    testWidgets(
+        'suscripción Plan 1 PAUSADA: limit del servidor ya es el de Free '
+        '⇒ el aviso dice Free e inactiva, no Plan 1', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.paused,
+        ),
+        // El servidor ya colapsó el efectivo a Free (20).
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(
+        find.textContaining('Tu suscripción a Plan 1 no está activa'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
+      // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'segundo hallazgo (Codex, 2026-09-29): Plan 1 ACTIVA con el límite '
+        'todavía en Free (propagación pendiente) ⇒ genérico, nunca "no '
+        'está activa"', (tester) async {
+      // MISMO limit/nominal que el test de arriba — la ÚNICA diferencia es
+      // el status: `active`, no `paused`. Antes de este segundo fix,
+      // `resolveNoticeTier` comparaba límites (efectivo Free < nominal
+      // Plan 1) y decía "inactiva" en los dos casos por igual — mintiendo
+      // acá, porque la suscripción SÍ está activa (AGENTS.md §11.1).
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.active,
+        ),
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(
+        find.text('Tu plan incluye 20 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.text('PLAN 2'), findsNothing);
     });
   });
 }
