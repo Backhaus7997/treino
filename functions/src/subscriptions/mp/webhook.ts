@@ -171,8 +171,28 @@ export type WebhookOutcome =
   | "sin-id"
   | "firma-invalida"
   | "sin-plan"
+  /**
+   * MP contesto que ese id NO existe (404). Se acusa con 200: reintentar un
+   * recurso que no existe es ruido para siempre.
+   */
+  | "no-encontrado"
   /** MP no contesto. Es el UNICO que pide reintento. */
   | "error-mp";
+
+/**
+ * El codigo HTTP con el que se contesta cada resultado. Vive aparte para poder
+ * testear la regla que importa: MP reintenta cada 15 minutos hasta recibir un
+ * 200, asi que solo dos resultados NO son 200 y solo uno es un 5xx.
+ *
+ *   - 401: la firma no coincide. Nadie legitimo la manda asi.
+ *   - 503: MP no contesto (o su respuesta se arregla sola). Es el UNICO que
+ *     pide reintento, y es exactamente lo que hace falta.
+ */
+export function statusHttpDe(outcome: WebhookOutcome): 200 | 401 | 503 {
+  if (outcome === "firma-invalida") return 401;
+  if (outcome === "error-mp") return 503;
+  return 200;
+}
 
 export interface WebhookDeps {
   mpClient: MpClient;
@@ -495,6 +515,17 @@ export async function runMpWebhook(
     preapproval = await deps.mpClient.getPreapproval(preapprovalId);
   } catch (e) {
     const err = e as MpApiError;
+    if (err.status === 404) {
+      // MP no conoce ese id: el simulador del panel manda 123456, o el recurso
+      // ya no existe. Reintentar no lo va a crear (ver MpApiError.retryable), y
+      // con un 5xx MP insiste cada 15 minutos para siempre. No se marca como
+      // procesado ni se toca nada; si fuera una suscripcion nuestra, el barrido
+      // de las 03:00 la reconcilia desde mp_plans.
+      logger.warn("mp/webhook: MP no conoce ese preapproval — no se reintenta", {
+        preapprovalId,
+      });
+      return "no-encontrado";
+    }
     logger.error("mp/webhook: no se pudo leer el preapproval", {
       preapprovalId,
       status: err.status,
@@ -597,16 +628,15 @@ export const mpWebhook = onRequest(
       return;
     }
 
-    if (outcome === "firma-invalida") {
-      res.status(401).send("firma invalida");
-      return;
-    }
-    if (outcome === "error-mp") {
-      // El UNICO 5xx. Le pide a MP que reintente en 15 minutos, que es
-      // exactamente lo que hace falta cuando el que fallo fue MP.
-      res.status(503).send("no se pudo consultar a Mercado Pago");
-      return;
-    }
-    res.status(200).send("ok");
+    const status = statusHttpDe(outcome);
+    res
+      .status(status)
+      .send(
+        status === 401
+          ? "firma invalida"
+          : status === 503
+            ? "no se pudo consultar a Mercado Pago"
+            : "ok",
+      );
   },
 );

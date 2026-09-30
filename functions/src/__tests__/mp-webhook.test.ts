@@ -66,7 +66,9 @@ import {
   firmaValida,
   idDelEvento,
   runMpWebhook,
+  statusHttpDe,
   topicoDelEvento,
+  WebhookOutcome,
 } from "../subscriptions/mp/webhook";
 import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
 import { conLaConocidaPrimero } from "../subscriptions/mp/reconcile";
@@ -331,6 +333,72 @@ describe("runMpWebhook — solo lo transitorio pide reintento", () => {
     expect(r).toBe("reconciliado");
     expect((store.users.t1.subscription as Record<string, unknown>).status)
       .toBe("active");
+  });
+});
+
+describe("runMpWebhook — un 404 no es transitorio", () => {
+  // Simulador del panel de MP, 2026-09-30: manda el id 123456. MP contesta 404
+  // y el handler devolvia 503, o sea "reintenta en 15 minutos" para siempre
+  // sobre un recurso que no existe. El encabezado del archivo y
+  // MpApiError.retryable ya decian que eso no se hace; el codigo no lo cumplia.
+  it("si MP no conoce el id devuelve no-encontrado, que se acusa con 200", async () => {
+    warnSpy.mockClear();
+    errorSpy.mockClear();
+    const { app } = fakeApp(MUNDO());
+    const mp = fakeMp(new MpApiError("no existe", 404));
+
+    const r = await runMpWebhook(app, req(), deps(mp));
+
+    expect(r).toBe("no-encontrado");
+    expect(statusHttpDe(r)).toBe(200);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("no conoce"),
+      expect.anything(),
+    );
+  });
+
+  it("y no escribe nada: ni marca el evento ni toca una cuenta", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    const antes = JSON.parse(JSON.stringify(store));
+
+    await runMpWebhook(app, req(), deps(fakeMp(new MpApiError("no existe", 404))));
+
+    expect(store).toEqual(antes);
+  });
+
+  it.each([0, 401, 429, 500, 503])(
+    "un %i de MP SI pide reintento",
+    async (status) => {
+      // El 401 es NUESTRO token: se sigue pidiendo reintento para que, una vez
+      // arreglado, MP reenvie los eventos en vez de perderlos.
+      const { app } = fakeApp(MUNDO());
+      const mp = fakeMp(new MpApiError("falla", status));
+
+      const r = await runMpWebhook(app, req(), deps(mp));
+
+      expect(r).toBe("error-mp");
+      expect(statusHttpDe(r)).toBe(503);
+    },
+  );
+});
+
+describe("statusHttpDe — solo dos resultados no son 200", () => {
+  // Record<WebhookOutcome, ...> obliga a decidir el codigo de cada resultado
+  // nuevo: si se agrega uno y no figura aca, no compila.
+  const ESPERADO: Record<WebhookOutcome, number> = {
+    reconciliado: 200,
+    duplicado: 200,
+    "topico-ignorado": 200,
+    "sin-id": 200,
+    "sin-plan": 200,
+    "no-encontrado": 200,
+    "firma-invalida": 401,
+    "error-mp": 503,
+  };
+
+  it.each(Object.entries(ESPERADO))("%s → %i", (outcome, status) => {
+    expect(statusHttpDe(outcome as WebhookOutcome)).toBe(status);
   });
 });
 
