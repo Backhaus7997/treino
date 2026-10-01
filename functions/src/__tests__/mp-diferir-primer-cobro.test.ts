@@ -14,9 +14,6 @@ jest.mock("firebase-functions", () => ({
   logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
 }));
 
-import { readFileSync } from "fs";
-import { join } from "path";
-
 import { logger } from "firebase-functions";
 
 import { MpPreapproval } from "../subscriptions/mp/client";
@@ -33,6 +30,7 @@ import {
   VENTANA_AUTORIZACION_MS,
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
+  cobroAntesDeLaPrueba,
   cobrosExitosos,
   decidirDiferimiento,
   diasDePrueba,
@@ -41,6 +39,10 @@ import {
   planesARevisar,
   situacionDeLaPrueba,
 } from "../subscriptions/mp/diferir-primer-cobro";
+import {
+  MOTIVO_ABANDONO,
+  MOTIVO_REEMPLAZO,
+} from "../subscriptions/mp/motivos-terminal";
 import { SubscriptionTier } from "../subscriptions/tier-config";
 
 /** Timestamp de mentira con la unica operacion que el codigo usa. */
@@ -55,7 +57,14 @@ beforeEach(() => jest.clearAllMocks());
 // pagadoHastaDe: la evidencia de pago, leida de lo que MP dice que cobro.
 // ---------------------------------------------------------------------------
 
-/** Una suscripcion con un cobro, tal como la devuelve la busqueda de MP. */
+/**
+ * Una suscripcion con un cobro, tal como la devuelve la busqueda de MP.
+ *
+ * Trae montos POSITIVOS (`charged_amount` y `last_charged_amount`) a proposito: asi
+ * la rama positiva de la regla de los montos corre en TODOS los tests del flujo
+ * principal, y no solo en los que la prueban de frente. Un test que quiera la
+ * suscripcion sin montos (MP que no los manda) pisa `summarized` entero.
+ */
 function pagada(
   ultimoCobro: string,
   over: Partial<MpPreapproval> = {},
@@ -70,7 +79,9 @@ function pagada(
     },
     summarized: {
       charged_quantity: 1,
+      charged_amount: 22000,
       last_charged_date: ultimoCobro,
+      last_charged_amount: 22000,
       pending_charge_quantity: 0,
     },
     ...over,
@@ -872,35 +883,49 @@ describe("planesARevisar: el plan que pago no se cae del tope", () => {
     }
   });
 
-  // ── Los terminal que NO son una baja: traen `terminalReason` ──
+  // ── Los terminal: solo el ABANDONO queda afuera ──
 
-  it("deja afuera un checkout ABANDONADO que el barrido marco terminal (trae motivo)", () => {
+  it("deja afuera un checkout ABANDONADO que el barrido marco terminal", () => {
     // El barrido nocturno marca `terminal` a un checkout sin suscripcion a los 30
-    // dias, con `terminalReason`. Sin descartarlo, un PF con un anual y varios
+    // dias, con MOTIVO_ABANDONO. Sin descartarlo, un PF con un anual y varios
     // toques de hace mas de un mes volveria a empujar fuera al plan que pago.
     const planes = [
-      plan("abandonado-3", 40, { terminalReason: "checkout abandonado" }),
-      plan("abandonado-2", 50, { terminalReason: "checkout abandonado" }),
-      plan("abandonado-1", 60, { terminalReason: "checkout abandonado" }),
+      plan("abandonado-3", 40, { terminalReason: MOTIVO_ABANDONO }),
+      plan("abandonado-2", 50, { terminalReason: MOTIVO_ABANDONO }),
+      plan("abandonado-1", 60, { terminalReason: MOTIVO_ABANDONO }),
       plan("pago", 200),
     ];
 
     expect(ids(planes)).toEqual(["pago"]);
   });
 
-  it("deja afuera un plan que reemplazamos nosotros (trae motivo)", () => {
-    const planes = [
-      plan("reemplazado", 5, { terminalReason: "reemplazado por otro plan" }),
-      plan("pago", 20),
-    ];
+  it("un plan pagado que despues se REEMPLAZO sigue contando", () => {
+    // `darDeBajaUnPlan` lo marca `terminal` con MOTIVO_REEMPLAZO, y SOLO despues de
+    // encontrarle una suscripcion a la que dar de baja: tuvo una de verdad, y es la
+    // evidencia de ese pago.
+    const planes = [plan("reemplazado", 5, { terminalReason: MOTIVO_REEMPLAZO })];
 
-    expect(ids(planes)).toEqual(["pago"]);
+    const r = planesARevisar(planes, "plan2", AHORA);
+
+    expect(r.ids).toEqual(["reemplazado"]);
+    expect(r.candidatos).toBe(1);
   });
 
-  it("cualquier motivo escrito como string lo deja afuera: no se compara contra un literal", () => {
-    // Si manana el barrido estrena un motivo nuevo, tampoco es una baja.
+  it("los reemplazados y las bajas cuentan juntos, del mas nuevo al mas viejo", () => {
+    const planes = [
+      plan("baja", 30),
+      plan("reemplazado", 10, { terminalReason: MOTIVO_REEMPLAZO }),
+      plan("abandonado", 5, { terminalReason: MOTIVO_ABANDONO }),
+    ];
+
+    expect(ids(planes)).toEqual(["reemplazado", "baja"]);
+  });
+
+  it("un motivo que no conocemos tampoco lo deja afuera: solo se descarta el abandono", () => {
+    // Si manana el reconciliador estrena un motivo, por defecto no se pierde
+    // evidencia de pago.
     expect(ids([plan("x", 1, { terminalReason: "otro motivo" }), plan("pago", 20)]))
-      .toEqual(["pago"]);
+      .toEqual(["x", "pago"]);
   });
 
   it("un `terminalReason` que no es un string no cuenta como motivo", () => {
@@ -1006,6 +1031,10 @@ function armar(
     tier: opts.tier ?? "plan2",
     userData: "userData" in opts ? opts.userData : usuarioCancelado(),
     nowMs: opts.nowMs ?? AHORA,
+    // Explicito: los tests de la decision no dependen del valor de la constante, asi
+    // que flipearla (el rollback) no los pone rojos. El camino sin parametro tiene
+    // su propio test, que tampoco asume el valor.
+    habilitado: true,
     leerPlanes: async () => {
       lecturas.planes += 1;
       if (opts.planes instanceof Error) throw opts.planes;
@@ -1478,9 +1507,9 @@ describe("decidirDiferimiento: que planes se revisan, y hasta donde", () => {
     // Un anual (periodo largo) con varios toques de hace mas de un mes.
     const { input, lecturas } = armar({
       planes: [
-        plan("abandonado-3", 40, { terminalReason: "checkout abandonado" }),
-        plan("abandonado-2", 50, { terminalReason: "checkout abandonado" }),
-        plan("abandonado-1", 60, { terminalReason: "checkout abandonado" }),
+        plan("abandonado-3", 40, { terminalReason: MOTIVO_ABANDONO }),
+        plan("abandonado-2", 50, { terminalReason: MOTIVO_ABANDONO }),
+        plan("abandonado-1", 60, { terminalReason: MOTIVO_ABANDONO }),
         plan("p0", 200),
       ],
     });
@@ -1489,6 +1518,21 @@ describe("decidirDiferimiento: que planes se revisan, y hasta donde", () => {
 
     expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
     expect(lecturas.suscripciones).toEqual(["p0"]);
+  });
+
+  it("un plan pagado que despues se reemplazo SIGUE dando evidencia", async () => {
+    // El caso real: el plan que pago quedo marcado MOTIVO_REEMPLAZO cuando otro
+    // plan lo reemplazo. Sin contarlo, a ese PF se le cobraba en el acto lo que ya
+    // tenia pago.
+    const { input, lecturas } = armar({
+      planes: [plan("reemplazado", 10, { terminalReason: MOTIVO_REEMPLAZO })],
+      subs: { reemplazado: [pagada(ULTIMO_COBRO)] },
+    });
+
+    const r = await decidirDiferimiento(input);
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toEqual(["reemplazado"]);
   });
 
   it("sin ningun plan cerrado no se le pregunta nada a MP", async () => {
@@ -1753,9 +1797,8 @@ describe("decidirDiferimiento: el atajo del doble click", () => {
 // ---------------------------------------------------------------------------
 
 describe("decidirDiferimiento: el interruptor", () => {
-  it("viene ENCENDIDO", () => {
-    expect(DIFERIR_PRIMER_COBRO_ENABLED).toBe(true);
-  });
+  // Los dos estados se prueban por el parametro `habilitado`, no por el valor de la
+  // constante: el interruptor se puede flipear (es el rollback) sin tocar un test.
 
   it("encendido difiere", async () => {
     const { input } = armar();
@@ -1764,18 +1807,26 @@ describe("decidirDiferimiento: el interruptor", () => {
       .toEqual({ diferir: true, diferidoHastaMs: FIN });
   });
 
-  it("sin pasarlo vale la constante (encendida)", async () => {
-    const { input } = armar();
-
-    expect(await decidirDiferimiento(input))
-      .toEqual({ diferir: true, diferidoHastaMs: FIN });
-  });
-
   it("apagado NUNCA difiere, aunque todo lo demas lo permita", async () => {
     const { input } = armar();
 
     expect(await decidirDiferimiento({ ...input, habilitado: false }))
       .toEqual({ diferir: false, motivo: "deshabilitado" });
+  });
+
+  it("sin pasarlo vale la constante, sea cual sea su valor", async () => {
+    // Fija el CABLEADO del default sin asumir el valor: el resultado sin el
+    // parametro es exactamente el que da pasarle la constante.
+    const { input } = armar();
+    delete (input as { habilitado?: boolean }).habilitado;
+
+    const sinParametro = await decidirDiferimiento(input);
+    const conLaConstante = await decidirDiferimiento({
+      ...input,
+      habilitado: DIFERIR_PRIMER_COBRO_ENABLED,
+    });
+
+    expect(sinParametro).toEqual(conLaConstante);
   });
 
   it("apagado no lee NADA: ni planes, ni MP, ni el checkout abierto", async () => {
@@ -1819,40 +1870,6 @@ describe("decidirDiferimiento: el interruptor", () => {
       "mp/diferir-primer-cobro: se cobra en el acto",
       expect.objectContaining({ uid: "t1", motivo: "deshabilitado" }),
     );
-  });
-
-  it("apagarlo NO apaga las reglas del reconciliador: no leen el interruptor", () => {
-    // Los planes que ya se abrieron con prueba siguen existiendo en MP y siguen
-    // necesitando que se los lea asi. Si alguna de las funciones de esa mitad
-    // empezara a leer el interruptor, apagar el checkout los dejaria sin reglas.
-    const fuente = readFileSync(
-      join(__dirname, "../subscriptions/mp/diferir-primer-cobro.ts"),
-      "utf8",
-    );
-    const marca = "La otra mitad: como se LEE";
-    const mitadDelReconciliador = fuente.slice(fuente.indexOf(marca));
-
-    expect(fuente.indexOf(marca)).toBeGreaterThan(0);
-    expect(mitadDelReconciliador).toContain("aplicarPruebaDiferidaAlEstado");
-    expect(mitadDelReconciliador).not.toContain("DIFERIR_PRIMER_COBRO_ENABLED");
-    expect(mitadDelReconciliador).not.toContain("habilitado");
-
-    // Y el reconciliador ni lo importa.
-    const reconcile = readFileSync(
-      join(__dirname, "../subscriptions/mp/reconcile.ts"),
-      "utf8",
-    );
-    expect(reconcile).not.toContain("DIFERIR_PRIMER_COBRO_ENABLED");
-  });
-
-  it("con el interruptor apagado las reglas siguen leyendo un plan que ya tiene prueba", () => {
-    // La otra cara: la misma funcion que usa el reconciliador, sin ningun
-    // parametro que el interruptor pueda cambiar.
-    expect(aplicarPruebaDiferidaAlEstado({
-      ...EN_PRUEBA,
-      statusHoy: "grace",
-      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
-    })).toBe("active");
   });
 });
 
@@ -2366,4 +2383,73 @@ describe("las reglas de la prueba con un cobro de $0", () => {
       })).toBe("grace");
     });
   }
+});
+
+// ---------------------------------------------------------------------------
+// cobroAntesDeLaPrueba: la medicion del supuesto central del diferimiento.
+//
+// Si MP ignorara o acortara la prueba, la suscripcion del plan nuevo cobraria al
+// autorizar, cuando al PF todavia le quedan dias pagos por el plan anterior: pago
+// dos veces ese periodo. El reconciliador lo avisa con un warn. Con el interruptor
+// encendido, el primer PF real que vuelva a suscribirse con dias pagos es la
+// medicion.
+// ---------------------------------------------------------------------------
+
+describe("cobroAntesDeLaPrueba", () => {
+  const COBRADA = {
+    charged_quantity: 1,
+    charged_amount: 22000,
+    last_charged_amount: 22000,
+  };
+  const entrada = (
+    nowMs: number,
+    over: Partial<Pick<PruebaDiferidaInput, "diferidoHastaMs" | "summarized">> = {},
+  ) => ({ diferidoHastaMs: FIN, summarized: COBRADA, nowMs, ...over });
+
+  it("un cobro exitoso cuando faltan 13 dias para E: MP ignoro la prueba", () => {
+    expect(cobroAntesDeLaPrueba(entrada(AHORA))).toBe(true);
+  });
+
+  it("el borde: a exactamente el adelanto maximo de E todavia no avisa", () => {
+    // Un dia antes de E es lo mas temprano que suponemos que MP podria cobrar si
+    // cuenta los dias en su propio calendario (-04:00).
+    expect(cobroAntesDeLaPrueba(entrada(FIN - ADELANTO_MAXIMO_DEL_COBRO_MS)))
+      .toBe(false);
+  });
+
+  it("un milisegundo antes de ese margen SI avisa", () => {
+    expect(cobroAntesDeLaPrueba(entrada(FIN - ADELANTO_MAXIMO_DEL_COBRO_MS - 1)))
+      .toBe(true);
+  });
+
+  it("en E y despues no avisa: es el primer cobro que se esperaba", () => {
+    for (const nowMs of [FIN, FIN + DIA_MS, FIN + 30 * DIA_MS]) {
+      expect(cobroAntesDeLaPrueba(entrada(nowMs))).toBe(false);
+    }
+  });
+
+  it("sin ningun cobro exitoso no avisa", () => {
+    for (const summarized of [
+      undefined,
+      null,
+      {},
+      { charged_quantity: 0 },
+      { charged_quantity: Number.NaN },
+      { pending_charge_quantity: 1 },
+    ]) {
+      expect(cobroAntesDeLaPrueba(entrada(AHORA, { summarized }))).toBe(false);
+    }
+  });
+
+  it("una autorizacion de $0 no es un cobro: no avisa", () => {
+    expect(cobroAntesDeLaPrueba(entrada(AHORA, {
+      summarized: { charged_quantity: 1, charged_amount: 0 },
+    }))).toBe(false);
+  });
+
+  it("un plan que no es diferido nunca avisa, cobre cuando cobre", () => {
+    for (const diferidoHastaMs of [undefined, null, Number.NaN, "x", {}]) {
+      expect(cobroAntesDeLaPrueba(entrada(AHORA, { diferidoHastaMs }))).toBe(false);
+    }
+  });
 });

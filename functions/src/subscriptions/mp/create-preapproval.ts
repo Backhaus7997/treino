@@ -154,6 +154,13 @@ export interface CreatePreapprovalDeps {
   mpClient: MpClient;
   /** Reloj inyectable: el reuso de checkout se testea sin esperar 30 minutos. */
   nowMs: number;
+  /**
+   * El interruptor del diferimiento (`DIFERIR_PRIMER_COBRO_ENABLED`). Ausente vale
+   * la constante, que es lo que usa el callable. Existe para que los tests fijen
+   * el estado que prueban: asi no dependen del valor de la constante, y flipearla
+   * (el rollback) no los pone rojos por accidente.
+   */
+  diferirHabilitado?: boolean;
 }
 
 function ensureApp(): App {
@@ -253,6 +260,7 @@ export async function runCreatePreapproval(
       tier,
       userData: userSnap.data(),
       nowMs: deps.nowMs,
+      habilitado: deps.diferirHabilitado,
       // Se llama SOLO si el PF ya paso la elegibilidad barata (cancelado, mismo
       // tier, con dias por delante). Lee el MISMO documento que `abrirCheckout` y
       // con la MISMA definicion de "vigente" (`checkoutVigente`): asi el atajo no

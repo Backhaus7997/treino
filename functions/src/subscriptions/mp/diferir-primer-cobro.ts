@@ -33,7 +33,10 @@
  *      de [diasDePrueba] apunta a que no caiga antes, pero solo vale bajo este
  *      supuesto: ninguna otra regla depende de ello (el reconciliador deja
  *      holgura, y un plan con prueba se descarta como evidencia solo si le faltan
- *      mas de [ADELANTO_MAXIMO_DEL_COBRO_MS] para cobrar).
+ *      mas de [ADELANTO_MAXIMO_DEL_COBRO_MS] para cobrar). Si MP ignorara o
+ *      acortara la prueba, el reconciliador lo avisa con un warn
+ *      ([cobroAntesDeLaPrueba]): con el interruptor encendido, el primer PF real
+ *      que vuelva a suscribirse con dias pagos es la medicion de este supuesto.
  *   c. Que `date_created` de la suscripcion sea el momento de la autorizacion, y
  *      que `pending_charge_quantity` pueda contar el primer cobro programado.
  *
@@ -75,6 +78,7 @@ import { SubscriptionStatus } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import { MpPreapproval } from "./client";
+import { MOTIVO_ABANDONO } from "./motivos-terminal";
 
 /**
  * El interruptor del diferimiento. ENCENDIDO.
@@ -163,8 +167,9 @@ function puedeHaberCobrado(
   // Un plan de PF (no de alumno) del MISMO tier que pide.
   if (data.producto === "athlete" || data.tier !== tier) return false;
 
-  // Cerrado por una baja: `terminal` y SIN motivo.
-  if (data.terminal !== true || typeof data.terminalReason === "string") {
+  // Un plan que tuvo una suscripcion: cerrado (`terminal`) y que NO sea un
+  // checkout abandonado. Un plan reemplazado SIGUE contando.
+  if (data.terminal !== true || data.terminalReason === MOTIVO_ABANDONO) {
     return false;
   }
 
@@ -205,19 +210,23 @@ export interface PlanesARevisar {
  *      planes de PF anteriores al 2026-09-17 no tienen el campo (ver el default de
  *      `lookupPlan`), y son justamente los que mas pueden haber pagado.
  *
- *   2. **Cerrado por una baja: `terminal === true` y SIN `terminalReason`.** Un
- *      plan que MP dio de baja (`cancelled`) tuvo una suscripcion de verdad, y
- *      `reconcile.ts` lo marca `terminal` sin motivo. Un checkout que el PF abrio
- *      y no pago NO es terminal, asi que sale de la lista sin preguntarle nada a
- *      MP. Ojo con la segunda mitad del filtro: el barrido nocturno SI marca
- *      `terminal` a un checkout sin suscripcion a los 30 dias (con
- *      `terminalReason: "checkout abandonado"`), y a un plan que nosotros
- *      reemplazamos (con `"reemplazado por otro plan"`). Sin descartar los que
- *      traen motivo, un PF con un anual (periodo de hasta 12 meses) y varios
- *      toques de hace mas de un mes volveria a empujar fuera al plan que pago. El
- *      costo: un checkout abandonado que se pago tarde y despues se cancelo
- *      conserva su motivo y queda afuera. Es raro, y el resultado es cobrar en el
- *      acto, como antes.
+ *   2. **Un plan que tuvo una suscripcion: `terminal === true`, y que NO sea un
+ *      checkout abandonado.** `reconcile.ts` marca `terminal` cuando MP da de baja
+ *      la suscripcion (`cancelled`, sin motivo) y cuando REEMPLAZAMOS un plan (con
+ *      [MOTIVO_REEMPLAZO], y solo si MP le encuentra alguna suscripcion): en los
+ *      dos hubo una suscripcion, que pudo haber cobrado. Un
+ *      checkout que el PF abrio y no pago NO es terminal, asi que sale de la lista
+ *      sin preguntarle nada a MP. Un plan pagado y despues reemplazado SIGUE
+ *      contando: es la evidencia de ese pago. Lo unico que se descarta de los
+ *      terminal es el [MOTIVO_ABANDONO]: el barrido nocturno marca asi un checkout
+ *      que a los 30 dias seguia sin suscripcion, y sin descartarlo un PF con un
+ *      anual (periodo de hasta 12 meses) y varios toques de hace mas de un mes
+ *      volveria a empujar fuera al plan que pago. El costo: un checkout abandonado
+ *      que se pago tarde y despues se cancelo conserva su motivo y queda afuera. Es
+ *      raro, y el resultado es cobrar en el acto, como antes. Los motivos se
+ *      comparan contra las constantes de `motivos-terminal.ts`, que es lo que
+ *      escribe el reconciliador: con un literal copiado aca, el dia que alguien
+ *      cambie el motivo el filtro dejaria de reconocerlo sin que nada falle.
  *
  *   3. **Si el plan se abrio con prueba, que haya podido cobrar.** Un plan
  *      diferido (`diferidoHastaMs` = E) no cobra antes de E, salvo por el adelanto
@@ -842,6 +851,29 @@ export function situacionDeLaPrueba(i: PruebaDiferidaInput): SituacionDeLaPrueba
 
   if (!autorizadaATiempo(i.planCreadoMs, i.mpDateCreated)) return "fuera-de-ventana";
   return i.nowMs < e + HOLGURA_PRUEBA_MS ? "en-prueba" : "vencida";
+}
+
+/**
+ * Si un plan con prueba YA tuvo un cobro exitoso cuando todavia faltaba mas del
+ * adelanto maximo ([ADELANTO_MAXIMO_DEL_COBRO_MS]) para que le tocara cobrar.
+ *
+ * Quiere decir que MP IGNORO o ACORTO la prueba, y que el PF pago dos veces: el
+ * periodo que ya tenia pago y el que acaba de cobrar el plan nuevo. Es la medicion
+ * del supuesto (b) de "Lo que se ASUME de MP". El cobro ocurrio en algun momento
+ * anterior o igual a `nowMs`, asi que si `nowMs` ya esta antes de E menos el
+ * adelanto, el cobro cayo antes de lo que cualquier forma de contar los dias
+ * podria explicar.
+ *
+ * No cambia ningun estado ni ninguna fecha: el plan que ya cobro se lee como
+ * cualquier otro. Es solo para que el reconciliador avise.
+ */
+export function cobroAntesDeLaPrueba(
+  i: Pick<PruebaDiferidaInput, "diferidoHastaMs" | "summarized" | "nowMs">,
+): boolean {
+  const e = i.diferidoHastaMs;
+  if (typeof e !== "number" || !Number.isFinite(e)) return false;
+  if (cobrosExitosos(i.summarized) < 1) return false;
+  return i.nowMs < e - ADELANTO_MAXIMO_DEL_COBRO_MS;
 }
 
 /**

@@ -173,10 +173,11 @@
  * lee como cualquier otro plan.
  *
  * Esas reglas descansan en supuestos sobre como MP cuenta una prueba que NO estan
- * medidos, y por eso los dos casos que piden que alguien mire loguean un warn: la
- * autorizacion tardia (deja sin plan a quien autorizo un pago) y la prueba vencida
- * sin cobro (podria estar dando acceso gratis). Las reglas, los supuestos y el
- * por que de cada una estan en ese archivo.
+ * medidos, y por eso los tres casos que piden que alguien mire loguean un warn: la
+ * autorizacion tardia (deja sin plan a quien autorizo un pago), la prueba vencida
+ * sin cobro (podria estar dando acceso gratis) y el plan con prueba que ya cobro
+ * antes de tiempo (MP ignoro o acorto la prueba: el PF pago dos veces). Las
+ * reglas, los supuestos y el por que de cada una estan en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -204,6 +205,8 @@ import {
   PruebaDiferidaInput,
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
+  cobroAntesDeLaPrueba,
+  cobrosExitosos,
   situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
 import {
@@ -213,6 +216,7 @@ import {
   hayCobroPendiente,
   mapMpStatus,
 } from "./map-status";
+import { MOTIVO_ABANDONO, MOTIVO_REEMPLAZO } from "./motivos-terminal";
 import {
   MP_PLANS_COLLECTION,
   ProductoMp,
@@ -524,18 +528,12 @@ const CAMPO_REEMPLAZO = "supersededBy";
  */
 export const CAMPO_CUENTA_ELIMINADA = "cuentaEliminadaAtMs";
 
-/**
- * Los dos motivos de `terminal` que escribe este archivo. Son constantes y no
- * literales sueltos porque `puedeSeguirCobrando` COMPARA contra uno de ellos:
- * escritos a mano en dos lados, el dia que alguien cambie una redaccion el
- * filtro deja de reconocer su propio motivo y el bug es silencioso.
- *
- * (El tercer `terminal` que existe no tiene motivo: el de `status === cancelled`
- * mas abajo. Que la baja del PF sea la unica SIN motivo es deliberado — ver
- * `puedeSeguirCobrando`.)
- */
-const MOTIVO_ABANDONO = "checkout abandonado";
-const MOTIVO_REEMPLAZO = "reemplazado por otro plan";
+// Los dos motivos de `terminal` que escribe este archivo (`MOTIVO_ABANDONO` y
+// `MOTIVO_REEMPLAZO`) viven en `motivos-terminal.ts`, junto con la explicacion de
+// las tres clases de `terminal`: `diferir-primer-cobro.ts` tambien los lee, y un
+// import hacia este archivo seria circular. El tercer `terminal` no tiene motivo:
+// es el de `status === cancelled`, y que la baja del PF sea la unica SIN motivo es
+// deliberado (ver `puedeSeguirCobrando`).
 
 /**
  * Este plan todavia PUEDE estar cobrandole al PF, asi que hay que mirarlo.
@@ -1233,6 +1231,26 @@ export async function reconcileSubscription(
     hacia: status,
     diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
   };
+  if (cobroAntesDeLaPrueba(pruebaDiferida)) {
+    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de un dia para
+    // el fin de lo que el PF tenia pago: MP ignoro o acorto la prueba, y el PF pago
+    // dos veces ese periodo. No cambia el estado (un plan que cobro se lee como
+    // cualquiera), pero es el aviso de que el supuesto central del diferimiento
+    // no se cumplio: hay que revisar ese pago y evaluar apagar el interruptor
+    // (`DIFERIR_PRIMER_COBRO_ENABLED`, en `diferir-primer-cobro.ts`).
+    logger.warn(
+      "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el PF " +
+        "tenia pago, MP ignoro o acorto la prueba y el PF pago dos veces",
+      {
+        planId,
+        uid,
+        mpStatus: mp.status,
+        diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+        cobros: cobrosExitosos(mp.summarized),
+        nowIso: isoDeMs(deps.nowMs),
+      },
+    );
+  }
   if (situacion === "fuera-de-ventana") {
     // WARN y no info. Esto deja SIN el plan a alguien que autorizo un pago (hasta
     // el primer cobro real de MP) y que probablemente crea que ya lo tiene: tiene
@@ -1414,22 +1432,37 @@ export async function reconcileSubscription(
       { merge: true },
     );
 
-    // La baja es terminal en MP: no se reactiva un preapproval cancelado, se
-    // crea uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra
-    // una llamada diaria a MP para siempre.
-    if (status === "cancelled") {
-      await getFirestore(app)
-        .collection(MP_PLANS_COLLECTION)
-        .doc(planId)
-        .set({ terminal: true }, { merge: true });
-    }
-
     logger.info("mp/reconcile: suscripcion actualizada", {
       planId,
       uid,
       tier: mapping.tier,
       status,
     });
+  }
+
+  // La baja es terminal en MP: no se reactiva un preapproval cancelado, se
+  // crea uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra
+  // una llamada diaria a MP para siempre.
+  //
+  // ── FUERA del `if (!sinCambios)`, y es el arreglo ──
+  //
+  // Las dos escrituras (el usuario y el plan) no son atomicas. Con la marca
+  // adentro del `if`, una falla entre las dos dejaba el `subscription` ya
+  // escrito y el plan sin marcar, y la corrida siguiente veia `sinCambios` y
+  // nunca la reintentaba: el plan quedaba sin `terminal` PARA SIEMPRE. No era
+  // solo ruido en el barrido. `terminal` es lo que distingue, para
+  // `planesARevisar`, un plan que tuvo una suscripcion de verdad de un checkout
+  // que nadie pago, asi que un plan pagado y sin marca dejaba de contar como
+  // evidencia de pago y a ese PF se le cobraba en el acto lo que ya tenia pago.
+  //
+  // Ahora se escribe siempre que MP diga `cancelled` y el plan no la tenga. Es
+  // idempotente (`merge`, sin motivo): la unica clase de `terminal` sin motivo
+  // es justamente la baja (ver `motivos-terminal.ts`).
+  if (status === "cancelled" && planDoc?.terminal !== true) {
+    await getFirestore(app)
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planId)
+      .set({ terminal: true }, { merge: true });
   }
 
   // ── LA BAJA DE LO QUE ESTE PLAN REEMPLAZA ──

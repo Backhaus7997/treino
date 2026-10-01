@@ -57,13 +57,14 @@ jest.mock("firebase-admin/firestore", () => (
 
 import { HttpsError } from "firebase-functions/v2/https";
 
-import { runCreatePreapproval } from "../subscriptions/mp/create-preapproval";
+import { runCreatePreapproval as runCreatePreapprovalReal } from "../subscriptions/mp/create-preapproval";
 import {
   MpApiError,
   MpClient,
   MpPreapproval,
   MpPreapprovalPlan,
 } from "../subscriptions/mp/client";
+import { DIFERIR_PRIMER_COBRO_ENABLED } from "../subscriptions/mp/diferir-primer-cobro";
 import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
 
 // ---------------------------------------------------------------------------
@@ -176,6 +177,17 @@ function fakeMp(
 
 const PF = { users: { t1: { role: "trainer" } } };
 const OK = { mpClient: fakeMp().client, nowMs: 1_000_000 };
+
+/**
+ * `runCreatePreapproval` con el interruptor del diferimiento ENCENDIDO por defecto.
+ *
+ * Los tests de este archivo prueban el camino con diferimiento, y no tienen por que
+ * depender del valor de la constante `DIFERIR_PRIMER_COBRO_ENABLED`: flipearla (el
+ * rollback) no puede ponerlos rojos por accidente. Un test del camino apagado pasa
+ * `diferirHabilitado: false` y gana sobre este default.
+ */
+const runCreatePreapproval: typeof runCreatePreapprovalReal = (app, uid, raw, deps) =>
+  runCreatePreapprovalReal(app, uid, raw, { diferirHabilitado: true, ...deps });
 
 async function errorDe(fn: () => Promise<unknown>): Promise<HttpsError> {
   try {
@@ -681,7 +693,10 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     },
   });
 
-  /** Lo que MP dice del plan p0: un cobro real el 20/8. */
+  /**
+   * Lo que MP dice del plan p0: un cobro real el 20/8. Con montos POSITIVOS, para
+   * que la rama positiva de la regla de los montos corra en todo el flujo principal.
+   */
   const COBRO_DE_P0: Record<string, MpPreapproval[]> = {
     p0: [{
       id: "s0",
@@ -689,7 +704,9 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       auto_recurring: { frequency: 1, frequency_type: "months" },
       summarized: {
         charged_quantity: 1,
+        charged_amount: 22000,
         last_charged_date: "2026-08-20T12:00:00.000Z",
+        last_charged_amount: 22000,
         pending_charge_quantity: 0,
       },
     }],
@@ -1253,5 +1270,76 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     expect(err.code).toBe("unavailable");
     expect(mp.llamadas).toHaveLength(0);
     expect(escrituras).toHaveLength(0);
+  });
+
+  // ── El interruptor apagado: el rollback ──
+  //
+  // Existe por si MP rechaza (o cuenta distinto) una prueba de dias. Apagado, el
+  // checkout es el de siempre: cobra en el acto, y no lee ni busca nada.
+
+  it("apagado, un PF con dias pagos abre un checkout NORMAL y no busca nada en MP", async () => {
+    const { app, store, lecturas } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const r = await runCreatePreapproval(app, "t1", PEDIDO, {
+      ...deps(mp.client),
+      diferirHabilitado: false,
+    });
+
+    expect(r.status).toBe("created");
+    esUnCheckoutNormal(mp, store);
+    expect(mp.busquedas).toEqual([]);
+    // Ni los planes de Firestore ni el checkout abierto: solo la lectura de
+    // `abrirCheckout`.
+    expect(lecturas.filter((l) => l.col === "mp_checkouts")).toHaveLength(1);
+    expect(lecturas.filter((l) => l.col === "mp_plans")).toHaveLength(0);
+  });
+
+  it("apagado, un checkout DIFERIDO que ya estaba abierto no se reusa: se abre uno normal", async () => {
+    // El rollback tiene que ser real: si se reusara, el PF seguiria pagando por un
+    // plan con una prueba que el interruptor acaba de apagar.
+    const mundo = PF_DADO_DE_BAJA();
+    mundo.mp_checkouts = { t1: checkoutGuardado({ diferidoHastaMs: FIN }) };
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const r = await runCreatePreapproval(app, "t1", PEDIDO, {
+      ...deps(mp.client),
+      diferirHabilitado: false,
+    });
+
+    expect(r.status).toBe("created");
+    esUnCheckoutNormal(mp, store);
+  });
+
+  it("encendido, el mismo mundo SI difiere (el control del camino apagado)", async () => {
+    const { app, store } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", PEDIDO, {
+      ...deps(mp.client),
+      diferirHabilitado: true,
+    });
+
+    expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
+    expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
+  });
+
+  it("sin pasar el interruptor vale la constante, sea cual sea su valor", async () => {
+    // Fija el cableado del default sin asumir el valor: lo que hace el handler sin
+    // el parametro es exactamente lo que hace pasandole la constante.
+    const sinParametro = fakeApp(PF_DADO_DE_BAJA());
+    const mpSin = fakeMp(undefined, COBRO_DE_P0);
+    await runCreatePreapprovalReal(sinParametro.app, "t1", PEDIDO, deps(mpSin.client));
+
+    const conLaConstante = fakeApp(PF_DADO_DE_BAJA());
+    const mpCon = fakeMp(undefined, COBRO_DE_P0);
+    await runCreatePreapprovalReal(conLaConstante.app, "t1", PEDIDO, {
+      ...deps(mpCon.client),
+      diferirHabilitado: DIFERIR_PRIMER_COBRO_ENABLED,
+    });
+
+    expect(mpSin.llamadas).toEqual(mpCon.llamadas);
+    expect(mpSin.busquedas).toEqual(mpCon.busquedas);
   });
 });

@@ -76,6 +76,8 @@ import {
 } from "../subscriptions/mp/reconcile";
 import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
 import { ReconcileDeps } from "../subscriptions/mp/reconcile";
+import { decidirDiferimiento } from "../subscriptions/mp/diferir-primer-cobro";
+import { MOTIVO_REEMPLAZO } from "../subscriptions/mp/motivos-terminal";
 import { effectiveWeightLimit } from "../subscriptions/effective-limit";
 import { toSubscriptionState } from "../subscriptions/subscription-state";
 
@@ -83,7 +85,16 @@ import { toSubscriptionState } from "../subscriptions/subscription-state";
 
 type Store = Record<string, Record<string, Record<string, unknown>>>;
 
-function fakeApp(seed: Store = {}) {
+function fakeApp(
+  seed: Store = {},
+  opts: {
+    /**
+     * Corre antes de CADA escritura y puede tirar: es como se reproduce una falla
+     * transitoria de Firestore entre dos escrituras que no son atomicas.
+     */
+    alEscribir?: (col: string, id: string, data: Record<string, unknown>) => void;
+  } = {},
+) {
   const store: Store = seed;
   const escrituras: { col: string; id: string; data: unknown; merge: boolean }[] = [];
 
@@ -93,12 +104,13 @@ function fakeApp(seed: Store = {}) {
       exists: store[col]?.[id] !== undefined,
       data: () => store[col]?.[id],
     }),
-    set: async (data: Record<string, unknown>, opts?: { merge?: boolean }) => {
+    set: async (data: Record<string, unknown>, o?: { merge?: boolean }) => {
+      opts.alEscribir?.(col, id, data);
       store[col] = store[col] ?? {};
-      store[col][id] = opts?.merge
+      store[col][id] = o?.merge
         ? { ...(store[col][id] ?? {}), ...data }
         : data;
-      escrituras.push({ col, id, data, merge: opts?.merge === true });
+      escrituras.push({ col, id, data, merge: o?.merge === true });
     },
   });
 
@@ -2518,5 +2530,353 @@ describe("reconcileSubscription: la prueba diferida", () => {
       expect.stringContaining("posible acceso gratis"),
       expect.anything(),
     );
+  });
+
+  // ── MP ignoro o acorto la prueba: el PF cobro antes de tiempo y pago dos veces ──
+  //
+  // Es la medicion del supuesto central del diferimiento. La suscripcion de un plan
+  // con prueba cobro cuando todavia faltaba mas de un dia para el fin de lo que el
+  // PF tenia pago: pago ese periodo dos veces.
+
+  const COBRO_ANTES_DE_TIEMPO = {
+    charged_quantity: 1,
+    charged_amount: 22000,
+    last_charged_date: AUTORIZADA_HACE_30_MIN,
+    last_charged_amount: 22000,
+    pending_charge_quantity: 0,
+  };
+  const MENSAJE_COBRO_DOBLE =
+    "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el PF " +
+    "tenia pago, MP ignoro o acorto la prueba y el PF pago dos veces";
+
+  it("un plan con prueba que ya cobro cuando faltan 13 dias: WARN de cobro doble", async () => {
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: COBRO_ANTES_DE_TIEMPO,
+    }));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      MENSAJE_COBRO_DOBLE,
+      expect.objectContaining({
+        planId: "p1",
+        uid: "t1",
+        mpStatus: "authorized",
+        cobros: 1,
+        diferidoHastaIso: new Date(FIN_PAGO).toISOString(),
+        nowIso: new Date(AHORA).toISOString(),
+      }),
+    );
+    // No cambia el estado: un plan que ya cobro se lee como cualquier otro.
+    expect(subDe(store).status).toBe("active");
+  });
+
+  it("el borde: a exactamente un dia de E todavia no avisa, un milisegundo antes si", async () => {
+    // Un dia antes de E es lo mas temprano que suponemos que MP podria cobrar si
+    // cuenta los dias en su propio calendario (-04:00).
+    for (const [nowMs, avisa] of [
+      [FIN_PAGO - DIA_MS, false],
+      [FIN_PAGO - DIA_MS - 1, true],
+    ] as const) {
+      warnSpy.mockClear();
+      const { app } = fakeApp(DIFERIDO());
+
+      await reconcileSubscription(app, "p1", fakeMp({
+        ...EN_PRUEBA_MP,
+        summarized: COBRO_ANTES_DE_TIEMPO,
+      }, nowMs));
+
+      expect(warnSpy.mock.calls.some((c) => c[0] === MENSAJE_COBRO_DOBLE))
+        .toBe(avisa);
+    }
+  });
+
+  it("el primer cobro que se esperaba (en E o despues) NO avisa", async () => {
+    for (const nowMs of [FIN_PAGO, FIN_PAGO + 2 * DIA_MS]) {
+      warnSpy.mockClear();
+      const { app } = fakeApp(DIFERIDO());
+
+      await reconcileSubscription(app, "p1", fakeMp({
+        ...EN_PRUEBA_MP,
+        summarized: COBRO_ANTES_DE_TIEMPO,
+      }, nowMs));
+
+      expect(warnSpy).not.toHaveBeenCalledWith(MENSAJE_COBRO_DOBLE, expect.anything());
+    }
+  });
+
+  it("avisa tambien si despues el PF cancelo: ya pago dos veces", async () => {
+    const { app } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      summarized: COBRO_ANTES_DE_TIEMPO,
+    }));
+
+    expect(warnSpy).toHaveBeenCalledWith(MENSAJE_COBRO_DOBLE, expect.anything());
+  });
+
+  it("una autorizacion de $0 no es un cobro: no avisa", async () => {
+    const { app } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 1, charged_amount: 0, pending_charge_quantity: 0 },
+    }));
+
+    expect(warnSpy).not.toHaveBeenCalledWith(MENSAJE_COBRO_DOBLE, expect.anything());
+  });
+
+  it("un plan normal, que cobra al autorizar, nunca avisa", async () => {
+    // Sin `diferidoHastaMs` no hay prueba que MP pueda haber ignorado.
+    const mundo = DIFERIDO();
+    delete mundo.mp_plans.p1.diferidoHastaMs;
+    const { app } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: COBRO_ANTES_DE_TIEMPO,
+    }));
+
+    expect(warnSpy).not.toHaveBeenCalledWith(MENSAJE_COBRO_DOBLE, expect.anything());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La baja del PF deja el plan listo para ser evidencia de un pago.
+//
+// El diferimiento solo mira planes `terminal`: es lo que distingue un plan que tuvo
+// una suscripcion de verdad de un checkout que nadie pago. Hasta aca TODAS las
+// fixtures del diferimiento escribian `terminal: true` a mano, asi que si el
+// reconciliador dejara de escribirlo (o le agregara un motivo que el filtro
+// descarta) el diferimiento se apagaria sin que ningun test se pusiera rojo.
+//
+// Estos corren el reconciliador de verdad y despues `decidirDiferimiento` de verdad
+// contra el MISMO store.
+// ---------------------------------------------------------------------------
+
+/** El mapa `subscription` que dejo el reconciliador, sin interpretar. */
+const subDe = (store: Store) =>
+  store.users.t1.subscription as Record<string, unknown>;
+
+describe("reconcile + diferimiento: la baja del PF deja el plan listo para contar como pago", () => {
+  const FIN_X = Date.parse("2026-09-20T12:00:00.000Z");
+  const COBRO_DE_AGOSTO = "2026-08-20T12:00:00.000Z";
+
+  /** Un PF activo que pago el 20/8 con su plan p0. Nada marcado `terminal`: eso lo hace la baja. */
+  const PF_QUE_PAGA = (): Store => ({
+    users: {
+      t1: {
+        role: "trainer",
+        subscription: {
+          tier: "plan2",
+          status: "active",
+          currentPeriodEnd: ts(FIN_X),
+          prepaidTier: null,
+          prepaidUntil: null,
+        },
+      },
+    },
+    mp_plans: {
+      p0: {
+        uid: "t1",
+        tier: "plan2",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 18 * DIA_MS),
+      },
+    },
+  });
+
+  /** La suscripcion de p0 despues de que el PF se dio de baja. MP omite la fecha de una cancelada que pago. */
+  const BAJA_DE_P0: MpPreapproval = {
+    id: "s0",
+    status: "cancelled",
+    external_reference: "t1",
+    date_created: COBRO_DE_AGOSTO,
+    next_payment_date: undefined,
+    auto_recurring: {
+      ...AUTO_RECURRING_REAL,
+      start_date: COBRO_DE_AGOSTO,
+      transaction_amount: 22000,
+    },
+    summarized: {
+      charged_quantity: 1,
+      charged_amount: 22000,
+      last_charged_date: COBRO_DE_AGOSTO,
+      last_charged_amount: 22000,
+      pending_charge_quantity: 0,
+    },
+  };
+
+  /**
+   * `decidirDiferimiento` tal como lo arma `create-preapproval.ts`, pero leyendo del
+   * store que acaba de escribir el reconciliador: los planes de la cuenta y el
+   * documento del usuario. Lo unico que viene de afuera es lo que dice MP.
+   */
+  const decidir = (store: Store, deps: ReconcileDeps, userData = store.users.t1) =>
+    decidirDiferimiento({
+      uid: "t1",
+      tier: "plan2",
+      userData,
+      nowMs: AHORA,
+      habilitado: true,
+      leerPlanes: async () =>
+        Object.entries(store.mp_plans)
+          .filter(([, datos]) => datos.uid === "t1")
+          .map(([id, data]) => ({ id, data })),
+      leerSuscripciones: (planId) => deps.mpClient.searchPreapprovalsByPlan(planId),
+    });
+
+  it("la baja deja el plan `terminal` SIN motivo, y el siguiente checkout lleva prueba", async () => {
+    const { app, store } = fakeApp(PF_QUE_PAGA());
+    const deps = fakeMp(BAJA_DE_P0);
+
+    const r = await reconcileSubscription(app, "p0", deps);
+
+    expect(r.outcome).toBe("written");
+    expect(subDe(store).status).toBe("cancelled");
+    // Lo que escribe el reconciliador, sin ayuda de la fixture.
+    expect(store.mp_plans.p0.terminal).toBe(true);
+    expect(store.mp_plans.p0).not.toHaveProperty("terminalReason");
+
+    // Y de ahi sale el diferimiento: el plan cuenta como evidencia de pago.
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN_X });
+  });
+
+  it("si el reconciliador dejara de marcar la baja, el diferimiento NO se dispararia (el control)", async () => {
+    // Prueba que el test anterior depende de lo que escribe el reconciliador: el
+    // mismo mundo con el plan sin marcar no difiere.
+    const { app, store } = fakeApp(PF_QUE_PAGA());
+    const deps = fakeMp(BAJA_DE_P0);
+    await reconcileSubscription(app, "p0", deps);
+    delete store.mp_plans.p0.terminal;
+
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+  });
+
+  it("una falla ENTRE la escritura del usuario y la del plan se repara en la corrida siguiente", async () => {
+    // El bug: la marca estaba adentro del `if (!sinCambios)`. Una falla entre las
+    // dos escrituras dejaba el usuario escrito y el plan sin marcar, y la corrida
+    // siguiente veia `sinCambios` y nunca la reintentaba: el plan que pago dejaba
+    // de contar como evidencia PARA SIEMPRE.
+    let fallo = false;
+    const { app, store } = fakeApp(PF_QUE_PAGA(), {
+      alEscribir: (col, id, data) => {
+        if (!fallo && col === "mp_plans" && id === "p0" && data.terminal === true) {
+          fallo = true;
+          throw new Error("UNAVAILABLE");
+        }
+      },
+    });
+    const deps = fakeMp(BAJA_DE_P0);
+
+    await expect(reconcileSubscription(app, "p0", deps)).rejects.toThrow("UNAVAILABLE");
+    // El estado exacto que dejaba el bug: el usuario escrito, el plan sin marcar.
+    expect(subDe(store).status).toBe("cancelled");
+    expect(store.mp_plans.p0.terminal).toBeUndefined();
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+
+    const r = await reconcileSubscription(app, "p0", deps);
+
+    expect(r.outcome).toBe("unchanged");
+    expect(store.mp_plans.p0.terminal).toBe(true);
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN_X });
+  });
+
+  it("la marca es idempotente: un plan que ya es terminal no se vuelve a escribir", async () => {
+    // Ya esta marcado y el usuario ya tiene la baja: no hay nada que escribir, ni en
+    // `users` ni en `mp_plans`.
+    const mundo = PF_QUE_PAGA();
+    (mundo.users.t1.subscription as Record<string, unknown>).status = "cancelled";
+    (mundo.mp_plans.p0 as Record<string, unknown>).terminal = true;
+    const { app, escrituras } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p0", fakeMp(BAJA_DE_P0));
+
+    expect(r.outcome).toBe("unchanged");
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("solo la baja marca: un plan que MP no dio de baja queda sin terminal", async () => {
+    // `terminal` saca al plan del barrido para siempre. Marcarlo en cualquier otro
+    // estado dejaria de mirar una suscripcion que sigue viva y cobrando.
+    const { app, store } = fakeApp(PF_QUE_PAGA());
+
+    await reconcileSubscription(app, "p0", fakeMp({
+      ...BAJA_DE_P0,
+      status: "authorized",
+      next_payment_date: new Date(FIN_X).toISOString(),
+    }));
+
+    expect(store.mp_plans.p0.terminal).toBeUndefined();
+  });
+
+  it("el barrido de la noche tambien la repara, y despues el plan sale del barrido", async () => {
+    const mundo = PF_QUE_PAGA();
+    (mundo.users.t1.subscription as Record<string, unknown>).status = "cancelled";
+    const { app, store } = fakeApp(mundo);
+    const deps = fakeMp(BAJA_DE_P0);
+
+    const primera = await reconcileAllSubscriptions(app, deps);
+
+    expect(primera.total).toBe(1);
+    expect(primera.unchanged).toBe(1);
+    expect(store.mp_plans.p0.terminal).toBe(true);
+
+    // Ya marcado: el barrido no vuelve a visitarlo.
+    const segunda = await reconcileAllSubscriptions(app, deps);
+    expect(segunda.total).toBe(0);
+  });
+
+  // ── Un plan pagado que despues se reemplazo tambien tiene que contar ──
+
+  it("un plan pagado que se reemplazo queda `terminal` con MOTIVO_REEMPLAZO y SIGUE dando evidencia", async () => {
+    // p0 (pago el 20/8) sigue vivo cuando el PF compra p1: al confirmarse p1, el
+    // reconciliador da de baja p0 y lo marca terminal CON motivo. Ese plan pagado
+    // es la evidencia del pago, y el filtro no puede descartarlo.
+    const mundo = PF_QUE_PAGA();
+    mundo.mp_plans.p1 = {
+      uid: "t1",
+      tier: "plan2",
+      cycle: "annual",
+      createdAt: ts(AHORA - DIA_MS),
+    };
+    const { app, store } = fakeApp(mundo);
+    const deps = fakeMpMultiPlan({
+      p0: {
+        ...BAJA_DE_P0,
+        status: "authorized",
+        next_payment_date: new Date(FIN_X).toISOString(),
+      },
+      p1: {
+        id: "s1",
+        status: "authorized",
+        external_reference: "t1",
+        next_payment_date: new Date(AHORA + 365 * DIA_MS).toISOString(),
+        auto_recurring: { transaction_amount: 220000 },
+        summarized: { charged_quantity: 1, charged_amount: 220000, pending_charge_quantity: 0 },
+      },
+    });
+
+    const r = await reconcileSubscription(app, "p1", deps);
+
+    expect(r.dadosDeBaja).toBe(1);
+    expect(deps.bajas).toEqual(["s0"]);
+    expect(store.mp_plans.p0.terminal).toBe(true);
+    // El motivo que escribe el reconciliador es la constante compartida.
+    expect(store.mp_plans.p0.terminalReason).toBe(MOTIVO_REEMPLAZO);
+
+    // El PF cancela el plan nuevo (p1 sigue sin cerrar en este store): el unico
+    // plan que puede ser evidencia es p0, el reemplazado.
+    const cancelado = {
+      subscription: { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(FIN_X) },
+    };
+    expect(await decidir(store, deps, cancelado))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN_X });
   });
 });
