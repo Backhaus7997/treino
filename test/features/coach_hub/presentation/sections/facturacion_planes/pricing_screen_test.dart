@@ -1239,19 +1239,75 @@ void main() {
           expect(abiertas, hasLength(2));
         });
 
+        // EL TEXTO EXACTO, y por qué es un «si». Si el primer cobro se difiere
+        // lo decide el servidor, que además exige ver en MP un cobro real que
+        // respalde esos días (`diferir-primer-cobro.ts`); desde el cliente eso
+        // no se ve. La versión anterior decía «Pagado hasta el 15/10: el primer
+        // cobro es ese día.» y afirmaba un pago que nadie había comprobado.
         testWidgets(
-            'dice hasta cuándo está pago y que el primer cobro es ese día',
-            (tester) async {
+            'la nota es condicional: «Si ya pagaste hasta el d/m, el primer '
+            'cobro es ese día.»', (tester) async {
           await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
 
-          const nota = 'Pagado hasta el 15/10: el primer cobro es ese día.';
+          const nota =
+              'Si ya pagaste hasta el 15/10, el primer cobro es ese día.';
           expect(
             enElPieDe(SubscriptionTier.plan1, find.text(nota)),
             findsOneWidget,
           );
           // Una sola, en la tarjeta del plan actual y en ninguna otra.
-          expect(find.textContaining('Pagado hasta'), findsOneWidget);
+          expect(find.textContaining('Si ya pagaste hasta'), findsOneWidget);
+          // Y la afirmación incondicional de antes no volvió.
+          expect(find.textContaining('Pagado hasta'), findsNothing);
         });
+
+        // ── La nota y el borde de un día ──
+        //
+        // El servidor sólo difiere el primer cobro si falta AL MENOS un día:
+        // con `finMs - nowMs < MIN_DIFERIMIENTO_MS` cobra en el acto
+        // (`queda-menos-de-un-dia`, functions/src/subscriptions/mp/
+        // diferir-primer-cobro.ts). Con menos, la nota sería falsa con
+        // seguridad y no se dibuja. El botón NO depende del borde: volver a
+        // suscribirse sigue siendo válido a una hora del vencimiento.
+        //
+        // El fin se mide contra el «ahora» congelado y no contra un instante
+        // escrito a mano: el borde es una DIFERENCIA, no una fecha.
+        for (final (descripcion, resta, conNota) in <(String, Duration, bool)>[
+          ('14 días', const Duration(days: 14), true),
+          ('24 h y 1 minuto', const Duration(hours: 24, minutes: 1), true),
+          // El servidor descarta con `<`, no con `<=`: con EXACTAMENTE un día
+          // todavía difiere.
+          ('exactamente 24 h', const Duration(hours: 24), true),
+          ('23 h 59 min', const Duration(hours: 23, minutes: 59), false),
+          ('1 hora', const Duration(hours: 1), false),
+          ('1 minuto', const Duration(minutes: 1), false),
+        ]) {
+          testWidgets(
+              'con $descripcion por delante la nota '
+              '${conNota ? 'aparece' : 'se esconde'} y el botón sigue',
+              (tester) async {
+            final fin = AppClock.now().add(resta).toUtc();
+            await pumpEn(tester, size, cancelado(fin), web: true);
+
+            expect(
+              find.textContaining('Si ya pagaste hasta'),
+              conNota ? findsOneWidget : findsNothing,
+              reason: conNota
+                  ? 'con $descripcion el servidor SÍ puede diferir y la nota '
+                      'faltó'
+                  : 'con $descripcion el servidor cobra en el acto y la nota '
+                      'prometió lo contrario',
+            );
+            // Pase lo que pase con la nota, el plan se puede volver a
+            // contratar: es la tarjeta del plan actual, dada de baja.
+            expect(
+              enElPieDe(
+                  SubscriptionTier.plan1, find.text('VOLVER A SUSCRIBIRME')),
+              findsOneWidget,
+            );
+            expect(find.text('TU PLAN ACTUAL'), findsNothing);
+          });
+        }
 
         // El botón y la nota son dos renglones nuevos en una tarjeta que ya
         // tenía el precio-héroe. Con el texto grande el botón crece y la nota
@@ -1274,7 +1330,10 @@ void main() {
                 'textScale 1.5',
           );
           expect(find.text('VOLVER A SUSCRIBIRME'), findsOneWidget);
-          expect(find.textContaining('Pagado hasta el 15/10'), findsOneWidget);
+          expect(
+            find.textContaining('Si ya pagaste hasta el 15/10'),
+            findsOneWidget,
+          );
         });
 
         // `currentPeriodEnd` es un instante UTC: entre las 21:00 y las 23:59
@@ -1290,7 +1349,8 @@ void main() {
           );
 
           expect(
-            find.text('Pagado hasta el 15/10: el primer cobro es ese día.'),
+            find.text(
+                'Si ya pagaste hasta el 15/10, el primer cobro es ese día.'),
             findsOneWidget,
           );
           expect(find.textContaining('16/10'), findsNothing);
@@ -1330,7 +1390,7 @@ void main() {
           await pumpEn(tester, size, cancelado(vencido), web: true);
 
           expect(find.text('VOLVER A SUSCRIBIRME'), findsNothing);
-          expect(find.textContaining('Pagado hasta'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(
             enElPieDe(SubscriptionTier.plan1, find.text('ELEGIR PLAN')),
             findsOneWidget,
@@ -1371,7 +1431,7 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('VOLVER A SUSCRIBIRME'), findsNothing);
-          expect(find.textContaining('Pagado hasta'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
         });
 
@@ -1398,7 +1458,7 @@ void main() {
               findsOneWidget,
             );
             expect(find.text('VOLVER A SUSCRIBIRME'), findsNothing);
-            expect(find.textContaining('Pagado hasta'), findsNothing);
+            expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           });
         }
       });
@@ -1424,7 +1484,7 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('VOLVER A SUSCRIBIRME'), findsNothing);
-          expect(find.textContaining('Pagado hasta'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(find.textContaining('cobro'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNothing);
           expect(

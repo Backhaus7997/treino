@@ -675,6 +675,8 @@ class _PlanCards extends StatelessWidget {
                 annual: annual,
                 isCurrent: tierActual == tier,
                 pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
+                primerCobroDiferible:
+                    tierActual == tier && vigencia.primerCobroDiferible,
                 recommended: tier == recommended,
                 palette: palette,
                 checkout: checkout,
@@ -684,6 +686,8 @@ class _PlanCards extends StatelessWidget {
                 annual: annual,
                 isCurrent: tierActual == tier,
                 pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
+                primerCobroDiferible:
+                    tierActual == tier && vigencia.primerCobroDiferible,
                 recommended: tier == recommended,
                 palette: palette,
                 checkout: checkout,
@@ -951,6 +955,7 @@ class _PlanCard extends StatelessWidget {
     required this.annual,
     required this.isCurrent,
     required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -962,6 +967,9 @@ class _PlanCard extends StatelessWidget {
 
   /// Ver [_PlanCtaButton.pagadoHasta].
   final DateTime? pagadoHasta;
+
+  /// Ver [_PlanCtaButton.primerCobroDiferible].
+  final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
   final PlanCheckout checkout;
@@ -1144,6 +1152,7 @@ class _PlanCard extends StatelessWidget {
             annual: annual,
             isCurrent: isCurrent,
             pagadoHasta: pagadoHasta,
+            primerCobroDiferible: primerCobroDiferible,
             recommended: recommended,
             palette: palette,
             checkout: checkout,
@@ -1187,6 +1196,7 @@ class _NarrowPlanCard extends StatelessWidget {
     required this.annual,
     required this.isCurrent,
     required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -1198,6 +1208,9 @@ class _NarrowPlanCard extends StatelessWidget {
 
   /// Ver [_PlanCtaButton.pagadoHasta].
   final DateTime? pagadoHasta;
+
+  /// Ver [_PlanCtaButton.primerCobroDiferible].
+  final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
   final PlanCheckout checkout;
@@ -1354,6 +1367,7 @@ class _NarrowPlanCard extends StatelessWidget {
             annual: annual,
             isCurrent: isCurrent,
             pagadoHasta: pagadoHasta,
+            primerCobroDiferible: primerCobroDiferible,
             recommended: recommended,
             palette: palette,
             checkout: checkout,
@@ -1483,6 +1497,7 @@ class _PlanCtaButton extends StatelessWidget {
     required this.annual,
     required this.isCurrent,
     required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -1502,6 +1517,12 @@ class _PlanCtaButton extends StatelessWidget {
   /// [VigenciaDelPlan.pagadoHasta]); en cualquier otro caso es `null` y la
   /// tarjeta se comporta como siempre.
   final DateTime? pagadoHasta;
+
+  /// Si falta al menos un día para [pagadoHasta], que es el único borde de la
+  /// decisión de diferir el primer cobro que se ve desde el cliente (ver
+  /// [VigenciaDelPlan.primerCobroDiferible]). Decide si se dibuja la nota del
+  /// primer cobro; el botón de volver a suscribirse no depende de esto.
+  final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
 
@@ -1528,7 +1549,7 @@ class _PlanCtaButton extends StatelessWidget {
       // una tercera superficie DEJA DE COMPILAR hasta que alguien decida qué
       // dice acá.
       //
-      // Todo el texto nuevo de la baja (el botón y la fecha) cuelga de
+      // Todo el texto nuevo de la baja (el botón y la nota) cuelga de
       // [PlanCheckoutAvailable] y de nada más. La app móvil muestra lo de
       // siempre: «TU PLAN ACTUAL», sin botón y sin una palabra sobre volver a
       // pagar. Bajo 3.1.3(f) invitar a re-contratar es un call to action de
@@ -1548,18 +1569,37 @@ class _PlanCtaButton extends StatelessWidget {
                 disponible,
                 'VOLVER A SUSCRIBIRME', // i18n: Fase W3
               ),
-              const SizedBox(height: AppSpacing.s8),
-              // Lo que cambia la decisión: no se le cobra dos veces los días que
-              // ya pagó. La fecha es `currentPeriodEnd` en calendario argentino.
-              Text(
-                'Pagado hasta el ${fechaDiaMesArg(hasta)}: '
-                'el primer cobro es ese día.', // i18n: Fase W3
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: palette.textMuted,
-                  fontSize: AppTextSize.caption,
+              // La nota del primer cobro es CONDICIONAL («Si ya pagaste…»)
+              // y se esconde con menos de un día por delante, por el mismo
+              // motivo: si el primer cobro se difiere lo decide el SERVIDOR,
+              // no esta pantalla. `decidirDiferimiento`, en
+              // functions/src/subscriptions/mp/diferir-primer-cobro.ts,
+              // difiere sólo si la baja está pedida, el tier es el mismo,
+              // falta al menos `MIN_DIFERIMIENTO_MS` (un día) y MP muestra un
+              // cobro real que respalde esos días. Las tres primeras se ven
+              // desde acá; la última no, y la fecha final es la MENOR entre
+              // nuestro fin y lo que cubre ese cobro. Por eso el texto no
+              // afirma un pago que nadie verificó: deja el «si» en manos del
+              // servidor.
+              //
+              // Con menos de un día NO se difiere (`queda-menos-de-un-dia`):
+              // se cobra en el acto y la nota sería falsa con seguridad, así
+              // que no se dibuja. El botón queda, porque volver a suscribirse
+              // sigue siendo válido; lo que se calla es sólo lo que no se
+              // cumple. Se evalúa al construir, sin timer: ver
+              // [VigenciaDelPlan].
+              if (primerCobroDiferible) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  'Si ya pagaste hasta el ${fechaDiaMesArg(hasta)}, '
+                  'el primer cobro es ese día.', // i18n: Fase W3
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: palette.textMuted,
+                    fontSize: AppTextSize.caption,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
       };

@@ -13,6 +13,12 @@
 ///   3. Que el borde sea el del servidor (estricto). `now == fin` ya es vencido.
 ///   4. Que nada que no sea una baja cambie de tier por la fecha: un período
 ///      vencido en un `pending` o `paused` NO lo vuelve Free acá.
+///   5. Que [VigenciaDelPlan.primerCobroDiferible] use el MISMO borde que el
+///      servidor para diferir el primer cobro (`decidirDiferimiento`, en
+///      `functions/src/subscriptions/mp/diferir-primer-cobro.ts`): con menos de
+///      un día se cobra en el acto (`finMs - nowMs < MIN_DIFERIMIENTO_MS`), con
+///      exactamente un día todavía se difiere. Si el aviso de la pricing page
+///      dice «el primer cobro es ese día» donde el servidor cobra ya, miente.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -39,6 +45,7 @@ void main() {
       expect(v.tierEfectivo, SubscriptionTier.free);
       expect(v.cancelada, isFalse);
       expect(v.pagadoHasta, isNull);
+      expect(v.primerCobroDiferible, isFalse);
     });
 
     // Cualquier estado que no sea `cancelled` conserva el tier del doc, y la
@@ -61,6 +68,23 @@ void main() {
         expect(v.tierEfectivo, SubscriptionTier.plan2);
         expect(v.cancelada, isFalse);
         expect(v.pagadoHasta, isNull);
+        expect(v.primerCobroDiferible, isFalse);
+      });
+
+      // El servidor sólo difiere si la suscripción está `cancelled`
+      // (`no-esta-cancelada`): un período largo por delante en un estado que no
+      // es la baja NO habilita el aviso.
+      test('$status con un mes por delante tampoco difiere el primer cobro',
+          () {
+        final v = VigenciaDelPlan.de(
+          _sub(
+            status,
+            fin: _ahora.add(const Duration(days: 30)),
+          ),
+          now: _ahora,
+        );
+
+        expect(v.primerCobroDiferible, isFalse);
       });
     }
   });
@@ -76,10 +100,12 @@ void main() {
       expect(v.tierEfectivo, SubscriptionTier.plan1);
       expect(v.cancelada, isTrue);
       expect(v.pagadoHasta, fin);
+      expect(v.primerCobroDiferible, isTrue);
     });
 
     // Un milisegundo antes del fin sigue rigiendo: es `nowMs < currentPeriodEndMs`.
-    test('a un milisegundo de vencer todavía rige', () {
+    // Pero a un milisegundo del fin el servidor ya no difiere: cobra ya.
+    test('a un milisegundo de vencer todavía rige, pero no se difiere', () {
       final fin = _ahora.add(const Duration(milliseconds: 1));
       final v = VigenciaDelPlan.de(
         _sub(SubscriptionStatus.cancelled, fin: fin),
@@ -88,6 +114,50 @@ void main() {
 
       expect(v.tierEfectivo, SubscriptionTier.plan1);
       expect(v.pagadoHasta, fin);
+      expect(v.primerCobroDiferible, isFalse);
+    });
+
+    // ── El borde de un día: `finMs - nowMs < MIN_DIFERIMIENTO_MS` = no difiere
+    group('el primer cobro y el borde de un día', () {
+      VigenciaDelPlan conResta(Duration resta) => VigenciaDelPlan.de(
+            _sub(SubscriptionStatus.cancelled, fin: _ahora.add(resta)),
+            now: _ahora,
+          );
+
+      test('con un día y un milisegundo por delante se difiere', () {
+        expect(
+          conResta(const Duration(days: 1, milliseconds: 1))
+              .primerCobroDiferible,
+          isTrue,
+        );
+      });
+
+      // El servidor descarta con `<`, no con `<=`: este es el caso que una
+      // comparación `>` en vez de `>=` rompería sin que nada más lo note.
+      test('con EXACTAMENTE un día por delante todavía se difiere', () {
+        expect(
+          conResta(const Duration(days: 1)).primerCobroDiferible,
+          isTrue,
+        );
+      });
+
+      test('con un día menos un milisegundo ya no se difiere', () {
+        final v =
+            conResta(const Duration(days: 1) - const Duration(milliseconds: 1));
+
+        expect(v.primerCobroDiferible, isFalse);
+        // El plan sigue rigiendo y se puede volver a contratar: lo único que
+        // cambia es lo que se le promete sobre el primer cobro.
+        expect(v.tierEfectivo, SubscriptionTier.plan1);
+        expect(v.pagadoHasta, isNotNull);
+      });
+
+      test('con una hora por delante no se difiere', () {
+        expect(
+          conResta(const Duration(hours: 1)).primerCobroDiferible,
+          isFalse,
+        );
+      });
     });
   });
 
@@ -104,6 +174,7 @@ void main() {
       expect(v.tierEfectivo, SubscriptionTier.free);
       expect(v.cancelada, isTrue, reason: 'la baja se pidió igual');
       expect(v.pagadoHasta, isNull);
+      expect(v.primerCobroDiferible, isFalse);
     });
 
     // El borde del servidor es estricto: en el instante exacto del fin ya
@@ -129,6 +200,7 @@ void main() {
       expect(v.tierEfectivo, SubscriptionTier.free);
       expect(v.cancelada, isTrue);
       expect(v.pagadoHasta, isNull);
+      expect(v.primerCobroDiferible, isFalse);
     });
   });
 
@@ -158,6 +230,25 @@ void main() {
 
       expect(v.tierEfectivo, SubscriptionTier.free);
       expect(v.pagadoHasta, isNull);
+    });
+
+    // El borde de un día también sale de `AppClock`: es el mismo «ahora» que
+    // decide si el período corre, para que las dos respuestas no choquen.
+    // El fin va en UTC (como lo guarda Firestore) y se arma sumándole al
+    // «ahora» congelado, así que no depende del huso de la máquina.
+    test('sin `now` el borde de un día también sale de AppClock', () {
+      AppClock.freeze(DateTime(2026, 10, 1, 12));
+      addTearDown(AppClock.unfreeze);
+
+      VigenciaDelPlan conResta(Duration resta) => VigenciaDelPlan.de(
+            _sub(
+              SubscriptionStatus.cancelled,
+              fin: AppClock.now().add(resta).toUtc(),
+            ),
+          );
+
+      expect(conResta(const Duration(hours: 25)).primerCobroDiferible, isTrue);
+      expect(conResta(const Duration(hours: 23)).primerCobroDiferible, isFalse);
     });
   });
 }

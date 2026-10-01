@@ -2,6 +2,15 @@ import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_subscription.dart';
 
+/// Cuánto periodo pagado tiene que quedar para que el servidor DIFIERA el
+/// primer cobro de un checkout nuevo: un día.
+///
+/// Espeja `MIN_DIFERIMIENTO_MS` de
+/// `functions/src/subscriptions/mp/diferir-primer-cobro.ts` (24 h, `DIA_MS`).
+/// Si el servidor cambia ese número, cambia acá también: el aviso de la
+/// pricing page se esconde con este borde.
+const Duration _kMinDiferimiento = Duration(days: 1);
+
 /// Qué plan rige HOY para el PF y qué le quedó de una baja.
 ///
 /// «El tier que dice el doc» y «el plan que el PF tiene» dejan de ser lo mismo
@@ -33,11 +42,19 @@ import 'package:treino/features/coach/domain/trainer_subscription.dart';
 /// `microsecondsSinceEpoch`, sin importar el flag UTC), así que no hace falta
 /// pasar nada a calendario argentino; eso sólo se necesita para MOSTRAR la
 /// fecha, y ya lo resuelve `fechaDiaMesArg`.
+///
+/// ## El primer cobro
+///
+/// La pricing page le avisa al PF qué pasa con su primer cobro si vuelve a
+/// suscribirse, y eso lo decide el servidor con una regla que tiene un borde
+/// visible desde acá: un día. [primerCobroDiferible] lo expone, con el mismo
+/// "ahora" que [pagadoHasta] para que las dos cosas no se contradigan.
 final class VigenciaDelPlan {
   const VigenciaDelPlan._({
     required this.tierEfectivo,
     required this.cancelada,
     required this.pagadoHasta,
+    required this.primerCobroDiferible,
   });
 
   /// Calcula la vigencia de [suscripcion] (`null` = PF sin suscripción, Free
@@ -56,16 +73,23 @@ final class VigenciaDelPlan {
         tierEfectivo: tier,
         cancelada: false,
         pagadoHasta: null,
+        primerCobroDiferible: false,
       );
     }
 
     final fin = suscripcion.currentPeriodEnd;
-    final corre = fin != null && (now ?? AppClock.now()).isBefore(fin);
+    final ahora = now ?? AppClock.now();
+    final corre = fin != null && ahora.isBefore(fin);
     return VigenciaDelPlan._(
       // Un período que ya no corre es Free, igual que en el servidor.
       tierEfectivo: corre ? tier : SubscriptionTier.free,
       cancelada: true,
       pagadoHasta: corre ? fin : null,
+      // `>=` y no `>`: el servidor descarta con `finMs - nowMs <
+      // MIN_DIFERIMIENTO_MS`, o sea que con EXACTAMENTE un día todavía
+      // difiere.
+      primerCobroDiferible:
+          fin != null && fin.difference(ahora) >= _kMinDiferimiento,
     );
   }
 
@@ -84,4 +108,21 @@ final class VigenciaDelPlan {
   /// Que sea no-nulo es exactamente «cancelada con días pagos»: el único
   /// estado en que el PF puede volver a contratar el MISMO plan.
   final DateTime? pagadoHasta;
+
+  /// El servidor PUEDE diferir el primer cobro de un checkout nuevo de este
+  /// plan hasta [pagadoHasta]: la baja está pedida y falta al menos un día
+  /// para esa fecha. Es lo único de la decisión que el cliente alcanza a ver.
+  ///
+  /// Es una condición NECESARIA y no suficiente. Que MP muestre un cobro real
+  /// que respalde esos días lo decide el servidor, y desde acá no se ve: `true`
+  /// no promete que el cobro se difiera, y por eso el texto que lo usa es un
+  /// «si». `false` en cambio es definitivo: con menos de un día el servidor
+  /// cobra en el acto, pase lo que pase con MP.
+  ///
+  /// Espeja `decidirDiferimiento` (`queda-menos-de-un-dia`) en
+  /// `functions/src/subscriptions/mp/diferir-primer-cobro.ts`.
+  ///
+  /// Se calcula al construir y no hay un timer que lo refresque: una pantalla
+  /// que queda abierta al cruzar el borde lo conserva hasta el próximo rebuild.
+  final bool primerCobroDiferible;
 }
