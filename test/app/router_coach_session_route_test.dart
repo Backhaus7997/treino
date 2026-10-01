@@ -32,6 +32,7 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/session_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -40,10 +41,6 @@ import 'package:treino/l10n/app_l10n.dart';
 /// cuando `bornAt` falta o no llega al piso, así que un perfil "completo" sin
 /// este campo nunca llega a la pantalla que el test quiere medir.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
-
-/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
-/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
-final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
 
 class _MockUser extends Mock implements User {}
 
@@ -69,7 +66,8 @@ UserProfile _profile() => UserProfile(
       email: 'coach@example.com',
       displayName: 'coach',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'coach@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
