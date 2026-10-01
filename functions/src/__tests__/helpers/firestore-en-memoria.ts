@@ -87,7 +87,8 @@ export function fakeApp(seed: Store = {}) {
   const runTransaction = async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
     for (let intento = 0; intento < 10; intento++) {
       const leidas: Record<string, number> = {};
-      const escrituras: [Ref, Doc][] = [];
+      // `undefined` = borrar el documento.
+      const escrituras: [Ref, Doc | undefined][] = [];
       const tx = {
         get: async (ref: Ref) => {
           leidas[key(ref.__col, ref.id)] = version[key(ref.__col, ref.id)] ?? 0;
@@ -98,13 +99,21 @@ export function fakeApp(seed: Store = {}) {
         update: (ref: Ref, data: Doc) => {
           escrituras.push([ref, data]);
         },
+        // Siempre con merge: es como lo usan los tramites de este repo.
+        set: (ref: Ref, data: Doc) => {
+          escrituras.push([ref, data]);
+        },
+        delete: (ref: Ref) => {
+          escrituras.push([ref, undefined]);
+        },
       };
       const r = await fn(tx);
       const conflicto = Object.entries(leidas)
         .some(([k, v]) => (version[k] ?? 0) !== v);
       if (conflicto) continue;
       for (const [ref, data] of escrituras) {
-        write(ref.__col, ref.id, { ...(store[ref.__col]?.[ref.id] ?? {}), ...data });
+        if (data === undefined) write(ref.__col, ref.id, undefined);
+        else write(ref.__col, ref.id, { ...(store[ref.__col]?.[ref.id] ?? {}), ...data });
       }
       return r;
     }
