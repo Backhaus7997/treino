@@ -68,6 +68,11 @@ const FORMA_DEL_CODIGO = /^\d{6}$/;
 export type EstadoDeSolicitud =
   /** Se generó un código nuevo y quedó en la cola de mails. */
   | "enviado"
+  /**
+   * Ya hay un código sin vencer y con intentos: NO se manda otro. Lo contesta el
+   * pedido automático de la pantalla (ver `SolicitudDeCodigoOpciones`).
+   */
+  | "vigente"
   /** El mail ya estaba confirmado: no hay nada que mandar. */
   | "ya-verificado"
   /** Hubo un envío hace menos de 60 s. `reintentarEnMs` dice cuánto falta. */
@@ -97,6 +102,17 @@ export type EstadoDeVerificacion =
 export interface VerificacionResult {
   estado: EstadoDeVerificacion;
   intentosRestantes?: number;
+}
+
+export interface SolicitudDeCodigoOpciones {
+  /**
+   * `true` solo desde el botón «Reenviar». La pantalla pide el código sola al
+   * abrirse, y cada código nuevo invalida el anterior: sin esto, quien cierra la
+   * app para ir a buscar el mail vuelve, la pantalla pide otro, y el que tiene en
+   * la bandeja ya no sirve. Con `false`, si hay uno vigente se contesta `vigente`
+   * y no se manda nada.
+   */
+  reenviar?: boolean;
 }
 
 export interface CodigoDeps {
@@ -139,6 +155,7 @@ export async function runSolicitarCodigo(
   app: App,
   uid: string,
   deps: CodigoDeps,
+  opciones: SolicitudDeCodigoOpciones = {},
 ): Promise<SolicitudDeCodigoResult> {
   const db = getFirestore(app);
   const usuario = (await db.collection("users").doc(uid).get()).data();
@@ -151,7 +168,21 @@ export async function runSolicitarCodigo(
   if (!email) return { estado: "sin-email" };
 
   const ref = db.collection(VERIFICACIONES_COLLECTION).doc(uid);
-  const enviadoMs = (await ref.get()).data()?.enviadoMs;
+  const previo = (await ref.get()).data();
+
+  // Pedido automático con un código todavía útil: no se pisa. Ver
+  // `SolicitudDeCodigoOpciones.reenviar`.
+  const intentosPrevios = typeof previo?.intentos === "number" ? previo.intentos : 0;
+  if (
+    opciones.reenviar !== true &&
+    typeof previo?.venceMs === "number" &&
+    deps.nowMs <= previo.venceMs &&
+    intentosPrevios < MAX_INTENTOS
+  ) {
+    return { estado: "vigente" };
+  }
+
+  const enviadoMs = previo?.enviadoMs;
   if (typeof enviadoMs === "number" && deps.nowMs - enviadoMs < REENVIO_COOLDOWN_MS) {
     return {
       estado: "enfriando",
@@ -269,14 +300,18 @@ export async function runVerificarCodigo(
 // Deuda declarada en el registry de `appcheck-enforcement.test.ts`.
 // ---------------------------------------------------------------------------
 
-/** Callable: mandar (o reenviar) el código. Requiere sesión. Sin body. */
+/**
+ * Callable: mandar el código. Requiere sesión. Body opcional `{reenviar: true}`,
+ * solo desde el botón «Reenviar»: sin él, un código vigente no se pisa.
+ */
 export const solicitarCodigoDeVerificacion = functions.onCall(
   { region: "southamerica-east1" },
   async (request): Promise<SolicitudDeCodigoResult> => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
-    return runSolicitarCodigo(ensureApp(), request.auth.uid, { nowMs: Date.now() });
+    const reenviar = (request.data ?? {}).reenviar === true;
+    return runSolicitarCodigo(ensureApp(), request.auth.uid, { nowMs: Date.now() }, { reenviar });
   },
 );
 

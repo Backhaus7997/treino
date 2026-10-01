@@ -82,11 +82,15 @@ const MUNDO = (): Store => ({
   },
 });
 
-/** Pide el código fijando cuál sale. */
+/**
+ * Pide el código fijando cuál sale. `reenviar` = el botón «Reenviar»; sin él es
+ * el pedido automático de la pantalla al abrirse.
+ */
 const pedir = (
   app: Parameters<typeof runSolicitarCodigo>[0], uid: string, codigo: string, nowMs = AHORA,
+  reenviar = false,
 ) =>
-  runSolicitarCodigo(app, uid, { nowMs, generarCodigo: () => codigo });
+  runSolicitarCodigo(app, uid, { nowMs, generarCodigo: () => codigo }, { reenviar });
 
 const verificar = (
   app: Parameters<typeof runVerificarCodigo>[0], uid: string, codigo: unknown, nowMs = AHORA + 1_000,
@@ -159,26 +163,63 @@ describe("pedir el código", () => {
     expect(mails(store)).toHaveLength(0);
   });
 
-  it("dos pedidos en menos de 60 s mandan UN solo mail", async () => {
+  it("«Reenviar» dos veces en menos de 60 s manda UN solo mail", async () => {
     const { app, store } = fakeApp(MUNDO());
 
     await pedir(app, ALUMNA, "111111");
-    const r = await pedir(app, ALUMNA, "222222", AHORA + 30_000);
+    const r = await pedir(app, ALUMNA, "222222", AHORA + 30_000, true);
 
     expect(r).toEqual({ estado: "enfriando", reintentarEnMs: REENVIO_COOLDOWN_MS - 30_000 });
     expect(mails(store)).toHaveLength(1);
 
     // Pasado el cooldown, sale.
-    const r2 = await pedir(app, ALUMNA, "333333", AHORA + REENVIO_COOLDOWN_MS);
+    const r2 = await pedir(app, ALUMNA, "333333", AHORA + REENVIO_COOLDOWN_MS, true);
     expect(r2.estado).toBe("enviado");
     expect(mails(store)).toHaveLength(2);
+  });
+
+  it("abrir la pantalla de nuevo NO invalida el código que ya está en la bandeja", async () => {
+    // El caso real: el usuario cierra la app para ir a buscar el mail y vuelve.
+    // Si la pantalla pidiera otro código al abrirse, el que tiene ya no serviría.
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "111111");
+
+    const r = await pedir(app, ALUMNA, "222222", AHORA + 5 * 60_000);
+
+    expect(r.estado).toBe("vigente");
+    expect(mails(store)).toHaveLength(1);
+    expect((await verificar(app, ALUMNA, "111111", AHORA + 5 * 60_000 + 1)).estado)
+      .toBe("verificado");
+  });
+
+  it("con el código vencido, el pedido automático manda uno nuevo", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "111111");
+
+    const r = await pedir(app, ALUMNA, "222222", AHORA + CODIGO_VIGENCIA_MS + 1);
+
+    expect(r.estado).toBe("enviado");
+    expect(mails(store)).toHaveLength(2);
+  });
+
+  it("con los intentos agotados, el pedido automático manda uno nuevo", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "111111");
+    for (let i = 0; i < MAX_INTENTOS; i++) await verificar(app, ALUMNA, "000000");
+
+    const r = await pedir(app, ALUMNA, "222222", AHORA + 2 * 60_000);
+
+    expect(r.estado).toBe("enviado");
+    expect(mails(store)).toHaveLength(2);
+    expect((await verificar(app, ALUMNA, "222222", AHORA + 2 * 60_000 + 1)).estado)
+      .toBe("verificado");
   });
 
   it("un código nuevo reemplaza al anterior", async () => {
     const { app } = fakeApp(MUNDO());
 
     await pedir(app, ALUMNA, "111111");
-    await pedir(app, ALUMNA, "222222", AHORA + REENVIO_COOLDOWN_MS);
+    await pedir(app, ALUMNA, "222222", AHORA + REENVIO_COOLDOWN_MS, true);
 
     const viejo = await verificar(app, ALUMNA, "111111", AHORA + REENVIO_COOLDOWN_MS + 1);
     expect(viejo.estado).toBe("incorrecto");
