@@ -24,11 +24,12 @@ export type MailKind =
   | "federated-signin-hint"
   | "email-verification"
   // El código de 6 dígitos que confirma el mail (`auth/codigo-de-verificacion.ts`).
-  // Obligatorio para TODOS, también Google y Apple. Además del código, le dice
-  // al usuario que los pagos y sus confirmaciones van por mail, con un botón a
-  // los planes: es lo que la app NO puede decir (3.1.3(f)). Uno por rol porque
-  // el plan y el lugar donde se paga no son los mismos. Sin `prefKey`: sin este
-  // mail no se puede entrar a la app.
+  // Obligatorio para TODOS, también Google y Apple. Con `showPlans: "1"`, además
+  // del código le dice al usuario que los pagos y sus confirmaciones van por
+  // mail, con un botón a los planes: es lo que la app NO puede decir (3.1.3(f)).
+  // Uno por rol porque el plan y el lugar donde se paga no son los mismos. Sin
+  // `prefKey`: sin este mail no se puede entrar a la app, así que el opt-out de
+  // `novedades_plan` saca el bloque de pagos (`muestraPlanes`), no el mail.
   | "email-code-athlete"
   | "email-code-trainer"
   | "appointment-confirmed"

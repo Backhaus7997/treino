@@ -43,6 +43,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -68,6 +69,7 @@ UserProfile _profile() => UserProfile(
       email: 'test@test.com',
       displayName: 'Test User',
       bornAt: _adultBornAt,
+      emailVerification: mailConfirmadoPara(UserRole.athlete, 'test@test.com'),
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),

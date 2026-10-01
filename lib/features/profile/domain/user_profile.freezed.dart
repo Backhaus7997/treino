@@ -155,6 +155,19 @@ mixin _$UserProfile {
 // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
   TrainerSubscription? get subscription => throw _privateConstructorUsedError;
   double? get weightedLoad =>
+      throw _privateConstructorUsedError; // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail> get emailVerification =>
       throw _privateConstructorUsedError; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
@@ -237,6 +250,8 @@ abstract class $UserProfileCopyWith<$Res> {
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      Map<String, VerifiedEmail> emailVerification,
       Map<String, int> onboardingSeen,
       TemplatePreferences? templatePreferences});
 
@@ -295,6 +310,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
+    Object? emailVerification = null,
     Object? onboardingSeen = null,
     Object? templatePreferences = freezed,
   }) {
@@ -444,6 +460,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
+      emailVerification: null == emailVerification
+          ? _value.emailVerification
+          : emailVerification // ignore: cast_nullable_to_non_nullable
+              as Map<String, VerifiedEmail>,
       onboardingSeen: null == onboardingSeen
           ? _value.onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
@@ -530,6 +550,8 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      Map<String, VerifiedEmail> emailVerification,
       Map<String, int> onboardingSeen,
       TemplatePreferences? templatePreferences});
 
@@ -588,6 +610,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
+    Object? emailVerification = null,
     Object? onboardingSeen = null,
     Object? templatePreferences = freezed,
   }) {
@@ -737,6 +760,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
+      emailVerification: null == emailVerification
+          ? _value._emailVerification
+          : emailVerification // ignore: cast_nullable_to_non_nullable
+              as Map<String, VerifiedEmail>,
       onboardingSeen: null == onboardingSeen
           ? _value._onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
@@ -789,10 +816,14 @@ class _$UserProfileImpl implements _UserProfile {
       this.activeRoutineId,
       this.subscription,
       this.weightedLoad,
+      @JsonKey(includeToJson: false)
+      final Map<String, VerifiedEmail> emailVerification =
+          const <String, VerifiedEmail>{},
       final Map<String, int> onboardingSeen = const <String, int>{},
       this.templatePreferences})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes,
+        _emailVerification = emailVerification,
         _onboardingSeen = onboardingSeen;
 
   factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -987,6 +1018,38 @@ class _$UserProfileImpl implements _UserProfile {
   final TrainerSubscription? subscription;
   @override
   final double? weightedLoad;
+// ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  final Map<String, VerifiedEmail> _emailVerification;
+// ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail> get emailVerification {
+    if (_emailVerification is EqualUnmodifiableMapView)
+      return _emailVerification;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_emailVerification);
+  }
+
 // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
@@ -1039,7 +1102,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, emailVerification: $emailVerification, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -1114,9 +1177,10 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.weightedLoad, weightedLoad) ||
                 other.weightedLoad == weightedLoad) &&
             const DeepCollectionEquality()
+                .equals(other._emailVerification, _emailVerification) &&
+            const DeepCollectionEquality()
                 .equals(other._onboardingSeen, _onboardingSeen) &&
-            (identical(other.templatePreferences, templatePreferences) ||
-                other.templatePreferences == templatePreferences));
+            (identical(other.templatePreferences, templatePreferences) || other.templatePreferences == templatePreferences));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1159,6 +1223,7 @@ class _$UserProfileImpl implements _UserProfile {
         activeRoutineId,
         subscription,
         weightedLoad,
+        const DeepCollectionEquality().hash(_emailVerification),
         const DeepCollectionEquality().hash(_onboardingSeen),
         templatePreferences
       ]);
@@ -1217,6 +1282,8 @@ abstract class _UserProfile implements UserProfile {
       final String? activeRoutineId,
       final TrainerSubscription? subscription,
       final double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      final Map<String, VerifiedEmail> emailVerification,
       final Map<String, int> onboardingSeen,
       final TemplatePreferences? templatePreferences}) = _$UserProfileImpl;
 
@@ -1390,7 +1457,21 @@ abstract class _UserProfile implements UserProfile {
   TrainerSubscription? get subscription;
   @override
   double?
-      get weightedLoad; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
+      get weightedLoad; // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail>
+      get emailVerification; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
 // existing accounts need no backfill and no migration.

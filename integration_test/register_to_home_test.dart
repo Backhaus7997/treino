@@ -23,7 +23,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import 'package:treino/features/home/home_screen.dart';
+import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/profile_setup/presentation/profile_setup_flow.dart';
 
 import 'support/e2e_helpers.dart';
@@ -115,15 +115,19 @@ void main() {
     await tester.tap(find.text('EMPEZAR'));
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
-    // Submit persisted displayName → onboarding-complete gate → /home.
+    // Submit persisted displayName → onboarding-complete gate → /home, y de
+    // ahí el gate del mail confirmado con código (`VerifyMailScreen`): una
+    // cuenta nueva todavía no lo confirmó. El código llega por mail y este test
+    // no puede leerlo —el backend guarda solo el hash—, así que el recorrido
+    // termina en esa pantalla.
     //
     // Ojo al tocar esto: el submit persiste displayName Y bornAt en la MISMA
     // escritura, y de eso depende que no haya loop. Si alguna vez se separan,
-    // el gate de edad del router manda a /birth-date en lugar de a /home.
+    // el gate de edad del router manda a /birth-date en lugar de seguir.
     expect(
-      find.byType(HomeScreen),
+      find.byType(VerifyMailScreen),
       findsOneWidget,
-      reason: 'completing profile-setup should land the new athlete on /home',
+      reason: 'una cuenta nueva confirma el mail antes de usar la app',
     );
   });
 }

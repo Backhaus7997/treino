@@ -5,10 +5,12 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -50,6 +52,8 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -60,6 +64,8 @@ UserProfile _trainerIncomplete() => UserProfile(
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
       bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.trainer, 'trainer@example.com'),
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -71,6 +77,8 @@ UserProfile _trainerComplete() => UserProfile(
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
       bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.trainer, 'trainer@example.com'),
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -136,6 +144,8 @@ ProviderContainer _anonContainer() => ProviderContainer(
         authNotifierProvider.overrideWith(
           () => _StubAuthNotifier(const AsyncData(null)),
         ),
+        emailGateEnabledProvider
+            .overrideWith((ref) => Stream<bool>.value(false)),
         userProfileProvider
             .overrideWith((ref) => Stream<UserProfile?>.value(null)),
       ],
@@ -145,13 +155,20 @@ ProviderContainer _loggedInContainer({
   required UserProfile profile,
   bool deletionInFlight = false,
   bool pendingWrites = false,
+  String? authEmail,
+  // El interruptor `app_config/email_gate`. Apagado por defecto: solo los tests
+  // del gate del mail lo prenden, y los demás no tocan Firebase para leerlo.
+  Stream<bool>? emailGate,
 }) {
   final mockUser = MockUser();
+  when(() => mockUser.email).thenReturn(authEmail);
   return ProviderContainer(
     overrides: [
       authNotifierProvider.overrideWith(
         () => _StubAuthNotifier(AsyncData(mockUser)),
       ),
+      emailGateEnabledProvider
+          .overrideWith((ref) => emailGate ?? Stream<bool>.value(false)),
       userProfileProvider.overrideWith(
         (ref) => Stream<UserProfile?>.value(profile),
       ),
@@ -462,6 +479,203 @@ void main() {
       // tiene, y el chequeo de disponibilidad lo rechazaría contra sí mismo.
       final c = await ready(_athletePreAgeGate());
       expect(callRedirect(c, '/home'), isNot(equals('/profile-setup')));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Gate del mail confirmado con código (VerifyMailScreen)
+  //
+  // Para TODAS las cuentas —también Google y Apple—, después del gate de edad y
+  // antes del onboarding del PF. `emailVerification` lo escribe solo la Cloud
+  // Function `verificarCodigoDeMail`, y cuenta la entrada del rol de HOY con el
+  // mail de Auth de HOY (`correoVerificadoParaElRol`).
+  // ---------------------------------------------------------------------------
+  group('gate del mail confirmado con código', () {
+    // El mail de Auth del test es, por defecto, el del perfil: es lo que el
+    // gate compara. Sin mail en Auth el gate no corre, y no es lo que se mide.
+    Future<ProviderContainer> listo(
+      UserProfile profile, {
+      String? authEmail,
+      bool interruptor = true,
+    }) async {
+      final c = _loggedInContainer(
+        profile: profile,
+        authEmail: authEmail ?? profile.email,
+        emailGate: Stream<bool>.value(interruptor),
+      );
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      await c.read(emailGateEnabledProvider.future);
+      return c;
+    }
+
+    UserProfile sinMail(UserProfile p) =>
+        p.copyWith(emailVerification: const {});
+
+    test('sin el mail confirmado, toda ruta privada manda a /verificar-mail',
+        () async {
+      final c = await listo(sinMail(_athleteProfile()));
+      for (final ruta in ['/home', '/workout', '/coach', '/profile']) {
+        expect(callRedirect(c, ruta), equals('/verificar-mail'), reason: ruta);
+      }
+    });
+
+    test('en la pantalla y sin confirmar, se queda', () async {
+      final c = await listo(sinMail(_athleteProfile()));
+      expect(callRedirect(c, '/verificar-mail'), isNull);
+    });
+
+    test('apenas llega la marca, sale a /home', () async {
+      // ENTRADA y SALIDA contra la misma condición: sin la salida, el usuario
+      // se queda mirando la pantalla con el mail ya confirmado.
+      final c = await listo(_athleteProfile());
+      expect(callRedirect(c, '/verificar-mail'), equals('/home'));
+    });
+
+    test('con la marca puesta, el gate no dispara', () async {
+      final c = await listo(_athleteProfile());
+      expect(callRedirect(c, '/home'), isNull);
+    });
+
+    test('el alumno verificado que pasa a PF vuelve a la pantalla (promoción)',
+        () async {
+      // El mail del entrenador es otro, y la entrada de alumno no lo cubre. Con
+      // un solo flag para los dos roles, este PF entraba sin ver el código.
+      final promovido = _trainerComplete().copyWith(
+        emailVerification: mailConfirmadoPara(
+          UserRole.athlete,
+          'trainer@example.com',
+        ),
+      );
+      final c = await listo(promovido);
+      expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+    });
+
+    test('una entrada con otro mail que el de Auth no alcanza', () async {
+      // El equipo le cambió el correo en Auth: el nuevo no lo abrió nadie.
+      final c = await listo(
+        _athleteProfile(),
+        authEmail: 'otro@example.com',
+      );
+      expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+    });
+
+    test('al PF también, y ANTES de su onboarding', () async {
+      final sin = await listo(sinMail(_trainerIncomplete()));
+      expect(callRedirect(sin, '/home'), equals('/verificar-mail'));
+
+      final con = await listo(_trainerIncomplete());
+      expect(
+        callRedirect(con, '/home'),
+        equals('/profile/edit-trainer?mode=onboarding'),
+      );
+    });
+
+    group('interruptor app_config/email_gate', () {
+      test('apagado, un alumno sin confirmar NO va al gate', () async {
+        final c = await listo(sinMail(_athleteProfile()), interruptor: false);
+        for (final ruta in ['/home', '/workout', '/coach', '/profile']) {
+          expect(callRedirect(c, ruta), isNull, reason: ruta);
+        }
+      });
+
+      test('apagado, quien está parado en la pantalla sale a /home', () async {
+        // Misma condición para entrar y para salir: con el interruptor apagado
+        // no puede quedarse mirando una pantalla que ya no corresponde.
+        final c = await listo(sinMail(_athleteProfile()), interruptor: false);
+        expect(callRedirect(c, '/verificar-mail'), equals('/home'));
+      });
+
+      test('apagado, el PF sin confirmar sigue directo a su onboarding',
+          () async {
+        final c =
+            await listo(sinMail(_trainerIncomplete()), interruptor: false);
+        expect(
+          callRedirect(c, '/home'),
+          equals('/profile/edit-trainer?mode=onboarding'),
+        );
+      });
+
+      test('prendido, el alumno sin confirmar va al gate', () async {
+        final c = await listo(sinMail(_athleteProfile()));
+        expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+      });
+
+      test('cargando, el gate no corre (falla abierto)', () async {
+        // El stream todavía no emitió: `valueOrNull` es null y eso es "apagado".
+        final c = _loggedInContainer(
+          profile: sinMail(_athleteProfile()),
+          authEmail: 'athlete@example.com',
+          emailGate: const Stream<bool>.empty(),
+        );
+        addTearDown(c.dispose);
+        await c.read(authNotifierProvider.future);
+        await c.read(userProfileProvider.future);
+        expect(c.read(emailGateEnabledProvider).isLoading, isTrue);
+
+        expect(callRedirect(c, '/home'), isNull);
+      });
+
+      test('con error, el gate no corre (falla abierto)', () async {
+        final c = _loggedInContainer(
+          profile: sinMail(_athleteProfile()),
+          authEmail: 'athlete@example.com',
+          emailGate: Stream<bool>.error(StateError('permission-denied')),
+        );
+        addTearDown(c.dispose);
+        await c.read(authNotifierProvider.future);
+        await c.read(userProfileProvider.future);
+        await c
+            .read(emailGateEnabledProvider.future)
+            .then<void>((_) {}, onError: (_) {});
+        expect(c.read(emailGateEnabledProvider).hasError, isTrue);
+
+        expect(callRedirect(c, '/home'), isNull);
+      });
+    });
+
+    test('el gate de edad va primero (es un requisito legal)', () async {
+      // Sin fecha y sin mail confirmado: primero la fecha.
+      final c = await listo(_athletePreAgeGate());
+      expect(callRedirect(c, '/home'), equals('/birth-date'));
+    });
+
+    test('en /birth-date con la fecha inválida, el gate del mail NO lo saca',
+        () async {
+      // Si lo sacara, el de edad lo devolvería: rebote infinito, para toda la
+      // base de cuentas viejas el día del deploy.
+      final c = await listo(_athletePreAgeGate());
+      expect(callRedirect(c, '/birth-date'), isNull);
+    });
+
+    test('las rutas públicas no se gatean', () async {
+      final c = await listo(sinMail(_athleteProfile()));
+      // Logueado en una ruta pública va a /home, y desde ahí aplica el gate.
+      expect(callRedirect(c, '/login'), equals('/home'));
+      expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+    });
+
+    test('punto fijo: desde /home termina en /verificar-mail, sin ciclos',
+        () async {
+      final c = await listo(sinMail(_trainerIncomplete()));
+
+      var location = '/home';
+      final visited = <String>[location];
+      for (var i = 0; i < 10; i++) {
+        final next = callRedirect(c, location);
+        if (next == null) break;
+        expect(
+          visited,
+          isNot(contains(next)),
+          reason: 'ciclo de redirect: ${visited.join(" → ")} → $next',
+        );
+        visited.add(next);
+        location = next;
+      }
+
+      expect(location, equals('/verificar-mail'));
+      expect(callRedirect(c, location), isNull);
     });
   });
 }

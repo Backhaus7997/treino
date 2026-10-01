@@ -807,10 +807,30 @@ export function renderMail(
   // app no puede: un llamado a pagar afuera, impreso en el binario, tumba la
   // exención 3.1.3(f) (ver `anti_steering_movil_test.dart`). El mail sí puede, y
   // pedir el código es lo que garantiza que se abra.
+  //
+  // El bloque de pagos va solo con `showPlans: "1"` (ver `muestraPlanes`): sin
+  // él, quien apagó lo comercial o no tiene nada que pagar recibe el código y
+  // nada más. Si falta el param, tampoco: ante la duda, sin contenido comercial.
   case "email-code-athlete":
   case "email-code-trainer": {
     const codigo = params.codigo ? String(params.codigo) : "";
     const esPf = kind === "email-code-trainer";
+    const conPlanes = params.showPlans === "1";
+    const planes: Line[] = [
+      [
+        strong("Todo lo de tu plan llega por acá."),
+        esPf ?
+          " Los pagos de tu plan y sus confirmaciones se hacen por mail y " +
+            "desde el Coach Hub web, nunca dentro de la app." :
+          " Los pagos de TREINO Pro y sus confirmaciones se hacen por mail, " +
+            "nunca dentro de la app.",
+      ],
+      [
+        esPf ?
+          "Tocá el botón para ver los planes y elegir el tuyo." :
+          "Cuando quieras pasarte a TREINO Pro, tocá el botón para ver los planes.",
+      ],
+    ];
     return build(
       codigo ? `${codigo} es tu código de TREINO` : "Tu código de TREINO", // i18n: email transaccional
       codigo || "Confirmá tu mail",
@@ -819,23 +839,13 @@ export function renderMail(
           "Es tu código para confirmar tu mail en TREINO. Ingresalo en la app: " +
             "vence en 15 minutos.",
         ],
-        [
-          strong("Todo lo de tu plan llega por acá."),
-          esPf ?
-            " Los pagos de tu plan y sus confirmaciones se hacen por mail y " +
-              "desde el Coach Hub web, nunca dentro de la app." :
-            " Los pagos de TREINO Pro y sus confirmaciones se hacen por mail, " +
-              "nunca dentro de la app.",
-        ],
-        [
-          esPf ?
-            "Tocá el botón para ver los planes y elegir el tuyo." :
-            "Cuando quieras pasarte a TREINO Pro, tocá el botón para ver los planes.",
-        ],
+        ...(conPlanes ? planes : []),
         ["Si no creaste una cuenta en TREINO, ignorá este mail."],
       ],
-      "VER LOS PLANES",
-      esPf ? trainerWebCheckout() : `${LANDING_URL}/es/suscripcion/checkout`,
+      conPlanes ? "VER LOS PLANES" : undefined,
+      conPlanes ?
+        (esPf ? trainerWebCheckout() : `${LANDING_URL}/es/suscripcion/checkout`) :
+        undefined,
     );
   }
 

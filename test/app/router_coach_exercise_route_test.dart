@@ -25,6 +25,7 @@ import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/presentation/exercise_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -54,6 +55,8 @@ UserProfile _profile() => UserProfile(
       email: 'coach@example.com',
       displayName: 'coach',
       bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'coach@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,

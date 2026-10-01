@@ -8,9 +8,12 @@ import 'package:treino/app/coach_hub_router.dart';
 import 'package:treino/core/utils/deep_link_destination.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+
+import '../helpers/mail_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
 
@@ -74,12 +77,17 @@ Future<String?> _call(
 ProviderContainer _container({
   required Override authOverride,
   Override? profileOverride,
+  // El interruptor `app_config/email_gate`. Apagado por defecto: solo los tests
+  // del gate del mail lo prenden, y los demás no tocan Firebase para leerlo.
+  Stream<bool>? emailGate,
 }) {
   return ProviderContainer(overrides: [
     authOverride,
     profileOverride ??
         userProfileProvider
             .overrideWith((ref) => Stream<UserProfile?>.value(null)),
+    emailGateEnabledProvider
+        .overrideWith((ref) => emailGate ?? Stream<bool>.value(false)),
   ]);
 }
 
@@ -651,6 +659,271 @@ void main() {
         ),
         '/dashboard',
       );
+    });
+  });
+
+  // ── Gate del mail confirmado con código (VerifyMailScreen) ───────────────
+  //
+  // Misma regla que la app móvil (`authRedirect`), pero el Hub tiene una
+  // restricción extra: el `?to=` del mail vive en una caja que el bloque de
+  // aterrizajes CONSUME. El gate tiene que correr antes, o el PF que confirma
+  // el mail pierde el destino.
+  group('coachHubRedirect — gate del mail confirmado con código', () {
+    const email = 'trainer@example.com';
+
+    UserProfile verificado() => _trainerProfile().copyWith(
+          emailVerification: mailConfirmadoPara(UserRole.trainer, email),
+        );
+
+    // Alumno verificado al que el equipo promovió a entrenador: solo tiene la
+    // entrada de ALUMNO, y el mail que le llega ahora es el del entrenador.
+    UserProfile promovido() => _trainerProfile().copyWith(
+          emailVerification: mailConfirmadoPara(UserRole.athlete, email),
+        );
+
+    // El mail de Auth tiene que ser el del perfil: sin mail en Auth el gate no
+    // corre, y no es lo que se mide.
+    ProviderContainer armar(
+      UserProfile profile, {
+      Stream<bool>? interruptor,
+    }) {
+      final user = _MockUser();
+      when(() => user.email).thenReturn(email);
+      final c = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+        profileOverride: userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(profile),
+        ),
+        emailGate: interruptor ?? Stream<bool>.value(true),
+      );
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    Future<ProviderContainer> listo(
+      UserProfile profile, {
+      bool interruptor = true,
+    }) async {
+      final c = armar(profile, interruptor: Stream<bool>.value(interruptor));
+      await c.read(userProfileProvider.future);
+      await c.read(emailGateEnabledProvider.future);
+      return c;
+    }
+
+    DeepLinkDestinationBox cajaFacturacion() => DeepLinkDestinationBox(
+          const DeepLinkDestination(DeepLinkTo.facturacion),
+        );
+
+    // Sigue los redirects como go_router: aplica el resultado y vuelve a
+    // preguntar sobre la ubicación nueva, hasta que contesta `null`.
+    List<String> cadena(
+      ProviderContainer c,
+      String desde,
+      DeepLinkDestinationBox box,
+    ) {
+      final visitadas = [desde];
+      for (var i = 0; i < 5; i++) {
+        final siguiente = coachHubRedirect(
+          c.read,
+          visitadas.last,
+          initialDestination: box,
+        );
+        if (siguiente == null) return visitadas;
+        visitadas.add(siguiente);
+      }
+      fail('redirect sin punto fijo: $visitadas');
+    }
+
+    test('PF sin el mail confirmado → /verificar-mail, desde cualquier ruta',
+        () async {
+      final c = await listo(_trainerProfile());
+      // `/login` incluida: un PF que se acaba de loguear va al gate ANTES del
+      // bloque de aterrizajes, no después.
+      for (final ruta in ['/dashboard', '/alumnos', '/login', '/', '/agenda']) {
+        expect(await _call(c, ruta), '/verificar-mail', reason: ruta);
+      }
+    });
+
+    test('con el interruptor APAGADO el gate no existe', () async {
+      final c = await listo(_trainerProfile(), interruptor: false);
+      expect(await _call(c, '/dashboard'), isNull);
+      expect(await _call(c, '/login'), '/dashboard');
+    });
+
+    test('apagar el interruptor SACA de la pantalla a quien está en ella',
+        () async {
+      final c = await listo(_trainerProfile(), interruptor: false);
+      expect(await _call(c, '/verificar-mail'), '/dashboard');
+    });
+
+    test('alumno promovido a PF (solo la entrada de alumno) → /verificar-mail',
+        () async {
+      final c = await listo(promovido());
+      expect(await _call(c, '/dashboard'), '/verificar-mail');
+    });
+
+    test('en la pantalla y sin confirmar, se queda', () async {
+      final c = await listo(_trainerProfile());
+      expect(await _call(c, '/verificar-mail'), isNull);
+    });
+
+    test('PF con el mail confirmado: el gate no dispara', () async {
+      final c = await listo(verificado());
+      expect(await _call(c, '/dashboard'), isNull);
+    });
+
+    test('PF confirmado parado en la pantalla → /dashboard', () async {
+      // ENTRADA y SALIDA contra la misma condición: sin la salida, el PF se
+      // queda mirando la pantalla con el mail ya confirmado.
+      final c = await listo(verificado());
+      expect(await _call(c, '/verificar-mail'), '/dashboard');
+    });
+
+    test('el alumno sigue yendo a /not-allowed: el gate no es suyo', () async {
+      final user = _MockUser();
+      when(() => user.email).thenReturn('athlete@example.com');
+      final c = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+        profileOverride: userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_athleteProfile()),
+        ),
+        emailGate: Stream<bool>.value(true),
+      );
+      addTearDown(c.dispose);
+      await c.read(emailGateEnabledProvider.future);
+
+      // Sin mail confirmado y con el gate prendido: el rol va primero.
+      expect(await _call(c, '/dashboard'), '/not-allowed');
+      expect(await _call(c, '/verificar-mail'), '/not-allowed');
+      expect(await _call(c, '/not-allowed'), isNull);
+    });
+
+    test('va ANTES de traducir /home/notifications', () async {
+      final c = await listo(_trainerProfile());
+      expect(await _call(c, '/home/notifications'), '/verificar-mail');
+    });
+
+    // EL FLUJO QUE IMPORTA: el mail trae `?to=facturacion`, el PF todavía no
+    // confirmó, confirma, y tiene que terminar en `/facturacion/planes`.
+    group('el destino del mail sobrevive a la confirmación', () {
+      test('sin confirmar: va al gate y la caja NO se toca', () async {
+        final box = cajaFacturacion();
+        final c = await listo(_trainerProfile());
+
+        expect(cadena(c, kCoachHubInitialLocation, box), [
+          kCoachHubInitialLocation,
+          '/verificar-mail',
+        ]);
+        expect(box.value?.to, DeepLinkTo.facturacion);
+
+        // El `refreshListenable` revalida el redirect con cada cambio de
+        // perfil o de interruptor: el PF puede tardar minutos en la pantalla.
+        for (var i = 0; i < 3; i++) {
+          expect(
+            coachHubRedirect(
+              c.read,
+              '/verificar-mail',
+              initialDestination: box,
+            ),
+            isNull,
+          );
+        }
+        expect(box.value?.to, DeepLinkTo.facturacion);
+      });
+
+      test('al confirmar: sale a la landing y de ahí a /facturacion/planes',
+          () async {
+        final box = cajaFacturacion();
+        final sinConfirmar = await listo(_trainerProfile());
+        cadena(sinConfirmar, kCoachHubInitialLocation, box);
+
+        // Llega el perfil con la marca (la escribe el servidor).
+        final confirmado = await listo(verificado());
+        expect(cadena(confirmado, '/verificar-mail', box), [
+          '/verificar-mail',
+          kCoachHubInitialLocation, // la salida es una ruta de ATERRIZAJE…
+          '/facturacion/planes', // …y por eso la pasada siguiente usa la caja.
+        ]);
+        expect(box.value, isNull);
+      });
+
+      test(
+          'el interruptor todavía cargando NO gasta la caja del PF sin '
+          'confirmar', () async {
+        // El perfil y el interruptor llegan por separado: si el perfil llega
+        // primero, el aterrizaje no puede consumir el destino antes de saber
+        // si el gate está prendido.
+        final interruptor = StreamController<bool>();
+        addTearDown(interruptor.close);
+        final box = cajaFacturacion();
+        final c = armar(_trainerProfile(), interruptor: interruptor.stream);
+
+        // Sin respuesta del interruptor: no hay gate (falla abierto), el PF
+        // sigue a la landing, pero el destino queda guardado.
+        expect(c.read(emailGateEnabledProvider).isLoading, isTrue);
+        await c.read(userProfileProvider.future);
+        expect(cadena(c, '/login', box), ['/login', kCoachHubInitialLocation]);
+        expect(box.value?.to, DeepLinkTo.facturacion);
+
+        // Llega el interruptor prendido: ahora sí, al gate, con la caja intacta.
+        interruptor.add(true);
+        await c.read(emailGateEnabledProvider.future);
+        expect(cadena(c, kCoachHubInitialLocation, box), [
+          kCoachHubInitialLocation,
+          '/verificar-mail',
+        ]);
+        expect(box.value?.to, DeepLinkTo.facturacion);
+      });
+
+      test(
+          'el interruptor que resuelve en APAGADO suelta la caja: el PF sin '
+          'confirmar cae en el destino del mail', () async {
+        // La otra mitad de la espera: guardar el destino no puede ser para
+        // siempre. Si el interruptor llega en `false` no hay gate, y el mismo
+        // bloque de aterrizajes tiene que consumir lo que quedó guardado.
+        final interruptor = StreamController<bool>();
+        addTearDown(interruptor.close);
+        final box = cajaFacturacion();
+        final c = armar(_trainerProfile(), interruptor: interruptor.stream);
+        await c.read(userProfileProvider.future);
+
+        // Cargando: a la landing, con la caja todavía en poder del router.
+        expect(c.read(emailGateEnabledProvider).isLoading, isTrue);
+        expect(cadena(c, '/login', box), ['/login', kCoachHubInitialLocation]);
+        expect(box.value?.to, DeepLinkTo.facturacion);
+
+        // Llega el interruptor en `false`: la revalidación sobre la landing
+        // consume la caja y va al destino del mail, sin pasar por el gate.
+        interruptor.add(false);
+        expect(await c.read(emailGateEnabledProvider.future), isFalse);
+        expect(cadena(c, kCoachHubInitialLocation, box), [
+          kCoachHubInitialLocation,
+          '/facturacion/planes',
+        ]);
+        expect(box.value, isNull);
+      });
+
+      test('interruptor cargando y mail ya confirmado: la caja se usa de una',
+          () async {
+        // Para el PF confirmado da igual lo que diga el interruptor: no hay
+        // motivo para demorarle el destino.
+        final interruptor = StreamController<bool>();
+        addTearDown(interruptor.close);
+        final box = cajaFacturacion();
+        final c = armar(verificado(), interruptor: interruptor.stream);
+        await c.read(userProfileProvider.future);
+
+        expect(c.read(emailGateEnabledProvider).isLoading, isTrue);
+        expect(cadena(c, kCoachHubInitialLocation, box), [
+          kCoachHubInitialLocation,
+          '/facturacion/planes',
+        ]);
+        expect(box.value, isNull);
+      });
     });
   });
 }

@@ -940,6 +940,8 @@ describe("tildes", () => {
       timeLabel: "19:00",
       amountLabel: "$ 25.000",
       dueLabel: "26/08/2026",
+      // Con el bloque de pagos del mail del código: es el copy más largo.
+      showPlans: "1",
     });
     // Las URLs quedan afuera: `/suscripcion/checkout` es una ruta, no copy.
     const copy = `${subject}\n${text}`.replace(/https?:\/\/\S+/g, "");
@@ -1153,7 +1155,7 @@ describe("código de verificación del mail", () => {
   });
 
   it.each(AMBOS)("%s dice que los pagos y sus confirmaciones van por mail", (kind) => {
-    const out = renderMail(kind, { codigo: CODIGO });
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" });
 
     expect(out.text).toMatch(/pagos .* se hacen por mail/);
     // La etiqueta del botón vive en el HTML; el texto plano lleva la URL.
@@ -1161,7 +1163,7 @@ describe("código de verificación del mail", () => {
   });
 
   it("el del alumno manda al checkout de gettreino.com", () => {
-    const out = renderMail("email-code-athlete", { codigo: CODIGO });
+    const out = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" });
 
     expect(out.text).toContain("https://gettreino.com/es/suscripcion/checkout");
   });
@@ -1169,10 +1171,25 @@ describe("código de verificación del mail", () => {
   it("el del entrenador manda a los planes del Coach Hub web, no a la app", () => {
     // La app no vende: un PF que toca el botón en el teléfono tiene que caer en
     // la web, donde se contrata. Ver `trainerWebCheckout`.
-    const out = renderMail("email-code-trainer", { codigo: CODIGO });
+    const out = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" });
 
     expect(out.text).toContain("https://app.gettreino.com/?to=facturacion");
     expect(out.text).not.toContain("/suscripcion/checkout");
+  });
+
+  // `muestraPlanes`: quien apagó lo comercial, o no tiene nada que pagar.
+  it.each(AMBOS)("%s con showPlans \"0\" es solo el código: sin pagos ni botón", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "0" });
+
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).toContain("vence en 15 minutos");
+    expect(out.text).not.toMatch(/pago|plan|Pro\b/i);
+    expect(out.html).not.toContain("VER LOS PLANES");
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it.each(AMBOS)("%s sin showPlans tampoco lleva el bloque: ante la duda, nada comercial", (kind) => {
+    expect(renderMail(kind, { codigo: CODIGO }).html).not.toContain("VER LOS PLANES");
   });
 
   it.each(AMBOS)("%s sin código no rompe ni dice «undefined»", (kind) => {

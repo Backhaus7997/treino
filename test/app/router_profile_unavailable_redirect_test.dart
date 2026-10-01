@@ -11,6 +11,7 @@ import 'package:treino/features/profile/application/account_deletion_notifier.da
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -46,6 +47,8 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,

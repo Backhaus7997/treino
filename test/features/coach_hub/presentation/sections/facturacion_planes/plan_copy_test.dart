@@ -77,4 +77,47 @@ void main() {
       }
     });
   });
+
+  // La fecha corta de «tu plan rige hasta el 15/10». Dos ejes que NO son el
+  // mismo y que arreglar uno no arregla el otro: el HUSO (el día calendario se
+  // lee en ART, no en UTC ni en el huso de quien corre el test) y el DÍA (el
+  // borde de medianoche ART, que cae a las 03:00 UTC). Todos los instantes de
+  // acá son UTC explícitos, así que el resultado no depende de la máquina.
+  group('fechaDiaMesArg', () {
+    test('mediodía ART: el día calendario es el mismo que en UTC', () {
+      expect(fechaDiaMesArg(DateTime.utc(2026, 10, 15, 15)), '15/10');
+    });
+
+    // El caso que motivó el helper: entre las 21:00 y las 23:59 ART el día UTC
+    // ya es el siguiente. Leer los campos crudos mostraría «16/10».
+    test('22:30 ART (01:30 UTC del día siguiente) sigue siendo el día ART', () {
+      expect(fechaDiaMesArg(DateTime.utc(2026, 10, 16, 1, 30)), '15/10');
+    });
+
+    test('el borde es medianoche ART: 02:59 UTC es ayer, 03:00 UTC es hoy', () {
+      expect(fechaDiaMesArg(DateTime.utc(2026, 10, 16, 2, 59)), '15/10');
+      expect(fechaDiaMesArg(DateTime.utc(2026, 10, 16, 3, 0)), '16/10');
+    });
+
+    test('cruza el borde del año: 01:00 UTC del 1/1 es el 31/12 en ART', () {
+      expect(fechaDiaMesArg(DateTime.utc(2027, 1, 1, 1)), '31/12');
+    });
+
+    test('sin cero a la izquierda: «5/3», no «05/03»', () {
+      expect(fechaDiaMesArg(DateTime.utc(2026, 3, 5, 15)), '5/3');
+    });
+
+    // `fromMillisecondsSinceEpoch` devuelve el MISMO instante con flag local.
+    // La conversión a UTC adentro del helper existe para esto: si faltara,
+    // el resultado dependería del huso del equipo que corre la suite.
+    test('un instante con flag local da lo mismo que su equivalente UTC', () {
+      final utc = DateTime.utc(2026, 10, 16, 1, 30);
+      final local = DateTime.fromMillisecondsSinceEpoch(
+        utc.millisecondsSinceEpoch,
+      );
+
+      expect(local.isUtc, isFalse);
+      expect(fechaDiaMesArg(local), fechaDiaMesArg(utc));
+    });
+  });
 }

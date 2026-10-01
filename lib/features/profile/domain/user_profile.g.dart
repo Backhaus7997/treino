@@ -63,6 +63,12 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           : TrainerSubscription.fromJson(
               json['subscription'] as Map<String, dynamic>),
       weightedLoad: (json['weightedLoad'] as num?)?.toDouble(),
+      emailVerification: (json['emailVerification'] as Map<String, dynamic>?)
+              ?.map(
+            (k, e) =>
+                MapEntry(k, VerifiedEmail.fromJson(e as Map<String, dynamic>)),
+          ) ??
+          const <String, VerifiedEmail>{},
       onboardingSeen: (json['onboardingSeen'] as Map<String, dynamic>?)?.map(
             (k, e) => MapEntry(k, (e as num).toInt()),
           ) ??

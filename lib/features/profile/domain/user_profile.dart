@@ -9,6 +9,7 @@ import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
 import 'user_role.dart';
+import 'verified_email.dart';
 
 part 'user_profile.freezed.dart';
 part 'user_profile.g.dart';
@@ -154,6 +155,21 @@ class UserProfile with _$UserProfile {
     // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
     TrainerSubscription? subscription,
     double? weightedLoad,
+
+    // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+    // `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+    // Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+    // de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+    // Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+    // Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+    // Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+    // tiene que ser la del rol de HOY y del mail de Auth de HOY.
+    // `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+    // alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false)
+    @Default(<String, VerifiedEmail>{})
+    Map<String, VerifiedEmail> emailVerification,
 
     // ── Welcome tour seen-flags (issue #627) ────────────────────────────
     // Map of `OnboardingSurface.wireKey` → version of the tour that user
