@@ -190,9 +190,11 @@ requieren una suscripción, y existe también una suscripción para atletas.
   del pie de gettreino.com, sin necesidad de iniciar sesión. Si el último día
   cae en un día inhábil, el plazo se extiende hasta el primer día hábil
   siguiente.
-- **Atletas**, desde la aplicación móvil: el pago lo procesa App Store o Google
-  Play. **La baja y el reembolso los gestiona la tienda**, desde los ajustes de
-  suscripciones de tu dispositivo.
+- **Atletas**: el pago lo procesa Mercado Pago y liquida a la cuenta de
+  BACKHAUSTIN S.A.S. **Tenés 10 días corridos para arrepentirte** y recuperar
+  todo lo pagado, desde el Botón de Arrepentimiento del pie de gettreino.com,
+  sin necesidad de iniciar sesión. Si el último día cae en un día inhábil, el
+  plazo se extiende hasta el primer día hábil siguiente.
 
 En los dos casos, pasado el plazo de arrepentimiento podés dar de baja cuando
 quieras conservando el acceso hasta el final del período pagado.

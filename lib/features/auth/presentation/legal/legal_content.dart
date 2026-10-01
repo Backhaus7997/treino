@@ -20,10 +20,10 @@ class LegalSection {
 }
 
 /// Ultima revision de Términos y Condiciones.
-const String kTermsLastUpdated = '25 de septiembre de 2026';
+const String kTermsLastUpdated = '1 de octubre de 2026';
 
 /// Ultima revision de Política de Privacidad.
-const String kPrivacyLastUpdated = '21 de septiembre de 2026';
+const String kPrivacyLastUpdated = '1 de octubre de 2026';
 
 /// Version vigente de Términos y Condiciones, para evidencia de
 /// aceptacion (`UserProfile.accepted...Version`).
@@ -142,7 +142,7 @@ const List<LegalSection> kTermsSections = <LegalSection>[
         '\n'
         'Cómo se cobra depende de dónde contrates:\n'
         '• Entrenadores, en el Coach Hub web: el pago lo procesa Mercado Pago y liquida a la cuenta de BACKHAUSTIN S.A.S. Tenés 10 días corridos para arrepentirte y recuperar todo lo pagado, desde el Botón de Arrepentimiento del pie de gettreino.com, sin necesidad de iniciar sesión. Si el último día cae en un día inhábil, el plazo se extiende hasta el primer día hábil siguiente.\n'
-        '• Atletas, desde la aplicación móvil: el pago lo procesa App Store o Google Play. La baja y el reembolso los gestiona la tienda, desde los ajustes de suscripciones de tu dispositivo.\n'
+        '• Atletas: el pago lo procesa Mercado Pago y liquida a la cuenta de BACKHAUSTIN S.A.S. Tenés 10 días corridos para arrepentirte y recuperar todo lo pagado, desde el Botón de Arrepentimiento del pie de gettreino.com, sin necesidad de iniciar sesión. Si el último día cae en un día inhábil, el plazo se extiende hasta el primer día hábil siguiente.\n'
         '\n'
         'En los dos casos, pasado el plazo de arrepentimiento podés dar de baja cuando quieras conservando el acceso hasta el final del período pagado.\n'
         '\n'
@@ -324,11 +324,11 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '• Prestarte el servicio: Guardar rutinas, registrar sesiones, calcular progreso, mostrarte estadísticas\n'
         '• Vincularte con un entrenador: Descubrimiento, solicitud de vínculo, chat, agenda, compartir lo que elijas\n'
         '• Función social: Feed, seguimientos, reacciones, rankings del gimnasio\n'
-        '• Comunicaciones: Verificación de cuenta, recuperación de contraseña, avisos operativos\n'
+        '• Comunicaciones: Verificación de cuenta, recuperación de contraseña, avisos operativos y avisos sobre tu plan y tus pagos, por correo electrónico\n'
         '• Notificaciones: Recordatorios y avisos, si los aceptás\n'
         '• Seguridad: Prevención de abuso, protección de cuentas, integridad del servicio\n'
         '• Mejora del producto: Analítica agregada y diagnóstico de errores\n'
-        '• Facturación: Sólo para entrenadores con suscripción paga\n'
+        '• Facturación: Sólo para quien tiene una suscripción paga, entrenador o atleta\n'
         '\n'
         'Lo que NO hacemos: no vendemos tus datos, no hacemos publicidad, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador.',
   ),
@@ -372,7 +372,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         'Actúan como encargados del tratamiento, bajo contrato y sólo siguiendo nuestras instrucciones:\n'
         '• Google (Firebase / Google Cloud): Autenticación, base de datos, archivos, notificaciones, analítica, reportes de error\n'
         '• Google Places: Las búsquedas de gimnasios que hacés\n'
-        '• Resend: Envío de correo transaccional (verificación, recupero de contraseña)\n'
+        '• Resend: Envío de correo (verificación, recupero de contraseña, avisos sobre tu plan y tus pagos)\n'
         '• Vercel: Alojamiento del sitio web y del panel web para entrenadores\n'
         '• CARTO: Provee las imágenes del mapa. Al cargarlo, tu dirección IP llega a su servidor\n'
         '• Apple / Google: Si iniciás sesión con sus cuentas, o si contratás por sus tiendas\n'
