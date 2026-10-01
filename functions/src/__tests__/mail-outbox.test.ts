@@ -780,6 +780,34 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       );
     });
 
+    // Los dos caminos a `failed` que agrega la baja también borran los
+    // `SECRET_PARAMS`: un comercial no los trae hoy, pero la invariante de la
+    // cola es «todo `failed` sale sin secretos», no «los que conocíamos».
+    it("los `failed` de la baja también borran los params secretos", async () => {
+      jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+      const conSecreto = {
+        ...comercial,
+        params: { ...(comercial.params ?? {}), actionLink: "https://x.test/?oobCode=s" },
+      };
+
+      // Sin clave: el camino del `motivo`.
+      await seed(conSecreto);
+      await enviar(makeOkSender(), "");
+      let doc = await readQueueDoc(mailId);
+      expect(doc?.lastError).toBe("sin clave de baja");
+      expect(doc?.params?.actionLink).toBeUndefined();
+
+      // Sin perfil: el camino de la oposición sin dónde registrarse.
+      await purge(mailId);
+      await borrarPerfil();
+      await seed(conSecreto);
+      await enviar(makeOkSender(), BAJA_KEY);
+      doc = await readQueueDoc(mailId);
+      expect(doc?.lastError).toBe("sin perfil para registrar la oposición");
+      expect(doc?.params?.actionLink).toBeUndefined();
+    });
+
     it("un uid que no entra en el token también falla cerrado, sin tirar", async () => {
       // No pasa con los uids de Auth (máximo 128); la dirección se simula.
       jest.spyOn(logger, "error").mockImplementation(() => undefined);

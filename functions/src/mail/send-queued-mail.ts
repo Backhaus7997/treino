@@ -393,6 +393,7 @@ export async function sendQueuedMailHandler(
         status: "failed",
         attempts,
         lastError: "sin perfil para registrar la oposición",
+        ...sinSecretos(),
       });
       return;
     }
@@ -467,7 +468,7 @@ export async function sendQueuedMailHandler(
           kind: data.kind,
           ...(causa ? { error: causa } : {}),
         });
-        await ref.update({ status: "failed", attempts, lastError: motivo });
+        await ref.update({ status: "failed", attempts, lastError: motivo, ...sinSecretos() });
         return;
       }
     }
