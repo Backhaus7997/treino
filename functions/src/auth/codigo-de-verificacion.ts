@@ -54,9 +54,17 @@
  *   borra al cerrar el envío, igual que `actionLink`.
  * - 5 intentos por código. Pedir uno nuevo reemplaza al anterior y reinicia los
  *   intentos, pero hay un cooldown de 60 s entre envíos —el mismo que el botón
- *   «Reenviar» de la app; si este fuera más largo, el botón mentiría—.
- * - Fuerza bruta: como mucho 5 intentos por minuto contra 10^6 combinaciones.
- *   En la vida de un código (15 min) eso es menos de 1 en 13.000.
+ *   «Reenviar» de la app; si este fuera más largo, el botón mentiría— y topes de
+ *   5 envíos por hora y 10 por día (`decidirEnvio`). Las ventanas son fijas
+ *   desde su primer envío, no móviles: en el borde entre dos pueden salir el
+ *   doble seguidos.
+ * - Fuerza bruta: 10 códigos por ventana de 24 h con 5 intentos cada uno son 50
+ *   intentos contra 10^6 combinaciones, 1 en 20.000 por ventana (el doble en el
+ *   borde entre dos).
+ *
+ * ── El bloque de pagos del mail ──
+ *
+ * Va solo si le sirve y si se puede decir: ver `muestraPlanes`.
  */
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
@@ -69,6 +77,11 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { enqueueMail } from "../mail/enqueue-mail";
+import {
+  ATHLETE_PAYWALL_ENFORCEMENT_ENABLED,
+  ENFORCED_FIELD,
+} from "../subscriptions/athlete-paywall-enforced";
+import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 
 /** Un documento por usuario, con el código vigente. Solo servidor. */
 export const VERIFICACIONES_COLLECTION = "verificaciones_de_mail";
@@ -87,6 +100,16 @@ export const REENVIO_COOLDOWN_MS = 60 * 1000;
 
 export const MAX_INTENTOS = 5;
 
+/**
+ * Topes de envíos por cuenta. El cooldown solo separa un envío del siguiente;
+ * esto acota cuántos mails saca una cuenta contra la cuota de Resend, que el
+ * día del encendido ya recibe uno por cada cuenta que abre la app.
+ */
+export const MAX_ENVIOS_POR_HORA = 5;
+export const MAX_ENVIOS_POR_DIA = 10;
+const HORA_MS = 60 * 60 * 1000;
+const DIA_MS = 24 * HORA_MS;
+
 const FORMA_DEL_CODIGO = /^\d{6}$/;
 
 export type EstadoDeSolicitud =
@@ -101,6 +124,8 @@ export type EstadoDeSolicitud =
   | "ya-verificado"
   /** Hubo un envío hace menos de 60 s. `reintentarEnMs` dice cuánto falta. */
   | "enfriando"
+  /** Llegó al tope de envíos de la hora o del día. `reintentarEnMs`, ídem. */
+  | "limitado"
   /** La cuenta todavía no eligió rol: no sabemos qué mail mandarle. */
   | "sin-perfil"
   /** La cuenta no tiene mail (no debería pasar con los métodos de ingreso de hoy). */
@@ -198,6 +223,104 @@ export function verificadoParaSuRol(
   return confirmado !== "" && confirmado === normal(email);
 }
 
+/** Las ventanas de los topes, tal como quedan escritas si el envío sale. */
+export interface Ventanas {
+  horaDesdeMs: number;
+  enviosEnLaHora: number;
+  diaDesdeMs: number;
+  enviosEnElDia: number;
+}
+
+export type DecisionDeEnvio =
+  | { estado: "enviar"; ventanas: Ventanas }
+  | { estado: "vigente" }
+  | { estado: "enfriando" | "limitado"; reintentarEnMs: number };
+
+const num = (v: unknown): number | undefined => (typeof v === "number" ? v : undefined);
+
+/**
+ * Si sale un código nuevo, dado el documento anterior. En orden: un código
+ * todavía útil no se pisa, el cooldown separa los envíos, y los topes de la
+ * hora y del día acotan el total. Las ventanas son fijas desde su primer envío.
+ */
+export function decidirEnvio(
+  previo: Record<string, unknown> | undefined,
+  pedido: { rol: Rol; email: string; nowMs: number; reenviar: boolean },
+): DecisionDeEnvio {
+  const { nowMs } = pedido;
+  // Un código emitido para el otro rol o para otro mail no le sirve a nadie: al
+  // recién promovido le toca el mail del entrenador. No cuenta como vigente ni
+  // lo frena el cooldown —el rol y el mail solo los cambia el equipo—. Los
+  // topes sí corren: cuidan la cuota, no al usuario.
+  const mismoPedido =
+    previo?.rol === pedido.rol && normal(previo?.email) === normal(pedido.email);
+
+  // Pedido automático con un código todavía útil: no se pisa. Ver
+  // `SolicitudDeCodigoOpciones.reenviar`.
+  const vence = num(previo?.venceMs);
+  if (
+    !pedido.reenviar && mismoPedido && vence !== undefined && nowMs <= vence &&
+    (num(previo?.intentos) ?? 0) < MAX_INTENTOS
+  ) {
+    return { estado: "vigente" };
+  }
+
+  const enviado = num(previo?.enviadoMs);
+  if (mismoPedido && enviado !== undefined && nowMs - enviado < REENVIO_COOLDOWN_MS) {
+    return { estado: "enfriando", reintentarEnMs: REENVIO_COOLDOWN_MS - (nowMs - enviado) };
+  }
+
+  const ventana = (desde: unknown, envios: unknown, largo: number) => {
+    const d = num(desde);
+    return d !== undefined && nowMs - d < largo ?
+      { desde: d, envios: num(envios) ?? 0, hasta: d + largo } :
+      { desde: nowMs, envios: 0, hasta: nowMs + largo };
+  };
+  const hora = ventana(previo?.horaDesdeMs, previo?.enviosEnLaHora, HORA_MS);
+  const dia = ventana(previo?.diaDesdeMs, previo?.enviosEnElDia, DIA_MS);
+  const espera = Math.max(
+    hora.envios >= MAX_ENVIOS_POR_HORA ? hora.hasta - nowMs : 0,
+    dia.envios >= MAX_ENVIOS_POR_DIA ? dia.hasta - nowMs : 0,
+  );
+  if (espera > 0) return { estado: "limitado", reintentarEnMs: espera };
+
+  return {
+    estado: "enviar",
+    ventanas: {
+      horaDesdeMs: hora.desde,
+      enviosEnLaHora: hora.envios + 1,
+      diaDesdeMs: dia.desde,
+      enviosEnElDia: dia.envios + 1,
+    },
+  };
+}
+
+/**
+ * Si el mail del código lleva el bloque de pagos. Va sin él cuando:
+ * - el usuario apagó lo comercial por mail (`novedades_plan`): la política de
+ *   privacidad promete la oposición, y este mail es obligatorio;
+ * - es alumno y el plan free no le aplica (`athletePaywallEnforced === false`:
+ *   ya paga, tiene un PF activo, o el interruptor está apagado). Sin paywall, el
+ *   checkout de la landing da 404.
+ *
+ * El campo AUSENTE cuenta como que aplica, al revés que en `firestore.rules`
+ * (que lo lee como `false` para no bloquear de más): ausente es la cuenta recién
+ * creada, a la que `syncAthletePaywallOnUser` todavía no le escribió nada, y que
+ * todavía no tiene suscripción ni PF vinculado. Con el interruptor apagado no
+ * aplica a nadie.
+ */
+export function muestraPlanes(
+  rol: Rol,
+  usuario: Record<string, unknown> | undefined,
+  paywallDelAlumnoPrendido: boolean,
+): boolean {
+  const prefs = usuario?.notificationPrefs as
+    | Record<string, { email?: unknown } | undefined>
+    | undefined;
+  if (prefs?.[ATHLETE_PROSPECT_PREF_KEY]?.email === false) return false;
+  return rol === "trainer" || (paywallDelAlumnoPrendido && usuario?.[ENFORCED_FIELD] !== false);
+}
+
 /**
  * Genera un código y lo manda por mail. El mail depende del rol: el del
  * entrenador lo manda a los planes del Coach Hub; el del alumno, al checkout
@@ -219,45 +342,33 @@ export async function runSolicitarCodigo(
   if (verificadoParaSuRol(usuario, email)) return { estado: "ya-verificado" };
 
   const ref = db.collection(VERIFICACIONES_COLLECTION).doc(uid);
-  const previo = (await ref.get()).data();
-
-  // Un código emitido para el otro rol o para otro mail no le sirve a nadie: al
-  // recién promovido le toca el mail del entrenador. No cuenta como vigente ni
-  // lo frena el cooldown —el rol y el mail solo los cambia el equipo—.
-  const mismoPedido = previo?.rol === rol && normal(previo?.email) === normal(email);
-
-  // Pedido automático con un código todavía útil: no se pisa. Ver
-  // `SolicitudDeCodigoOpciones.reenviar`.
-  const intentosPrevios = typeof previo?.intentos === "number" ? previo.intentos : 0;
-  if (
-    opciones.reenviar !== true &&
-    mismoPedido &&
-    typeof previo?.venceMs === "number" &&
-    deps.nowMs <= previo.venceMs &&
-    intentosPrevios < MAX_INTENTOS
-  ) {
-    return { estado: "vigente" };
-  }
-
-  const enviadoMs = previo?.enviadoMs;
-  if (mismoPedido && typeof enviadoMs === "number" && deps.nowMs - enviadoMs < REENVIO_COOLDOWN_MS) {
-    return {
-      estado: "enfriando",
-      reintentarEnMs: REENVIO_COOLDOWN_MS - (deps.nowMs - enviadoMs),
-    };
-  }
-
-  // El código nuevo REEMPLAZA al anterior: el viejo deja de servir y los
-  // intentos vuelven a cero.
   const codigo = (deps.generarCodigo ?? generarCodigo)();
-  await ref.set({
-    codigoHash: hashDelCodigo(uid, codigo),
-    rol,
-    email,
-    venceMs: deps.nowMs + CODIGO_VIGENCIA_MS,
-    intentos: 0,
-    enviadoMs: deps.nowMs,
+
+  // Transacción: dos pedidos simultáneos no pasan los dos el cooldown ni los
+  // topes. Sin ella, una ráfaga de pedidos en paralelo saca un mail cada uno.
+  const decision = await db.runTransaction(async (tx) => {
+    const d = decidirEnvio((await tx.get(ref)).data(), {
+      rol,
+      email,
+      nowMs: deps.nowMs,
+      reenviar: opciones.reenviar === true,
+    });
+    if (d.estado === "enviar") {
+      // El código nuevo REEMPLAZA al anterior: el viejo deja de servir y los
+      // intentos vuelven a cero.
+      tx.set(ref, {
+        codigoHash: hashDelCodigo(uid, codigo),
+        rol,
+        email,
+        venceMs: deps.nowMs + CODIGO_VIGENCIA_MS,
+        intentos: 0,
+        enviadoMs: deps.nowMs,
+        ...d.ventanas,
+      });
+    }
+    return d;
   });
+  if (decision.estado !== "enviar") return decision;
 
   // `enqueueMail` no tira nunca: devuelve `null` si no pudo escribir. Con un
   // `scope` único por envío, `null` solo puede ser una falla.
@@ -265,12 +376,17 @@ export async function runSolicitarCodigo(
     toUid: uid,
     kind: rol === "trainer" ? "email-code-trainer" : "email-code-athlete",
     scope: `${uid}_${deps.nowMs}`,
-    params: { codigo },
+    params: {
+      codigo,
+      showPlans: muestraPlanes(rol, usuario, ATHLETE_PAYWALL_ENFORCEMENT_ENABLED) ? "1" : "0",
+    },
   });
   if (encolado === null) {
     // Se borra el código: el mail no salió, así que ese código no le sirve a
     // nadie, y sin documento tampoco queda el cooldown —castigar al usuario con
-    // 60 s de espera por una falla nuestra sería el botón que miente—.
+    // 60 s de espera por una falla nuestra sería el botón que miente—. También
+    // se reinician los topes, y eso no abre nada: la falla de la cola no la
+    // provoca el usuario.
     await ref.delete().catch(() => undefined);
     logger.error("codigoDeVerificacion: no se pudo encolar el mail", { uid });
     throw new HttpsError("unavailable", "No pudimos mandar el código. Probá de nuevo.");
