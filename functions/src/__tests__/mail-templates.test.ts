@@ -1183,3 +1183,238 @@ describe("código de verificación del mail", () => {
     expect(out.text.split("\n")[0]).toBe("Confirmá tu mail");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pie de baja de los correos promocionales
+//
+// Decreto 1558/01, Anexo I, art. 27, párrafo 3: en toda comunicación con fines
+// de publicidad hay que indicar «en forma expresa y destacada» cómo pedir el
+// retiro. `sendQueuedMail` decide al enviar y le pasa la URL a `renderMail`;
+// estos tests miran qué hace la plantilla con ella.
+// ---------------------------------------------------------------------------
+describe("pie de baja de los correos promocionales", () => {
+  const BAJA = "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi";
+  const MUTED_GRIS = "#9BA8A1";
+  const BONE_BLANCO = "#FFFFFF";
+
+  /**
+   * Transcripciones EXACTAS de `design.md` §2. Se copian acá a propósito, y no
+   * se importan de `templates.ts`: un test que lee la constante que prueba
+   * pasaría igual con la transcripción retocada.
+   */
+  const LEY_25326 =
+    "Ley 25.326, art. 27, inc. 3: \"El titular podrá en cualquier momento " +
+    "solicitar el retiro o bloqueo de su nombre de los bancos de datos a los que " +
+    "se refiere el presente artículo.\"";
+  const DECRETO_1558 =
+    "Decreto 1558/01, Anexo I, art. 27, párrafo 3: \"En toda comunicación con " +
+    "fines de publicidad que se realice por correo, teléfono, correo electrónico, " +
+    "Internet u otro medio a distancia a conocer, se deberá indicar, en forma " +
+    "expresa y destacada, la posibilidad del titular del dato de solicitar el " +
+    "retiro o bloqueo, total o parcial, de su nombre de la base de datos. A pedido " +
+    "del interesado, se deberá informar el nombre del responsable o usuario del " +
+    "banco de datos que proveyó la información.\"";
+  const RESPONSABLE = "Responsable: BACKHAUSTIN S.A.S. — CUIT 30-71929587-4";
+  const AVISO =
+    "Recibís este correo promocional porque tenés una cuenta en TREINO. " +
+    "Si no querés recibir más, ";
+  const LINK_TEXTO = "dejá de recibir correos promocionales";
+
+  /** `esc()` escribe `&quot;`; el lector ve la comilla. Se compara lo que se VE. */
+  const visible = (html: string) => html.replace(/&quot;/g, "\"");
+
+  const PARAMS: MailParams = {
+    trainerName: "Jose",
+    athleteName: "Marta",
+    otherName: "Jose",
+    dateLabel: "martes 26 de agosto",
+    timeLabel: "19:00",
+    amountLabel: "$ 25.000",
+    dueLabel: "26/08/2026",
+    limit: 2,
+    blockedCount: 3,
+  };
+
+  describe("sin la opción, el mail sale como siempre", () => {
+    it.each(ALL_KINDS)("%s: pasar `{}` o `{comercial: true}` no cambia nada", (kind) => {
+      const base = renderMail(kind, PARAMS);
+
+      expect(renderMail(kind, PARAMS, {})).toEqual(base);
+      expect(renderMail(kind, PARAMS, { comercial: true })).toEqual(base);
+    });
+
+    it.each(ALL_KINDS)("%s: el pie es el de hoy y el texto plano no tiene pie", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS);
+
+      expect(html).toContain(
+        "Recibís este mail porque tenés una cuenta en TREINO.<br>" +
+          "<a href=\"https://gettreino.com\" style=\"color:" + MUTED_GRIS + ";\">" +
+          "gettreino.com</a></div>",
+      );
+      for (const huella of ["promocional", "Ley 25.326", "Decreto 1558", "BACKHAUSTIN"]) {
+        expect(html).not.toContain(huella);
+        expect(text).not.toContain(huella);
+      }
+    });
+  });
+
+  describe("con la opción", () => {
+    it.each(ALL_KINDS)("%s: lleva el link en el HTML y la URL completa en el texto", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(html).toContain(`<a href="${BAJA}"`);
+      expect(html).toContain(`>${LINK_TEXTO}</a>`);
+      expect(text).toContain(BAJA);
+    });
+
+    it.each(ALL_KINDS)("%s: transcribe los dos textos y nombra al responsable", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS, { bajaDePromocionales: BAJA });
+
+      for (const literal of [LEY_25326, DECRETO_1558, RESPONSABLE]) {
+        expect(text).toContain(literal);
+        expect(visible(html)).toContain(literal);
+      }
+    });
+
+    it("el aviso dice «promocional» y reemplaza al «Recibís este mail» del pie común", () => {
+      const { html, text } = renderMail("link-requested", PARAMS, {
+        bajaDePromocionales: BAJA,
+      });
+
+      expect(visible(html)).toContain(AVISO);
+      expect(text).toContain(`${AVISO}${LINK_TEXTO}:\n${BAJA}`);
+      // Dos frases casi iguales una abajo de la otra serían ruido.
+      expect(html).not.toContain("Recibís este mail porque");
+    });
+
+    it("conserva el link de marca a la landing", () => {
+      const { html } = renderMail("link-requested", PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(html).toContain(">gettreino.com</a>");
+    });
+
+    it("el texto plano lleva el pie DESPUÉS del botón y el cuerpo", () => {
+      // Hoy el text/plain no tiene pie: sin esto, quien lee en texto no tendría
+      // el mecanismo, que la norma pide en toda comunicación de publicidad.
+      const { text } = renderMail("limit-reached", { ...PARAMS, ctaUrl: "https://app.gettreino.com/x" }, {
+        bajaDePromocionales: BAJA,
+      });
+
+      const ordenados = [
+        text.indexOf("Llegaste al tope"),
+        text.indexOf("https://app.gettreino.com/x"),
+        text.indexOf(BAJA),
+        text.indexOf("Ley 25.326"),
+        text.indexOf("Decreto 1558"),
+        text.indexOf("Responsable:"),
+      ];
+      expect(ordenados.every((i) => i >= 0)).toBe(true);
+      expect([...ordenados].sort((a, b) => a - b)).toEqual(ordenados);
+    });
+
+    it("el aviso está DESTACADO: color del cuerpo y letra más grande que el pie chico", () => {
+      const { html } = renderMail("link-requested", PARAMS, { bajaDePromocionales: BAJA });
+
+      // El <div> que contiene el link de baja.
+      const divDelAviso = html.match(/<div style="([^"]*)">Recibís este correo promocional/);
+      expect(divDelAviso).not.toBeNull();
+      const estilo = divDelAviso![1];
+      expect(estilo).toContain(`color:${BONE_BLANCO}`);
+      expect(estilo).not.toContain(MUTED_GRIS);
+      expect(estilo).toContain("font-size:14px");
+
+      // Y las transcripciones van en el gris chico del pie.
+      const divDeLasNormas = html.match(/<div style="([^"]*)">Ley 25\.326/);
+      expect(divDeLasNormas).not.toBeNull();
+      expect(divDeLasNormas![1]).toContain(`color:${MUTED_GRIS}`);
+      expect(divDeLasNormas![1]).toContain("font-size:12px");
+    });
+
+    it("escapa la URL: no puede romper el atributo ni abrir un tag", () => {
+      const hostil = "https://x.test/?a=1&b=\"><script>alert(1)</script>";
+      const { html, text } = renderMail("link-requested", PARAMS, {
+        bajaDePromocionales: hostil,
+      });
+
+      expect(html).not.toContain("<script>");
+      expect(html).toContain("&lt;script&gt;");
+      expect(html).toContain("a=1&amp;b=&quot;&gt;");
+      // En text/plain no hay nada que escapar: va tal cual.
+      expect(text).toContain(hostil);
+    });
+
+    it("no filtra «undefined» ni «null»", () => {
+      const { html, text } = renderMail("link-requested", {}, { bajaDePromocionales: BAJA });
+
+      expect(`${html} ${text}`).not.toMatch(/undefined|null|NaN/);
+    });
+
+    it("la opción agrega el pie y no toca el cuerpo ni el asunto", () => {
+      const sin = renderMail("appointment-confirmed", PARAMS);
+      const con = renderMail("appointment-confirmed", PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(con.subject).toBe(sin.subject);
+      expect(con.text.startsWith(sin.text)).toBe(true);
+    });
+  });
+
+  describe("limit-reached con `comercial: false`", () => {
+    const CTA = "https://app.gettreino.com/?to=facturacion";
+    const render = (opciones?: Parameters<typeof renderMail>[2]) =>
+      renderMail("limit-reached", { limit: 2, blockedCount: 3, ctaUrl: CTA }, opciones);
+
+    it("omite la línea de venta", () => {
+      const { html, text } = render({ comercial: false });
+
+      expect(text).not.toContain("planes más grandes");
+      expect(text).not.toContain("Si querés seguir sumando");
+      expect(html).not.toContain("planes más grandes");
+    });
+
+    it("omite el botón VER LOS PLANES, y su URL en el texto plano", () => {
+      const { html, text } = render({ comercial: false });
+
+      expect(html).not.toContain("VER LOS PLANES");
+      expect(ctaHref(html)).toBe("");
+      // Con el botón fuera, la URL del CTA tampoco puede quedar en el texto.
+      expect(text).not.toContain(CTA);
+      expect(html).not.toContain(CTA);
+    });
+
+    it("CONSERVA lo operativo: el tope, los bloqueados y que no pierden nada", () => {
+      const { text } = render({ comercial: false });
+
+      expect(text).toContain("2 alumnos");
+      expect(text).toContain("3 alumnos quedaron en solo lectura");
+      expect(text).toContain("Tus alumnos no pierden nada");
+    });
+
+    it("sin opciones (o con `comercial: true`) sigue llevando el bloque entero", () => {
+      for (const { html, text } of [render(), render({ comercial: true })]) {
+        expect(text).toContain("Si querés seguir sumando, hay planes más grandes.");
+        expect(html).toContain("VER LOS PLANES");
+        expect(ctaHref(html)).toBe(CTA);
+        expect(text).toContain(CTA);
+      }
+    });
+
+    it("es independiente del pie de baja", () => {
+      // Sin bloque comercial y con pie: combinación que `sendQueuedMail` no
+      // produce hoy, pero la plantilla no tiene por qué asumir que no existe.
+      const { html, text } = render({ comercial: false, bajaDePromocionales: BAJA });
+
+      expect(text).not.toContain("planes más grandes");
+      expect(text).toContain(BAJA);
+      expect(html).toContain(`<a href="${BAJA}"`);
+    });
+
+    it.each(ALL_KINDS.filter((k) => k !== "limit-reached"))(
+      "%s: ignora `comercial: false` (no tiene bloque que omitir)",
+      (kind) => {
+        expect(renderMail(kind, PARAMS, { comercial: false })).toEqual(
+          renderMail(kind, PARAMS),
+        );
+      },
+    );
+  });
+});

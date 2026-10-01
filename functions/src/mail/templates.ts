@@ -69,6 +69,56 @@ export interface RenderedMail {
 }
 
 /**
+ * Lo que `sendQueuedMail` decide al ENVIAR y la plantilla no puede saber sola.
+ * Sin opciones, el mail sale exactamente como siempre.
+ */
+export interface OpcionesDeMail {
+  /**
+   * La URL de baja de los correos promocionales (`baja-de-promocionales.ts`).
+   * Con ella el pie lleva el aviso destacado, el link y las transcripciones
+   * legales, en HTML y en texto plano. Sin ella el pie es el de siempre.
+   */
+  bajaDePromocionales?: string;
+  /**
+   * `false` omite el bloque de venta de un mail operativo (hoy sólo
+   * `limit-reached`: la línea «hay planes más grandes» y el botón VER LOS
+   * PLANES). Los demás kinds no tienen bloque que omitir y lo ignoran.
+   * Default `true`.
+   */
+  comercial?: boolean;
+}
+
+// ── Las transcripciones del pie de baja ─────────────────────────────────────
+//
+// Textuales: la Disposición DNPDP 4/2009 (art. 1) pide que el correo de
+// publicidad directa transcriba los dos textos, no que los parafrasee. Fuentes
+// en `openspec/changes/baja-de-correos-promocionales/design.md` §2. NO se
+// retocan para que «suenen mejor»: una paráfrasis deja de ser la transcripción.
+const TRANSCRIPCION_LEY_25326 =
+  "Ley 25.326, art. 27, inc. 3: \"El titular podrá en cualquier momento " +
+  "solicitar el retiro o bloqueo de su nombre de los bancos de datos a los que " +
+  "se refiere el presente artículo.\"";
+
+const TRANSCRIPCION_DECRETO_1558 =
+  "Decreto 1558/01, Anexo I, art. 27, párrafo 3: \"En toda comunicación con " +
+  "fines de publicidad que se realice por correo, teléfono, correo electrónico, " +
+  "Internet u otro medio a distancia a conocer, se deberá indicar, en forma " +
+  "expresa y destacada, la posibilidad del titular del dato de solicitar el " +
+  "retiro o bloqueo, total o parcial, de su nombre de la base de datos. A pedido " +
+  "del interesado, se deberá informar el nombre del responsable o usuario del " +
+  "banco de datos que proveyó la información.\"";
+
+// Lo pide la segunda oración del párrafo 3, y es el responsable que declara
+// `docs/legal/politica-de-privacidad.md`.
+const RESPONSABLE_DEL_BANCO = "Responsable: BACKHAUSTIN S.A.S. — CUIT 30-71929587-4";
+
+const AVISO_PROMOCIONAL =
+  "Recibís este correo promocional porque tenés una cuenta en TREINO. " +
+  "Si no querés recibir más, ";
+
+const TEXTO_DEL_LINK_DE_BAJA = "dejá de recibir correos promocionales";
+
+/**
  * Escapes HTML-significant characters.
  *
  * Display names are user-controlled. Without this a name containing a `<`
@@ -251,6 +301,8 @@ type CtaSize = "normal" | "hero";
  *                   un borde que brilla de blanco a mint. Es para el mail cuyo
  *                   UNICO trabajo es que toquen el boton (el del tope del plan
  *                   free); el resto usa "normal".
+ * @param bajaUrl  - URL de baja de los correos promocionales. Con ella el pie
+ *                   cambia (ver `pieDeBaja`); sin ella queda como siempre.
  */
 function layout(
   heading: string,
@@ -259,6 +311,7 @@ function layout(
   ctaLabel?: string,
   ctaHref: string = APP_ENTRY_ATHLETE,
   ctaSize: CtaSize = "normal",
+  bajaUrl?: string,
 ): string {
   // Hace falta la etiqueta Y el destino. Sin destino, `ctaHref` llega como ""
   // —los mails de auth pasan el `actionLink` crudo, y `sendQueuedMail` lo BORRA
@@ -320,13 +373,74 @@ function layout(
     `line-height:1.6;color:${MUTED};font-family:${FONT};">${bodyHtml}</td></tr>`,
     cta,
     "</table>",
+    bajaUrl ? pieDeBaja(bajaUrl) : pieComun(),
+    "</td></tr></table></body></html>",
+  ].join("");
+}
+
+/** El pie de siempre: de dónde viene el correo. */
+function pieComun(): string {
+  return [
     "<div style=\"max-width:520px;padding:20px 8px;font-size:12px;",
     `line-height:1.6;color:${MUTED};font-family:${FONT};">`,
     "Recibís este mail porque tenés una cuenta en TREINO.<br>",
     `<a href="${esc(LANDING_URL)}" style="color:${MUTED};">gettreino.com</a>`,
     "</div>",
-    "</td></tr></table></body></html>",
   ].join("");
+}
+
+/**
+ * El pie de un correo promocional (Decreto 1558/01, Anexo I, art. 27, párr. 3).
+ *
+ * Dos bloques, y la diferencia entre ellos es el punto: la norma pide que la
+ * posibilidad de bajarse esté «en forma expresa y destacada». El aviso con el
+ * link va en BONE y a 14px —el color de los titulares y los valores resaltados
+ * del cuerpo—, no en el MUTED de 12px del pie común, que es lo que se ignora. Lo
+ * chico son las transcripciones y el responsable.
+ *
+ * El aviso REEMPLAZA a «Recibís este mail porque tenés una cuenta»: dice lo
+ * mismo con «promocional» adentro, y dos frases iguales seguidas serían ruido.
+ *
+ * Todo lo que entra a un atributo o a un nodo pasa por `esc()`, también la URL:
+ * hoy sólo trae base64url, pero este helper no tiene por qué saberlo.
+ */
+function pieDeBaja(bajaUrl: string): string {
+  return [
+    "<div style=\"max-width:520px;padding:20px 8px 0 8px;font-size:14px;",
+    `line-height:1.6;color:${BONE};font-family:${FONT};">`,
+    esc(AVISO_PROMOCIONAL),
+    `<a href="${esc(bajaUrl)}" style="color:${MINT};text-decoration:underline;">`,
+    `${esc(TEXTO_DEL_LINK_DE_BAJA)}</a>.`,
+    "</div>",
+    "<div style=\"max-width:520px;padding:12px 8px 20px 8px;font-size:12px;",
+    `line-height:1.6;color:${MUTED};font-family:${FONT};">`,
+    `${esc(TRANSCRIPCION_LEY_25326)}<br><br>`,
+    `${esc(TRANSCRIPCION_DECRETO_1558)}<br><br>`,
+    `${esc(RESPONSABLE_DEL_BANCO)}<br>`,
+    `<a href="${esc(LANDING_URL)}" style="color:${MUTED};">gettreino.com</a>`,
+    "</div>",
+  ].join("");
+}
+
+/**
+ * El mismo pie, en texto plano. Hoy el text/plain NO tiene pie: sin esto, quien
+ * lee en texto no tendría el mecanismo de baja, que es justo lo que la norma
+ * pide en toda comunicación de publicidad. La URL va completa: un link que sólo
+ * existe dentro de un `<a>` no existe para quien lee en texto.
+ */
+function pieDeBajaEnTexto(bajaUrl: string): string[] {
+  return [
+    "",
+    "--",
+    `${AVISO_PROMOCIONAL}${TEXTO_DEL_LINK_DE_BAJA}:`,
+    bajaUrl,
+    "",
+    TRANSCRIPCION_LEY_25326,
+    "",
+    TRANSCRIPCION_DECRETO_1558,
+    "",
+    RESPONSABLE_DEL_BANCO,
+  ];
 }
 
 /**
@@ -385,14 +499,18 @@ function lineToText(line: Line): string {
  * the text/plain part. A password-reset mail whose only link lives inside an
  * HTML anchor is unusable for anyone reading in plain text — and unusable is
  * the same as broken when it is the path back into a locked account.
+ *
+ * `bajaUrl` agrega el pie de baja de los correos promocionales a las DOS partes.
+ * Lo pasa `renderMail`, no cada `case`: ver el `build` local de allá.
  */
-function build(
+function buildMail(
   subject: string,
   heading: string,
   lines: Line[],
   ctaLabel?: string,
   ctaHref?: string,
   ctaSize?: CtaSize,
+  bajaUrl?: string,
 ): RenderedMail {
   const bodyHtml = lines
     .map((l) => `<p style="margin:0 0 12px 0;">${lineToHtml(l)}</p>`)
@@ -400,6 +518,7 @@ function build(
 
   const textLines = [heading, "", ...lines.map(lineToText)];
   if (ctaHref) textLines.push("", ctaHref);
+  if (bajaUrl) textLines.push(...pieDeBajaEnTexto(bajaUrl));
 
   // El preheader se DERIVA de la primera linea del cuerpo, no es un parametro
   // por template. Un campo mas que cada `case` tiene que acordarse de pasar es
@@ -411,7 +530,7 @@ function build(
 
   return {
     subject,
-    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref, ctaSize),
+    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref, ctaSize, bajaUrl),
     text: textLines.join("\n"),
   };
 }
@@ -581,10 +700,34 @@ function downgradeReason(reason: string | number | undefined): string {
  * Missing params degrade to an empty string rather than throwing: a template
  * gap must not strand a queue document in permanent failure.
  *
- * @param kind   - Selects the template.
- * @param params - Template values, as persisted on the queue doc.
+ * @param kind     - Selects the template.
+ * @param params   - Template values, as persisted on the queue doc.
+ * @param opciones - Lo que `sendQueuedMail` decide al enviar: el pie de baja de
+ *                   los correos promocionales y si el mail lleva su bloque
+ *                   comercial. Sin ellas, el mail sale como siempre.
  */
-export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
+export function renderMail(
+  kind: MailKind,
+  params: MailParams,
+  opciones: OpcionesDeMail = {},
+): RenderedMail {
+  const { bajaDePromocionales, comercial = true } = opciones;
+
+  // Este `build` LOCAL tapa al de módulo (`buildMail`) a propósito: el pie de
+  // baja es una decisión de ENVÍO, no de cada plantilla, y pasarlo a mano por
+  // los 30 `case` es el campo que el próximo MailKind se va a olvidar de
+  // pasar —y el síntoma sería un correo promocional sin el mecanismo de baja—.
+  // Así NINGÚN `case` puede olvidarlo, porque no lo ve.
+  const build = (
+    subject: string,
+    heading: string,
+    lines: Line[],
+    ctaLabel?: string,
+    ctaHref?: string,
+    ctaSize?: CtaSize,
+  ): RenderedMail =>
+    buildMail(subject, heading, lines, ctaLabel, ctaHref, ctaSize, bajaDePromocionales);
+
   // Destino del CTA. Los productores pasan `ctaUrl` cuando el destinatario es
   // el entrenador; el resto cae al landing. Se resuelve una sola vez acá para
   // que la URL entre TAMBIEN en la parte de texto plano — un CTA que solo vive
@@ -1034,6 +1177,12 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
   // notas») esta copiado LITERAL de `blocked_students_screen.dart`, igual que
   // en el downgrade. Son el mismo hecho contado por dos canales: si divergen,
   // el PF cree que son dos problemas distintos.
+  //
+  // CON `comercial: false` SE VA EL BLOQUE DE VENTA y nada más: la línea «hay
+  // planes más grandes» y el botón VER LOS PLANES (también su URL en el texto
+  // plano). Lo operativo —el tope, quiénes quedaron en solo lectura, que no
+  // pierden nada— le llega igual a quien se opuso a lo comercial: tiene que
+  // enterarse de que sus alumnos quedaron bloqueados. Ver `bloqueComercial`.
   case "limit-reached": {
     const blocked = countParam(params.blockedCount);
     const limit = limitParam(params.limit);
@@ -1058,15 +1207,19 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
           : ["Los alumnos que pasen ese tope quedan en solo lectura: los podés " +
             "ver, pero no editarles rutinas ni notas."],
       ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
-      ["Si querés seguir sumando, hay planes más grandes."],
     );
+    if (comercial) {
+      lines.push(["Si querés seguir sumando, hay planes más grandes."]);
+    }
 
     return build(
       "Llegaste al tope de alumnos de tu cuenta", // i18n: email transaccional
       "Llegaste al tope",
       lines,
-      "VER LOS PLANES",
-      ctaUrl,
+      // Sin etiqueta Y sin destino: `buildMail` agrega la URL al texto plano
+      // apenas hay `ctaHref`, y un botón que no existe no puede dejar su link.
+      comercial ? "VER LOS PLANES" : undefined,
+      comercial ? ctaUrl : undefined,
     );
   }
 
