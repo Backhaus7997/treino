@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../core/utils/deep_link_destination.dart';
 import '../features/auth/application/auth_providers.dart';
+import '../features/auth/application/email_gate_providers.dart';
+import '../features/auth/domain/mail_verificado.dart';
+import '../features/auth/presentation/verify_mail_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_login_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/moderacion/routes.dart';
@@ -35,9 +38,18 @@ import '../features/coach_hub/presentation/shell/content_max_width.dart';
 import '../features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
+import 'theme/app_palette.dart';
 
 /// Rutas públicas del Coach Hub (no requieren auth).
 const _coachHubPublicRoutes = {'/login'};
+
+/// Gate del mail confirmado con código (`VerifyMailScreen`).
+///
+/// El MISMO path que en la app móvil (`_verifyMailRoute` de `router.dart`):
+/// es la misma pantalla y el mismo gate, y tener un solo nombre evita que los
+/// dos routers se desincronicen. Acá es una ruta top-level FUERA del
+/// `ShellRoute`: quien todavía no confirmó el mail no ve el sidebar.
+const _verifyMailRoute = '/verificar-mail';
 
 /// Lógica de redirect pura del Coach Hub — testeable como función standalone.
 ///
@@ -115,6 +127,44 @@ String? coachHubRedirect(
       return isNotAllowed ? null : '/not-allowed';
     }
 
+    // Gate del mail confirmado con código. Misma regla que la app móvil
+    // (`authRedirect`): el interruptor `app_config/email_gate`
+    // (`emailGateEnabledProvider`, falla ABIERTO: cargando, en error o sin
+    // documento es «apagado») y `correoVerificadoParaElRol`, POR ROL y contra
+    // el mail de Auth de hoy. Un alumno verificado que el equipo promueve a
+    // entrenador entra por el Hub —es donde se loguea un PF— y vuelve a ver la
+    // pantalla, porque el mail que le llega es el del entrenador.
+    //
+    // Va DESPUÉS del role gate de arriba —un alumno nunca ve esta pantalla en
+    // el Hub: va a `/not-allowed`— y ANTES del mapeo de `/home/notifications` y
+    // del bloque de aterrizajes de abajo. Ese orden no es cosmético:
+    // `initialDestination` (el `?to=` que trajo el mail) se CONSUME en el
+    // bloque de aterrizajes. Si el gate corriera después, el PF que llega desde
+    // un mail con `?to=facturacion` y todavía no confirmó gastaría el destino
+    // camino a `/facturacion/planes`, el gate lo rebotaría a `/verificar-mail`
+    // y, al confirmar, caería en el dashboard con el destino perdido. Con el
+    // gate antes, mientras confirma la caja NO se toca.
+    //
+    // Por eso la SALIDA va a `kCoachHubInitialLocation` y no a cualquier ruta:
+    // es una ruta de aterrizaje, así que en la pasada siguiente (go_router
+    // re-evalúa el redirect sobre lo que devolvimos) el bloque de abajo consume
+    // la caja y lo manda a `/facturacion/planes`.
+    //
+    // ENTRADA y SALIDA contra la MISMA condición, y quedarse mientras no se
+    // pueda salir (misma regla que el gate de la app móvil). A diferencia de
+    // allá, tampoco se exceptúa `/login`: un PF sin confirmar que se acaba de
+    // loguear tiene que ir al gate ANTES del bloque de aterrizajes, no después.
+    final gateAsync = read(emailGateEnabledProvider);
+    final mailSinConfirmar = !correoVerificadoParaElRol(profile, user.email);
+    final gateOn = gateAsync.valueOrNull ?? false;
+    final enElGateDelMail = location.startsWith(_verifyMailRoute);
+    if (gateOn && mailSinConfirmar && !enElGateDelMail) {
+      return _verifyMailRoute;
+    }
+    if (enElGateDelMail) {
+      return gateOn && mailSinConfirmar ? null : kCoachHubInitialLocation;
+    }
+
     // El push de vinculación manda UN SOLO `deepLink` a las dos superficies, y
     // las rutas no coinciden: en la app móvil las solicitudes pendientes viven
     // en `/home/notifications?tab=solicitudes` y acá la sección es
@@ -171,8 +221,20 @@ String? coachHubRedirect(
       // en un path no-nulo. Un logout+login posterior en la MISMA pestaña
       // también pasa por este mismo branch (vía `isPublic`), y tiene que
       // encontrar la caja vacía, no reciclar el destino de la sesión previa.
-      final dest = initialDestination?.value;
-      initialDestination?.value = null;
+      //
+      // Única excepción: el interruptor todavía no llegó Y el mail está sin
+      // confirmar. El perfil y el interruptor son dos listeners de Firestore
+      // distintos y nada garantiza que el interruptor llegue primero: si el
+      // perfil llega antes, el PF que cae desde un mail con `?to=` gastaría el
+      // destino ACÁ, un instante antes de que el interruptor llegue en `true` y
+      // lo mande al gate, y la caja ya estaría vacía. No es una espera: el PF
+      // sigue su camino (a `/dashboard`, como siempre) y el destino queda
+      // guardado; cuando el interruptor llega, o lo manda al gate o este mismo
+      // bloque lo consume. Al PF con el mail ya confirmado no lo toca: para él
+      // da igual lo que diga el interruptor.
+      final destinoEnEspera = gateAsync.isLoading && mailSinConfirmar;
+      final dest = destinoEnEspera ? null : initialDestination?.value;
+      if (!destinoEnEspera) initialDestination?.value = null;
       final destino = _coachHubPathFor(dest);
       if (destino != null) return destino;
 
@@ -262,6 +324,30 @@ final List<RouteBase> _signedInRoutes = [
   ...routineEditorRoutes, // /routine-editor/:athleteId
 ];
 
+/// [VerifyMailScreen] con el ancho de una pantalla de escritorio.
+///
+/// La pantalla se hizo para el teléfono: el campo del código y el botón ocupan
+/// todo el ancho disponible (medido: 1360 px en una ventana de 1400). Acá se la
+/// acota igual que `CoachHubLoginScreen` y `CoachHubNotAllowedScreen`, las
+/// otras dos pantallas sin shell del Hub. El fondo se pinta afuera porque el
+/// `Scaffold` de la pantalla solo cubre la caja.
+class _VerifyMailEnElHub extends StatelessWidget {
+  const _VerifyMailEnElHub();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: AppPalette.of(context).bg,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: const VerifyMailScreen(),
+        ),
+      ),
+    );
+  }
+}
+
 /// Build del GoRouter del Coach Hub (ADR-CHW-001, ADR-CHW-008).
 ///
 /// `/login` y `/not-allowed` son rutas top-level (NO renderizan el shell): el
@@ -301,6 +387,12 @@ GoRouter buildCoachHubRouter({
       GoRoute(
         path: '/not-allowed',
         builder: (_, __) => const CoachHubNotAllowedScreen(),
+      ),
+      // Gate del mail con código. Top-level, fuera del shell, como `/login` y
+      // `/not-allowed`: sin sidebar hasta que confirme.
+      GoRoute(
+        path: _verifyMailRoute,
+        builder: (_, __) => const _VerifyMailEnElHub(),
       ),
       ShellRoute(
         pageBuilder: (ctx, state, child) => NoTransitionPage(
