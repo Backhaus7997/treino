@@ -18,7 +18,7 @@ import { Messaging } from "firebase-admin/messaging";
 import { Auth, getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions";
 import { verificarToken } from "../mail/baja-de-promocionales";
-import { enqueueMail, dedupeKey } from "../mail/enqueue-mail";
+import { EnqueueMailInput, enqueueMail, dedupeKey } from "../mail/enqueue-mail";
 import { sendQueuedMail, sendQueuedMailHandler } from "../mail/send-queued-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
 import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
@@ -979,6 +979,52 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       }
     });
 
+    describe("si el documento trae `prefKey` Y `bloqueComercial` gana el bloque", () => {
+      // El tipo ya los hace excluyentes; esto cubre el documento que llegó por otro
+      // camino. Si ganara `prefKey`, su gate frenaría el mail ENTERO y se comería
+      // el aviso operativo que `bloqueComercial` existe para dejar pasar.
+      const losDos = { ...conBloque, prefKey: PREF } as never;
+
+      it("con la preferencia APAGADA: el aviso operativo sale, sin bloque ni pie", async () => {
+        const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        await setPrefs({ [PREF]: { email: false } });
+        await seed(losDos);
+        const sender = makeOkSender();
+
+        await enviar(sender, BAJA_KEY);
+
+        expect(sender.sent).toHaveLength(1);
+        const { html, text } = sender.sent[0];
+        expect(text).toContain("3 alumnos quedaron en solo lectura");
+        expect(text).not.toContain(BLOQUE);
+        expect(html).not.toContain("VER LOS PLANES");
+        for (const huella of SIN_PIE) {
+          expect(html).not.toContain(huella);
+          expect(text).not.toContain(huella);
+        }
+        const doc = await readQueueDoc(mailId);
+        expect(doc?.status).toBe("sent");
+        expect(doc?.lastError).toBeUndefined();
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("gana bloqueComercial"),
+          expect.objectContaining({ mailId }),
+        );
+      });
+
+      it("con la preferencia PRENDIDA: el mail completo, con bloque y con pie", async () => {
+        jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+        await setPrefs({ [PREF]: { email: true } });
+        await seed(losDos);
+        const sender = makeOkSender();
+
+        await enviar(sender, BAJA_KEY);
+
+        expect(sender.sent).toHaveLength(1);
+        expect(sender.sent[0].text).toContain(BLOQUE);
+        expect(sender.sent[0].text).toMatch(URL_DE_BAJA);
+      });
+    });
+
     it("un `bloqueComercial` fuera de la allowlist no puede llevar link: sale sin bloque", async () => {
       // El tipo lo impide al encolar; esto cubre un documento que llegó por otro
       // camino. Un link para esa preferencia contestaría `invalido`: un link muerto.
@@ -1059,5 +1105,54 @@ describe("enqueueMail: bloqueComercial", () => {
     const marca: NonNullable<MailQueueDoc["bloqueComercial"]> = ATHLETE_PROSPECT_PREF_KEY;
 
     expect(marca).toBe("novedades_plan");
+  });
+});
+
+describe("prefKey y bloqueComercial son excluyentes en el tipo", () => {
+  const base = {
+    toUid: "pf-1",
+    kind: "limit-reached" as const,
+    scope: "s",
+    params: {},
+  };
+  const losDos = {
+    ...base,
+    prefKey: "novedades_plan" as const,
+    bloqueComercial: "novedades_plan" as const,
+  };
+
+  it("`enqueueMail` no admite los dos juntos", () => {
+    // @ts-expect-error — `prefKey` frena el mail entero, `bloqueComercial` sólo el bloque.
+    const input: EnqueueMailInput = losDos;
+
+    expect(input).toBeDefined();
+  });
+
+  it("cada uno por separado sí", () => {
+    const conPrefKey: EnqueueMailInput = { ...base, prefKey: "nueva_solicitud" };
+    const conBloque: EnqueueMailInput = { ...base, bloqueComercial: "novedades_plan" };
+
+    expect([conPrefKey.prefKey, conBloque.bloqueComercial]).toEqual([
+      "nueva_solicitud",
+      "novedades_plan",
+    ]);
+  });
+
+  it("`MailQueueDoc` tampoco", () => {
+    const doc = {
+      toUid: "pf-1",
+      kind: "limit-reached" as const,
+      params: {},
+      status: "pending" as const,
+      attempts: 0,
+      createdAt: FieldValue.serverTimestamp(),
+      prefKey: "novedades_plan" as const,
+      bloqueComercial: "novedades_plan" as const,
+    };
+
+    // @ts-expect-error — mismo motivo.
+    const tipado: MailQueueDoc = doc;
+
+    expect(tipado).toBeDefined();
   });
 });

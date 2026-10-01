@@ -261,8 +261,50 @@ export type MailParams = Record<string, string | number>;
 /** Lifecycle of a queued mail. Terminal states are `sent` and `failed`. */
 export type MailStatus = "pending" | "sent" | "failed";
 
+/**
+ * Cómo se frena un mail por oposición. **`prefKey` y `bloqueComercial` son
+ * EXCLUYENTES**, y el tipo lo impone: juntos, el gate de `prefKey` frenaría el
+ * mail ENTERO y se comería justo el aviso operativo que `bloqueComercial` existe
+ * para dejar pasar. Si llegan los dos igual (un documento que no pasó por el
+ * tipo), `sendQueuedMail` hace ganar a `bloqueComercial` y avisa con `warn`.
+ */
+export type MailOptOut =
+  | {
+    /**
+     * Optional `notificationPrefs` key. When present, the consumer skips the
+     * send if the user turned the email channel off for that key. Transactional
+     * mail (payment overdue, session confirmed) leaves this undefined — it is
+     * service-critical and not subject to opt-out.
+     */
+    prefKey?: string;
+    bloqueComercial?: never;
+  }
+  | {
+    prefKey?: never;
+    /**
+     * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy sólo
+     * `limit-reached`: «N alumnos quedaron en solo lectura» + «hay planes más
+     * grandes»). No se puede frenar entero con `prefKey`: quien se opuso a lo
+     * comercial igual tiene que enterarse de lo operativo. Lo que se frena es el
+     * BLOQUE.
+     *
+     * Al enviar, `sendQueuedMail` lee esa preferencia —con la misma regla que
+     * `prefKey`, sólo `false` explícito frena— y:
+     *   - apagada → renderiza sin las líneas ni el CTA de venta, y sin pie de
+     *     baja;
+     *   - prendida o ausente → el mail completo, CON el pie de baja.
+     *
+     * Es un literal y no un `string`: el link de baja sólo existe para las
+     * preferencias de la allowlist de `baja-de-promocionales.ts`. Se evalúa al
+     * enviar, no al encolar, por la misma razón que `prefKey`.
+     */
+    bloqueComercial?: "novedades_plan";
+  };
+
 /** Shape of a `mail_queue/{dedupeKey}` document. */
-export interface MailQueueDoc {
+export type MailQueueDoc = MailQueueDocBase & MailOptOut;
+
+interface MailQueueDocBase {
   /** Recipient uid. The address is resolved from Auth at send time. */
   toUid: string;
   /**
@@ -282,30 +324,6 @@ export interface MailQueueDoc {
   kind: MailKind;
   /** Template parameters. */
   params: MailParams;
-  /**
-   * Optional `notificationPrefs` key. When present, the consumer skips the
-   * send if the user turned the email channel off for that key. Transactional
-   * mail (payment overdue, session confirmed) leaves this undefined — it is
-   * service-critical and not subject to opt-out.
-   */
-  prefKey?: string;
-  /**
-   * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy sólo
-   * `limit-reached`: «N alumnos quedaron en solo lectura» + «hay planes más
-   * grandes»). No se puede frenar entero con `prefKey`: quien se opuso a lo
-   * comercial igual tiene que enterarse de lo operativo. Lo que se frena es el
-   * BLOQUE.
-   *
-   * Al enviar, `sendQueuedMail` lee esa preferencia —con la misma regla que
-   * `prefKey`, sólo `false` explícito frena— y:
-   *   - apagada → renderiza sin las líneas ni el CTA de venta, y sin pie de baja;
-   *   - prendida o ausente → el mail completo, CON el pie de baja.
-   *
-   * Es un literal y no un `string`: el link de baja sólo existe para las
-   * preferencias de la allowlist de `baja-de-promocionales.ts`. Se evalúa al
-   * enviar, no al encolar, por la misma razón que `prefKey`.
-   */
-  bloqueComercial?: "novedades_plan";
   status: MailStatus;
   /** Incremented on every send attempt, successful or not. */
   attempts: number;

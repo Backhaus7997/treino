@@ -32,8 +32,8 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import {
   MAIL_QUEUE_COLLECTION,
   MailKind,
+  MailOptOut,
   MailParams,
-  MailQueueDoc,
 } from "./types";
 
 /** Firestore gRPC status code for a `create()` on an existing document. */
@@ -64,24 +64,21 @@ export function dedupeKey(kind: MailKind, scope: string, toUid: string): string 
   return `${safe(scope)}__${kind}__${safe(toUid)}`;
 }
 
-/** Everything `enqueueMail` needs to persist one pending mail. */
-export interface EnqueueMailInput {
+/**
+ * Everything `enqueueMail` needs to persist one pending mail.
+ *
+ * `prefKey` (frena el mail ENTERO) y `bloqueComercial` (frena sólo el bloque de
+ * venta de un mail operativo) son excluyentes: ver `MailOptOut`.
+ */
+export type EnqueueMailInput = EnqueueMailBase & MailOptOut;
+
+interface EnqueueMailBase {
   /** Recipient uid. The address is resolved from Auth at send time. */
   toUid: string;
   kind: MailKind;
   /** What this mail is deduped by. See `dedupeKey`. */
   scope: string;
   params: MailParams;
-  /**
-   * Optional `users/{uid}.notificationPrefs` key. Omit for transactional mail
-   * that is not subject to opt-out.
-   */
-  prefKey?: string;
-  /**
-   * Para el mail operativo con un bloque comercial adentro: se frena el bloque,
-   * no el mail. Ver `MailQueueDoc.bloqueComercial`.
-   */
-  bloqueComercial?: MailQueueDoc["bloqueComercial"];
   /**
    * Cuando el dedupe rechaza este mail, ACTUALIZA los params del que ya está
    * encolado en vez de descartarlo — siempre que siga en `pending`.

@@ -129,6 +129,16 @@ async function emailChannelAllowed(
   return value !== false;
 }
 
+/**
+ * Lo que decide cómo se frena un mail, ya resuelto: `prefKey` y `bloqueComercial`
+ * son excluyentes (ver `MailOptOut`), así que a lo sumo uno viene lleno.
+ */
+interface OposicionDelMail {
+  toUid: string;
+  prefKey?: string;
+  bloqueComercial?: string;
+}
+
 /** Qué le falta o le sobra a un mail por la baja de los correos promocionales. */
 interface DecisionDeBaja {
   /**
@@ -182,26 +192,26 @@ interface DecisionDeBaja {
  */
 async function decidirBaja(
   app: App,
-  data: MailQueueDoc,
+  { toUid, prefKey, bloqueComercial }: OposicionDelMail,
   literal: boolean,
 ): Promise<DecisionDeBaja> {
   if (literal) {
-    if (prefTieneBaja(data.prefKey)) {
+    if (prefTieneBaja(prefKey)) {
       return { sinBajaPosible: "sin cuenta para la baja", comercial: true };
     }
-    return { comercial: !data.bloqueComercial };
+    return { comercial: !bloqueComercial };
   }
 
-  if (prefTieneBaja(data.prefKey)) {
-    return { prefKeyDelLink: data.prefKey, comercial: true };
+  if (prefTieneBaja(prefKey)) {
+    return { prefKeyDelLink: prefKey, comercial: true };
   }
 
-  if (data.bloqueComercial) {
+  if (bloqueComercial) {
     const prendida =
-      prefTieneBaja(data.bloqueComercial) &&
-      (await emailChannelAllowed(app, data.toUid, data.bloqueComercial));
+      prefTieneBaja(bloqueComercial) &&
+      (await emailChannelAllowed(app, toUid, bloqueComercial));
     return prendida ?
-      { prefKeyDelLink: data.bloqueComercial, soloElBloque: true, comercial: true } :
+      { prefKeyDelLink: bloqueComercial, soloElBloque: true, comercial: true } :
       { comercial: false };
   }
 
@@ -291,13 +301,33 @@ export async function sendQueuedMailHandler(
   // no existe haria fallar un mail que sí tiene destino.
   const literal = typeof data.toAddress === "string" && data.toAddress !== "";
 
+  // `prefKey` y `bloqueComercial` son excluyentes en el tipo, pero este es un
+  // documento de Firestore: puede traer los dos. Entonces GANA `bloqueComercial`.
+  // El gate de `prefKey` frena el mail ENTERO, y se comería justo el aviso
+  // operativo que `bloqueComercial` existe para dejar pasar. Se lee con un tipo
+  // plano: el del documento ya no admite el caso, y TypeScript lo daría por
+  // imposible.
+  const crudo = data as { prefKey?: string; bloqueComercial?: string };
+  if (crudo.prefKey && crudo.bloqueComercial) {
+    logger.warn("sendQueuedMail: prefKey y bloqueComercial juntos; gana bloqueComercial", {
+      mailId,
+      kind: data.kind,
+      prefKey: crudo.prefKey,
+    });
+  }
+  const oposicion: OposicionDelMail = {
+    toUid: data.toUid,
+    prefKey: crudo.bloqueComercial ? undefined : crudo.prefKey,
+    bloqueComercial: crudo.bloqueComercial,
+  };
+
   // Opt-out check, when this mail is subject to one.
-  if (data.prefKey && !literal) {
-    const allowed = await emailChannelAllowed(app, data.toUid, data.prefKey);
+  if (oposicion.prefKey && !literal) {
+    const allowed = await emailChannelAllowed(app, data.toUid, oposicion.prefKey);
     if (!allowed) {
       logger.info("sendQueuedMail: email channel off, skipping", {
         mailId,
-        prefKey: data.prefKey,
+        prefKey: oposicion.prefKey,
       });
       await ref.update({ status: "failed", lastError: "email channel off" });
       return;
@@ -319,7 +349,7 @@ export async function sendQueuedMailHandler(
   // El link se calcula ACÁ, al enviar, y NO se persiste en `mail_queue`: es un
   // HMAC, se recalcula igual en cada reintento, y guardarlo dejaría en la cola
   // una credencial por cada mail comercial.
-  const baja = await decidirBaja(app, data, literal);
+  const baja = await decidirBaja(app, oposicion, literal);
 
   let bajaDePromocionales: string | undefined;
   let comercial = baja.comercial;
