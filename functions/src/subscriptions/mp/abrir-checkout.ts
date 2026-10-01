@@ -30,6 +30,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { MpApiError, MpClient } from "./client";
+import { diasDePrueba } from "./diferir-primer-cobro";
 import { PreapprovalMapping, recordPlan } from "./tier-mapping";
 
 /** Coleccion del checkout en curso por usuario. Un doc por uid, se pisa. */
@@ -84,9 +85,77 @@ export interface AbrirCheckoutInput {
   frequencyMonths: number;
   /** Lo que se escribe en `mp_plans` para que el cobro sea reconciliable. */
   mapping: PreapprovalMapping;
+  /**
+   * Hasta cuando (ms) ya tiene pago el periodo este usuario, o `null` / ausente
+   * para un checkout normal, que cobra al autorizar. Lo decide
+   * `diferir-primer-cobro.ts`; aca solo se aplica.
+   *
+   * Es el UNICO dato del diferimiento que viaja. Los dias de prueba se calculan
+   * en esta funcion a partir de el y de [nowMs], para que el plan de MP, el
+   * documento de checkout y el de `mp_plans` no puedan contradecirse.
+   *
+   * Cuenta para la ventana de reuso y se compara APARTE de [huella], con un
+   * `?? null` de cada lado. Dos razones:
+   *
+   *   - Un checkout diferido NO se puede reusar para un pedido normal (ni al
+   *     reves): el reusado cobraria en el acto, o difiriria lo que ya no esta
+   *     pago. Cualquiera de los dos es un cobro mal hecho.
+   *   - La huella no puede ganar campos (ver su dartdoc), y este NO la gana. Un
+   *     documento de checkout anterior a esto no trae el campo, y con el `?? null`
+   *     sigue siendo igual a un pedido normal: el doble click de un PF que ya
+   *     tenia un checkout abierto cuando se desplego esto sigue deduplicandose.
+   */
+  diferidoHastaMs?: number | null;
   mpClient: MpClient;
   /** Reloj inyectable: la ventana de reuso se testea sin esperar 30 minutos. */
   nowMs: number;
+}
+
+/** Un checkout abierto, tal como esta guardado en `mp_checkouts/{uid}`. */
+export interface CheckoutGuardado {
+  initPoint: string;
+  planId: string;
+  /**
+   * El `diferidoHastaMs` guardado, o `null` si el documento no lo tiene (un
+   * checkout normal, o uno anterior al diferimiento). SIN interpretar: puede no
+   * ser un numero, y quien lo compara lo hace con `===`.
+   */
+  diferidoHastaMs: unknown;
+}
+
+/**
+ * El checkout abierto de [previo] SI todavia sirve para este pedido, o `null`.
+ *
+ * Sirve cuando se creo dentro de [CHECKOUT_REUSE_MS], coincide la [huella] ENTERA,
+ * y tiene `initPoint` y `planId`. NO mira el diferimiento: eso lo compara quien
+ * llama, porque `create-preapproval.ts` necesita LEER cual es antes de decidir si
+ * sale a MP.
+ *
+ * Es la UNICA definicion de "el checkout vigente". La usan `abrirCheckout` para
+ * reusar y `create-preapproval.ts` para saltearse la busqueda en MP cuando un
+ * doble click va a reusar un checkout diferido: con dos copias, la ventana de
+ * una podria divergir de la de la otra y un pedido se saltearia la verificacion
+ * para despues NO reusar.
+ */
+export function checkoutVigente(
+  previo: Record<string, unknown> | undefined,
+  huella: Record<string, string>,
+  nowMs: number,
+): CheckoutGuardado | null {
+  if (!previo) return null;
+
+  const creado = previo.createdAtMs;
+  const vigente =
+    typeof creado === "number" && nowMs - creado < CHECKOUT_REUSE_MS;
+  const mismaHuella = Object.entries(huella)
+    .every(([k, v]) => previo[k] === v);
+  if (!vigente || !mismaHuella) return null;
+
+  const { initPoint, planId } = previo;
+  if (typeof initPoint !== "string" || initPoint === "") return null;
+  if (typeof planId !== "string" || planId === "") return null;
+
+  return { initPoint, planId, diferidoHastaMs: previo.diferidoHastaMs ?? null };
 }
 
 /**
@@ -99,37 +168,40 @@ export async function abrirCheckout(
   i: AbrirCheckoutInput,
 ): Promise<CheckoutAbierto> {
   const { app, uid, huella, mapping, nowMs } = i;
+  // `null` = checkout normal. Se normaliza una sola vez: ausente, `undefined` y
+  // `null` quieren decir lo mismo en la entrada y en lo que se guarda.
+  const diferidoHastaMs = i.diferidoHastaMs ?? null;
 
   const checkoutRef = getFirestore(app)
     .collection(MP_CHECKOUTS_COLLECTION)
     .doc(uid);
 
   // ── Reuso: el mismo plan, pedido de nuevo, dentro de la ventana ──
-  const previo = (await checkoutRef.get()).data();
-  if (previo) {
-    const creado = previo.createdAtMs;
-    const vigente =
-      typeof creado === "number" && nowMs - creado < CHECKOUT_REUSE_MS;
-    const mismaHuella = Object.entries(huella)
-      .every(([k, v]) => previo[k] === v);
-    if (
-      vigente &&
-      mismaHuella &&
-      typeof previo.initPoint === "string" && previo.initPoint !== "" &&
-      typeof previo.planId === "string" && previo.planId !== ""
-    ) {
-      logger.info("mp/abrir-checkout: se reusa el checkout abierto", {
-        uid,
-        ...huella,
-        planId: previo.planId,
-      });
-      return {
-        initPoint: previo.initPoint,
-        planId: previo.planId,
-        status: "reused",
-      };
-    }
+  //
+  // Ver el dartdoc de `AbrirCheckoutInput.diferidoHastaMs`: el diferimiento se
+  // compara aparte de la huella, y con `?? null` (adentro de `checkoutVigente`)
+  // para que un documento sin el campo siga valiendo como "normal".
+  const abierto = checkoutVigente((await checkoutRef.get()).data(), huella, nowMs);
+  if (abierto && abierto.diferidoHastaMs === diferidoHastaMs) {
+    logger.info("mp/abrir-checkout: se reusa el checkout abierto", {
+      uid,
+      ...huella,
+      planId: abierto.planId,
+    });
+    return {
+      initPoint: abierto.initPoint,
+      planId: abierto.planId,
+      status: "reused",
+    };
   }
+
+  // Los dias de prueba salen de aca y de ningun otro lado, a partir de la fecha
+  // y del reloj de ESTE request. `diasDePrueba` redondea hacia arriba para no
+  // adelantar el cobro, pero que MP cuente la prueba como suponemos (N dias
+  // corridos desde la autorizacion) NO esta medido: ver "Lo que se ASUME de MP"
+  // en `diferir-primer-cobro.ts`.
+  const freeTrialDays =
+    diferidoHastaMs === null ? undefined : diasDePrueba(diferidoHastaMs, nowMs);
 
   let creado;
   try {
@@ -139,6 +211,8 @@ export async function abrirCheckout(
       backUrl: i.backUrl,
       transactionAmount: i.amount,
       frequencyMonths: i.frequencyMonths,
+      // Solo cuando hay prueba: el pedido normal llega a MP exactamente como antes.
+      ...(freeTrialDays === undefined ? {} : { freeTrialDays }),
     });
   } catch (e) {
     const err = e as MpApiError;
@@ -171,7 +245,7 @@ export async function abrirCheckout(
   // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
   // que no se puede perder es de que plan es esta suscripcion. El checkout es
   // una comodidad; el mapeo es lo que hace reconciliable el cobro.
-  await recordPlan(app, planId, mapping);
+  await recordPlan(app, planId, mapping, diferidoHastaMs);
 
   await checkoutRef.set({
     planId,
@@ -180,9 +254,17 @@ export async function abrirCheckout(
     // Milisegundos y no serverTimestamp: la ventana de reuso se compara contra
     // un reloj inyectado, y un sentinel no se puede leer en el mismo request.
     createdAtMs: nowMs,
+    // SOLO cuando hay diferimiento: el documento de un checkout normal queda con
+    // la forma de siempre, y es la que el reuso espera de los ya guardados.
+    ...(diferidoHastaMs === null ? {} : { diferidoHastaMs }),
   });
 
-  logger.info("mp/abrir-checkout: checkout abierto", { uid, ...huella, planId });
+  logger.info("mp/abrir-checkout: checkout abierto", {
+    uid,
+    ...huella,
+    planId,
+    ...(freeTrialDays === undefined ? {} : { diasDePrueba: freeTrialDays }),
+  });
 
   return { initPoint, planId, status: "created" };
 }

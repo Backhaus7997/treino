@@ -218,17 +218,29 @@ export function tierFromAmount(amount: unknown): PreapprovalMapping | null {
  * El `producto` viaja adentro del mapping y por eso se escribe solo. Este es el
  * unico escritor de `mp_plans`, asi que todo documento nuevo lo tiene; los
  * viejos no, y de eso se ocupa el default de [lookupPlan].
+ *
+ * [diferidoHastaMs] es el dia hasta el que el PF ya tenia pago el periodo cuando
+ * se creo este plan CON PRUEBA (ver `diferir-primer-cobro.ts`). Se escribe SOLO
+ * cuando hay uno: el documento de un plan normal queda exactamente como siempre,
+ * y un `undefined` explicito lo rechazaria Firestore.
+ *
+ * No va adentro de [PreapprovalMapping] a proposito. Es un dato de CONTROL del
+ * reconciliador, como `terminal` o `supersededBy`, y no responde "de que plan es
+ * esta suscripcion": que `lookupPlan` lo devolviera (o no) cambiaria lo que
+ * promete ese tipo. El reconciliador lo lee del documento, que ya tiene a mano.
  */
 export async function recordPlan(
   app: App,
   planId: string,
   mapping: PreapprovalMapping,
+  diferidoHastaMs: number | null = null,
 ): Promise<void> {
   await getFirestore(app)
     .collection(MP_PLANS_COLLECTION)
     .doc(planId)
     .set({
       ...mapping,
+      ...(diferidoHastaMs === null ? {} : { diferidoHastaMs }),
       createdAt: FieldValue.serverTimestamp(),
     });
 }
