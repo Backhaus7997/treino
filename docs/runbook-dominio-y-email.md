@@ -253,6 +253,37 @@ publicación de la app.
 
 ---
 
+## Pedido de baja de correos promocionales que llega por mail
+
+Alguien le escribe a `treino@gettreino.com` pidiendo no recibir más correos
+promocionales. Dos caminos:
+
+1. **Que lo haga la persona.** Respondele que use el link «dejá de recibir
+   correos promocionales» del pie de cualquier correo promocional de TREINO.
+   Existe desde el deploy del pie (orden en
+   [`openspec/changes/baja-de-correos-promocionales/design.md`](../openspec/changes/baja-de-correos-promocionales/design.md)
+   §10); un correo anterior no lo tiene.
+2. **Que lo haga el operador**, en la consola de Firebase: Authentication, buscá
+   la cuenta por mail y copiá el `uid`; después Firestore → `users/{uid}` →
+   `notificationPrefs` → `novedades_plan` → `email` = `false` (boolean). Si el
+   mapa `notificationPrefs` o `novedades_plan` no existe, se crea. **Poné
+   `false`, no borres el campo**: la clave ausente cuenta como prendida.
+
+⚠️ `treino-dev` es producción: es un documento de un usuario real. Confirmá que
+el `uid` es el del mail que pidió la baja antes de escribir.
+
+`sendQueuedMail` lee esa preferencia **al enviar**, así que también frena un
+correo que ya estaba encolado. Frena los mails comerciales con `prefKey`
+`novedades_plan` y el bloque de venta de `limit-reached`. **No** frena los avisos
+operativos de la cuenta: un aviso de que los alumnos quedaron en solo lectura le
+sigue llegando a quien se dio de baja de lo promocional.
+
+El link del pie lo firma el secreto `BAJA_PROMOCIONALES_KEY` (propio, no se
+reusa otro). Rotarlo invalida todos los links ya enviados: sólo ante una
+filtración.
+
+---
+
 ## Deuda conocida
 
 - **Sin deep links.** No hay `assetlinks.json`, ni associated domains, ni
@@ -264,5 +295,9 @@ publicación de la app.
   el vacío. Decidir entre `noreply@` o un `Reply-To` a una casilla real.
 - **`gettreino-vercel.app` no existe** (NXDOMAIN) y sigue listado en Vercel →
   Domains. Basura para limpiar.
-- **El canal push no lee `notificationPrefs`.** Las CFs mandan siempre. Email sí
-  lo respeta en las dos filas de `kEmailBackedTypes`.
+- **Push y email leen `notificationPrefs`, pero sólo si el productor pasa
+  `prefKey`.** `sendFcm` salta a quien tiene `notificationPrefs.<prefKey>.push ===
+  false` (`functions/src/notifications/send-fcm.ts:133-141`) y `sendQueuedMail`
+  hace lo mismo con `.email === false`; un push o un mail sin `prefKey` no se
+  frena nunca. Es opt-out: la clave ausente cuenta como prendida. El Coach Hub
+  sólo dibuja la casilla de email en las dos filas de `kEmailBackedTypes`.
