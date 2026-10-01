@@ -29,7 +29,12 @@
 import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { MAIL_QUEUE_COLLECTION, MailKind, MailParams } from "./types";
+import {
+  MAIL_QUEUE_COLLECTION,
+  MailKind,
+  MailParams,
+  MailQueueDoc,
+} from "./types";
 
 /** Firestore gRPC status code for a `create()` on an existing document. */
 const ALREADY_EXISTS = 6;
@@ -72,6 +77,11 @@ export interface EnqueueMailInput {
    * that is not subject to opt-out.
    */
   prefKey?: string;
+  /**
+   * Para el mail operativo con un bloque comercial adentro: se frena el bloque,
+   * no el mail. Ver `MailQueueDoc.bloqueComercial`.
+   */
+  bloqueComercial?: MailQueueDoc["bloqueComercial"];
   /**
    * Cuando el dedupe rechaza este mail, ACTUALIZA los params del que ya está
    * encolado en vez de descartarlo — siempre que siga en `pending`.
@@ -169,7 +179,15 @@ export async function enqueueMail(
   app: App,
   input: EnqueueMailInput,
 ): Promise<string | null> {
-  const { toUid, kind, scope, params, prefKey, refreshPendingParams } = input;
+  const {
+    toUid,
+    kind,
+    scope,
+    params,
+    prefKey,
+    bloqueComercial,
+    refreshPendingParams,
+  } = input;
   const id = dedupeKey(kind, scope, toUid);
 
   const doc: Record<string, unknown> = {
@@ -181,6 +199,7 @@ export async function enqueueMail(
     createdAt: FieldValue.serverTimestamp(),
   };
   if (prefKey) doc.prefKey = prefKey;
+  if (bloqueComercial) doc.bloqueComercial = bloqueComercial;
 
   try {
     await getFirestore(app)

@@ -102,7 +102,9 @@ export type MailKind =
   // `subscription`, y el que nunca pago no transiciona nada.
   //
   // Sin `prefKey`, igual que sus dos hermanos: es la respuesta a algo que el PF
-  // acaba de intentar hacer, no una novedad de producto.
+  // acaba de intentar hacer, no una novedad de producto. Pero SÍ lleva
+  // `bloqueComercial`: el aviso de que sus alumnos quedaron en solo lectura le
+  // llega siempre, y lo que se puede apagar es el párrafo de venta.
   | "limit-reached"
   // ── El ALUMNO que se quedo sin cobertura ────────────────────────────────
   //
@@ -287,6 +289,23 @@ export interface MailQueueDoc {
    * service-critical and not subject to opt-out.
    */
   prefKey?: string;
+  /**
+   * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy sólo
+   * `limit-reached`: «N alumnos quedaron en solo lectura» + «hay planes más
+   * grandes»). No se puede frenar entero con `prefKey`: quien se opuso a lo
+   * comercial igual tiene que enterarse de lo operativo. Lo que se frena es el
+   * BLOQUE.
+   *
+   * Al enviar, `sendQueuedMail` lee esa preferencia —con la misma regla que
+   * `prefKey`, sólo `false` explícito frena— y:
+   *   - apagada → renderiza sin las líneas ni el CTA de venta, y sin pie de baja;
+   *   - prendida o ausente → el mail completo, CON el pie de baja.
+   *
+   * Es un literal y no un `string`: el link de baja sólo existe para las
+   * preferencias de la allowlist de `baja-de-promocionales.ts`. Se evalúa al
+   * enviar, no al encolar, por la misma razón que `prefKey`.
+   */
+  bloqueComercial?: "novedades_plan";
   status: MailStatus;
   /** Incremented on every send attempt, successful or not. */
   attempts: number;

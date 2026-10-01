@@ -130,6 +130,10 @@ describe("enqueueProspectMail", () => {
     expect(String(arg.params.ctaUrl)).not.toContain("/abrir/");
     // Sin prefKey: el PF no puede optar por no enterarse de que choco el tope.
     expect(arg.prefKey).toBeUndefined();
+    // Pero el bloque de venta SI se puede apagar: `sendQueuedMail` lee esa
+    // preferencia al enviar y omite «planes mas grandes» y el boton, sin frenar
+    // el aviso de que sus alumnos quedaron en solo lectura.
+    expect(arg.bloqueComercial).toBe("novedades_plan");
   });
 });
 

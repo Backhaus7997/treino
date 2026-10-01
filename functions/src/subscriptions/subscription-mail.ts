@@ -115,6 +115,7 @@ import { enqueueMail } from "../mail/enqueue-mail";
 import { artDateKey } from "../mail/format";
 import { trainerWebCheckout } from "../mail/templates";
 import { MailParams } from "../mail/types";
+import { ATHLETE_PROSPECT_PREF_KEY } from "./athlete-prospect-mail";
 import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { MappedSubscription } from "./subscription-state";
 
@@ -495,7 +496,14 @@ export function decideProspectMail(
  *
  * El CTA dice VER LOS PLANES y va al Coach Hub web — ver `trainerWebCheckout`.
  *
- * Sin `prefKey`, como sus dos hermanos.
+ * Sin `prefKey`, como sus dos hermanos: el aviso de que N alumnos quedaron en
+ * solo lectura es operativo y le llega siempre al PF. PERO lleva un bloque de
+ * venta adentro («hay planes más grandes» + VER LOS PLANES), y ese bloque SÍ se
+ * puede apagar: por eso marca `bloqueComercial`. Al enviar, `sendQueuedMail` lee
+ * `novedades_plan`; con la preferencia apagada manda el mail sin el bloque y sin
+ * pie, y con ella prendida o ausente manda el mail completo con el pie de baja
+ * (Decreto 1558/01, Anexo I, art. 27, párr. 3). Ver §6.3 de
+ * `openspec/changes/baja-de-correos-promocionales/design.md`.
  */
 export async function enqueueProspectMail(
   app: App,
@@ -512,5 +520,6 @@ export async function enqueueProspectMail(
       blockedCount,
       ctaUrl: trainerWebCheckout(),
     },
+    bloqueComercial: ATHLETE_PROSPECT_PREF_KEY,
   });
 }

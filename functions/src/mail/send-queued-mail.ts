@@ -17,6 +17,9 @@
  *     a cap one malformed document would hammer Resend for a week.
  *   - Re-entry is safe: a document already `sent` short-circuits. That covers
  *     the window where the Resend call succeeded but the status write did not.
+ *   - Los correos promocionales llevan en el pie un link de baja, calculado
+ *     ACÁ al enviar (nunca persistido) y con falla cerrada si falta la clave.
+ *     Ver `decidirBaja` y `baja-de-promocionales.ts`.
  *
  * TODO(mail-sweeper): a `pending` document whose retries are exhausted is only
  * visible in logs. Add a scheduled sweep that reports stuck documents once
@@ -33,6 +36,11 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "./types";
 import { renderMail } from "./templates";
 import { MailSendError, MailSender, createResendSender } from "./resend-client";
+import {
+  BAJA_PROMOCIONALES_KEY,
+  prefTieneBaja,
+  urlDeBaja,
+} from "./baja-de-promocionales";
 
 /**
  * Resend API key. Create it with:
@@ -98,8 +106,9 @@ async function resolveAddress(
 /**
  * Checks the email channel in `users/{uid}.notificationPrefs`.
  *
- * Only consulted when the queue document carries a `prefKey`. Transactional
- * mail omits it and is never gated here.
+ * Only consulted when the queue document carries a `prefKey` (gates the whole
+ * mail) or a `bloqueComercial` (gates only the commercial block; see
+ * `decidirBaja`). Transactional mail omits both and is never gated here.
  *
  * @returns true when the mail may be sent.
  */
@@ -120,14 +129,75 @@ async function emailChannelAllowed(
   return value !== false;
 }
 
+/** Qué le falta o le sobra a un mail por la baja de los correos promocionales. */
+interface DecisionDeBaja {
+  /**
+   * La preferencia con la que se firma el link de baja del pie, o `undefined`
+   * si este mail no lleva pie.
+   */
+  prefKeyDelLink?: string;
+  /** `false`: la plantilla omite su bloque de venta. */
+  comercial: boolean;
+}
+
+/**
+ * Decide, AL ENVIAR, si el mail lleva el pie de baja y si lleva su bloque
+ * comercial. Se evalúa acá y no al encolar: si la persona se opone entre que se
+ * encoló y que salió, gana la oposición.
+ *
+ * - **`prefKey` de la allowlist** (el mail ES comercial; el gate de arriba ya
+ *   dejó pasar a quien no se opuso): pie de baja.
+ * - **`bloqueComercial`** (un mail operativo con un bloque comercial adentro):
+ *   preferencia apagada → sin bloque y SIN pie, porque ya no hay nada comercial;
+ *   prendida o ausente → el mail completo CON pie, porque tiene contenido de
+ *   publicidad y la norma pide el mecanismo en toda comunicación así.
+ * - **Cualquier otro**: no es comercial, no se toca.
+ *
+ * Un destinatario `toAddress` literal no tiene cuenta, ni preferencias, ni a
+ * dónde apuntar una baja: nunca lleva pie. Si encima trae `bloqueComercial`,
+ * sale sin el bloque —sin mecanismo de baja no se manda publicidad—. Hoy
+ * ningún productor lo hace; es la salida segura si alguno lo hiciera.
+ *
+ * Un `bloqueComercial` fuera de la allowlist tampoco puede llevar link (la
+ * callable lo rechazaría: sería un link muerto), así que se trata igual: sin
+ * bloque. El tipo ya lo impide al encolar; esto cubre el documento que llegó por
+ * otro camino.
+ */
+async function decidirBaja(
+  app: App,
+  data: MailQueueDoc,
+  literal: boolean,
+): Promise<DecisionDeBaja> {
+  if (literal) return { comercial: !data.bloqueComercial };
+
+  if (prefTieneBaja(data.prefKey)) {
+    return { prefKeyDelLink: data.prefKey, comercial: true };
+  }
+
+  if (data.bloqueComercial) {
+    const prendida =
+      prefTieneBaja(data.bloqueComercial) &&
+      (await emailChannelAllowed(app, data.toUid, data.bloqueComercial));
+    return prendida ?
+      { prefKeyDelLink: data.bloqueComercial, comercial: true } :
+      { comercial: false };
+  }
+
+  return { comercial: true };
+}
+
 /**
  * Pure handler extracted for jest testability, mirroring the notify-* CFs.
  *
- * @param app    - Admin SDK app.
- * @param mailId - Queue document ID; doubles as the Resend idempotency key.
- * @param data   - Queue document contents.
- * @param sender - Injected sender. Tests pass a mock; production builds one
- *                 from the RESEND_API_KEY secret.
+ * @param app     - Admin SDK app.
+ * @param mailId  - Queue document ID; doubles as the Resend idempotency key.
+ * @param data    - Queue document contents.
+ * @param sender  - Injected sender. Tests pass a mock; production builds one
+ *                  from the RESEND_API_KEY secret.
+ * @param bajaKey - Clave del HMAC del link de baja (BAJA_PROMOCIONALES_KEY).
+ *                  Se inyecta como el `sender`. El default es VACÍO a propósito:
+ *                  quien se olvide de pasarla no manda un correo promocional sin
+ *                  el mecanismo de baja, falla cerrado.
  */
 export async function sendQueuedMailHandler(
   app: App,
@@ -137,6 +207,7 @@ export async function sendQueuedMailHandler(
   // eslint-disable-next-line no-param-reassign
   data: MailQueueDoc | undefined,
   sender: MailSender,
+  bajaKey = "",
 ): Promise<void> {
   if (!data) {
     logger.warn("sendQueuedMail: empty document, skipping", { mailId });
@@ -220,7 +291,60 @@ export async function sendQueuedMailHandler(
     return;
   }
 
-  const rendered = renderMail(data.kind, data.params ?? {});
+  // ── El pie de baja de los correos promocionales ──────────────────────────
+  //
+  // El link se calcula ACÁ, al enviar, y NO se persiste en `mail_queue`: es un
+  // HMAC, se recalcula igual en cada reintento, y guardarlo dejaría en la cola
+  // una credencial por cada mail comercial.
+  const baja = await decidirBaja(app, data, literal);
+
+  let bajaDePromocionales: string | undefined;
+  if (baja.prefKeyDelLink) {
+    // FALLA CERRADO. Un correo promocional sin el mecanismo de baja es
+    // exactamente lo que el Decreto 1558/01 prohíbe, y mandarlo "igual, sin el
+    // link" es la salida que nadie va a notar. Con `defineSecret` el deploy ya
+    // falla si el secreto no existe: esto es un cinturón, no el freno
+    // principal. El mail perdido no se reencola (`sendQueuedMail` sólo escucha
+    // creaciones); es comercial, y su productor lo vuelve a mandar en el
+    // próximo disparo, pasado el enfriamiento.
+    if (!bajaKey) {
+      logger.error("sendQueuedMail: sin clave de baja, el mail comercial no sale", {
+        mailId,
+        kind: data.kind,
+      });
+      await ref.update({
+        status: "failed",
+        attempts,
+        lastError: "sin clave de baja",
+      });
+      return;
+    }
+
+    try {
+      bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
+    } catch (error: unknown) {
+      // Un uid que no entra en la gramática del token (no pasa con los de
+      // Auth, que miden hasta 128). Se frena igual que sin clave, y NO se deja
+      // salir la excepción: la plataforma reintentaría una semana un mail que
+      // va a fallar idéntico cada vez.
+      logger.error("sendQueuedMail: no se pudo armar el link de baja", {
+        mailId,
+        kind: data.kind,
+        error: String(error),
+      });
+      await ref.update({
+        status: "failed",
+        attempts,
+        lastError: "link de baja no representable",
+      });
+      return;
+    }
+  }
+
+  const rendered = renderMail(data.kind, data.params ?? {}, {
+    bajaDePromocionales,
+    comercial: baja.comercial,
+  });
 
   try {
     await sender.send({
@@ -274,12 +398,18 @@ export const sendQueuedMail = onDocumentCreated(
   {
     document: `${MAIL_QUEUE_COLLECTION}/{mailId}`,
     region: "southamerica-east1",
-    secrets: [RESEND_API_KEY],
+    secrets: [RESEND_API_KEY, BAJA_PROMOCIONALES_KEY],
     retry: true,
   },
   async (event) => {
     const data = event.data?.data() as MailQueueDoc | undefined;
     const sender = createResendSender(RESEND_API_KEY.value(), MAIL_FROM.value());
-    await sendQueuedMailHandler(ensureApp(), event.params.mailId, data, sender);
+    await sendQueuedMailHandler(
+      ensureApp(),
+      event.params.mailId,
+      data,
+      sender,
+      BAJA_PROMOCIONALES_KEY.value(),
+    );
   },
 );
