@@ -15,6 +15,8 @@
  *   4. Que un mail que no salió no deje al usuario esperando un cooldown.
  *   5. Que la verificación sea POR ROL: a la alumna que pasa a entrenadora se le
  *      vuelve a pedir, y le llega el mail del entrenador.
+ *   6. Que una cuenta no saque más de 5 mails por hora ni 10 por día, ni con
+ *      pedidos en paralelo.
  */
 
 import { createHash } from "crypto";
@@ -60,9 +62,11 @@ jest.mock("firebase-admin/auth", () => ({
 
 import {
   CODIGO_VIGENCIA_MS,
+  MAX_ENVIOS_POR_HORA,
   MAX_INTENTOS,
   REENVIO_COOLDOWN_MS,
   VERIFICACIONES_COLLECTION,
+  decidirEnvio,
   generarCodigo,
   runSolicitarCodigo,
   runVerificarCodigo,
@@ -446,5 +450,94 @@ describe("por rol: la alumna que el equipo pasa a entrenadora", () => {
 
     expect((await verificar(app, ALUMNA, "048213")).estado).toBe("sin-codigo");
     expect(verificacion(store, ALUMNA)).toBeUndefined();
+  });
+});
+
+describe("decidirEnvio: cooldown y topes", () => {
+  const MIN = 60_000;
+  const H = 60 * MIN;
+  const D = 24 * H;
+  const P = { rol: "athlete" as const, email: "a@test.com", nowMs: AHORA, reenviar: true };
+  /** Ya mandó `hora` en la hora y `dia` en el día; el último, hace 2 min. */
+  const doc = (hora: number, dia: number, horaDesde = AHORA - 30 * MIN, diaDesde = AHORA - 5 * H) => ({
+    rol: "athlete",
+    email: "a@test.com",
+    enviadoMs: AHORA - 2 * MIN,
+    horaDesdeMs: horaDesde,
+    enviosEnLaHora: hora,
+    diaDesdeMs: diaDesde,
+    enviosEnElDia: dia,
+  });
+
+  it("el primer envío abre las dos ventanas", () => {
+    expect(decidirEnvio(undefined, P)).toEqual({
+      estado: "enviar",
+      ventanas: { horaDesdeMs: AHORA, enviosEnLaHora: 1, diaDesdeMs: AHORA, enviosEnElDia: 1 },
+    });
+  });
+
+  it("el 5.º de la hora sale; el 6.º espera a que cierre la ventana", () => {
+    expect(decidirEnvio(doc(4, 4), P)).toMatchObject({ estado: "enviar", ventanas: { enviosEnLaHora: 5 } });
+    expect(decidirEnvio(doc(5, 5), P)).toEqual({ estado: "limitado", reintentarEnMs: 30 * MIN });
+  });
+
+  it("cerrada la ventana de la hora arranca otra, y el día sigue contando", () => {
+    expect(decidirEnvio(doc(5, 5, AHORA - H), P)).toMatchObject({
+      estado: "enviar",
+      ventanas: { horaDesdeMs: AHORA, enviosEnLaHora: 1, enviosEnElDia: 6 },
+    });
+  });
+
+  it("el 10.º del día sale; el 11.º espera a que cierre el día", () => {
+    expect(decidirEnvio(doc(0, 9, AHORA - H), P)).toMatchObject({ estado: "enviar", ventanas: { enviosEnElDia: 10 } });
+    expect(decidirEnvio(doc(0, 10, AHORA - H), P)).toEqual({ estado: "limitado", reintentarEnMs: D - 5 * H });
+  });
+
+  it("con las dos ventanas llenas espera la que cierra más tarde", () => {
+    expect(decidirEnvio(doc(5, 10), P)).toEqual({ estado: "limitado", reintentarEnMs: D - 5 * H });
+  });
+
+  it("cerrado el día arranca otro", () => {
+    expect(decidirEnvio(doc(0, 10, AHORA - H, AHORA - D), P)).toMatchObject({
+      estado: "enviar",
+      ventanas: { diaDesdeMs: AHORA, enviosEnElDia: 1 },
+    });
+  });
+
+  it("el cooldown contesta antes que los topes: es la espera más corta", () => {
+    const reciente = { ...doc(5, 5), enviadoMs: AHORA - 10_000 };
+    expect(decidirEnvio(reciente, P)).toEqual({ estado: "enfriando", reintentarEnMs: 50_000 });
+  });
+
+  it("el recién promovido se saltea el cooldown, pero no los topes", () => {
+    const reciente = { ...doc(5, 5), enviadoMs: AHORA - 10_000 };
+    expect(decidirEnvio(reciente, { ...P, rol: "trainer" })).toMatchObject({ estado: "limitado" });
+  });
+});
+
+describe("de punta a punta", () => {
+  it("dos «Reenviar» simultáneos mandan UN mail", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    const rs = await Promise.all([
+      pedir(app, ALUMNA, "111111", AHORA, true),
+      pedir(app, ALUMNA, "222222", AHORA, true),
+    ]);
+
+    expect(rs.map((r) => r.estado).sort()).toEqual(["enfriando", "enviado"]);
+    expect(mails(store)).toHaveLength(1);
+  });
+
+  it("pasado el tope de la hora, «Reenviar» contesta limitado y no manda", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    for (let i = 0; i < MAX_ENVIOS_POR_HORA; i++) {
+      expect((await pedir(app, ALUMNA, "111111", AHORA + i * REENVIO_COOLDOWN_MS, true)).estado)
+        .toBe("enviado");
+    }
+
+    const r = await pedir(app, ALUMNA, "111111", AHORA + MAX_ENVIOS_POR_HORA * REENVIO_COOLDOWN_MS, true);
+
+    expect(r).toEqual({ estado: "limitado", reintentarEnMs: 60 * 60_000 - MAX_ENVIOS_POR_HORA * REENVIO_COOLDOWN_MS });
+    expect(mails(store)).toHaveLength(MAX_ENVIOS_POR_HORA);
   });
 });
