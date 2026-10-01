@@ -32,6 +32,20 @@
  * pasar y ese mail no salía nunca. El mail va guardado porque si el equipo le
  * cambia el correo en Auth, al nuevo todavía no lo abrió nadie.
  *
+ * ── Despliegue: el pin protege DESDE que está arriba ──
+ *
+ * La regla de `users` es por pines, no por lista blanca de claves: hasta que se
+ * despliega el pin de `emailVerification`, el dueño puede escribírselo, y
+ * después el mismo pin lo vuelve indeleble desde el cliente (mismo molde que
+ * `athletePaywallEnforced` en `firestore.rules`). Por eso, en este orden:
+ *
+ *   1. Desplegar las reglas.
+ *   2. Antes de que la app llame a `verificarCodigoDeMail`, contar los `users`
+ *      con `emailVerification` (consola: filtro `emailVerification != null`).
+ *      Hasta ahí nadie lo escribe, así que lo esperado es 0, y cualquiera que
+ *      aparezca es falso: se borra por Admin SDK.
+ *   3. Recién ahí desplegar las funciones y prender el gate.
+ *
  * ── Seguridad ──
  *
  * - En `verificaciones_de_mail/{uid}` el código se guarda como hash
