@@ -9,7 +9,7 @@
 ///      Si no, la pricing page marca «TU PLAN ACTUAL» sobre un plan que el PF ya
 ///      no tiene y no le deja volver a comprarlo.
 ///   2. Que una baja con días pagos NO se confunda con una vencida. Si no, el PF
-///      pierde el botón de volver a suscribirse justo cuando le conviene.
+///      pierde el botón de reactivar el plan justo cuando le conviene.
 ///   3. Que el borde sea el del servidor (estricto). `now == fin` ya es vencido.
 ///   4. Que nada que no sea una baja cambie de tier por la fecha: un período
 ///      vencido en un `pending` o `paused` NO lo vuelve Free acá.
@@ -201,6 +201,73 @@ void main() {
       expect(v.cancelada, isTrue);
       expect(v.pagadoHasta, isNull);
       expect(v.primerCobroDiferible, isFalse);
+    });
+  });
+
+  // `vencida` es lo que la tab de Facturación usa para decidir de dónde sale el
+  // tope de alumnos: el servidor no reescribe el doc cuando una baja vence, así
+  // que el `weightLimit` cacheado sigue siendo el del plan viejo.
+  group('vencida', () {
+    test('sin suscripción no está vencida', () {
+      expect(VigenciaDelPlan.de(null, now: _ahora).vencida, isFalse);
+    });
+
+    // Sólo una BAJA puede vencer. Un `pending` o `paused` con la fecha cumplida
+    // no está «vencido» en este sentido: este helper no los baja a Free.
+    for (final status in SubscriptionStatus.values) {
+      if (status == SubscriptionStatus.cancelled) continue;
+
+      test('$status nunca está vencida, aunque la fecha esté cumplida', () {
+        final v = VigenciaDelPlan.de(
+          _sub(status, fin: _ahora.subtract(const Duration(days: 30))),
+          now: _ahora,
+        );
+
+        expect(v.vencida, isFalse);
+      });
+    }
+
+    test('una baja con días pagos no está vencida', () {
+      final v = VigenciaDelPlan.de(
+        _sub(
+          SubscriptionStatus.cancelled,
+          fin: _ahora.add(const Duration(days: 14)),
+        ),
+        now: _ahora,
+      );
+
+      expect(v.vencida, isFalse);
+    });
+
+    test('una baja con el período cumplido está vencida', () {
+      final v = VigenciaDelPlan.de(
+        _sub(
+          SubscriptionStatus.cancelled,
+          fin: _ahora.subtract(const Duration(days: 1)),
+        ),
+        now: _ahora,
+      );
+
+      expect(v.vencida, isTrue);
+      expect(v.tierEfectivo, SubscriptionTier.free);
+    });
+
+    test('en el instante exacto del fin ya está vencida', () {
+      final v = VigenciaDelPlan.de(
+        _sub(SubscriptionStatus.cancelled, fin: _ahora),
+        now: _ahora,
+      );
+
+      expect(v.vencida, isTrue);
+    });
+
+    test('una baja sin fecha de fin está vencida', () {
+      final v = VigenciaDelPlan.de(
+        _sub(SubscriptionStatus.cancelled),
+        now: _ahora,
+      );
+
+      expect(v.vencida, isTrue);
     });
   });
 

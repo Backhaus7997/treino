@@ -33,6 +33,14 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// efectivo» de la cuenta, es lo que decide qué tarjeta lleva la etiqueta de
 /// plan actual y si hay algo que re-contratar.
 ///
+/// Tampoco espeja el PISO PREPAGO del servidor (`prepaidTier`/`prepaidUntil`,
+/// `conPisoPrepago` en `functions/src/subscriptions/effective-limit.ts`): el
+/// tier que el PF ya pagó y que sigue valiendo aunque su suscripción actual sea
+/// otra. `TrainerSubscription` no tiene esos campos, así que acá no hay de
+/// dónde leerlo. Un piso sólo SUBE el límite, nunca lo baja, y por eso un PF
+/// con un piso vigente puede tener en el servidor un límite MAYOR que el que
+/// sale de este helper.
+///
 /// ## El reloj
 ///
 /// "Ahora" sale de [AppClock] —el seam que un test puede congelar— y no de un
@@ -108,6 +116,16 @@ final class VigenciaDelPlan {
   /// Que sea no-nulo es exactamente «cancelada con días pagos»: el único
   /// estado en que el PF puede volver a contratar el MISMO plan.
   final DateTime? pagadoHasta;
+
+  /// La baja está pedida y el período pagado ya no corre (o nunca tuvo fecha):
+  /// lo que rige es Free, aunque el doc siga diciendo otro tier. Es [cancelada]
+  /// sin [pagadoHasta].
+  ///
+  /// El servidor nunca reescribe el tier del doc cuando esto pasa (el límite
+  /// cae «sin que se escriba un solo documento», `entitlement-triggers.ts`),
+  /// así que el tope de alumnos cacheado en `weightLimit` sigue siendo el del
+  /// plan viejo. Quien lo muestre tiene que tomarlo del [tierEfectivo].
+  bool get vencida => cancelada && pagadoHasta == null;
 
   /// El servidor PUEDE diferir el primer cobro de un checkout nuevo de este
   /// plan hasta [pagadoHasta]: la baja está pedida y falta al menos un día

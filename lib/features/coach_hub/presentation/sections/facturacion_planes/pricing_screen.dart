@@ -658,7 +658,7 @@ class _PlanCards extends StatelessWidget {
 
     // «Actual» es el tier EFECTIVO, no el del doc: una baja con el período ya
     // vencido es Free. Y los días pagos de una baja viajan SÓLO a la tarjeta del
-    // plan actual —es la única en la que tiene sentido «volver a suscribirme»—,
+    // plan actual —es la única en la que tiene sentido «reactivar plan»—,
     // así que ninguna otra puede dibujar la fecha por error.
     final tierActual = vigencia.tierEfectivo;
 
@@ -1489,7 +1489,7 @@ class _PopularBadge extends StatelessWidget {
 /// "tu plan actual", "gratis", y —según la superficie— comprar o decir dónde se
 /// compra. El cuarto es el plan actual DADO DE BAJA con días todavía pagos, y
 /// sólo existe donde se puede cobrar: ahí "tu plan actual" deja de ser un
-/// cartel y pasa a ser «volver a suscribirme».
+/// cartel y pasa a ser «reactivar plan».
 class _PlanCtaButton extends StatelessWidget {
   const _PlanCtaButton({
     super.key,
@@ -1521,7 +1521,7 @@ class _PlanCtaButton extends StatelessWidget {
   /// Si falta al menos un día para [pagadoHasta], que es el único borde de la
   /// decisión de diferir el primer cobro que se ve desde el cliente (ver
   /// [VigenciaDelPlan.primerCobroDiferible]). Decide si se dibuja la nota del
-  /// primer cobro; el botón de volver a suscribirse no depende de esto.
+  /// primer cobro; el botón de reactivar el plan no depende de esto.
   final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
@@ -1541,7 +1541,7 @@ class _PlanCtaButton extends StatelessWidget {
 
       // Sin días pagos que re-contratar —el plan no está dado de baja— el
       // actual es un cartel, como siempre. Free también: no hay nada que
-      // cobrar, así que «volver a suscribirme» a un plan sin precio sería
+      // cobrar, así que «reactivar plan» sobre un plan sin precio sería
       // pedirle al servidor un checkout que no existe.
       if (hasta == null || kTierPricesArs[tier] == null) return _planActual();
 
@@ -1567,7 +1567,7 @@ class _PlanCtaButton extends StatelessWidget {
               _botonDeCompra(
                 context,
                 disponible,
-                'VOLVER A SUSCRIBIRME', // i18n: Fase W3
+                'REACTIVAR PLAN', // i18n: Fase W3
               ),
               // La nota del primer cobro es CONDICIONAL («Si ya pagaste…»)
               // y se esconde con menos de un día por delante, por el mismo
@@ -1584,7 +1584,7 @@ class _PlanCtaButton extends StatelessWidget {
               //
               // Con menos de un día NO se difiere (`queda-menos-de-un-dia`):
               // se cobra en el acto y la nota sería falsa con seguridad, así
-              // que no se dibuja. El botón queda, porque volver a suscribirse
+              // que no se dibuja. El botón queda, porque reactivar el plan
               // sigue siendo válido; lo que se calla es sólo lo que no se
               // cumple. Se evalúa al construir, sin timer: ver
               // [VigenciaDelPlan].
@@ -1667,7 +1667,7 @@ class _PlanCtaButton extends StatelessWidget {
         ),
       );
 
-  /// El botón que arranca el checkout. «ELEGIR PLAN» y «VOLVER A SUSCRIBIRME»
+  /// El botón que arranca el checkout. «ELEGIR PLAN» y «REACTIVAR PLAN»
   /// son el MISMO punto de compra con otra etiqueta: comparten acá la llamada a
   /// [PlanCheckoutAvailable.start] y el estilo, para que no haya un segundo
   /// camino de cobro que se desincronice del primero. Sólo se puede llamar con

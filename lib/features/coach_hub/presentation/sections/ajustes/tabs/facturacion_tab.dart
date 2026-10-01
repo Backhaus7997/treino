@@ -28,6 +28,25 @@ import 'package:treino/features/profile/application/user_providers.dart';
 /// historial de comprobantes (Fase 2). Un PF sin `subscription` en su doc es
 /// Free por definición (sin backfill).
 ///
+/// ## Qué plan muestra
+///
+/// El que RIGE, no el que dice el doc ([VigenciaDelPlan]). Una baja con el
+/// período ya vencido es Free, y el servidor no reescribe el tier del doc
+/// cuando eso pasa (`entitlement-triggers.ts`: el límite cae «sin que se
+/// escriba un solo documento»). Leer el tier a secas dejaba esta card diciendo
+/// «Plan 1», «x / 7» y sin la línea de plantillas mientras la pricing page ya
+/// marcaba a Free como el plan actual.
+///
+/// ## La línea de la baja y la app móvil
+///
+/// «Plan dado de baja. Sigue activo hasta el d/m.» es un estado de la cuenta y
+/// no una invitación a pagar, pero eso sólo se sostiene porque la app móvil no
+/// llega a esta pestaña: `/ajustes` vive en el router del Coach Hub web
+/// (`coach_hub_router.dart`) y `router.dart`, el de la app, no lo registra. Lo
+/// fija `test/app/guards/router_movil_sin_ajustes_scan_test.dart`. Si algún día
+/// esta pestaña llega al teléfono, esa línea hay que revisarla contra 3.1.3(f)
+/// antes de mostrarla ahí.
+///
 /// El uso se computa client-side desde los `trainerLinks` con
 /// [computeWeightedLoad] (active=1.0, paused=0.5) — misma lógica que el gate
 /// server-side de PR4. El `weightedLoad` denormalizado que el CF escribirá
@@ -41,11 +60,17 @@ class FacturacionTab extends ConsumerWidget {
 
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final sub = profile?.subscription;
-    // Sin suscripción → Free (sin backfill). Límite del tier vigente.
-    final tier = sub?.tier ?? SubscriptionTier.free;
-    final limit = sub?.weightLimit ?? tier.weightLimit;
-    // Qué le quedó de una baja: si la pidió y hasta cuándo le dura lo pagado.
+    // Qué plan rige y qué le quedó de una baja. Sin suscripción → Free (sin
+    // backfill); una baja con el período vencido también es Free aunque el doc
+    // siga diciendo otro tier.
     final vigencia = VigenciaDelPlan.de(sub);
+    final tier = vigencia.tierEfectivo;
+    // El tope cacheado en el doc (`weightLimit`) es el del tier NOMINAL: ya
+    // vencida la baja es el de un plan que el PF no tiene, así que sale de la
+    // tabla del tier efectivo. En cualquier otro caso manda el del doc.
+    final limit = vigencia.vencida
+        ? tier.weightLimit
+        : (sub?.weightLimit ?? tier.weightLimit);
 
     final links = ref.watch(trainerLinksStreamProvider).valueOrNull ?? const [];
     final load = computeWeightedLoad(links);
@@ -166,10 +191,16 @@ class _CurrentPlanCard extends StatelessWidget {
                     // y el PF tiene que poder leer las dos cosas juntas. Sin
                     // esta línea la card dice «Plan 1» como si nada y la baja
                     // —que ya no se puede repetir— queda invisible.
+                    //
+                    // «Dado de baja» y no «cancelado»: es el término del link
+                    // «Dar de baja la suscripción», del diálogo y de los
+                    // Términos §7. Dos nombres para lo mismo obligan al PF a
+                    // adivinar si son la misma cosa.
                     if (hasta != null) ...[
                       const SizedBox(height: AppSpacing.hairline),
                       Text(
-                        'Cancelado. Activo hasta el ${fechaDiaMesArg(hasta)}.', // i18n: Fase W3
+                        'Plan dado de baja. '
+                        'Sigue activo hasta el ${fechaDiaMesArg(hasta)}.', // i18n: Fase W3
                         style: TextStyle(
                           color: palette.textMuted,
                           fontSize: AppTextSize.caption,
