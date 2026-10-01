@@ -4703,6 +4703,18 @@ service cloud.firestore {
     match /verificaciones_de_mail/{uid} {
       allow read, write: if false;
     }
+    // El interruptor del gate del mail: `app_config/email_gate`, que prende o
+    // apaga la pantalla del código en la app (`emailGateEnabledProvider`). Es
+    // EXACTAMENTE ese documento: cualquier otro de `app_config`, y listar la
+    // colección, quedan denegados por defecto (no hay comodín). Lo lee
+    // (`get`, y escucharlo) cualquier cliente con sesión; lo escribe solo el
+    // equipo, desde la consola o el Admin SDK (que se saltea las reglas), nunca
+    // un cliente. Sin sesión la lectura se deniega y la app lo toma como
+    // apagado: ante un error la app apaga el gate, no lo deja prendido.
+    match /app_config/email_gate {
+      allow get: if request.auth != null;
+      allow write: if false;
+    }
 
     // ── Moderación: bloqueo de usuario (change `moderacion-reporte-y-bloqueo`) ──
     //
