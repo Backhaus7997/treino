@@ -4,6 +4,7 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/gender.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/profile/domain/verified_email.dart';
 
 void main() {
   final fixedDt = DateTime.utc(2026, 5, 11, 13, 30);
@@ -357,6 +358,90 @@ void main() {
         expect(profile.trainerLocationConsentAt, isNull);
         expect(profile.trainerLocationConsentPromptedAt, isNull);
       });
+    });
+  });
+
+  group('UserProfile.emailVerification', () {
+    UserProfile perfil({Map<String, VerifiedEmail>? verificacion}) =>
+        UserProfile(
+          uid: 'uid-mail',
+          email: 'a@b.com',
+          displayName: null,
+          role: UserRole.trainer,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+          emailVerification: verificacion ?? const {},
+        );
+
+    test('el alta no lo manda: `toJson()` no trae la clave', () {
+      // `UserRepository._altaPayload` escribe el `toJson()` entero, y la regla
+      // de create de `firestore.rules` rechaza `emailVerification`. Con la clave
+      // en el JSON, ningún registro nuevo se podría guardar.
+      expect(perfil().toJson(), isNot(contains('emailVerification')));
+      expect(
+        perfil(
+          verificacion: {
+            'trainer': VerifiedEmail(email: 'a@b.com', verifiedAt: fixedDt),
+          },
+        ).toJson(),
+        isNot(contains('emailVerification')),
+      );
+    });
+
+    test('fromJson lee el mapa por rol tal como lo escribe la Cloud Function',
+        () {
+      final raw = <String, dynamic>{
+        'uid': 'uid-mail',
+        'email': 'a@b.com',
+        'displayName': null,
+        'role': 'trainer',
+        'createdAt': Timestamp.fromDate(fixedDt),
+        'updatedAt': Timestamp.fromDate(fixedDt),
+        'emailVerification': <String, dynamic>{
+          'athlete': <String, dynamic>{
+            'email': 'a@b.com',
+            'verifiedAt': Timestamp.fromDate(fixedDt),
+          },
+          'trainer': <String, dynamic>{
+            'email': 'pf@b.com',
+            'verifiedAt':
+                Timestamp.fromDate(fixedDt.add(const Duration(days: 9))),
+          },
+        },
+      };
+
+      final profile = UserProfile.fromJson(raw);
+
+      expect(profile.emailVerification.keys,
+          unorderedEquals(['athlete', 'trainer']));
+      expect(profile.emailVerification['athlete']?.email, 'a@b.com');
+      expect(profile.emailVerification['athlete']?.verifiedAt, fixedDt);
+      expect(profile.emailVerification['trainer']?.email, 'pf@b.com');
+      expect(
+        profile.emailVerification['trainer']?.verifiedAt,
+        fixedDt.add(const Duration(days: 9)),
+      );
+    });
+
+    test('sin el campo, vacío; una entrada sin mail no tira el parseo', () {
+      final base = <String, dynamic>{
+        'uid': 'uid-mail',
+        'email': 'a@b.com',
+        'displayName': null,
+        'role': 'athlete',
+        'createdAt': Timestamp.fromDate(fixedDt),
+        'updatedAt': Timestamp.fromDate(fixedDt),
+      };
+      expect(UserProfile.fromJson(base).emailVerification, isEmpty);
+
+      final rota = UserProfile.fromJson({
+        ...base,
+        'emailVerification': <String, dynamic>{
+          'athlete': <String, dynamic>{},
+        },
+      });
+      expect(rota.emailVerification['athlete']?.email, '');
+      expect(rota.emailVerification['athlete']?.verifiedAt, isNull);
     });
   });
 }

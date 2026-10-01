@@ -9,6 +9,7 @@ import 'package:treino/features/profile/application/account_deletion_notifier.da
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -16,10 +17,6 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// `authRedirect` manda a `/birth-date`, que es exactamente lo que le pasa a
 /// una cuenta creada antes del requisito.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
-
-/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
-/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
-final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
 
 class MockUser extends Mock implements User {}
 
@@ -54,7 +51,8 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -65,7 +63,8 @@ UserProfile _trainerIncomplete() => UserProfile(
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.trainer, 'trainer@example.com'),
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -77,7 +76,8 @@ UserProfile _trainerComplete() => UserProfile(
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.trainer, 'trainer@example.com'),
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -152,8 +152,10 @@ ProviderContainer _loggedInContainer({
   required UserProfile profile,
   bool deletionInFlight = false,
   bool pendingWrites = false,
+  String? authEmail,
 }) {
   final mockUser = MockUser();
+  when(() => mockUser.email).thenReturn(authEmail);
   return ProviderContainer(
     overrides: [
       authNotifierProvider.overrideWith(
@@ -476,19 +478,29 @@ void main() {
   // Gate del mail confirmado con código (VerifyMailScreen)
   //
   // Para TODAS las cuentas —también Google y Apple—, después del gate de edad y
-  // antes del onboarding del PF. `mailVerificadoAt` lo escribe solo la Cloud
-  // Function `verificarCodigoDeMail`.
+  // antes del onboarding del PF. `emailVerification` lo escribe solo la Cloud
+  // Function `verificarCodigoDeMail`, y cuenta la entrada del rol de HOY con el
+  // mail de Auth de HOY (`correoVerificadoParaElRol`).
   // ---------------------------------------------------------------------------
   group('gate del mail confirmado con código', () {
-    Future<ProviderContainer> listo(UserProfile profile) async {
-      final c = _loggedInContainer(profile: profile);
+    // El mail de Auth del test es, por defecto, el del perfil: es lo que el
+    // gate compara. Sin mail en Auth el gate no corre, y no es lo que se mide.
+    Future<ProviderContainer> listo(
+      UserProfile profile, {
+      String? authEmail,
+    }) async {
+      final c = _loggedInContainer(
+        profile: profile,
+        authEmail: authEmail ?? profile.email,
+      );
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
       await c.read(userProfileProvider.future);
       return c;
     }
 
-    UserProfile sinMail(UserProfile p) => p.copyWith(mailVerificadoAt: null);
+    UserProfile sinMail(UserProfile p) =>
+        p.copyWith(emailVerification: const {});
 
     test('sin el mail confirmado, toda ruta privada manda a /verificar-mail',
         () async {
@@ -513,6 +525,29 @@ void main() {
     test('con la marca puesta, el gate no dispara', () async {
       final c = await listo(_athleteProfile());
       expect(callRedirect(c, '/home'), isNull);
+    });
+
+    test('el alumno verificado que pasa a PF vuelve a la pantalla (promoción)',
+        () async {
+      // El mail del entrenador es otro, y la entrada de alumno no lo cubre. Con
+      // un solo flag para los dos roles, este PF entraba sin ver el código.
+      final promovido = _trainerComplete().copyWith(
+        emailVerification: mailConfirmadoPara(
+          UserRole.athlete,
+          'trainer@example.com',
+        ),
+      );
+      final c = await listo(promovido);
+      expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+    });
+
+    test('una entrada con otro mail que el de Auth no alcanza', () async {
+      // El equipo le cambió el correo en Auth: el nuevo no lo abrió nadie.
+      final c = await listo(
+        _athleteProfile(),
+        authEmail: 'otro@example.com',
+      );
+      expect(callRedirect(c, '/home'), equals('/verificar-mail'));
     });
 
     test('al PF también, y ANTES de su onboarding', () async {

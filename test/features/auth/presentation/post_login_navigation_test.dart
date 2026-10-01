@@ -22,6 +22,7 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../helpers/onboarding_test_helpers.dart';
+import '../../../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -30,10 +31,6 @@ import '../../../helpers/onboarding_test_helpers.dart';
 /// cuando `bornAt` falta o no llega al piso, así que un perfil "completo" sin
 /// este campo nunca llega a la pantalla que el test quiere medir.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
-
-/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
-/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
-final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
 
 // ---------------------------------------------------------------------------
 // Issue #499 — flicker /home → /profile-setup en el 100% de los registros
@@ -135,7 +132,8 @@ UserProfile _completeProfile() => UserProfile(
       email: 'existente@example.com',
       displayName: 'tincho',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'existente@example.com'),
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),

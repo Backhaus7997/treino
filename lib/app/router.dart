@@ -9,6 +9,7 @@ import '../core/utils/deep_link_destination.dart';
 import '../core/widgets/treino_bottom_bar.dart';
 import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
+import '../features/auth/domain/mail_verificado.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/profile_unavailable_screen.dart';
@@ -273,8 +274,13 @@ String? authRedirect(
 
     // Gate del mail confirmado con código (`VerifyMailScreen`). Para TODAS las
     // cuentas —también Google y Apple, que traen `emailVerified` en true y por
-    // eso no sirve—: `mailVerificadoAt` lo escribe solo la Cloud Function
+    // eso no sirve—: `emailVerification` lo escribe solo la Cloud Function
     // `verificarCodigoDeMail` cuando el código coincide.
+    //
+    // POR ROL y contra el mail de Auth de hoy (`correoVerificadoParaElRol`): la
+    // entrada que cuenta es la del rol actual. Un alumno ya verificado que el
+    // equipo promueve a entrenador vuelve a esta pantalla, porque el mail que le
+    // llega es el del entrenador.
     //
     // Después del de edad (requisito legal, va primero) y antes del
     // onboarding del PF, que puede esperar un minuto más.
@@ -283,7 +289,7 @@ String? authRedirect(
     // pueda salir — el par que el gate de edad aprendió por las malas (ver su
     // comentario). La salida no necesita esperar escrituras pendientes: el
     // campo lo escribe el servidor, así que nunca hay un valor optimista.
-    final mailSinConfirmar = profile.mailVerificadoAt == null;
+    final mailSinConfirmar = !correoVerificadoParaElRol(profile, user.email);
     final enElGateDelMail = location.startsWith(_verifyMailRoute);
     if (!isPublic && mailSinConfirmar && !enElGateDelMail) {
       return _verifyMailRoute;

@@ -17,8 +17,10 @@ import 'widgets/auth_pill_button.dart';
 ///
 /// Lo pasan TODAS las cuentas —también Google y Apple— antes de usar la app
 /// (decisión de producto, 2026-10-01). El router lo exige mientras
-/// `users/{uid}.mailVerificadoAt` sea null; lo escribe solo la Cloud Function
-/// `verificarCodigoDeMail` (`functions/src/auth/codigo-de-verificacion.ts`).
+/// `correoVerificadoParaElRol` dé false: no hay entrada de
+/// `users/{uid}.emailVerification` para el rol de hoy con el mail de Auth de
+/// hoy. La escribe solo la Cloud Function `verificarCodigoDeMail`
+/// (`functions/src/auth/codigo-de-verificacion.ts`).
 ///
 /// ── Lo que esta pantalla NO dice, a propósito ──
 ///
@@ -31,7 +33,7 @@ import 'widgets/auth_pill_button.dart';
 /// ── Salir de acá ──
 ///
 /// No navega a mano después de validar: espera el snapshot del perfil con
-/// `mailVerificadoAt`, y el router la saca sola (mismo criterio que
+/// `emailVerification`, y el router la saca sola (mismo criterio que
 /// `BirthDateGateScreen`). Navegar antes que el dato correría una carrera con
 /// el stream y podría rebotar de vuelta.
 class VerifyMailScreen extends ConsumerStatefulWidget {

@@ -11,6 +11,7 @@ import 'package:treino/features/profile/application/account_deletion_notifier.da
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
 
 /// Fecha de nacimiento de un adulto.
 ///
@@ -18,10 +19,6 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// `authRedirect` manda a `/birth-date`, que es exactamente lo que le pasa a
 /// una cuenta creada antes del requisito.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
-
-/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
-/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
-final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
 
 /// Issue #544 — "autenticado pero sin perfil accesible" deja la app en
 /// skeleton infinito. authRedirect ahora detecta `hasError` en
@@ -50,7 +47,8 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
-      mailVerificadoAt: _mailVerificadoAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
