@@ -65,15 +65,18 @@ class _Navegacion extends NavigatorObserver {
       cambios++;
 }
 
-/// Reloj de la pantalla en los tests. `pump` adelanta el tiempo falso pero no
-/// `DateTime.now`, así que quien mide una espera adelanta los dos: [avanzar]
-/// hace `pump` Y mueve este reloj.
+/// Reloj de la pantalla en los tests. Sigue al tiempo falso de `pump` (que no
+/// mueve `DateTime.now`), así los timers y la espera dicen lo mismo. [salto]
+/// suma tiempo que pasó SIN que corra ningún timer, como con la app en segundo
+/// plano. [lecturas] cuenta cuántas veces la pantalla miró la hora: cada tick
+/// la mira, así que es lo que mide cuántos ticks hubo.
 class _Reloj {
-  DateTime ahora = DateTime.utc(2026, 10, 1, 12);
+  Duration salto = Duration.zero;
+  int lecturas = 0;
 
-  Future<void> avanzar(WidgetTester tester, Duration d) {
-    ahora = ahora.add(d);
-    return tester.pump(d);
+  DateTime lee() {
+    lecturas++;
+    return TestWidgetsFlutterBinding.instance.clock.now().add(salto);
   }
 }
 
@@ -102,7 +105,7 @@ Future<void> _montar(
       container: container,
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: VerifyMailScreen(ahora: reloj == null ? null : () => reloj.ahora),
+        home: VerifyMailScreen(ahora: reloj?.lee),
         navigatorObservers: [if (navegacion != null) navegacion],
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
@@ -220,7 +223,7 @@ void main() {
     expect(_reenviar(tester).onPressed, isNull);
     expect(find.text('Reenviar código en 60 s'), findsOneWidget);
 
-    await reloj.avanzar(tester, const Duration(seconds: 61));
+    await tester.pump(const Duration(seconds: 61));
     expect(_reenviar(tester).onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('verify_mail_resend')));
@@ -256,14 +259,14 @@ void main() {
 
     // Pasados los 60 s del cooldown común sigue bloqueado: la espera es la del
     // servidor, no la del botón.
-    await reloj.avanzar(tester, const Duration(seconds: 61));
+    await tester.pump(const Duration(seconds: 61));
     expect(_reenviar(tester).onPressed, isNull);
     expect(
       find.text('Pediste muchos códigos. Probá de nuevo en 44 min.'),
       findsOneWidget,
     );
 
-    await reloj.avanzar(tester, const Duration(minutes: 45));
+    await tester.pump(const Duration(minutes: 45));
     expect(_reenviar(tester).onPressed, isNotNull);
     expect(find.text('Ya podés pedir otro código.'), findsOneWidget);
     await _desmontar(tester);
@@ -290,8 +293,8 @@ void main() {
   testWidgets(
       'la espera sale del reloj, no de contar ticks (app en segundo '
       'plano)', (tester) async {
-    // Con la app en segundo plano el Timer.periodic no repone los ticks que se
-    // pierde: restando de a uno, la espera de 45 min seguiría diciendo 45 min.
+    // Con la app en segundo plano los timers no reponen el tiempo que pasó:
+    // restando de a uno por tick, la espera de 45 min seguiría diciendo 45 min.
     final servicio = _Servicio()
       ..solicitud = const ResultadoDeSolicitud(
         SolicitudDeCodigo.limitado,
@@ -304,16 +307,141 @@ void main() {
       findsOneWidget,
     );
 
-    // Pasan 40 min de reloj y el Timer dispara UN solo tick.
-    reloj.ahora = reloj.ahora.add(const Duration(minutes: 40));
-    await tester.pump(const Duration(seconds: 1));
+    // Pasan 40 min de reloj sin que corra ningún timer, y después dispara UN
+    // solo tick (el próximo de la cuenta cae a los 60 s).
+    reloj.salto += const Duration(minutes: 40);
+    await tester.pump(const Duration(seconds: 61));
 
+    // 45 min - 40 min - 61 s = 3 min 59 s → 4 min, hacia arriba.
     expect(
-      find.text('Pediste muchos códigos. Probá de nuevo en 5 min.'),
+      find.text('Pediste muchos códigos. Probá de nuevo en 4 min.'),
       findsOneWidget,
     );
     expect(_reenviar(tester).onPressed, isNull);
     await _desmontar(tester);
+  });
+
+  testWidgets('con una espera de horas NO se reconstruye cada segundo',
+      (tester) async {
+    // Reconstruir la pantalla cada segundo para mostrar «4 h» gasta batería.
+    // Cada tick mira el reloj, así que las lecturas cuentan los ticks.
+    final servicio = _Servicio()
+      ..solicitud = const ResultadoDeSolicitud(
+        SolicitudDeCodigo.limitado,
+        reintentarEn: Duration(hours: 4),
+      );
+    final reloj = _Reloj();
+    await _montar(tester, servicio, reloj: reloj);
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 4 h.'),
+      findsOneWidget,
+    );
+
+    // 10 min: lo que se ve no cambia hasta que baje a 3 h, así que ni un tick.
+    final alMontar = reloj.lecturas;
+    await tester.pump(const Duration(minutes: 10));
+    expect(reloj.lecturas, alMontar);
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 4 h.'),
+      findsOneWidget,
+    );
+
+    // A la hora de reloj (t = 70 min) ya bajó a 3 h.
+    await tester.pump(const Duration(hours: 1));
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 3 h.'),
+      findsOneWidget,
+    );
+
+    // Un segundo ANTES del vencimiento sigue bloqueado, y no hay botón
+    // habilitado antes de tiempo ni un «0 min».
+    await tester.pump(const Duration(hours: 4) -
+        const Duration(minutes: 70) -
+        const Duration(seconds: 1));
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 1 min.'),
+      findsOneWidget,
+    );
+    expect(_reenviar(tester).onPressed, isNull);
+
+    // Y en el vencimiento, se habilita.
+    await tester.pump(const Duration(seconds: 1));
+    expect(_reenviar(tester).onPressed, isNotNull);
+    expect(find.text('Ya podés pedir otro código.'), findsOneWidget);
+    await _desmontar(tester);
+  });
+
+  group('al volver de segundo plano', () {
+    // El timer no avanza con el dispositivo dormido: con el tick a una hora de
+    // distancia, sin recalcular al volver se vería la espera de antes de
+    // bloquear el teléfono.
+    Future<_Reloj> montarConEspera(WidgetTester tester) async {
+      final servicio = _Servicio()
+        ..solicitud = const ResultadoDeSolicitud(
+          SolicitudDeCodigo.limitado,
+          reintentarEn: Duration(hours: 4),
+        );
+      final reloj = _Reloj();
+      await _montar(tester, servicio, reloj: reloj);
+      return reloj;
+    }
+
+    Future<void> dormirYVolver(WidgetTester tester, _Reloj reloj, Duration d) {
+      // Las transiciones válidas de la plataforma, una por una.
+      for (final e in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(e);
+      }
+      // Pasa el tiempo de reloj, pero ningún pump llega al tick programado.
+      reloj.salto += d;
+      for (final e in [
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(e);
+      }
+      return tester.pump();
+    }
+
+    testWidgets('recalcula contra el reloj sin esperar al timer',
+        (tester) async {
+      final reloj = await montarConEspera(tester);
+      expect(
+        find.text('Pediste muchos códigos. Probá de nuevo en 4 h.'),
+        findsOneWidget,
+      );
+
+      await dormirYVolver(tester, reloj, const Duration(hours: 2));
+
+      expect(
+        find.text('Pediste muchos códigos. Probá de nuevo en 2 h.'),
+        findsOneWidget,
+      );
+      expect(_reenviar(tester).onPressed, isNull);
+
+      // Y el tick quedó re-armado: sigue la cuenta (a los 90 min pasa a minutos).
+      await tester.pump(const Duration(seconds: 1801));
+      expect(
+        find.text('Pediste muchos códigos. Probá de nuevo en 90 min.'),
+        findsOneWidget,
+      );
+      await _desmontar(tester);
+    });
+
+    testWidgets('si venció mientras dormía, el botón se habilita',
+        (tester) async {
+      final reloj = await montarConEspera(tester);
+
+      await dormirYVolver(tester, reloj, const Duration(hours: 5));
+
+      expect(_reenviar(tester).onPressed, isNotNull);
+      expect(find.text('Ya podés pedir otro código.'), findsOneWidget);
+      await _desmontar(tester);
+    });
   });
 
   testWidgets('verificado después de «limitado»: el éxito no queda tapado',
