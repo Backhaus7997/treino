@@ -1235,26 +1235,59 @@ describe("pie de baja de los correos promocionales", () => {
     blockedCount: 3,
   };
 
-  describe("sin la opción, el mail sale como siempre", () => {
-    it.each(ALL_KINDS)("%s: pasar `{}` o `{comercial: true}` no cambia nada", (kind) => {
-      const base = renderMail(kind, PARAMS);
+  describe("sin la opción, el mail sale como salía en origin/main", () => {
+    /**
+     * El pie de `origin/main` (`templates.ts`, `layout()`), COPIADO como literal:
+     * el `<div>` con «Recibís este mail porque tenés una cuenta en TREINO.» y el
+     * link a gettreino.com, más el cierre del documento. Comparar `renderMail`
+     * contra `renderMail` sólo prueba que la función es determinista; esto es lo
+     * que prueba que el pie de hoy no cambió. Si el pie común cambia a propósito,
+     * este literal se cambia a propósito, en el mismo commit.
+     */
+    const PIE_DE_ORIGIN_MAIN =
+      "<div style=\"max-width:520px;padding:20px 8px;font-size:12px;" +
+      "line-height:1.6;color:#9BA8A1;font-family:Arial,Helvetica,sans-serif;\">" +
+      "Recibís este mail porque tenés una cuenta en TREINO.<br>" +
+      "<a href=\"https://gettreino.com\" style=\"color:#9BA8A1;\">gettreino.com</a>" +
+      "</div>";
+    const CIERRE_DEL_DOCUMENTO = "</td></tr></table></body></html>";
 
-      expect(renderMail(kind, PARAMS, {})).toEqual(base);
-      expect(renderMail(kind, PARAMS, { comercial: true })).toEqual(base);
+    it.each(ALL_KINDS)("%s: el HTML termina en el pie de origin/main, byte a byte", (kind) => {
+      const { html } = renderMail(kind, PARAMS);
+
+      expect(html.endsWith(PIE_DE_ORIGIN_MAIN + CIERRE_DEL_DOCUMENTO)).toBe(true);
     });
 
-    it.each(ALL_KINDS)("%s: el pie es el de hoy y el texto plano no tiene pie", (kind) => {
+    it.each(["appointment-confirmed", "password-reset", "limit-reached"] as const)(
+      "%s: el pie no cambia ni pasando opciones que no lo piden",
+      (kind) => {
+        // `{}` y `{comercial: true}` no piden pie de baja.
+        for (const opciones of [undefined, {}, { comercial: true }]) {
+          const { html } = renderMail(kind, PARAMS, opciones);
+
+          expect(html.endsWith(PIE_DE_ORIGIN_MAIN + CIERRE_DEL_DOCUMENTO)).toBe(true);
+        }
+      },
+    );
+
+    it.each(ALL_KINDS)("%s: el texto plano no tiene pie ni separador", (kind) => {
       const { html, text } = renderMail(kind, PARAMS);
 
-      expect(html).toContain(
-        "Recibís este mail porque tenés una cuenta en TREINO.<br>" +
-          "<a href=\"https://gettreino.com\" style=\"color:" + MUTED_GRIS + ";\">" +
-          "gettreino.com</a></div>",
-      );
+      // Hoy el text/plain no tiene pie; sin la opción tiene que seguir así.
+      expect(text.split("\n")).not.toContain("--");
       for (const huella of ["promocional", "Ley 25.326", "Decreto 1558", "BACKHAUSTIN"]) {
         expect(html).not.toContain(huella);
         expect(text).not.toContain(huella);
       }
+    });
+
+    it.each(ALL_KINDS)("%s: `{}` y `{comercial: true}` son los defaults", (kind) => {
+      // No dice «como antes» (eso lo dicen los de arriba): dice que las opciones
+      // por default equivalen a no pasarlas.
+      const sinOpciones = renderMail(kind, PARAMS);
+
+      expect(renderMail(kind, PARAMS, {})).toEqual(sinOpciones);
+      expect(renderMail(kind, PARAMS, { comercial: true })).toEqual(sinOpciones);
     });
   });
 
