@@ -1,11 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show FirebaseException, SetOptions;
+    show
+        CollectionReference,
+        DocumentReference,
+        FirebaseException,
+        FirebaseFirestore,
+        SetOptions;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/notification_pref_keys.dart';
+
+class _MockFirestore extends Mock implements FirebaseFirestore {}
+
+class _MockUsers extends Mock
+    implements CollectionReference<Map<String, dynamic>> {}
+
+class _MockUserDoc extends Mock
+    implements DocumentReference<Map<String, dynamic>> {}
 
 /// El interruptor «Correos promocionales» de Perfil › Privacidad: lo que se
 /// escribe en `users/{uid}` y cómo se lee de vuelta.
@@ -39,9 +53,9 @@ void main() {
 
       final data = await leerDoc();
       // `equals` sobre el documento ENTERO y no sólo sobre la ruta anidada:
-      // si la escritura dejara un campo literal `notificationPrefs.x.email`
-      // JUNTO al mapa, una lectura por ruta lo ignoraría y el test saldría
-      // verde con el documento sucio.
+      // un campo de más (o un mapa en otro lugar) tiene que verse. OJO: esto
+      // NO detecta una clave con puntos —el fake la interpreta como ruta—;
+      // eso lo cubre el grupo de «lo que RECIBE Firestore», más abajo.
       expect(
         data,
         equals({
@@ -130,6 +144,82 @@ void main() {
         repo.setCorreosPromocionales(uid, false),
         throwsA(isA<FirebaseException>()),
       );
+    });
+  });
+
+  // POR QUÉ HACE FALTA UN ESPÍA, y no alcanza con leer el documento de vuelta:
+  // `fake_cloud_firestore` interpreta una clave con puntos como una RUTA aun en
+  // un `set` con merge, así que una escritura con
+  // `'notificationPrefs.novedades_plan.email'` termina en el mismo documento
+  // anidado que la correcta y los tests de arriba salen verdes. Firestore de
+  // verdad no hace eso: en un `set` esa clave es un campo cuyo NOMBRE contiene
+  // los puntos (verificado contra el emulador con el SDK de JS: el documento
+  // queda con un campo literal `notificationPrefs.novedades_plan.email`; sólo
+  // `update()` interpreta la ruta). Se comprobó por mutación que con la clave
+  // con puntos los tests que leen el documento siguen en verde.
+  // Para ver qué se manda, hay que mirar el argumento que recibe `set`.
+  group('setCorreosPromocionales — lo que RECIBE Firestore', () {
+    late _MockFirestore firestoreEspia;
+    late _MockUserDoc doc;
+
+    setUp(() {
+      registerFallbackValue(SetOptions(merge: true));
+      registerFallbackValue(<String, Object?>{});
+      firestoreEspia = _MockFirestore();
+      final users = _MockUsers();
+      doc = _MockUserDoc();
+      when(() => firestoreEspia.collection('users')).thenReturn(users);
+      when(() => users.doc(uid)).thenReturn(doc);
+      when(() => doc.set(any(), any())).thenAnswer((_) async {});
+    });
+
+    UserRepository repoEspia() => UserRepository(
+          firestore: firestoreEspia,
+          // El GymRepository por defecto también tocaría el firestore espía.
+          gyms: GymRepository(firestore: FakeFirebaseFirestore()),
+        );
+
+    test('el dato es el mapa anidado, sin ninguna clave con puntos', () async {
+      await repoEspia().setCorreosPromocionales(uid, false);
+
+      final captured =
+          verify(() => doc.set(captureAny(), captureAny())).captured;
+      final data = captured[0] as Map<String, Object?>;
+
+      expect(
+        data,
+        equals({
+          'notificationPrefs': {
+            'novedades_plan': {'email': false},
+          },
+        }),
+      );
+      // Mirar sólo las claves del nivel de arriba no alcanza: una con puntos
+      // es exactamente lo que se cuela ahí.
+      expect(data.keys.where((k) => k.contains('.')), isEmpty);
+    });
+
+    test('va con merge:true, que es lo que hace profundo el merge', () async {
+      await repoEspia().setCorreosPromocionales(uid, true);
+
+      final captured =
+          verify(() => doc.set(captureAny(), captureAny())).captured;
+      final data = captured[0] as Map<String, Object?>;
+      final options = captured[1] as SetOptions;
+
+      expect(options.merge, isTrue,
+          reason: 'sin merge, el set REEMPLAZA el documento entero');
+      expect(
+        (data['notificationPrefs']! as Map)['novedades_plan'],
+        {'email': true},
+      );
+    });
+
+    test('es UNA sola escritura al documento del usuario', () async {
+      await repoEspia().setCorreosPromocionales(uid, false);
+
+      verify(() => doc.set(any(), any())).called(1);
+      verifyNoMoreInteractions(doc);
     });
   });
 
