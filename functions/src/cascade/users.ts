@@ -6,6 +6,7 @@
  *   - `userPublicProfiles/{uid}` (hard delete)
  *   - `trainerPublicProfiles/{uid}` (defensive no-op if absent)
  *   - `retention_notices/{uid}` (hard delete)
+ *   - `verificaciones_de_mail/{uid}` (hard delete)
  *
  * Admin SDK bypasses Firestore security rules — no rules change needed.
  * REQ-ACCDEL-CF-004 | ADR-ACCDEL-001
@@ -14,6 +15,7 @@
 import { App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { RETENTION_NOTICES_COLLECTION } from "../retention/collection";
+import { VERIFICACIONES_COLLECTION } from "../auth/codigo-de-verificacion";
 
 /**
  * Deletes all Firestore documents owned by the given user.
@@ -50,4 +52,9 @@ export async function deleteUserDocs(
   // cascada, justamente para que este delete se lo lleve. La auditoria de la
   // baja queda en `audit_log/{uid}`, que se retiene a proposito.
   await db.collection(RETENTION_NOTICES_COLLECTION).doc(uid).delete();
+
+  // Step 5: Delete verificaciones_de_mail/{uid}, el código de 6 dígitos
+  // pendiente. Mismo molde que el paso 4: el uid va en el ID, ninguna query por
+  // campo lo alcanza, y adentro queda el mail de la cuenta.
+  await db.collection(VERIFICACIONES_COLLECTION).doc(uid).delete();
 }

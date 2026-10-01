@@ -27,15 +27,10 @@
  * RESPUESTA. Cerrarlo pide un delay constante artificial; se documenta en vez
  * de fingir que no esta.
  *
- * ESTADO: desplegado, pero EL CLIENTE TODAVIA NO LO LLAMA.
- *
- * `AuthService.sendPasswordResetEmail` y `sendEmailVerification`
- * (lib/features/auth/data/auth_service.dart:121 y :130) siguen yendo a
- * FirebaseAuth directo, asi que los mails de recuperacion aun salen por las
- * plantillas default. Es a proposito: `treino-dev` es produccion y el padron de
- * Auth es uno solo, no hay donde ensayar. Primero se comprueba a mano que estos
- * callables mandan bien, y recien despues se migra el cliente — sobre un flujo
- * donde el usuario ya esta afuera de su cuenta, ese orden no es opcional.
+ * ESTADO: desplegado y EN USO. `AuthService.sendPasswordResetEmail` y
+ * `sendEmailVerification` (lib/features/auth/data/auth_service.dart) llaman a
+ * estos dos callables. Hasta 2026-10-01 este bloque decia que el cliente
+ * todavia no los llamaba, y ya no era cierto.
  *
  * `requestPasswordReset` es un endpoint SIN autenticar que escribe en
  * Firestore. Se publico recien cuando `send.gettreino.com` quedo verificado en

@@ -160,6 +160,24 @@
  *   - **El `paused`.** Un PF que pausa en MP sigue cayendo a Free en el acto
  *     aunque tenga periodo pago. Es la misma injusticia de forma, pero es otra
  *     decision de politica y meterla acá seria cambiarla de contrabando.
+ *
+ * ── LA PRUEBA DIFERIDA ──
+ *
+ * Un plan que nacio con dias de prueba (`mp_plans.diferidoHastaMs`, ver
+ * `diferir-primer-cobro.ts`) se lee con reglas propias mientras su suscripcion
+ * no haya tenido ningun cobro EXITOSO (un monto de $0 no cuenta). Una autorizada
+ * mucho despues de abrir el checkout se trata como `pending`, y la guarda (5)
+ * protege lo que el PF ya tenia pago; una autorizada a tiempo no pasa a `grace`
+ * por un cobro que todavia no corresponde; y una prueba cancelada no estira el
+ * fin de periodo mas alla de lo que el PF ya pago. Desde el primer cobro real se
+ * lee como cualquier otro plan.
+ *
+ * Esas reglas descansan en supuestos sobre como MP cuenta una prueba que NO estan
+ * medidos, y por eso los tres casos que piden que alguien mire loguean un warn: la
+ * autorizacion tardia (deja sin plan a quien autorizo un pago), la prueba vencida
+ * sin cobro (podria estar dando acceso gratis) y el plan con prueba que ya cobro
+ * antes de tiempo (MP ignoro o acorto la prueba: el PF pago dos veces). Las
+ * reglas, los supuestos y el por que de cada una estan en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -183,12 +201,22 @@ import {
   createMpClient,
 } from "./client";
 import {
+  HOLGURA_PRUEBA_MS,
+  PruebaDiferidaInput,
+  aplicarPruebaDiferidaAlEstado,
+  aplicarPruebaDiferidaAlPeriodo,
+  cobroAntesDeLaPrueba,
+  cobrosExitosos,
+  situacionDeLaPrueba,
+} from "./diferir-primer-cobro";
+import {
   AthleteStatus,
   athleteStatusDesde,
   athleteStatusOtorga,
   hayCobroPendiente,
   mapMpStatus,
 } from "./map-status";
+import { MOTIVO_ABANDONO, MOTIVO_REEMPLAZO } from "./motivos-terminal";
 import {
   MP_PLANS_COLLECTION,
   ProductoMp,
@@ -315,6 +343,18 @@ function comoTimestamp(v: unknown): Timestamp | null {
 }
 
 /**
+ * `unknown` → ISO 8601 si es un numero de ms que da una fecha valida, si no
+ * `null`. Solo para logs: un campo que vino mal de un documento no puede hacer que
+ * el reconciliador tire un `RangeError` (que es lo que hace `toISOString` con una
+ * fecha invalida) justo cuando intenta avisar que algo esta raro.
+ */
+function isoDeMs(ms: unknown): string | null {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/**
  * Un periodo de `auto_recurring` sumado a su `start_date`.
  *
  * Existe por un hallazgo de la prueba real contra MP, y la asimetria es fea:
@@ -410,6 +450,38 @@ export function resolverFinDePeriodo(
 }
 
 /**
+ * El fin de periodo con el tope de la prueba diferida, o [base] sin tocar si el
+ * plan no es diferido.
+ *
+ * La regla vive en `diferir-primer-cobro.ts`; acá solo se traduce entre
+ * Timestamp y ms, y se deja registro cuando algo cambia. Devuelve el MISMO
+ * objeto cuando no hay cambio, asi que para un plan normal es una identidad.
+ */
+function conTopeDeLaPruebaDiferida(
+  base: Timestamp | null,
+  prueba: PruebaDiferidaInput,
+  contexto: { planId: string; uid: string },
+): Timestamp | null {
+  const baseMs = base === null ? null : base.toMillis();
+  const topeMs = aplicarPruebaDiferidaAlPeriodo({
+    ...prueba,
+    periodEndMs: baseMs,
+  });
+  if (topeMs === baseMs) return base;
+
+  logger.info(
+    "mp/reconcile: el fin de periodo de una prueba diferida se acota a lo " +
+      "que el PF ya pago",
+    {
+      ...contexto,
+      desdeIso: baseMs === null ? null : new Date(baseMs).toISOString(),
+      haciaIso: topeMs === null ? null : new Date(topeMs).toISOString(),
+    },
+  );
+  return topeMs === null ? null : Timestamp.fromMillis(topeMs);
+}
+
+/**
  * El rango del limite (`null` = plan3 = SIN TOPE = el mayor) ahora se importa de
  * `effective-limit.ts` como `limitRank`.
  *
@@ -456,18 +528,12 @@ const CAMPO_REEMPLAZO = "supersededBy";
  */
 export const CAMPO_CUENTA_ELIMINADA = "cuentaEliminadaAtMs";
 
-/**
- * Los dos motivos de `terminal` que escribe este archivo. Son constantes y no
- * literales sueltos porque `puedeSeguirCobrando` COMPARA contra uno de ellos:
- * escritos a mano en dos lados, el dia que alguien cambie una redaccion el
- * filtro deja de reconocer su propio motivo y el bug es silencioso.
- *
- * (El tercer `terminal` que existe no tiene motivo: el de `status === cancelled`
- * mas abajo. Que la baja del PF sea la unica SIN motivo es deliberado — ver
- * `puedeSeguirCobrando`.)
- */
-const MOTIVO_ABANDONO = "checkout abandonado";
-const MOTIVO_REEMPLAZO = "reemplazado por otro plan";
+// Los dos motivos de `terminal` que escribe este archivo (`MOTIVO_ABANDONO` y
+// `MOTIVO_REEMPLAZO`) viven en `motivos-terminal.ts`, junto con la explicacion de
+// las tres clases de `terminal`: `diferir-primer-cobro.ts` tambien los lee, y un
+// import hacia este archivo seria circular. El tercer `terminal` no tiene motivo:
+// es el de `status === cancelled`, y que la baja del PF sea la unica SIN motivo es
+// deliberado (ver `puedeSeguirCobrando`).
 
 /**
  * Este plan todavia PUEDE estar cobrandole al PF, asi que hay que mirarlo.
@@ -1085,7 +1151,9 @@ export async function reconcileSubscription(
     return { planId, outcome: "skipped-uid-no-coincide" };
   }
 
-  const { status, degraded } = mapMpStatus({
+  // `statusDeMp` y no `status`: el del PF puede ajustarse mas abajo por la prueba
+  // diferida, y el del alumno se queda con el que dijo el mapeo.
+  const { status: statusDeMp, degraded } = mapMpStatus({
     raw: mp.status,
     cobroPendiente: hayCobroPendiente(mp.summarized),
     trainerId: uid,
@@ -1129,10 +1197,93 @@ export async function reconcileSubscription(
       planId,
       uid,
       mp,
-      status,
+      status: statusDeMp,
       planDoc,
       deps,
     });
+  }
+
+  // ── LA PRUEBA DIFERIDA: un plan que nacio con dias de prueba se lee distinto ──
+  //
+  // Solo para el PF, y por eso va despues del corte: el checkout del alumno
+  // nunca escribe `diferidoHastaMs`. Va ANTES de la guarda de no-regresion de
+  // abajo porque una suscripcion autorizada fuera de ventana sale de acá como
+  // `pending`, y es esa guarda la que le conserva al PF lo que ya tenia pago.
+  //
+  // Para un plan normal (sin `diferidoHastaMs`) o que ya cobro, esto devuelve el
+  // mismo `statusDeMp`. Las reglas y su por que: `diferir-primer-cobro.ts`.
+  const pruebaDiferida: PruebaDiferidaInput = {
+    diferidoHastaMs: planDoc?.diferidoHastaMs,
+    planCreadoMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
+    mpStatus: mp.status,
+    statusHoy: statusDeMp,
+    summarized: mp.summarized,
+    mpDateCreated: mp.date_created,
+    nowMs: deps.nowMs,
+  };
+  const situacion = situacionDeLaPrueba(pruebaDiferida);
+  const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
+  const contextoDeLaPrueba = {
+    planId,
+    uid,
+    mpStatus: mp.status,
+    desde: statusDeMp,
+    hacia: status,
+    diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+  };
+  if (cobroAntesDeLaPrueba(pruebaDiferida)) {
+    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de un dia para
+    // el fin de lo que el PF tenia pago: MP ignoro o acorto la prueba, y el PF pago
+    // dos veces ese periodo. No cambia el estado (un plan que cobro se lee como
+    // cualquiera), pero es el aviso de que el supuesto central del diferimiento
+    // no se cumplio: hay que revisar ese pago y evaluar apagar el interruptor
+    // (`DIFERIR_PRIMER_COBRO_ENABLED`, en `diferir-primer-cobro.ts`).
+    logger.warn(
+      "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el PF " +
+        "tenia pago, MP ignoro o acorto la prueba y el PF pago dos veces",
+      {
+        planId,
+        uid,
+        mpStatus: mp.status,
+        diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+        cobros: cobrosExitosos(mp.summarized),
+        nowIso: isoDeMs(deps.nowMs),
+      },
+    );
+  }
+  if (situacion === "fuera-de-ventana") {
+    // WARN y no info. Esto deja SIN el plan a alguien que autorizo un pago (hasta
+    // el primer cobro real de MP) y que probablemente crea que ya lo tiene: tiene
+    // que poder verse en el log para atender el reclamo.
+    logger.warn(
+      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
+        "como pending",
+      {
+        ...contextoDeLaPrueba,
+        autorizadaEn: typeof mp.date_created === "string"
+          ? mp.date_created.slice(0, 40)
+          : null,
+        planCreadoIso: isoDeMs(pruebaDiferida.planCreadoMs),
+      },
+    );
+  } else if (situacion === "vencida" && statusDeMp === "active") {
+    // WARN y no info. Pasado el horizonte, sin ningun cobro exitoso y sin un cobro
+    // pendiente, el mapeo de siempre deja `active`: acceso pago sin que MP haya
+    // cobrado ni intentado cobrar nada. No se corrige aca (no hay evidencia de que
+    // sea un error, y bajarlo seria revocar), pero es acceso gratis posible.
+    logger.warn(
+      "mp/reconcile: prueba diferida vencida sin ningun cobro exitoso ni cobro " +
+        "pendiente, posible acceso gratis",
+      {
+        ...contextoDeLaPrueba,
+        // En `vencida`, E es siempre un numero (si no, la situacion seria `no-aplica`).
+        horizonteIso: typeof pruebaDiferida.diferidoHastaMs === "number"
+          ? isoDeMs(pruebaDiferida.diferidoHastaMs + HOLGURA_PRUEBA_MS)
+          : null,
+      },
+    );
+  } else if (status !== statusDeMp) {
+    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", contextoDeLaPrueba);
   }
 
   const userRef = getFirestore(app).collection("users").doc(uid);
@@ -1201,16 +1352,23 @@ export async function reconcileSubscription(
   // también ese pago, tiene que quitarlo a mano — el aviso lo advierte.
   const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
 
+  // El tope de la prueba diferida se aplica SOLO en la rama sin arrepentimiento:
+  // el instante del arrepentimiento gana sobre cualquier fin de periodo, y ahi ni
+  // se pregunta. Para un plan normal `conTopeDeLaPruebaDiferida` no cambia nada.
   const periodEnd =
     arrepentidoAt !== null
       ? Timestamp.fromMillis(arrepentidoAt)
-      : resolverFinDePeriodo({
-        deMp: parsePeriodEnd(mp.next_payment_date, planId),
-        yaGuardada: actual?.currentPeriodEnd,
-        autoRecurring: mp.auto_recurring,
-        status,
-        planId,
-      });
+      : conTopeDeLaPruebaDiferida(
+        resolverFinDePeriodo({
+          deMp: parsePeriodEnd(mp.next_payment_date, planId),
+          yaGuardada: actual?.currentPeriodEnd,
+          autoRecurring: mp.auto_recurring,
+          status,
+          planId,
+        }),
+        pruebaDiferida,
+        { planId, uid },
+      );
 
   // ── EL PISO PREPAGO: lo que el PF ya pago y este write estaba tirando ──
   //
@@ -1274,22 +1432,37 @@ export async function reconcileSubscription(
       { merge: true },
     );
 
-    // La baja es terminal en MP: no se reactiva un preapproval cancelado, se
-    // crea uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra
-    // una llamada diaria a MP para siempre.
-    if (status === "cancelled") {
-      await getFirestore(app)
-        .collection(MP_PLANS_COLLECTION)
-        .doc(planId)
-        .set({ terminal: true }, { merge: true });
-    }
-
     logger.info("mp/reconcile: suscripcion actualizada", {
       planId,
       uid,
       tier: mapping.tier,
       status,
     });
+  }
+
+  // La baja es terminal en MP: no se reactiva un preapproval cancelado, se
+  // crea uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra
+  // una llamada diaria a MP para siempre.
+  //
+  // ── FUERA del `if (!sinCambios)`, y es el arreglo ──
+  //
+  // Las dos escrituras (el usuario y el plan) no son atomicas. Con la marca
+  // adentro del `if`, una falla entre las dos dejaba el `subscription` ya
+  // escrito y el plan sin marcar, y la corrida siguiente veia `sinCambios` y
+  // nunca la reintentaba: el plan quedaba sin `terminal` PARA SIEMPRE. No era
+  // solo ruido en el barrido. `terminal` es lo que distingue, para
+  // `planesARevisar`, un plan que tuvo una suscripcion de verdad de un checkout
+  // que nadie pago, asi que un plan pagado y sin marca dejaba de contar como
+  // evidencia de pago y a ese PF se le cobraba en el acto lo que ya tenia pago.
+  //
+  // Ahora se escribe siempre que MP diga `cancelled` y el plan no la tenga. Es
+  // idempotente (`merge`, sin motivo): la unica clase de `terminal` sin motivo
+  // es justamente la baja (ver `motivos-terminal.ts`).
+  if (status === "cancelled" && planDoc?.terminal !== true) {
+    await getFirestore(app)
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planId)
+      .set({ terminal: true }, { merge: true });
   }
 
   // ── LA BAJA DE LO QUE ESTE PLAN REEMPLAZA ──

@@ -46,7 +46,7 @@ if (bannerProd) console.warn(bannerProd);
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
-const { getFirestore } = require('firebase-admin/firestore');
+const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 
 const { app } = inicializarAdmin();
 const db = getFirestore(app);
@@ -64,13 +64,21 @@ async function run() {
     process.exit(1);
   }
 
-  const { email, displayName } = snap.data();
+  const { email, displayName, role } = snap.data();
   console.log(
     `Promoting ${email} (${displayName || '(no displayName)'}) → role: trainer`,
   );
 
   const batch = db.batch();
-  batch.update(db.collection('users').doc(uid), { role: 'trainer' });
+  // Cada promoción vuelve a pedir el código de 6 dígitos, y con él llega el
+  // mail del entrenador (dónde paga un PF). Sin borrar la entrada, alguien
+  // promovido por segunda vez entraría con la verificación de la primera.
+  // Solo si el rol CAMBIA: re-correr el script sobre un entrenador (para
+  // rellenar el nombre, por ejemplo) no lo manda de vuelta a verificar.
+  // Ver `functions/src/auth/codigo-de-verificacion.ts`.
+  const cambios = { role: 'trainer' };
+  if (role !== 'trainer') cambios['emailVerification.trainer'] = FieldValue.delete();
+  batch.update(db.collection('users').doc(uid), cambios);
 
   // Backfill the public name so the trainer is not blank in discovery. merge:true
   // keeps it compatible with the trainer fields the onboarding dual-write adds later.

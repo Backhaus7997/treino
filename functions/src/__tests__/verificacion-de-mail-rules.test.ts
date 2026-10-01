@@ -6,7 +6,7 @@
  *   firebase emulators:exec --only firestore,auth,storage --project treino-dev \
  *     "npm --prefix functions test -- --runInBand verificacion-de-mail-rules"
  *
- * `users/{uid}.mailVerificadoAt` es la llave de la pantalla del código, y la
+ * `users/{uid}.emailVerification` es la llave de la pantalla del código, y la
  * pantalla es la que obliga a abrir el mail que explica cómo se paga. Si el
  * dueño del documento pudiera escribirse ese campo, el código sería decorativo.
  * Y `verificaciones_de_mail` guarda el hash, los intentos y el vencimiento: leer
@@ -34,6 +34,8 @@ const [HOST, PUERTO] = (process.env.FIRESTORE_EMULATOR_HOST ?? "127.0.0.1:8080")
 
 const UID = "alumna-verificacion";
 const MARCA = firebase.firestore.Timestamp.fromMillis(Date.parse("2026-10-01T12:00:00.000Z"));
+/** Verificada como alumna. La de entrenador es otra entrada del mismo mapa. */
+const VERIFICADA = { athlete: { email: `${UID}@example.test`, verifiedAt: MARCA } };
 
 /**
  * Un usuario como los que siembra `users-subscription-rules.test.ts`: las
@@ -72,13 +74,13 @@ async function sembrar(col: string, id: string, data: Record<string, unknown>) {
 
 const comoElDueno = () => testEnv.authenticatedContext(UID).firestore();
 
-describe("users.mailVerificadoAt — lo escribe solo la Cloud Function", () => {
+describe("users.emailVerification — lo escribe solo la Cloud Function", () => {
   it("el dueño NO puede crearse el documento ya verificado", async () => {
     await assertFails(
       comoElDueno().collection("users").doc(UID).set({
         uid: UID,
         role: "athlete",
-        mailVerificadoAt: MARCA,
+        emailVerification: VERIFICADA,
       }),
     );
   });
@@ -93,22 +95,34 @@ describe("users.mailVerificadoAt — lo escribe solo la Cloud Function", () => {
     await sembrar("users", UID, USUARIO);
 
     await assertFails(
-      comoElDueno().collection("users").doc(UID).update({ mailVerificadoAt: MARCA }),
+      comoElDueno().collection("users").doc(UID).update({ emailVerification: VERIFICADA }),
     );
   });
 
   it("tampoco puede tocar la marca una vez puesta", async () => {
-    await sembrar("users", UID, { ...USUARIO, mailVerificadoAt: MARCA });
+    await sembrar("users", UID, { ...USUARIO, emailVerification: VERIFICADA });
 
     await assertFails(
       comoElDueno().collection("users").doc(UID).update({
-        mailVerificadoAt: firebase.firestore.FieldValue.delete(),
+        emailVerification: firebase.firestore.FieldValue.delete(),
+      }),
+    );
+  });
+
+  it("ni sumarse la de entrenador con la de alumna puesta", async () => {
+    // El caso de la promoción: la entrada nueva es la que obliga a abrir el
+    // mail del entrenador, y el cliente no la puede escribir.
+    await sembrar("users", UID, { ...USUARIO, emailVerification: VERIFICADA });
+
+    await assertFails(
+      comoElDueno().collection("users").doc(UID).update({
+        "emailVerification.trainer": { email: `${UID}@example.test`, verifiedAt: MARCA },
       }),
     );
   });
 
   it("con la marca puesta sigue pudiendo editar su perfil", async () => {
-    await sembrar("users", UID, { ...USUARIO, mailVerificadoAt: MARCA });
+    await sembrar("users", UID, { ...USUARIO, emailVerification: VERIFICADA });
 
     await assertSucceeds(
       comoElDueno().collection("users").doc(UID).update({ displayName: "Anita" }),

@@ -1,3 +1,4 @@
+import '../../../../../core/utils/argentina_time.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 
 /// El texto del cupo de un plan, en UN solo lugar.
@@ -62,3 +63,33 @@ String tierName(SubscriptionTier tier) => switch (tier) {
       SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
       SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
     };
+
+/// `d/m` de un instante, en calendario argentino: la fecha corta de «tu plan
+/// rige hasta el 15/10» que comparten las pantallas de plan (alumnos
+/// bloqueados, pricing y Facturación).
+///
+/// Mismo motivo que [cupoTexto]: la escribió primero
+/// `blocked_students_screen.dart` como privada, y apenas una segunda pantalla
+/// necesitó la misma fecha había que copiarla. Dos copias de una fecha no
+/// fallan hoy: fallan el día que alguien arregla el huso horario de una.
+///
+/// OJO, no es EL formateador de fechas del módulo. El diálogo de baja
+/// (`cancel_subscription_dialog.dart`) tiene el suyo, `dd/mm/aaaa` con año y
+/// ceros, que es otro texto para otro momento («Conservás el acceso hasta el
+/// 03/10/2026.»). Los dos resuelven el huso igual (ART), pero un cambio de
+/// huso o de formato en uno no llega solo al otro.
+///
+/// Va con `toArgentina` y no leyendo los campos crudos ni convirtiendo a hora
+/// local: `currentPeriodEnd` es un instante UTC, y entre las 21:00 y las 23:59
+/// ART su día UTC ya es el siguiente — el PF leería una fecha corrida un día.
+///
+/// (El nombre del helper de conversión local va sin escribir literal a
+/// propósito: `no_raw_clock_scan_test.dart` escanea el TEXTO del archivo, así
+/// que citarlo en un comentario suma deuda al ratchet igual que usarlo.)
+///
+/// Sin cero a la izquierda («3/10», no «03/10»): es el formato que ya mostraba
+/// esa pantalla, y cambiarlo sería cambiarle el copy a quien no lo pidió.
+String fechaDiaMesArg(DateTime instant) {
+  final d = toArgentina(instant.toUtc());
+  return '${d.day}/${d.month}';
+}
