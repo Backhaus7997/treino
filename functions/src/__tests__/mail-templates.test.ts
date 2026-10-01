@@ -36,6 +36,8 @@ const KINDS: Record<MailKind, true> = {
   "password-reset": true,
   "federated-signin-hint": true,
   "email-verification": true,
+  "email-code-athlete": true,
+  "email-code-trainer": true,
   "appointment-confirmed": true,
   "appointment-series-created": true,
   "appointment-cancelled": true,
@@ -246,6 +248,11 @@ describe("destino del CTA", () => {
   // hacer) y `withdrawal-team-notice` va al equipo, sin pantalla nuestra a la
   // que mandarlo; `withdrawal-expired` manda a la BAJA, en la landing, que es
   // lo único que la persona puede hacer después de que venció el plazo.
+  //
+  // Los dos del código de verificación (`email-code-*`) mandan a donde se
+  // paga, que no es la app: el del alumno al checkout de la landing y el del
+  // entrenador al Coach Hub web (`trainerWebCheckout`). Sus destinos se
+  // verifican uno por uno en «código de verificación del mail».
   it("todo CTA que no sea un action link vive bajo /abrir", () => {
     const conActionLink = [
       "password-reset", "email-verification", "service-cancel-confirm",
@@ -256,9 +263,11 @@ describe("destino del CTA", () => {
       "withdrawal-received", "withdrawal-team-notice",
     ];
     const aLaLanding = ["withdrawal-expired"];
+    const alCobroWeb = ["email-code-athlete", "email-code-trainer"];
     const resto = ALL_KINDS.filter(
       (k) =>
-        !conActionLink.includes(k) && !sinBoton.includes(k) && !aLaLanding.includes(k),
+        !conActionLink.includes(k) && !sinBoton.includes(k) &&
+        !aLaLanding.includes(k) && !alCobroWeb.includes(k),
     );
 
     expect(resto).toHaveLength(19);
@@ -1121,5 +1130,56 @@ describe("Botón de Arrepentimiento", () => {
     it("no tiene botón", () => {
       expect(ctaHref(renderMail("withdrawal-team-notice", DATOS).html)).toBe("");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Código de verificación del mail (`auth/codigo-de-verificacion.ts`)
+//
+// Es el mail que tiene que abrir TODO el que entra a la app, y el único lugar
+// donde se le puede decir que los pagos van por mail: la app no puede.
+// ---------------------------------------------------------------------------
+describe("código de verificación del mail", () => {
+  const CODIGO = "048213";
+  const AMBOS = ["email-code-athlete", "email-code-trainer"] as const;
+
+  it.each(AMBOS)("%s lleva el código en el asunto y como titular", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO });
+
+    expect(out.subject).toContain(CODIGO);
+    // El titular es la primera línea del texto plano.
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).toContain("vence en 15 minutos");
+  });
+
+  it.each(AMBOS)("%s dice que los pagos y sus confirmaciones van por mail", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO });
+
+    expect(out.text).toMatch(/pagos .* se hacen por mail/);
+    // La etiqueta del botón vive en el HTML; el texto plano lleva la URL.
+    expect(out.html).toContain("VER LOS PLANES");
+  });
+
+  it("el del alumno manda al checkout de gettreino.com", () => {
+    const out = renderMail("email-code-athlete", { codigo: CODIGO });
+
+    expect(out.text).toContain("https://gettreino.com/es/suscripcion/checkout");
+  });
+
+  it("el del entrenador manda a los planes del Coach Hub web, no a la app", () => {
+    // La app no vende: un PF que toca el botón en el teléfono tiene que caer en
+    // la web, donde se contrata. Ver `trainerWebCheckout`.
+    const out = renderMail("email-code-trainer", { codigo: CODIGO });
+
+    expect(out.text).toContain("https://app.gettreino.com/?to=facturacion");
+    expect(out.text).not.toContain("/suscripcion/checkout");
+  });
+
+  it.each(AMBOS)("%s sin código no rompe ni dice «undefined»", (kind) => {
+    const out = renderMail(kind, {});
+
+    expect(out.subject).not.toContain("undefined");
+    expect(out.text).not.toContain("undefined");
+    expect(out.text.split("\n")[0]).toBe("Confirmá tu mail");
   });
 });

@@ -119,6 +119,14 @@ export { sendQueuedMail } from "./mail/send-queued-mail";
 // un `--only functions` sin filtros PODA del set desplegado toda funcion
 // ausente de este archivo.
 export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
+
+// El código de 6 dígitos que confirma el mail. Obligatorio para todos —también
+// Google y Apple—, y el mail que lo lleva es el que explica que los pagos van
+// por mail. Ver el encabezado de `auth/codigo-de-verificacion.ts`.
+export {
+  solicitarCodigoDeVerificacion,
+  verificarCodigoDeMail,
+} from "./auth/codigo-de-verificacion";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
 // Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
 // accurate for display after client-side pause/terminate/decline/cancel —

@@ -320,6 +320,10 @@ service cloud.firestore {
                     // nada. Lo escribe el webhook de la tienda, nunca el
                     // cliente.
                     && request.resource.data.get('athleteSubscription', null) == null
+                    // mailVerificadoAt: CF-write-only (`auth/codigo-de-verificacion.ts`).
+                    // Es la llave de la pantalla del código: sembrarlo al crear
+                    // el doc es saltearse el mail que explica cómo se paga.
+                    && request.resource.data.get('mailVerificadoAt', null) == null
                     // customExerciseVideoUsage: CF-write-only. Es el contador
                     // denormalizado de cuantos videos de ejercicio custom tiene
                     // subidos este usuario y cuantos bytes ocupan, que escribe
@@ -460,6 +464,10 @@ service cloud.firestore {
                     // indeleble lo que se sembró al crear, y el que lee el
                     // comentario da por cerrado lo que quedó abierto.
                     && request.resource.data.get('athleteSubscription', null) == resource.data.get('athleteSubscription', null)
+                    // mailVerificadoAt: CF-write-only, pineado en LOS DOS verbos
+                    // por lo mismo que `athleteSubscription`. Lo escribe
+                    // `verificarCodigoDeMail` cuando el código coincide.
+                    && request.resource.data.get('mailVerificadoAt', null) == resource.data.get('mailVerificadoAt', null)
                     // customExerciseVideoUsage: CF-write-only. Es el contador
                     // denormalizado de cuantos videos de ejercicio custom tiene
                     // subidos este usuario y cuantos bytes ocupan, que escribe
@@ -4686,6 +4694,13 @@ service cloud.firestore {
     // un PF no se le acredite el plan que pago. Leerlo filtra que ids de
     // suscripcion existen y cuando se movieron.
     match /mp_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+    // El código de 6 dígitos que confirma el mail (`auth/codigo-de-verificacion.ts`).
+    // Guarda solo el hash, pero leerlo da los intentos y el vencimiento, y
+    // escribirlo es plantarse un código propio y marcarse verificado sin abrir
+    // el mail. Cerrado entero: lo usa solo la Cloud Function.
+    match /verificaciones_de_mail/{uid} {
       allow read, write: if false;
     }
 
