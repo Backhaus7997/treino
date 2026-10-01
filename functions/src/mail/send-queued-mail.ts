@@ -103,6 +103,29 @@ async function resolveAddress(
   }
 }
 
+/** Lo que el envío necesita saber de `users/{uid}`: si existe y qué prefiere. */
+interface PerfilDeMail {
+  /**
+   * ¿Existe el documento? Importa para lo COMERCIAL: sin perfil no hay dónde
+   * registrar la oposición (la callable de baja nunca crea el documento), así
+   * que no se le puede ofrecer publicidad. Ver `decidirBaja` y el gate del handler.
+   */
+  existe: boolean;
+  prefs?: Record<string, Record<string, boolean> | undefined>;
+}
+
+/**
+ * Lee `users/{uid}` UNA vez. Quien necesite el perfil lo pasa de mano en mano:
+ * no se vuelve a leer para preguntar otra cosa.
+ */
+async function leerPerfil(app: App, uid: string): Promise<PerfilDeMail> {
+  const snap = await getFirestore(app).collection("users").doc(uid).get();
+  return {
+    existe: snap.exists,
+    prefs: snap.data()?.notificationPrefs as PerfilDeMail["prefs"],
+  };
+}
+
 /**
  * Checks the email channel in `users/{uid}.notificationPrefs`.
  *
@@ -110,19 +133,15 @@ async function resolveAddress(
  * mail) or a `bloqueComercial` (gates only the commercial block; see
  * `decidirBaja`). Transactional mail omits both and is never gated here.
  *
+ * Esta es la REGLA, no la lectura: un perfil ausente cuenta como «prendido». Que
+ * además lo comercial exija que el perfil EXISTA no cambia esta regla —los
+ * `prefKey` no comerciales (`nueva_solicitud`, `sesion_cancelada`) siguen
+ * enviándose con el documento ausente—; se chequea aparte.
+ *
  * @returns true when the mail may be sent.
  */
-async function emailChannelAllowed(
-  app: App,
-  uid: string,
-  prefKey: string,
-): Promise<boolean> {
-  const snap = await getFirestore(app).collection("users").doc(uid).get();
-  const prefs = snap.data()?.notificationPrefs as
-    | Record<string, Record<string, boolean> | undefined>
-    | undefined;
-
-  const value = prefs?.[prefKey]?.email;
+function emailChannelAllowed(perfil: PerfilDeMail, prefKey: string): boolean {
+  const value = perfil.prefs?.[prefKey]?.email;
   // Absent preference means the user never touched the toggle. Defaults live
   // in the Flutter layer (NotifPrefs._defaultFor); the server errs towards
   // sending, since every producer that passes a prefKey opted into it.
@@ -207,9 +226,16 @@ async function decidirBaja(
   }
 
   if (bloqueComercial) {
-    const prendida =
-      prefTieneBaja(bloqueComercial) &&
-      (await emailChannelAllowed(app, toUid, bloqueComercial));
+    let prendida = false;
+    if (prefTieneBaja(bloqueComercial)) {
+      const perfil = await leerPerfil(app, toUid);
+      // SIN PERFIL no se ofrece el bloque: la oposición no tendría dónde
+      // registrarse (la callable de baja no crea `users/{uid}`), y el link del
+      // pie diría «listo» sin que quede nada escrito. Pasa si la identidad de
+      // Auth existe y el documento no (`deleteAccount` borra Firestore antes que
+      // Auth).
+      prendida = perfil.existe && emailChannelAllowed(perfil, bloqueComercial);
+    }
     return prendida ?
       { prefKeyDelLink: bloqueComercial, soloElBloque: true, comercial: true } :
       { comercial: false };
@@ -323,13 +349,33 @@ export async function sendQueuedMailHandler(
 
   // Opt-out check, when this mail is subject to one.
   if (oposicion.prefKey && !literal) {
-    const allowed = await emailChannelAllowed(app, data.toUid, oposicion.prefKey);
-    if (!allowed) {
+    const perfil = await leerPerfil(app, data.toUid);
+    if (!emailChannelAllowed(perfil, oposicion.prefKey)) {
       logger.info("sendQueuedMail: email channel off, skipping", {
         mailId,
         prefKey: oposicion.prefKey,
       });
       await ref.update({ status: "failed", lastError: "email channel off" });
+      return;
+    }
+
+    // Lo COMERCIAL exige que `users/{uid}` EXISTA. Sin documento la oposición no
+    // tiene dónde registrarse —la callable de baja contesta `listo` sin crear
+    // nada— y un mail promocional saldría después de que la página dijo «listo».
+    // Pasa si la identidad de Auth existe y el documento no (`deleteAccount`
+    // borra Firestore antes que Auth). Los `prefKey` no comerciales conservan su
+    // comportamiento: documento ausente → se envía.
+    if (!perfil.existe && prefTieneBaja(oposicion.prefKey)) {
+      logger.warn("sendQueuedMail: sin perfil para registrar la oposición, el mail comercial no sale", {
+        mailId,
+        kind: data.kind,
+        uid: data.toUid,
+      });
+      await ref.update({
+        status: "failed",
+        attempts,
+        lastError: "sin perfil para registrar la oposición",
+      });
       return;
     }
   }

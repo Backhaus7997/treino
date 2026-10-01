@@ -13,7 +13,7 @@
  */
 
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { DocumentReference, FieldValue, getFirestore } from "firebase-admin/firestore";
 import { Messaging } from "firebase-admin/messaging";
 import { Auth, getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions";
@@ -573,16 +573,41 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
     await sendQueuedMailHandler(testApp, mailId, await readQueueDoc(mailId), sender, bajaKey);
   }
 
+  /** Perfiles de otros uids que un test crea y hay que limpiar. */
+  const perfilesExtra: string[] = [];
+
+  /** `users/{uid}` EXISTE (sin preferencias): lo que lo comercial exige. */
+  async function crearPerfil(otroUid: string): Promise<void> {
+    perfilesExtra.push(otroUid);
+    await db().collection("users").doc(otroUid).set({ displayName: "Marta" });
+  }
+
+  /** La identidad de Auth sigue viva pero `users/{uid}` ya no: el estado parcial de `deleteAccount`. */
+  async function borrarPerfil(): Promise<void> {
+    await db().collection("users").doc(uid).delete();
+  }
+
+  /** Cuántas veces se leyó un documento de `users/…` (pasa-a-través, no se mockea). */
+  function lecturasDePerfil(get: jest.SpyInstance): number {
+    return get.mock.contexts.filter(
+      (ref: DocumentReference) => ref.path.startsWith("users/"),
+    ).length;
+  }
+
   beforeEach(async () => {
     await getAuth(testApp)
       .createUser({ uid, email: "baja-pie@example.com" })
       .catch(() => undefined);
+    // Lo comercial exige que el perfil EXISTA: por default, existe.
+    await crearPerfil(uid);
   });
 
   afterEach(async () => {
     jest.restoreAllMocks();
     await purge(mailId);
-    await db().collection("users").doc(uid).delete().catch(() => undefined);
+    for (const u of perfilesExtra.splice(0)) {
+      await db().collection("users").doc(u).delete().catch(() => undefined);
+    }
     await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
@@ -644,14 +669,15 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect((await readQueueDoc(mailId))?.lastError).toBe("email channel off");
     });
 
-    it("con la preferencia prendida o ausente sale CON pie", async () => {
+    it("con la preferencia prendida o ausente (perfil sin ella) sale CON pie", async () => {
       await setPrefs({ [PREF]: { email: true } });
       await seed(comercial);
       const prendida = makeOkSender();
       await enviar(prendida, BAJA_KEY);
 
+      // «Ausente» es el perfil sin la preferencia, NO el perfil ausente (abajo).
       await purge(mailId);
-      await db().collection("users").doc(uid).delete();
+      await crearPerfil(uid);
       await seed(comercial);
       const ausente = makeOkSender();
       await enviar(ausente, BAJA_KEY);
@@ -660,6 +686,38 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
         expect(sender.sent).toHaveLength(1);
         expect(sender.sent[0].text).toMatch(URL_DE_BAJA);
       }
+    });
+
+    it("SIN PERFIL (`users/{uid}` ausente) NO sale: sin dónde registrar la oposición", async () => {
+      // Estado parcial admitido: `deleteAccount` borra Firestore ANTES que Auth,
+      // así que la identidad puede existir sin documento. La callable de baja
+      // contesta `listo` sin crear nada, y un comercial que saliera después de
+      // eso contradiría la página.
+      const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+      await borrarPerfil();
+      await seed(comercial);
+      const sender = makeOkSender();
+
+      await expect(enviar(sender, BAJA_KEY)).resolves.toBeUndefined();
+
+      expect(sender.sent).toHaveLength(0);
+      const doc = await readQueueDoc(mailId);
+      expect(doc?.status).toBe("failed");
+      expect(doc?.lastError).toBe("sin perfil para registrar la oposición");
+      expect(doc?.attempts).toBe(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("sin perfil"),
+        expect.objectContaining({ mailId, kind: "athlete-coverage-lost" }),
+      );
+    });
+
+    it("lee `users/{uid}` UNA sola vez", async () => {
+      await seed(comercial);
+      const get = jest.spyOn(DocumentReference.prototype, "get");
+
+      await enviar(makeOkSender(), BAJA_KEY);
+
+      expect(lecturasDePerfil(get)).toBe(1);
     });
 
     it("FALLA CERRADO sin clave: no sale, `failed`, y grita en el log", async () => {
@@ -690,6 +748,7 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       jest
         .spyOn(Auth.prototype, "getUser")
         .mockResolvedValue({ email: "uid-largo@example.com" } as never);
+      await crearPerfil("u".repeat(151));
       await seed({ ...comercial, toUid: "u".repeat(151) });
       const sender = makeOkSender();
 
@@ -708,6 +767,7 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       jest
         .spyOn(Auth.prototype, "getUser")
         .mockResolvedValue({ email: "barras@example.com" } as never);
+      await crearPerfil("a/b/c");
       await seed({ ...comercial, toUid: "a/b/c" });
       const sender = makeOkSender();
 
@@ -764,6 +824,16 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
     };
 
     it("otro `prefKey` (no es comercial)", async () => {
+      await algunoSinPie(
+        { kind: "link-requested", params: { athleteName: "Marta" }, prefKey: "nueva_solicitud" },
+        makeOkSender(),
+      );
+    });
+
+    it("un `prefKey` NO comercial con el perfil ausente se envía, igual que antes", async () => {
+      // `nueva_solicitud` y `sesion_cancelada` no son publicidad: no necesitan un
+      // lugar donde registrar la oposición.
+      await borrarPerfil();
       await algunoSinPie(
         { kind: "link-requested", params: { athleteName: "Marta" }, prefKey: "nueva_solicitud" },
         makeOkSender(),
@@ -850,7 +920,7 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect(verificarToken(url![1], BAJA_KEY)).toEqual({ uid, prefKey: PREF });
     });
 
-    it("preferencia AUSENTE (sin documento de usuario): también el completo", async () => {
+    it("preferencia AUSENTE (perfil sin ella): también el completo", async () => {
       await seed(conBloque);
       const sender = makeOkSender();
 
@@ -859,6 +929,36 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect(sender.sent).toHaveLength(1);
       expect(sender.sent[0].text).toContain(BLOQUE);
       expect(sender.sent[0].text).toMatch(URL_DE_BAJA);
+    });
+
+    it("SIN PERFIL (`users/{uid}` ausente): sale SIN bloque y SIN pie", async () => {
+      // Sin documento no hay dónde registrar la oposición, y el link del pie
+      // diría «listo» sin que quede nada escrito. El aviso operativo sale igual.
+      await borrarPerfil();
+      await seed(conBloque);
+      const sender = makeOkSender();
+
+      await enviar(sender, BAJA_KEY);
+
+      expect(sender.sent).toHaveLength(1);
+      const { html, text } = sender.sent[0];
+      expect(text).toContain("3 alumnos quedaron en solo lectura");
+      expect(text).not.toContain(BLOQUE);
+      expect(html).not.toContain("VER LOS PLANES");
+      for (const huella of SIN_PIE) {
+        expect(html).not.toContain(huella);
+        expect(text).not.toContain(huella);
+      }
+      expect((await readQueueDoc(mailId))?.status).toBe("sent");
+    });
+
+    it("lee `users/{uid}` UNA sola vez", async () => {
+      await seed(conBloque);
+      const get = jest.spyOn(DocumentReference.prototype, "get");
+
+      await enviar(makeOkSender(), BAJA_KEY);
+
+      expect(lecturasDePerfil(get)).toBe(1);
     });
 
     it("sólo `false` explícito frena (igual que `prefKey`)", async () => {
@@ -930,6 +1030,7 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       jest
         .spyOn(Auth.prototype, "getUser")
         .mockResolvedValue({ email: "barras@example.com" } as never);
+      await crearPerfil("a/b/c");
       await seed({ ...conBloque, toUid: "a/b/c" });
       const sender = makeOkSender();
 
@@ -950,6 +1051,7 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       jest
         .spyOn(Auth.prototype, "getUser")
         .mockResolvedValue({ email: "uid-largo@example.com" } as never);
+      await crearPerfil("u".repeat(151));
       await seed({ ...conBloque, toUid: "u".repeat(151) });
       const sender = makeOkSender();
 

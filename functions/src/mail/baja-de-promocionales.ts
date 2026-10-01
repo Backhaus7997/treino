@@ -284,8 +284,13 @@ export async function runBajaDeCorreosPromocionales(
     // la preferencia ya apagada, NO escribe: sin escritura no hay triggers.
     const snap = await ref.get();
     if (!snap.exists) {
-      // La cuenta ya no existe. No hay nada que apagar ni a quién escribirle, y
-      // decir «listo» es cierto y no revela si la cuenta existía. Nunca se CREA.
+      // Sin `users/{uid}` no hay dónde registrar la oposición, y NUNCA se crea el
+      // documento. Contestar `listo` es verdad porque `sendQueuedMail` no manda
+      // lo comercial a quien no tiene perfil: el mail con `prefKey` de la
+      // allowlist queda `failed` y el bloque de `bloqueComercial` se omite (ver
+      // `leerPerfil` y el gate del handler). Aunque la identidad de Auth siga viva
+      // —`deleteAccount` borra Firestore antes que Auth—, no sale publicidad. Y no
+      // revela si la cuenta existía.
       logger.info("bajaDeCorreosPromocionales: la cuenta no existe", { uid });
       return { status: "listo" };
     }
