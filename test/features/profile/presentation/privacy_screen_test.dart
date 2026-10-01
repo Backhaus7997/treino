@@ -6,10 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:mock_exceptions/mock_exceptions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/analytics/analytics_consent.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
@@ -61,6 +63,23 @@ Future<void> _alDocumento(WidgetTester tester) async {
   await tester.pump();
 }
 
+/// La PRIMERA llamada a `GoogleFonts.*` de un proceso de test devuelve un
+/// estilo que todavía mide con Ahem (cada glifo = 1 em), y con el texto a 3x el
+/// encabezado «PRIVACIDAD» desborda por 287 px aunque con Barlow real mida 256.
+/// Sólo importa cuando el test corre solo o filtrado (en el archivo entero lo
+/// calientan los tests de antes), pero un test no puede depender de qué corrió
+/// antes. Se pide la MISMA variante que dibuja la pantalla y se deja un hueco
+/// async REAL para que la carga termine antes del `pumpWidget`.
+Future<void> _calentarFuentes(WidgetTester tester) async {
+  GoogleFonts.barlow(fontWeight: FontWeight.w600);
+  GoogleFonts.barlowCondensed(fontWeight: FontWeight.w700);
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.runAsync(
+    () => Future<void>.delayed(const Duration(milliseconds: 200)),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _montar(
   WidgetTester tester, {
   required UserRepository repo,
@@ -69,6 +88,13 @@ Future<void> _montar(
   Locale locale = const Locale('es', 'AR'),
   Size size = const Size(390, 844),
   double textScale = 1.0,
+  // Un inset inferior del sistema (`MediaQuery.padding.bottom`), como el del
+  // home indicator. 0 = no tocar el que ya trae el `MediaQuery`.
+  double insetInferior = 0,
+  // Si viene, el `Scaffold` se arma como el del shell: `extendBody: true` con
+  // esta barra como `bottomNavigationBar`, así la barra queda ENCIMA del cuerpo
+  // y el `Scaffold` publica su alto en `padding.bottom`.
+  Widget? barraFlotante,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -95,10 +121,17 @@ Future<void> _montar(
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(textScale),
+            padding: insetInferior > 0
+                ? EdgeInsets.only(bottom: insetInferior)
+                : null,
           ),
           child: child!,
         ),
-        home: const Scaffold(body: PrivacyScreen()),
+        home: Scaffold(
+          extendBody: barraFlotante != null,
+          bottomNavigationBar: barraFlotante,
+          body: const PrivacyScreen(),
+        ),
       ),
     ),
   );
@@ -633,6 +666,76 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byKey(_llaveCorreos), findsOneWidget);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Texto de ACCESIBILIDAD. A tamaños normales la pantalla entra entera y no
+  // scrollea, así que estos dos defectos sólo aparecían con la letra más grande.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — con el texto de accesibilidad', () {
+    late _MockUserRepository repo;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+    });
+
+    // La barra flotante del shell: `Scaffold(extendBody: true)` la dibuja
+    // ENCIMA del cuerpo y publica su alto en `MediaQuery.padding.bottom`.
+    const barraKey = ValueKey('barra-flotante-del-shell');
+    const altoBarra = 100.0;
+    const barra = SizedBox(key: barraKey, height: altoBarra);
+
+    Future<void> alFinalDelScroll(WidgetTester tester) async {
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -5000),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'al final del scroll la última línea queda POR ENCIMA de la barra '
+        'flotante del shell', (tester) async {
+      await _calentarFuentes(tester);
+      await _montar(
+        tester,
+        repo: repo,
+        size: const Size(390, 700),
+        textScale: 3.0,
+        barraFlotante: barra,
+      );
+      final l10n = AppL10n.of(tester.element(find.byType(PrivacyScreen)));
+
+      await alFinalDelScroll(tester);
+
+      final finDelTexto =
+          tester.getBottomLeft(find.text(l10n.privacyPromoEmailsSubtitle)).dy;
+      final topeDeLaBarra = tester.getTopLeft(find.byKey(barraKey)).dy;
+      expect(
+        finDelTexto,
+        lessThanOrEqualTo(topeDeLaBarra),
+        reason: 'con un margen fijo la última línea de la tarjeta de correos '
+            'quedaba debajo del vidrio y no había más scroll para despejarla',
+      );
+    });
+
+    testWidgets(
+        'el margen inferior del scroll SUMA el inset del sistema, no es un '
+        'número fijo', (tester) async {
+      await _calentarFuentes(tester);
+      await _montar(tester, repo: repo, insetInferior: 34);
+
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView),
+      );
+      expect(
+        scroll.padding!.resolve(TextDirection.ltr).bottom,
+        AppSpacing.s20 + 34,
+        reason: 'el margen base del repo más el `MediaQuery.padding.bottom`',
+      );
     });
   });
 }

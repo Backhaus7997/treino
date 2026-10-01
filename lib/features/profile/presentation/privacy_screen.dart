@@ -116,7 +116,20 @@ class PrivacyScreen extends ConsumerWidget {
         // `cacheExtent`. Acá el `Column` scrollea entero, como una sola unidad.
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            // El inset inferior SUMA `MediaQuery.paddingOf(context).bottom`
+            // en vez de dejar un 20 fijo. El shell corre con `extendBody: true`:
+            // el `Scaffold` no le resta al body la barra flotante, la publica
+            // en `padding.bottom`. Con un margen fijo, al final del scroll la
+            // última línea de la tarjeta de correos quedaba DEBAJO del vidrio,
+            // y sólo se notaba con los tamaños de texto de accesibilidad, donde
+            // el contenido es lo bastante alto como para que scrollee. Mismo
+            // patrón que `home_screen.dart` y `trainer_agenda_tab.dart`.
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.s20,
+              0,
+              AppSpacing.s20,
+              AppSpacing.s20 + MediaQuery.paddingOf(context).bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
