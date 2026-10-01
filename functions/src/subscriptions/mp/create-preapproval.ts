@@ -45,10 +45,19 @@
  * Se crea un plan POR CHECKOUT y no seis fijos, porque el `external_reference`
  * vive en el plan: con planes compartidos perderiamos a quien acreditarle el
  * cupo. Ver el encabezado de `client.ts`.
+ *
+ * ── Lo unico que LEE de `subscription`: si al PF le quedan dias pagos ──
+ *
+ * Escribir sigue estando prohibido (arriba). Leer es para UNA decision de precio
+ * y no de permiso: nada de lo que dice el documento bloquea un checkout. Un PF
+ * dado de baja que vuelve al mismo plan antes de que venza lo que ya pago abre
+ * un plan con prueba, y MP cobra recien cuando ese periodo termina; sin eso paga
+ * dos veces los mismos dias. La regla entera vive en `diferir-primer-cobro.ts`.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -56,12 +65,14 @@ import { defineSecret } from "firebase-functions/params";
 import { SubscriptionCycle, SubscriptionTier } from "../tier-config";
 import {
   CYCLES,
+  MP_PLANS_COLLECTION,
   PAID_TIERS,
   amountFor,
   frequencyMonthsFor,
 } from "./tier-mapping";
-import { MpClient, createMpClient } from "./client";
+import { MpApiError, MpClient, createMpClient } from "./client";
 import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
+import { Diferimiento, decidirDiferimiento } from "./diferir-primer-cobro";
 import { trainerWebCheckout } from "../../mail/templates";
 
 export { MP_CHECKOUTS_COLLECTION } from "./abrir-checkout";
@@ -193,7 +204,8 @@ export async function runCreatePreapproval(
   // El rol se lee del documento, no del token: `role` es intrinseco y se
   // provisiona server-side (AGENTS.md regla 3). Un custom claim viejo en un
   // token sin refrescar seria una fuente mas debil.
-  const userSnap = await getFirestore(app).collection("users").doc(uid).get();
+  const db = getFirestore(app);
+  const userSnap = await db.collection("users").doc(uid).get();
   if (!userSnap.exists || userSnap.data()?.role !== "trainer") {
     throw new HttpsError(
       "permission-denied",
@@ -207,6 +219,47 @@ export async function runCreatePreapproval(
     // tier a PAID_TIERS sin precio falle acá y no con un monto `undefined`
     // viajando a MP.
     throw new HttpsError("internal", `sin precio para ${tier}/${cycle}`);
+  }
+
+  // ── ¿Le quedan dias pagos? Se decide ANTES de abrir nada ──
+  //
+  // Va despues del gate de rol y del precio: un alumno o un tier invalido no
+  // tienen que gastar una sola lectura de Firestore ni una llamada a MP.
+  //
+  // Si la lectura falla, se TIRA y no se sigue de largo. Seguir sin saber si el
+  // PF tiene dias pagos es abrirle un checkout que cobra en el acto, o sea el
+  // doble cobro que esto viene a cerrar. `unavailable` porque reintentar sirve
+  // (el PF vuelve a tocar el boton), igual que cuando MP rechaza la creacion.
+  let diferimiento: Diferimiento;
+  try {
+    diferimiento = await decidirDiferimiento({
+      uid,
+      tier,
+      userData: userSnap.data(),
+      nowMs: deps.nowMs,
+      leerPlanes: async () => {
+        // Un solo campo en el `where` y el orden en memoria: ver
+        // `planesARevisar`. Cero indices nuevos.
+        const snap = await db
+          .collection(MP_PLANS_COLLECTION)
+          .where("uid", "==", uid)
+          .get();
+        return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
+      },
+      leerSuscripciones: (planId) =>
+        deps.mpClient.searchPreapprovalsByPlan(planId),
+    });
+  } catch (e) {
+    const err = e as MpApiError;
+    logger.error(
+      "mp/create-preapproval: no se pudo comprobar si al PF le quedan dias " +
+        "pagos, no se abre el checkout",
+      { uid, tier, status: err.status, error: String(e) },
+    );
+    throw new HttpsError(
+      "unavailable",
+      "no se pudo verificar tu suscripcion actual, proba de nuevo",
+    );
   }
 
   // Todo lo que sigue —la ventana anti-doble-click, el mapeo de error de MP a
@@ -226,6 +279,9 @@ export async function runCreatePreapproval(
     amount,
     frequencyMonths: frequencyMonthsFor(cycle),
     mapping: { producto: "trainer", uid, tier, cycle },
+    // `null` es el checkout de siempre. El campo NO va en la huella: ver el
+    // dartdoc de `AbrirCheckoutInput.diferidoHastaMs`.
+    diferidoHastaMs: diferimiento.diferir ? diferimiento.diferidoHastaMs : null,
     mpClient: deps.mpClient,
     nowMs: deps.nowMs,
   });
