@@ -61,6 +61,10 @@
  * - Fuerza bruta: 10 códigos por ventana de 24 h con 5 intentos cada uno son 50
  *   intentos contra 10^6 combinaciones, 1 en 20.000 por ventana (el doble en el
  *   borde entre dos).
+ *
+ * ── El bloque de pagos del mail ──
+ *
+ * Va solo si le sirve y si se puede decir: ver `muestraPlanes`.
  */
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
@@ -73,6 +77,11 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { enqueueMail } from "../mail/enqueue-mail";
+import {
+  ATHLETE_PAYWALL_ENFORCEMENT_ENABLED,
+  ENFORCED_FIELD,
+} from "../subscriptions/athlete-paywall-enforced";
+import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 
 /** Un documento por usuario, con el código vigente. Solo servidor. */
 export const VERIFICACIONES_COLLECTION = "verificaciones_de_mail";
@@ -287,6 +296,32 @@ export function decidirEnvio(
 }
 
 /**
+ * Si el mail del código lleva el bloque de pagos. Va sin él cuando:
+ * - el usuario apagó lo comercial por mail (`novedades_plan`): la política de
+ *   privacidad promete la oposición, y este mail es obligatorio;
+ * - es alumno y el plan free no le aplica (`athletePaywallEnforced === false`:
+ *   ya paga, tiene un PF activo, o el interruptor está apagado). Sin paywall, el
+ *   checkout de la landing da 404.
+ *
+ * El campo AUSENTE cuenta como que aplica, al revés que en `firestore.rules`
+ * (que lo lee como `false` para no bloquear de más): ausente es la cuenta recién
+ * creada, a la que `syncAthletePaywallOnUser` todavía no le escribió nada, y que
+ * todavía no tiene suscripción ni PF vinculado. Con el interruptor apagado no
+ * aplica a nadie.
+ */
+export function muestraPlanes(
+  rol: Rol,
+  usuario: Record<string, unknown> | undefined,
+  paywallDelAlumnoPrendido: boolean,
+): boolean {
+  const prefs = usuario?.notificationPrefs as
+    | Record<string, { email?: unknown } | undefined>
+    | undefined;
+  if (prefs?.[ATHLETE_PROSPECT_PREF_KEY]?.email === false) return false;
+  return rol === "trainer" || (paywallDelAlumnoPrendido && usuario?.[ENFORCED_FIELD] !== false);
+}
+
+/**
  * Genera un código y lo manda por mail. El mail depende del rol: el del
  * entrenador lo manda a los planes del Coach Hub; el del alumno, al checkout
  * de gettreino.com.
@@ -341,7 +376,10 @@ export async function runSolicitarCodigo(
     toUid: uid,
     kind: rol === "trainer" ? "email-code-trainer" : "email-code-athlete",
     scope: `${uid}_${deps.nowMs}`,
-    params: { codigo },
+    params: {
+      codigo,
+      showPlans: muestraPlanes(rol, usuario, ATHLETE_PAYWALL_ENFORCEMENT_ENABLED) ? "1" : "0",
+    },
   });
   if (encolado === null) {
     // Se borra el código: el mail no salió, así que ese código no le sirve a

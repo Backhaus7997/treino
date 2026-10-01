@@ -17,6 +17,7 @@
  *      vuelve a pedir, y le llega el mail del entrenador.
  *   6. Que una cuenta no saque más de 5 mails por hora ni 10 por día, ni con
  *      pedidos en paralelo.
+ *   7. Que el bloque de pagos del mail vaya solo a quien le sirve y lo aceptó.
  */
 
 import { createHash } from "crypto";
@@ -68,9 +69,11 @@ import {
   VERIFICACIONES_COLLECTION,
   decidirEnvio,
   generarCodigo,
+  muestraPlanes,
   runSolicitarCodigo,
   runVerificarCodigo,
 } from "../auth/codigo-de-verificacion";
+import { ATHLETE_PAYWALL_ENFORCEMENT_ENABLED } from "../subscriptions/athlete-paywall-enforced";
 import { Store, fakeApp } from "./helpers/firestore-en-memoria";
 
 const AHORA = Date.parse("2026-10-01T12:00:00.000Z");
@@ -515,6 +518,22 @@ describe("decidirEnvio: cooldown y topes", () => {
   });
 });
 
+describe("muestraPlanes: el bloque de pagos del mail", () => {
+  const apagado = { notificationPrefs: { novedades_plan: { email: false } } };
+
+  it.each([
+    ["PF", "trainer", {}, false, true],
+    ["PF que apagó novedades_plan", "trainer", apagado, true, false],
+    ["alumno, con el interruptor apagado", "athlete", {}, false, false],
+    ["alumno recién creado (sin el campo)", "athlete", {}, true, true],
+    ["alumno al que el free le aplica", "athlete", { athletePaywallEnforced: true }, true, true],
+    ["alumno que ya paga o tiene PF activo", "athlete", { athletePaywallEnforced: false }, true, false],
+    ["alumno que apagó novedades_plan", "athlete", apagado, true, false],
+  ] as const)("%s", (_, rol, usuario, prendido, esperado) => {
+    expect(muestraPlanes(rol, usuario, prendido)).toBe(esperado);
+  });
+});
+
 describe("de punta a punta", () => {
   it("dos «Reenviar» simultáneos mandan UN mail", async () => {
     const { app, store } = fakeApp(MUNDO());
@@ -539,5 +558,28 @@ describe("de punta a punta", () => {
 
     expect(r).toEqual({ estado: "limitado", reintentarEnMs: 60 * 60_000 - MAX_ENVIOS_POR_HORA * REENVIO_COOLDOWN_MS });
     expect(mails(store)).toHaveLength(MAX_ENVIOS_POR_HORA);
+  });
+
+  it("al PF le va el bloque de pagos, salvo que haya apagado novedades_plan", async () => {
+    const mundo = MUNDO();
+    mundo.users[OTRA] = { role: "trainer", notificationPrefs: { novedades_plan: { email: false } } };
+    const { app, store } = fakeApp(mundo);
+
+    await pedir(app, PROFE, "111111");
+    await pedir(app, OTRA, "222222");
+
+    const porUid = Object.fromEntries(
+      mails(store).map((m) => [m.toUid, (m.params as Record<string, unknown>).showPlans]),
+    );
+    expect(porUid).toEqual({ [PROFE]: "1", [OTRA]: "0" });
+  });
+
+  it("al alumno recién creado, el bloque depende del interruptor del paywall", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await pedir(app, ALUMNA, "111111");
+
+    expect((mails(store)[0].params as Record<string, unknown>).showPlans)
+      .toBe(ATHLETE_PAYWALL_ENFORCEMENT_ENABLED ? "1" : "0");
   });
 });
