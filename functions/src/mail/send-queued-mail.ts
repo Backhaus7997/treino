@@ -136,6 +136,12 @@ interface DecisionDeBaja {
    * si este mail no lleva pie.
    */
   prefKeyDelLink?: string;
+  /**
+   * `true`: el link existe sólo por un bloque comercial dentro de un mail
+   * operativo (`bloqueComercial`), no porque el mail entero sea comercial
+   * (`prefKey`). Decide qué pasa si el link no se puede armar: ver el handler.
+   */
+  soloElBloque?: boolean;
   /** `false`: la plantilla omite su bloque de venta. */
   comercial: boolean;
 }
@@ -150,7 +156,8 @@ interface DecisionDeBaja {
  * - **`bloqueComercial`** (un mail operativo con un bloque comercial adentro):
  *   preferencia apagada → sin bloque y SIN pie, porque ya no hay nada comercial;
  *   prendida o ausente → el mail completo CON pie, porque tiene contenido de
- *   publicidad y la norma pide el mecanismo en toda comunicación así.
+ *   publicidad y la norma pide el mecanismo en toda comunicación así. (Si el
+ *   link no se puede armar, el handler lo degrada a «sin bloque y sin pie».)
  * - **Cualquier otro**: no es comercial, no se toca.
  *
  * Un destinatario `toAddress` literal no tiene cuenta, ni preferencias, ni a
@@ -179,7 +186,7 @@ async function decidirBaja(
       prefTieneBaja(data.bloqueComercial) &&
       (await emailChannelAllowed(app, data.toUid, data.bloqueComercial));
     return prendida ?
-      { prefKeyDelLink: data.bloqueComercial, comercial: true } :
+      { prefKeyDelLink: data.bloqueComercial, soloElBloque: true, comercial: true } :
       { comercial: false };
   }
 
@@ -197,7 +204,8 @@ async function decidirBaja(
  * @param bajaKey - Clave del HMAC del link de baja (BAJA_PROMOCIONALES_KEY).
  *                  Se inyecta como el `sender`. El default es VACÍO a propósito:
  *                  quien se olvide de pasarla no manda un correo promocional sin
- *                  el mecanismo de baja, falla cerrado.
+ *                  el mecanismo de baja: falla cerrado, o sale sin su bloque
+ *                  comercial si el mail sólo lo llevaba adentro.
  */
 export async function sendQueuedMailHandler(
   app: App,
@@ -299,51 +307,62 @@ export async function sendQueuedMailHandler(
   const baja = await decidirBaja(app, data, literal);
 
   let bajaDePromocionales: string | undefined;
+  let comercial = baja.comercial;
   if (baja.prefKeyDelLink) {
-    // FALLA CERRADO. Un correo promocional sin el mecanismo de baja es
-    // exactamente lo que el Decreto 1558/01 prohíbe, y mandarlo "igual, sin el
-    // link" es la salida que nadie va a notar. Con `defineSecret` el deploy ya
-    // falla si el secreto no existe: esto es un cinturón, no el freno
-    // principal. El mail perdido no se reencola (`sendQueuedMail` sólo escucha
-    // creaciones); es comercial, y su productor lo vuelve a mandar en el
-    // próximo disparo, pasado el enfriamiento.
+    // Sin clave, o con un uid que no entra en la gramática del token (no pasa
+    // con los de Auth, que miden hasta 128), NO hay link que poner. Qué se hace
+    // entonces depende de qué es el mail, y en los dos casos suena la alarma:
+    //
+    // - **Mail entero comercial (`prefKey`)**: FALLA CERRADO. Un correo
+    //   promocional sin el mecanismo de baja es exactamente lo que el Decreto
+    //   1558/01 prohíbe, y mandarlo "igual, sin el link" es la salida que nadie
+    //   va a notar. El mail perdido no se reencola (`sendQueuedMail` sólo
+    //   escucha creaciones); es comercial, y su productor lo vuelve a mandar en
+    //   el próximo disparo, pasado el enfriamiento.
+    // - **Mail operativo con bloque de venta (`bloqueComercial`)**: DEGRADA. Sale
+    //   SIN el bloque y SIN pie, como si la preferencia estuviera apagada. El
+    //   aviso operativo («N alumnos quedaron en solo lectura») le tiene que
+    //   llegar igual, y no sale contenido comercial sin mecanismo de baja.
+    //
+    // Con `defineSecret` el deploy ya falla si el secreto no existe: esto es un
+    // cinturón, no el freno principal. Y NUNCA se deja salir la excepción: la
+    // plataforma reintentaría una semana un mail que falla idéntico cada vez.
+    let motivo: string | undefined;
+    let causa: string | undefined;
     if (!bajaKey) {
-      logger.error("sendQueuedMail: sin clave de baja, el mail comercial no sale", {
-        mailId,
-        kind: data.kind,
-      });
-      await ref.update({
-        status: "failed",
-        attempts,
-        lastError: "sin clave de baja",
-      });
-      return;
+      motivo = "sin clave de baja";
+    } else {
+      try {
+        bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
+      } catch (error: unknown) {
+        motivo = "link de baja no representable";
+        causa = String(error);
+      }
     }
 
-    try {
-      bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
-    } catch (error: unknown) {
-      // Un uid que no entra en la gramática del token (no pasa con los de
-      // Auth, que miden hasta 128). Se frena igual que sin clave, y NO se deja
-      // salir la excepción: la plataforma reintentaría una semana un mail que
-      // va a fallar idéntico cada vez.
-      logger.error("sendQueuedMail: no se pudo armar el link de baja", {
-        mailId,
-        kind: data.kind,
-        error: String(error),
-      });
-      await ref.update({
-        status: "failed",
-        attempts,
-        lastError: "link de baja no representable",
-      });
-      return;
+    if (motivo) {
+      if (baja.soloElBloque) {
+        logger.error(`sendQueuedMail: ${motivo}, el mail sale sin su bloque comercial`, {
+          mailId,
+          kind: data.kind,
+          ...(causa ? { error: causa } : {}),
+        });
+        comercial = false;
+      } else {
+        logger.error(`sendQueuedMail: ${motivo}, el mail comercial no sale`, {
+          mailId,
+          kind: data.kind,
+          ...(causa ? { error: causa } : {}),
+        });
+        await ref.update({ status: "failed", attempts, lastError: motivo });
+        return;
+      }
     }
   }
 
   const rendered = renderMail(data.kind, data.params ?? {}, {
     bajaDePromocionales,
-    comercial: baja.comercial,
+    comercial,
   });
 
   try {

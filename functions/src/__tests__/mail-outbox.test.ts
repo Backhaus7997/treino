@@ -15,7 +15,7 @@
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { Messaging } from "firebase-admin/messaging";
-import { getAuth } from "firebase-admin/auth";
+import { Auth, getAuth } from "firebase-admin/auth";
 import { logger } from "firebase-functions";
 import { verificarToken } from "../mail/baja-de-promocionales";
 import { enqueueMail, dedupeKey } from "../mail/enqueue-mail";
@@ -684,6 +684,23 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       );
     });
 
+    it("un uid que no entra en el token también falla cerrado, sin tirar", async () => {
+      // No pasa con los uids de Auth (máximo 128); la dirección se simula.
+      jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      jest
+        .spyOn(Auth.prototype, "getUser")
+        .mockResolvedValue({ email: "uid-largo@example.com" } as never);
+      await seed({ ...comercial, toUid: "u".repeat(151) });
+      const sender = makeOkSender();
+
+      await expect(enviar(sender, BAJA_KEY)).resolves.toBeUndefined();
+
+      expect(sender.sent).toHaveLength(0);
+      const doc = await readQueueDoc(mailId);
+      expect(doc?.status).toBe("failed");
+      expect(doc?.lastError).toBe("link de baja no representable");
+    });
+
     it("el mail que falla cerrado NO se reintenta", async () => {
       jest.spyOn(logger, "error").mockImplementation(() => undefined);
       await seed(comercial);
@@ -824,18 +841,67 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect(sender.sent[0].text).not.toMatch(URL_DE_BAJA);
     });
 
-    it("preferencia PRENDIDA y clave vacía: el mail necesita pie, así que FALLA CERRADO", async () => {
+    it("preferencia PRENDIDA y clave vacía: sale SIN bloque y SIN pie, y suena la alarma", async () => {
+      // El aviso operativo le tiene que llegar igual, y no puede salir contenido
+      // comercial sin mecanismo de baja. El fail-closed (`failed`) es sólo para
+      // los mails enteramente comerciales (`prefKey`), de arriba.
       const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
       await seed(conBloque);
+
+      // Sin pasar la clave (el default) y pasándola vacía: lo mismo.
+      for (const clave of [undefined, ""]) {
+        await purge(mailId);
+        await seed(conBloque);
+        const sender = makeOkSender();
+
+        await enviar(sender, clave);
+
+        expect(sender.sent).toHaveLength(1);
+        const { html, text } = sender.sent[0];
+        expect(text).toContain("3 alumnos quedaron en solo lectura");
+        expect(text).not.toContain(BLOQUE);
+        expect(html).not.toContain("VER LOS PLANES");
+        expect(text).not.toContain("https://app.gettreino.com/?to=facturacion");
+        expect(html).not.toContain("https://app.gettreino.com/?to=facturacion");
+        for (const huella of SIN_PIE) {
+          expect(html).not.toContain(huella);
+          expect(text).not.toContain(huella);
+        }
+        const doc = await readQueueDoc(mailId);
+        expect(doc?.status).toBe("sent");
+        expect(doc?.lastError).toBeUndefined();
+      }
+      // Para el monitoreo: un mail comercial degradado no puede ser silencioso.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("sin clave de baja"),
+        expect.objectContaining({ mailId, kind: "limit-reached" }),
+      );
+    });
+
+    it("uid que no entra en el token: sale SIN bloque y SIN pie, no `failed`", async () => {
+      // 151 caracteres no caben en la gramática del token (tope 150 bytes). No
+      // pasa con los uids de Auth (el Admin SDK ni deja crear uno de más de 128),
+      // así que la dirección se simula; el mail operativo no puede perderse por eso.
+      const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      jest
+        .spyOn(Auth.prototype, "getUser")
+        .mockResolvedValue({ email: "uid-largo@example.com" } as never);
+      await seed({ ...conBloque, toUid: "u".repeat(151) });
       const sender = makeOkSender();
 
-      await enviar(sender, "");
+      await enviar(sender, BAJA_KEY);
 
-      expect(sender.sent).toHaveLength(0);
-      const doc = await readQueueDoc(mailId);
-      expect(doc?.status).toBe("failed");
-      expect(doc?.lastError).toBe("sin clave de baja");
-      expect(errorSpy).toHaveBeenCalled();
+      expect(sender.sent).toHaveLength(1);
+      expect(sender.sent[0].to).toBe("uid-largo@example.com");
+      expect(sender.sent[0].text).toContain("3 alumnos quedaron en solo lectura");
+      expect(sender.sent[0].text).not.toContain(BLOQUE);
+      expect(sender.sent[0].html).not.toContain("VER LOS PLANES");
+      expect(sender.sent[0].text).not.toMatch(URL_DE_BAJA);
+      expect((await readQueueDoc(mailId))?.status).toBe("sent");
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("link de baja no representable"),
+        expect.objectContaining({ mailId }),
+      );
     });
 
     it("NO persiste el link tampoco acá", async () => {
