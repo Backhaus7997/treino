@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/router.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -143,6 +144,8 @@ ProviderContainer _anonContainer() => ProviderContainer(
         authNotifierProvider.overrideWith(
           () => _StubAuthNotifier(const AsyncData(null)),
         ),
+        emailGateEnabledProvider
+            .overrideWith((ref) => Stream<bool>.value(false)),
         userProfileProvider
             .overrideWith((ref) => Stream<UserProfile?>.value(null)),
       ],
@@ -153,6 +156,9 @@ ProviderContainer _loggedInContainer({
   bool deletionInFlight = false,
   bool pendingWrites = false,
   String? authEmail,
+  // El interruptor `app_config/email_gate`. Apagado por defecto: solo los tests
+  // del gate del mail lo prenden, y los demás no tocan Firebase para leerlo.
+  Stream<bool>? emailGate,
 }) {
   final mockUser = MockUser();
   when(() => mockUser.email).thenReturn(authEmail);
@@ -161,6 +167,8 @@ ProviderContainer _loggedInContainer({
       authNotifierProvider.overrideWith(
         () => _StubAuthNotifier(AsyncData(mockUser)),
       ),
+      emailGateEnabledProvider
+          .overrideWith((ref) => emailGate ?? Stream<bool>.value(false)),
       userProfileProvider.overrideWith(
         (ref) => Stream<UserProfile?>.value(profile),
       ),
@@ -488,14 +496,17 @@ void main() {
     Future<ProviderContainer> listo(
       UserProfile profile, {
       String? authEmail,
+      bool interruptor = true,
     }) async {
       final c = _loggedInContainer(
         profile: profile,
         authEmail: authEmail ?? profile.email,
+        emailGate: Stream<bool>.value(interruptor),
       );
       addTearDown(c.dispose);
       await c.read(authNotifierProvider.future);
       await c.read(userProfileProvider.future);
+      await c.read(emailGateEnabledProvider.future);
       return c;
     }
 
@@ -559,6 +570,69 @@ void main() {
         callRedirect(con, '/home'),
         equals('/profile/edit-trainer?mode=onboarding'),
       );
+    });
+
+    group('interruptor app_config/email_gate', () {
+      test('apagado, un alumno sin confirmar NO va al gate', () async {
+        final c = await listo(sinMail(_athleteProfile()), interruptor: false);
+        for (final ruta in ['/home', '/workout', '/coach', '/profile']) {
+          expect(callRedirect(c, ruta), isNull, reason: ruta);
+        }
+      });
+
+      test('apagado, quien está parado en la pantalla sale a /home', () async {
+        // Misma condición para entrar y para salir: con el interruptor apagado
+        // no puede quedarse mirando una pantalla que ya no corresponde.
+        final c = await listo(sinMail(_athleteProfile()), interruptor: false);
+        expect(callRedirect(c, '/verificar-mail'), equals('/home'));
+      });
+
+      test('apagado, el PF sin confirmar sigue directo a su onboarding',
+          () async {
+        final c =
+            await listo(sinMail(_trainerIncomplete()), interruptor: false);
+        expect(
+          callRedirect(c, '/home'),
+          equals('/profile/edit-trainer?mode=onboarding'),
+        );
+      });
+
+      test('prendido, el alumno sin confirmar va al gate', () async {
+        final c = await listo(sinMail(_athleteProfile()));
+        expect(callRedirect(c, '/home'), equals('/verificar-mail'));
+      });
+
+      test('cargando, el gate no corre (falla abierto)', () async {
+        // El stream todavía no emitió: `valueOrNull` es null y eso es "apagado".
+        final c = _loggedInContainer(
+          profile: sinMail(_athleteProfile()),
+          authEmail: 'athlete@example.com',
+          emailGate: const Stream<bool>.empty(),
+        );
+        addTearDown(c.dispose);
+        await c.read(authNotifierProvider.future);
+        await c.read(userProfileProvider.future);
+        expect(c.read(emailGateEnabledProvider).isLoading, isTrue);
+
+        expect(callRedirect(c, '/home'), isNull);
+      });
+
+      test('con error, el gate no corre (falla abierto)', () async {
+        final c = _loggedInContainer(
+          profile: sinMail(_athleteProfile()),
+          authEmail: 'athlete@example.com',
+          emailGate: Stream<bool>.error(StateError('permission-denied')),
+        );
+        addTearDown(c.dispose);
+        await c.read(authNotifierProvider.future);
+        await c.read(userProfileProvider.future);
+        await c
+            .read(emailGateEnabledProvider.future)
+            .then<void>((_) {}, onError: (_) {});
+        expect(c.read(emailGateEnabledProvider).hasError, isTrue);
+
+        expect(callRedirect(c, '/home'), isNull);
+      });
     });
 
     test('el gate de edad va primero (es un requisito legal)', () async {

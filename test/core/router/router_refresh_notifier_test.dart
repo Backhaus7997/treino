@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 
@@ -17,6 +18,14 @@ class MockUser extends Mock implements User {}
 Stream<UserProfile?> _silentProfile(Ref ref) =>
     Completer<UserProfile?>().future.asStream();
 
+/// Lo mismo para el interruptor `app_config/email_gate`. En estos tests no toca
+/// Firestore (el user de prueba no tiene uid, así que el provider emite `false`
+/// sin abrir nada), pero cuando auth emite se reconstruye y pasa por
+/// AsyncData(false) → AsyncLoading → AsyncData(false): esas transiciones son
+/// notificaciones de más que rompen el conteo exacto del primer test (daba 3 en
+/// vez de 2).
+Stream<bool> _silentGate(Ref ref) => Completer<bool>().future.asStream();
+
 void main() {
   group('RouterRefreshNotifier (via routerRefreshNotifierProvider)', () {
     test('notifyListeners fires once per auth stream emission', () async {
@@ -27,6 +36,7 @@ void main() {
         overrides: [
           authStateChangesProvider.overrideWith((_) => controller.stream),
           userProfileProvider.overrideWith(_silentProfile),
+          emailGateEnabledProvider.overrideWith(_silentGate),
         ],
       );
       addTearDown(container.dispose);
@@ -56,6 +66,7 @@ void main() {
           authStateChangesProvider
               .overrideWith((_) => Stream<User?>.value(MockUser())),
           userProfileProvider.overrideWith((_) => profileController.stream),
+          emailGateEnabledProvider.overrideWith(_silentGate),
         ],
       );
       addTearDown(container.dispose);
@@ -78,6 +89,41 @@ void main() {
       await profileController.close();
     });
 
+    test('notifyListeners fires when the email gate switch changes', () async {
+      final gateController = StreamController<bool>.broadcast();
+
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((_) => Stream<User?>.value(MockUser())),
+          userProfileProvider.overrideWith(_silentProfile),
+          emailGateEnabledProvider.overrideWith((_) => gateController.stream),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(routerRefreshNotifierProvider);
+
+      int callCount = 0;
+      notifier.addListener(() => callCount++);
+
+      // Deja pasar el arranque (auth emite su user fijo) y toma la línea de base.
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final baseline = callCount;
+
+      // El equipo prende el interruptor desde la consola: el redirect tiene que
+      // re-evaluarse sin esperar a un cambio de auth o de profile.
+      gateController.add(true);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, baseline + 1);
+
+      gateController.add(false);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, baseline + 2);
+
+      await gateController.close();
+    });
+
     test(
         'after container dispose, additional emissions do NOT call notifyListeners',
         () async {
@@ -87,6 +133,7 @@ void main() {
         overrides: [
           authStateChangesProvider.overrideWith((_) => controller.stream),
           userProfileProvider.overrideWith(_silentProfile),
+          emailGateEnabledProvider.overrideWith(_silentGate),
         ],
       );
 

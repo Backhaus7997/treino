@@ -9,6 +9,7 @@ import '../core/utils/deep_link_destination.dart';
 import '../core/widgets/treino_bottom_bar.dart';
 import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
+import '../features/auth/application/email_gate_providers.dart';
 import '../features/auth/domain/mail_verificado.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
@@ -277,6 +278,15 @@ String? authRedirect(
     // eso no sirve—: `emailVerification` lo escribe solo la Cloud Function
     // `verificarCodigoDeMail` cuando el código coincide.
     //
+    // INTERRUPTOR en el servidor: solo corre si `app_config/email_gate` tiene
+    // `{enabled: true}` (`emailGateEnabledProvider`). Falla ABIERTO: sin
+    // documento, en `false`, cargando, o si el stream falla en cualquier momento
+    // (el provider convierte el error en `false`), el gate no existe, porque el
+    // código es un canal de comunicación y no un control de acceso. Si Resend se
+    // queda sin cuota, el equipo lo apaga desde la consola de Firestore, sin
+    // deploy ni build. Apagado también SACA de la pantalla a quien esté parado
+    // en ella: es la misma condición para entrar y para salir (más abajo).
+    //
     // POR ROL y contra el mail de Auth de hoy (`correoVerificadoParaElRol`): la
     // entrada que cuenta es la del rol actual. Un alumno ya verificado que el
     // equipo promueve a entrenador vuelve a esta pantalla, porque el mail que le
@@ -289,7 +299,9 @@ String? authRedirect(
     // pueda salir — el par que el gate de edad aprendió por las malas (ver su
     // comentario). La salida no necesita esperar escrituras pendientes: el
     // campo lo escribe el servidor, así que nunca hay un valor optimista.
-    final mailSinConfirmar = !correoVerificadoParaElRol(profile, user.email);
+    final gateOn = read(emailGateEnabledProvider).valueOrNull ?? false;
+    final mailSinConfirmar =
+        gateOn && !correoVerificadoParaElRol(profile, user.email);
     final enElGateDelMail = location.startsWith(_verifyMailRoute);
     if (!isPublic && mailSinConfirmar && !enElGateDelMail) {
       return _verifyMailRoute;
