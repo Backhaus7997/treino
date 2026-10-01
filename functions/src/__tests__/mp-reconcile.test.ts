@@ -778,6 +778,27 @@ describe("reconcileSubscription — la baja de la suscripcion reemplazada", () =
     expect(escrituras).toHaveLength(0);
   });
 
+  it("una cuenta eliminada ya no escribe nada, ni sale a la red", async () => {
+    // `deleteAccount` cancela en MP y marca los planes del usuario. El
+    // `cancelled` que MP avisa enseguida por webhook no tiene a quien
+    // escribirle: sin la guarda, `users/{uid}` se recrea vacio (`set` con
+    // `merge`) despues de la cascada.
+    const mundo = MUNDO();
+    mundo.mp_plans.p1.cuentaEliminadaAtMs = AHORA;
+    const { app, escrituras } = fakeApp(mundo);
+
+    // Por el barrido: si saliera a la red daria `error-mp`.
+    const r = await reconcileSubscription(
+      app, "p1", fakeMp(new MpApiError("no deberia preguntarse", 500)));
+    expect(r.outcome).toBe("skipped-cuenta-eliminada");
+
+    // Por el webhook: llega con la suscripcion en mano y tampoco escribe.
+    const w = await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA), AUTORIZADA);
+    expect(w.outcome).toBe("skipped-cuenta-eliminada");
+
+    expect(escrituras).toHaveLength(0);
+  });
+
   it("un `pending` NO da de baja nada — todavia no compro", async () => {
     // El error que este diseño evita: cancelar sobre una INTENCION. El PF que
     // abre el checkout, mira el precio y cierra la pestaña se quedaria sin el

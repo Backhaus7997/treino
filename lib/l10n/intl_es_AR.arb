@@ -782,6 +782,7 @@
   "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
   "eliminarCuentaSheetBodyBold": "irreversible",
   "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.",
+  "eliminarCuentaSheetSubscriptionNote": "Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.",
   "eliminarCuentaSheetDeleteCta": "ELIMINAR",
   "eliminarCuentaSheetCancelCta": "CANCELAR",
   "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",

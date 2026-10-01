@@ -55,6 +55,24 @@ void main() {
     expect(find.byType(RichText), findsAtLeastNWidgets(1));
   });
 
+  // Eliminar la cuenta da de baja la suscripcion pero NO devuelve plata. Sin este
+  // aviso, quien borra la cuenta cree que se le reembolsa (y el texto viejo de
+  // Coach Hub lo prometia de verdad).
+  testWidgets(
+      'avisa que la suscripcion se cancela y que no se devuelve el dinero',
+      (tester) async {
+    await tester.pumpWidget(_buildSheet());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. '
+        'No se devuelve el dinero del período en curso.',
+      ),
+      findsOneWidget,
+    );
+  });
+
   // SCENARIO-561: tap CANCELAR closes sheet
   testWidgets('SCENARIO-560: tap CANCELAR pops the sheet', (tester) async {
     bool popped = false;

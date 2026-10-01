@@ -214,6 +214,11 @@ export type ReconcileOutcome =
    * escritura, y pisaria el plan que acaba de comprar.
    */
   | "skipped-reemplazado"
+  /**
+   * La cuenta del usuario se elimino (`deleteAccount`). Ver la guarda de cuenta
+   * eliminada: escribir acá recrearia un `users/{uid}` vacio.
+   */
+  | "skipped-cuenta-eliminada"
   | "sin-suscripcion"
   | "error-mp";
 
@@ -436,6 +441,20 @@ function mismaFecha(
  * `cancelled` no habla del entrenador sino de nuestra propia escritura.
  */
 const CAMPO_REEMPLAZO = "supersededBy";
+
+/**
+ * El campo de `mp_plans` que dice "la cuenta de este usuario se elimino".
+ *
+ * Lo pone `deleteAccount` (`cascade/subscriptions.ts`) sobre TODOS los planes del
+ * usuario, despues de cancelar en MP. Sin el, el `cancelled` que MP avisa por
+ * webhook a los pocos segundos —y el barrido de las 03:00, que sigue visitando
+ * los planes no terminales— escribirian con `set` y `merge` sobre `users/{uid}` y
+ * recrearian un documento vacio de alguien que ya no existe.
+ *
+ * Es un momento (ms) y no un booleano por coherencia con `CAMPO_ARREPENTIDO`, y
+ * sirve para auditar cuando se elimino.
+ */
+export const CAMPO_CUENTA_ELIMINADA = "cuentaEliminadaAtMs";
 
 /**
  * Los dos motivos de `terminal` que escribe este archivo. Son constantes y no
@@ -972,6 +991,16 @@ export async function reconcileSubscription(
       reemplazadoPor,
     });
     return { planId, outcome: "skipped-reemplazado" };
+  }
+
+  // ── GUARDA DE CUENTA ELIMINADA: no hay a quien escribirle ──
+  //
+  // Antes de salir a la red, por lo mismo que la de reemplazo: ahorra la llamada
+  // a MP, y vale tambien para el webhook, que llega con la suscripcion en
+  // `conocida` y por eso nunca pasaria por la consulta.
+  if (typeof planDoc?.[CAMPO_CUENTA_ELIMINADA] === "number") {
+    logger.info("mp/reconcile: la cuenta se elimino — no se escribe", { planId });
+    return { planId, outcome: "skipped-cuenta-eliminada" };
   }
 
   // Se busca POR PLAN y no por id de suscripcion, y esa es la diferencia con la

@@ -161,6 +161,19 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     );
                   },
                 ),
+                const SizedBox(height: 8),
+                // Eliminar la cuenta da de baja la suscripcion, pero NO devuelve
+                // plata: el arrepentimiento es otro derecho y no lo ejerce esto.
+                // Sin este aviso, quien borra la cuenta cree que se le reembolsa.
+                Text(
+                  AppL10n.of(context).eliminarCuentaSheetSubscriptionNote,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 13,
+                    color: palette.textMuted,
+                  ),
+                ),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   // Do NOT pop the sheet here — the notifier's flow needs

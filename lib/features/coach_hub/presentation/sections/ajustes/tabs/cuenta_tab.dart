@@ -584,8 +584,10 @@ class _DangerZone extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             // i18n: Fase W3
-            'Tu cuenta tiene $alumnos. Eliminar la cuenta cancela todos los '
-            'planes y emite los reembolsos correspondientes.',
+            'Tu cuenta tiene $alumnos. Eliminar la cuenta no devuelve el dinero '
+            'del período en curso. Si solo querés dejar de pagar, dá de baja tu '
+            'plan desde Facturación: conservás el acceso hasta el final del '
+            'período que ya pagaste.',
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 16),

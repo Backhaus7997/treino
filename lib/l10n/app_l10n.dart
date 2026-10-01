@@ -2276,6 +2276,12 @@ abstract class AppL10n {
   /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.'**
   String get eliminarCuentaSheetBodySuffix;
 
+  /// No description provided for @eliminarCuentaSheetSubscriptionNote.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.'**
+  String get eliminarCuentaSheetSubscriptionNote;
+
   /// No description provided for @eliminarCuentaSheetDeleteCta.
   ///
   /// In es_AR, this message translates to:

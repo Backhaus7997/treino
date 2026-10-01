@@ -1223,6 +1223,10 @@ class AppL10nEs extends AppL10n {
       '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
+  String get eliminarCuentaSheetSubscriptionNote =>
+      'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.';
+
+  @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
 
   @override
@@ -6210,6 +6214,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get eliminarCuentaSheetBodySuffix =>
       '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
+
+  @override
+  String get eliminarCuentaSheetSubscriptionNote =>
+      'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.';
 
   @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
