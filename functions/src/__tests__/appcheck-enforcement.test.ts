@@ -302,8 +302,13 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "antes de calcular nada; y lo unico que habilita es APAGAR el canal de " +
       "mail de una preferencia de una lista cerrada (novedades_plan) de esa " +
       "cuenta — nunca encenderlo, nunca otro campo, nunca otro uid, y nunca " +
-      "crea el documento. El peor abuso es un bucle de requests invalidos, " +
-      "acotado por maxInstances: 5. Ver baja-de-promocionales.ts.",
+      "crea el documento. " +
+      "Lo que NO la cierra: el token no vence (tiene que servir en el mail de " +
+      "hace meses), asi que uno valido que se filtre o se reenvie se puede " +
+      "REPRODUCIR sin limite. Cada llamada cuesta una LECTURA de users/{uid}; " +
+      "si la preferencia ya estaba apagada no escribe, asi que no dispara los " +
+      "triggers de `users`. maxInstances: 5 limita la concurrencia, NO el total " +
+      "de llamadas. Ver baja-de-promocionales.ts.",
     exitCondition:
       "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
       "flag aca junto con confirmarBajaPorMail. Medir antes que la pagina de " +

@@ -426,6 +426,111 @@ describe("runBajaDeCorreosPromocionales", () => {
     });
   });
 
+  describe("el replay de un token válido NO escribe", () => {
+    // Un token válido no vence, así que uno filtrado se puede repetir sin fin. Si
+    // cada llamada escribiera, cada una dispararía los triggers de `users`; el
+    // costo del replay tiene que ser una LECTURA.
+    const updateTimeDe = async (uid: string) => (await users().doc(uid).get()).updateTime;
+
+    it("la segunda llamada con el MISMO token no escribe", async () => {
+      const uid = nuevoUid("replay");
+      await users().doc(uid).set({ displayName: "Marta" });
+      const input = { token: firmarToken(uid, PREF, KEY) };
+      const update = jest.spyOn(DocumentReference.prototype, "update");
+
+      const primera = await runBajaDeCorreosPromocionales(app, input, KEY);
+      const trasLaPrimera = await updateTimeDe(uid);
+      const segunda = await runBajaDeCorreosPromocionales(app, input, KEY);
+      const tercera = await runBajaDeCorreosPromocionales(app, input, KEY);
+
+      expect([primera, segunda, tercera]).toEqual(Array(3).fill({ status: "listo" }));
+      // UNA escritura en total, la primera.
+      expect(update).toHaveBeenCalledTimes(1);
+      expect((await updateTimeDe(uid))?.isEqual(trasLaPrimera!)).toBe(true);
+      expect((await prefsDe(uid))?.notificationPrefs).toEqual({
+        novedades_plan: { email: false },
+      });
+    });
+
+    it("una preferencia que YA estaba apagada no se escribe ni una vez", async () => {
+      const uid = nuevoUid("ya-apagada");
+      await users().doc(uid).set({
+        notificationPrefs: { novedades_plan: { email: false, push: true } },
+      });
+      const antes = await updateTimeDe(uid);
+      const update = jest.spyOn(DocumentReference.prototype, "update");
+
+      const out = await runBajaDeCorreosPromocionales(
+        app,
+        { token: firmarToken(uid, PREF, KEY) },
+        KEY,
+      );
+
+      expect(out).toEqual({ status: "listo" });
+      expect(update).not.toHaveBeenCalled();
+      expect((await updateTimeDe(uid))?.isEqual(antes!)).toBe(true);
+    });
+
+    it("si `email` NO es `false` (ausente o `true`) sí escribe", async () => {
+      // El cortocircuito es sólo para `=== false`: cualquier otra cosa se apaga.
+      const ausente = nuevoUid("sin-email");
+      const prendida = nuevoUid("email-true");
+      await users().doc(ausente).set({ notificationPrefs: { novedades_plan: { push: true } } });
+      await users().doc(prendida).set({ notificationPrefs: { novedades_plan: { email: true } } });
+      const update = jest.spyOn(DocumentReference.prototype, "update");
+
+      for (const uid of [ausente, prendida]) {
+        await runBajaDeCorreosPromocionales(app, { token: firmarToken(uid, PREF, KEY) }, KEY);
+      }
+
+      expect(update).toHaveBeenCalledTimes(2);
+      expect((await prefsDe(ausente))?.notificationPrefs?.novedades_plan).toEqual({
+        push: true,
+        email: false,
+      });
+      expect((await prefsDe(prendida))?.notificationPrefs?.novedades_plan).toEqual({
+        email: false,
+      });
+    });
+
+    it("una cuenta inexistente tampoco escribe", async () => {
+      const uid = nuevoUid("replay-inexistente");
+      const update = jest.spyOn(DocumentReference.prototype, "update");
+
+      await runBajaDeCorreosPromocionales(app, { token: firmarToken(uid, PREF, KEY) }, KEY);
+
+      expect(update).not.toHaveBeenCalled();
+      expect((await users().doc(uid).get()).exists).toBe(false);
+    });
+
+    it("si la cuenta se borra ENTRE la lectura y la escritura contesta `listo`", async () => {
+      const uid = nuevoUid("carrera");
+      await users().doc(uid).set({ displayName: "Marta" });
+      jest
+        .spyOn(DocumentReference.prototype, "update")
+        .mockRejectedValueOnce(Object.assign(new Error("not found"), { code: 5 }));
+
+      const out = await runBajaDeCorreosPromocionales(
+        app,
+        { token: firmarToken(uid, PREF, KEY) },
+        KEY,
+      );
+
+      expect(out).toEqual({ status: "listo" });
+    });
+
+    it("una falla al LEER tampoco contesta `listo`: tira", async () => {
+      const uid = nuevoUid("falla-lectura");
+      jest
+        .spyOn(DocumentReference.prototype, "get")
+        .mockRejectedValueOnce(Object.assign(new Error("unavailable"), { code: 14 }));
+
+      await expect(
+        runBajaDeCorreosPromocionales(app, { token: firmarToken(uid, PREF, KEY) }, KEY),
+      ).rejects.toThrow("unavailable");
+    });
+  });
+
   it("un usuario inexistente contesta `listo` y NO crea el documento", async () => {
     // El caso que justifica `update` en vez de `set`: con `set` + merge, esto
     // dejaría `users/{uid}` creado, a medias, para una cuenta que ya no existe.

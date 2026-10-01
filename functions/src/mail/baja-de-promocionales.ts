@@ -46,6 +46,11 @@
  * existe contesta `listo`, igual que una viva (anti-enumeración: es cierto, no
  * le vamos a escribir, y no le cuenta a nadie si la cuenta existe).
  *
+ * **4b. El replay no escribe.** El token no vence, así que uno filtrado se puede
+ * repetir. Se lee el documento antes: con la preferencia ya apagada contesta
+ * `listo` SIN escribir, y sin escritura no se disparan los triggers de `users`.
+ * El costo de un replay es una lectura por llamada.
+ *
  * **5. El token no se loguea.** Lo que se loguea es el uid, que ya está en la
  * base; el token es la credencial.
  */
@@ -267,24 +272,43 @@ export async function runBajaDeCorreosPromocionales(
   }
 
   const { uid, prefKey } = baja;
+  const ref = getFirestore(app).collection("users").doc(uid);
+  // Con `FieldPath` en vez de un string con puntos, para que una clave con
+  // puntos no se lea como anidada.
+  const campo = new FieldPath("notificationPrefs", prefKey, "email");
   try {
-    // `update` y NO `set`: un `set` con merge crearía `users/{uid}` para una
-    // cuenta que ya no existe, y un documento a medias en `users` es peor que
-    // ninguno. Con `FieldPath` en vez de un string con puntos, para que una
-    // clave con puntos no se lea como anidada. Sólo toca esa hoja: no pisa las
-    // demás claves de `notificationPrefs`.
-    await getFirestore(app)
-      .collection("users")
-      .doc(uid)
-      .update(new FieldPath("notificationPrefs", prefKey, "email"), false);
+    // LEE PRIMERO. Un token válido no vence (es la propiedad buscada: tiene que
+    // servir en el mail de hace meses), así que uno filtrado o reenviado se puede
+    // repetir sin fin. Si cada llamada ESCRIBIERA, cada una dispararía los
+    // triggers de `users`; leyendo primero, el replay cuesta una lectura y, con
+    // la preferencia ya apagada, NO escribe: sin escritura no hay triggers.
+    const snap = await ref.get();
+    if (!snap.exists) {
+      // La cuenta ya no existe. No hay nada que apagar ni a quién escribirle, y
+      // decir «listo» es cierto y no revela si la cuenta existía. Nunca se CREA.
+      logger.info("bajaDeCorreosPromocionales: la cuenta no existe", { uid });
+      return { status: "listo" };
+    }
+    if (snap.get(campo) === false) {
+      logger.info("bajaDeCorreosPromocionales: ya estaba apagada, no se escribe", {
+        uid,
+        prefKey,
+      });
+      return { status: "listo" };
+    }
+
+    // `update` y NO `set`: un `set` con merge crearía `users/{uid}` si la cuenta
+    // se borra entre la lectura y la escritura, y un documento a medias en
+    // `users` es peor que ninguno. Sólo toca esa hoja: no pisa las demás claves
+    // de `notificationPrefs`.
+    await ref.update(campo, false);
   } catch (error: unknown) {
     if (esNotFound(error)) {
-      // La cuenta se borró. No hay nada que apagar ni a quién escribirle, y
-      // decir «listo» es cierto y no revela si la cuenta existía.
+      // Se borró entre la lectura y la escritura.
       logger.info("bajaDeCorreosPromocionales: la cuenta ya no existe", { uid });
       return { status: "listo" };
     }
-    logger.error("bajaDeCorreosPromocionales: no se pudo escribir", {
+    logger.error("bajaDeCorreosPromocionales: no se pudo dar de baja", {
       uid,
       prefKey,
       error: String(error),
@@ -317,8 +341,11 @@ function ensureApp(): App {
 // campo, nunca otro uid—. La exención está declarada en
 // `__tests__/appcheck-enforcement.test.ts`.
 //
-// `maxInstances: 5`, como las demás callables públicas: acota el costo de un
-// bucle de requests inválidos.
+// Lo que NO la cierra: un token válido que se filtre se puede reproducir sin
+// límite, porque no vence. Cada llamada cuesta una lectura de `users/{uid}`, y
+// si la preferencia ya estaba apagada no escribe (ver `runBajaDeCorreosPromocionales`).
+// `maxInstances: 5` limita la CONCURRENCIA —cuántas instancias corren a la vez—,
+// no el total de llamadas.
 // ---------------------------------------------------------------------------
 
 /** Callable: dar de baja los correos promocionales. Pública; la credencial es el token. */
