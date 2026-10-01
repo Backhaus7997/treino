@@ -13,6 +13,11 @@
  *      checkout de la landing; el del entrenador, a los planes del Coach Hub.
  *   3. Que el código nunca quede guardado en claro donde se verifica.
  *   4. Que un mail que no salió no deje al usuario esperando un cooldown.
+ *   5. Que la verificación sea POR ROL: a la alumna que pasa a entrenadora se le
+ *      vuelve a pedir, y le llega el mail del entrenador.
+ *   6. Que una cuenta no saque más de 5 mails por hora ni 10 por día, ni con
+ *      pedidos en paralelo.
+ *   7. Que el bloque de pagos del mail vaya solo a quien le sirve y lo aceptó.
  */
 
 import { createHash } from "crypto";
@@ -58,13 +63,17 @@ jest.mock("firebase-admin/auth", () => ({
 
 import {
   CODIGO_VIGENCIA_MS,
+  MAX_ENVIOS_POR_HORA,
   MAX_INTENTOS,
   REENVIO_COOLDOWN_MS,
   VERIFICACIONES_COLLECTION,
+  decidirEnvio,
   generarCodigo,
+  muestraPlanes,
   runSolicitarCodigo,
   runVerificarCodigo,
 } from "../auth/codigo-de-verificacion";
+import { ATHLETE_PAYWALL_ENFORCEMENT_ENABLED } from "../subscriptions/athlete-paywall-enforced";
 import { Store, fakeApp } from "./helpers/firestore-en-memoria";
 
 const AHORA = Date.parse("2026-10-01T12:00:00.000Z");
@@ -98,6 +107,11 @@ const verificar = (
   runVerificarCodigo(app, uid, codigo, { nowMs });
 
 const mails = (store: Store) => Object.values(store.mail_queue ?? {});
+
+/** Lo que `verificarCodigoDeMail` deja en `users/{uid}`. */
+type PorRol = Record<string, { email: string; verifiedAt: { toMillis: () => number } }>;
+const verificacion = (store: Store, uid: string) =>
+  store.users[uid].emailVerification as PorRol | undefined;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -145,7 +159,9 @@ describe("pedir el código", () => {
 
   it("si ya está verificado no manda nada", async () => {
     const mundo = MUNDO();
-    mundo.users[ALUMNA].mailVerificadoAt = ts(AHORA - 1_000);
+    mundo.users[ALUMNA].emailVerification = {
+      athlete: { email: "alumna@test.com", verifiedAt: ts(AHORA - 1_000) },
+    };
     const { app, store } = fakeApp(mundo);
 
     const r = await pedir(app, ALUMNA, "048213");
@@ -242,15 +258,17 @@ describe("pedir el código", () => {
 });
 
 describe("validar el código", () => {
-  it("el correcto marca mailVerificadoAt, borra el código y pone emailVerified", async () => {
+  it("el correcto marca la entrada de SU rol, borra el código y pone emailVerified", async () => {
     const { app, store } = fakeApp(MUNDO());
     await pedir(app, ALUMNA, "048213");
 
     const r = await verificar(app, ALUMNA, "048213", AHORA + 60_000);
 
     expect(r).toEqual({ estado: "verificado" });
-    const marca = store.users[ALUMNA].mailVerificadoAt as { toMillis: () => number };
-    expect(marca.toMillis()).toBe(AHORA + 60_000);
+    const marca = verificacion(store, ALUMNA);
+    expect(Object.keys(marca ?? {})).toEqual(["athlete"]);
+    expect(marca?.athlete.email).toBe("alumna@test.com");
+    expect(marca?.athlete.verifiedAt.toMillis()).toBe(AHORA + 60_000);
     expect(store[VERIFICACIONES_COLLECTION]?.[ALUMNA]).toBeUndefined();
     expect(mockUpdateUser).toHaveBeenCalledWith(ALUMNA, { emailVerified: true });
   });
@@ -286,7 +304,7 @@ describe("validar el código", () => {
     }
     expect((await verificar(app, ALUMNA, "000000")).estado).toBe("bloqueado");
     expect((await verificar(app, ALUMNA, "048213")).estado).toBe("bloqueado");
-    expect(store.users[ALUMNA].mailVerificadoAt).toBeUndefined();
+    expect(verificacion(store, ALUMNA)).toBeUndefined();
   });
 
   it("vencido no sirve", async () => {
@@ -296,7 +314,7 @@ describe("validar el código", () => {
     const r = await verificar(app, ALUMNA, "048213", AHORA + CODIGO_VIGENCIA_MS + 1);
 
     expect(r.estado).toBe("vencido");
-    expect(store.users[ALUMNA].mailVerificadoAt).toBeUndefined();
+    expect(verificacion(store, ALUMNA)).toBeUndefined();
   });
 
   it("un formato inválido no gasta intentos", async () => {
@@ -325,7 +343,7 @@ describe("validar el código", () => {
     await pedir(app, OTRA, "999999");
 
     expect((await verificar(app, OTRA, "048213")).estado).toBe("incorrecto");
-    expect(store.users[OTRA].mailVerificadoAt).toBeUndefined();
+    expect(verificacion(store, OTRA)).toBeUndefined();
   });
 
   it("dos canjes simultáneos del mismo código marcan UNA vez", async () => {
@@ -342,7 +360,7 @@ describe("validar el código", () => {
   });
 
   it("si Auth no deja marcar emailVerified, la verificación vale igual", async () => {
-    // Lo que decide el acceso es `mailVerificadoAt`, no `emailVerified`.
+    // Lo que decide el acceso es `emailVerification`, no `emailVerified`.
     const { app, store } = fakeApp(MUNDO());
     await pedir(app, ALUMNA, "048213");
     mockUpdateUser.mockImplementation(async () => {
@@ -352,6 +370,216 @@ describe("validar el código", () => {
     const r = await verificar(app, ALUMNA, "048213");
 
     expect(r.estado).toBe("verificado");
-    expect(store.users[ALUMNA].mailVerificadoAt).toBeDefined();
+    expect(verificacion(store, ALUMNA)?.athlete).toBeDefined();
+  });
+});
+
+describe("por rol: la alumna que el equipo pasa a entrenadora", () => {
+  /** Verificada como alumna y ya promovida: así la deja el script de promoción. */
+  const PROMOVIDA = (): Store => ({
+    users: {
+      [ALUMNA]: {
+        role: "trainer",
+        emailVerification: { athlete: { email: "alumna@test.com", verifiedAt: ts(AHORA - 9_000) } },
+      },
+    },
+  });
+
+  it("vuelve a pedir el código, y le llega el mail del ENTRENADOR", async () => {
+    const { app, store } = fakeApp(PROMOVIDA());
+
+    const r = await pedir(app, ALUMNA, "777777");
+
+    expect(r.estado).toBe("enviado");
+    expect(mails(store).map((m) => m.kind)).toEqual(["email-code-trainer"]);
+  });
+
+  it("al verificar suma la entrada de entrenador sin perder la de alumna", async () => {
+    const { app, store } = fakeApp(PROMOVIDA());
+    await pedir(app, ALUMNA, "777777");
+
+    expect((await verificar(app, ALUMNA, "777777")).estado).toBe("verificado");
+
+    const marca = verificacion(store, ALUMNA);
+    expect(marca?.trainer.email).toBe("alumna@test.com");
+    expect(marca?.athlete.verifiedAt.toMillis()).toBe(AHORA - 9_000);
+    expect((await pedir(app, ALUMNA, "888888", AHORA + REENVIO_COOLDOWN_MS)).estado)
+      .toBe("ya-verificado");
+  });
+
+  it("el código que pidió como alumna no le sirve después de la promoción", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "048213");
+    store.users[ALUMNA].role = "trainer";
+
+    // Ni para verificar —marcaría al entrenador con el mail del alumno—...
+    expect((await verificar(app, ALUMNA, "048213")).estado).toBe("sin-codigo");
+    expect(verificacion(store, ALUMNA)).toBeUndefined();
+
+    // ...ni como «vigente»: el pedido automático manda el del entrenador.
+    const r = await pedir(app, ALUMNA, "777777", AHORA + REENVIO_COOLDOWN_MS);
+    expect(r.estado).toBe("enviado");
+    expect(mails(store).map((m) => m.kind)).toEqual(["email-code-athlete", "email-code-trainer"]);
+  });
+
+  it("promovida a los segundos de pedir el de alumna: el del entrenador sale sin esperar", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "048213");
+    store.users[ALUMNA].role = "trainer";
+
+    expect((await pedir(app, ALUMNA, "777777", AHORA + 1_000)).estado).toBe("enviado");
+    expect(mails(store).map((m) => m.kind)).toEqual(["email-code-athlete", "email-code-trainer"]);
+  });
+
+  it("si el equipo le cambia el mail en Auth, el nuevo se verifica de nuevo", async () => {
+    const mundo = MUNDO();
+    mundo.users[ALUMNA].emailVerification = {
+      athlete: { email: "vieja@test.com", verifiedAt: ts(AHORA - 9_000) },
+    };
+    const { app } = fakeApp(mundo);
+
+    expect((await pedir(app, ALUMNA, "777777")).estado).toBe("enviado");
+
+    // Mayúsculas o espacios no lo hacen otro mail.
+    mockEmails[ALUMNA] = "  VIEJA@test.com ";
+    expect((await pedir(app, ALUMNA, "888888", AHORA + REENVIO_COOLDOWN_MS)).estado)
+      .toBe("ya-verificado");
+  });
+
+  it("el código mandado al mail anterior no verifica el nuevo", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    await pedir(app, ALUMNA, "048213");
+    mockEmails[ALUMNA] = "nueva@test.com";
+
+    expect((await verificar(app, ALUMNA, "048213")).estado).toBe("sin-codigo");
+    expect(verificacion(store, ALUMNA)).toBeUndefined();
+  });
+});
+
+describe("decidirEnvio: cooldown y topes", () => {
+  const MIN = 60_000;
+  const H = 60 * MIN;
+  const D = 24 * H;
+  const P = { rol: "athlete" as const, email: "a@test.com", nowMs: AHORA, reenviar: true };
+  /** Ya mandó `hora` en la hora y `dia` en el día; el último, hace 2 min. */
+  const doc = (hora: number, dia: number, horaDesde = AHORA - 30 * MIN, diaDesde = AHORA - 5 * H) => ({
+    rol: "athlete",
+    email: "a@test.com",
+    enviadoMs: AHORA - 2 * MIN,
+    horaDesdeMs: horaDesde,
+    enviosEnLaHora: hora,
+    diaDesdeMs: diaDesde,
+    enviosEnElDia: dia,
+  });
+
+  it("el primer envío abre las dos ventanas", () => {
+    expect(decidirEnvio(undefined, P)).toEqual({
+      estado: "enviar",
+      ventanas: { horaDesdeMs: AHORA, enviosEnLaHora: 1, diaDesdeMs: AHORA, enviosEnElDia: 1 },
+    });
+  });
+
+  it("el 5.º de la hora sale; el 6.º espera a que cierre la ventana", () => {
+    expect(decidirEnvio(doc(4, 4), P)).toMatchObject({ estado: "enviar", ventanas: { enviosEnLaHora: 5 } });
+    expect(decidirEnvio(doc(5, 5), P)).toEqual({ estado: "limitado", reintentarEnMs: 30 * MIN });
+  });
+
+  it("cerrada la ventana de la hora arranca otra, y el día sigue contando", () => {
+    expect(decidirEnvio(doc(5, 5, AHORA - H), P)).toMatchObject({
+      estado: "enviar",
+      ventanas: { horaDesdeMs: AHORA, enviosEnLaHora: 1, enviosEnElDia: 6 },
+    });
+  });
+
+  it("el 10.º del día sale; el 11.º espera a que cierre el día", () => {
+    expect(decidirEnvio(doc(0, 9, AHORA - H), P)).toMatchObject({ estado: "enviar", ventanas: { enviosEnElDia: 10 } });
+    expect(decidirEnvio(doc(0, 10, AHORA - H), P)).toEqual({ estado: "limitado", reintentarEnMs: D - 5 * H });
+  });
+
+  it("con las dos ventanas llenas espera la que cierra más tarde", () => {
+    expect(decidirEnvio(doc(5, 10), P)).toEqual({ estado: "limitado", reintentarEnMs: D - 5 * H });
+  });
+
+  it("cerrado el día arranca otro", () => {
+    expect(decidirEnvio(doc(0, 10, AHORA - H, AHORA - D), P)).toMatchObject({
+      estado: "enviar",
+      ventanas: { diaDesdeMs: AHORA, enviosEnElDia: 1 },
+    });
+  });
+
+  it("el cooldown contesta antes que los topes: es la espera más corta", () => {
+    const reciente = { ...doc(5, 5), enviadoMs: AHORA - 10_000 };
+    expect(decidirEnvio(reciente, P)).toEqual({ estado: "enfriando", reintentarEnMs: 50_000 });
+  });
+
+  it("el recién promovido se saltea el cooldown, pero no los topes", () => {
+    const reciente = { ...doc(5, 5), enviadoMs: AHORA - 10_000 };
+    expect(decidirEnvio(reciente, { ...P, rol: "trainer" })).toMatchObject({ estado: "limitado" });
+  });
+});
+
+describe("muestraPlanes: el bloque de pagos del mail", () => {
+  const apagado = { notificationPrefs: { novedades_plan: { email: false } } };
+
+  it.each([
+    ["PF", "trainer", {}, false, true],
+    ["PF que apagó novedades_plan", "trainer", apagado, true, false],
+    ["alumno, con el interruptor apagado", "athlete", {}, false, false],
+    ["alumno recién creado (sin el campo)", "athlete", {}, true, true],
+    ["alumno al que el free le aplica", "athlete", { athletePaywallEnforced: true }, true, true],
+    ["alumno que ya paga o tiene PF activo", "athlete", { athletePaywallEnforced: false }, true, false],
+    ["alumno que apagó novedades_plan", "athlete", apagado, true, false],
+  ] as const)("%s", (_, rol, usuario, prendido, esperado) => {
+    expect(muestraPlanes(rol, usuario, prendido)).toBe(esperado);
+  });
+});
+
+describe("de punta a punta", () => {
+  it("dos «Reenviar» simultáneos mandan UN mail", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    const rs = await Promise.all([
+      pedir(app, ALUMNA, "111111", AHORA, true),
+      pedir(app, ALUMNA, "222222", AHORA, true),
+    ]);
+
+    expect(rs.map((r) => r.estado).sort()).toEqual(["enfriando", "enviado"]);
+    expect(mails(store)).toHaveLength(1);
+  });
+
+  it("pasado el tope de la hora, «Reenviar» contesta limitado y no manda", async () => {
+    const { app, store } = fakeApp(MUNDO());
+    for (let i = 0; i < MAX_ENVIOS_POR_HORA; i++) {
+      expect((await pedir(app, ALUMNA, "111111", AHORA + i * REENVIO_COOLDOWN_MS, true)).estado)
+        .toBe("enviado");
+    }
+
+    const r = await pedir(app, ALUMNA, "111111", AHORA + MAX_ENVIOS_POR_HORA * REENVIO_COOLDOWN_MS, true);
+
+    expect(r).toEqual({ estado: "limitado", reintentarEnMs: 60 * 60_000 - MAX_ENVIOS_POR_HORA * REENVIO_COOLDOWN_MS });
+    expect(mails(store)).toHaveLength(MAX_ENVIOS_POR_HORA);
+  });
+
+  it("al PF le va el bloque de pagos, salvo que haya apagado novedades_plan", async () => {
+    const mundo = MUNDO();
+    mundo.users[OTRA] = { role: "trainer", notificationPrefs: { novedades_plan: { email: false } } };
+    const { app, store } = fakeApp(mundo);
+
+    await pedir(app, PROFE, "111111");
+    await pedir(app, OTRA, "222222");
+
+    const porUid = Object.fromEntries(
+      mails(store).map((m) => [m.toUid, (m.params as Record<string, unknown>).showPlans]),
+    );
+    expect(porUid).toEqual({ [PROFE]: "1", [OTRA]: "0" });
+  });
+
+  it("al alumno recién creado, el bloque depende del interruptor del paywall", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await pedir(app, ALUMNA, "111111");
+
+    expect((mails(store)[0].params as Record<string, unknown>).showPlans)
+      .toBe(ATHLETE_PAYWALL_ENFORCEMENT_ENABLED ? "1" : "0");
   });
 });

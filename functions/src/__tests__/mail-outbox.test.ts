@@ -460,6 +460,44 @@ describe("sendQueuedMailHandler", () => {
     expect((await readQueueDoc(mailId))?.status).toBe("failed");
   });
 
+  // `codigo` y `actionLink` son secretos de un solo uso: la fila queda como
+  // registro del envío, no como copia del secreto. Ver `SECRET_PARAMS`.
+  it("al enviar borra los params secretos y deja el resto", async () => {
+    await seedQueueDoc({
+      kind: "email-code-athlete",
+      params: { codigo: "048213", actionLink: "https://x.test/?oobCode=abc", trainerName: "Jose" },
+    });
+
+    await sendQueuedMailHandler(testApp, mailId, await readQueueDoc(mailId), makeOkSender());
+
+    const doc = await readQueueDoc(mailId);
+    expect(doc?.status).toBe("sent");
+    expect(doc?.params).toEqual({ trainerName: "Jose" });
+  });
+
+  it("no vuelve a procesar un mail ya fallido (sin el código saldría vacío)", async () => {
+    await seedQueueDoc({ kind: "email-code-athlete", params: {}, status: "failed" });
+    const sender = makeOkSender();
+
+    await sendQueuedMailHandler(testApp, mailId, await readQueueDoc(mailId), sender);
+
+    expect(sender.sent).toHaveLength(0);
+  });
+
+  it("un reintento conserva el código; un fallo permanente lo borra", async () => {
+    await seedQueueDoc({ kind: "email-code-athlete", params: { codigo: "048213" } });
+
+    await expect(
+      sendQueuedMailHandler(testApp, mailId, await readQueueDoc(mailId), makeFailingSender(429)),
+    ).rejects.toThrow(MailSendError);
+    expect((await readQueueDoc(mailId))?.params).toEqual({ codigo: "048213" });
+
+    await sendQueuedMailHandler(testApp, mailId, await readQueueDoc(mailId), makeFailingSender(422));
+    const doc = await readQueueDoc(mailId);
+    expect(doc?.status).toBe("failed");
+    expect(doc?.params).toEqual({});
+  });
+
   it("fails permanently when the recipient has no address", async () => {
     await getAuth(testApp).deleteUser(uid).catch(() => undefined);
     await seedQueueDoc();

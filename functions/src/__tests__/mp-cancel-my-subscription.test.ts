@@ -303,9 +303,9 @@ describe("quien puede dar de baja QUE", () => {
     // no vence.
     const mundo = MUNDO_PF();
     (mundo.mp_plans.p1 as Record<string, unknown>).terminal = true;
-    // El valor real de MOTIVO_ABANDONO en reconcile.ts:432. Escribirlo a mano
-    // es a proposito: si alguien lo cambia alla, este test se pone rojo y avisa
-    // que hay un contrato entre los dos archivos.
+    // El valor real de MOTIVO_ABANDONO en `motivos-terminal.ts`. Escribirlo a
+    // mano es a proposito: si alguien lo cambia alla, este test se pone rojo y
+    // avisa que hay un contrato entre los dos archivos.
     (mundo.mp_plans.p1 as Record<string, unknown>).terminalReason =
       "checkout abandonado";
     const { app } = fakeApp(mundo);
