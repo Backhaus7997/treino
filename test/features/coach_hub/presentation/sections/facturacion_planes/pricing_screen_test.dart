@@ -1086,7 +1086,7 @@ void main() {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Plan dado de baja — «reactivar plan» y qué cuenta como plan actual
+  // Plan dado de baja — «volver a contratar» y qué cuenta como plan actual
   //
   // Una suscripción `cancelled` conserva su tier pago HASTA `currentPeriodEnd`
   // y después es Free (el servidor: `nowMs < currentPeriodEndMs`). La pantalla
@@ -1098,7 +1098,7 @@ void main() {
   //     tiene, y tampoco se podía comprar.
   //
   // Lo que se vende y lo que se dice cambia por SUPERFICIE: sólo el Coach Hub
-  // web ofrece «REACTIVAR PLAN» y la fecha. La app móvil no gana ni una
+  // web ofrece «VOLVER A CONTRATAR» y la fecha. La app móvil no gana ni una
   // palabra (3.1.3(f)): sólo cambia QUÉ tarjeta lleva «TU PLAN ACTUAL».
   //
   // El reloj va congelado en `AppClock`: 1/10/2026 12:00. Los fines de período
@@ -1171,12 +1171,12 @@ void main() {
     ]) {
       group('web, layout $layout', () {
         testWidgets(
-            'con días pagos el plan ofrece REACTIVAR PLAN, no TU PLAN '
+            'con días pagos el plan ofrece VOLVER A CONTRATAR, no TU PLAN '
             'ACTUAL', (tester) async {
           await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
 
           expect(
-            enElPieDe(SubscriptionTier.plan1, find.text('REACTIVAR PLAN')),
+            enElPieDe(SubscriptionTier.plan1, find.text('VOLVER A CONTRATAR')),
             findsOneWidget,
           );
           expect(
@@ -1187,7 +1187,7 @@ void main() {
           // pago sigue rigiendo. Los otros dos planes se venden como siempre.
           expect(find.text('TU PLAN ACTUAL'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
-          expect(find.text('REACTIVAR PLAN'), findsOneWidget);
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
         });
 
         // El botón es el MISMO punto de compra que «ELEGIR PLAN»: pide el
@@ -1212,7 +1212,7 @@ void main() {
             debugPlanCheckoutLauncher = null;
           });
 
-          final volver = find.text('REACTIVAR PLAN');
+          final volver = find.text('VOLVER A CONTRATAR');
 
           // Mensual: es el ciclo por default del toggle.
           await tester.ensureVisible(volver);
@@ -1300,7 +1300,8 @@ void main() {
             // Pase lo que pase con la nota, el plan se puede volver a
             // contratar: es la tarjeta del plan actual, dada de baja.
             expect(
-              enElPieDe(SubscriptionTier.plan1, find.text('REACTIVAR PLAN')),
+              enElPieDe(
+                  SubscriptionTier.plan1, find.text('VOLVER A CONTRATAR')),
               findsOneWidget,
             );
             expect(find.text('TU PLAN ACTUAL'), findsNothing);
@@ -1327,7 +1328,7 @@ void main() {
             reason: 'la tarjeta de un plan dado de baja desborda con '
                 'textScale 1.5',
           );
-          expect(find.text('REACTIVAR PLAN'), findsOneWidget);
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
           expect(
             find.textContaining('Si ya pagaste hasta el 15/10'),
             findsOneWidget,
@@ -1365,7 +1366,7 @@ void main() {
           );
 
           expect(
-            enElPieDe(SubscriptionTier.plan2, find.text('REACTIVAR PLAN')),
+            enElPieDe(SubscriptionTier.plan2, find.text('VOLVER A CONTRATAR')),
             findsOneWidget,
           );
           expect(
@@ -1376,7 +1377,7 @@ void main() {
             enElPieDe(SubscriptionTier.plan3, find.text('ELEGIR PLAN')),
             findsOneWidget,
           );
-          expect(find.text('REACTIVAR PLAN'), findsOneWidget);
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
         });
 
         // Vencida, el plan ya no es el del PF: se vende como cualquier otro y
@@ -1386,7 +1387,7 @@ void main() {
             'Free es el actual', (tester) async {
           await pumpEn(tester, size, cancelado(vencido), web: true);
 
-          expect(find.text('REACTIVAR PLAN'), findsNothing);
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
           expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(
             enElPieDe(SubscriptionTier.plan1, find.text('ELEGIR PLAN')),
@@ -1405,7 +1406,7 @@ void main() {
             (tester) async {
           await pumpEn(tester, size, cancelado(null), web: true);
 
-          expect(find.text('REACTIVAR PLAN'), findsNothing);
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNWidgets(3));
           expect(
             enElPieDe(SubscriptionTier.free, find.text('TU PLAN ACTUAL')),
@@ -1427,7 +1428,7 @@ void main() {
             enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
             findsOneWidget,
           );
-          expect(find.text('REACTIVAR PLAN'), findsNothing);
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
           expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
         });
@@ -1438,7 +1439,7 @@ void main() {
         for (final status in SubscriptionStatus.values) {
           if (status == SubscriptionStatus.cancelled) continue;
 
-          testWidgets('$status no ofrece reactivar el plan', (tester) async {
+          testWidgets('$status no ofrece volver a contratar', (tester) async {
             await pumpEn(
               tester,
               size,
@@ -1454,7 +1455,7 @@ void main() {
               enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
               findsOneWidget,
             );
-            expect(find.text('REACTIVAR PLAN'), findsNothing);
+            expect(find.text('VOLVER A CONTRATAR'), findsNothing);
             expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           });
         }
@@ -1480,24 +1481,29 @@ void main() {
             enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
             findsOneWidget,
           );
-          expect(find.text('REACTIVAR PLAN'), findsNothing);
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
           expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(find.textContaining('cobro'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNothing);
-          // El verbo de la compra no entra a la app móvil en ninguna forma.
-          // Bajo 3.1.3(f) «reactivar» es un call to action igual que
-          // «reactivalo» (`avisos_de_tope_movil_sin_llamado_a_comprar_test`,
-          // que lo cuenta entre sus agujas con el stem «reactiva»); acá se
-          // barre el stem sin distinguir mayúsculas, así que un copy nuevo con
-          // otra conjugación cae igual.
-          expect(
-            tester
-                .widgetList<Text>(find.byType(Text))
-                .map((t) => (t.data ?? '').toLowerCase())
-                .where((t) => t.contains('reactiv')),
-            isEmpty,
-            reason: 'la app móvil dice «reactivar» en algún renglón',
-          );
+          // Los verbos de la compra no entran a la app móvil en ninguna forma.
+          // Bajo 3.1.3(f) «volver a contratar» y «reactivar» son calls to
+          // action igual que «contratá» y «reactivalo»
+          // (`avisos_de_tope_movil_sin_llamado_a_comprar_test` los cuenta
+          // entre sus agujas, con los stems «contrata» y «reactiva»). Acá se
+          // barren sin distinguir mayúsculas y por stem, así que otra
+          // conjugación del mismo verbo cae igual. Los dos van: el botón web
+          // dice uno, y el otro es el que ese test ya trata como llamado.
+          final textos = tester
+              .widgetList<Text>(find.byType(Text))
+              .map((t) => (t.data ?? '').toLowerCase())
+              .toList();
+          for (final stem in const ['volver a contratar', 'reactiv']) {
+            expect(
+              textos.where((t) => t.contains(stem)),
+              isEmpty,
+              reason: 'la app móvil dice «$stem» en algún renglón',
+            );
+          }
           expect(
             enElPieDe(SubscriptionTier.plan1, find.byType(TreinoTappable)),
             findsNothing,

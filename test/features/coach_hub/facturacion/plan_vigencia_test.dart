@@ -9,7 +9,7 @@
 ///      Si no, la pricing page marca «TU PLAN ACTUAL» sobre un plan que el PF ya
 ///      no tiene y no le deja volver a comprarlo.
 ///   2. Que una baja con días pagos NO se confunda con una vencida. Si no, el PF
-///      pierde el botón de reactivar el plan justo cuando le conviene.
+///      pierde el botón de volver a contratar justo cuando le conviene.
 ///   3. Que el borde sea el del servidor (estricto). `now == fin` ya es vencido.
 ///   4. Que nada que no sea una baja cambie de tier por la fecha: un período
 ///      vencido en un `pending` o `paused` NO lo vuelve Free acá.
