@@ -17,6 +17,13 @@ import 'auth_providers.dart';
 /// acceso. Si Resend se queda sin cuota, el equipo apaga el gate desde la
 /// consola de Firestore, sin deploy ni build nuevo.
 ///
+/// Lo que NO cubre: SIN CONEXIÓN, Firestore no tira error, sigue entregando lo
+/// último que tenía en caché. Un cliente que guardó `{enabled: true}` y se
+/// queda offline ve el gate prendido hasta que se reconecta, aunque el equipo
+/// ya lo haya apagado; el cambio llega con la reconexión. Se deja así a
+/// propósito: offline tampoco se puede pedir ni validar el código, y leer la
+/// caché como "apagado" haría parpadear el gate en cada arranque.
+///
 /// Depende del uid y NO de un stream abierto de entrada: la regla de
 /// `app_config` pide sesión. Un stream abierto con la sesión cerrada recibe
 /// permission-denied, un `StreamProvider` que terminó en error no se vuelve a
