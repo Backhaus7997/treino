@@ -254,7 +254,7 @@ class _PrivacySwitchCard extends StatelessWidget {
                       color: palette.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.hairline),
                   Text(
                     subtitle,
                     style: GoogleFonts.barlow(
