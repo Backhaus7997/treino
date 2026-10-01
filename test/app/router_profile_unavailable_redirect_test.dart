@@ -19,6 +19,10 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// una cuenta creada antes del requisito.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
 
+/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
+/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
+final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
+
 /// Issue #544 — "autenticado pero sin perfil accesible" deja la app en
 /// skeleton infinito. authRedirect ahora detecta `hasError` en
 /// userProfileProvider y degrada explícito a /profile-unavailable.
@@ -46,6 +50,7 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
+      mailVerificadoAt: _mailVerificadoAt,
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,

@@ -1226,6 +1226,10 @@ async function seedCoaches() {
       displayName: c.displayName,
       role: 'trainer',
       bornAt: bornAtFor(c.uid),
+      // Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
+      // `VerifyMailScreen` frena a TODA cuenta sembrada —el mismo problema que
+      // `bornAt` documenta arriba—, y el código iría a un mail que no existe.
+      mailVerificadoAt: ts(daysAgo(60)),
       createdAt: ts(daysAgo(90)),
       updatedAt: ts(NOW),
       avatarUrl: null,
@@ -1308,6 +1312,8 @@ async function seedAthletes() {
       displayName: a.displayName,
       role: 'athlete',
       bornAt: bornAtFor(a.uid),
+      // Ver el comentario de los entrenadores, más arriba.
+      mailVerificadoAt: ts(daysAgo(60)),
       createdAt: ts(daysAgo(70)),
       updatedAt: ts(NOW),
       avatarUrl: null,

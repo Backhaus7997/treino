@@ -102,10 +102,11 @@ void main() {
       ),
     ).thenAnswer((_) async {});
 
-    // El mail de verificacion ya no sale por `user.sendEmailVerification()`:
-    // sale por el callable `requestEmailVerification`, que lo encola en el
-    // outbox y lo manda por Resend. El doble tiene que existir aca porque
-    // signUpWithEmail lo llama en el camino feliz.
+    // El mail de verificacion con link sale por el callable
+    // `requestEmailVerification` (outbox + Resend), no por
+    // `user.sendEmailVerification()`. El alta ya NO lo manda —lo reemplaza el
+    // codigo de `VerifyMailScreen`—, pero el doble lo sigue usando el grupo de
+    // `sendEmailVerification` de mas abajo.
     functions = MockFirebaseFunctions();
     callable = MockHttpsCallable();
     when(() => functions.httpsCallable(any())).thenReturn(callable);
@@ -130,7 +131,7 @@ void main() {
   // ---------------------------------------------------------------------------
   group('AuthService.signUpWithEmail', () {
     test(
-        'scenario 1.2 — returns User on success and calls sendEmailVerification',
+        'scenario 1.2 — returns User on success and does NOT send the link mail',
         () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
@@ -145,8 +146,8 @@ void main() {
       );
 
       expect(result, user);
-      verify(() => functions.httpsCallable('requestEmailVerification'))
-          .called(1);
+      // El codigo de 6 digitos de la pantalla obligatoria reemplaza al link.
+      verifyNever(() => functions.httpsCallable('requestEmailVerification'));
     });
 
     test('D03 — signUp never calls updateDisplayName (deferred to Etapa 6)',
@@ -180,7 +181,7 @@ void main() {
 
     // T29: SCENARIO-020 — happy path call order (no displayName work)
     test(
-        'SCENARIO-020: signup happy path calls sendEmailVerification and getOrCreate; never updateDisplayName',
+        'SCENARIO-020: signup happy path calls getOrCreate, sends no link mail, never updateDisplayName',
         () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
@@ -192,9 +193,9 @@ void main() {
       await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
       verifyNever(() => user.updateDisplayName(any()));
-      verify(() => functions.httpsCallable('requestEmailVerification'))
-          .called(1);
-      // Y nunca por el camino viejo, que mandaba el mail de Firebase.
+      // Ningun mail con link: ni por el callable ni por el camino viejo de
+      // Firebase. Lo reemplaza el codigo de la pantalla obligatoria.
+      verifyNever(() => functions.httpsCallable('requestEmailVerification'));
       verifyNever(() => user.sendEmailVerification());
       verify(
         () => mockRepo.getOrCreate(

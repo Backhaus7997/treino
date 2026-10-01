@@ -40,6 +40,10 @@ import '../helpers/onboarding_test_helpers.dart';
 /// este campo nunca llega a la pantalla que el test quiere medir.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
 
+/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
+/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
+final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
+
 class _MockUser extends Mock implements User {}
 
 class _StubAuthNotifier extends AuthNotifier {
@@ -74,6 +78,7 @@ UserProfile _trainerProfile() => UserProfile(
       email: 'trainer@example.com',
       displayName: 'Lautaro PF',
       bornAt: _adultBornAt,
+      mailVerificadoAt: _mailVerificadoAt,
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -90,6 +95,7 @@ UserProfile _athleteProfile() => UserProfile(
       email: 'athlete@example.com',
       displayName: 'sporty',
       bornAt: _adultBornAt,
+      mailVerificadoAt: _mailVerificadoAt,
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,

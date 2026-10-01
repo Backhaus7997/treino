@@ -31,6 +31,10 @@ import '../../../helpers/onboarding_test_helpers.dart';
 /// este campo nunca llega a la pantalla que el test quiere medir.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
 
+/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
+/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
+final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
+
 // ---------------------------------------------------------------------------
 // Issue #499 — flicker /home → /profile-setup en el 100% de los registros
 // nuevos.
@@ -131,6 +135,7 @@ UserProfile _completeProfile() => UserProfile(
       email: 'existente@example.com',
       displayName: 'tincho',
       bornAt: _adultBornAt,
+      mailVerificadoAt: _mailVerificadoAt,
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
