@@ -10,8 +10,12 @@ import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../auth/application/auth_providers.dart';
+import '../application/correos_promocionales_providers.dart';
+import '../application/user_providers.dart';
 
-/// Los controles de privacidad del usuario. Hoy, uno solo: la analítica.
+/// Los controles de privacidad del usuario: la analítica (por dispositivo) y
+/// los correos promocionales (por cuenta).
 ///
 /// Existe porque la Política de Privacidad promete que el consentimiento se
 /// puede **revocar en cualquier momento** y la app no tenía dónde. Un documento
@@ -19,16 +23,56 @@ import '../../../l10n/app_l10n.dart';
 /// misma clase de afirmación falsa que persigue la §11.1 de AGENTS.md, sólo que
 /// publicada.
 ///
-/// El interruptor aplica en el acto (ver [AnalyticsConsentNotifier]), no al
-/// próximo arranque: «en cualquier momento» quiere decir ahora.
+/// Son DOS tarjetas separadas y no una lista, porque no son la misma clase de
+/// preferencia. La analítica vive en este dispositivo
+/// ([AnalyticsConsentNotifier]) y su explicación lo dice. Los correos
+/// promocionales viven en el documento del usuario y rigen para la cuenta
+/// entera, en cualquier dispositivo: si compartieran tarjeta, la frase «es una
+/// preferencia de ESTE dispositivo» les tocaría a los dos, y a los correos les
+/// sería falsa.
+///
+/// Los interruptores aplican en el acto, no al próximo arranque: «en cualquier
+/// momento» quiere decir ahora.
 class PrivacyScreen extends ConsumerWidget {
   const PrivacyScreen({super.key});
+
+  /// Guarda la preferencia de correos. Si la escritura falla, avisa.
+  ///
+  /// No hay estado local que revertir: el interruptor lee SIEMPRE del stream
+  /// del documento ([correosPromocionalesProvider]), y Firestore aplica la
+  /// escritura en su caché al instante —el switch se mueve— y la deshace sola
+  /// si el servidor la rechaza, re-emitiendo el valor real. Un `setState`
+  /// optimista acá sería una segunda fuente de verdad que puede quedar
+  /// desfasada de la primera.
+  Future<void> _guardarCorreos(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool habilitado,
+  }) async {
+    final uid = ref.read(authStateChangesProvider).valueOrNull?.uid;
+    // Sin sesión el interruptor ya está deshabilitado: es sólo un cinturón.
+    if (uid == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final mensaje = AppL10n.of(context).privacyPromoEmailsSaveError;
+    try {
+      await ref
+          .read(userRepositoryProvider)
+          .setCorreosPromocionales(uid, habilitado);
+    } catch (_) {
+      // Sin `action`: es un aviso que se va solo, así que el candado de
+      // `persist` (snackbar_persist_scan_test) no aplica.
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(mensaje)));
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final habilitada = ref.watch(analyticsConsentProvider);
+    final correos = ref.watch(correosPromocionalesProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,102 +99,180 @@ class PrivacyScreen extends ConsumerWidget {
           ),
         ),
 
-        // ── El interruptor ──────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: TreinoFadeSlideIn(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-                border: Border.all(
-                  color: palette.textMuted.withValues(alpha: 0.12),
+        // El contenido scrollea: con dos tarjetas y los textos al tamaño de
+        // letra del sistema más grande, una Column fija desbordaba.
+        //
+        // `SingleChildScrollView` + `Column` y NO un `ListView(children:)`:
+        // `TreinoFadeSlideIn` re-anima cada vez que un viewport desmonta y
+        // vuelve a montar a su hijo, y un `ListView` desmonta lo que sale del
+        // `cacheExtent`. Acá el `Column` scrollea entero, como una sola unidad.
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Analítica: preferencia de ESTE dispositivo ────────────────
+                TreinoFadeSlideIn(
+                  child: _PrivacySwitchCard(
+                    switchKey: const ValueKey('privacy-analytics-switch'),
+                    icon: TreinoIcon.shieldCheck,
+                    title: l10n.privacyAnalyticsTitle,
+                    subtitle: l10n.privacyAnalyticsSubtitle,
+                    value: habilitada,
+                    onChanged: (v) => ref
+                        .read(analyticsConsentProvider.notifier)
+                        .setEnabled(v),
+                  ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      TreinoIcon.shieldCheck,
-                      size: 20,
-                      color: palette.textMuted,
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.privacyAnalyticsTitle,
-                            style: GoogleFonts.barlow(
-                              fontWeight: FontWeight.w600,
-                              fontSize: AppTextSize.body,
-                              color: palette.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.privacyAnalyticsSubtitle,
-                            style: GoogleFonts.barlow(
-                              fontSize: AppTextSize.bodyDense,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Semantics(
-                      label: l10n.privacyAnalyticsTitle,
-                      toggled: habilitada,
-                      child: Switch(
-                        value: habilitada,
-                        activeThumbColor: palette.accent,
-                        onChanged: (v) => ref
-                            .read(analyticsConsentProvider.notifier)
-                            .setEnabled(v),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
 
-        // ── Qué implica, dicho sin eufemismos ───────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          child: Text(
-            l10n.privacyAnalyticsExplainer,
-            style: GoogleFonts.barlow(
-              fontSize: AppTextSize.bodyDense,
-              height: 1.45,
-              color: palette.textMuted,
-            ),
-          ),
-        ),
+                // ── Qué implica, dicho sin eufemismos ─────────────────────────
+                const SizedBox(height: 18),
+                Text(
+                  l10n.privacyAnalyticsExplainer,
+                  style: GoogleFonts.barlow(
+                    fontSize: AppTextSize.bodyDense,
+                    height: 1.45,
+                    color: palette.textMuted,
+                  ),
+                ),
 
-        // La aclaración de Crashlytics va SIEMPRE visible, no detrás de un
-        // "ver más". Un interruptor rotulado «analítica» que deja otra
-        // recolección prendida y no lo dice es una media verdad, y una media
-        // verdad en una pantalla de privacidad es peor que no tener la pantalla.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Text(
-            l10n.privacyAnalyticsCrashNote,
-            style: GoogleFonts.barlow(
-              fontSize: AppTextSize.caption,
-              height: 1.45,
-              color: palette.textMuted.withValues(alpha: 0.75),
+                // La aclaración de Crashlytics va SIEMPRE visible, no detrás de
+                // un "ver más". Un interruptor rotulado «analítica» que deja otra
+                // recolección prendida y no lo dice es una media verdad, y una
+                // media verdad en una pantalla de privacidad es peor que no
+                // tener la pantalla.
+                const SizedBox(height: 12),
+                Text(
+                  l10n.privacyAnalyticsCrashNote,
+                  style: GoogleFonts.barlow(
+                    fontSize: AppTextSize.caption,
+                    height: 1.45,
+                    color: palette.textMuted.withValues(alpha: 0.75),
+                  ),
+                ),
+
+                // ── Correos promocionales: preferencia de la CUENTA ───────────
+                //
+                // Va DESPUÉS de todo el bloque de analítica —tarjeta, explicación
+                // y nota de Crashlytics—, no entre medio: la explicación dice
+                // «esta preferencia es de ESTE dispositivo» y tiene que quedar
+                // pegada a la tarjeta de la que habla.
+                const SizedBox(height: 20),
+                TreinoFadeSlideIn(
+                  child: _PrivacySwitchCard(
+                    switchKey: const ValueKey('privacy-promo-emails-switch'),
+                    icon: TreinoIcon.mail,
+                    title: l10n.privacyPromoEmailsTitle,
+                    subtitle: l10n.privacyPromoEmailsSubtitle,
+                    // `hasValue` y no `valueOrNull ?? true`: el atajo muestra
+                    // PRENDIDO mientras carga. Sin respuesta (cargando o con
+                    // error) el interruptor queda deshabilitado, y lo que
+                    // muestre su perilla no es un dato — por eso tampoco se lo
+                    // anuncia al lector de pantalla (ver `_PrivacySwitchCard`).
+                    value: correos.hasValue ? correos.requireValue : false,
+                    sabeSuValor: correos.hasValue,
+                    onChanged: correos.hasValue
+                        ? (v) => _guardarCorreos(context, ref, habilitado: v)
+                        : null,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Una tarjeta con un título, una línea de explicación y un interruptor.
+///
+/// [onChanged] en `null` deja el interruptor deshabilitado. Cuando
+/// [sabeSuValor] es `false`, [value] es sólo un relleno para dibujar la perilla
+/// y NO se le expone al lector de pantalla: un `Switch` no puede dibujar «no
+/// sé», así que a la vista le queda un gris apagado, pero la semántica sí puede
+/// callar el estado en vez de anunciar «apagado» sobre algo que no se leyó.
+class _PrivacySwitchCard extends StatelessWidget {
+  const _PrivacySwitchCard({
+    required this.switchKey,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.sabeSuValor = true,
+  });
+
+  final Key switchKey;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final bool sabeSuValor;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(
+          color: palette.textMuted.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: palette.textMuted),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppTextSize.body,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.barlow(
+                      fontSize: AppTextSize.bodyDense,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // El `Switch` declara SU PROPIO estado (`toggled: value`) y los
+            // nodos de semántica se fusionan: con `toggled: null` en este
+            // wrapper el lector igual oía «apagado». Para callarlo hay que
+            // excluir la semántica del hijo y describir el control desde acá.
+            Semantics(
+              label: title,
+              toggled: sabeSuValor ? value : null,
+              enabled: onChanged != null,
+              excludeSemantics: !sabeSuValor,
+              child: Switch(
+                key: switchKey,
+                value: value,
+                activeThumbColor: palette.accent,
+                onChanged: onChanged,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

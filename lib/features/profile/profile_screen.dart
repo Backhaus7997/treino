@@ -175,6 +175,12 @@ class _AthleteProfile extends ConsumerWidget {
           // DOCUMENTOS que se leen, y esto es un control que se acciona.
           // Meterlo ahí haría que el usuario que busca "cómo apago esto" tenga
           // que entrar a una lista de textos legales para encontrarlo.
+          //
+          // El rótulo nombra los DOS controles que hay adentro (analítica y
+          // correos). Se llamaba «Analítica de uso», y con ese título nadie iba
+          // a buscar ahí cómo dejar de recibir correos: un control que existe
+          // pero que el rótulo esconde no cumple lo que promete la política
+          // («Revocar consentimiento: desde los ajustes»).
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(8),
             child: _A11ySectionGroup(
@@ -183,11 +189,11 @@ class _AthleteProfile extends ConsumerWidget {
               tiles: [
                 Semantics(
                   button: true,
-                  label: l10n.privacyAnalyticsTitle,
+                  label: l10n.privacyEntryTitle,
                   excludeSemantics: true,
                   child: ProfileSectionTile(
                     icon: TreinoIcon.shieldCheck,
-                    title: l10n.privacyAnalyticsTitle,
+                    title: l10n.privacyEntryTitle,
                     inGroup: true,
                     onTap: () => context.push('/profile/settings/privacidad'),
                   ),

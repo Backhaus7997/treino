@@ -4639,6 +4639,20 @@ class AppL10nEn extends AppL10n {
       'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
 
   @override
+  String get privacyEntryTitle => 'Analytics and emails';
+
+  @override
+  String get privacyPromoEmailsTitle => 'Promotional emails';
+
+  @override
+  String get privacyPromoEmailsSubtitle =>
+      'Turn it off and we\'ll stop sending them. Account notices still reach you.';
+
+  @override
+  String get privacyPromoEmailsSaveError =>
+      'We couldn\'t save the change. Try again.';
+
+  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);

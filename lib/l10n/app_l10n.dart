@@ -8181,6 +8181,30 @@ abstract class AppL10n {
   /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
   String get privacyAnalyticsCrashNote;
 
+  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Analítica y correos'**
+  String get privacyEntryTitle;
+
+  /// Titulo del interruptor de correos promocionales en la pantalla de privacidad. Es una preferencia de la CUENTA, no del dispositivo. Sin 'plan', 'pago', 'suscripcion', 'precio', 'oferta', 'web' ni 'Pro': Guideline 3.1.3 de Apple, ver test/features/paywall/.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Correos promocionales'**
+  String get privacyPromoEmailsTitle;
+
+  /// Subtitulo del interruptor de correos promocionales. 'Los avisos de tu cuenta' es cierto: solo los mails con prefKey se frenan, los operativos siguen saliendo. Mismas palabras prohibidas que el titulo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si lo apagás, no te mandamos más. Los avisos de tu cuenta te siguen llegando.'**
+  String get privacyPromoEmailsSubtitle;
+
+  /// Snackbar cuando falla la escritura del interruptor de correos promocionales. El interruptor vuelve solo al valor real.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
+  String get privacyPromoEmailsSaveError;
+
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///
   /// In es_AR, this message translates to:

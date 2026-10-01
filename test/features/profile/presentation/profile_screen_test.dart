@@ -89,6 +89,10 @@ Widget _buildProfileScreen() {
             path: 'routines',
             builder: (_, __) => const Scaffold(body: Text('ROUTINES')),
           ),
+          GoRoute(
+            path: 'settings/privacidad',
+            builder: (_, __) => const Scaffold(body: Text('PRIVACIDAD')),
+          ),
         ],
       ),
     ],
@@ -170,6 +174,24 @@ void main() {
         ),
         findsNothing,
       );
+    });
+
+    // La fila de Privacidad se llamaba «Analítica de uso» y desde que la pantalla
+    // que abre también guarda los correos promocionales, con ese rótulo nadie
+    // iba a buscarlos ahí. La ruta no cambia.
+    testWidgets(
+        'la fila de Privacidad se rotula «Analítica y correos» y abre '
+        '/profile/settings/privacidad', (tester) async {
+      await tester.pumpWidget(_buildProfileScreen());
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(find.text('Analítica y correos'), 50);
+      expect(find.text('Analítica de uso'), findsNothing);
+
+      await tester.tap(find.text('Analítica y correos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PRIVACIDAD'), findsOneWidget);
     });
 
     // SCENARIO-530: Tapping "Cerrar sesión" tile calls signOut.
