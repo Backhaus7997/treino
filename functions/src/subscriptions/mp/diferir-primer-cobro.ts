@@ -21,13 +21,23 @@
  * testea con fakes de una linea y ningun test puede pasar porque un mock de
  * Firestore acepto de mas.
  *
+ * Tiene dos mitades que comparten constantes y vocabulario:
+ *
+ *   1. AL ABRIR EL CHECKOUT (`decidirDiferimiento`): si el PF califica, y hasta
+ *      cuando tiene pago el periodo.
+ *   2. AL RECONCILIAR (`aplicarPruebaDiferidaAlEstado` y
+ *      `aplicarPruebaDiferidaAlPeriodo`): como se lee despues un plan que nacio
+ *      con prueba. Hace falta porque el link de un checkout no vence y MP no
+ *      deja dar de baja un plan. Ver el encabezado de esa seccion.
+ *
  * ── Por que el pago se comprueba CONTRA MP y no contra nuestra fecha ──
  *
  * `currentPeriodEnd` dice hasta cuando le DURA el plan al PF, no que lo haya
  * PAGADO. Una fecha futura tambien la pueden tener un PF sembrado a mano con el
  * Admin SDK (no hay pago que descontar) o una suscripcion que se cancelo antes de
- * cobrar nada. Diferir contra una fecha asi es regalar dias: por eso se exige ver
- * en MP un cobro real, y el diferimiento nunca pasa de lo que ese cobro cubre.
+ * cobrar nada, como una prueba cancelada antes de su primer cobro. Diferir contra
+ * una fecha asi es regalar dias: por eso se exige ver en MP un cobro real, y el
+ * diferimiento nunca pasa de lo que ese cobro cubre.
  *
  * ── La pregunta de fondo: fallar para que lado ──
  *
@@ -40,6 +50,7 @@
 
 import { logger } from "firebase-functions";
 
+import { SubscriptionStatus } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import { MpPreapproval } from "./client";
@@ -239,10 +250,9 @@ export interface DecidirDiferimientoInput {
  *   4. MP muestra un cobro real que lo respalda (ver [pagadoHastaDe]).
  *
  * El resultado es el MENOR entre nuestra fecha de fin y lo que cubre el cobro de
- * MP. Cada fuente puede estar equivocada hacia adelante (la nuestra por un tope
- * que no se aplico, la de MP porque el cobro fue hace meses y la suscripcion se
- * reactivo): quedarse con la menor es no regalarle al PF mas de lo que las dos
- * aceptan.
+ * MP. Nuestra fecha puede estar corrida hacia adelante (un tope que no se aplico,
+ * una fecha sembrada a mano) y MP puede respaldar menos de lo que ella dice:
+ * quedarse con la menor es no regalarle al PF mas de lo que las dos aceptan.
  *
  * De los planes que se revisan se toma el primero (el mas nuevo) que muestre un
  * cobro. Dentro de ese plan, el pago mas lejano.
@@ -315,4 +325,178 @@ export async function decidirDiferimiento(
     diasDePrueba: diasDePrueba(diferidoHastaMs, nowMs),
   });
   return { diferir: true, diferidoHastaMs };
+}
+
+// ---------------------------------------------------------------------------
+// La otra mitad: como se LEE, al reconciliar, un plan que nacio con prueba.
+// ---------------------------------------------------------------------------
+//
+// El plan diferido guarda `diferidoHastaMs` (E) en `mp_plans`. Mientras su
+// suscripcion no tenga ningun cobro exitoso, el reconciliador la lee con las
+// reglas de abajo; apenas MP cobra una vez, todo vuelve a ser como en cualquier
+// otro plan. Las reglas existen por tres cosas que vienen de MP y no se pueden
+// arreglar de nuestro lado:
+//
+//   1. **El link de un checkout no vence y MP no deja dar de baja un plan**
+//      (`client.ts`, `cancelPreapproval`). Los dias de prueba se calcularon para
+//      el momento en que se abrio el checkout; si el PF paga ese mismo link
+//      semanas despues, el primer cobro cae semanas despues de E. Sin una regla,
+//      le daria plan pago todo ese tiempo sin que MP haya cobrado nada. Y se
+//      puede usar a proposito: abrir el checkout, no pagarlo, y autorizarlo
+//      cuando convenga para correr el primer cobro tanto como se quiera.
+//
+//   2. **`pending_charge_quantity` durante la prueba.** Si MP cuenta el primer
+//      cobro programado como pendiente (no esta verificado), `hayCobroPendiente`
+//      lo leeria como un cobro rebotado y el PF pasaria a `grace`, con su mail de
+//      "no pudimos cobrar", sin que se le haya intentado cobrar nada.
+//
+//   3. **Una prueba cancelada antes de su primer cobro.** `resolverFinDePeriodo`
+//      arma el fin con `next_payment_date`, con lo que ya estaba guardado o, si
+//      no hay nada, con alta mas un periodo entero. Ninguno de los tres sabe que
+//      el PF solo pago hasta E (a traves del plan anterior): el ultimo le regala
+//      un mes que nunca se cobro, y los otros se pasan de E por el redondeo a
+//      dias.
+//
+// Lo que NO hacen: no dan de baja nada en MP. El pagador autorizo de buena fe, la
+// baja es terminal, y una decision nuestra equivocada no se puede deshacer. Se
+// limitan a decidir que escribimos en `subscription`.
+
+/**
+ * Cuanto despues de abrir el checkout puede autorizar el pagador para que la
+ * prueba que le calculamos siga valiendo.
+ *
+ * Los dias se contaron desde el momento en que se abrio el checkout. Asumimos que
+ * MP los cuenta desde que el pagador AUTORIZA (no esta medido), asi que el primer
+ * cobro cae `autorizacion + dias`. Autorizando a las pocas horas la diferencia es
+ * chica y entra en [HOLGURA_PRUEBA_MS]; autorizando varios dias despues, el cobro
+ * se corre esos mismos dias y deja de ser el que le corresponde.
+ */
+export const VENTANA_AUTORIZACION_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Cuanto despues de E se sigue tratando como "en prueba" a una suscripcion que
+ * todavia no cobro.
+ *
+ * El primer cobro cae en E o hasta un dia despues (por el `ceil` de
+ * [diasDePrueba]) mas lo que tardo el pagador en autorizar (hasta
+ * [VENTANA_AUTORIZACION_MS]), y MP puede demorarse en intentarlo. Tres dias
+ * cubren eso con aire; pasados, un cobro pendiente vuelve a leerse como `grace`
+ * y el aviso de "no pudimos cobrar" es verdad.
+ */
+export const HOLGURA_PRUEBA_MS = 3 * DIA_MS;
+
+/** Lo que el reconciliador sabe de un plan y de su suscripcion de MP. */
+export interface PruebaDiferidaInput {
+  /**
+   * `mp_plans/{planId}.diferidoHastaMs` (E), TAL CUAL salio del documento. Si no
+   * es un numero finito, el plan no es diferido y nada de lo de abajo aplica.
+   */
+  diferidoHastaMs: unknown;
+  /** `mp_plans/{planId}.createdAt` en ms, o `null` si no se pudo leer. */
+  planCreadoMs: number | null;
+  /** El `status` CRUDO de la suscripcion de MP. */
+  mpStatus: unknown;
+  /** El estado al que llego el mapeo de siempre (`mapMpStatus`). */
+  statusHoy: SubscriptionStatus;
+  /** `summarized` de la suscripcion de MP. */
+  summarized: unknown;
+  /** `date_created` de la suscripcion de MP: cuando el pagador autorizo. */
+  mpDateCreated: unknown;
+  nowMs: number;
+}
+
+/**
+ * E si este plan es diferido Y su suscripcion todavia no cobro nada; si no,
+ * `null`, que quiere decir "este plan se lee como cualquier otro".
+ *
+ * Que `charged_quantity` falte o no sea un numero se lee como "no cobro": es el
+ * estado normal de una suscripcion recien autorizada. Desde el primer cobro real
+ * las reglas se apagan solas, y con ellas cualquier posibilidad de que una
+ * prueba retenga a alguien que ya esta pagando.
+ */
+function enPruebaSinCobrar(
+  diferidoHastaMs: unknown,
+  summarized: unknown,
+): number | null {
+  if (typeof diferidoHastaMs !== "number" || !Number.isFinite(diferidoHastaMs)) {
+    return null;
+  }
+  const cobros = (summarized as { charged_quantity?: unknown } | null | undefined)
+    ?.charged_quantity;
+  if (typeof cobros === "number" && Number.isFinite(cobros) && cobros >= 1) {
+    return null;
+  }
+  return diferidoHastaMs;
+}
+
+/**
+ * Si la suscripcion se autorizo dentro de la ventana que la prueba calculada
+ * tolera. Cualquier fecha que falte o no se entienda cuenta como FUERA: ante la
+ * duda no se le da plan pago a una suscripcion que todavia no cobro.
+ */
+function autorizadaATiempo(
+  planCreadoMs: number | null,
+  mpDateCreated: unknown,
+): boolean {
+  if (planCreadoMs === null || !Number.isFinite(planCreadoMs)) return false;
+  if (typeof mpDateCreated !== "string") return false;
+  const autorizadaMs = Date.parse(mpDateCreated);
+  if (!Number.isFinite(autorizadaMs)) return false;
+  return autorizadaMs - planCreadoMs <= VENTANA_AUTORIZACION_MS;
+}
+
+/**
+ * El estado que el reconciliador tiene que escribir para un plan que puede ser
+ * diferido. Para uno que no lo es (o que ya cobro), devuelve [statusHoy] tal cual.
+ *
+ * Solo toca una suscripcion que MP dice `authorized`:
+ *
+ *   - **Autorizada fuera de la ventana** (el link se pago mucho despues de abrir
+ *     el checkout): `pending`. De este plan el PF no recibe nada hasta el primer
+ *     cobro real de MP, y la guarda de `pending` del reconciliador conserva lo
+ *     que ya tuviera pago. Ver el punto 1 del encabezado de esta seccion.
+ *
+ *   - **A tiempo y antes de E + [HOLGURA_PRUEBA_MS]**: `active`, aunque MP diga
+ *     que hay un cobro pendiente. Durante la prueba no se debe nada.
+ *
+ *   - **A tiempo y pasado ese horizonte**: el mapeo de siempre, o sea `grace` si
+ *     hay un cobro pendiente. Ahi el primer cobro ya tendria que haber salido.
+ */
+export function aplicarPruebaDiferidaAlEstado(
+  i: PruebaDiferidaInput,
+): SubscriptionStatus {
+  const e = enPruebaSinCobrar(i.diferidoHastaMs, i.summarized);
+  if (e === null) return i.statusHoy;
+  if (i.mpStatus !== "authorized") return i.statusHoy;
+
+  if (!autorizadaATiempo(i.planCreadoMs, i.mpDateCreated)) return "pending";
+  if (i.nowMs < e + HOLGURA_PRUEBA_MS) return "active";
+  return i.statusHoy;
+}
+
+/**
+ * El fin de periodo que el reconciliador tiene que escribir para un plan que
+ * puede ser diferido. Para uno que no lo es (o que ya cobro), devuelve
+ * [periodEndMs] tal cual.
+ *
+ * Solo toca una suscripcion que MP dice `cancelled` o `paused`: `min(fin, E)`, y
+ * si no habia fin por ningun camino, E. El PF solo pago hasta E, a traves del
+ * plan anterior; lo que pase de ahi (el mes que la cascada de
+ * `resolverFinDePeriodo` deriva del alta) es un periodo que nunca se cobro.
+ *
+ * Tener E como respaldo cuando falta la fecha importa: un `null` le sacaria el
+ * plan en el acto a alguien que si pago hasta E.
+ *
+ * El arrepentimiento NO pasa por aca. Quien llama conserva su precedencia: el
+ * instante del arrepentimiento gana sobre cualquier fin de periodo.
+ */
+export function aplicarPruebaDiferidaAlPeriodo(
+  i: PruebaDiferidaInput & { periodEndMs: number | null },
+): number | null {
+  const e = enPruebaSinCobrar(i.diferidoHastaMs, i.summarized);
+  if (e === null) return i.periodEndMs;
+  if (i.mpStatus !== "cancelled" && i.mpStatus !== "paused") {
+    return i.periodEndMs;
+  }
+  return Math.min(i.periodEndMs ?? e, e);
 }

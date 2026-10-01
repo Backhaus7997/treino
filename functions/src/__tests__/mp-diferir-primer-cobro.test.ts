@@ -20,9 +20,14 @@ import { MpPreapproval } from "../subscriptions/mp/client";
 import {
   DIA_MS,
   DecidirDiferimientoInput,
+  HOLGURA_PRUEBA_MS,
   MAX_PLANES_A_REVISAR,
   MIN_DIFERIMIENTO_MS,
   PlanDeLaCuenta,
+  PruebaDiferidaInput,
+  VENTANA_AUTORIZACION_MS,
+  aplicarPruebaDiferidaAlEstado,
+  aplicarPruebaDiferidaAlPeriodo,
   decidirDiferimiento,
   diasDePrueba,
   pagadoHastaDe,
@@ -742,4 +747,329 @@ describe("decidirDiferimiento: si no puede LEER, tira (nunca cae a cobrar en el 
     expect(await decidirDiferimiento(input))
       .toEqual({ diferir: false, motivo: "otro-tier" });
   });
+});
+
+// ---------------------------------------------------------------------------
+// La otra mitad: como se lee, al reconciliar, un plan que nacio con prueba.
+//
+// Tres cosas de MP lo vuelven necesario (detalle en el encabezado de esa
+// seccion del modulo): el link de un checkout no vence, `pending_charge_quantity`
+// puede contar un cobro que todavia no corresponde, y una prueba cancelada
+// deriva su fin de un periodo entero que nunca se pago.
+// ---------------------------------------------------------------------------
+
+const HORA_MS = 60 * 60 * 1000;
+
+/** Una suscripcion en prueba: el plan se abrio hace 1 h y se autorizo hace 30 min. */
+const EN_PRUEBA: PruebaDiferidaInput = {
+  diferidoHastaMs: FIN,
+  planCreadoMs: AHORA - HORA_MS,
+  mpStatus: "authorized",
+  statusHoy: "active",
+  summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+  mpDateCreated: new Date(AHORA - 30 * 60 * 1000).toISOString(),
+  nowMs: AHORA,
+};
+
+/** Una autorizacion `horas` despues de abrir el checkout. */
+const autorizadaDespues = (horas: number, extraMs = 0): PruebaDiferidaInput => ({
+  ...EN_PRUEBA,
+  planCreadoMs: AHORA - 10 * DIA_MS,
+  mpDateCreated: new Date(AHORA - 10 * DIA_MS + horas * HORA_MS + extraMs)
+    .toISOString(),
+});
+
+describe("aplicarPruebaDiferidaAlEstado: autorizada a tiempo", () => {
+  it("sin cobro pendiente queda active", () => {
+    expect(aplicarPruebaDiferidaAlEstado(EN_PRUEBA)).toBe("active");
+  });
+
+  it("CON cobro pendiente tambien queda active: durante la prueba no se debe nada", () => {
+    // Si MP cuenta el primer cobro programado como pendiente, el mapeo de
+    // siempre diria `grace` y el PF recibiria un "no pudimos cobrar" sin que se
+    // le haya intentado cobrar nada.
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...EN_PRUEBA,
+      statusHoy: "grace",
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    });
+
+    expect(r).toBe("active");
+  });
+
+  it("la ventana de autorizacion es inclusiva: exactamente 24 h todavia vale", () => {
+    expect(aplicarPruebaDiferidaAlEstado(autorizadaDespues(24))).toBe("active");
+    expect(VENTANA_AUTORIZACION_MS).toBe(24 * HORA_MS);
+  });
+
+  it("y 24 h y un milisegundo ya no", () => {
+    expect(aplicarPruebaDiferidaAlEstado(autorizadaDespues(24, 1))).toBe("pending");
+  });
+
+  it("autorizar ANTES de que exista el plan (reloj corrido) cuenta como a tiempo", () => {
+    // Defensa contra el desfasaje entre el reloj de MP y el de Firestore: una
+    // diferencia negativa nunca puede castigar a quien pago.
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...EN_PRUEBA,
+      mpDateCreated: new Date(AHORA - 3 * HORA_MS).toISOString(),
+    });
+
+    expect(r).toBe("active");
+  });
+});
+
+describe("aplicarPruebaDiferidaAlEstado: el horizonte E + holgura", () => {
+  const conPendiente = (nowMs: number): PruebaDiferidaInput => ({
+    ...EN_PRUEBA,
+    nowMs,
+    statusHoy: "grace",
+    summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+  });
+
+  it("un milisegundo antes del horizonte sigue active", () => {
+    expect(aplicarPruebaDiferidaAlEstado(
+      conPendiente(FIN + HOLGURA_PRUEBA_MS - 1))).toBe("active");
+  });
+
+  it("en el horizonte exacto vuelve el mapeo de siempre: grace", () => {
+    expect(aplicarPruebaDiferidaAlEstado(
+      conPendiente(FIN + HOLGURA_PRUEBA_MS))).toBe("grace");
+  });
+
+  it("pasado el horizonte, un cobro pendiente es grace: el primer cobro ya tendria que haber salido", () => {
+    expect(aplicarPruebaDiferidaAlEstado(
+      conPendiente(FIN + 10 * DIA_MS))).toBe("grace");
+  });
+
+  it("pasado el horizonte sin cobro pendiente queda active, como cualquier plan", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...EN_PRUEBA,
+      nowMs: FIN + 10 * DIA_MS,
+      statusHoy: "active",
+    });
+
+    expect(r).toBe("active");
+  });
+
+  it("la holgura son 3 dias", () => {
+    expect(HOLGURA_PRUEBA_MS).toBe(3 * DIA_MS);
+  });
+});
+
+describe("aplicarPruebaDiferidaAlEstado: un link viejo pagado tarde", () => {
+  it("autorizada varios dias despues de abrir el checkout: pending", () => {
+    // El link de un checkout no vence. Pagado tarde, el primer cobro cae tarde
+    // y el PF tendria plan pago sin haber pagado nada.
+    expect(aplicarPruebaDiferidaAlEstado(autorizadaDespues(3 * 24)))
+      .toBe("pending");
+  });
+
+  it("y es pending aunque no haya cobro pendiente", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      statusHoy: "active",
+    });
+
+    expect(r).toBe("pending");
+  });
+
+  it("y es pending aunque el mapeo dijera grace", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      statusHoy: "grace",
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    });
+
+    expect(r).toBe("pending");
+  });
+
+  it("vale tambien pasado el horizonte: el link viejo no se vuelve valido con el tiempo", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      nowMs: FIN + 30 * DIA_MS,
+    });
+
+    expect(r).toBe("pending");
+  });
+
+  const fechasQueFaltan: [string, Partial<PruebaDiferidaInput>][] = [
+    ["el plan sin createdAt legible", { planCreadoMs: null }],
+    ["el plan con createdAt NaN", { planCreadoMs: Number.NaN }],
+    ["la suscripcion sin date_created", { mpDateCreated: undefined }],
+    ["date_created null", { mpDateCreated: null }],
+    ["date_created que no es fecha", { mpDateCreated: "ayer" }],
+    ["date_created numerico", { mpDateCreated: AHORA }],
+  ];
+
+  for (const [caso, patch] of fechasQueFaltan) {
+    it(`con ${caso} NO se asume que fue a tiempo: pending`, () => {
+      // Ante la duda no se le da plan pago a una suscripcion que todavia no
+      // cobro. Es el lado barato de equivocarse: el primer cobro real lo corrige.
+      expect(aplicarPruebaDiferidaAlEstado({ ...EN_PRUEBA, ...patch }))
+        .toBe("pending");
+    });
+  }
+});
+
+describe("aplicarPruebaDiferidaAlEstado: lo que NO toca", () => {
+  it("desde el primer cobro real todo es como en cualquier plan", () => {
+    // Un link viejo y un cobro pendiente: con cobros >= 1 ya no es una prueba.
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      statusHoy: "grace",
+      summarized: { charged_quantity: 1, pending_charge_quantity: 1 },
+    });
+
+    expect(r).toBe("grace");
+  });
+
+  it("con cobros >= 1 devuelve siempre el mapeo de siempre", () => {
+    for (const statusHoy of ["active", "grace", "pending"] as const) {
+      expect(aplicarPruebaDiferidaAlEstado({
+        ...autorizadaDespues(5 * 24),
+        statusHoy,
+        summarized: { charged_quantity: 2 },
+      })).toBe(statusHoy);
+    }
+  });
+
+  const noDiferidos: [string, unknown][] = [
+    ["sin diferidoHastaMs", undefined],
+    ["diferidoHastaMs null", null],
+    ["diferidoHastaMs NaN", Number.NaN],
+    ["diferidoHastaMs infinito", Number.POSITIVE_INFINITY],
+    ["diferidoHastaMs como string", String(FIN)],
+    ["diferidoHastaMs como Timestamp", { toMillis: () => FIN }],
+  ];
+
+  for (const [caso, diferidoHastaMs] of noDiferidos) {
+    it(`un plan ${caso} se lee como cualquier otro, aunque la fecha sea tardia`, () => {
+      for (const statusHoy of ["active", "grace"] as const) {
+        expect(aplicarPruebaDiferidaAlEstado({
+          ...autorizadaDespues(5 * 24),
+          diferidoHastaMs,
+          statusHoy,
+        })).toBe(statusHoy);
+      }
+    });
+  }
+
+  const noAutorizadas = ["pending", "paused", "cancelled", "loquesea", undefined, null];
+
+  for (const mpStatus of noAutorizadas) {
+    it(`MP ${String(mpStatus)}: el estado lo decide el mapeo de siempre`, () => {
+      for (const statusHoy of ["pending", "paused", "cancelled"] as const) {
+        expect(aplicarPruebaDiferidaAlEstado({
+          ...autorizadaDespues(5 * 24),
+          mpStatus,
+          statusHoy,
+        })).toBe(statusHoy);
+      }
+    });
+  }
+
+  it("charged_quantity ausente, basura o summarized roto se lee como `no cobro`", () => {
+    // Una suscripcion recien autorizada no trae cobros: es el caso normal.
+    for (const summarized of [
+      undefined,
+      null,
+      "cobrado",
+      {},
+      { charged_quantity: null },
+      { charged_quantity: "1" },
+      { charged_quantity: Number.NaN },
+      { charged_quantity: 0 },
+    ]) {
+      expect(aplicarPruebaDiferidaAlEstado({
+        ...autorizadaDespues(5 * 24),
+        summarized,
+      })).toBe("pending");
+    }
+  });
+});
+
+describe("aplicarPruebaDiferidaAlPeriodo", () => {
+  /** Una prueba cancelada antes de su primer cobro. */
+  const cancelada = (periodEndMs: number | null, patch = {}) => ({
+    ...EN_PRUEBA,
+    mpStatus: "cancelled",
+    statusHoy: "cancelled" as const,
+    periodEndMs,
+    ...patch,
+  });
+
+  it("cancelada: un fin pasado de E se acota a E", () => {
+    // La cascada de `resolverFinDePeriodo` deriva "alta + un mes" de una
+    // suscripcion que nunca cobro: ese mes no se pago.
+    const unMesDespues = AHORA + 30 * DIA_MS;
+
+    expect(aplicarPruebaDiferidaAlPeriodo(cancelada(unMesDespues))).toBe(FIN);
+  });
+
+  it("cancelada: un fin ANTERIOR a E se respeta (min, no pisar)", () => {
+    expect(aplicarPruebaDiferidaAlPeriodo(cancelada(FIN - 5 * DIA_MS)))
+      .toBe(FIN - 5 * DIA_MS);
+  });
+
+  it("cancelada: un fin igual a E queda en E", () => {
+    expect(aplicarPruebaDiferidaAlPeriodo(cancelada(FIN))).toBe(FIN);
+  });
+
+  it("cancelada SIN fin por ningun camino: E, no `null`", () => {
+    // Un `null` le sacaria el plan en el acto a alguien que si pago hasta E.
+    expect(aplicarPruebaDiferidaAlPeriodo(cancelada(null))).toBe(FIN);
+  });
+
+  it("pausada se acota igual", () => {
+    expect(aplicarPruebaDiferidaAlPeriodo(cancelada(AHORA + 90 * DIA_MS, {
+      mpStatus: "paused",
+      statusHoy: "paused" as const,
+    }))).toBe(FIN);
+  });
+
+  it("autorizada o pendiente: el fin no se toca, ni siquiera si pasa de E", () => {
+    for (const mpStatus of ["authorized", "pending"]) {
+      expect(aplicarPruebaDiferidaAlPeriodo({
+        ...EN_PRUEBA,
+        mpStatus,
+        periodEndMs: FIN + 40 * DIA_MS,
+      })).toBe(FIN + 40 * DIA_MS);
+    }
+    expect(aplicarPruebaDiferidaAlPeriodo({ ...EN_PRUEBA, periodEndMs: null }))
+      .toBeNull();
+  });
+
+  it("con cobros >= 1 no se acota nada: el PF ya esta pagando este plan", () => {
+    const r = aplicarPruebaDiferidaAlPeriodo(cancelada(AHORA + 30 * DIA_MS, {
+      summarized: { charged_quantity: 1, last_charged_date: "2026-09-20T12:00:00.000Z" },
+    }));
+
+    expect(r).toBe(AHORA + 30 * DIA_MS);
+  });
+
+  it("con cobros >= 1 y sin fin sigue siendo null, como en cualquier plan", () => {
+    const r = aplicarPruebaDiferidaAlPeriodo(cancelada(null, {
+      summarized: { charged_quantity: 3 },
+    }));
+
+    expect(r).toBeNull();
+  });
+
+  const noDiferidos: [string, unknown][] = [
+    ["sin diferidoHastaMs", undefined],
+    ["diferidoHastaMs null", null],
+    ["diferidoHastaMs NaN", Number.NaN],
+    ["diferidoHastaMs como string", String(FIN)],
+  ];
+
+  for (const [caso, diferidoHastaMs] of noDiferidos) {
+    it(`un plan ${caso} conserva su fin tal cual`, () => {
+      expect(aplicarPruebaDiferidaAlPeriodo(
+        cancelada(AHORA + 30 * DIA_MS, { diferidoHastaMs }),
+      )).toBe(AHORA + 30 * DIA_MS);
+      expect(aplicarPruebaDiferidaAlPeriodo(
+        cancelada(null, { diferidoHastaMs }),
+      )).toBeNull();
+    });
+  }
 });

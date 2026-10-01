@@ -1881,3 +1881,449 @@ describe("reconcileSubscription — el periodo prepago no se tira", () => {
     expect(warnSpy).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// LA PRUEBA DIFERIDA.
+//
+// Un PF dado de baja que vuelve al mismo plan con dias ya pagos abre un plan CON
+// PRUEBA (`diferir-primer-cobro.ts`): MP cobra recien cuando vence lo que ya
+// estaba pago. Eso le pide tres cosas al reconciliador, y las tres vienen de MP:
+//
+//   - el link de un checkout no vence, asi que uno viejo pagado tarde NO puede
+//     darle plan pago al PF hasta el primer cobro real;
+//   - durante la prueba no se debe nada, asi que un cobro "pendiente" no es
+//     `grace` (ni un mail de "no pudimos cobrar");
+//   - una prueba cancelada antes de cobrar no estira el fin de periodo mas alla
+//     de lo que el PF ya pago.
+//
+// Las reglas puras se prueban en `mp-diferir-primer-cobro.test.ts`. Acá se fija
+// lo que el RECONCILIADOR hace con ellas, incluido lo que NO tiene que cambiar.
+// ---------------------------------------------------------------------------
+
+describe("reconcileSubscription: la prueba diferida", () => {
+  const HORA_MS = 60 * 60 * 1000;
+  /** E: hasta cuando tenia pago el periodo cuando se abrio el checkout diferido. */
+  const FIN_PAGO = AHORA + 13 * DIA_MS;
+  /** Autorizada hace 30 minutos: el plan se abrio hace 1 hora. */
+  const AUTORIZADA_HACE_30_MIN = new Date(AHORA - 30 * 60 * 1000).toISOString();
+
+  /**
+   * El PF dado de baja que vuelve. `p0` es el plan que pago (terminal, como lo
+   * deja la baja) y `p1` el checkout diferido que abrio hace 1 hora.
+   */
+  const DIFERIDO = (): Store => ({
+    users: {
+      t1: {
+        role: "trainer",
+        subscription: {
+          tier: "plan2",
+          status: "cancelled",
+          currentPeriodEnd: ts(FIN_PAGO),
+        },
+      },
+    },
+    mp_plans: {
+      p0: {
+        uid: "t1",
+        tier: "plan2",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 20 * DIA_MS),
+        terminal: true,
+      },
+      p1: {
+        uid: "t1",
+        tier: "plan2",
+        cycle: "monthly",
+        createdAt: ts(AHORA - HORA_MS),
+        diferidoHastaMs: FIN_PAGO,
+      },
+    },
+  });
+
+  /** La suscripcion de `p1` recien autorizada, en prueba: el primer cobro es en E + 1 dia. */
+  const EN_PRUEBA_MP: MpPreapproval = {
+    id: "sub-prueba",
+    status: "authorized",
+    external_reference: "t1",
+    date_created: AUTORIZADA_HACE_30_MIN,
+    next_payment_date: new Date(FIN_PAGO + DIA_MS).toISOString(),
+    auto_recurring: {
+      ...AUTO_RECURRING_REAL,
+      start_date: AUTORIZADA_HACE_30_MIN,
+      transaction_amount: 22000,
+    },
+    summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+  };
+
+  const subDe = (store: Store) =>
+    store.users.t1.subscription as Record<string, unknown>;
+  const finDe = (store: Store) =>
+    (subDe(store).currentPeriodEnd as { toMillis(): number }).toMillis();
+
+  // ── Autorizada a tiempo: es una prueba y no se debe nada ──
+
+  it("a tiempo y con un cobro 'pendiente' queda active, NO grace", async () => {
+    // Si MP cuenta el primer cobro programado como pendiente, el mapeo de
+    // siempre diria `grace` y el PF recibiria un "no pudimos cobrar" sin que se
+    // le haya intentado cobrar nada.
+    const { app, store } = fakeApp(DIFERIDO());
+    const deps = fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    });
+
+    const r = await reconcileSubscription(app, "p1", deps);
+
+    expect(r.outcome).toBe("written");
+    expect(r.status).toBe("active");
+    expect(subDe(store).status).toBe("active");
+    expect(subDe(store).tier).toBe("plan2");
+    // El proximo cobro de MP es el fin de la prueba, y eso es lo que se guarda.
+    expect(finDe(store)).toBe(FIN_PAGO + DIA_MS);
+    // Volver a suscribirse no da de baja nada: el plan anterior ya esta cancelado.
+    expect(deps.bajas).toEqual([]);
+    expect(r.dadosDeBaja).toBe(0);
+  });
+
+  it("el MISMO payload sin el marcador de prueba SI es grace (el control del test anterior)", async () => {
+    // Es lo que prueba que es la regla de la prueba, y no otra cosa, la que
+    // impide el grace.
+    const mundo = DIFERIDO();
+    delete mundo.mp_plans.p1.diferidoHastaMs;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }));
+
+    expect(subDe(store).status).toBe("grace");
+  });
+
+  it("pasado E + 3 dias un cobro pendiente vuelve a ser grace", async () => {
+    // El primer cobro ya tendria que haber salido: el aviso es verdad.
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }, FIN_PAGO + 4 * DIA_MS));
+
+    expect(subDe(store).status).toBe("grace");
+  });
+
+  it("un milisegundo antes del horizonte sigue siendo active", async () => {
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }, FIN_PAGO + 3 * DIA_MS - 1));
+
+    expect(subDe(store).status).toBe("active");
+  });
+
+  // ── Un link viejo pagado tarde ──
+
+  /** El plan se abrio hace 4 dias y el pagador lo autorizo hace 1: 3 dias despues. */
+  const LINK_VIEJO = (): { mundo: Store; mp: MpPreapproval } => {
+    const mundo = DIFERIDO();
+    mundo.mp_plans.p1.createdAt = ts(AHORA - 4 * DIA_MS);
+    return {
+      mundo,
+      mp: {
+        ...EN_PRUEBA_MP,
+        date_created: new Date(AHORA - DIA_MS).toISOString(),
+      },
+    };
+  };
+
+  it("autorizada varios dias despues: pending, y NO pisa lo que el PF ya tenia pago", async () => {
+    // El `init_point` no vence y MP no deja dar de baja un plan. Pagado tarde, el
+    // primer cobro cae tarde: darle plan pago al PF todo ese tiempo sin que MP
+    // haya cobrado nada seria regalarlo. La guarda de `pending` le conserva lo
+    // que si pago.
+    const { mundo, mp } = LINK_VIEJO();
+    const { app, store, escrituras } = fakeApp(mundo);
+    const deps = fakeMp(mp);
+
+    const r = await reconcileSubscription(app, "p1", deps);
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect(r.status).toBe("pending");
+    expect(escrituras).toHaveLength(0);
+    expect(subDe(store).status).toBe("cancelled");
+    expect(finDe(store)).toBe(FIN_PAGO);
+    // No se da de baja nada en MP: el pagador autorizo de buena fe y la baja es
+    // terminal.
+    expect(deps.bajas).toEqual([]);
+  });
+
+  it("sin periodo pago vigente que proteger, el link viejo escribe `pending`: nada de este plan", async () => {
+    // El PF ya no tiene dias pagos. La suscripcion tardia no le da plan hasta
+    // que MP cobre de verdad.
+    const { mundo, mp } = LINK_VIEJO();
+    (mundo.users.t1.subscription as Record<string, unknown>).currentPeriodEnd =
+      ts(AHORA - 1);
+    const { app, store } = fakeApp(mundo);
+    const deps = fakeMp(mp);
+
+    const r = await reconcileSubscription(app, "p1", deps);
+
+    expect(r.outcome).toBe("written");
+    expect(subDe(store).status).toBe("pending");
+    expect(deps.bajas).toEqual([]);
+    // Y como no esta confirmada, no da de baja nada de lo anterior.
+    expect(r.dadosDeBaja).toBe(0);
+  });
+
+  it("el BARRIDO tampoco se la acredita: el link viejo no cambia el estado del PF", async () => {
+    const { mundo, mp } = LINK_VIEJO();
+    const { app, store } = fakeApp(mundo);
+
+    const r = await reconcileAllSubscriptions(app, fakeMp(mp));
+
+    // p0 es terminal y no se consulta; p1 es la unica y se saltea.
+    expect(r.total).toBe(1);
+    expect(r.skipped).toBe(1);
+    expect(r.written).toBe(0);
+    expect(subDe(store).status).toBe("cancelled");
+  });
+
+  it("pagado tarde y con el primer cobro hecho, es un plan como cualquier otro", async () => {
+    // Desde el primer cobro real las reglas se apagan solas: el PF esta pagando
+    // este plan, y no hay prueba que cuidar.
+    const { mundo, mp } = LINK_VIEJO();
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...mp,
+      summarized: {
+        charged_quantity: 1,
+        last_charged_date: new Date(AHORA).toISOString(),
+        pending_charge_quantity: 0,
+      },
+    }));
+
+    expect(subDe(store).status).toBe("active");
+  });
+
+  it("con el primer cobro hecho y un cobro pendiente, es grace como siempre", async () => {
+    const { mundo, mp } = LINK_VIEJO();
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...mp,
+      summarized: { charged_quantity: 1, pending_charge_quantity: 1 },
+    }));
+
+    expect(subDe(store).status).toBe("grace");
+  });
+
+  // ── Cancelada durante la prueba: el PF solo pago hasta E ──
+
+  /**
+   * El PF autorizo el plan diferido y despues lo cancelo, antes del primer cobro.
+   * Mientras estaba en prueba el reconciliador le escribio `active` con el
+   * proximo cobro de MP (E + 1 dia): eso es lo que hay guardado.
+   */
+  const CANCELA_EN_PRUEBA = (): Store => {
+    const mundo = DIFERIDO();
+    mundo.users.t1.subscription = {
+      tier: "plan2",
+      status: "active",
+      currentPeriodEnd: ts(FIN_PAGO + DIA_MS),
+    };
+    return mundo;
+  };
+
+  const CANCELADA_MP: MpPreapproval = {
+    ...EN_PRUEBA_MP,
+    status: "cancelled",
+    // MP omite la fecha de una cancelada que cobro; de una que NO cobro, la trae.
+    next_payment_date: undefined,
+  };
+
+  it("cancelada sin fecha de MP: conserva hasta E, no hasta lo guardado (E + 1 dia)", async () => {
+    // Lo guardado es la fecha del primer cobro, que ya no va a ocurrir.
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    const r = await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP));
+
+    expect(subDe(store).status).toBe("cancelled");
+    expect(finDe(store)).toBe(FIN_PAGO);
+    expect(r.accesoHastaMs).toBe(FIN_PAGO);
+    expect(store.mp_plans.p1.terminal).toBe(true);
+  });
+
+  it("cancelada sin nada guardado: ni el mes derivado del alta lo estira mas alla de E", async () => {
+    // El agujero de la cascada: sin fecha de MP ni guardada, `resolverFinDePeriodo`
+    // deriva alta + un periodo entero, o sea un mes que nunca se pago.
+    const mundo = CANCELA_EN_PRUEBA();
+    mundo.users.t1.subscription = { tier: "plan2", status: "active" };
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP));
+
+    // Sin el tope hubiera sido el alta + 1 mes (el test de regresion de abajo
+    // fija que esa es la cuenta de un plan normal).
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
+  it("cancelada CON la fecha del primer cobro de MP (la trae si nunca cobro): se acota a E", async () => {
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      next_payment_date: new Date(FIN_PAGO + DIA_MS).toISOString(),
+    }));
+
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
+  it("cancelada con una fecha ANTERIOR a E: se respeta, el tope no la estira", async () => {
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      next_payment_date: new Date(FIN_PAGO - 5 * DIA_MS).toISOString(),
+    }));
+
+    expect(finDe(store)).toBe(FIN_PAGO - 5 * DIA_MS);
+  });
+
+  it("cancelada sin fecha por ningun camino: E, no `null` (que le sacaria el plan en el acto)", async () => {
+    const mundo = CANCELA_EN_PRUEBA();
+    delete mundo.users.t1.subscription;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      auto_recurring: null,
+    }));
+
+    expect(subDe(store).status).toBe("cancelled");
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
+  it("pausada durante la prueba se acota igual", async () => {
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      status: "paused",
+      next_payment_date: new Date(FIN_PAGO + 20 * DIA_MS).toISOString(),
+    }));
+
+    expect(subDe(store).status).toBe("paused");
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
+  it("el arrepentimiento conserva su precedencia: su instante gana sobre el tope", async () => {
+    // Quien se arrepintio pierde el acceso en ese instante; el tope no lo
+    // adelanta ni lo atrasa. Aca el arrepentimiento es DESPUES de E a proposito:
+    // si el tope aplicara, el fin quedaria en E.
+    const mundo = CANCELA_EN_PRUEBA();
+    mundo.mp_plans.p1.arrepentidoAtMs = FIN_PAGO + 2 * DIA_MS;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP));
+
+    expect(finDe(store)).toBe(FIN_PAGO + 2 * DIA_MS);
+  });
+
+  it("cancelada DESPUES del primer cobro: no se acota, es un plan que se pago", async () => {
+    // El PF pago este plan. Su fin ya no es "hasta E" sino lo que MP cobro, y
+    // acotarlo a E le sacaria dias que si pago.
+    const mundo = CANCELA_EN_PRUEBA();
+    mundo.users.t1.subscription = {
+      tier: "plan2",
+      status: "active",
+      currentPeriodEnd: ts(FIN_PAGO + 25 * DIA_MS),
+    };
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      summarized: {
+        charged_quantity: 1,
+        last_charged_date: new Date(FIN_PAGO + DIA_MS).toISOString(),
+        pending_charge_quantity: 0,
+      },
+    }));
+
+    expect(finDe(store)).toBe(FIN_PAGO + 25 * DIA_MS);
+  });
+
+  // ── Lo que NO cambia: un plan sin marcador se lee exactamente como antes ──
+
+  it("REGRESION: un plan normal autorizado 'tarde' sigue siendo active", async () => {
+    // Sin `diferidoHastaMs` la ventana de autorizacion no existe: es el caso de
+    // todos los PF que no vuelven de una baja, y el de TODOS los planes que ya
+    // hay en produccion.
+    const { mundo, mp } = LINK_VIEJO();
+    delete mundo.mp_plans.p1.diferidoHastaMs;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(mp));
+
+    expect(subDe(store).status).toBe("active");
+  });
+
+  it("REGRESION: un plan normal cancelado no se acota: lo deriva la cascada de siempre", async () => {
+    const mundo = CANCELA_EN_PRUEBA();
+    delete mundo.mp_plans.p1.diferidoHastaMs;
+    mundo.users.t1.subscription = { tier: "plan2", status: "active" };
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP));
+
+    // Alta + 1 mes, tal cual `resolverFinDePeriodo`: mas alla de E.
+    expect(finDe(store)).toBeGreaterThan(FIN_PAGO);
+    expect(finDe(store))
+      .toBe(finDePeriodoDesdeAltaMs(EN_PRUEBA_MP.auto_recurring));
+  });
+
+  it("un `diferidoHastaMs` que no es un numero deja el plan como uno normal", async () => {
+    // El documento es de Firestore: "lo escribimos nosotros" no es una garantia.
+    const { mundo, mp } = LINK_VIEJO();
+    mundo.mp_plans.p1.diferidoHastaMs = "mañana";
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(mp));
+
+    expect(subDe(store).status).toBe("active");
+  });
+
+  it("un plan de ALUMNO nunca pasa por estas reglas", async () => {
+    // El checkout del alumno no escribe el marcador, pero aunque alguien lo
+    // pusiera el corte por producto va antes: el alumno se lee con su escritor.
+    const { app, store } = fakeApp({
+      users: { u1: { role: "athlete" } },
+      mp_plans: {
+        a1: {
+          producto: "athlete",
+          uid: "u1",
+          cycle: "monthly",
+          createdAt: ts(AHORA - 4 * DIA_MS),
+          diferidoHastaMs: FIN_PAGO,
+        },
+      },
+    });
+
+    const r = await reconcileSubscription(app, "a1", fakeMp({
+      id: "sub-alumno",
+      status: "authorized",
+      external_reference: "u1",
+      date_created: new Date(AHORA - DIA_MS).toISOString(),
+      next_payment_date: new Date(AHORA + 30 * DIA_MS).toISOString(),
+      auto_recurring: { transaction_amount: 4500 },
+      summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+    }));
+
+    expect(r.producto).toBe("athlete");
+    expect(r.athleteStatus).toBe("active");
+    expect(store.users.u1.athleteSubscription).toEqual({ status: "active" });
+    expect(store.users.u1.subscription).toBeUndefined();
+  });
+});

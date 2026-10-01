@@ -160,6 +160,17 @@
  *   - **El `paused`.** Un PF que pausa en MP sigue cayendo a Free en el acto
  *     aunque tenga periodo pago. Es la misma injusticia de forma, pero es otra
  *     decision de politica y meterla acá seria cambiarla de contrabando.
+ *
+ * ── LA PRUEBA DIFERIDA ──
+ *
+ * Un plan que nacio con dias de prueba (`mp_plans.diferidoHastaMs`, ver
+ * `diferir-primer-cobro.ts`) se lee con reglas propias mientras su suscripcion
+ * no haya cobrado nada. Una autorizada mucho despues de abrir el checkout se
+ * trata como `pending`, y la guarda (5) protege lo que el PF ya tenia pago; una
+ * autorizada a tiempo no pasa a `grace` por un cobro que todavia no
+ * corresponde; y una prueba cancelada no estira el fin de periodo mas alla de lo
+ * que el PF ya pago. Desde el primer cobro real se lee como cualquier otro plan.
+ * Las reglas, y por que existen, estan en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -182,6 +193,11 @@ import {
   MpPreapproval,
   createMpClient,
 } from "./client";
+import {
+  PruebaDiferidaInput,
+  aplicarPruebaDiferidaAlEstado,
+  aplicarPruebaDiferidaAlPeriodo,
+} from "./diferir-primer-cobro";
 import {
   AthleteStatus,
   athleteStatusDesde,
@@ -407,6 +423,38 @@ export function resolverFinDePeriodo(
     status: i.status,
   });
   return Timestamp.fromMillis(derivada);
+}
+
+/**
+ * El fin de periodo con el tope de la prueba diferida, o [base] sin tocar si el
+ * plan no es diferido.
+ *
+ * La regla vive en `diferir-primer-cobro.ts`; acá solo se traduce entre
+ * Timestamp y ms, y se deja registro cuando algo cambia. Devuelve el MISMO
+ * objeto cuando no hay cambio, asi que para un plan normal es una identidad.
+ */
+function conTopeDeLaPruebaDiferida(
+  base: Timestamp | null,
+  prueba: PruebaDiferidaInput,
+  contexto: { planId: string; uid: string },
+): Timestamp | null {
+  const baseMs = base === null ? null : base.toMillis();
+  const topeMs = aplicarPruebaDiferidaAlPeriodo({
+    ...prueba,
+    periodEndMs: baseMs,
+  });
+  if (topeMs === baseMs) return base;
+
+  logger.info(
+    "mp/reconcile: el fin de periodo de una prueba diferida se acota a lo " +
+      "que el PF ya pago",
+    {
+      ...contexto,
+      desdeIso: baseMs === null ? null : new Date(baseMs).toISOString(),
+      haciaIso: topeMs === null ? null : new Date(topeMs).toISOString(),
+    },
+  );
+  return topeMs === null ? null : Timestamp.fromMillis(topeMs);
 }
 
 /**
@@ -1085,7 +1133,9 @@ export async function reconcileSubscription(
     return { planId, outcome: "skipped-uid-no-coincide" };
   }
 
-  const { status, degraded } = mapMpStatus({
+  // `statusDeMp` y no `status`: el del PF puede ajustarse mas abajo por la prueba
+  // diferida, y el del alumno se queda con el que dijo el mapeo.
+  const { status: statusDeMp, degraded } = mapMpStatus({
     raw: mp.status,
     cobroPendiente: hayCobroPendiente(mp.summarized),
     trainerId: uid,
@@ -1129,9 +1179,38 @@ export async function reconcileSubscription(
       planId,
       uid,
       mp,
-      status,
+      status: statusDeMp,
       planDoc,
       deps,
+    });
+  }
+
+  // ── LA PRUEBA DIFERIDA: un plan que nacio con dias de prueba se lee distinto ──
+  //
+  // Solo para el PF, y por eso va despues del corte: el checkout del alumno
+  // nunca escribe `diferidoHastaMs`. Va ANTES de la guarda de no-regresion de
+  // abajo porque una suscripcion autorizada fuera de ventana sale de acá como
+  // `pending`, y es esa guarda la que le conserva al PF lo que ya tenia pago.
+  //
+  // Para un plan normal (sin `diferidoHastaMs`) o que ya cobro, esto devuelve el
+  // mismo `statusDeMp`. Las reglas y su por que: `diferir-primer-cobro.ts`.
+  const pruebaDiferida: PruebaDiferidaInput = {
+    diferidoHastaMs: planDoc?.diferidoHastaMs,
+    planCreadoMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
+    mpStatus: mp.status,
+    statusHoy: statusDeMp,
+    summarized: mp.summarized,
+    mpDateCreated: mp.date_created,
+    nowMs: deps.nowMs,
+  };
+  const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
+  if (status !== statusDeMp) {
+    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", {
+      planId,
+      uid,
+      mpStatus: mp.status,
+      desde: statusDeMp,
+      hacia: status,
     });
   }
 
@@ -1201,16 +1280,23 @@ export async function reconcileSubscription(
   // también ese pago, tiene que quitarlo a mano — el aviso lo advierte.
   const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
 
+  // El tope de la prueba diferida se aplica SOLO en la rama sin arrepentimiento:
+  // el instante del arrepentimiento gana sobre cualquier fin de periodo, y ahi ni
+  // se pregunta. Para un plan normal `conTopeDeLaPruebaDiferida` no cambia nada.
   const periodEnd =
     arrepentidoAt !== null
       ? Timestamp.fromMillis(arrepentidoAt)
-      : resolverFinDePeriodo({
-        deMp: parsePeriodEnd(mp.next_payment_date, planId),
-        yaGuardada: actual?.currentPeriodEnd,
-        autoRecurring: mp.auto_recurring,
-        status,
-        planId,
-      });
+      : conTopeDeLaPruebaDiferida(
+        resolverFinDePeriodo({
+          deMp: parsePeriodEnd(mp.next_payment_date, planId),
+          yaGuardada: actual?.currentPeriodEnd,
+          autoRecurring: mp.auto_recurring,
+          status,
+          planId,
+        }),
+        pruebaDiferida,
+        { planId, uid },
+      );
 
   // ── EL PISO PREPAGO: lo que el PF ya pago y este write estaba tirando ──
   //
