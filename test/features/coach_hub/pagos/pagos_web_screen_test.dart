@@ -124,9 +124,16 @@ List<Override> _mixedBucketsOverrides() {
   ];
 }
 
-/// 30 pagos PAGADOS, uno por dia hacia atras. El bucket «Pagados» del filtro
-/// por defecto no los toma —arranca en «Por vencer»—, asi que el test entra
-/// por el chip.
+/// 30 pagos PAGADOS, uno cada DOS dias hacia atras desde AHORA: cubren 58 dias,
+/// asi que la ventana de 30 deja afuera a casi la mitad sea el dia que sea. El
+/// bucket «Pagados» del filtro por defecto no los toma —arranca en «Por
+/// vencer»—, asi que el test entra por el chip.
+///
+/// Antes iban uno por dia desde `_periodStart` (el 1° del mes). El dia 1 eso es
+/// casi AHORA, los 30 caian adentro de la ventana de 30 dias y el test de abajo
+/// se ponia rojo un dia por mes (visto el 2026-10-01). La ventana de la pantalla
+/// se mide desde ahora, no desde el inicio del mes: el fixture tiene que hacer
+/// lo mismo.
 List<Override> _treintaPagadosOverrides() => [
       trainerPaymentsProvider.overrideWith(
         (ref) => Stream.value([
@@ -135,7 +142,7 @@ List<Override> _treintaPagadosOverrides() => [
               id: 'pg$i',
               concept: 'Cuota $i', // i18n
               status: PaymentStatus.paid,
-              createdAt: _periodStart.subtract(Duration(days: i)),
+              createdAt: _now.subtract(Duration(days: i * 2)),
             ),
         ]),
       ),
@@ -498,10 +505,13 @@ void main() {
       await tester.tap(find.byKey(const Key('pagos_periodo_treintaDias')));
       await tester.pumpAndSettle();
 
-      // Los 30 pagos son uno por dia hacia atras desde `_periodStart`, asi
-      // que con la ventana de 30 dias el paginado deja de hacer falta: la
-      // lista entra en una pagina y el pie se esconde solo.
-      expect(find.text('1–25 de 30'), findsNothing);
+      // Los 30 pagos van uno cada dos dias hacia atras desde ahora, asi que con
+      // la ventana de 30 dias quedan 16: la lista entra en una pagina y el pie
+      // se esconde solo. Se busca el prefijo y no «de 30» a secas: con 29 pagos
+      // el pie diria «1–25 de 29» y el chequeo viejo pasaba igual.
+      expect(find.textContaining('1–25 de'), findsNothing);
+      expect(find.text('Cuota 0'), findsOneWidget);
+      expect(find.text('Cuota 29'), findsNothing);
     });
   });
 
