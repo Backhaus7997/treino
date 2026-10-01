@@ -18,6 +18,10 @@ enum SolicitudDeCodigo {
   /// Hubo un envío hace menos de 60 s. Ver [ResultadoDeSolicitud.reintentarEn].
   enfriando,
 
+  /// La cuenta llegó al tope de envíos (5 por hora, 10 por día). La espera
+  /// puede ser de horas: ver [ResultadoDeSolicitud.reintentarEn].
+  limitado,
+
   /// La cuenta no tiene rol o no tiene mail, o el servidor contestó algo que
   /// este binario no conoce. Para la pantalla es lo mismo: no salió.
   noSalio,
@@ -47,7 +51,8 @@ class ResultadoDeSolicitud {
 
   final SolicitudDeCodigo estado;
 
-  /// Solo con [SolicitudDeCodigo.enfriando]: cuánto falta para poder pedir otro.
+  /// Solo con [SolicitudDeCodigo.enfriando] y [SolicitudDeCodigo.limitado]:
+  /// cuánto falta para poder pedir otro.
   final Duration? reintentarEn;
 }
 
@@ -71,14 +76,16 @@ ResultadoDeSolicitud parsearSolicitud(Object? data) {
     'vigente' => SolicitudDeCodigo.vigente,
     'ya-verificado' => SolicitudDeCodigo.yaVerificado,
     'enfriando' => SolicitudDeCodigo.enfriando,
+    'limitado' => SolicitudDeCodigo.limitado,
     _ => SolicitudDeCodigo.noSalio,
   };
   final ms = mapa['reintentarEnMs'];
+  final conEspera = estado == SolicitudDeCodigo.enfriando ||
+      estado == SolicitudDeCodigo.limitado;
   return ResultadoDeSolicitud(
     estado,
-    reintentarEn: estado == SolicitudDeCodigo.enfriando && ms is num
-        ? Duration(milliseconds: ms.toInt())
-        : null,
+    reintentarEn:
+        conEspera && ms is num ? Duration(milliseconds: ms.toInt()) : null,
   );
 }
 

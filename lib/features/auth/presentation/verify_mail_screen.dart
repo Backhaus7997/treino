@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,8 +37,16 @@ import 'widgets/auth_pill_button.dart';
 /// `emailVerification`, y el router la saca sola (mismo criterio que
 /// `BirthDateGateScreen`). Navegar antes que el dato correría una carrera con
 /// el stream y podría rebotar de vuelta.
+/// Desde cuántos segundos de espera por el tope de envíos se muestra en horas
+/// (90 min) y no en minutos.
+const _segundosParaHoras = 90 * 60;
+
 class VerifyMailScreen extends ConsumerStatefulWidget {
-  const VerifyMailScreen({super.key});
+  const VerifyMailScreen({super.key, @visibleForTesting this.ahora});
+
+  /// Reloj de la cuenta regresiva. `null` ⇒ `DateTime.now`. Se inyecta en los
+  /// tests porque `pump` adelanta el tiempo falso pero no `DateTime.now`.
+  final DateTime Function()? ahora;
 
   /// Tiene que coincidir con `REENVIO_COOLDOWN_MS` del backend: si fuera más
   /// corto, el botón diría «enviado» y el servidor no mandaría nada.
@@ -47,19 +56,31 @@ class VerifyMailScreen extends ConsumerStatefulWidget {
   ConsumerState<VerifyMailScreen> createState() => _VerifyMailScreenState();
 }
 
-class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
+class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
+    with WidgetsBindingObserver {
   final _codigo = TextEditingController();
   Timer? _timer;
+
+  /// Cuándo se puede pedir otro código. La cuenta regresiva se calcula contra
+  /// esto y no restando por tick: un timer no repone los ticks que se pierde con
+  /// la app en segundo plano, y con esperas de hasta 24 h el usuario que vuelve
+  /// del mail vería una espera vieja.
+  DateTime? _hasta;
   int _reenviarEn = 0;
   bool _enviando = false;
   bool _verificando = false;
   bool _verificado = false;
+
+  /// El último pedido contestó «limitado»: la espera es de minutos u horas y se
+  /// cuenta con [_reenviarEn], pero se muestra en minutos u horas (ver [build]).
+  bool _limitado = false;
   String? _aviso;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _codigo.addListener(() => setState(() {}));
     // El pedido AUTOMÁTICO: si ya hay un código vigente el servidor no manda
     // otro, así el que el usuario tiene en la bandeja sigue sirviendo.
@@ -69,25 +90,87 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _codigo.dispose();
     super.dispose();
   }
 
+  /// Los timers de Dart corren sobre un reloj monótono que NO avanza mientras el
+  /// dispositivo duerme: con el tick a una hora de distancia, quien bloquea el
+  /// teléfono dos horas volvería a una espera vieja y un botón bloqueado hasta
+  /// que el timer por fin dispare. Al volver se recalcula contra el reloj y se
+  /// vuelve a armar el tick.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _hasta == null || !mounted) {
+      return;
+    }
+    setState(_recalcularEspera);
+    _programarTick();
+  }
+
   String get _email =>
       ref.read(firebaseAuthProvider).currentUser?.email ?? 'tu mail';
 
-  void _arrancarCuentaRegresiva(Duration espera) {
+  DateTime _ahora() => (widget.ahora ?? DateTime.now)();
+
+  /// Segundos que faltan hasta [_hasta], hacia arriba: el botón nunca se
+  /// habilita antes de lo que dijo el servidor.
+  void _recalcularEspera() {
+    final faltan = _hasta?.difference(_ahora()).inMilliseconds ?? 0;
+    _reenviarEn = faltan <= 0 ? 0 : (faltan / 1000).ceil();
+  }
+
+  /// [tope] acota un valor absurdo del servidor. El cooldown es de 60 s; los
+  /// topes de envíos del backend esperan hasta 24 h.
+  void _arrancarCuentaRegresiva(
+    Duration espera, {
+    Duration tope = const Duration(minutes: 10),
+  }) {
     _timer?.cancel();
-    setState(() => _reenviarEn = espera.inSeconds.clamp(1, 600));
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() => _reenviarEn = _reenviarEn > 0 ? _reenviarEn - 1 : 0);
-      if (_reenviarEn == 0) t.cancel();
-    });
+    final segundos = (espera.inMilliseconds / 1000).ceil();
+    _hasta = _ahora().add(Duration(seconds: segundos.clamp(1, tope.inSeconds)));
+    setState(_recalcularEspera);
+    _programarTick();
+  }
+
+  /// Un `Timer` de una sola vez, que se vuelve a armar en cada tick, en lugar de
+  /// un `periodic` de 1 s: con una espera de horas, reconstruir la pantalla cada
+  /// segundo solo para mostrar «4 h» gasta batería. El tick cae en el próximo
+  /// momento en que cambia lo que se VE, y recién ahí recalcula contra el reloj:
+  /// si la app estuvo en segundo plano, el primer tick al volver ya corrige la
+  /// espera.
+  ///
+  /// El botón se habilita en el tick del vencimiento (`piso == 0`) y solo si el
+  /// reloj ya lo pasó: un tick que cae antes no cambia nada y se vuelve a armar.
+  void _programarTick() {
+    _timer?.cancel();
+    final hasta = _hasta;
+    if (hasta == null || _reenviarEn == 0) return;
+
+    // `piso`: el valor de `_reenviarEn` (segundos) hasta el cual se ve lo mismo.
+    // Lo que se ve cambia cuando la espera baja a ese valor.
+    final s = _reenviarEn;
+    final int piso;
+    if (!_limitado) {
+      piso = s - 1; // «Reenviar código en N s»: cambia cada segundo.
+    } else if (s >= _segundosParaHoras) {
+      // En horas: cambia al bajar a la hora de abajo, o al pasar a minutos.
+      piso = math.max(((s / 3600).ceil() - 1) * 3600, _segundosParaHoras - 1);
+    } else {
+      piso = ((s / 60).ceil() - 1) * 60; // En minutos; el último llega a 0.
+    }
+
+    final espera = hasta.difference(_ahora()) - Duration(seconds: piso);
+    _timer = Timer(
+      espera > Duration.zero ? espera : const Duration(milliseconds: 1),
+      () {
+        if (!mounted) return;
+        setState(_recalcularEspera);
+        _programarTick();
+      },
+    );
   }
 
   Future<void> _pedir({required bool reenviar}) async {
@@ -103,6 +186,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
       if (!mounted) return;
       setState(() {
         _enviando = false;
+        _limitado = r.estado == SolicitudDeCodigo.limitado;
         switch (r.estado) {
           case SolicitudDeCodigo.enviado:
             _aviso = reenviar
@@ -116,6 +200,10 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
             _aviso = 'Tu mail ya está confirmado.'; // i18n
           case SolicitudDeCodigo.enfriando:
             _aviso = 'Esperá un momento para pedir otro código.'; // i18n
+          case SolicitudDeCodigo.limitado:
+            // Mientras corre la espera, `build` muestra los minutos que faltan;
+            // este es el texto que queda cuando termina.
+            _aviso = 'Ya podés pedir otro código.'; // i18n
           case SolicitudDeCodigo.noSalio:
             _error = 'No pudimos mandar el código. Probá de nuevo.'; // i18n
         }
@@ -124,6 +212,11 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
         _arrancarCuentaRegresiva(VerifyMailScreen.cooldown);
       } else if (r.estado == SolicitudDeCodigo.enfriando) {
         _arrancarCuentaRegresiva(r.reintentarEn ?? VerifyMailScreen.cooldown);
+      } else if (r.estado == SolicitudDeCodigo.limitado) {
+        _arrancarCuentaRegresiva(
+          r.reintentarEn ?? VerifyMailScreen.cooldown,
+          tope: const Duration(hours: 24),
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -153,6 +246,12 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
             // El router la saca cuando llega el perfil con la marca.
             _verificado = true;
             _aviso = 'Listo, mail confirmado.'; // i18n
+            // Ya no hay nada que esperar: sin esto, el «Pediste muchos
+            // códigos…» taparía este aviso.
+            _timer?.cancel();
+            _hasta = null;
+            _reenviarEn = 0;
+            _limitado = false;
           case VerificacionDeCodigo.incorrecto:
             final n = r.intentosRestantes;
             _error = n == null
@@ -190,6 +289,14 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
     final puedeConfirmar =
         _codigo.text.trim().length == 6 && !_verificando && !_verificado;
     final puedeReenviar = _reenviarEn == 0 && !_enviando && !_verificado;
+    final enEsperaPorTope = _limitado && _reenviarEn > 0;
+    // Desde 90 min en horas (hacia arriba): «en 1440 min» no se lee.
+    final cuanto = _reenviarEn >= _segundosParaHoras
+        ? '${(_reenviarEn / 3600).ceil()} h'
+        : '${(_reenviarEn / 60).ceil()} min';
+    final aviso = enEsperaPorTope
+        ? 'Pediste muchos códigos. Probá de nuevo en $cuanto.' // i18n
+        : _aviso;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -213,7 +320,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _aviso ??
+                  aviso ??
                       'Te estamos mandando un código de 6 dígitos a '
                           '$_email.', // i18n
                   key: const Key('verify_mail_aviso'),
@@ -268,7 +375,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
                       foregroundColor: palette.textMuted,
                     ),
                     child: Text(
-                      _reenviarEn > 0
+                      _reenviarEn > 0 && !enEsperaPorTope
                           ? 'Reenviar código en $_reenviarEn s' // i18n
                           : 'Reenviar código', // i18n
                     ),

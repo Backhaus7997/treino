@@ -22,6 +22,7 @@ void main() {
         'vigente': SolicitudDeCodigo.vigente,
         'ya-verificado': SolicitudDeCodigo.yaVerificado,
         'enfriando': SolicitudDeCodigo.enfriando,
+        'limitado': SolicitudDeCodigo.limitado,
         'sin-perfil': SolicitudDeCodigo.noSalio,
         'sin-email': SolicitudDeCodigo.noSalio,
       };
@@ -37,11 +38,17 @@ void main() {
       expect(parsearSolicitud('texto').estado, SolicitudDeCodigo.noSalio);
     });
 
-    test('reintentarEn solo viene con enfriando', () {
+    test('reintentarEn solo viene con enfriando y limitado', () {
       expect(
         parsearSolicitud({'estado': 'enfriando', 'reintentarEnMs': 30000})
             .reintentarEn,
         const Duration(seconds: 30),
+      );
+      // El tope de envíos espera horas, no segundos: tiene que llegar entero.
+      expect(
+        parsearSolicitud({'estado': 'limitado', 'reintentarEnMs': 2700000})
+            .reintentarEn,
+        const Duration(minutes: 45),
       );
       expect(
         parsearSolicitud({'estado': 'enviado', 'reintentarEnMs': 30000})
