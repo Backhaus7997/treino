@@ -702,6 +702,29 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     expect(mp.busquedas).toEqual(["p0"]);
   });
 
+  it("difiere aunque la busqueda de MP omita last_charged_date: el respaldo desde el alta", async () => {
+    // Si MP no manda la fecha del ultimo cobro, sin respaldo el diferimiento no se
+    // dispararia nunca y el PF volveria a pagar dos veces. `date_created` mas los
+    // cobros que MP confirma alcanzan: alta 20/8 + 1 cobro = 20/9.
+    const { app, store } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, {
+      p0: [{
+        id: "s0",
+        status: "cancelled",
+        date_created: "2026-08-20T12:00:00.000Z",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: { charged_quantity: 1, pending_charge_quantity: 0 },
+      }],
+    });
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, deps(mp.client));
+
+    expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
+    expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(FIN);
+  });
+
   it("difiere tambien el cambio de ciclo dentro del mismo plan (mensual a anual)", async () => {
     const { app } = fakeApp(PF_DADO_DE_BAJA());
     const mp = fakeMp(undefined, COBRO_DE_P0);

@@ -30,6 +30,7 @@ import {
   aplicarPruebaDiferidaAlPeriodo,
   decidirDiferimiento,
   diasDePrueba,
+  evidenciaDePago,
   pagadoHastaDe,
   planesARevisar,
 } from "../subscriptions/mp/diferir-primer-cobro";
@@ -109,6 +110,10 @@ describe("pagadoHastaDe", () => {
       .toBe("2026-03-03T00:00:00.000Z");
   });
 
+  // OJO: ninguna de estas suscripciones trae `date_created`, y es a proposito. Con
+  // el, un `last_charged_date` ausente o invalido lo rescata el respaldo desde el
+  // alta (ver el bloque de abajo); sin el, el respaldo no tiene de donde salir y
+  // lo unico que queda es la fecha del ultimo cobro.
   const sinEvidencia: [string, MpPreapproval][] = [
     ["sin cobros (charged_quantity 0)", pagada("2026-08-20T12:00:00.000Z", {
       summarized: {
@@ -142,16 +147,20 @@ describe("pagadoHastaDe", () => {
         last_charged_date: "2026-08-20T12:00:00.000Z",
       },
     })],
-    ["sin last_charged_date", pagada("2026-08-20T12:00:00.000Z", {
-      summarized: { charged_quantity: 1 },
-    })],
-    ["last_charged_date null", pagada("2026-08-20T12:00:00.000Z", {
-      summarized: { charged_quantity: 1, last_charged_date: null },
-    })],
-    ["last_charged_date que no es fecha", pagada("manana")],
-    ["last_charged_date numerico", pagada("2026-08-20T12:00:00.000Z", {
-      summarized: { charged_quantity: 1, last_charged_date: 1_787_000_000_000 },
-    })],
+    ["sin last_charged_date (y sin date_created para el respaldo)",
+      pagada("2026-08-20T12:00:00.000Z", {
+        summarized: { charged_quantity: 1 },
+      })],
+    ["last_charged_date null (y sin date_created para el respaldo)",
+      pagada("2026-08-20T12:00:00.000Z", {
+        summarized: { charged_quantity: 1, last_charged_date: null },
+      })],
+    ["last_charged_date que no es fecha (y sin date_created para el respaldo)",
+      pagada("manana")],
+    ["last_charged_date numerico (y sin date_created para el respaldo)",
+      pagada("2026-08-20T12:00:00.000Z", {
+        summarized: { charged_quantity: 1, last_charged_date: 1_787_000_000_000 },
+      })],
     ["sin auto_recurring", pagada("2026-08-20T12:00:00.000Z", {
       auto_recurring: undefined,
     })],
@@ -194,6 +203,328 @@ describe("pagadoHastaDe", () => {
     });
 
     expect(pagadoHastaDe(dosAnios)).toBe(Date.parse("2028-08-20T12:00:00.000Z"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El respaldo desde el alta.
+//
+// `last_charged_date` es lo unico de la evidencia que no esta medido contra MP.
+// Si la busqueda lo omitiera, sin respaldo `pagadoHastaDe` daria `null` siempre y
+// el diferimiento no se dispararia NUNCA (el PF seguiria pagando dos veces). Con
+// `charged_quantity >= 1` y un `date_created` valido se reconstruye:
+// `date_created + cobros * periodo`. Con una prueba gratis NO, porque el primer
+// cobro no cae en `date_created` y no sabemos cuantos dias despues.
+// ---------------------------------------------------------------------------
+
+/**
+ * Una suscripcion con cobros pero SIN `last_charged_date`, y con `date_created`: la
+ * forma que tendria la respuesta de la busqueda si MP omitiera ese campo.
+ */
+function sinFechaDeCobro(
+  over: Partial<MpPreapproval> = {},
+  resumen: Record<string, unknown> = {},
+): MpPreapproval {
+  return {
+    id: "s1",
+    status: "cancelled",
+    date_created: "2026-08-20T12:00:00.000Z",
+    auto_recurring: {
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: 22000,
+    },
+    summarized: { charged_quantity: 1, pending_charge_quantity: 0, ...resumen },
+    ...over,
+  };
+}
+
+/** La prueba gratis de 13 dias que mandamos en un plan diferido. */
+const PRUEBA_DE_13_DIAS = { frequency: 13, frequency_type: "days" };
+
+describe("pagadoHastaDe: el respaldo desde el alta", () => {
+  it("un cobro mensual: el alta mas UN periodo", () => {
+    expect(pagadoHastaDe(sinFechaDeCobro()))
+      .toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+
+  it("cada cobro exitoso compra UN periodo: tres cobros mensuales son alta + 3 meses", () => {
+    const tres = sinFechaDeCobro(
+      { date_created: "2026-06-20T12:00:00.000Z" },
+      { charged_quantity: 3 },
+    );
+
+    expect(pagadoHastaDe(tres)).toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+
+  it("un anual con un cobro cubre 12 meses desde el alta", () => {
+    const anual = sinFechaDeCobro({
+      date_created: "2026-03-01T09:30:00.000Z",
+      auto_recurring: { frequency: 12, frequency_type: "months" },
+    });
+
+    expect(pagadoHastaDe(anual)).toBe(Date.parse("2027-03-01T09:30:00.000Z"));
+  });
+
+  it("la cantidad de cobros multiplica el periodo: dos anuales son 24 meses", () => {
+    // El tope de 24 es del PERIODO (`frequency`), no del total.
+    const dosAnuales = sinFechaDeCobro(
+      {
+        date_created: "2026-03-01T09:30:00.000Z",
+        auto_recurring: { frequency: 12, frequency_type: "months" },
+      },
+      { charged_quantity: 2 },
+    );
+
+    expect(pagadoHastaDe(dosAnuales)).toBe(Date.parse("2028-03-01T09:30:00.000Z"));
+  });
+
+  it("el desborde de mes lo normaliza el calendario, igual que en reconcile", () => {
+    const ms = pagadoHastaDe(sinFechaDeCobro({
+      date_created: "2026-01-31T00:00:00.000Z",
+    }));
+
+    expect(new Date(ms as number).toISOString())
+      .toBe("2026-03-03T00:00:00.000Z");
+  });
+
+  it("respeta el huso horario con el que MP manda el alta", () => {
+    expect(pagadoHastaDe(sinFechaDeCobro({
+      date_created: "2026-08-20T10:00:00.000-04:00",
+    }))).toBe(Date.parse("2026-09-20T10:00:00.000-04:00"));
+  });
+
+  it("dice que la fecha salio del alta", () => {
+    expect(evidenciaDePago(sinFechaDeCobro())).toEqual({
+      hastaMs: Date.parse("2026-09-20T12:00:00.000Z"),
+      fuente: "alta",
+    });
+  });
+
+  // `last_charged_date` presente pero que no se entiende cuenta como ausente.
+  const ultimoCobroQueNoSirve: [string, Record<string, unknown>][] = [
+    ["ausente", {}],
+    ["null", { last_charged_date: null }],
+    ["un string vacio", { last_charged_date: "" }],
+    ["un string que no es fecha", { last_charged_date: "ayer" }],
+    ["un numero", { last_charged_date: 1_787_000_000_000 }],
+    ["un objeto", { last_charged_date: { date: "2026-08-20" } }],
+  ];
+
+  for (const [caso, resumen] of ultimoCobroQueNoSirve) {
+    it(`se usa cuando last_charged_date es ${caso}`, () => {
+      expect(pagadoHastaDe(sinFechaDeCobro({}, resumen)))
+        .toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+    });
+  }
+
+  it("un plan SIN prueba (`free_trial` null) usa el respaldo", () => {
+    const sub = sinFechaDeCobro({
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        free_trial: null,
+      },
+    });
+
+    expect(pagadoHastaDe(sub)).toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+
+  it("y tambien con `free_trial` ausente o `undefined`", () => {
+    const sub = sinFechaDeCobro({
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        free_trial: undefined,
+      },
+    });
+
+    expect(pagadoHastaDe(sub)).toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+    expect(pagadoHastaDe(sinFechaDeCobro()))
+      .toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+});
+
+describe("pagadoHastaDe: el respaldo NO corre con una prueba gratis", () => {
+  // Con prueba el primer cobro cae cuando la prueba termina, no en `date_created`,
+  // y no sabemos cuantos dias despues. Se prefiere no reconstruir nada: el
+  // diferimiento no se dispara y el checkout cobra en el acto, como antes.
+  const conPrueba: [string, unknown][] = [
+    ["la de un plan nuestro (13 dias)", PRUEBA_DE_13_DIAS],
+    ["en meses", { frequency: 1, frequency_type: "months" }],
+    ["un objeto vacio: forma que no conocemos, no se asume que no hay prueba", {}],
+    ["un string", "13 days"],
+    ["un string vacio", ""],
+    ["un booleano", true],
+  ];
+
+  for (const [caso, free_trial] of conPrueba) {
+    it(`da null con free_trial ${caso}`, () => {
+      const sub = sinFechaDeCobro({
+        auto_recurring: { frequency: 1, frequency_type: "months", free_trial },
+      });
+
+      expect(pagadoHastaDe(sub)).toBeNull();
+      expect(evidenciaDePago(sub)).toBeNull();
+    });
+  }
+
+  it("con prueba, ni varios cobros ni un anual lo rescatan", () => {
+    const sub = sinFechaDeCobro(
+      {
+        date_created: "2026-03-01T09:30:00.000Z",
+        auto_recurring: {
+          frequency: 12,
+          frequency_type: "months",
+          free_trial: PRUEBA_DE_13_DIAS,
+        },
+      },
+      { charged_quantity: 2 },
+    );
+
+    expect(pagadoHastaDe(sub)).toBeNull();
+  });
+
+  it("pero con una prueba y `last_charged_date` valida SI hay evidencia: es la fuente principal", () => {
+    // Un plan diferido nuestro DESPUES de su primer cobro: ya no hace falta
+    // adivinar nada, MP dice cuando fue el cobro. La prueba solo le cierra la
+    // puerta al respaldo, no a la fuente medida.
+    const sub = sinFechaDeCobro(
+      {
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          free_trial: PRUEBA_DE_13_DIAS,
+        },
+      },
+      { last_charged_date: "2026-09-20T12:00:00.000Z" },
+    );
+
+    expect(evidenciaDePago(sub)).toEqual({
+      hastaMs: Date.parse("2026-10-20T12:00:00.000Z"),
+      fuente: "ultimo-cobro",
+    });
+  });
+});
+
+describe("pagadoHastaDe: lo que el respaldo exige", () => {
+  const sinAlta: [string, Partial<MpPreapproval>][] = [
+    ["date_created ausente", { date_created: undefined }],
+    ["date_created null", { date_created: null }],
+    ["date_created vacio", { date_created: "" }],
+    ["date_created que no es fecha", { date_created: "ayer" }],
+    ["date_created numerico", { date_created: 1_787_000_000_000 }],
+  ];
+
+  for (const [caso, patch] of sinAlta) {
+    it(`da null con ${caso}: sin alta no hay desde donde contar`, () => {
+      expect(pagadoHastaDe(sinFechaDeCobro(patch))).toBeNull();
+    });
+  }
+
+  const periodoQueNoEntendemos: [string, unknown][] = [
+    ["sin auto_recurring", undefined],
+    ["auto_recurring null", null],
+    ["auto_recurring que no es un objeto", "mensual"],
+    ["frequency cero", { frequency: 0, frequency_type: "months" }],
+    ["frequency negativa", { frequency: -1, frequency_type: "months" }],
+    ["frequency fraccionaria", { frequency: 1.5, frequency_type: "months" }],
+    ["frequency absurda (24 meses es el tope)", { frequency: 25, frequency_type: "months" }],
+    ["frequency como string", { frequency: "1", frequency_type: "months" }],
+    ["frequency_type days", { frequency: 30, frequency_type: "days" }],
+    ["sin frequency_type", { frequency: 1 }],
+    ["sin frequency", { frequency_type: "months" }],
+  ];
+
+  for (const [caso, auto_recurring] of periodoQueNoEntendemos) {
+    it(`da null con ${caso}: un periodo que no entendemos no se multiplica`, () => {
+      expect(pagadoHastaDe(sinFechaDeCobro({ auto_recurring }))).toBeNull();
+    });
+  }
+
+  const cobrosQueNoSirven: [string, unknown][] = [
+    ["cero", 0],
+    ["negativo", -1],
+    ["NaN", Number.NaN],
+    ["infinito", Number.POSITIVE_INFINITY],
+    ["un string", "1"],
+    ["null", null],
+    ["fraccionario: se multiplica, y un 1.5 no es una cantidad de cobros", 1.5],
+    ["menor que uno", 0.5],
+  ];
+
+  for (const [caso, charged_quantity] of cobrosQueNoSirven) {
+    it(`da null con charged_quantity ${caso}, aunque haya alta`, () => {
+      expect(pagadoHastaDe(sinFechaDeCobro({}, { charged_quantity }))).toBeNull();
+    });
+  }
+
+  it("sin charged_quantity tampoco, aunque haya alta", () => {
+    const sub = sinFechaDeCobro({ summarized: { pending_charge_quantity: 0 } });
+
+    expect(pagadoHastaDe(sub)).toBeNull();
+  });
+
+  it("sin summarized tampoco: el alta sola no prueba ningun cobro", () => {
+    expect(pagadoHastaDe(sinFechaDeCobro({ summarized: undefined }))).toBeNull();
+    expect(pagadoHastaDe(sinFechaDeCobro({ summarized: null }))).toBeNull();
+  });
+
+  it("una cantidad absurda no se sale del rango de fechas: da null, nunca NaN", () => {
+    // `cobros * periodo` desborda el rango de `Date`. Sin la guarda saldria un
+    // NaN, y `Math.min` lo propagaria hasta una fecha de diferimiento invalida.
+    for (const charged_quantity of [1e15, Number.MAX_SAFE_INTEGER, 1e300]) {
+      const r = pagadoHastaDe(sinFechaDeCobro({}, { charged_quantity }));
+
+      expect(r).toBeNull();
+    }
+  });
+});
+
+describe("pagadoHastaDe: la fecha del ultimo cobro sigue siendo la fuente principal", () => {
+  it("con las dos presentes gana last_charged_date, aunque den fechas distintas", () => {
+    // Alta 20/6 con 3 cobros: el respaldo daria el 20/9. El ultimo cobro fue el
+    // 25/8, o sea que MP dice 25/9.
+    const sub = sinFechaDeCobro(
+      { date_created: "2026-06-20T12:00:00.000Z" },
+      { charged_quantity: 3, last_charged_date: "2026-08-25T12:00:00.000Z" },
+    );
+
+    expect(evidenciaDePago(sub)).toEqual({
+      hastaMs: Date.parse("2026-09-25T12:00:00.000Z"),
+      fuente: "ultimo-cobro",
+    });
+  });
+
+  it("gana aunque el respaldo diera una fecha MAS LEJANA: no se toma el maximo", () => {
+    // Alta 20/5 con 5 cobros: el respaldo daria el 20/10. La fuente medida dice
+    // 25/9 y esa es la que vale.
+    const sub = sinFechaDeCobro(
+      { date_created: "2026-05-20T12:00:00.000Z" },
+      { charged_quantity: 5, last_charged_date: "2026-08-25T12:00:00.000Z" },
+    );
+
+    expect(pagadoHastaDe(sub)).toBe(Date.parse("2026-09-25T12:00:00.000Z"));
+  });
+
+  it("gana aunque no haya date_created: el respaldo no es requisito de la fuente principal", () => {
+    const sub = pagada("2026-08-20T12:00:00.000Z");
+
+    expect(sub.date_created).toBeUndefined();
+    expect(evidenciaDePago(sub)).toEqual({
+      hastaMs: Date.parse("2026-09-20T12:00:00.000Z"),
+      fuente: "ultimo-cobro",
+    });
+  });
+
+  it("si la fuente principal es valida pero el periodo no se entiende, NO cae al respaldo", () => {
+    // El respaldo tampoco entiende el periodo: no hay con que multiplicar.
+    const sub = sinFechaDeCobro(
+      { auto_recurring: { frequency: 0, frequency_type: "months" } },
+      { last_charged_date: "2026-08-25T12:00:00.000Z" },
+    );
+
+    expect(pagadoHastaDe(sub)).toBeNull();
   });
 });
 
@@ -498,10 +829,76 @@ describe("decidirDiferimiento: cuando SI se difiere", () => {
         uid: "t1",
         tier: "plan2",
         planConPago: "p0",
+        fuenteDelPago: "ultimo-cobro",
         diasDePrueba: 13,
         diferidoHastaIso: "2026-09-20T12:00:00.000Z",
       }),
     );
+    // Con la fecha del ultimo cobro no hay nada que avisar.
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  // ── Si MP omite `last_charged_date`: el respaldo desde el alta ──
+
+  /** La suscripcion de p0 como la devolveria la busqueda SIN `last_charged_date`. */
+  const SIN_FECHA_DE_COBRO: MpPreapproval = {
+    id: "s0",
+    status: "cancelled",
+    date_created: ULTIMO_COBRO,
+    auto_recurring: { frequency: 1, frequency_type: "months" },
+    summarized: { charged_quantity: 1, pending_charge_quantity: 0 },
+  };
+
+  it("si la busqueda de MP omite last_charged_date, el alta alcanza para diferir", async () => {
+    // Es el caso por el que existe el respaldo: sin el, el diferimiento no se
+    // dispararia nunca y el PF volveria a pagar dos veces.
+    const { input } = armar({ subs: { p0: [SIN_FECHA_DE_COBRO] } });
+
+    expect(await decidirDiferimiento(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("y avisa con un warn que el pago se reconstruyo, porque no es un camino normal", async () => {
+    const { input } = armar({ subs: { p0: [SIN_FECHA_DE_COBRO] } });
+
+    await decidirDiferimiento(input);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: MP no mando last_charged_date, el pago se " +
+        "reconstruye desde el alta",
+      { uid: "t1", tier: "plan2", planConPago: "p0" },
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se difiere el primer cobro",
+      expect.objectContaining({ fuenteDelPago: "alta" }),
+    );
+  });
+
+  it("el respaldo tambien respeta la fecha MENOR: manda nuestro fin si es antes", async () => {
+    const { input } = armar({
+      userData: usuarioCancelado("plan2", AHORA + 4 * DIA_MS),
+      subs: { p0: [SIN_FECHA_DE_COBRO] },
+    });
+
+    expect(await decidirDiferimiento(input))
+      .toEqual({ diferir: true, diferidoHastaMs: AHORA + 4 * DIA_MS });
+  });
+
+  it("con dos suscripciones en el plan, una con fecha de cobro y otra solo con alta, gana la mas lejana", async () => {
+    const { input } = armar({
+      userData: usuarioCancelado("plan2", AHORA + 40 * DIA_MS),
+      subs: {
+        p0: [
+          pagada("2026-08-10T12:00:00.000Z", { id: "s-con-fecha" }),
+          { ...SIN_FECHA_DE_COBRO, id: "s-solo-alta", date_created: "2026-08-25T12:00:00.000Z" },
+        ],
+      },
+    });
+
+    expect(await decidirDiferimiento(input)).toEqual({
+      diferir: true,
+      diferidoHastaMs: Date.parse("2026-09-25T12:00:00.000Z"),
+    });
   });
 });
 
@@ -617,6 +1014,47 @@ describe("decidirDiferimiento: sin un cobro real en MP no se difiere", () => {
     expect(await decidirDiferimiento(input))
       .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
     expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("sin last_charged_date y con prueba gratis el respaldo no corre: no se difiere", async () => {
+    // Es un plan diferido nuestro cuya busqueda omite la fecha del ultimo cobro:
+    // el primer cobro no cayo en `date_created`, asi que no se reconstruye nada y
+    // el checkout cobra en el acto, como antes.
+    const { input } = armar({
+      subs: {
+        p0: [{
+          id: "s0",
+          status: "cancelled",
+          date_created: ULTIMO_COBRO,
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: "months",
+            free_trial: { frequency: 13, frequency_type: "days" },
+          },
+          summarized: { charged_quantity: 1 },
+        }],
+      },
+    });
+
+    expect(await decidirDiferimiento(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("sin last_charged_date y sin date_created no hay de donde contar: no se difiere", async () => {
+    const { input } = armar({
+      subs: {
+        p0: [{
+          id: "s0",
+          status: "cancelled",
+          auto_recurring: { frequency: 1, frequency_type: "months" },
+          summarized: { charged_quantity: 1 },
+        }],
+      },
+    });
+
+    expect(await decidirDiferimiento(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
   });
 
   it("un cobro cuyos datos no se entienden no es evidencia", async () => {

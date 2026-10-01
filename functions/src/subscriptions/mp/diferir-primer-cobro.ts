@@ -125,30 +125,101 @@ export function planesARevisar(
 }
 
 /**
- * Hasta cuando esta PAGO el periodo de una suscripcion, segun lo que MP dice que
- * cobro. `null` si no hay evidencia de un cobro real.
+ * [desdeMs] mas [meses] meses, o `null` si la cuenta no da una fecha valida.
  *
- * Es la fecha del ULTIMO cobro exitoso mas un periodo de `auto_recurring`. Se
- * exigen las tres cosas juntas (que haya cobrado, cuando fue el ultimo, y un
- * periodo que entendemos) porque con una sola que falte la cuenta seria
- * inventada, y una fecha inventada es un dia regalado o un cobro adelantado.
+ * `setUTCMonth` normaliza el desborde de mes solo (31 de enero + 1 mes cae en
+ * marzo), que es como cuenta el calendario. Es la aritmetica de
+ * `finDePeriodoDesdeAltaMs` (reconcile.ts), copiada y no importada a proposito:
+ * `reconcile.ts` importa este archivo, y un import en el otro sentido seria
+ * circular.
  *
- * Los campos `charged_quantity` y `last_charged_date` salen de `summarized`, tal
- * como los define el SDK oficial (`sdk-nodejs/src/clients/preApproval/
- * commonTypes.ts`, `SummarizedResponse`, consultado el 2026-10-01).
- *
- * OJO, lo que NO esta medido: ningun payload real del repo trae
- * `last_charged_date`, y ningun codigo lo lee todavia. El reconciliador y
- * `arrepentimiento-por-mail.ts` ya leen `summarized` de los resultados de
- * `searchPreapprovalsByPlan` sin volver a pedir por id, pero si MP omitiera ese
- * campo de la busqueda esta funcion daria `null` y el PF seguiria cobrando en el
- * acto: el comportamiento de antes, nunca uno peor.
- *
- * La aritmetica de meses es la de `finDePeriodoDesdeAltaMs` (reconcile.ts), y
- * esta copiada y no importada a proposito: `reconcile.ts` importa este archivo, y
- * un import en el otro sentido seria circular.
+ * El `null` existe por el respaldo de [evidenciaDePago], donde los meses son
+ * `cobros * periodo`: un `cobros` absurdo se sale del rango de `Date`, y sin esta
+ * guarda saldria un `NaN` que `Math.min` propagaria hasta una fecha de
+ * diferimiento invalida.
  */
-export function pagadoHastaDe(sub: MpPreapproval): number | null {
+function sumarMesesUtc(desdeMs: number, meses: number): number | null {
+  const d = new Date(desdeMs);
+  d.setUTCMonth(d.getUTCMonth() + meses);
+  const ms = d.getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** De donde salio la fecha con la que se da por pagado un periodo. */
+export type FuenteDelPago = "ultimo-cobro" | "alta";
+
+export interface EvidenciaDePago {
+  /** Hasta cuando esta pago el periodo, en ms. */
+  hastaMs: number;
+  fuente: FuenteDelPago;
+}
+
+/**
+ * Hasta cuando esta PAGO el periodo de una suscripcion, segun lo que MP dice que
+ * cobro, y de donde sale esa fecha. `null` si no hay evidencia de un cobro real.
+ *
+ * Siempre hacen falta dos cosas: que MP confirme cobros
+ * (`summarized.charged_quantity >= 1`) y un periodo que entendemos
+ * (`auto_recurring`: un entero de 1 a 24, en `months`). Sin alguna de las dos la
+ * cuenta seria inventada, y una fecha inventada es un dia regalado o un cobro
+ * adelantado. Con eso hay dos fuentes, en este orden:
+ *
+ *   1. **`last_charged_date`** (fuente `ultimo-cobro`): el ULTIMO cobro exitoso
+ *      mas un periodo. Es la fecha que midio MP, y gana siempre que se entienda,
+ *      incluso en un plan con prueba (ahi ya es un cobro real).
+ *
+ *   2. **El alta** (fuente `alta`): `date_created + cobros * periodo`. Es el
+ *      respaldo, y solo corre si (1) falta o no es una fecha.
+ *
+ * Los campos salen de `summarized`, tal como los define el SDK oficial
+ * (`sdk-nodejs/src/clients/preApproval/commonTypes.ts`, `SummarizedResponse`,
+ * consultado el 2026-10-01).
+ *
+ * ── Por que existe el respaldo ──
+ *
+ * De todo lo que usa la fuente (1), `last_charged_date` es lo unico que NO esta
+ * medido: ningun payload real del repo lo trae y ningun codigo lo lee todavia. Si
+ * la busqueda de MP lo omitiera, sin respaldo esta funcion daria `null` siempre y
+ * el diferimiento no se dispararia NUNCA: el PF volveria a pagar dos veces, que
+ * es justo lo que todo esto viene a cerrar, y sin un solo sintoma en el log.
+ *
+ * `charged_quantity` y `date_created` si los leen otros modulos de los mismos
+ * resultados de busqueda (`arrepentimiento-por-mail.ts`), asi que se reconstruye
+ * con ellos. La cuenta supone que cada cobro exitoso compra UN periodo y que el
+ * primero se cobra al autorizar, o sea en `date_created` (nuestros planes no
+ * mandan `start_date`).
+ *
+ * Es una aproximacion. Lo esperable, aunque no esta medido, es que se quede corta
+ * y no larga: un cobro que llego tarde o una pausa corren el pago real hacia
+ * adelante de lo que da la cuenta. Por el lado largo no se suma ningun riesgo
+ * nuevo: el respaldo pide el mismo `charged_quantity >= 1` que (1), y el
+ * diferimiento nunca pasa de nuestro propio fin de periodo (ver
+ * `decidirDiferimiento`).
+ *
+ * Es un parche y no un camino normal, igual que el fallback por monto de
+ * `tier-mapping.ts`: `decidirDiferimiento` loguea un warn cada vez que el
+ * respaldo es el que decide, para que si algun dia pasa a ser el unico se note.
+ *
+ * ── Y por que NO con una prueba gratis ──
+ *
+ * La cuenta del respaldo supone que el primer cobro cae en `date_created`. Con
+ * `free_trial` (que es como abrimos NOSOTROS los planes diferidos) el primero cae
+ * cuando la prueba termina, y no sabemos cuantos dias despues: MP puede contarlos
+ * distinto de como los mandamos, y eso no esta medido. `alta + cobros * periodo`
+ * ignoraria la prueba entera. Se prefiere no reconstruir nada: se devuelve `null`,
+ * el diferimiento no se dispara y el checkout cobra en el acto, que es el
+ * comportamiento de antes. Para esos planes `last_charged_date` es la UNICA
+ * fuente.
+ *
+ * "Con prueba" es cualquier `free_trial` que no sea `null` ni este ausente:
+ * ante una forma que no conocemos (un objeto vacio, un string) no se asume que
+ * no hay prueba.
+ *
+ * El respaldo tambien exige que `charged_quantity` sea un ENTERO: se multiplica,
+ * y un 1.5 no es una cantidad de cobros. Y descarta el resultado si no es una
+ * fecha valida (ver [sumarMesesUtc]).
+ */
+export function evidenciaDePago(sub: MpPreapproval): EvidenciaDePago | null {
   const resumen = sub.summarized;
   if (resumen === null || typeof resumen !== "object") return null;
   const { charged_quantity: cobros, last_charged_date: ultimo } = resumen as {
@@ -159,15 +230,17 @@ export function pagadoHastaDe(sub: MpPreapproval): number | null {
   if (typeof cobros !== "number" || !Number.isFinite(cobros) || cobros < 1) {
     return null;
   }
-  if (typeof ultimo !== "string") return null;
-  const ultimoMs = Date.parse(ultimo);
-  if (!Number.isFinite(ultimoMs)) return null;
 
   const ar = sub.auto_recurring;
   if (ar === null || typeof ar !== "object") return null;
-  const { frequency: n, frequency_type: tipo } = ar as {
+  const {
+    frequency: n,
+    frequency_type: tipo,
+    free_trial: prueba,
+  } = ar as {
     frequency?: unknown;
     frequency_type?: unknown;
+    free_trial?: unknown;
   };
   // Mismos limites que `finDePeriodoDesdeAltaMs`: un periodo que no entendemos
   // no se suma.
@@ -176,11 +249,30 @@ export function pagadoHastaDe(sub: MpPreapproval): number | null {
   }
   if (tipo !== "months") return null;
 
-  // `setUTCMonth` normaliza el desborde de mes solo (31 de enero + 1 mes cae en
-  // marzo), que es como cuenta el calendario.
-  const d = new Date(ultimoMs);
-  d.setUTCMonth(d.getUTCMonth() + n);
-  return d.getTime();
+  // (1) La fecha del ultimo cobro, si MP la mando y se entiende.
+  const ultimoMs = typeof ultimo === "string" ? Date.parse(ultimo) : Number.NaN;
+  if (Number.isFinite(ultimoMs)) {
+    const hastaMs = sumarMesesUtc(ultimoMs, n);
+    return hastaMs === null ? null : { hastaMs, fuente: "ultimo-cobro" };
+  }
+
+  // (2) El respaldo desde el alta. Ver "Y por que NO con una prueba gratis".
+  if (prueba != null) return null;
+  if (!Number.isInteger(cobros)) return null;
+  const altaMs =
+    typeof sub.date_created === "string" ? Date.parse(sub.date_created) : Number.NaN;
+  if (!Number.isFinite(altaMs)) return null;
+
+  const hastaMs = sumarMesesUtc(altaMs, cobros * n);
+  return hastaMs === null ? null : { hastaMs, fuente: "alta" };
+}
+
+/**
+ * La fecha de [evidenciaDePago] sin su fuente, para quien solo necesita saber
+ * hasta cuando esta pago el periodo.
+ */
+export function pagadoHastaDe(sub: MpPreapproval): number | null {
+  return evidenciaDePago(sub)?.hastaMs ?? null;
 }
 
 /**
@@ -247,7 +339,8 @@ export interface DecidirDiferimientoInput {
  *   2. Es del MISMO tier que el PF pide (cualquier ciclo: pasar de mensual a
  *      anual dentro del mismo plan tambien paga dos veces los dias que quedan).
  *   3. Le queda al menos [MIN_DIFERIMIENTO_MS] de periodo.
- *   4. MP muestra un cobro real que lo respalda (ver [pagadoHastaDe]).
+ *   4. MP muestra un cobro real que lo respalda (ver [evidenciaDePago], que
+ *      explica las dos fuentes de la fecha y por que hay un respaldo).
  *
  * El resultado es el MENOR entre nuestra fecha de fin y lo que cubre el cobro de
  * MP. Nuestra fecha puede estar corrida hacia adelante (un tope que no se aplico,
@@ -293,27 +386,40 @@ export async function decidirDiferimiento(
   // Desde aca se sale a la red, y un fallo TIRA (ver el encabezado).
   const planes = planesARevisar(await i.leerPlanes(), tier);
 
-  let pagadoHasta: number | null = null;
+  let pago: EvidenciaDePago | null = null;
   let planConPago: string | null = null;
   for (const planId of planes) {
-    const fechas = (await i.leerSuscripciones(planId))
-      .map(pagadoHastaDe)
-      .filter((f): f is number => f !== null);
-    if (fechas.length > 0) {
-      pagadoHasta = Math.max(...fechas);
+    const evidencias = (await i.leerSuscripciones(planId))
+      .map(evidenciaDePago)
+      .filter((e): e is EvidenciaDePago => e !== null);
+    if (evidencias.length > 0) {
+      // El pago mas lejano de ese plan.
+      pago = evidencias.reduce((mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor));
       planConPago = planId;
       break;
     }
   }
-  if (pagadoHasta === null) {
+  if (pago === null) {
     return sinDiferir("sin-pago-comprobado", { planesRevisados: planes.length });
   }
 
-  const diferidoHastaMs = Math.min(finMs, pagadoHasta);
+  if (pago.fuente === "alta") {
+    // El respaldo decidio: MP no mando `last_charged_date` (o no se entiende). Es
+    // un parche que grita, no un camino normal: si empieza a verse en cada
+    // checkout, la fuente principal no esta llegando y hay que mirar el payload.
+    logger.warn(
+      "mp/diferir-primer-cobro: MP no mando last_charged_date, el pago se " +
+        "reconstruye desde el alta",
+      { uid, tier, planConPago },
+    );
+  }
+
+  const diferidoHastaMs = Math.min(finMs, pago.hastaMs);
   if (diferidoHastaMs - nowMs < MIN_DIFERIMIENTO_MS) {
     return sinDiferir("pago-vence-pronto", {
       finDePeriodoIso: new Date(finMs).toISOString(),
-      pagadoHastaIso: new Date(pagadoHasta).toISOString(),
+      pagadoHastaIso: new Date(pago.hastaMs).toISOString(),
+      fuenteDelPago: pago.fuente,
     });
   }
 
@@ -321,6 +427,7 @@ export async function decidirDiferimiento(
     uid,
     tier,
     planConPago,
+    fuenteDelPago: pago.fuente,
     diferidoHastaIso: new Date(diferidoHastaMs).toISOString(),
     diasDePrueba: diasDePrueba(diferidoHastaMs, nowMs),
   });
