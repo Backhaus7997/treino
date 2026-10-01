@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' show Tristate;
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,6 +16,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/analytics/analytics_consent.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/application/correos_promocionales_providers.dart';
@@ -738,4 +741,170 @@ void main() {
       );
     });
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // El interruptor se apila DEBAJO del texto cuando la letra es muy grande.
+  // Con el ícono, el texto y el switch en una fila, la columna del texto queda
+  // más angosta que la palabra «promocionales» y Flutter la parte en el medio
+  // («pr / omocional / es»).
+  //
+  // Se assertean POSICIONES RELATIVAS y la palabra contra sí misma, nunca un
+  // ancho en píxeles: el ancho depende de la fuente y en tests no es el del
+  // device.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — el switch se apila con la letra muy grande', () {
+    late _MockUserRepository repo;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+    });
+
+    Future<AppL10n> montarA(WidgetTester tester, double escala) async {
+      await _calentarFuentes(tester);
+      await _montar(tester, repo: repo, textScale: escala);
+      return AppL10n.of(tester.element(find.byType(PrivacyScreen)));
+    }
+
+    // El umbral está en 1.5: por debajo todo queda como siempre, y 1.5 ya
+    // apila. 1.35 es lo más grande que ofrece iOS sin accesibilidad.
+    const casos = <(double, bool)>[
+      (1.0, false),
+      (1.35, false),
+      (1.45, false),
+      (1.5, true),
+      (2.0, true),
+      (3.0, true),
+    ];
+
+    for (final tarjeta in _tarjetas) {
+      for (final (escala, apilado) in casos) {
+        testWidgets(
+            'tarjeta de ${tarjeta.nombre} a ${escala}x: el switch queda '
+            '${apilado ? 'DEBAJO del texto' : 'AL COSTADO'}', (tester) async {
+          final l10n = await montarA(tester, escala);
+
+          final titulo = find.text(tarjeta.titulo(l10n));
+          final subtitulo = find.text(tarjeta.subtitulo(l10n));
+          final interruptor = find.byKey(tarjeta.llave);
+          final icono = find.byIcon(tarjeta.icono);
+
+          if (apilado) {
+            expect(
+              tester.getTopLeft(interruptor).dy,
+              greaterThanOrEqualTo(tester.getBottomLeft(subtitulo).dy),
+              reason: 'apilado: el switch arranca donde termina el texto',
+            );
+            expect(
+              tester.getCenter(interruptor).dx,
+              greaterThan(tester.view.physicalSize.width / 2),
+              reason: 'y va alineado a la derecha',
+            );
+            // El texto toma todo el ancho: el ícono no le quita columna, se
+            // va ARRIBA del título, pegado al mismo borde izquierdo.
+            expect(
+              tester.getBottomLeft(icono).dy,
+              lessThanOrEqualTo(tester.getTopLeft(titulo).dy),
+              reason: 'apilado: el ícono sube sobre el título',
+            );
+            expect(
+              tester.getTopLeft(icono).dx,
+              closeTo(tester.getTopLeft(titulo).dx, 0.01),
+              reason: 'y comparte el borde izquierdo con el texto',
+            );
+          } else {
+            expect(
+              tester.getTopLeft(interruptor).dy,
+              lessThan(tester.getBottomLeft(subtitulo).dy),
+              reason: 'a escala normal el switch sigue al lado del texto, no '
+                  'debajo',
+            );
+            expect(
+              tester.getTopLeft(interruptor).dx,
+              greaterThan(tester.getTopRight(titulo).dx),
+              reason: '…y a la derecha de él',
+            );
+            expect(
+              tester.getTopRight(icono).dx,
+              lessThan(tester.getTopLeft(titulo).dx),
+              reason: 'y el ícono, a la izquierda',
+            );
+          }
+        });
+      }
+    }
+
+    // 3.1 ≈ el tamaño más grande de iOS (accesibilidad 5). Va aparte del 3.0
+    // porque ahí la palabra mide ~287 px y el texto, si el ícono le sigue
+    // quitando columna, tiene 280: con 3.0 entraría por 2 px y el test no
+    // distinguiría «el ícono sube» de «el ícono se queda en la fila».
+    for (final escala in const [3.0, 3.1]) {
+      testWidgets(
+          'a ${escala}x el título «Correos promocionales» no parte ninguna '
+          'palabra', (tester) async {
+        final l10n = await montarA(tester, escala);
+
+        final parrafo = tester.renderObject<RenderParagraph>(
+          find.text(l10n.privacyPromoEmailsTitle),
+        );
+        double anchoDe(String palabra) {
+          final pintor = TextPainter(
+            text: TextSpan(text: palabra, style: parrafo.text.style),
+            textDirection: TextDirection.ltr,
+            textScaler: parrafo.textScaler,
+          )..layout();
+          final ancho = pintor.width;
+          pintor.dispose();
+          return ancho;
+        }
+
+        final palabraMasLarga = l10n.privacyPromoEmailsTitle
+            .split(' ')
+            .map(anchoDe)
+            .reduce(math.max);
+
+        expect(
+          parrafo.size.width,
+          greaterThanOrEqualTo(palabraMasLarga),
+          reason: 'el texto tiene que tener, como mínimo, el ancho de su '
+              'palabra más larga; si no, Flutter la corta en el medio',
+        );
+      });
+    }
+  });
 }
+
+/// Los datos de cada tarjeta de la pantalla, para probar las dos igual.
+class _Tarjeta {
+  const _Tarjeta(
+    this.nombre,
+    this.llave,
+    this.icono,
+    this.titulo,
+    this.subtitulo,
+  );
+
+  final String nombre;
+  final Key llave;
+  final IconData icono;
+  final String Function(AppL10n) titulo;
+  final String Function(AppL10n) subtitulo;
+}
+
+final _tarjetas = <_Tarjeta>[
+  _Tarjeta(
+    'analítica',
+    _llaveAnalitica,
+    TreinoIcon.shieldCheck,
+    (l10n) => l10n.privacyAnalyticsTitle,
+    (l10n) => l10n.privacyAnalyticsSubtitle,
+  ),
+  _Tarjeta(
+    'correos',
+    _llaveCorreos,
+    TreinoIcon.mail,
+    (l10n) => l10n.privacyPromoEmailsTitle,
+    (l10n) => l10n.privacyPromoEmailsSubtitle,
+  ),
+];

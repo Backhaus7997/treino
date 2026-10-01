@@ -237,9 +237,73 @@ class _PrivacySwitchCard extends StatelessWidget {
   final bool sabeSuValor;
   final ValueChanged<bool>? onChanged;
 
+  /// Desde qué escala de texto el interruptor deja de ir AL COSTADO del texto
+  /// y pasa DEBAJO.
+  ///
+  /// POR QUÉ HACE FALTA. En una fila ícono + texto + switch la columna del
+  /// texto es lo que sobra, y con la letra muy grande sobra menos que la
+  /// palabra más larga del título: «promocionales» queda partida en el medio
+  /// («Correos pr / omocional / es»). Flutter parte una palabra antes de
+  /// desbordar, así que no hay excepción ni franja amarilla que lo avise.
+  ///
+  /// POR QUÉ UN UMBRAL Y NO MEDIR. Decidirlo midiendo la palabra con un
+  /// `TextPainter` exigiría conocer el ancho del switch (lo fija el tema, no
+  /// este archivo) y, en un widget test, mediría con una fuente que no es la
+  /// del device. Un umbral sobre la escala es determinístico y el error cuesta
+  /// distinto para cada lado: apilar de más es una fila más de alto; no apilar
+  /// de menos es una palabra rota.
+  ///
+  /// POR QUÉ 1.5. Cae en el medio de los dos tamaños de iOS que lo rodean: el
+  /// más grande SIN accesibilidad (xxxLarge, ≈1.35, que se ve bien en fila y
+  /// queda igual) y el primero CON ella (≈1.65). Android tiene una escala
+  /// continua y ahí 1.5 ya apila. Esos ≈ salen de la tabla de tamaños de
+  /// Dynamic Type de Apple, no están medidos en el device.
+  static const double _escalaQueApila = 1.5;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final apilado =
+        MediaQuery.textScalerOf(context).scale(1) >= _escalaQueApila;
+
+    final iconWidget = Icon(icon, size: 20, color: palette.textMuted);
+    final textos = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: GoogleFonts.barlow(
+            fontWeight: FontWeight.w600,
+            fontSize: AppTextSize.body,
+            color: palette.textPrimary,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        Text(
+          subtitle,
+          style: GoogleFonts.barlow(
+            fontSize: AppTextSize.bodyDense,
+            color: palette.textMuted,
+          ),
+        ),
+      ],
+    );
+    // El `Switch` declara SU PROPIO estado (`toggled: value`) y los
+    // nodos de semántica se fusionan: con `toggled: null` en este
+    // wrapper el lector igual oía «apagado». Para callarlo hay que
+    // excluir la semántica del hijo y describir el control desde acá.
+    final control = Semantics(
+      label: title,
+      toggled: sabeSuValor ? value : null,
+      enabled: onChanged != null,
+      excludeSemantics: !sabeSuValor,
+      child: Switch(
+        key: switchKey,
+        value: value,
+        activeThumbColor: palette.accent,
+        onChanged: onChanged,
+      ),
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -251,52 +315,46 @@ class _PrivacySwitchCard extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: palette.textMuted),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: apilado
+            // APILADO: ícono arriba, texto a TODO el ancho, switch abajo a la
+            // derecha. El ícono NO se queda en la fila del texto aunque se vea
+            // más natural: se midió «promocionales» en Barlow SemiBold 14 px a
+            // 3.1x (el tamaño más grande de iOS) en ≈287 px, y en un iPhone de
+            // 390 pt el texto tiene 314 sin ícono y 280 con él. Con el ícono
+            // al lado la palabra se seguiría partiendo.
+            //
+            // LÍMITE, y no se promete lo contrario: en una pantalla de 320 pt
+            // a 3.1x el texto tiene 244 px y la palabra necesita ≈287, así que
+            // no entra ni con todo el ancho y Flutter la parte igual.
+            // `Stretch` hace que la tarjeta ocupe el ancho entero; el ícono y
+            // el switch se alinean con `Align` porque un hijo `stretch` de
+            // ancho fijo se centraría.
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w600,
-                      fontSize: AppTextSize.body,
-                      color: palette.textPrimary,
-                    ),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: iconWidget,
                   ),
-                  const SizedBox(height: AppSpacing.hairline),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.barlow(
-                      fontSize: AppTextSize.bodyDense,
-                      color: palette.textMuted,
-                    ),
+                  const SizedBox(height: AppSpacing.s8),
+                  textos,
+                  const SizedBox(height: AppSpacing.s8),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: control,
                   ),
                 ],
+              )
+            : Row(
+                children: [
+                  iconWidget,
+                  const SizedBox(width: 14),
+                  Expanded(child: textos),
+                  const SizedBox(width: 12),
+                  control,
+                ],
               ),
-            ),
-            const SizedBox(width: 12),
-            // El `Switch` declara SU PROPIO estado (`toggled: value`) y los
-            // nodos de semántica se fusionan: con `toggled: null` en este
-            // wrapper el lector igual oía «apagado». Para callarlo hay que
-            // excluir la semántica del hijo y describir el control desde acá.
-            Semantics(
-              label: title,
-              toggled: sabeSuValor ? value : null,
-              enabled: onChanged != null,
-              excludeSemantics: !sabeSuValor,
-              child: Switch(
-                key: switchKey,
-                value: value,
-                activeThumbColor: palette.accent,
-                onChanged: onChanged,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
