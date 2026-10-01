@@ -177,6 +177,25 @@ describe("token de baja: firmar y verificar", () => {
       expect(verificarToken(`V1.${p}.${u}.${sig}`, KEY)).toBeNull();
     });
 
+    it.each([
+      ["con barras (`a/b/c`)", "a/b/c"],
+      ["con una barra al principio", "/a"],
+      ["que es sólo una barra", "/"],
+      ["que es `.`", "."],
+      ["que es `..`", ".."],
+      ["reservado por Firestore", "__reservado__"],
+    ])("un uid %s, aunque la firma sea VÁLIDA", (_nombre, uid) => {
+      // Firmado a mano con la clave de verdad: la firma es perfecta. Auth acepta
+      // estos uids (sólo valida 1-128 caracteres) y Firestore leería `a/b/c`
+      // como la ruta `users/a/b/c`: otro documento, en otra colección.
+      const hecho = tokenSegunElDiseno(PREF, uid, KEY);
+
+      expect(hecho).toMatch(/^v1\./);
+      expect(verificarToken(hecho, KEY)).toBeNull();
+      // Y tampoco se emite: no hay por qué firmar un link que se va a rechazar.
+      expect(() => firmarToken(uid, PREF, KEY)).toThrow();
+    });
+
     it("una firma hecha con otra clave", () => {
       expect(verificarToken(firmarToken("uid-123", PREF, OTRA_KEY), KEY)).toBeNull();
     });
@@ -537,6 +556,28 @@ describe("runBajaDeCorreosPromocionales", () => {
       });
       expect((await prefsDe(victima))?.notificationPrefs).toBeUndefined();
     });
+  });
+
+  it("un uid con barras NO escribe en la ruta que forma: contesta `invalido`", async () => {
+    // El ataque: Auth acepta `<uid>/b/c`, y `doc("<uid>/b/c")` apunta a
+    // `users/<uid>/b/c`. Con la firma de un uid así, la callable escribiría ahí.
+    const base = nuevoUid("barras");
+    const uid = `${base}/b/c`;
+    const ajeno = users().doc(base).collection("b").doc("c");
+    await ajeno.set({ displayName: "No me toques" });
+
+    try {
+      const out = await runBajaDeCorreosPromocionales(
+        app,
+        { token: tokenSegunElDiseno(PREF, uid, KEY) },
+        KEY,
+      );
+
+      expect(out).toEqual({ status: "invalido" });
+      expect((await ajeno.get()).data()).toEqual({ displayName: "No me toques" });
+    } finally {
+      await ajeno.delete();
+    }
   });
 
   it("una falla REAL de Firestore NO contesta `listo`: tira", async () => {

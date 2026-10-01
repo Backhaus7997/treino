@@ -701,6 +701,24 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect(doc?.lastError).toBe("link de baja no representable");
     });
 
+    it("un uid con barras (`a/b/c`) tampoco lleva link: falla cerrado", async () => {
+      // Auth lo acepta; en el link sería la ruta `users/a/b/c`. Se trata igual
+      // que un uid que no entra en el token.
+      jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      jest
+        .spyOn(Auth.prototype, "getUser")
+        .mockResolvedValue({ email: "barras@example.com" } as never);
+      await seed({ ...comercial, toUid: "a/b/c" });
+      const sender = makeOkSender();
+
+      await expect(enviar(sender, BAJA_KEY)).resolves.toBeUndefined();
+
+      expect(sender.sent).toHaveLength(0);
+      const doc = await readQueueDoc(mailId);
+      expect(doc?.status).toBe("failed");
+      expect(doc?.lastError).toBe("link de baja no representable");
+    });
+
     it("el mail que falla cerrado NO se reintenta", async () => {
       jest.spyOn(logger, "error").mockImplementation(() => undefined);
       await seed(comercial);
@@ -876,6 +894,23 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
         expect.stringContaining("sin clave de baja"),
         expect.objectContaining({ mailId, kind: "limit-reached" }),
       );
+    });
+
+    it("un uid con barras (`a/b/c`): sale SIN bloque y SIN pie, no `failed`", async () => {
+      jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      jest
+        .spyOn(Auth.prototype, "getUser")
+        .mockResolvedValue({ email: "barras@example.com" } as never);
+      await seed({ ...conBloque, toUid: "a/b/c" });
+      const sender = makeOkSender();
+
+      await enviar(sender, BAJA_KEY);
+
+      expect(sender.sent).toHaveLength(1);
+      expect(sender.sent[0].text).toContain("3 alumnos quedaron en solo lectura");
+      expect(sender.sent[0].text).not.toContain(BLOQUE);
+      expect(sender.sent[0].text).not.toMatch(URL_DE_BAJA);
+      expect((await readQueueDoc(mailId))?.status).toBe("sent");
     });
 
     it("uid que no entra en el token: sale SIN bloque y SIN pie, no `failed`", async () => {

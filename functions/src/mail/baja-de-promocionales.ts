@@ -104,6 +104,27 @@ const TOKEN_MAX_LEN = 320;
  */
 const PREFS_CON_BAJA: ReadonlySet<string> = new Set([ATHLETE_PROSPECT_PREF_KEY]);
 
+/**
+ * ¿Este uid sirve como id de documento de `users/{uid}`?
+ *
+ * Auth acepta uids de 1 a 128 caracteres y no mira su contenido, pero
+ * `collection("users").doc(uid)` SÍ lo lee como ruta: un uid `a/b/c` apunta a
+ * `users/a/b/c`, otro documento, en otra colección. Con el uid sacado de un
+ * token, ese sería el camino a escribir donde no corresponde, así que se
+ * rechaza al firmar y al verificar. Tampoco sirven `.` ni `..`, ni los que
+ * Firestore reserva (`__algo__`): `doc()` los rechaza con un error que no es
+ * `NOT_FOUND`.
+ */
+function esUidDeDocumento(uid: string): boolean {
+  return (
+    uid.length > 0 &&
+    !uid.includes("/") &&
+    uid !== "." &&
+    uid !== ".." &&
+    !/^__.*__$/.test(uid)
+  );
+}
+
 /** ¿Esta preferencia tiene baja por link? */
 export function prefTieneBaja(prefKey: unknown): prefKey is string {
   return typeof prefKey === "string" && PREFS_CON_BAJA.has(prefKey);
@@ -131,12 +152,16 @@ function firmar(key: string, p: string, u: string): string {
  * (`prefTieneBaja`).
  *
  * Tira si la clave está vacía —un HMAC con clave vacía es válido para Node y
- * cualquiera podría forjarlo— o si el resultado no cabe en la gramática, porque
- * un link que `verificarToken` va a rechazar siempre es un link muerto en un
- * mail que se manda de verdad.
+ * cualquiera podría forjarlo—, si el uid no sirve como id de documento (ver
+ * `esUidDeDocumento`) o si el resultado no cabe en la gramática: un link que
+ * `verificarToken` va a rechazar siempre es un link muerto en un mail que se
+ * manda de verdad.
  */
 export function firmarToken(uid: string, prefKey: string, key: string): string {
   if (!key) throw new Error("firmarToken: clave vacía");
+  if (!esUidDeDocumento(uid)) {
+    throw new Error("firmarToken: el uid no es un id de documento");
+  }
   const p = aBase64Url(prefKey);
   const u = aBase64Url(uid);
   const token = `v1.${p}.${u}.${firmar(key, p, u)}`;
@@ -186,7 +211,12 @@ export function verificarToken(token: unknown, key: string): BajaVerificada | nu
   const prefKey = deBase64Url(p);
   if (!prefTieneBaja(prefKey)) return null;
 
-  return { uid: deBase64Url(u), prefKey };
+  // Y el uid tiene que ser un id de documento: con la firma buena igual puede
+  // venir uno que `doc()` leería como ruta (`a/b/c`). Ver `esUidDeDocumento`.
+  const uid = deBase64Url(u);
+  if (!esUidDeDocumento(uid)) return null;
+
+  return { uid, prefKey };
 }
 
 export type EstadoDeBaja =
