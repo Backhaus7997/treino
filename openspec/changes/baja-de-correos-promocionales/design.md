@@ -202,6 +202,11 @@ escribir**, y sin escritura no hay triggers. El costo de un replay es una lectur
 por llamada. `maxInstances: 5` limita la concurrencia, no el total de llamadas, y
 la exención de App Check (`appcheck-enforcement.test.ts`) lo dice así.
 
+El `listo` sin escribir de la cuenta **sin `users/{uid}`** es verdad por el lado
+del **envío**: `deleteAccount` borra Firestore antes que Auth, así que la identidad
+puede existir sin documento, y sin documento no hay dónde registrar la oposición.
+`sendQueuedMail` no manda lo comercial a quien no tiene perfil (§6.1 y §6.3).
+
 ## 6. El pie del correo
 
 ### 6.1 Cuándo
@@ -224,6 +229,15 @@ una dirección literal no tiene cuenta a la que apuntar la baja, y un mail con
 `prefKey` es comercial de punta a punta, sin versión sin publicidad. Queda
 `failed` (`lastError: "sin cuenta para la baja"`) con `logger.error`, igual que
 sin clave. (Con `bloqueComercial` y literal, el mail sale sin el bloque, §6.3.)
+
+Lo comercial exige además que **`users/{uid}` exista**: sin documento la oposición
+no tiene dónde registrarse (la callable nunca lo crea, §5.5) y el mail saldría
+después de que la página dijo «listo». Un mail con `prefKey` de la allowlist y el
+documento ausente queda `failed` (`lastError: "sin perfil para registrar la
+oposición"`, con `logger.warn`); con `bloqueComercial` sale sin el bloque y sin
+pie (§6.3). Los `prefKey` no comerciales (`nueva_solicitud`, `sesion_cancelada`)
+conservan su comportamiento: documento ausente → se envía. El documento se lee
+una sola vez.
 
 Este fail-closed aplica **sólo a los mails con `prefKey`**, los enteramente
 comerciales. Un mail con `bloqueComercial` no falla entero por falta de link:
@@ -265,9 +279,10 @@ sólo `false` explícito frena) y:
 - **apagada** → `renderMail(kind, params, { comercial: false })`: la plantilla
   omite las líneas y el CTA de venta. Sin pie de baja: el mail ya no tiene nada
   comercial.
-- **prendida o ausente** → el mail completo **con el pie de baja de §6.2**:
-  tiene contenido comercial, y la norma pide el mecanismo en toda comunicación
-  con fines de publicidad.
+- **prendida o ausente** (el perfil existe, con la preferencia prendida o sin
+  ella) → el mail completo **con el pie de baja de §6.2**: tiene contenido
+  comercial, y la norma pide el mecanismo en toda comunicación con fines de
+  publicidad. Con el **perfil ausente** se trata como apagada (§6.1).
 
 Se evalúa al enviar, no al encolar, por la misma razón que `prefKey`: si la
 persona se opone entre que se encoló y que salió, gana la oposición.
