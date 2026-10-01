@@ -20,9 +20,12 @@ VerifiedEmail _$VerifiedEmailFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$VerifiedEmail {
-// `''` y no `required`: una entrada sin mail no confirma nada (el gate la
-// lee como "no verificado"), pero tampoco puede tirar el parseo y dejar el
-// perfil entero en `/profile-unavailable`.
+// `''` y no `required`: tolera una entrada a la que le FALTA `email` (el
+// gate la lee como "no verificado"). Nada más: una entrada null o que no sea
+// un mapa, o un `verifiedAt` que no sea Timestamp, siguen tirando en
+// `fromJson` y el perfil entero no parsea. Como este mapa lo escribe solo la
+// Cloud Function, una forma rota solo vendría de una operación manual con el
+// Admin SDK.
   String get email => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime? get verifiedAt => throw _privateConstructorUsedError;
@@ -126,9 +129,12 @@ class _$VerifiedEmailImpl implements _VerifiedEmail {
   factory _$VerifiedEmailImpl.fromJson(Map<String, dynamic> json) =>
       _$$VerifiedEmailImplFromJson(json);
 
-// `''` y no `required`: una entrada sin mail no confirma nada (el gate la
-// lee como "no verificado"), pero tampoco puede tirar el parseo y dejar el
-// perfil entero en `/profile-unavailable`.
+// `''` y no `required`: tolera una entrada a la que le FALTA `email` (el
+// gate la lee como "no verificado"). Nada más: una entrada null o que no sea
+// un mapa, o un `verifiedAt` que no sea Timestamp, siguen tirando en
+// `fromJson` y el perfil entero no parsea. Como este mapa lo escribe solo la
+// Cloud Function, una forma rota solo vendría de una operación manual con el
+// Admin SDK.
   @override
   @JsonKey()
   final String email;
@@ -179,9 +185,12 @@ abstract class _VerifiedEmail implements VerifiedEmail {
   factory _VerifiedEmail.fromJson(Map<String, dynamic> json) =
       _$VerifiedEmailImpl.fromJson;
 
-// `''` y no `required`: una entrada sin mail no confirma nada (el gate la
-// lee como "no verificado"), pero tampoco puede tirar el parseo y dejar el
-// perfil entero en `/profile-unavailable`.
+// `''` y no `required`: tolera una entrada a la que le FALTA `email` (el
+// gate la lee como "no verificado"). Nada más: una entrada null o que no sea
+// un mapa, o un `verifiedAt` que no sea Timestamp, siguen tirando en
+// `fromJson` y el perfil entero no parsea. Como este mapa lo escribe solo la
+// Cloud Function, una forma rota solo vendría de una operación manual con el
+// Admin SDK.
   @override
   String get email;
   @override
