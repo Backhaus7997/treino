@@ -165,12 +165,18 @@
  *
  * Un plan que nacio con dias de prueba (`mp_plans.diferidoHastaMs`, ver
  * `diferir-primer-cobro.ts`) se lee con reglas propias mientras su suscripcion
- * no haya cobrado nada. Una autorizada mucho despues de abrir el checkout se
- * trata como `pending`, y la guarda (5) protege lo que el PF ya tenia pago; una
- * autorizada a tiempo no pasa a `grace` por un cobro que todavia no
- * corresponde; y una prueba cancelada no estira el fin de periodo mas alla de lo
- * que el PF ya pago. Desde el primer cobro real se lee como cualquier otro plan.
- * Las reglas, y por que existen, estan en ese archivo.
+ * no haya tenido ningun cobro EXITOSO (un monto de $0 no cuenta). Una autorizada
+ * mucho despues de abrir el checkout se trata como `pending`, y la guarda (5)
+ * protege lo que el PF ya tenia pago; una autorizada a tiempo no pasa a `grace`
+ * por un cobro que todavia no corresponde; y una prueba cancelada no estira el
+ * fin de periodo mas alla de lo que el PF ya pago. Desde el primer cobro real se
+ * lee como cualquier otro plan.
+ *
+ * Esas reglas descansan en supuestos sobre como MP cuenta una prueba que NO estan
+ * medidos, y por eso los dos casos que piden que alguien mire loguean un warn: la
+ * autorizacion tardia (deja sin plan a quien autorizo un pago) y la prueba vencida
+ * sin cobro (podria estar dando acceso gratis). Las reglas, los supuestos y el
+ * por que de cada una estan en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -194,9 +200,11 @@ import {
   createMpClient,
 } from "./client";
 import {
+  HOLGURA_PRUEBA_MS,
   PruebaDiferidaInput,
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
+  situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
 import {
   AthleteStatus,
@@ -328,6 +336,18 @@ function comoTimestamp(v: unknown): Timestamp | null {
   return v != null && typeof (v as { toMillis?: unknown }).toMillis === "function"
     ? (v as Timestamp)
     : null;
+}
+
+/**
+ * `unknown` → ISO 8601 si es un numero de ms que da una fecha valida, si no
+ * `null`. Solo para logs: un campo que vino mal de un documento no puede hacer que
+ * el reconciliador tire un `RangeError` (que es lo que hace `toISOString` con una
+ * fecha invalida) justo cuando intenta avisar que algo esta raro.
+ */
+function isoDeMs(ms: unknown): string | null {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 /**
@@ -1203,15 +1223,49 @@ export async function reconcileSubscription(
     mpDateCreated: mp.date_created,
     nowMs: deps.nowMs,
   };
+  const situacion = situacionDeLaPrueba(pruebaDiferida);
   const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
-  if (status !== statusDeMp) {
-    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", {
-      planId,
-      uid,
-      mpStatus: mp.status,
-      desde: statusDeMp,
-      hacia: status,
-    });
+  const contextoDeLaPrueba = {
+    planId,
+    uid,
+    mpStatus: mp.status,
+    desde: statusDeMp,
+    hacia: status,
+    diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+  };
+  if (situacion === "fuera-de-ventana") {
+    // WARN y no info. Esto deja SIN el plan a alguien que autorizo un pago (hasta
+    // el primer cobro real de MP) y que probablemente crea que ya lo tiene: tiene
+    // que poder verse en el log para atender el reclamo.
+    logger.warn(
+      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
+        "como pending",
+      {
+        ...contextoDeLaPrueba,
+        autorizadaEn: typeof mp.date_created === "string"
+          ? mp.date_created.slice(0, 40)
+          : null,
+        planCreadoIso: isoDeMs(pruebaDiferida.planCreadoMs),
+      },
+    );
+  } else if (situacion === "vencida" && statusDeMp === "active") {
+    // WARN y no info. Pasado el horizonte, sin ningun cobro exitoso y sin un cobro
+    // pendiente, el mapeo de siempre deja `active`: acceso pago sin que MP haya
+    // cobrado ni intentado cobrar nada. No se corrige aca (no hay evidencia de que
+    // sea un error, y bajarlo seria revocar), pero es acceso gratis posible.
+    logger.warn(
+      "mp/reconcile: prueba diferida vencida sin ningun cobro exitoso ni cobro " +
+        "pendiente, posible acceso gratis",
+      {
+        ...contextoDeLaPrueba,
+        // En `vencida`, E es siempre un numero (si no, la situacion seria `no-aplica`).
+        horizonteIso: typeof pruebaDiferida.diferidoHastaMs === "number"
+          ? isoDeMs(pruebaDiferida.diferidoHastaMs + HOLGURA_PRUEBA_MS)
+          : null,
+      },
+    );
+  } else if (status !== statusDeMp) {
+    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", contextoDeLaPrueba);
   }
 
   const userRef = getFirestore(app).collection("users").doc(uid);

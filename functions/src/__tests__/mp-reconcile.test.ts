@@ -1886,8 +1886,9 @@ describe("reconcileSubscription — el periodo prepago no se tira", () => {
 // LA PRUEBA DIFERIDA.
 //
 // Un PF dado de baja que vuelve al mismo plan con dias ya pagos abre un plan CON
-// PRUEBA (`diferir-primer-cobro.ts`): MP cobra recien cuando vence lo que ya
-// estaba pago. Eso le pide tres cosas al reconciliador, y las tres vienen de MP:
+// PRUEBA (`diferir-primer-cobro.ts`): se espera que MP cobre recien cuando vence
+// lo que ya estaba pago (supuesto que no esta medido). Eso le pide tres cosas al
+// reconciliador, y las tres vienen de MP:
 //
 //   - el link de un checkout no vence, asi que uno viejo pagado tarde NO puede
 //     darle plan pago al PF hasta el primer cobro real;
@@ -2040,9 +2041,9 @@ describe("reconcileSubscription: la prueba diferida", () => {
 
   it("autorizada varios dias despues: pending, y NO pisa lo que el PF ya tenia pago", async () => {
     // El `init_point` no vence y MP no deja dar de baja un plan. Pagado tarde, el
-    // primer cobro cae tarde: darle plan pago al PF todo ese tiempo sin que MP
-    // haya cobrado nada seria regalarlo. La guarda de `pending` le conserva lo
-    // que si pago.
+    // primer cobro caeria tarde (suponiendo que la prueba corre desde la
+    // autorizacion): darle plan pago al PF todo ese tiempo sin que MP haya cobrado
+    // nada seria regalarlo. La guarda de `pending` le conserva lo que si pago.
     const { mundo, mp } = LINK_VIEJO();
     const { app, store, escrituras } = fakeApp(mundo);
     const deps = fakeMp(mp);
@@ -2325,5 +2326,197 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(r.athleteStatus).toBe("active");
     expect(store.users.u1.athleteSubscription).toEqual({ status: "active" });
     expect(store.users.u1.subscription).toBeUndefined();
+  });
+
+  // ── Una autorizacion de $0 no es un cobro: las reglas de la prueba siguen ──
+  //
+  // MP podria reportar la autorizacion de la prueba como `charged_quantity >= 1`
+  // con `charged_amount: 0` (no esta medido). Si contara como un pago, las reglas
+  // se apagarian antes de que MP haya cobrado un peso.
+
+  const AUTORIZACION_EN_CERO = {
+    charged_quantity: 1,
+    charged_amount: 0,
+    pending_charge_quantity: 1,
+  };
+
+  it("a tiempo y con una autorizacion de $0 queda active, NO grace", async () => {
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: AUTORIZACION_EN_CERO,
+    }));
+
+    expect(subDe(store).status).toBe("active");
+  });
+
+  it("un link viejo con una autorizacion de $0 sigue siendo pending", async () => {
+    const { mundo, mp } = LINK_VIEJO();
+    const { app, escrituras } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p1", fakeMp({
+      ...mp,
+      summarized: AUTORIZACION_EN_CERO,
+    }));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("cancelada con una autorizacion de $0 se acota igual a E", async () => {
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      summarized: AUTORIZACION_EN_CERO,
+    }));
+
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
+  it("el mismo payload con un monto POSITIVO es un cobro real: las reglas se apagan", async () => {
+    // El control del test anterior: es el monto, y no otra cosa, lo que decide.
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { ...AUTORIZACION_EN_CERO, charged_amount: 22000 },
+    }));
+
+    expect(subDe(store).status).toBe("grace");
+  });
+
+  // ── Los warns: lo que podria dejar a alguien sin plan o con plan gratis ──
+
+  const HORIZONTE = FIN_PAGO + 3 * DIA_MS;
+
+  it("autorizada fuera de ventana: WARN (no info), con el plan y la fecha", async () => {
+    // Deja sin el plan a alguien que autorizo un pago: tiene que poder verse.
+    const { mundo, mp } = LINK_VIEJO();
+    const { app } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(mp));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
+        "como pending",
+      expect.objectContaining({
+        planId: "p1",
+        uid: "t1",
+        mpStatus: "authorized",
+        desde: "active",
+        hacia: "pending",
+        diferidoHastaIso: new Date(FIN_PAGO).toISOString(),
+        autorizadaEn: mp.date_created,
+      }),
+    );
+  });
+
+  it("prueba vencida sin ningun cobro ni cobro pendiente: WARN de posible acceso gratis", async () => {
+    // Pasado E + 3 dias, a tiempo, sin cobro exitoso y sin cobro pendiente: el
+    // mapeo de siempre deja `active`, o sea plan pago sin que MP haya cobrado ni
+    // intentado cobrar nada. No se corrige (no hay evidencia de error) pero se avisa.
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+    }, HORIZONTE));
+
+    expect(subDe(store).status).toBe("active");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "mp/reconcile: prueba diferida vencida sin ningun cobro exitoso ni cobro " +
+        "pendiente, posible acceso gratis",
+      expect.objectContaining({
+        planId: "p1",
+        uid: "t1",
+        diferidoHastaIso: new Date(FIN_PAGO).toISOString(),
+        horizonteIso: new Date(HORIZONTE).toISOString(),
+      }),
+    );
+  });
+
+  it("un milisegundo antes del horizonte NO avisa: todavia es una prueba", async () => {
+    const { app } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+    }, HORIZONTE - 1));
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("vencida PERO con un cobro pendiente es grace, y no avisa de acceso gratis", async () => {
+    // El caso normal de un cobro que rebota: ya lo cubre `grace`.
+    const { app, store } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }, HORIZONTE));
+
+    expect(subDe(store).status).toBe("grace");
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("vencida con una autorizacion de $0 tambien avisa: sigue sin haber un cobro real", async () => {
+    const { app } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 1, charged_amount: 0, pending_charge_quantity: 0 },
+    }, HORIZONTE));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("posible acceso gratis"),
+      expect.anything(),
+    );
+  });
+
+  it("vencida pero con el primer cobro hecho NO avisa: es un plan como cualquier otro", async () => {
+    const { app } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 1, charged_amount: 22000, pending_charge_quantity: 0 },
+    }, HORIZONTE));
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("a tiempo y en prueba no avisa nada: solo se ajusta el estado de grace a active", async () => {
+    const { app } = fakeApp(DIFERIDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...EN_PRUEBA_MP,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }));
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("un plan normal nunca dispara estos avisos", async () => {
+    // Ni con el mismo payload que una autorizacion tardia, ni vencido: sin
+    // `diferidoHastaMs` las reglas no existen.
+    const { mundo, mp } = LINK_VIEJO();
+    delete mundo.mp_plans.p1.diferidoHastaMs;
+    const { app } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p1", fakeMp(mp, HORIZONTE + 30 * DIA_MS));
+
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("una prueba cancelada no dispara el aviso de vencida: MP ya dijo algo terminal", async () => {
+    const { app } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP, HORIZONTE));
+
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("posible acceso gratis"),
+      expect.anything(),
+    );
   });
 });

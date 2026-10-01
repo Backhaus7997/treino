@@ -111,6 +111,53 @@ export interface AbrirCheckoutInput {
   nowMs: number;
 }
 
+/** Un checkout abierto, tal como esta guardado en `mp_checkouts/{uid}`. */
+export interface CheckoutGuardado {
+  initPoint: string;
+  planId: string;
+  /**
+   * El `diferidoHastaMs` guardado, o `null` si el documento no lo tiene (un
+   * checkout normal, o uno anterior al diferimiento). SIN interpretar: puede no
+   * ser un numero, y quien lo compara lo hace con `===`.
+   */
+  diferidoHastaMs: unknown;
+}
+
+/**
+ * El checkout abierto de [previo] SI todavia sirve para este pedido, o `null`.
+ *
+ * Sirve cuando se creo dentro de [CHECKOUT_REUSE_MS], coincide la [huella] ENTERA,
+ * y tiene `initPoint` y `planId`. NO mira el diferimiento: eso lo compara quien
+ * llama, porque `create-preapproval.ts` necesita LEER cual es antes de decidir si
+ * sale a MP.
+ *
+ * Es la UNICA definicion de "el checkout vigente". La usan `abrirCheckout` para
+ * reusar y `create-preapproval.ts` para saltearse la busqueda en MP cuando un
+ * doble click va a reusar un checkout diferido: con dos copias, la ventana de
+ * una podria divergir de la de la otra y un pedido se saltearia la verificacion
+ * para despues NO reusar.
+ */
+export function checkoutVigente(
+  previo: Record<string, unknown> | undefined,
+  huella: Record<string, string>,
+  nowMs: number,
+): CheckoutGuardado | null {
+  if (!previo) return null;
+
+  const creado = previo.createdAtMs;
+  const vigente =
+    typeof creado === "number" && nowMs - creado < CHECKOUT_REUSE_MS;
+  const mismaHuella = Object.entries(huella)
+    .every(([k, v]) => previo[k] === v);
+  if (!vigente || !mismaHuella) return null;
+
+  const { initPoint, planId } = previo;
+  if (typeof initPoint !== "string" || initPoint === "") return null;
+  if (typeof planId !== "string" || planId === "") return null;
+
+  return { initPoint, planId, diferidoHastaMs: previo.diferidoHastaMs ?? null };
+}
+
 /**
  * Abre un checkout, o devuelve el que ya estaba abierto.
  *
@@ -130,40 +177,29 @@ export async function abrirCheckout(
     .doc(uid);
 
   // ── Reuso: el mismo plan, pedido de nuevo, dentro de la ventana ──
-  const previo = (await checkoutRef.get()).data();
-  if (previo) {
-    const creado = previo.createdAtMs;
-    const vigente =
-      typeof creado === "number" && nowMs - creado < CHECKOUT_REUSE_MS;
-    const mismaHuella = Object.entries(huella)
-      .every(([k, v]) => previo[k] === v);
-    // Ver el dartdoc de `AbrirCheckoutInput.diferidoHastaMs`: aparte de la
-    // huella, y con `?? null` para que un documento sin el campo siga
-    // valiendo como "normal".
-    const mismoDiferimiento = (previo.diferidoHastaMs ?? null) === diferidoHastaMs;
-    if (
-      vigente &&
-      mismaHuella &&
-      mismoDiferimiento &&
-      typeof previo.initPoint === "string" && previo.initPoint !== "" &&
-      typeof previo.planId === "string" && previo.planId !== ""
-    ) {
-      logger.info("mp/abrir-checkout: se reusa el checkout abierto", {
-        uid,
-        ...huella,
-        planId: previo.planId,
-      });
-      return {
-        initPoint: previo.initPoint,
-        planId: previo.planId,
-        status: "reused",
-      };
-    }
+  //
+  // Ver el dartdoc de `AbrirCheckoutInput.diferidoHastaMs`: el diferimiento se
+  // compara aparte de la huella, y con `?? null` (adentro de `checkoutVigente`)
+  // para que un documento sin el campo siga valiendo como "normal".
+  const abierto = checkoutVigente((await checkoutRef.get()).data(), huella, nowMs);
+  if (abierto && abierto.diferidoHastaMs === diferidoHastaMs) {
+    logger.info("mp/abrir-checkout: se reusa el checkout abierto", {
+      uid,
+      ...huella,
+      planId: abierto.planId,
+    });
+    return {
+      initPoint: abierto.initPoint,
+      planId: abierto.planId,
+      status: "reused",
+    };
   }
 
   // Los dias de prueba salen de aca y de ningun otro lado, a partir de la fecha
-  // y del reloj de ESTE request. `ceil` adentro de `diasDePrueba`: el primer
-  // cobro cae en esa fecha o apenas despues, nunca antes.
+  // y del reloj de ESTE request. `diasDePrueba` redondea hacia arriba para no
+  // adelantar el cobro, pero que MP cuente la prueba como suponemos (N dias
+  // corridos desde la autorizacion) NO esta medido: ver "Lo que se ASUME de MP"
+  // en `diferir-primer-cobro.ts`.
   const freeTrialDays =
     diferidoHastaMs === null ? undefined : diasDePrueba(diferidoHastaMs, nowMs);
 

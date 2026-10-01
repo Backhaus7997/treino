@@ -49,10 +49,16 @@
  * ── Lo unico que LEE de `subscription`: si al PF le quedan dias pagos ──
  *
  * Escribir sigue estando prohibido (arriba). Leer es para UNA decision de precio
- * y no de permiso: nada de lo que dice el documento bloquea un checkout. Un PF
- * dado de baja que vuelve al mismo plan antes de que venza lo que ya pago abre
- * un plan con prueba, y MP cobra recien cuando ese periodo termina; sin eso paga
- * dos veces los mismos dias. La regla entera vive en `diferir-primer-cobro.ts`.
+ * y no de permiso: ningun VALOR del documento bloquea un checkout. La LECTURA si
+ * puede frenarlo: si para saber si al PF le quedan dias pagos hay que consultar
+ * Firestore o MP y esa consulta falla, el callable tira `unavailable` en vez de
+ * abrir un checkout que quiza cobre dos veces (ver el handler).
+ *
+ * Un PF dado de baja que vuelve al mismo plan antes de que venza lo que ya pago
+ * abre un plan con prueba, y se espera que MP cobre recien cuando ese periodo
+ * termina. Eso ultimo es un supuesto que NO esta medido (ver "Lo que se ASUME de
+ * MP" en `diferir-primer-cobro.ts`); sin la prueba, paga dos veces los mismos
+ * dias. La regla entera vive en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -71,7 +77,12 @@ import {
   frequencyMonthsFor,
 } from "./tier-mapping";
 import { MpApiError, MpClient, createMpClient } from "./client";
-import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
+import {
+  CheckoutAbierto,
+  MP_CHECKOUTS_COLLECTION,
+  abrirCheckout,
+  checkoutVigente,
+} from "./abrir-checkout";
 import { Diferimiento, decidirDiferimiento } from "./diferir-primer-cobro";
 import { trainerWebCheckout } from "../../mail/templates";
 
@@ -230,6 +241,11 @@ export async function runCreatePreapproval(
   // PF tiene dias pagos es abrirle un checkout que cobra en el acto, o sea el
   // doble cobro que esto viene a cerrar. `unavailable` porque reintentar sirve
   // (el PF vuelve a tocar el boton), igual que cuando MP rechaza la creacion.
+  //
+  // La huella se arma UNA vez, ACA, porque la usan dos cosas: `abrirCheckout`
+  // para reusar, y el atajo del doble click de abajo para no buscar en MP un
+  // pago que ya se verifico cuando se abrio ese mismo checkout.
+  const huella = { tier, cycle };
   let diferimiento: Diferimiento;
   try {
     diferimiento = await decidirDiferimiento({
@@ -237,6 +253,20 @@ export async function runCreatePreapproval(
       tier,
       userData: userSnap.data(),
       nowMs: deps.nowMs,
+      // Se llama SOLO si el PF ya paso la elegibilidad barata (cancelado, mismo
+      // tier, con dias por delante). Lee el MISMO documento que `abrirCheckout` y
+      // con la MISMA definicion de "vigente" (`checkoutVigente`): asi el atajo no
+      // puede saltearse la busqueda para despues no reusar.
+      diferidoDelCheckoutAbierto: async () => {
+        const previo = (
+          await db.collection(MP_CHECKOUTS_COLLECTION).doc(uid).get()
+        ).data();
+        const diferido = checkoutVigente(previo, huella, deps.nowMs)
+          ?.diferidoHastaMs;
+        return typeof diferido === "number" && Number.isFinite(diferido)
+          ? diferido
+          : null;
+      },
       leerPlanes: async () => {
         // Un solo campo en el `where` y el orden en memoria: ver
         // `planesARevisar`. Cero indices nuevos.
@@ -273,7 +303,7 @@ export async function runCreatePreapproval(
     // ⚠️ La huella es EXACTAMENTE `{tier, cycle}` y no puede ganar campos: los
     // documentos de `mp_checkouts` que hay en produccion tienen esos dos y
     // ninguno mas. Ver el dartdoc de `AbrirCheckoutInput.huella`.
-    huella: { tier, cycle },
+    huella,
     reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
     backUrl: BACK_URL,
     amount,

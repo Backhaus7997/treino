@@ -14,11 +14,16 @@ jest.mock("firebase-functions", () => ({
   logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
 }));
 
+import { readFileSync } from "fs";
+import { join } from "path";
+
 import { logger } from "firebase-functions";
 
 import { MpPreapproval } from "../subscriptions/mp/client";
 import {
+  ADELANTO_MAXIMO_DEL_COBRO_MS,
   DIA_MS,
+  DIFERIR_PRIMER_COBRO_ENABLED,
   DecidirDiferimientoInput,
   HOLGURA_PRUEBA_MS,
   MAX_PLANES_A_REVISAR,
@@ -28,11 +33,13 @@ import {
   VENTANA_AUTORIZACION_MS,
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
+  cobrosExitosos,
   decidirDiferimiento,
   diasDePrueba,
   evidenciaDePago,
   pagadoHastaDe,
   planesARevisar,
+  situacionDeLaPrueba,
 } from "../subscriptions/mp/diferir-primer-cobro";
 import { SubscriptionTier } from "../subscriptions/tier-config";
 
@@ -346,9 +353,9 @@ describe("pagadoHastaDe: el respaldo desde el alta", () => {
 });
 
 describe("pagadoHastaDe: el respaldo NO corre con una prueba gratis", () => {
-  // Con prueba el primer cobro cae cuando la prueba termina, no en `date_created`,
-  // y no sabemos cuantos dias despues. Se prefiere no reconstruir nada: el
-  // diferimiento no se dispara y el checkout cobra en el acto, como antes.
+  // Con prueba se espera que el primer cobro caiga cuando la prueba termina, no en
+  // `date_created`, y no sabemos cuantos dias despues. Se prefiere no reconstruir
+  // nada: el diferimiento no se dispara y el checkout cobra en el acto, como antes.
   const conPrueba: [string, unknown][] = [
     ["la de un plan nuestro (13 dias)", PRUEBA_DE_13_DIAS],
     ["en meses", { frequency: 1, frequency_type: "months" }],
@@ -529,7 +536,133 @@ describe("pagadoHastaDe: la fecha del ultimo cobro sigue siendo la fuente princi
 });
 
 // ---------------------------------------------------------------------------
-// diasDePrueba: el primer cobro cae en la fecha o apenas despues, NUNCA antes.
+// Una autorizacion de $0 no es un pago.
+//
+// MP podria reportar la autorizacion de una prueba como `charged_quantity >= 1`
+// con `charged_amount: 0` (no esta medido). Contarla como un pago convertiria el
+// alta de una prueba en evidencia de que el PF pago un periodo entero.
+// ---------------------------------------------------------------------------
+
+/** Montos que NO son un pago: presentes, finitos, y en $0 o menos. */
+const MONTOS_SIN_PAGO: [string, Record<string, unknown>][] = [
+  ["charged_amount 0", { charged_amount: 0 }],
+  ["charged_amount negativo", { charged_amount: -1 }],
+  ["charged_amount '0.0' (string)", { charged_amount: "0.0" }],
+  ["last_charged_amount 0", { last_charged_amount: 0 }],
+  ["last_charged_amount '0' (el SDK lo tipa como string)", { last_charged_amount: "0" }],
+  ["last_charged_amount '-5'", { last_charged_amount: "-5" }],
+  ["los dos en 0", { charged_amount: 0, last_charged_amount: 0 }],
+  ["uno positivo y el otro en 0", { charged_amount: 22000, last_charged_amount: 0 }],
+];
+
+/**
+ * Montos que SI cuentan, o que no vinieron: la regla de la cantidad manda, como
+ * siempre. Un monto que falta no puede dejar sin evidencia a todo plan.
+ */
+const MONTOS_QUE_CUENTAN: [string, Record<string, unknown>][] = [
+  ["charged_amount positivo", { charged_amount: 22000 }],
+  ["last_charged_amount positivo como string", { last_charged_amount: "22000.0" }],
+  ["los dos positivos", { charged_amount: 44000, last_charged_amount: "22000" }],
+  ["montos null", { charged_amount: null, last_charged_amount: null }],
+  ["montos ausentes", {}],
+  ["monto NaN (no es un numero finito)", { charged_amount: Number.NaN }],
+  ["monto infinito (no es finito)", { charged_amount: Number.POSITIVE_INFINITY }],
+  ["monto string vacio: no es un $0", { last_charged_amount: "" }],
+  ["monto string en blanco", { last_charged_amount: "   " }],
+  ["monto string que no es un numero", { last_charged_amount: "n/a" }],
+  ["monto que es un objeto", { charged_amount: { amount: 0 } }],
+];
+
+describe("cobrosExitosos: un monto en $0 no es un pago", () => {
+  it("devuelve la cantidad de cobros cuando no hay montos", () => {
+    expect(cobrosExitosos({ charged_quantity: 3 })).toBe(3);
+  });
+
+  for (const [caso, montos] of MONTOS_SIN_PAGO) {
+    it(`da 0 con ${caso}, aunque charged_quantity sea 1`, () => {
+      expect(cobrosExitosos({ charged_quantity: 1, ...montos })).toBe(0);
+    });
+  }
+
+  for (const [caso, montos] of MONTOS_QUE_CUENTAN) {
+    it(`cuenta el cobro con ${caso}`, () => {
+      expect(cobrosExitosos({ charged_quantity: 2, ...montos })).toBe(2);
+    });
+  }
+
+  const sinCantidad: [string, unknown][] = [
+    ["summarized undefined", undefined],
+    ["summarized null", null],
+    ["summarized que no es un objeto", "cobrado"],
+    ["charged_quantity ausente", { charged_amount: 22000 }],
+    ["charged_quantity 0", { charged_quantity: 0, charged_amount: 22000 }],
+    ["charged_quantity NaN", { charged_quantity: Number.NaN }],
+    ["charged_quantity como string", { charged_quantity: "1" }],
+  ];
+
+  for (const [caso, summarized] of sinCantidad) {
+    it(`da 0 con ${caso}: un monto positivo no reemplaza a la cantidad`, () => {
+      expect(cobrosExitosos(summarized)).toBe(0);
+    });
+  }
+});
+
+describe("pagadoHastaDe: una autorizacion de $0 no es evidencia de pago", () => {
+  const conMontos = (montos: Record<string, unknown>) =>
+    pagada("2026-08-20T12:00:00.000Z", {
+      summarized: {
+        charged_quantity: 1,
+        last_charged_date: "2026-08-20T12:00:00.000Z",
+        ...montos,
+      },
+    });
+
+  for (const [caso, montos] of MONTOS_SIN_PAGO) {
+    it(`da null con ${caso}, aunque haya last_charged_date`, () => {
+      expect(pagadoHastaDe(conMontos(montos))).toBeNull();
+      expect(evidenciaDePago(conMontos(montos))).toBeNull();
+    });
+  }
+
+  for (const [caso, montos] of MONTOS_QUE_CUENTAN) {
+    it(`sigue dando la fecha con ${caso}`, () => {
+      expect(pagadoHastaDe(conMontos(montos)))
+        .toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+    });
+  }
+
+  it("el respaldo desde el alta tambien lo exige: charged_amount 0 sin last_charged_date da null", () => {
+    expect(pagadoHastaDe(sinFechaDeCobro({}, { charged_amount: 0 }))).toBeNull();
+    expect(pagadoHastaDe(sinFechaDeCobro({}, { last_charged_amount: "0" }))).toBeNull();
+  });
+
+  it("y con un monto positivo el respaldo sigue andando", () => {
+    expect(pagadoHastaDe(sinFechaDeCobro({}, { charged_amount: 22000 })))
+      .toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+
+  it("una prueba nuestra que solo autorizo (cantidad 1, monto 0) no deja evidencia", () => {
+    // La forma que tendria la suscripcion de un plan diferido recien autorizado si
+    // MP contara la autorizacion como un cobro de $0.
+    const autorizacion = sinFechaDeCobro(
+      {
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: "months",
+          free_trial: PRUEBA_DE_13_DIAS,
+        },
+      },
+      { charged_quantity: 1, charged_amount: 0, last_charged_amount: 0 },
+    );
+
+    expect(pagadoHastaDe(autorizacion)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// diasDePrueba: la cuenta de los dias. Bajo el supuesto de dias corridos de 24 h
+// desde la autorizacion (NO medido contra MP), el cobro cae en la fecha o apenas
+// despues; el test fija el redondeo, no el comportamiento de MP.
 // ---------------------------------------------------------------------------
 
 describe("diasDePrueba", () => {
@@ -559,8 +692,9 @@ describe("diasDePrueba", () => {
     expect(diasDePrueba(AHORA + 365 * DIA_MS, AHORA)).toBe(365);
   });
 
-  it("el primer cobro nunca cae antes de la fecha, para cualquier hora", () => {
-    // Barrido: el cobro cae a `ahora + dias`. Tiene que ser >= la fecha.
+  it("con dias corridos de 24 h el cobro no cae antes de la fecha, para cualquier hora", () => {
+    // Barrido del REDONDEO, no de MP: si la prueba corre `dias * 24 h` desde ahora,
+    // el cobro cae a `ahora + dias`. Tiene que ser >= la fecha.
     for (let horas = 1; horas <= 24 * 40; horas += 7) {
       const fin = AHORA + horas * 60 * 60 * 1000 + 123;
       const cobro = AHORA + diasDePrueba(fin, AHORA) * DIA_MS;
@@ -587,16 +721,33 @@ function plan(
       tier: "plan2",
       cycle: "monthly",
       createdAt: ts(AHORA - edadDias * DIA_MS),
+      // Por defecto un plan CERRADO por una baja: la unica clase que puede ser la
+      // evidencia de un pago (`reconcile.ts` lo marca `terminal`, sin motivo,
+      // cuando MP dice `cancelled`). Un checkout sin pagar se arma con `abierto`.
+      terminal: true,
       ...data,
     },
   };
 }
 
+/**
+ * Un checkout que el PF abrio y NO pago (o que todavia no se dio de baja): no es
+ * `terminal`. Cada toque del boton fuera de la ventana de reuso deja uno.
+ */
+const abierto = (
+  id: string,
+  edadDias: number,
+  data: Record<string, unknown> = {},
+): PlanDeLaCuenta => plan(id, edadDias, { terminal: undefined, ...data });
+
 describe("planesARevisar", () => {
+  const ids = (planes: PlanDeLaCuenta[], tier: SubscriptionTier = "plan2") =>
+    planesARevisar(planes, tier, AHORA).ids;
+
   it("del mas nuevo al mas viejo, sin importar el orden en que llegan", () => {
     const planes = [plan("viejo", 40), plan("nuevo", 2), plan("medio", 15)];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["nuevo", "medio", "viejo"]);
+    expect(ids(planes)).toEqual(["nuevo", "medio", "viejo"]);
   });
 
   it("deja afuera los planes de ALUMNO", () => {
@@ -605,20 +756,20 @@ describe("planesARevisar", () => {
       plan("p1", 5),
     ];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["p1"]);
+    expect(ids(planes)).toEqual(["p1"]);
   });
 
   it("un alumno que ademas tiene tier escrito sigue afuera", () => {
     // Defensa: el filtro de producto no depende de que falte el tier.
     const planes = [plan("a1", 1, { producto: "athlete" })];
 
-    expect(planesARevisar(planes, "plan2")).toEqual([]);
+    expect(ids(planes)).toEqual([]);
   });
 
   it("deja afuera los planes de OTRO tier", () => {
     const planes = [plan("p3", 1, { tier: "plan3" }), plan("p2", 9)];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["p2"]);
+    expect(ids(planes)).toEqual(["p2"]);
   });
 
   it("un plan de PF anterior a `producto` (sin el campo) SI entra", () => {
@@ -626,7 +777,7 @@ describe("planesARevisar", () => {
     // pueden haber pagado.
     const planes = [plan("legado", 30, { producto: undefined })];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["legado"]);
+    expect(ids(planes)).toEqual(["legado"]);
   });
 
   it("incluye cualquier ciclo del tier: el diferimiento es por plan, no por ciclo", () => {
@@ -635,7 +786,7 @@ describe("planesARevisar", () => {
       plan("anual", 10, { cycle: "annual" }),
     ];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["mensual", "anual"]);
+    expect(ids(planes)).toEqual(["mensual", "anual"]);
   });
 
   it(`no pasa de ${MAX_PLANES_A_REVISAR} planes: los mas nuevos`, () => {
@@ -643,7 +794,7 @@ describe("planesARevisar", () => {
       plan("p5", 50), plan("p3", 30), plan("p1", 10), plan("p4", 40), plan("p2", 20),
     ];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["p1", "p2", "p3"]);
+    expect(ids(planes)).toEqual(["p1", "p2", "p3"]);
   });
 
   it("el tope se cuenta DESPUES de filtrar: otros tiers no gastan lugar", () => {
@@ -655,7 +806,7 @@ describe("planesARevisar", () => {
       plan("p1", 20),
     ];
 
-    expect(planesARevisar(planes, "plan2")).toEqual(["p1"]);
+    expect(ids(planes)).toEqual(["p1"]);
   });
 
   it("un plan sin fecha legible va al final, pero no se descarta", () => {
@@ -666,12 +817,157 @@ describe("planesARevisar", () => {
       plan("con-fecha", 90),
     ];
 
-    expect(planesARevisar(planes, "plan2")[0]).toBe("con-fecha");
-    expect(planesARevisar(planes, "plan2")).toHaveLength(3);
+    expect(ids(planes)[0]).toBe("con-fecha");
+    expect(ids(planes)).toHaveLength(3);
   });
 
   it("sin planes da una lista vacia", () => {
-    expect(planesARevisar([], "plan2")).toEqual([]);
+    expect(planesARevisar([], "plan2", AHORA)).toEqual({ candidatos: 0, ids: [] });
+  });
+});
+
+describe("planesARevisar: el plan que pago no se cae del tope", () => {
+  const ids = (planes: PlanDeLaCuenta[]) => planesARevisar(planes, "plan2", AHORA).ids;
+
+  // ── Los toques sin pagar ──
+
+  it("deja afuera los checkouts que el PF abrio y no pago: no son terminal", () => {
+    expect(ids([abierto("sin-pagar", 1), plan("pago", 20)])).toEqual(["pago"]);
+  });
+
+  it("tres toques sin pagar NO empujan afuera al plan que pago", () => {
+    // El bug: cada toque fuera de la ventana de reuso abre un plan. Cortando por
+    // recencia ANTES de filtrar, el plan que pago era el cuarto mas nuevo, no se
+    // revisaba, y al PF se le cobraba en el acto lo que ya tenia pago.
+    const planes = [
+      abierto("toque-4", 1),
+      abierto("toque-3", 2),
+      abierto("toque-2", 3),
+      abierto("toque-1", 4),
+      plan("pago", 20),
+    ];
+
+    const r = planesARevisar(planes, "plan2", AHORA);
+
+    expect(r.ids).toEqual(["pago"]);
+    expect(r.candidatos).toBe(1);
+  });
+
+  it("cada cambio de ciclo abre un plan: tampoco lo empuja", () => {
+    const planes = [
+      abierto("anual-2", 1, { cycle: "annual" }),
+      abierto("mensual-2", 2),
+      abierto("anual-1", 3, { cycle: "annual" }),
+      abierto("mensual-1", 4),
+      plan("pago", 25),
+    ];
+
+    expect(ids(planes)).toEqual(["pago"]);
+  });
+
+  it("`terminal` tiene que ser exactamente `true`: nada que se le parezca", () => {
+    for (const terminal of ["true", 1, "yes", false, null, undefined, {}]) {
+      expect(ids([plan("raro", 1, { terminal }), plan("pago", 20)]))
+        .toEqual(["pago"]);
+    }
+  });
+
+  // ── Los terminal que NO son una baja: traen `terminalReason` ──
+
+  it("deja afuera un checkout ABANDONADO que el barrido marco terminal (trae motivo)", () => {
+    // El barrido nocturno marca `terminal` a un checkout sin suscripcion a los 30
+    // dias, con `terminalReason`. Sin descartarlo, un PF con un anual y varios
+    // toques de hace mas de un mes volveria a empujar fuera al plan que pago.
+    const planes = [
+      plan("abandonado-3", 40, { terminalReason: "checkout abandonado" }),
+      plan("abandonado-2", 50, { terminalReason: "checkout abandonado" }),
+      plan("abandonado-1", 60, { terminalReason: "checkout abandonado" }),
+      plan("pago", 200),
+    ];
+
+    expect(ids(planes)).toEqual(["pago"]);
+  });
+
+  it("deja afuera un plan que reemplazamos nosotros (trae motivo)", () => {
+    const planes = [
+      plan("reemplazado", 5, { terminalReason: "reemplazado por otro plan" }),
+      plan("pago", 20),
+    ];
+
+    expect(ids(planes)).toEqual(["pago"]);
+  });
+
+  it("cualquier motivo escrito como string lo deja afuera: no se compara contra un literal", () => {
+    // Si manana el barrido estrena un motivo nuevo, tampoco es una baja.
+    expect(ids([plan("x", 1, { terminalReason: "otro motivo" }), plan("pago", 20)]))
+      .toEqual(["pago"]);
+  });
+
+  it("un `terminalReason` que no es un string no cuenta como motivo", () => {
+    for (const terminalReason of [undefined, null, 0, false]) {
+      expect(ids([plan("baja", 1, { terminalReason })])).toEqual(["baja"]);
+    }
+  });
+
+  // ── Volver a suscribirse y cancelar, varias veces ──
+
+  it("tres vueltas de suscribirse con prueba y cancelar NO empujan afuera al plan que pago", () => {
+    // Cada vuelta deja un plan terminal que nunca cobro, y todos comparten E (el
+    // fin del periodo pago, todavia lejos). Ninguno puede ser evidencia.
+    const E = AHORA + 13 * DIA_MS;
+    const planes = [
+      plan("vuelta-3", 1, { diferidoHastaMs: E }),
+      plan("vuelta-2", 2, { diferidoHastaMs: E }),
+      plan("vuelta-1", 3, { diferidoHastaMs: E }),
+      plan("pago", 20),
+    ];
+
+    const r = planesARevisar(planes, "plan2", AHORA);
+
+    expect(r.ids).toEqual(["pago"]);
+    expect(r.candidatos).toBe(1);
+  });
+
+  it("un plan con prueba cuyo E ya paso SI entra: pudo haber cobrado", () => {
+    // La segunda generacion: el diferido cobro en E, y despues se cancelo.
+    const planes = [
+      plan("diferido-cobrado", 10, { diferidoHastaMs: AHORA - 3 * DIA_MS }),
+      plan("pago", 40),
+    ];
+
+    expect(ids(planes)).toEqual(["diferido-cobrado", "pago"]);
+  });
+
+  it("el borde: con E a exactamente un dia SI entra, con un milisegundo mas no", () => {
+    // Un dia es el adelanto maximo que suponemos (MP podria contar en su propio
+    // calendario, -04:00): hasta ahi todavia pudo haber cobrado.
+    expect(ids([plan("justo", 1, { diferidoHastaMs: AHORA + ADELANTO_MAXIMO_DEL_COBRO_MS })]))
+      .toEqual(["justo"]);
+    expect(ids([plan("lejos", 1, {
+      diferidoHastaMs: AHORA + ADELANTO_MAXIMO_DEL_COBRO_MS + 1,
+    })])).toEqual([]);
+  });
+
+  it("un `diferidoHastaMs` que no es un numero se ignora: el plan entra como cualquier otro", () => {
+    for (const diferidoHastaMs of ["manana", Number.NaN, null, {}]) {
+      expect(ids([plan("raro", 1, { diferidoHastaMs })])).toEqual(["raro"]);
+    }
+  });
+
+  // ── La cuenta de candidatos, que va al log ──
+
+  it("cuenta los candidatos ANTES del tope", () => {
+    const planes = [
+      plan("c5", 50), plan("c4", 40), plan("c3", 30), plan("c2", 20), plan("c1", 10),
+      abierto("sin-pagar", 1),
+      plan("otro-tier", 2, { tier: "plan3" }),
+      plan("alumno", 3, { producto: "athlete" }),
+    ];
+
+    const r = planesARevisar(planes, "plan2", AHORA);
+
+    expect(r.candidatos).toBe(5);
+    expect(r.ids).toEqual(["c1", "c2", "c3"]);
   });
 });
 
@@ -927,6 +1223,16 @@ describe("decidirDiferimiento: el estado de la suscripcion manda primero", () =>
     ["cancelado sin fecha de fin", {
       subscription: { tier: "plan2", status: "cancelled" },
     }, "sin-fecha-de-fin"],
+    ["una fecha de fin que no es un numero (NaN)", {
+      subscription: { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(Number.NaN) },
+    }, "sin-fecha-de-fin"],
+    ["una fecha de fin infinita", {
+      subscription: {
+        tier: "plan2",
+        status: "cancelled",
+        currentPeriodEnd: ts(Number.POSITIVE_INFINITY),
+      },
+    }, "sin-fecha-de-fin"],
     ["un estado ilegible (fecha como number)", {
       subscription: { tier: "plan2", status: "cancelled", currentPeriodEnd: FIN },
     }, "estado-degradado"],
@@ -1110,12 +1416,14 @@ describe("decidirDiferimiento: que planes se revisan, y hasta donde", () => {
     expect(lecturas.suscripciones).toEqual(["nuevo"]);
   });
 
-  it("salta los planes nuevos SIN cobro (checkouts abandonados) hasta dar con el que pago", async () => {
+  it("salta los planes cerrados que nunca cobraron hasta dar con el que pago", async () => {
+    // Son planes terminales (MP los dio de baja) cuya suscripcion nunca llego a
+    // cobrar: hay que preguntarle a MP para saberlo, y se sigue con el siguiente.
     const { input, lecturas } = armar({
-      planes: [plan("abandonado-2", 1), plan("abandonado-1", 5), plan("pago", 25)],
+      planes: [plan("sin-cobro-2", 1), plan("sin-cobro-1", 5), plan("pago", 25)],
       subs: {
-        "abandonado-2": [],
-        "abandonado-1": [pagada(ULTIMO_COBRO, {
+        "sin-cobro-2": [],
+        "sin-cobro-1": [pagada(ULTIMO_COBRO, {
           summarized: { charged_quantity: 0 },
         })],
         pago: [pagada(ULTIMO_COBRO)],
@@ -1125,7 +1433,114 @@ describe("decidirDiferimiento: que planes se revisan, y hasta donde", () => {
     const r = await decidirDiferimiento(input);
 
     expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
-    expect(lecturas.suscripciones).toEqual(["abandonado-2", "abandonado-1", "pago"]);
+    expect(lecturas.suscripciones).toEqual(["sin-cobro-2", "sin-cobro-1", "pago"]);
+  });
+
+  it("tres toques sin pagar NO le sacan el diferimiento al PF que pago", async () => {
+    // Cada toque fuera de la ventana de reuso abre un plan en MP. Cortando por
+    // recencia antes de filtrar, el plan que pago era el cuarto mas nuevo, no se
+    // revisaba, y el PF terminaba pagando en el acto lo que ya tenia pago.
+    const { input, lecturas } = armar({
+      planes: [
+        abierto("toque-3", 1),
+        abierto("toque-2", 2),
+        abierto("toque-1", 3),
+        abierto("cambio-de-ciclo", 4, { cycle: "annual" }),
+        plan("p0", 20),
+      ],
+    });
+
+    const r = await decidirDiferimiento(input);
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+    // A MP solo se le pregunta por el plan que puede haber cobrado.
+    expect(lecturas.suscripciones).toEqual(["p0"]);
+  });
+
+  it("tres vueltas de suscribirse con prueba y cancelar tampoco: el plan que pago se sigue viendo", async () => {
+    const E = FIN;
+    const { input, lecturas } = armar({
+      planes: [
+        plan("vuelta-3", 1, { diferidoHastaMs: E }),
+        plan("vuelta-2", 2, { diferidoHastaMs: E }),
+        plan("vuelta-1", 3, { diferidoHastaMs: E }),
+        plan("p0", 20),
+      ],
+    });
+
+    const r = await decidirDiferimiento(input);
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toEqual(["p0"]);
+  });
+
+  it("un checkout abandonado que el barrido ya marco terminal tampoco empuja al que pago", async () => {
+    // Un anual (periodo largo) con varios toques de hace mas de un mes.
+    const { input, lecturas } = armar({
+      planes: [
+        plan("abandonado-3", 40, { terminalReason: "checkout abandonado" }),
+        plan("abandonado-2", 50, { terminalReason: "checkout abandonado" }),
+        plan("abandonado-1", 60, { terminalReason: "checkout abandonado" }),
+        plan("p0", 200),
+      ],
+    });
+
+    const r = await decidirDiferimiento(input);
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toEqual(["p0"]);
+  });
+
+  it("sin ningun plan cerrado no se le pregunta nada a MP", async () => {
+    const { input, lecturas } = armar({
+      planes: [abierto("toque-2", 1), abierto("toque-1", 2)],
+    });
+
+    const r = await decidirDiferimiento(input);
+
+    expect(r).toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("loguea cuantos planes habia, cuantos eran candidatos y cuantos se revisaron", async () => {
+    // Para poder explicar despues un "sin-pago-comprobado": si `candidatos` es 0,
+    // no habia ningun plan cerrado que mirar.
+    const { input } = armar({
+      planes: [
+        abierto("toque-2", 1),
+        abierto("toque-1", 2),
+        plan("otro-tier", 3, { tier: "plan3" }),
+        // Cuatro candidatos: el tope deja afuera al mas viejo, y p0 es el tercero.
+        plan("c2", 4), plan("c1", 5), plan("p0", 6), plan("c0", 7),
+      ],
+    });
+
+    await decidirDiferimiento(input);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se difiere el primer cobro",
+      expect.objectContaining({
+        planesEnLaCuenta: 7,
+        candidatos: 4,
+        planesRevisados: MAX_PLANES_A_REVISAR,
+      }),
+    );
+  });
+
+  it("el conteo tambien va al log cuando no se difiere", async () => {
+    const { input } = armar({ planes: [abierto("toque", 1), plan("c1", 2)], subs: { c1: [] } });
+
+    await decidirDiferimiento(input);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se cobra en el acto",
+      expect.objectContaining({
+        motivo: "sin-pago-comprobado",
+        planesEnLaCuenta: 2,
+        candidatos: 1,
+        planesRevisados: 1,
+      }),
+    );
   });
 
   it(`revisa a lo sumo ${MAX_PLANES_A_REVISAR} planes: el cuarto con pago no se ve`, async () => {
@@ -1184,6 +1599,260 @@ describe("decidirDiferimiento: si no puede LEER, tira (nunca cae a cobrar en el 
 
     expect(await decidirDiferimiento(input))
       .toEqual({ diferir: false, motivo: "otro-tier" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El atajo del doble click. Sin el, cada toque de un PF dado de baja pagaba hasta
+// tres busquedas en MP aunque el checkout diferido ya estuviera abierto y fuera a
+// reusarse. La verificacion contra MP se hizo cuando se abrio.
+// ---------------------------------------------------------------------------
+
+describe("decidirDiferimiento: el atajo del doble click", () => {
+  /** Un lector del checkout abierto que anota cuantas veces lo llamaron. */
+  function checkoutAbierto(valor: number | null | Error) {
+    const llamadas = { n: 0 };
+    const lector = async (): Promise<number | null> => {
+      llamadas.n += 1;
+      if (valor instanceof Error) throw valor;
+      return valor;
+    };
+    return { llamadas, lector };
+  }
+
+  it("con un checkout diferido abierto devuelve esa fecha y NO busca nada", async () => {
+    const abierto = checkoutAbierto(FIN);
+    const { input, lecturas } = armar();
+
+    const r = await decidirDiferimiento({
+      ...input,
+      diferidoDelCheckoutAbierto: abierto.lector,
+    });
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(abierto.llamadas.n).toBe(1);
+    // Ni los planes de Firestore ni una sola busqueda en MP.
+    expect(lecturas.planes).toBe(0);
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("devuelve EXACTAMENTE la fecha guardada, no la que saldria de buscar", async () => {
+    // `abrirCheckout` la compara para reusar: devolver otra crearia un plan nuevo
+    // sin haber verificado el pago. La guardada es 2 dias anterior a lo que
+    // daria la busqueda (FIN), y es la que tiene que volver.
+    const guardada = FIN - 2 * DIA_MS;
+    const { input } = armar();
+
+    const r = await decidirDiferimiento({
+      ...input,
+      diferidoDelCheckoutAbierto: checkoutAbierto(guardada).lector,
+    });
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: guardada });
+  });
+
+  it("loguea que reuso el diferimiento, sin salir a MP", async () => {
+    const { input } = armar();
+
+    await decidirDiferimiento({
+      ...input,
+      diferidoDelCheckoutAbierto: checkoutAbierto(FIN).lector,
+    });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se reusa el diferimiento del checkout abierto, " +
+        "no se busca en MP",
+      { uid: "t1", tier: "plan2", diferidoHastaIso: "2026-09-20T12:00:00.000Z" },
+    );
+  });
+
+  it("el borde: una fecha a exactamente un dia SI sirve", async () => {
+    const { input, lecturas } = armar();
+    const borde = AHORA + MIN_DIFERIMIENTO_MS;
+
+    const r = await decidirDiferimiento({
+      ...input,
+      diferidoDelCheckoutAbierto: checkoutAbierto(borde).lector,
+    });
+
+    expect(r).toEqual({ diferir: true, diferidoHastaMs: borde });
+    expect(lecturas.planes).toBe(0);
+  });
+
+  // Cualquiera de estas cosas deja al checkout abierto sin servir de atajo: se
+  // busca en MP como siempre, y esa busqueda manda.
+  const sinAtajo: [string, number | null][] = [
+    ["no hay checkout abierto", null],
+    ["la fecha guardada es NaN", Number.NaN],
+    ["la fecha guardada es infinita", Number.POSITIVE_INFINITY],
+    ["a la fecha guardada le queda menos de un dia", AHORA + MIN_DIFERIMIENTO_MS - 1],
+    ["la fecha guardada ya paso", AHORA - DIA_MS],
+    ["la fecha guardada pasa de nuestro fin de periodo", FIN + 1],
+  ];
+
+  for (const [caso, guardada] of sinAtajo) {
+    it(`si ${caso}, no hay atajo: se busca en MP`, async () => {
+      const { input, lecturas } = armar();
+
+      const r = await decidirDiferimiento({
+        ...input,
+        diferidoDelCheckoutAbierto: checkoutAbierto(guardada).lector,
+      });
+
+      expect(r).toEqual({ diferir: true, diferidoHastaMs: FIN });
+      expect(lecturas.planes).toBe(1);
+      expect(lecturas.suscripciones).toEqual(["p0"]);
+    });
+  }
+
+  it("sin lector del checkout abierto se busca siempre", async () => {
+    const { input, lecturas } = armar();
+
+    await decidirDiferimiento(input);
+
+    expect(lecturas.planes).toBe(1);
+  });
+
+  it("no mira el checkout abierto si la elegibilidad barata falla: ninguna lectura antes", async () => {
+    const cortes: Record<string, unknown>[] = [
+      usuarioCancelado("plan3"),
+      { role: "trainer" },
+      { subscription: { tier: "plan2", status: "active", currentPeriodEnd: ts(FIN) } },
+      usuarioCancelado("plan2", AHORA - DIA_MS),
+      usuarioCancelado("plan2", AHORA + MIN_DIFERIMIENTO_MS - 1),
+    ];
+
+    for (const userData of cortes) {
+      const abierto = checkoutAbierto(FIN);
+      const { input, lecturas } = armar({ userData });
+
+      const r = await decidirDiferimiento({
+        ...input,
+        diferidoDelCheckoutAbierto: abierto.lector,
+      });
+
+      expect(r.diferir).toBe(false);
+      expect(abierto.llamadas.n).toBe(0);
+      expect(lecturas.planes).toBe(0);
+    }
+  });
+
+  it("si el lector del checkout abierto tira, tira: no se cae a cobrar en el acto", async () => {
+    const { input } = armar();
+
+    await expect(decidirDiferimiento({
+      ...input,
+      diferidoDelCheckoutAbierto: checkoutAbierto(new Error("firestore caido")).lector,
+    })).rejects.toThrow("firestore caido");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El interruptor. Existe por si MP rechaza (o cuenta distinto) una prueba de dias,
+// que es lo unico del diseño que no se pudo probar contra la API.
+// ---------------------------------------------------------------------------
+
+describe("decidirDiferimiento: el interruptor", () => {
+  it("viene ENCENDIDO", () => {
+    expect(DIFERIR_PRIMER_COBRO_ENABLED).toBe(true);
+  });
+
+  it("encendido difiere", async () => {
+    const { input } = armar();
+
+    expect(await decidirDiferimiento({ ...input, habilitado: true }))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("sin pasarlo vale la constante (encendida)", async () => {
+    const { input } = armar();
+
+    expect(await decidirDiferimiento(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("apagado NUNCA difiere, aunque todo lo demas lo permita", async () => {
+    const { input } = armar();
+
+    expect(await decidirDiferimiento({ ...input, habilitado: false }))
+      .toEqual({ diferir: false, motivo: "deshabilitado" });
+  });
+
+  it("apagado no lee NADA: ni planes, ni MP, ni el checkout abierto", async () => {
+    const llamadas = { abierto: 0 };
+    const { input, lecturas } = armar();
+
+    await decidirDiferimiento({
+      ...input,
+      habilitado: false,
+      diferidoDelCheckoutAbierto: async () => {
+        llamadas.abierto += 1;
+        return FIN;
+      },
+    });
+
+    expect(lecturas.planes).toBe(0);
+    expect(lecturas.suscripciones).toEqual([]);
+    expect(llamadas.abierto).toBe(0);
+  });
+
+  it("apagado gana incluso con un checkout diferido abierto: no se lo reusa", async () => {
+    // El rollback tiene que ser real: con el interruptor apagado el pedido no
+    // lleva diferimiento y `abrirCheckout` abre un plan normal.
+    const { input } = armar();
+
+    const r = await decidirDiferimiento({
+      ...input,
+      habilitado: false,
+      diferidoDelCheckoutAbierto: async () => FIN,
+    });
+
+    expect(r.diferir).toBe(false);
+  });
+
+  it("apagado loguea el motivo", async () => {
+    const { input } = armar();
+
+    await decidirDiferimiento({ ...input, habilitado: false });
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se cobra en el acto",
+      expect.objectContaining({ uid: "t1", motivo: "deshabilitado" }),
+    );
+  });
+
+  it("apagarlo NO apaga las reglas del reconciliador: no leen el interruptor", () => {
+    // Los planes que ya se abrieron con prueba siguen existiendo en MP y siguen
+    // necesitando que se los lea asi. Si alguna de las funciones de esa mitad
+    // empezara a leer el interruptor, apagar el checkout los dejaria sin reglas.
+    const fuente = readFileSync(
+      join(__dirname, "../subscriptions/mp/diferir-primer-cobro.ts"),
+      "utf8",
+    );
+    const marca = "La otra mitad: como se LEE";
+    const mitadDelReconciliador = fuente.slice(fuente.indexOf(marca));
+
+    expect(fuente.indexOf(marca)).toBeGreaterThan(0);
+    expect(mitadDelReconciliador).toContain("aplicarPruebaDiferidaAlEstado");
+    expect(mitadDelReconciliador).not.toContain("DIFERIR_PRIMER_COBRO_ENABLED");
+    expect(mitadDelReconciliador).not.toContain("habilitado");
+
+    // Y el reconciliador ni lo importa.
+    const reconcile = readFileSync(
+      join(__dirname, "../subscriptions/mp/reconcile.ts"),
+      "utf8",
+    );
+    expect(reconcile).not.toContain("DIFERIR_PRIMER_COBRO_ENABLED");
+  });
+
+  it("con el interruptor apagado las reglas siguen leyendo un plan que ya tiene prueba", () => {
+    // La otra cara: la misma funcion que usa el reconciliador, sin ningun
+    // parametro que el interruptor pueda cambiar.
+    expect(aplicarPruebaDiferidaAlEstado({
+      ...EN_PRUEBA,
+      statusHoy: "grace",
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    })).toBe("active");
   });
 });
 
@@ -1296,8 +1965,9 @@ describe("aplicarPruebaDiferidaAlEstado: el horizonte E + holgura", () => {
 
 describe("aplicarPruebaDiferidaAlEstado: un link viejo pagado tarde", () => {
   it("autorizada varios dias despues de abrir el checkout: pending", () => {
-    // El link de un checkout no vence. Pagado tarde, el primer cobro cae tarde
-    // y el PF tendria plan pago sin haber pagado nada.
+    // El link de un checkout no vence. Pagado tarde, el primer cobro caeria tarde
+    // (suponiendo que la prueba corre desde la autorizacion) y el PF tendria plan
+    // pago sin haber pagado nada.
     expect(aplicarPruebaDiferidaAlEstado(autorizadaDespues(3 * 24)))
       .toBe("pending");
   });
@@ -1508,6 +2178,192 @@ describe("aplicarPruebaDiferidaAlPeriodo", () => {
       expect(aplicarPruebaDiferidaAlPeriodo(
         cancelada(null, { diferidoHastaMs }),
       )).toBeNull();
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// situacionDeLaPrueba: la clasificacion de la que sale el estado Y los warns.
+//
+// El reconciliador loguea un warn en dos de estas situaciones (la autorizacion
+// tardia deja sin plan a quien autorizo un pago; la prueba vencida sin cobro
+// podria estar dando acceso gratis), y decide el estado con la misma funcion.
+// ---------------------------------------------------------------------------
+
+describe("situacionDeLaPrueba", () => {
+  it("a tiempo y antes del horizonte: en-prueba", () => {
+    expect(situacionDeLaPrueba(EN_PRUEBA)).toBe("en-prueba");
+  });
+
+  it("a tiempo, un milisegundo antes del horizonte: en-prueba", () => {
+    expect(situacionDeLaPrueba({
+      ...EN_PRUEBA,
+      nowMs: FIN + HOLGURA_PRUEBA_MS - 1,
+    })).toBe("en-prueba");
+  });
+
+  it("a tiempo y en el horizonte exacto: vencida", () => {
+    expect(situacionDeLaPrueba({
+      ...EN_PRUEBA,
+      nowMs: FIN + HOLGURA_PRUEBA_MS,
+    })).toBe("vencida");
+  });
+
+  it("a tiempo y mucho despues del horizonte: vencida", () => {
+    expect(situacionDeLaPrueba({
+      ...EN_PRUEBA,
+      nowMs: FIN + 30 * DIA_MS,
+    })).toBe("vencida");
+  });
+
+  it("autorizada fuera de la ventana: fuera-de-ventana, antes o despues del horizonte", () => {
+    for (const nowMs of [AHORA, FIN + HOLGURA_PRUEBA_MS + DIA_MS]) {
+      expect(situacionDeLaPrueba({ ...autorizadaDespues(5 * 24), nowMs }))
+        .toBe("fuera-de-ventana");
+    }
+  });
+
+  it("sin fechas que se entiendan: fuera-de-ventana", () => {
+    expect(situacionDeLaPrueba({ ...EN_PRUEBA, planCreadoMs: null }))
+      .toBe("fuera-de-ventana");
+    expect(situacionDeLaPrueba({ ...EN_PRUEBA, mpDateCreated: "ayer" }))
+      .toBe("fuera-de-ventana");
+  });
+
+  it("no-aplica: un plan que no es diferido", () => {
+    for (const diferidoHastaMs of [undefined, null, Number.NaN, "x"]) {
+      expect(situacionDeLaPrueba({
+        ...autorizadaDespues(5 * 24),
+        diferidoHastaMs,
+      })).toBe("no-aplica");
+    }
+  });
+
+  it("no-aplica: una suscripcion que ya tuvo un cobro exitoso", () => {
+    expect(situacionDeLaPrueba({
+      ...autorizadaDespues(5 * 24),
+      summarized: { charged_quantity: 1, charged_amount: 22000 },
+    })).toBe("no-aplica");
+  });
+
+  it("no-aplica: MP no dice authorized", () => {
+    for (const mpStatus of ["pending", "paused", "cancelled", undefined]) {
+      expect(situacionDeLaPrueba({ ...EN_PRUEBA, mpStatus })).toBe("no-aplica");
+    }
+  });
+
+  it("un cobro en $0 sigue siendo una prueba", () => {
+    expect(situacionDeLaPrueba({
+      ...EN_PRUEBA,
+      summarized: { charged_quantity: 1, charged_amount: 0 },
+    })).toBe("en-prueba");
+  });
+
+  it("es coherente con el estado que se escribe", () => {
+    // La situacion y el estado salen de la misma regla: si divergieran, el log
+    // diria una cosa y el PF tendria otra.
+    const casos: [PruebaDiferidaInput, string][] = [
+      [EN_PRUEBA, "active"],
+      [{ ...EN_PRUEBA, nowMs: FIN + 10 * DIA_MS, statusHoy: "grace" }, "grace"],
+      [{ ...EN_PRUEBA, nowMs: FIN + 10 * DIA_MS, statusHoy: "active" }, "active"],
+      [autorizadaDespues(5 * 24), "pending"],
+      [{ ...EN_PRUEBA, mpStatus: "cancelled", statusHoy: "cancelled" }, "cancelled"],
+    ];
+
+    for (const [entrada, estado] of casos) {
+      expect(aplicarPruebaDiferidaAlEstado(entrada)).toBe(estado);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Un cobro de $0 no apaga las reglas de la prueba.
+//
+// "Sin cobro exitoso" es `charged_quantity` ausente o 0, O un monto cobrado en
+// $0 o menos. Si la autorizacion de la prueba contara como un pago, las reglas se
+// apagarian antes de que MP haya cobrado un peso.
+// ---------------------------------------------------------------------------
+
+describe("las reglas de la prueba con un cobro de $0", () => {
+  /** El resumen de una prueba recien autorizada que MP reportara como un cobro de $0. */
+  const AUTORIZACION_EN_CERO = {
+    charged_quantity: 1,
+    charged_amount: 0,
+    pending_charge_quantity: 1,
+  };
+
+  it("a tiempo y con un 'cobro pendiente' sigue siendo active, no grace", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...EN_PRUEBA,
+      statusHoy: "grace",
+      summarized: AUTORIZACION_EN_CERO,
+    });
+
+    expect(r).toBe("active");
+  });
+
+  it("un link viejo pagado tarde sigue siendo pending", () => {
+    const r = aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      statusHoy: "active",
+      summarized: AUTORIZACION_EN_CERO,
+    });
+
+    expect(r).toBe("pending");
+  });
+
+  it("una prueba cancelada se acota igual a E", () => {
+    const r = aplicarPruebaDiferidaAlPeriodo({
+      ...EN_PRUEBA,
+      mpStatus: "cancelled",
+      statusHoy: "cancelled",
+      summarized: AUTORIZACION_EN_CERO,
+      periodEndMs: AHORA + 30 * DIA_MS,
+    });
+
+    expect(r).toBe(FIN);
+  });
+
+  for (const [caso, montos] of MONTOS_SIN_PAGO) {
+    it(`con ${caso} las reglas siguen aplicando`, () => {
+      const summarized = { charged_quantity: 1, ...montos };
+
+      expect(aplicarPruebaDiferidaAlEstado({
+        ...autorizadaDespues(5 * 24),
+        summarized,
+      })).toBe("pending");
+      expect(aplicarPruebaDiferidaAlPeriodo({
+        ...EN_PRUEBA,
+        mpStatus: "cancelled",
+        summarized,
+        periodEndMs: AHORA + 30 * DIA_MS,
+      })).toBe(FIN);
+    });
+  }
+
+  it("con un monto POSITIVO el cobro es real y las reglas se apagan", () => {
+    const summarized = { charged_quantity: 1, charged_amount: 22000 };
+
+    expect(aplicarPruebaDiferidaAlEstado({
+      ...autorizadaDespues(5 * 24),
+      statusHoy: "grace",
+      summarized,
+    })).toBe("grace");
+    expect(aplicarPruebaDiferidaAlPeriodo({
+      ...EN_PRUEBA,
+      mpStatus: "cancelled",
+      summarized,
+      periodEndMs: AHORA + 30 * DIA_MS,
+    })).toBe(AHORA + 30 * DIA_MS);
+  });
+
+  for (const [caso, montos] of MONTOS_QUE_CUENTAN) {
+    it(`con ${caso} (cantidad 1) el cobro cuenta y las reglas se apagan`, () => {
+      expect(aplicarPruebaDiferidaAlEstado({
+        ...autorizadaDespues(5 * 24),
+        statusHoy: "grace",
+        summarized: { charged_quantity: 1, ...montos },
+      })).toBe("grace");
     });
   }
 });

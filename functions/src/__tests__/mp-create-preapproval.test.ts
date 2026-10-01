@@ -76,7 +76,10 @@ import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
 
 type Store = Record<string, Record<string, Record<string, unknown>>>;
 
-function fakeApp(seed: Store = {}, opts: { fallaLaQueryDePlanes?: boolean } = {}) {
+function fakeApp(
+  seed: Store = {},
+  opts: { fallaLaQueryDePlanes?: boolean; fallaLaLecturaDeCheckouts?: boolean } = {},
+) {
   // Copia por DOCUMENTO y no por JSON: los Timestamp de mentira de los planes
   // llevan una funcion (`toMillis`) que un clon por JSON borra.
   const store: Store = {};
@@ -85,15 +88,23 @@ function fakeApp(seed: Store = {}, opts: { fallaLaQueryDePlanes?: boolean } = {}
     for (const [id, d] of Object.entries(docs)) store[col][id] = { ...d };
   }
   const escrituras: { col: string; id: string; data: unknown }[] = [];
+  /** Cada `get` de un documento, en orden: lo que fija cuanto se lee y cuando. */
+  const lecturas: { col: string; id: string }[] = [];
 
   const app = {
     firestore: () => ({
       collection: (col: string) => ({
         doc: (id: string) => ({
-          get: async () => ({
-            exists: store[col]?.[id] !== undefined,
-            data: () => store[col]?.[id],
-          }),
+          get: async () => {
+            lecturas.push({ col, id });
+            if (opts.fallaLaLecturaDeCheckouts && col === "mp_checkouts") {
+              throw new Error("firestore caido");
+            }
+            return {
+              exists: store[col]?.[id] !== undefined,
+              data: () => store[col]?.[id],
+            };
+          },
           set: async (data: Record<string, unknown>) => {
             store[col] = store[col] ?? {};
             store[col][id] = data;
@@ -122,7 +133,7 @@ function fakeApp(seed: Store = {}, opts: { fallaLaQueryDePlanes?: boolean } = {}
     }),
   };
 
-  return { app: app as never, store, escrituras };
+  return { app: app as never, store, escrituras, lecturas };
 }
 
 /**
@@ -633,7 +644,8 @@ describe("runCreatePreapproval — cuando MP falla", () => {
 // Volver a suscribirse con dias ya pagos. Un PF que se dio de baja conserva el
 // plan hasta `currentPeriodEnd`; si antes de esa fecha vuelve al MISMO plan, el
 // checkout nuevo cobraba en el acto y pagaba dos veces los mismos dias. Ahora el
-// plan nace con una prueba de N dias y MP cobra cuando el periodo vence.
+// plan nace con una prueba de N dias y se espera que MP cobre cuando el periodo
+// vence (supuesto que no esta medido contra MP).
 // La regla entera se prueba en `mp-diferir-primer-cobro.test.ts`; acá se fija
 // lo que ESTE handler hace con la decision.
 // ---------------------------------------------------------------------------
@@ -694,7 +706,8 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     }, deps(mp.client));
 
     expect(r.status).toBe("created");
-    // 13 dias exactos: el primer cobro cae cuando vence lo que ya estaba pago.
+    // 13 dias exactos: se busca que el primer cobro caiga cuando vence lo que ya
+    // estaba pago.
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(FIN);
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
@@ -1002,6 +1015,8 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       status: "reused",
     });
     expect(mp.llamadas).toHaveLength(0);
+    // Y tampoco se vuelve a buscar el pago en MP: ya se verifico cuando se abrio.
+    expect(mp.busquedas).toEqual([]);
   });
 
   it("un checkout NORMAL guardado no se reusa para un pedido que ahora difiere", async () => {
@@ -1020,6 +1035,8 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     expect(r.status).toBe("created");
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
+    // Un checkout normal NO es atajo: se busca el pago en MP como siempre.
+    expect(mp.busquedas).toEqual(["p0"]);
   });
 
   it("un checkout DIFERIDO guardado no se reusa para un pedido normal", async () => {
@@ -1039,10 +1056,13 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     esUnCheckoutNormal(mp, store);
   });
 
-  it("un checkout diferido a OTRA fecha tampoco se reusa", async () => {
+  it("un checkout diferido a una fecha que PASA del fin de periodo de hoy no se reusa", async () => {
+    // Si el periodo se achico desde que se abrio, esa fecha ya no es lo que el PF
+    // tiene pago: no hay atajo, se busca en MP, y el resultado (FIN) no coincide
+    // con lo guardado, asi que se abre un plan nuevo con la fecha correcta.
     const mundo = PF_DADO_DE_BAJA();
     mundo.mp_checkouts = {
-      t1: checkoutGuardado({ diferidoHastaMs: FIN - 3 * DIA_MS }),
+      t1: checkoutGuardado({ diferidoHastaMs: FIN + 3 * DIA_MS }),
     };
     const { app, store } = fakeApp(mundo);
     const mp = fakeMp(undefined, COBRO_DE_P0);
@@ -1053,6 +1073,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
 
     expect(r.status).toBe("created");
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
+    expect(mp.busquedas).toEqual(["p0"]);
   });
 
   it("un checkout guardado ANTES de esto (sin el campo) se sigue reusando en un pedido normal", async () => {
@@ -1071,5 +1092,166 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
 
     expect(r.status).toBe("reused");
     expect(mp.llamadas).toHaveLength(0);
+  });
+
+  // ── El doble click: con un checkout diferido ya abierto, NO se vuelve a buscar ──
+  //
+  // Sin el atajo, cada toque de un PF dado de baja pagaba hasta tres busquedas en
+  // MP aunque el checkout ya estuviera abierto y fuera a reusarse. La verificacion
+  // del pago se hizo cuando se abrio.
+
+  const PEDIDO = { tier: "plan2", cycle: "monthly" };
+
+  it("el segundo toque reusa el checkout y hace 0 busquedas en MP", async () => {
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const primero = await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+    expect(primero.status).toBe("created");
+    // La verificacion se hizo UNA vez.
+    expect(mp.busquedas).toEqual(["p0"]);
+
+    const segundo = await runCreatePreapproval(
+      app, "t1", PEDIDO, { mpClient: mp.client, nowMs: AHORA + 60_000 });
+
+    expect(segundo).toEqual({
+      initPoint: primero.initPoint,
+      planId: primero.planId,
+      status: "reused",
+    });
+    // Ni una busqueda mas, ni un plan mas.
+    expect(mp.busquedas).toEqual(["p0"]);
+    expect(mp.llamadas).toHaveLength(1);
+  });
+
+  it("diez toques seguidos hacen UNA sola verificacion y UN solo plan", async () => {
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    for (let toque = 0; toque < 10; toque++) {
+      await runCreatePreapproval(
+        app, "t1", PEDIDO, { mpClient: mp.client, nowMs: AHORA + toque * 1000 });
+    }
+
+    expect(mp.busquedas).toHaveLength(1);
+    expect(mp.llamadas).toHaveLength(1);
+  });
+
+  it("el atajo trae la MISMA fecha: lo que se reusa es lo que se guardo", async () => {
+    const { app, store } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+    await runCreatePreapproval(
+      app, "t1", PEDIDO, { mpClient: mp.client, nowMs: AHORA + 60_000 });
+
+    expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
+    expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(FIN);
+  });
+
+  it("pasada la ventana de reuso se vuelve a buscar y se abre un plan nuevo", async () => {
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp({ id: "otro", init_point: "https://mp/otro" }, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+    const tarde = await runCreatePreapproval(
+      app, "t1", PEDIDO, { mpClient: mp.client, nowMs: AHORA + 31 * 60 * 1000 });
+
+    expect(tarde.status).toBe("created");
+    expect(mp.busquedas).toEqual(["p0", "p0"]);
+    expect(mp.llamadas).toHaveLength(2);
+  });
+
+  it("otro ciclo dentro de la ventana no usa el atajo: se busca y se abre un plan nuevo", async () => {
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+    const anual = await runCreatePreapproval(
+      app, "t1", { tier: "plan2", cycle: "annual" },
+      { mpClient: mp.client, nowMs: AHORA + 60_000 });
+
+    expect(anual.status).toBe("created");
+    expect(mp.busquedas).toEqual(["p0", "p0"]);
+  });
+
+  it("otro tier dentro de la ventana tampoco: no es atajo ni es elegible", async () => {
+    // Pide plan3 estando dado de baja en plan2: no es volver al mismo plan.
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+    const otro = await runCreatePreapproval(
+      app, "t1", { tier: "plan3", cycle: "monthly" },
+      { mpClient: mp.client, nowMs: AHORA + 60_000 });
+
+    expect(otro.status).toBe("created");
+    expect(mp.busquedas).toEqual(["p0"]);
+    expect(mp.llamadas[1]).not.toHaveProperty("freeTrialDays");
+  });
+
+  it("con una fecha guardada que queda a MENOS de un dia no hay atajo: se busca en MP", async () => {
+    const mundo = PF_DADO_DE_BAJA();
+    mundo.mp_checkouts = {
+      t1: checkoutGuardado({ diferidoHastaMs: AHORA + 6 * 60 * 60 * 1000 }),
+    };
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const r = await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual(["p0"]);
+    expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
+  });
+
+  it("con una fecha guardada valida, aunque distinta de la que saldria de buscar, SI se reusa", async () => {
+    // El atajo confia en la fecha guardada: la verificacion contra MP se hizo
+    // cuando se abrio ese checkout, hace menos de 30 minutos.
+    const mundo = PF_DADO_DE_BAJA();
+    mundo.mp_checkouts = {
+      t1: checkoutGuardado({ diferidoHastaMs: FIN - 3 * DIA_MS }),
+    };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const r = await runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client));
+
+    expect(r.status).toBe("reused");
+    expect(mp.busquedas).toEqual([]);
+    expect(mp.llamadas).toHaveLength(0);
+  });
+
+  it("no mira el checkout abierto si el PF ni siquiera es elegible: una sola lectura", async () => {
+    // La elegibilidad barata va primero y no lee nada. Un PF sin suscripcion lee
+    // `mp_checkouts` una vez (la de `abrirCheckout`); uno elegible, dos (el atajo
+    // y `abrirCheckout`).
+    const noElegible = fakeApp(PF);
+    await runCreatePreapproval(
+      noElegible.app, "t1", PEDIDO, deps(fakeMp().client));
+    const elegible = fakeApp(PF_DADO_DE_BAJA());
+    await runCreatePreapproval(
+      elegible.app, "t1", PEDIDO, deps(fakeMp(undefined, COBRO_DE_P0).client));
+
+    const deCheckouts = (l: { col: string }[]) =>
+      l.filter((x) => x.col === "mp_checkouts").length;
+    expect(deCheckouts(noElegible.lecturas)).toBe(1);
+    expect(deCheckouts(elegible.lecturas)).toBe(2);
+  });
+
+  it("si falla la lectura del checkout abierto: `unavailable` y NO se crea nada", async () => {
+    // Igual que cuando fallan los planes o MP: seguir de largo seria abrir un
+    // checkout que quiza cobre dos veces.
+    const { app, escrituras } = fakeApp(PF_DADO_DE_BAJA(), {
+      fallaLaLecturaDeCheckouts: true,
+    });
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", PEDIDO, deps(mp.client)));
+
+    expect(err.code).toBe("unavailable");
+    expect(mp.llamadas).toHaveLength(0);
+    expect(escrituras).toHaveLength(0);
   });
 });

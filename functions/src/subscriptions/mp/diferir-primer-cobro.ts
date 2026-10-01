@@ -13,13 +13,34 @@
  * ── El arreglo ──
  *
  * El plan nuevo se crea con una prueba de N dias (`auto_recurring.free_trial`),
- * donde N es lo que le queda al periodo pago. MP cobra por primera vez cuando la
- * prueba termina, o sea cuando lo que ya estaba pago vence.
+ * donde N es lo que le queda al periodo pago. La idea es que MP cobre por primera
+ * vez cuando la prueba termina, o sea cuando lo que ya estaba pago vence. Que MP
+ * se comporte asi NO esta medido: ver la seccion siguiente.
  *
- * Este archivo es PURO a proposito: no toca Firestore ni MP. Las dos lecturas que
- * necesita entran por parametro (`leerPlanes`, `leerSuscripciones`), asi que se
- * testea con fakes de una linea y ningun test puede pasar porque un mock de
- * Firestore acepto de mas.
+ * ── Lo que se ASUME de MP y NO esta medido ──
+ *
+ * Nadie probo este flujo contra la API real. Todo lo que sigue es un supuesto,
+ * sacado de los tipos del SDK oficial y del sentido comun, y el codigo esta
+ * escrito para no depender de que se cumpla al pie de la letra:
+ *
+ *   a. Que la API acepte `free_trial` en dias dentro del `auto_recurring` de un
+ *      plan (los tipos del SDK lo declaran). Si lo rechazara, el checkout de un PF
+ *      con dias pagos fallaria: para eso esta el interruptor
+ *      [DIFERIR_PRIMER_COBRO_ENABLED].
+ *   b. Que la prueba corra desde que el pagador AUTORIZA y que sean N dias
+ *      corridos. Si MP los cuenta en su propio calendario (-04:00), el primer
+ *      cobro podria caer hasta un dia ANTES de la fecha que calculamos. El `ceil`
+ *      de [diasDePrueba] apunta a que no caiga antes, pero solo vale bajo este
+ *      supuesto: ninguna otra regla depende de ello (el reconciliador deja
+ *      holgura, y un plan con prueba se descarta como evidencia solo si le faltan
+ *      mas de [ADELANTO_MAXIMO_DEL_COBRO_MS] para cobrar).
+ *   c. Que `date_created` de la suscripcion sea el momento de la autorizacion, y
+ *      que `pending_charge_quantity` pueda contar el primer cobro programado.
+ *
+ * Este archivo es PURO a proposito: no toca Firestore ni MP. Las lecturas que
+ * necesita entran por parametro (`leerPlanes`, `leerSuscripciones`,
+ * `diferidoDelCheckoutAbierto`), asi que se testea con fakes de una linea y ningun
+ * test puede pasar porque un mock de Firestore acepto de mas.
  *
  * Tiene dos mitades que comparten constantes y vocabulario:
  *
@@ -55,6 +76,28 @@ import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import { MpPreapproval } from "./client";
 
+/**
+ * El interruptor del diferimiento. ENCENDIDO.
+ *
+ * Apagado, el checkout NUNCA difiere: `decidirDiferimiento` corta antes de leer
+ * nada y el PF paga en el acto, como antes de que existiera esto. Existe por lo
+ * unico que no se pudo probar de todo el diseño: que la API de MP acepte una
+ * prueba en dias y la cuente como suponemos (ver "Lo que se ASUME de MP"). Si un
+ * checkout diferido empieza a fallar, el rollback es `false` y un deploy; no hay
+ * nada que migrar.
+ *
+ * Lo que NO apaga: las reglas del reconciliador (`aplicarPruebaDiferidaAlEstado`
+ * y `aplicarPruebaDiferidaAlPeriodo`). Los planes que ya se abrieron con prueba
+ * siguen existiendo en MP y siguen necesitando que se los lea asi; apagar el
+ * checkout no los cierra. Por eso esas funciones no leen este valor.
+ *
+ * `decidirDiferimiento` lo recibe por parametro (`habilitado`), con esta
+ * constante de default, igual que `resolvePlanLimits` con sus interruptores
+ * (`trainer-plan-limits.ts`): si no, uno de los dos caminos se shipearia sin un
+ * test encima.
+ */
+export const DIFERIR_PRIMER_COBRO_ENABLED = true;
+
 /** Un dia en ms. La prueba que le mandamos a MP se cuenta en dias. */
 export const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -71,10 +114,22 @@ export const MIN_DIFERIMIENTO_MS = DIA_MS;
  * Cuantos planes del PF se le consultan a MP para comprobar un pago.
  *
  * Cada uno es una llamada en el camino del boton "ELEGIR PLAN", asi que el peor
- * caso tiene que estar acotado. Tres alcanzan para lo real: el plan que pago, y
- * un par de checkouts posteriores que el PF abrio y no completo.
+ * caso tiene que estar acotado. El tope se aplica DESPUES de descartar los planes
+ * que no pueden ser evidencia (ver [planesARevisar]): cortar antes deja afuera
+ * justo al que pago.
  */
 export const MAX_PLANES_A_REVISAR = 3;
+
+/**
+ * Cuanto antes de E suponemos, como maximo, que MP puede cobrar el primer cobro
+ * de un plan con prueba.
+ *
+ * Los dias de prueba se calculan para que el cobro caiga en E. Si MP los cuenta en
+ * su propio calendario (-04:00) y no en tramos de 24 h (no esta medido), el cobro
+ * puede caer hasta un dia antes. Se usa para decidir que un plan con prueba
+ * TODAVIA NO PUDO COBRAR (ver [planesARevisar]); es un margen, no una garantia.
+ */
+export const ADELANTO_MAXIMO_DEL_COBRO_MS = DIA_MS;
 
 /** Un plan de `mp_plans` tal como sale de Firestore, sin interpretar. */
 export interface PlanDeLaCuenta {
@@ -97,31 +152,98 @@ function creadoEnMs(createdAt: unknown): number {
 }
 
 /**
- * Los planes de este PF que vale la pena consultarle a MP para comprobar un
- * pago: los de PF (no los de alumno) del MISMO tier que pide, del mas nuevo al
- * mas viejo, y no mas de [MAX_PLANES_A_REVISAR].
+ * Si este plan PUEDE ser la evidencia de un pago. Ver [planesARevisar] para el
+ * por que de cada filtro.
+ */
+function puedeHaberCobrado(
+  data: Record<string, unknown>,
+  tier: SubscriptionTier,
+  nowMs: number,
+): boolean {
+  // Un plan de PF (no de alumno) del MISMO tier que pide.
+  if (data.producto === "athlete" || data.tier !== tier) return false;
+
+  // Cerrado por una baja: `terminal` y SIN motivo.
+  if (data.terminal !== true || typeof data.terminalReason === "string") {
+    return false;
+  }
+
+  // Un plan con prueba que todavia no pudo cobrar.
+  const e = data.diferidoHastaMs;
+  if (
+    typeof e === "number" &&
+    Number.isFinite(e) &&
+    e > nowMs + ADELANTO_MAXIMO_DEL_COBRO_MS
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export interface PlanesARevisar {
+  /** Cuantos planes pasaron los filtros: ANTES del tope. Va al log. */
+  candidatos: number;
+  /** A los que se les pregunta a MP: los mas nuevos, hasta [MAX_PLANES_A_REVISAR]. */
+  ids: string[];
+}
+
+/**
+ * Los planes de este PF a los que vale la pena preguntarle a MP si cobraron.
  *
- * El filtro por tier no es prolijidad. El diferimiento solo aplica a volver al
- * mismo plan, asi que un pago de otro tier no prueba nada sobre este.
+ * ── El orden importa: primero se descarta, DESPUES se corta ──
  *
- * `producto !== "athlete"` y no `=== "trainer"`: los planes de PF anteriores al
- * 2026-09-17 no tienen el campo (ver el default de `lookupPlan`), y son
- * justamente los que mas pueden haber pagado.
+ * Cortar por recencia sobre TODOS los planes del tier deja afuera al que pago.
+ * Cada toque del boton fuera de la ventana de reuso de 30 minutos, y cada cambio
+ * de ciclo, abre un plan nuevo en MP: con tres toques sin pagar, el plan que si
+ * pago es el cuarto mas nuevo, no se revisa, y al PF se le cobra en el acto lo que
+ * ya tenia pago. Por eso el tope va al final y los filtros van antes. Los filtros:
  *
- * El orden se resuelve ACA, en memoria, y no en la query: un `orderBy` sobre un
- * campo distinto del `where` exigiria un indice compuesto. Con un puñado de
- * planes por PF ordenar despues no cuesta nada.
+ *   1. **Un plan de PF del MISMO tier que pide.** El diferimiento solo aplica a
+ *      volver al mismo plan, asi que un pago de otro tier (o de un alumno) no
+ *      prueba nada sobre este. `producto !== "athlete"` y no `=== "trainer"`: los
+ *      planes de PF anteriores al 2026-09-17 no tienen el campo (ver el default de
+ *      `lookupPlan`), y son justamente los que mas pueden haber pagado.
+ *
+ *   2. **Cerrado por una baja: `terminal === true` y SIN `terminalReason`.** Un
+ *      plan que MP dio de baja (`cancelled`) tuvo una suscripcion de verdad, y
+ *      `reconcile.ts` lo marca `terminal` sin motivo. Un checkout que el PF abrio
+ *      y no pago NO es terminal, asi que sale de la lista sin preguntarle nada a
+ *      MP. Ojo con la segunda mitad del filtro: el barrido nocturno SI marca
+ *      `terminal` a un checkout sin suscripcion a los 30 dias (con
+ *      `terminalReason: "checkout abandonado"`), y a un plan que nosotros
+ *      reemplazamos (con `"reemplazado por otro plan"`). Sin descartar los que
+ *      traen motivo, un PF con un anual (periodo de hasta 12 meses) y varios
+ *      toques de hace mas de un mes volveria a empujar fuera al plan que pago. El
+ *      costo: un checkout abandonado que se pago tarde y despues se cancelo
+ *      conserva su motivo y queda afuera. Es raro, y el resultado es cobrar en el
+ *      acto, como antes.
+ *
+ *   3. **Si el plan se abrio con prueba, que haya podido cobrar.** Un plan
+ *      diferido (`diferidoHastaMs` = E) no cobra antes de E, salvo por el adelanto
+ *      que suponemos como maximo ([ADELANTO_MAXIMO_DEL_COBRO_MS], no esta medido).
+ *      Volver a suscribirse y cancelar dentro del mismo periodo deja un plan
+ *      terminal por vuelta, ninguno llega a cobrar, y todos comparten E (el fin del
+ *      periodo pago): tres vueltas empujarian fuera al plan que si pago.
+ *
+ * Del mas nuevo al mas viejo. El orden se resuelve ACA, en memoria, y no en la
+ * query: un `orderBy` sobre un campo distinto del `where` exigiria un indice
+ * compuesto, y con un puñado de planes por PF ordenar despues no cuesta nada.
  */
 export function planesARevisar(
   planes: PlanDeLaCuenta[],
   tier: SubscriptionTier,
-): string[] {
-  return planes
-    .filter(({ data }) => data.producto !== "athlete" && data.tier === tier)
+  nowMs: number,
+): PlanesARevisar {
+  const candidatos = planes
+    .filter(({ data }) => puedeHaberCobrado(data, tier, nowMs))
     .map(({ id, data }) => ({ id, creado: creadoEnMs(data.createdAt) }))
-    .sort((a, b) => b.creado - a.creado)
-    .slice(0, MAX_PLANES_A_REVISAR)
-    .map((p) => p.id);
+    .sort((a, b) => b.creado - a.creado);
+
+  return {
+    candidatos: candidatos.length,
+    ids: candidatos.slice(0, MAX_PLANES_A_REVISAR).map((p) => p.id),
+  };
 }
 
 /**
@@ -145,6 +267,65 @@ function sumarMesesUtc(desdeMs: number, meses: number): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
+/**
+ * Un monto de `summarized` como numero, o `null` si no vino o no se entiende.
+ *
+ * Acepta un number finito, o un string que sea un numero: el SDK oficial tipa
+ * `last_charged_amount` como `string | null` y `charged_amount` como
+ * `number | null` (`sdk-nodejs/src/clients/preApproval/commonTypes.ts`,
+ * `SummarizedResponse`, consultado el 2026-10-01), y no sabemos cual de las dos
+ * formas manda la API de verdad. Un string vacio NO es 0: `Number("")` da 0, y
+ * leerlo asi convertiria un campo vacio en un monto de $0.
+ */
+function montoDe(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Cuantos cobros EXITOSOS muestra `summarized`: `charged_quantity` si es un numero
+ * finito >= 1 y ningun monto cobrado dice $0 o menos; si no, `0`.
+ *
+ * ── Por que no alcanza con `charged_quantity` ──
+ *
+ * Una autorizacion de prueba puede figurar como un "cobro" de $0: MP podria
+ * reportarla con `charged_quantity >= 1` y `charged_amount: 0` (no esta medido).
+ * Contarla como un pago convertiria el alta de una prueba en evidencia de que el
+ * PF pago un periodo entero, o apagaria las reglas de la prueba diferida antes de
+ * que MP haya cobrado un peso. Por eso, si `charged_amount` o `last_charged_amount`
+ * vienen como numero y no son positivos, no hay cobro.
+ *
+ * Un monto que falta (o no se entiende) NO descuenta nada: se cae a la regla de la
+ * cantidad, que es la de siempre. Pedir el monto como condicion obligatoria
+ * dejaria sin evidencia a todo plan si MP no lo manda.
+ *
+ * La usan las DOS mitades: la evidencia de pago al abrir el checkout
+ * ([evidenciaDePago]) y la regla del reconciliador que decide si una prueba
+ * "todavia no cobro". Que las dos lean lo mismo es lo que evita que una crea que
+ * hubo un pago y la otra no.
+ */
+export function cobrosExitosos(summarized: unknown): number {
+  if (summarized === null || typeof summarized !== "object") return 0;
+  const r = summarized as {
+    charged_quantity?: unknown;
+    charged_amount?: unknown;
+    last_charged_amount?: unknown;
+  };
+
+  const n = r.charged_quantity;
+  if (typeof n !== "number" || !Number.isFinite(n) || n < 1) return 0;
+
+  for (const bruto of [r.charged_amount, r.last_charged_amount]) {
+    const monto = montoDe(bruto);
+    if (monto !== null && monto <= 0) return 0;
+  }
+  return n;
+}
+
 /** De donde salio la fecha con la que se da por pagado un periodo. */
 export type FuenteDelPago = "ultimo-cobro" | "alta";
 
@@ -158,11 +339,12 @@ export interface EvidenciaDePago {
  * Hasta cuando esta PAGO el periodo de una suscripcion, segun lo que MP dice que
  * cobro, y de donde sale esa fecha. `null` si no hay evidencia de un cobro real.
  *
- * Siempre hacen falta dos cosas: que MP confirme cobros
- * (`summarized.charged_quantity >= 1`) y un periodo que entendemos
- * (`auto_recurring`: un entero de 1 a 24, en `months`). Sin alguna de las dos la
- * cuenta seria inventada, y una fecha inventada es un dia regalado o un cobro
- * adelantado. Con eso hay dos fuentes, en este orden:
+ * Siempre hacen falta dos cosas: que MP confirme cobros EXITOSOS (ver
+ * [cobrosExitosos]: `summarized.charged_quantity >= 1` y ningun monto cobrado en
+ * $0 o menos, porque la autorizacion de una prueba no es un pago) y un periodo que
+ * entendemos (`auto_recurring`: un entero de 1 a 24, en `months`). Sin alguna de
+ * las dos la cuenta seria inventada, y una fecha inventada es un dia regalado o un
+ * cobro adelantado. Con eso hay dos fuentes, en este orden:
  *
  *   1. **`last_charged_date`** (fuente `ultimo-cobro`): el ULTIMO cobro exitoso
  *      mas un periodo. Es la fecha que midio MP, y gana siempre que se entienda,
@@ -203,13 +385,13 @@ export interface EvidenciaDePago {
  * ── Y por que NO con una prueba gratis ──
  *
  * La cuenta del respaldo supone que el primer cobro cae en `date_created`. Con
- * `free_trial` (que es como abrimos NOSOTROS los planes diferidos) el primero cae
- * cuando la prueba termina, y no sabemos cuantos dias despues: MP puede contarlos
- * distinto de como los mandamos, y eso no esta medido. `alta + cobros * periodo`
- * ignoraria la prueba entera. Se prefiere no reconstruir nada: se devuelve `null`,
- * el diferimiento no se dispara y el checkout cobra en el acto, que es el
- * comportamiento de antes. Para esos planes `last_charged_date` es la UNICA
- * fuente.
+ * `free_trial` (que es como abrimos NOSOTROS los planes diferidos) se espera que el
+ * primero caiga cuando la prueba termina, y no sabemos cuantos dias despues: MP
+ * puede contarlos distinto de como los mandamos, y eso no esta medido.
+ * `alta + cobros * periodo` ignoraria la prueba entera. Se prefiere no reconstruir
+ * nada: se devuelve `null`, el diferimiento no se dispara y el checkout cobra en el
+ * acto, que es el comportamiento de antes. Para esos planes `last_charged_date` es
+ * la UNICA fuente.
  *
  * "Con prueba" es cualquier `free_trial` que no sea `null` ni este ausente:
  * ante una forma que no conocemos (un objeto vacio, un string) no se asume que
@@ -221,15 +403,10 @@ export interface EvidenciaDePago {
  */
 export function evidenciaDePago(sub: MpPreapproval): EvidenciaDePago | null {
   const resumen = sub.summarized;
-  if (resumen === null || typeof resumen !== "object") return null;
-  const { charged_quantity: cobros, last_charged_date: ultimo } = resumen as {
-    charged_quantity?: unknown;
-    last_charged_date?: unknown;
-  };
-
-  if (typeof cobros !== "number" || !Number.isFinite(cobros) || cobros < 1) {
-    return null;
-  }
+  const cobros = cobrosExitosos(resumen);
+  if (cobros < 1) return null;
+  // `cobros >= 1` implica que `resumen` es un objeto.
+  const { last_charged_date: ultimo } = resumen as { last_charged_date?: unknown };
 
   const ar = sub.auto_recurring;
   if (ar === null || typeof ar !== "object") return null;
@@ -276,13 +453,17 @@ export function pagadoHastaDe(sub: MpPreapproval): number | null {
 }
 
 /**
- * Cuantos dias de prueba hay que mandarle a MP para que el primer cobro caiga en
- * [diferidoHastaMs] o apenas despues, NUNCA antes.
+ * Cuantos dias de prueba hay que mandarle a MP para que, SI cuenta N dias corridos
+ * de 24 h desde la autorizacion, el primer cobro caiga en [diferidoHastaMs] o
+ * apenas despues.
  *
- * `ceil` y no `round`: redondear hacia abajo adelantaria el cobro y el PF
- * pagaria antes de que venza lo que ya pago, que es el bug entero. El costo de
- * redondear hacia arriba es que el primer cobro cae hasta un dia despues, que
- * es el lado barato de equivocarse.
+ * El "si" es un supuesto que NO esta medido (ver "Lo que se ASUME de MP"): si MP
+ * cuenta los dias en su propio calendario (-04:00), el cobro podria caer hasta un
+ * dia ANTES de esa fecha, y este calculo no lo puede evitar. Lo que SI evita es
+ * empeorarlo por redondeo: `ceil` y no `round`, porque redondear hacia abajo
+ * adelantaria el cobro y el PF pagaria antes de que venza lo que ya pago, que es
+ * el bug entero. El costo de redondear hacia arriba es que el cobro cae hasta un
+ * dia despues, que es el lado barato de equivocarse.
  *
  * Vive aca y la llama `abrir-checkout.ts`: los dias salen de UN solo lugar, a
  * partir de `diferidoHastaMs` y del reloj del request.
@@ -293,6 +474,7 @@ export function diasDePrueba(diferidoHastaMs: number, nowMs: number): number {
 
 /** Por que NO se difiere. Va al log para poder explicar un cobro en el acto. */
 export type MotivoSinDiferir =
+  | "deshabilitado"
   | "sin-suscripcion"
   | "estado-degradado"
   | "no-esta-cancelada"
@@ -306,7 +488,10 @@ export type Diferimiento =
   | { diferir: false; motivo: MotivoSinDiferir }
   | {
       diferir: true;
-      /** Hasta cuando esta pago el periodo, en ms. El primer cobro cae ahi. */
+      /**
+       * Hasta cuando esta pago el periodo, en ms. Es la fecha en la que se busca
+       * que caiga el primer cobro (ver [diasDePrueba] por lo que no esta medido).
+       */
       diferidoHastaMs: number;
     };
 
@@ -327,6 +512,24 @@ export interface DecidirDiferimientoInput {
   leerPlanes: () => Promise<PlanDeLaCuenta[]>;
   /** Las suscripciones de MP detras de un plan (`searchPreapprovalsByPlan`). */
   leerSuscripciones: (planId: string) => Promise<MpPreapproval[]>;
+  /**
+   * El `diferidoHastaMs` del checkout que ESTE pedido reusaria (misma huella,
+   * dentro de la ventana de reuso de `abrir-checkout.ts`), o `null` si no hay
+   * ninguno o es un checkout normal.
+   *
+   * Es el atajo del doble click. Sin el, cada toque de un PF dado de baja pagaba
+   * hasta [MAX_PLANES_A_REVISAR] busquedas en MP aunque el checkout ya estuviera
+   * abierto y fuera a reusarse. Se llama DESPUES de la elegibilidad barata (que es
+   * pura, sin ninguna lectura) y ANTES de salir a MP; si devuelve una fecha valida,
+   * se la reusa tal cual y no se busca nada. Opcional: sin el, siempre se busca.
+   */
+  diferidoDelCheckoutAbierto?: () => Promise<number | null>;
+  /**
+   * El interruptor [DIFERIR_PRIMER_COBRO_ENABLED]. Parametro y no la constante
+   * leida directo, para que los dos caminos tengan test (ver su dartdoc). Sin
+   * pasarlo vale la constante.
+   */
+  habilitado?: boolean;
 }
 
 /**
@@ -335,12 +538,25 @@ export interface DecidirDiferimientoInput {
  *
  * Se difiere SOLO si todo esto es cierto:
  *
+ *   0. El interruptor [DIFERIR_PRIMER_COBRO_ENABLED] esta encendido.
  *   1. `subscription` se lee sin degradacion, y esta `cancelled`.
  *   2. Es del MISMO tier que el PF pide (cualquier ciclo: pasar de mensual a
  *      anual dentro del mismo plan tambien paga dos veces los dias que quedan).
  *   3. Le queda al menos [MIN_DIFERIMIENTO_MS] de periodo.
  *   4. MP muestra un cobro real que lo respalda (ver [evidenciaDePago], que
  *      explica las dos fuentes de la fecha y por que hay un respaldo).
+ *
+ * De la 0 a la 3 salen del documento del usuario y no leen NADA: son la
+ * elegibilidad barata. Recien si pasan se mira el checkout abierto y despues se
+ * sale a la red.
+ *
+ * ── El atajo del doble click ──
+ *
+ * Con la elegibilidad barata en la mano, antes de buscar en MP se pregunta si ya
+ * hay un checkout diferido abierto que este pedido reusaria
+ * (`diferidoDelCheckoutAbierto`). Si lo hay, la verificacion contra MP ya se hizo
+ * cuando se abrio, y repetirla en cada toque costaria hasta
+ * [MAX_PLANES_A_REVISAR] busquedas. Ver el campo por las condiciones.
  *
  * El resultado es el MENOR entre nuestra fecha de fin y lo que cubre el cobro de
  * MP. Nuestra fecha puede estar corrida hacia adelante (un tope que no se aplico,
@@ -371,6 +587,12 @@ export async function decidirDiferimiento(
     return { diferir: false, motivo };
   };
 
+  // El interruptor va primero y corta antes de leer NADA.
+  if (!(i.habilitado ?? DIFERIR_PRIMER_COBRO_ENABLED)) {
+    return sinDiferir("deshabilitado");
+  }
+
+  // ── Elegibilidad barata: solo el documento del usuario, ninguna lectura ──
   const { state, degraded } = toSubscriptionState(i.userData, uid);
   if (degraded) return sinDiferir("estado-degradado");
   if (state === null) return sinDiferir("sin-suscripcion");
@@ -379,12 +601,45 @@ export async function decidirDiferimiento(
   }
   if (state.tier !== tier) return sinDiferir("otro-tier", { tierActual: state.tier });
 
+  // `Number.isFinite` ademas de `== null`: un `NaN` pasaria el chequeo de nulos y
+  // el resto del archivo haria cuentas con una fecha que no existe.
   const finMs = state.currentPeriodEndMs;
-  if (finMs == null) return sinDiferir("sin-fecha-de-fin");
+  if (finMs == null || !Number.isFinite(finMs)) return sinDiferir("sin-fecha-de-fin");
   if (finMs - nowMs < MIN_DIFERIMIENTO_MS) return sinDiferir("queda-menos-de-un-dia");
 
+  // ── El atajo del doble click: si ya hay un checkout diferido que se va a ──
+  // ── reusar, no se busca nada en MP ──
+  //
+  // La fecha tiene que seguir al menos [MIN_DIFERIMIENTO_MS] hacia adelante y no
+  // pasar de nuestro propio fin de periodo (si el periodo se achico desde que se
+  // abrio, esa fecha ya no es lo que el PF tiene pago). Y se devuelve EXACTAMENTE
+  // la que esta guardada: `abrirCheckout` la compara para reusar, y devolver otra
+  // crearia un plan nuevo SIN haber verificado el pago contra MP.
+  const abierto = await i.diferidoDelCheckoutAbierto?.();
+  if (
+    typeof abierto === "number" &&
+    Number.isFinite(abierto) &&
+    abierto - nowMs >= MIN_DIFERIMIENTO_MS &&
+    abierto <= finMs
+  ) {
+    logger.info(
+      "mp/diferir-primer-cobro: se reusa el diferimiento del checkout abierto, " +
+        "no se busca en MP",
+      { uid, tier, diferidoHastaIso: new Date(abierto).toISOString() },
+    );
+    return { diferir: true, diferidoHastaMs: abierto };
+  }
+
   // Desde aca se sale a la red, y un fallo TIRA (ver el encabezado).
-  const planes = planesARevisar(await i.leerPlanes(), tier);
+  const enLaCuenta = await i.leerPlanes();
+  const { candidatos, ids: planes } = planesARevisar(enLaCuenta, tier, nowMs);
+  // Cuantos planes quedan en cada etapa. Es lo que permite explicar despues un
+  // "sin-pago-comprobado": si `candidatos` es 0, no habia ningun plan cerrado.
+  const alcance = {
+    planesEnLaCuenta: enLaCuenta.length,
+    candidatos,
+    planesRevisados: planes.length,
+  };
 
   let pago: EvidenciaDePago | null = null;
   let planConPago: string | null = null;
@@ -399,9 +654,7 @@ export async function decidirDiferimiento(
       break;
     }
   }
-  if (pago === null) {
-    return sinDiferir("sin-pago-comprobado", { planesRevisados: planes.length });
-  }
+  if (pago === null) return sinDiferir("sin-pago-comprobado", alcance);
 
   if (pago.fuente === "alta") {
     // El respaldo decidio: MP no mando `last_charged_date` (o no se entiende). Es
@@ -417,6 +670,7 @@ export async function decidirDiferimiento(
   const diferidoHastaMs = Math.min(finMs, pago.hastaMs);
   if (diferidoHastaMs - nowMs < MIN_DIFERIMIENTO_MS) {
     return sinDiferir("pago-vence-pronto", {
+      ...alcance,
       finDePeriodoIso: new Date(finMs).toISOString(),
       pagadoHastaIso: new Date(pago.hastaMs).toISOString(),
       fuenteDelPago: pago.fuente,
@@ -426,6 +680,7 @@ export async function decidirDiferimiento(
   logger.info("mp/diferir-primer-cobro: se difiere el primer cobro", {
     uid,
     tier,
+    ...alcance,
     planConPago,
     fuenteDelPago: pago.fuente,
     diferidoHastaIso: new Date(diferidoHastaMs).toISOString(),
@@ -439,30 +694,33 @@ export async function decidirDiferimiento(
 // ---------------------------------------------------------------------------
 //
 // El plan diferido guarda `diferidoHastaMs` (E) en `mp_plans`. Mientras su
-// suscripcion no tenga ningun cobro exitoso, el reconciliador la lee con las
-// reglas de abajo; apenas MP cobra una vez, todo vuelve a ser como en cualquier
-// otro plan. Las reglas existen por tres cosas que vienen de MP y no se pueden
-// arreglar de nuestro lado:
+// suscripcion no tenga ningun cobro exitoso (ver [cobrosExitosos]), el
+// reconciliador la lee con las reglas de abajo; apenas MP cobra una vez, todo
+// vuelve a ser como en cualquier otro plan. Hay tres razones, y NO tienen el
+// mismo respaldo: la 1 esta documentada en el repo; la 2 y la 3 dependen de los
+// supuestos de "Lo que se ASUME de MP" (arriba) y no estan medidas.
 //
 //   1. **El link de un checkout no vence y MP no deja dar de baja un plan**
 //      (`client.ts`, `cancelPreapproval`). Los dias de prueba se calcularon para
 //      el momento en que se abrio el checkout; si el PF paga ese mismo link
-//      semanas despues, el primer cobro cae semanas despues de E. Sin una regla,
-//      le daria plan pago todo ese tiempo sin que MP haya cobrado nada. Y se
-//      puede usar a proposito: abrir el checkout, no pagarlo, y autorizarlo
-//      cuando convenga para correr el primer cobro tanto como se quiera.
+//      semanas despues, el primer cobro caeria (suponiendo que la prueba corre
+//      desde la autorizacion) semanas despues de E. Sin una regla, le daria plan
+//      pago todo ese tiempo sin que MP haya cobrado nada. Y se puede usar a
+//      proposito: abrir el checkout, no pagarlo, y autorizarlo cuando convenga
+//      para correr el primer cobro tanto como se quiera.
 //
 //   2. **`pending_charge_quantity` durante la prueba.** Si MP cuenta el primer
-//      cobro programado como pendiente (no esta verificado), `hayCobroPendiente`
-//      lo leeria como un cobro rebotado y el PF pasaria a `grace`, con su mail de
+//      cobro programado como pendiente (no esta medido), `hayCobroPendiente` lo
+//      leeria como un cobro rebotado y el PF pasaria a `grace`, con su mail de
 //      "no pudimos cobrar", sin que se le haya intentado cobrar nada.
 //
 //   3. **Una prueba cancelada antes de su primer cobro.** `resolverFinDePeriodo`
 //      arma el fin con `next_payment_date`, con lo que ya estaba guardado o, si
 //      no hay nada, con alta mas un periodo entero. Ninguno de los tres sabe que
 //      el PF solo pago hasta E (a traves del plan anterior): el ultimo le regala
-//      un mes que nunca se cobro, y los otros se pasan de E por el redondeo a
-//      dias.
+//      un mes que nunca se cobro, y los otros pueden pasarse de E (si MP manda
+//      `next_payment_date` en una prueba cancelada, que no esta medido, seria el
+//      primer cobro que no ocurrio, redondeado a dias).
 //
 // Lo que NO hacen: no dan de baja nada en MP. El pagador autorizo de buena fe, la
 // baja es terminal, y una decision nuestra equivocada no se puede deshacer. Se
@@ -474,9 +732,9 @@ export async function decidirDiferimiento(
  *
  * Los dias se contaron desde el momento en que se abrio el checkout. Asumimos que
  * MP los cuenta desde que el pagador AUTORIZA (no esta medido), asi que el primer
- * cobro cae `autorizacion + dias`. Autorizando a las pocas horas la diferencia es
- * chica y entra en [HOLGURA_PRUEBA_MS]; autorizando varios dias despues, el cobro
- * se corre esos mismos dias y deja de ser el que le corresponde.
+ * cobro caeria `autorizacion + dias`. Autorizando a las pocas horas la diferencia
+ * es chica y entra en [HOLGURA_PRUEBA_MS]; autorizando varios dias despues, el
+ * cobro se correria esos mismos dias y dejaria de ser el que le corresponde.
  */
 export const VENTANA_AUTORIZACION_MS = 24 * 60 * 60 * 1000;
 
@@ -484,11 +742,16 @@ export const VENTANA_AUTORIZACION_MS = 24 * 60 * 60 * 1000;
  * Cuanto despues de E se sigue tratando como "en prueba" a una suscripcion que
  * todavia no cobro.
  *
- * El primer cobro cae en E o hasta un dia despues (por el `ceil` de
+ * Bajo el supuesto de que MP cuenta N dias corridos desde la autorizacion (no esta
+ * medido), el primer cobro caeria en E o hasta un dia despues (por el `ceil` de
  * [diasDePrueba]) mas lo que tardo el pagador en autorizar (hasta
  * [VENTANA_AUTORIZACION_MS]), y MP puede demorarse en intentarlo. Tres dias
  * cubren eso con aire; pasados, un cobro pendiente vuelve a leerse como `grace`
  * y el aviso de "no pudimos cobrar" es verdad.
+ *
+ * Si MP cuenta en su propio calendario y el cobro cae ANTES de E
+ * ([ADELANTO_MAXIMO_DEL_COBRO_MS]), nada de esto se rompe: apenas hay un cobro
+ * exitoso el plan deja de leerse como prueba y vale el mapeo de siempre.
  */
 export const HOLGURA_PRUEBA_MS = 3 * DIA_MS;
 
@@ -513,8 +776,14 @@ export interface PruebaDiferidaInput {
 }
 
 /**
- * E si este plan es diferido Y su suscripcion todavia no cobro nada; si no,
- * `null`, que quiere decir "este plan se lee como cualquier otro".
+ * E si este plan es diferido Y su suscripcion todavia no tuvo ningun cobro
+ * EXITOSO; si no, `null`, que quiere decir "este plan se lee como cualquier otro".
+ *
+ * "Sin cobro exitoso" es lo que dice [cobrosExitosos]: `charged_quantity` ausente
+ * o 0, O un monto cobrado que figura en $0 o menos. Lo segundo es la autorizacion
+ * de una prueba reportada como un "cobro" de $0: si contara como pago, las reglas
+ * se apagarian antes de que MP haya cobrado un peso y el PF quedaria leido como un
+ * plan comun sin serlo.
  *
  * Que `charged_quantity` falte o no sea un numero se lee como "no cobro": es el
  * estado normal de una suscripcion recien autorizada. Desde el primer cobro real
@@ -528,11 +797,7 @@ function enPruebaSinCobrar(
   if (typeof diferidoHastaMs !== "number" || !Number.isFinite(diferidoHastaMs)) {
     return null;
   }
-  const cobros = (summarized as { charged_quantity?: unknown } | null | undefined)
-    ?.charged_quantity;
-  if (typeof cobros === "number" && Number.isFinite(cobros) && cobros >= 1) {
-    return null;
-  }
+  if (cobrosExitosos(summarized) >= 1) return null;
   return diferidoHastaMs;
 }
 
@@ -553,10 +818,37 @@ function autorizadaATiempo(
 }
 
 /**
+ * En que situacion esta la prueba de un plan, que es lo que el reconciliador
+ * necesita para decidir el estado Y para decidir que loguear.
+ *
+ *   - `no-aplica`: el plan no es diferido, ya tuvo un cobro exitoso, o MP no dice
+ *     `authorized`. Se lee como cualquier otro.
+ *   - `fuera-de-ventana`: autorizada mucho despues de abrir el checkout (o sin
+ *     fechas que se entiendan). Es el link viejo pagado tarde.
+ *   - `en-prueba`: autorizada a tiempo y antes de E + [HOLGURA_PRUEBA_MS].
+ *   - `vencida`: autorizada a tiempo, pasado ese horizonte y sin ningun cobro
+ *     exitoso. El primer cobro ya tendria que haber salido.
+ */
+export type SituacionDeLaPrueba =
+  | "no-aplica"
+  | "fuera-de-ventana"
+  | "en-prueba"
+  | "vencida";
+
+export function situacionDeLaPrueba(i: PruebaDiferidaInput): SituacionDeLaPrueba {
+  const e = enPruebaSinCobrar(i.diferidoHastaMs, i.summarized);
+  if (e === null) return "no-aplica";
+  if (i.mpStatus !== "authorized") return "no-aplica";
+
+  if (!autorizadaATiempo(i.planCreadoMs, i.mpDateCreated)) return "fuera-de-ventana";
+  return i.nowMs < e + HOLGURA_PRUEBA_MS ? "en-prueba" : "vencida";
+}
+
+/**
  * El estado que el reconciliador tiene que escribir para un plan que puede ser
  * diferido. Para uno que no lo es (o que ya cobro), devuelve [statusHoy] tal cual.
  *
- * Solo toca una suscripcion que MP dice `authorized`:
+ * Solo toca una suscripcion que MP dice `authorized` (ver [situacionDeLaPrueba]):
  *
  *   - **Autorizada fuera de la ventana** (el link se pago mucho despues de abrir
  *     el checkout): `pending`. De este plan el PF no recibe nada hasta el primer
@@ -568,17 +860,23 @@ function autorizadaATiempo(
  *
  *   - **A tiempo y pasado ese horizonte**: el mapeo de siempre, o sea `grace` si
  *     hay un cobro pendiente. Ahi el primer cobro ya tendria que haber salido.
+ *     Si NO hay cobro pendiente, el mapeo de siempre es `active`: una suscripcion
+ *     que lleva dias sin cobrar nada ni intentarlo y sigue dando plan pago. Eso no
+ *     se corrige aca (no hay evidencia de que sea un error) pero el reconciliador
+ *     lo avisa con un warn.
  */
 export function aplicarPruebaDiferidaAlEstado(
   i: PruebaDiferidaInput,
 ): SubscriptionStatus {
-  const e = enPruebaSinCobrar(i.diferidoHastaMs, i.summarized);
-  if (e === null) return i.statusHoy;
-  if (i.mpStatus !== "authorized") return i.statusHoy;
-
-  if (!autorizadaATiempo(i.planCreadoMs, i.mpDateCreated)) return "pending";
-  if (i.nowMs < e + HOLGURA_PRUEBA_MS) return "active";
-  return i.statusHoy;
+  switch (situacionDeLaPrueba(i)) {
+  case "fuera-de-ventana":
+    return "pending";
+  case "en-prueba":
+    return "active";
+  case "no-aplica":
+  case "vencida":
+    return i.statusHoy;
+  }
 }
 
 /**
