@@ -18,16 +18,40 @@
  *
  * Las cuentas de Google y Apple ya vienen con `emailVerified: true`. Con ese
  * campo, justo los que entran con un botón se saltearían el mail, que es el que
- * les explica cómo se paga. `users/{uid}.mailVerificadoAt` lo escribe SOLO esta
+ * les explica cómo se paga. `users/{uid}.emailVerification` lo escribe SOLO esta
  * función —está pineado en los dos verbos de `firestore.rules`—, así que no hay
- * forma de marcarse verificado desde el cliente.
+ * forma de marcarse verificado desde el cliente. (El script de promoción borra
+ * la entrada de entrenador, por Admin SDK: es lo que vuelve a pedir el código.)
+ *
+ * ── Por rol, y con el mail adentro ──
+ *
+ * `emailVerification` es `{ athlete?: {email, verifiedAt}, trainer?: {...} }`.
+ * Al alumno que el equipo promueve a entrenador se le vuelve a pedir el código,
+ * y el mail que le llega es el del entrenador: el que dice dónde paga un PF.
+ * Con un solo flag para los dos roles, la verificación de alumno lo dejaba
+ * pasar y ese mail no salía nunca. El mail va guardado porque si el equipo le
+ * cambia el correo en Auth, al nuevo todavía no lo abrió nadie.
+ *
+ * ── Despliegue: el pin protege DESDE que está arriba ──
+ *
+ * La regla de `users` es por pines, no por lista blanca de claves: hasta que se
+ * despliega el pin de `emailVerification`, el dueño puede escribírselo, y
+ * después el mismo pin lo vuelve indeleble desde el cliente (mismo molde que
+ * `athletePaywallEnforced` en `firestore.rules`). Por eso, en este orden:
+ *
+ *   1. Desplegar las reglas.
+ *   2. Antes de que la app llame a `verificarCodigoDeMail`, contar los `users`
+ *      con `emailVerification` (consola: filtro `emailVerification != null`).
+ *      Hasta ahí nadie lo escribe, así que lo esperado es 0, y cualquiera que
+ *      aparezca es falso: se borra por Admin SDK.
+ *   3. Recién ahí desplegar las funciones y prender el gate.
  *
  * ── Seguridad ──
  *
  * - En `verificaciones_de_mail/{uid}` el código se guarda como hash
- *   (sha256 de `uid:código`), nunca en claro. En `mail_queue` SÍ viaja en
- *   claro, porque la plantilla se arma al enviar: es una colección de servidor
- *   y el código vence a los 15 minutos.
+ *   (sha256 de `uid:código`), nunca en claro. En `mail_queue` viaja en claro
+ *   hasta que sale —la plantilla se arma al enviar— y `sendQueuedMail` lo
+ *   borra al cerrar el envío, igual que `actionLink`.
  * - 5 intentos por código. Pedir uno nuevo reemplaza al anterior y reinicia los
  *   intentos, pero hay un cooldown de 60 s entre envíos —el mismo que el botón
  *   «Reenviar» de la app; si este fuera más largo, el botón mentiría—.
@@ -49,8 +73,8 @@ import { enqueueMail } from "../mail/enqueue-mail";
 /** Un documento por usuario, con el código vigente. Solo servidor. */
 export const VERIFICACIONES_COLLECTION = "verificaciones_de_mail";
 
-/** El campo de `users/{uid}` que dice que el mail está confirmado con código. */
-export const CAMPO_MAIL_VERIFICADO = "mailVerificadoAt";
+/** El mapa de `users/{uid}` que dice para qué rol se confirmó el mail, y cuál. */
+export const CAMPO_VERIFICACION = "emailVerification";
 
 export const CODIGO_VIGENCIA_MS = 15 * 60 * 1000;
 
@@ -94,7 +118,10 @@ export type EstadoDeVerificacion =
   | "vencido"
   /** Se agotaron los intentos de este código: hay que pedir otro. */
   | "bloqueado"
-  /** Nunca se pidió un código (o ya se usó). */
+  /**
+   * Nunca se pidió un código, ya se usó, o es de otro rol (lo promovieron en el
+   * medio) o de otro mail.
+   */
   | "sin-codigo"
   /** No son 6 dígitos. No gasta intentos: es un error de tipeo, no un intento. */
   | "formato-invalido";
@@ -146,6 +173,31 @@ function mismoHash(a: string, b: string): boolean {
   return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
 }
 
+type Rol = "athlete" | "trainer";
+
+const esRol = (rol: unknown): rol is Rol => rol === "athlete" || rol === "trainer";
+
+/** Auth y lo guardado pueden diferir en mayúsculas o espacios: no es otro mail. */
+const normal = (email: unknown): string =>
+  typeof email === "string" ? email.trim().toLowerCase() : "";
+
+/**
+ * Si `usuario` confirmó con código, para el rol que tiene HOY, el mail que Auth
+ * tiene HOY. Ver el encabezado: por qué por rol y por qué con el mail.
+ */
+export function verificadoParaSuRol(
+  usuario: Record<string, unknown> | undefined,
+  email: string | undefined,
+): boolean {
+  const rol = usuario?.role;
+  if (!esRol(rol)) return false;
+  const porRol = usuario?.[CAMPO_VERIFICACION] as
+    | Partial<Record<Rol, { email?: unknown }>>
+    | undefined;
+  const confirmado = normal(porRol?.[rol]?.email);
+  return confirmado !== "" && confirmado === normal(email);
+}
+
 /**
  * Genera un código y lo manda por mail. El mail depende del rol: el del
  * entrenador lo manda a los planes del Coach Hub; el del alumno, al checkout
@@ -159,22 +211,27 @@ export async function runSolicitarCodigo(
 ): Promise<SolicitudDeCodigoResult> {
   const db = getFirestore(app);
   const usuario = (await db.collection("users").doc(uid).get()).data();
-  if (usuario?.[CAMPO_MAIL_VERIFICADO] != null) return { estado: "ya-verificado" };
-
   const rol = usuario?.role;
-  if (rol !== "athlete" && rol !== "trainer") return { estado: "sin-perfil" };
+  if (!esRol(rol)) return { estado: "sin-perfil" };
 
   const { email } = await getAuth(app).getUser(uid);
   if (!email) return { estado: "sin-email" };
+  if (verificadoParaSuRol(usuario, email)) return { estado: "ya-verificado" };
 
   const ref = db.collection(VERIFICACIONES_COLLECTION).doc(uid);
   const previo = (await ref.get()).data();
+
+  // Un código emitido para el otro rol o para otro mail no le sirve a nadie: al
+  // recién promovido le toca el mail del entrenador. No cuenta como vigente ni
+  // lo frena el cooldown —el rol y el mail solo los cambia el equipo—.
+  const mismoPedido = previo?.rol === rol && normal(previo?.email) === normal(email);
 
   // Pedido automático con un código todavía útil: no se pisa. Ver
   // `SolicitudDeCodigoOpciones.reenviar`.
   const intentosPrevios = typeof previo?.intentos === "number" ? previo.intentos : 0;
   if (
     opciones.reenviar !== true &&
+    mismoPedido &&
     typeof previo?.venceMs === "number" &&
     deps.nowMs <= previo.venceMs &&
     intentosPrevios < MAX_INTENTOS
@@ -183,7 +240,7 @@ export async function runSolicitarCodigo(
   }
 
   const enviadoMs = previo?.enviadoMs;
-  if (typeof enviadoMs === "number" && deps.nowMs - enviadoMs < REENVIO_COOLDOWN_MS) {
+  if (mismoPedido && typeof enviadoMs === "number" && deps.nowMs - enviadoMs < REENVIO_COOLDOWN_MS) {
     return {
       estado: "enfriando",
       reintentarEnMs: REENVIO_COOLDOWN_MS - (deps.nowMs - enviadoMs),
@@ -195,6 +252,8 @@ export async function runSolicitarCodigo(
   const codigo = (deps.generarCodigo ?? generarCodigo)();
   await ref.set({
     codigoHash: hashDelCodigo(uid, codigo),
+    rol,
+    email,
     venceMs: deps.nowMs + CODIGO_VIGENCIA_MS,
     intentos: 0,
     enviadoMs: deps.nowMs,
@@ -221,8 +280,8 @@ export async function runSolicitarCodigo(
 }
 
 /**
- * Valida el código. Si coincide, marca `users/{uid}.mailVerificadoAt` y borra
- * el código: se usa una sola vez.
+ * Valida el código. Si coincide, marca `users/{uid}.emailVerification.<rol>` y
+ * borra el código: se usa una sola vez.
  */
 export async function runVerificarCodigo(
   app: App,
@@ -236,17 +295,23 @@ export async function runVerificarCodigo(
   const db = getFirestore(app);
   const ref = db.collection(VERIFICACIONES_COLLECTION).doc(uid);
   const userRef = db.collection("users").doc(uid);
+  // Afuera: el callback de la transacción se reintenta y Auth no es parte de
+  // ella. Si el mail cambia en el medio, no coincide con el del código y falla
+  // cerrado (`sin-codigo`).
+  const { email } = await getAuth(app).getUser(uid);
 
   // Transacción: dos intentos simultaneos no pueden gastar el mismo intento, y
   // el código no puede canjearse dos veces.
   const r = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    const usuario = (await tx.get(userRef)).data();
     const d = snap.data();
-    if (!snap.exists || !d) {
-      // Sin código pendiente. Si ya está verificado es un doble toque, no un
-      // error: la pantalla tiene que poder seguir.
-      const usuario = (await tx.get(userRef)).data();
-      return usuario?.[CAMPO_MAIL_VERIFICADO] != null ?
+    const rol = usuario?.role;
+    if (!d || !email || !esRol(rol) || d.rol !== rol || normal(d.email) !== normal(email)) {
+      // Sin código pendiente, o con uno que ya no corresponde: de otro rol o de
+      // otro mail. Si ya está verificado es un doble toque, no un error: la
+      // pantalla tiene que poder seguir.
+      return verificadoParaSuRol(usuario, email) ?
         { estado: "verificado" as const, recien: false } :
         { estado: "sin-codigo" as const, recien: false };
     }
@@ -266,14 +331,22 @@ export async function runVerificarCodigo(
         { estado: "bloqueado" as const, recien: false };
     }
 
-    tx.set(userRef, { [CAMPO_MAIL_VERIFICADO]: Timestamp.fromMillis(deps.nowMs) }, { merge: true });
+    // El mapa entero, armado desde la lectura de esta misma transacción: la
+    // entrada del otro rol sobrevive sin depender del merge profundo de `set`.
+    const porRol = (usuario?.[CAMPO_VERIFICACION] ?? {}) as Record<string, unknown>;
+    tx.update(userRef, {
+      [CAMPO_VERIFICACION]: {
+        ...porRol,
+        [rol]: { email, verifiedAt: Timestamp.fromMillis(deps.nowMs) },
+      },
+    });
     tx.delete(ref);
     return { estado: "verificado" as const, recien: true };
   });
 
   if (r.recien) {
     // Para las cuentas con contraseña, que todavía tienen `emailVerified` en
-    // false. No es lo que decide el acceso —eso es `mailVerificadoAt`—, así que
+    // false. No es lo que decide el acceso —eso es `emailVerification`—, así que
     // si falla se avisa y se sigue.
     await getAuth(app)
       .updateUser(uid, { emailVerified: true })
