@@ -148,6 +148,13 @@ HMAC no guarda nada.
   largo antes).
 - **El `uid` sale del token, nunca del request.** La callable recibe `{token}` y
   nada más.
+- **El `uid` tiene que servir como id de documento.** Auth acepta uids de 1 a 128
+  caracteres sin mirar el contenido, y `collection("users").doc("a/b/c")` lee la
+  barra como separador: apunta a `users/a/b/c`, otro documento. Se rechaza `/`,
+  el vacío, `.`, `..` y los reservados por Firestore (`__algo__`) **al firmar**
+  (`firmarToken` tira: en `sendQueuedMail` es el caso «el uid no entra en el
+  token», ver §6.1 y §6.3) **y al verificar** (`verificarToken` devuelve `null` →
+  `invalido`, aunque la firma sea válida).
 - **Rotación**: cambiar la versión del secreto invalida todos los links ya
   enviados. Es aceptable sólo ante una filtración, y el prefijo `v1` deja lugar
   para convivir con un `v2`. No se rota por rutina.
@@ -181,7 +188,19 @@ el click llama a la callable.
 
 Una cuenta borrada contesta `listo`, igual que una viva: es cierto (no le vamos a
 escribir) y no le cuenta a nadie si la cuenta existe. Nunca se **crea** el
-documento: se usa `update`, y su `NOT_FOUND` se mapea a `listo`.
+documento: se lee primero (sin documento → `listo`, sin escribir) y la escritura
+es un `update`, cuyo `NOT_FOUND` —la cuenta se borró entre la lectura y la
+escritura— también se mapea a `listo`.
+
+### 5.6 Replay
+
+El token no vence (§5.1), así que uno válido que se filtre o se reenvíe se puede
+repetir sin fin. Si cada llamada escribiera `users/{uid}`, cada una dispararía los
+triggers de `users`. Por eso la callable **lee primero**: con
+`notificationPrefs.<prefKey>.email === false` ya puesto contesta `listo` **sin
+escribir**, y sin escritura no hay triggers. El costo de un replay es una lectura
+por llamada. `maxInstances: 5` limita la concurrencia, no el total de llamadas, y
+la exención de App Check (`appcheck-enforcement.test.ts`) lo dice así.
 
 ## 6. El pie del correo
 
@@ -199,6 +218,12 @@ la norma prohíbe. Con `defineSecret` el deploy ya falla si el secreto no existe
 así que esto es un cinturón, no el freno principal. El mail perdido no se
 reencola (`sendQueuedMail` sólo escucha creaciones): es comercial, y su
 productor lo vuelve a mandar en el próximo disparo, pasado el enfriamiento.
+
+Un mail con `prefKey` de la allowlist a un **`toAddress` literal** tampoco sale:
+una dirección literal no tiene cuenta a la que apuntar la baja, y un mail con
+`prefKey` es comercial de punta a punta, sin versión sin publicidad. Queda
+`failed` (`lastError: "sin cuenta para la baja"`) con `logger.error`, igual que
+sin clave. (Con `bloqueComercial` y literal, el mail sale sin el bloque, §6.3.)
 
 Este fail-closed aplica **sólo a los mails con `prefKey`**, los enteramente
 comerciales. Un mail con `bloqueComercial` no falla entero por falta de link:
@@ -246,6 +271,13 @@ sólo `false` explícito frena) y:
 
 Se evalúa al enviar, no al encolar, por la misma razón que `prefKey`: si la
 persona se opone entre que se encoló y que salió, gana la oposición.
+
+**`prefKey` y `bloqueComercial` son excluyentes.** El tipo del documento de la
+cola y el input de `enqueueMail` no admiten los dos juntos: el gate de `prefKey`
+frenaría el mail **entero** y se comería justo el aviso operativo que
+`bloqueComercial` existe para dejar pasar. Si un documento llega con los dos
+igual (no pasó por el tipo), **gana `bloqueComercial`**: se ignora el gate de
+`prefKey` y suena `logger.warn`.
 
 **Si el link no se puede armar** (clave de baja vacía, o un `uid` que no entra en
 la gramática del token) el mail con `bloqueComercial` **no falla**: sale sin el
