@@ -14,6 +14,22 @@ export type SubscriptionTier = "free" | "plan1" | "plan2" | "plan3";
 export type SubscriptionCycle = "monthly" | "annual";
 
 /**
+ * El nombre del plan que lee una persona. Espejo de `tierName()` en
+ * `plan_copy.dart`.
+ *
+ * Vive acá y no en el mail porque lo usan dos lados que tienen que decir lo
+ * mismo: el texto de los mails y el nombre del plan que Mercado Pago muestra en
+ * su checkout, en la lista de suscripciones y en el mail de cada cobro. Con el
+ * código crudo, el PF veía «TREINO — plan1 (mensual)».
+ */
+export const TIER_LABELS: Record<SubscriptionTier, string> = {
+  free: "Free",
+  plan1: "Plan 1",
+  plan2: "Plan 2",
+  plan3: "Plan 3",
+};
+
+/**
  * Weighted-load limit per tier (active=1.0, paused=0.5 count toward it).
  *
  * `null` = SIN LIMITE (plan3). Se eligio null y no Infinity ni un numero

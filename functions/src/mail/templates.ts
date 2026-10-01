@@ -21,7 +21,11 @@ import { MailKind, MailParams } from "./types";
 // PURA (un mapa de tier→numero, sin Firestore ni admin adentro). Se prefiere a
 // escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
 // dos copias del mismo numero se separan el dia que alguien mueva el plan.
-import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "../subscriptions/tier-config";
+import {
+  SubscriptionTier,
+  TIER_LABELS,
+  TIER_WEIGHT_LIMITS,
+} from "../subscriptions/tier-config";
 import { formatArs, formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
@@ -479,19 +483,13 @@ function plantillasLabel(limit: number): string {
 const FREE_CUPO_LABEL = cupoLabel(TIER_WEIGHT_LIMITS.free);
 
 /**
- * Nombre visible del plan. Espejo de `tierName()` en `plan_copy.dart`.
+ * Nombre visible del plan. La tabla vive en `tier-config.ts` (`TIER_LABELS`),
+ * compartida con el nombre del plan que se manda a Mercado Pago.
  *
  * El productor manda el CODIGO (`plan2`), no la etiqueta: misma regla que
  * `reason`. Un tier que no reconocemos cae a vacio y la oracion sigue leyendose
  * ("No pudimos cobrar tu suscripción."), en vez de imprimir el codigo crudo.
  */
-const TIER_LABELS: Record<SubscriptionTier, string> = {
-  free: "Free",
-  plan1: "Plan 1",
-  plan2: "Plan 2",
-  plan3: "Plan 3",
-};
-
 function tierLabel(tier: string | number | undefined): string {
   const key = String(tier ?? "");
   return Object.prototype.hasOwnProperty.call(TIER_LABELS, key)
