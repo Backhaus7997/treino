@@ -1,3 +1,10 @@
+// `CollectionReference` y `DocumentReference` están `@sealed` en
+// `cloud_firestore`, así que mockearlas dispara `subtype_of_sealed_class`. Mismo
+// trato —y mismo motivo— que `session_repository_adoption_timeout_test.dart`:
+// para ver QUÉ recibe `set()` hay que espiar la referencia, y
+// `fake_cloud_firestore` no lo muestra (ver el grupo «lo que RECIBE Firestore»).
+// ignore_for_file: subtype_of_sealed_class
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show
         CollectionReference,
