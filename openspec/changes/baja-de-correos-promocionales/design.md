@@ -200,14 +200,26 @@ así que esto es un cinturón, no el freno principal. El mail perdido no se
 reencola (`sendQueuedMail` sólo escucha creaciones): es comercial, y su
 productor lo vuelve a mandar en el próximo disparo, pasado el enfriamiento.
 
+Este fail-closed aplica **sólo a los mails con `prefKey`**, los enteramente
+comerciales. Un mail con `bloqueComercial` no falla entero por falta de link:
+degrada a «sin bloque y sin pie» (§6.3). Lo mismo vale si el `uid` no entra en la
+gramática del token (no pasa con los de Auth, que miden hasta 128): el mail con
+`prefKey` queda `failed` (`lastError: "link de baja no representable"`) y el de
+`bloqueComercial` degrada. En ningún caso se deja salir la excepción: la
+plataforma reintentaría una semana un mail que falla idéntico cada vez.
+
 ### 6.2 Qué dice
 
 `renderMail(kind, params, opciones?)` acepta `{ bajaDePromocionales?: string }`
 (la URL). Con la opción, el pie lleva, en HTML **y** en texto plano:
 
-1. **Destacado** (color del cuerpo, no el gris del pie): «Recibís este correo
-   promocional porque tenés una cuenta en TREINO. Si no querés recibir más,
-   [dejá de recibir correos promocionales]». En texto plano, la URL completa.
+1. **Destacado** (BONE `#FFFFFF` a 14px, el color de los titulares y de los
+   valores resaltados del cuerpo; el cuerpo y el pie comparten el gris `MUTED`,
+   así que «el color del cuerpo» no los distinguía; el link va en MINT y
+   subrayado): «Recibís este correo promocional porque tenés una cuenta en
+   TREINO. Si no querés recibir más, [dejá de recibir correos promocionales]».
+   En texto plano, la URL completa. Reemplaza al «Recibís este mail porque…» del
+   pie común.
 2. **Chico**: «Ley 25.326, art. 27, inc. 3: "…"» y «Decreto 1558/01, Anexo I,
    art. 27, párrafo 3: "…"», con los textos exactos de §2. Y «Responsable:
    BACKHAUSTIN S.A.S. — CUIT 30-71929587-4» (lo pide la segunda oración del
@@ -234,6 +246,13 @@ sólo `false` explícito frena) y:
 
 Se evalúa al enviar, no al encolar, por la misma razón que `prefKey`: si la
 persona se opone entre que se encoló y que salió, gana la oposición.
+
+**Si el link no se puede armar** (clave de baja vacía, o un `uid` que no entra en
+la gramática del token) el mail con `bloqueComercial` **no falla**: sale sin el
+bloque y sin pie, igual que con la preferencia apagada, y suena `logger.error`
+para el monitoreo. El aviso operativo llega igual y no sale contenido comercial
+sin mecanismo de baja. El fail-closed de §6.1 es sólo para los mails con
+`prefKey`.
 
 Este cambio lo cablea en `limit-reached` (`enqueueProspectMail`). El mail del
 código es de la rama `feat/functions-codigo-topes-y-planes` (D9, apilada sobre
@@ -343,7 +362,7 @@ Con filtro siempre: un `--only functions` pelado poda toda función ausente de
 | `functions/src/subscriptions/subscription-mail.ts` | `enqueueProspectMail` marca `bloqueComercial` |
 | `functions/src/index.ts` | exporta la callable |
 | `functions/src/__tests__/baja-de-promocionales.test.ts` | nuevo |
-| `functions/src/__tests__/send-queued-mail*.test.ts` | link sí/no según `prefKey` y destinatario |
+| `functions/src/__tests__/mail-outbox.test.ts` (el de `sendQueuedMailHandler`; no hay `send-queued-mail*.test.ts`) · `prospect-mail.test.ts` | link sí/no según `prefKey` y destinatario; `bloqueComercial` (incluido el degradado sin link); el productor lo marca |
 | `functions/src/__tests__/mail-templates.test.ts` | pie con y sin la opción, texto plano |
-| `functions/src/__tests__/appcheck-enforcement.test.ts` | `EXEMPTIONS` **y** `EXPECTED_DEPLOYED` |
+| `functions/src/__tests__/appcheck-enforcement.test.ts` | `EXEMPTIONS`, `EXPECTED_DEPLOYED` **y** `BASELINE` (el guard de deriva) |
 | `docs/runbook-dominio-y-email.md` | baja pedida por mail; corrige «push no lee `notificationPrefs`» |
