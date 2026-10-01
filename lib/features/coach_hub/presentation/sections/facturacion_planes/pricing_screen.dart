@@ -1589,11 +1589,23 @@ class _PlanCtaButton extends StatelessWidget {
               // sigue siendo válido; lo que se calla es sólo lo que no se
               // cumple. Se evalúa al construir, sin timer: ver
               // [VigenciaDelPlan].
+              //
+              // Y nombra a Mercado Pago a propósito. Para diferir el cobro
+              // el servidor crea el plan con `auto_recurring.free_trial`
+              // (`freeTrialDays`, en functions/src/subscriptions/mp/client.ts)
+              // y el checkout de MP rinde esa prueba como «¡Tenés N días
+              // gratis!». No hay un campo que cambie ese texto —`free_trial`
+              // sólo lleva frecuencia y tipo—, así que no se puede corregir
+              // en origen. Un PF que lo lee sin contexto cree que el plan
+              // nuevo no le cuesta nada, cuando esos días son los que ya
+              // pagó. Esta nota es donde se lo puede encuadrar antes de que
+              // llegue a esa pantalla, y por eso dice qué va a mostrar MP.
               if (primerCobroDiferible) ...[
                 const SizedBox(height: AppSpacing.s8),
                 Text(
-                  'Si ya pagaste hasta el ${fechaDiaMesArg(hasta)}, '
-                  'el primer cobro es ese día.', // i18n: Fase W3
+                  'Si ya pagaste, se te cobrará al finalizar tu período '
+                  'actual: ${fechaDiaMesArg(hasta)}. Mercado Pago lo muestra '
+                  'como días gratis.', // i18n: Fase W3
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: palette.textMuted,
