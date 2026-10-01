@@ -37,7 +37,11 @@ import 'widgets/auth_pill_button.dart';
 /// `BirthDateGateScreen`). Navegar antes que el dato correría una carrera con
 /// el stream y podría rebotar de vuelta.
 class VerifyMailScreen extends ConsumerStatefulWidget {
-  const VerifyMailScreen({super.key});
+  const VerifyMailScreen({super.key, @visibleForTesting this.ahora});
+
+  /// Reloj de la cuenta regresiva. `null` ⇒ `DateTime.now`. Se inyecta en los
+  /// tests porque `pump` adelanta el tiempo falso pero no `DateTime.now`.
+  final DateTime Function()? ahora;
 
   /// Tiene que coincidir con `REENVIO_COOLDOWN_MS` del backend: si fuera más
   /// corto, el botón diría «enviado» y el servidor no mandaría nada.
@@ -50,10 +54,20 @@ class VerifyMailScreen extends ConsumerStatefulWidget {
 class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
   final _codigo = TextEditingController();
   Timer? _timer;
+
+  /// Cuándo se puede pedir otro código. La cuenta regresiva se calcula contra
+  /// esto y no restando por tick: un `Timer.periodic` no repone los ticks que
+  /// se pierde con la app en segundo plano, y con esperas de hasta 24 h el
+  /// usuario que vuelve del mail vería una espera vieja.
+  DateTime? _hasta;
   int _reenviarEn = 0;
   bool _enviando = false;
   bool _verificando = false;
   bool _verificado = false;
+
+  /// El último pedido contestó «limitado»: la espera es de minutos u horas y se
+  /// cuenta con [_reenviarEn], pero se muestra en minutos u horas (ver [build]).
+  bool _limitado = false;
   String? _aviso;
   String? _error;
 
@@ -77,15 +91,31 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
   String get _email =>
       ref.read(firebaseAuthProvider).currentUser?.email ?? 'tu mail';
 
-  void _arrancarCuentaRegresiva(Duration espera) {
+  DateTime _ahora() => (widget.ahora ?? DateTime.now)();
+
+  /// Segundos que faltan hasta [_hasta], hacia arriba: el botón nunca se
+  /// habilita antes de lo que dijo el servidor.
+  void _recalcularEspera() {
+    final faltan = _hasta?.difference(_ahora()).inMilliseconds ?? 0;
+    _reenviarEn = faltan <= 0 ? 0 : (faltan / 1000).ceil();
+  }
+
+  /// [tope] acota un valor absurdo del servidor. El cooldown es de 60 s; los
+  /// topes de envíos del backend esperan hasta 24 h.
+  void _arrancarCuentaRegresiva(
+    Duration espera, {
+    Duration tope = const Duration(minutes: 10),
+  }) {
     _timer?.cancel();
-    setState(() => _reenviarEn = espera.inSeconds.clamp(1, 600));
+    final segundos = (espera.inMilliseconds / 1000).ceil();
+    _hasta = _ahora().add(Duration(seconds: segundos.clamp(1, tope.inSeconds)));
+    setState(_recalcularEspera);
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
         return;
       }
-      setState(() => _reenviarEn = _reenviarEn > 0 ? _reenviarEn - 1 : 0);
+      setState(_recalcularEspera);
       if (_reenviarEn == 0) t.cancel();
     });
   }
@@ -103,6 +133,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
       if (!mounted) return;
       setState(() {
         _enviando = false;
+        _limitado = r.estado == SolicitudDeCodigo.limitado;
         switch (r.estado) {
           case SolicitudDeCodigo.enviado:
             _aviso = reenviar
@@ -116,6 +147,10 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
             _aviso = 'Tu mail ya está confirmado.'; // i18n
           case SolicitudDeCodigo.enfriando:
             _aviso = 'Esperá un momento para pedir otro código.'; // i18n
+          case SolicitudDeCodigo.limitado:
+            // Mientras corre la espera, `build` muestra los minutos que faltan;
+            // este es el texto que queda cuando termina.
+            _aviso = 'Ya podés pedir otro código.'; // i18n
           case SolicitudDeCodigo.noSalio:
             _error = 'No pudimos mandar el código. Probá de nuevo.'; // i18n
         }
@@ -124,6 +159,11 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
         _arrancarCuentaRegresiva(VerifyMailScreen.cooldown);
       } else if (r.estado == SolicitudDeCodigo.enfriando) {
         _arrancarCuentaRegresiva(r.reintentarEn ?? VerifyMailScreen.cooldown);
+      } else if (r.estado == SolicitudDeCodigo.limitado) {
+        _arrancarCuentaRegresiva(
+          r.reintentarEn ?? VerifyMailScreen.cooldown,
+          tope: const Duration(hours: 24),
+        );
       }
     } catch (_) {
       if (!mounted) return;
@@ -153,6 +193,12 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
             // El router la saca cuando llega el perfil con la marca.
             _verificado = true;
             _aviso = 'Listo, mail confirmado.'; // i18n
+            // Ya no hay nada que esperar: sin esto, el «Pediste muchos
+            // códigos…» taparía este aviso.
+            _timer?.cancel();
+            _hasta = null;
+            _reenviarEn = 0;
+            _limitado = false;
           case VerificacionDeCodigo.incorrecto:
             final n = r.intentosRestantes;
             _error = n == null
@@ -190,6 +236,14 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
     final puedeConfirmar =
         _codigo.text.trim().length == 6 && !_verificando && !_verificado;
     final puedeReenviar = _reenviarEn == 0 && !_enviando && !_verificado;
+    final enEsperaPorTope = _limitado && _reenviarEn > 0;
+    // Desde 90 min en horas (hacia arriba): «en 1440 min» no se lee.
+    final cuanto = _reenviarEn >= 90 * 60
+        ? '${(_reenviarEn / 3600).ceil()} h'
+        : '${(_reenviarEn / 60).ceil()} min';
+    final aviso = enEsperaPorTope
+        ? 'Pediste muchos códigos. Probá de nuevo en $cuanto.' // i18n
+        : _aviso;
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -213,7 +267,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _aviso ??
+                  aviso ??
                       'Te estamos mandando un código de 6 dígitos a '
                           '$_email.', // i18n
                   key: const Key('verify_mail_aviso'),
@@ -268,7 +322,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen> {
                       foregroundColor: palette.textMuted,
                     ),
                     child: Text(
-                      _reenviarEn > 0
+                      _reenviarEn > 0 && !enEsperaPorTope
                           ? 'Reenviar código en $_reenviarEn s' // i18n
                           : 'Reenviar código', // i18n
                     ),

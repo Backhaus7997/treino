@@ -65,10 +65,23 @@ class _Navegacion extends NavigatorObserver {
       cambios++;
 }
 
+/// Reloj de la pantalla en los tests. `pump` adelanta el tiempo falso pero no
+/// `DateTime.now`, así que quien mide una espera adelanta los dos: [avanzar]
+/// hace `pump` Y mueve este reloj.
+class _Reloj {
+  DateTime ahora = DateTime.utc(2026, 10, 1, 12);
+
+  Future<void> avanzar(WidgetTester tester, Duration d) {
+    ahora = ahora.add(d);
+    return tester.pump(d);
+  }
+}
+
 Future<void> _montar(
   WidgetTester tester,
   _Servicio servicio, {
   _Navegacion? navegacion,
+  _Reloj? reloj,
 }) async {
   final auth = _MockAuth();
   final user = _MockUser();
@@ -89,7 +102,7 @@ Future<void> _montar(
       container: container,
       child: MaterialApp(
         theme: AppTheme.dark(),
-        home: const VerifyMailScreen(),
+        home: VerifyMailScreen(ahora: reloj == null ? null : () => reloj.ahora),
         navigatorObservers: [if (navegacion != null) navegacion],
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
@@ -199,14 +212,15 @@ void main() {
   testWidgets('«Reenviar» arranca bloqueado 60 s y después pide con reenviar',
       (tester) async {
     final servicio = _Servicio();
-    await _montar(tester, servicio);
+    final reloj = _Reloj();
+    await _montar(tester, servicio, reloj: reloj);
 
     // Mismo cooldown que el backend: si el botón se habilitara antes, diría
     // «enviado» y el servidor no mandaría nada.
     expect(_reenviar(tester).onPressed, isNull);
     expect(find.text('Reenviar código en 60 s'), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 61));
+    await reloj.avanzar(tester, const Duration(seconds: 61));
     expect(_reenviar(tester).onPressed, isNotNull);
 
     await tester.tap(find.byKey(const Key('verify_mail_resend')));
@@ -216,6 +230,111 @@ void main() {
     expect(servicio.pedidos, [false, true]);
     expect(find.text('Te mandamos un código nuevo a ana@test.com.'),
         findsOneWidget);
+    await _desmontar(tester);
+  });
+
+  testWidgets('con el tope de envíos: dice los minutos y no deja reenviar',
+      (tester) async {
+    // 44 min 10 s: se redondea PARA ARRIBA, el botón no se habilita antes de
+    // lo que dijo el servidor.
+    final servicio = _Servicio()
+      ..solicitud = const ResultadoDeSolicitud(
+        SolicitudDeCodigo.limitado,
+        reintentarEn: Duration(minutes: 44, seconds: 10),
+      );
+    final reloj = _Reloj();
+    await _montar(tester, servicio, reloj: reloj);
+
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 45 min.'),
+      findsOneWidget,
+    );
+    expect(_reenviar(tester).onPressed, isNull);
+    // Una espera de 45 min no se muestra como «en 2650 s».
+    expect(find.textContaining('Reenviar código en'), findsNothing);
+    expect(find.text('Reenviar código'), findsOneWidget);
+
+    // Pasados los 60 s del cooldown común sigue bloqueado: la espera es la del
+    // servidor, no la del botón.
+    await reloj.avanzar(tester, const Duration(seconds: 61));
+    expect(_reenviar(tester).onPressed, isNull);
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 44 min.'),
+      findsOneWidget,
+    );
+
+    await reloj.avanzar(tester, const Duration(minutes: 45));
+    expect(_reenviar(tester).onPressed, isNotNull);
+    expect(find.text('Ya podés pedir otro código.'), findsOneWidget);
+    await _desmontar(tester);
+  });
+
+  testWidgets('con el tope de envíos y 90 min o más: lo dice en horas',
+      (tester) async {
+    // 4 h 20 min: «en 260 min» no se lee. Se redondea hacia arriba, a 5 h.
+    final servicio = _Servicio()
+      ..solicitud = const ResultadoDeSolicitud(
+        SolicitudDeCodigo.limitado,
+        reintentarEn: Duration(hours: 4, minutes: 20),
+      );
+    await _montar(tester, servicio, reloj: _Reloj());
+
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 5 h.'),
+      findsOneWidget,
+    );
+    expect(_reenviar(tester).onPressed, isNull);
+    await _desmontar(tester);
+  });
+
+  testWidgets(
+      'la espera sale del reloj, no de contar ticks (app en segundo '
+      'plano)', (tester) async {
+    // Con la app en segundo plano el Timer.periodic no repone los ticks que se
+    // pierde: restando de a uno, la espera de 45 min seguiría diciendo 45 min.
+    final servicio = _Servicio()
+      ..solicitud = const ResultadoDeSolicitud(
+        SolicitudDeCodigo.limitado,
+        reintentarEn: Duration(minutes: 45),
+      );
+    final reloj = _Reloj();
+    await _montar(tester, servicio, reloj: reloj);
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 45 min.'),
+      findsOneWidget,
+    );
+
+    // Pasan 40 min de reloj y el Timer dispara UN solo tick.
+    reloj.ahora = reloj.ahora.add(const Duration(minutes: 40));
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(
+      find.text('Pediste muchos códigos. Probá de nuevo en 5 min.'),
+      findsOneWidget,
+    );
+    expect(_reenviar(tester).onPressed, isNull);
+    await _desmontar(tester);
+  });
+
+  testWidgets('verificado después de «limitado»: el éxito no queda tapado',
+      (tester) async {
+    final servicio = _Servicio()
+      ..solicitud = const ResultadoDeSolicitud(
+        SolicitudDeCodigo.limitado,
+        reintentarEn: Duration(minutes: 45),
+      );
+    await _montar(tester, servicio, reloj: _Reloj());
+
+    await tester.enterText(
+        find.byKey(const Key('verify_mail_code_field')), '048213');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('verify_mail_confirm')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Listo, mail confirmado.'), findsOneWidget);
+    expect(find.textContaining('Pediste muchos códigos'), findsNothing);
+    expect(find.textContaining('Reenviar código en'), findsNothing);
     await _desmontar(tester);
   });
 
