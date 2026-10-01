@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
-import '../../../../../core/utils/argentina_time.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/blocked_athletes_providers.dart';
@@ -291,7 +290,7 @@ class _EmptyState extends StatelessWidget {
           title: 'NINGUNO', // i18n: Fase W3
           body: 'Ninguno de tus alumnos quedó fuera de tu cupo. Cancelaste tu '
               'suscripción: tu plan ${tierName(tier)} rige hasta el '
-              '${_fechaArg(subscription!.currentPeriodEnd!)} y después tu '
+              '${fechaDiaMesArg(subscription!.currentPeriodEnd!)} y después tu '
               'cuenta funciona con el límite del plan Free '
               '(${cupoTexto(SubscriptionTier.free)}).', // i18n: Fase W3
           palette: palette,
@@ -430,20 +429,6 @@ _BlockCause _causeOf({
   return tier.isUnlimited ? _BlockCause.unexplained : _BlockCause.planLimit;
 }
 
-/// `dd/mm` de un instante, en calendario argentino.
-///
-/// Va con `toArgentina` y no leyendo los campos crudos ni convirtiendo a hora
-/// local: `currentPeriodEnd` es un instante UTC, y entre las 21:00 y las 23:59
-/// ART su día UTC ya es el siguiente — el PF leería una fecha corrida un día.
-///
-/// (El nombre del helper de conversión local va sin escribir literal a
-/// propósito: `no_raw_clock_scan_test.dart` escanea el TEXTO del archivo, así
-/// que citarlo en un comentario suma deuda al ratchet igual que usarlo.)
-String _fechaArg(DateTime instant) {
-  final d = toArgentina(instant.toUtc());
-  return '${d.day}/${d.month}';
-}
-
 String _explanation({
   required _BlockCause cause,
   required SubscriptionTier tier,
@@ -456,8 +441,8 @@ String _explanation({
       // saberlo.
       _BlockCause.subscriptionCancelled =>
         'Cancelaste tu suscripción: tu plan ${tierName(tier)} rige hasta el '
-            '${_fechaArg(subscription!.currentPeriodEnd!)} y después tu cuenta '
-            'funciona con el límite del plan Free '
+            '${fechaDiaMesArg(subscription!.currentPeriodEnd!)} y después tu '
+            'cuenta funciona con el límite del plan Free '
             '(${cupoTexto(SubscriptionTier.free)}). Sobre estos $count pasás '
             'a solo lectura: los seguís viendo y podés chatear, pero no podés '
             'editarles rutinas ni notas.', // i18n: Fase W3
