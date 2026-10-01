@@ -13,7 +13,9 @@ import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/cancel_subscription_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Facturación TREINO» (paywall Fase 7, PR2 — vista read-only).
@@ -42,6 +44,8 @@ class FacturacionTab extends ConsumerWidget {
     // Sin suscripción → Free (sin backfill). Límite del tier vigente.
     final tier = sub?.tier ?? SubscriptionTier.free;
     final limit = sub?.weightLimit ?? tier.weightLimit;
+    // Qué le quedó de una baja: si la pidió y hasta cuándo le dura lo pagado.
+    final vigencia = VigenciaDelPlan.de(sub);
 
     final links = ref.watch(trainerLinksStreamProvider).valueOrNull ?? const [];
     final load = computeWeightedLoad(links);
@@ -69,18 +73,20 @@ class FacturacionTab extends ConsumerWidget {
           load: load,
           limit: limit,
           palette: palette,
+          canceladoHasta: vigencia.pagadoHasta,
         ),
         // ── La baja ──
         //
-        // Sólo con un plan PAGO: un PF en Free no tiene nada que dar de baja, y
-        // ofrecérselo le haría creer que sí. El servidor devuelve
-        // `sin-suscripcion` igual —un botón que no se dibuja no es una
+        // Sólo con un plan PAGO y que no esté ya dado de baja: un PF en Free no
+        // tiene nada que dar de baja, y uno que ya la pidió tampoco —ofrecérsela
+        // otra vez le haría creer que la primera no valió—. El servidor
+        // devuelve `sin-suscripcion` igual —un botón que no se dibuja no es una
         // garantía— pero acá no hay por qué mostrarlo.
         //
         // Fuera de la card y no adentro, a propósito: la card dice lo que el PF
         // TIENE, y esto es una acción destructiva. Meterla ahí la pondría al
         // lado de «CAMBIAR PLAN», que es lo contrario de lo que hace.
-        if (tier != SubscriptionTier.free) ...[
+        if (tier != SubscriptionTier.free && !vigencia.cancelada) ...[
           const SizedBox(height: AppSpacing.s14),
           _CancelSubscriptionLink(palette: palette),
         ],
@@ -95,6 +101,7 @@ class _CurrentPlanCard extends StatelessWidget {
     required this.load,
     required this.limit,
     required this.palette,
+    required this.canceladoHasta,
   });
 
   final SubscriptionTier tier;
@@ -104,12 +111,17 @@ class _CurrentPlanCard extends StatelessWidget {
   final int? limit;
   final AppPalette palette;
 
+  /// Hasta cuándo conserva el plan un PF que ya lo dio de baja. `null` = no hay
+  /// baja, o su período pagado ya venció (ver [VigenciaDelPlan.pagadoHasta]).
+  final DateTime? canceladoHasta;
+
   @override
   Widget build(BuildContext context) {
     // Fracción para la barra, tope en 1.0 aunque esté sobre el límite.
     // Sin límite: la barra queda vacía y nunca hay excedente. Mostrar una
     // barra llena al 100% sugeriría que estás al tope, que es lo contrario.
     final lim = limit;
+    final hasta = canceladoHasta;
     final fraction =
         lim == null || lim == 0 ? 0.0 : (load / lim).clamp(0.0, 1.0);
     final overLimit = lim != null && load > lim;
@@ -150,6 +162,20 @@ class _CurrentPlanCard extends StatelessWidget {
                         letterSpacing: 0.5,
                       ),
                     ),
+                    // Dado de baja pero con días pagos: el plan sigue rigiendo,
+                    // y el PF tiene que poder leer las dos cosas juntas. Sin
+                    // esta línea la card dice «Plan 1» como si nada y la baja
+                    // —que ya no se puede repetir— queda invisible.
+                    if (hasta != null) ...[
+                      const SizedBox(height: AppSpacing.hairline),
+                      Text(
+                        'Cancelado. Activo hasta el ${fechaDiaMesArg(hasta)}.', // i18n: Fase W3
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: AppTextSize.caption,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach/application/template_quota_provider.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -11,6 +12,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -259,6 +261,143 @@ void main() {
       await tester.pump();
 
       expect(find.textContaining('Plantillas'), findsNothing);
+    });
+  });
+
+  // ── Plan dado de baja ──
+  //
+  // «Dar de baja la suscripción» sólo aparece en web (`resolvePlanCancel`), así
+  // que cada test que quiere VER el link fija esa superficie. Sin eso, los
+  // `findsNothing` de abajo pasarían por la plataforma y no por la baja.
+  group('plan dado de baja', () {
+    // 1/10/2026 12:00, LOCAL (`AppClock.freeze` lo exige).
+    setUp(() {
+      AppClock.freeze(DateTime(2026, 10, 1, 12));
+      debugPlanCancel = planCancelFor(isWeb: true);
+    });
+    tearDown(() {
+      AppClock.unfreeze();
+      debugPlanCancel = null;
+    });
+
+    UserProfile pf({
+      SubscriptionStatus status = SubscriptionStatus.active,
+      DateTime? fin,
+    }) =>
+        _trainer(
+          subscription: TrainerSubscription(
+            tier: SubscriptionTier.plan1,
+            status: status,
+            weightLimit: 7,
+            currentPeriodEnd: fin,
+          ),
+        );
+
+    final linkDeBaja = find.text('Dar de baja la suscripción');
+
+    // Control positivo de todos los `findsNothing` de este grupo: con el plan
+    // activo, en web, el link ESTÁ. Si esto fallara, los otros no probarían nada.
+    testWidgets('plan activo: ofrece dar de baja y no dice nada de una baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(links: const [], profile: pf()));
+      await tester.pump();
+
+      expect(linkDeBaja, findsOneWidget);
+      expect(find.textContaining('Cancelado'), findsNothing);
+    });
+
+    // Pidió la baja y le quedan días: el plan sigue rigiendo y la card tiene
+    // que decir las dos cosas. Ya no hay nada que dar de baja.
+    testWidgets(
+        'cancelado con días pagos: dice hasta cuándo y NO ofrece dar de baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        profile: pf(
+          status: SubscriptionStatus.cancelled,
+          fin: DateTime.utc(2026, 10, 15, 15),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Cancelado. Activo hasta el 15/10.'), findsOneWidget);
+      // El plan sigue siendo el que rige.
+      expect(find.text('TREINO Coach · Plan 1'), findsOneWidget);
+      expect(linkDeBaja, findsNothing);
+    });
+
+    // La fecha se lee en ART: 01:30 UTC del 16 son las 22:30 del 15.
+    testWidgets('la fecha se lee en calendario argentino, no en UTC',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        profile: pf(
+          status: SubscriptionStatus.cancelled,
+          fin: DateTime.utc(2026, 10, 16, 1, 30),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Cancelado. Activo hasta el 15/10.'), findsOneWidget);
+      expect(find.textContaining('16/10'), findsNothing);
+    });
+
+    // Vencida no hay «activo hasta»: la línea sería falsa. Y la baja sigue
+    // pedida, así que tampoco hay nada que dar de baja.
+    testWidgets('cancelado con el período vencido: sin línea y sin dar de baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        profile: pf(
+          status: SubscriptionStatus.cancelled,
+          fin: DateTime.utc(2026, 9, 30, 15),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Cancelado'), findsNothing);
+      expect(find.textContaining('Activo hasta'), findsNothing);
+      expect(linkDeBaja, findsNothing);
+    });
+
+    testWidgets('cancelado sin fecha de fin: sin línea y sin dar de baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        links: const [],
+        profile: pf(status: SubscriptionStatus.cancelled),
+      ));
+      await tester.pump();
+
+      expect(find.textContaining('Cancelado'), findsNothing);
+      expect(linkDeBaja, findsNothing);
+    });
+
+    // REGRESIÓN: lo que no es una baja queda como estaba — aunque el período
+    // del doc esté vencido, la línea y el ocultamiento son sólo de `cancelled`.
+    for (final status in SubscriptionStatus.values) {
+      if (status == SubscriptionStatus.cancelled) continue;
+
+      testWidgets('$status sigue ofreciendo dar de baja y sin línea de baja',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          links: const [],
+          profile: pf(status: status, fin: DateTime.utc(2026, 9, 30, 15)),
+        ));
+        await tester.pump();
+
+        expect(linkDeBaja, findsOneWidget);
+        expect(find.textContaining('Cancelado'), findsNothing);
+      });
+    }
+
+    // Free nunca tuvo qué dar de baja: no cambia.
+    testWidgets('sin suscripción (Free): no ofrece dar de baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(links: const []));
+      await tester.pump();
+
+      expect(linkDeBaja, findsNothing);
+      expect(find.textContaining('Cancelado'), findsNothing);
     });
   });
 }

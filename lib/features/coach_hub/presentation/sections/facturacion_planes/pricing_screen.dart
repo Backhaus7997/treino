@@ -11,6 +11,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
 import 'plan_copy.dart';
+import 'plan_vigencia.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
@@ -191,9 +192,14 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final currentTier =
-        ref.watch(userProfileProvider).valueOrNull?.subscription?.tier ??
-            SubscriptionTier.free;
+
+    // El plan «actual» NO es siempre el tier del doc: una suscripción dada de
+    // baja conserva el tier pago sólo mientras le queden días pagos, y después
+    // es Free. Se resuelve UNA vez acá y baja a las tarjetas ya decidido —ver
+    // [VigenciaDelPlan]—; ninguna tarjeta mira el estado ni el reloj.
+    final vigencia = VigenciaDelPlan.de(
+      ref.watch(userProfileProvider).valueOrNull?.subscription,
+    );
 
     // La superficie de compra se resuelve UNA vez, acá arriba, y baja por
     // parámetro hasta el CTA. No se vuelve a preguntar adentro de las tarjetas:
@@ -212,7 +218,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         if (constraints.maxWidth < _kNarrowBreakpoint) {
           return _NarrowBody(
             annual: _annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
             checkout: checkout,
             onCycleChanged: onCycleChanged,
@@ -220,7 +226,7 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         }
         return _WideBody(
           annual: _annual,
-          currentTier: currentTier,
+          vigencia: vigencia,
           palette: palette,
           checkout: checkout,
           onCycleChanged: onCycleChanged,
@@ -237,14 +243,14 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 class _WideBody extends StatelessWidget {
   const _WideBody({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
     required this.checkout,
     required this.onCycleChanged,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
 
   /// Ancho NO implica web: una tablet Android de 900pt llega hasta acá. Por eso
@@ -293,7 +299,7 @@ class _WideBody extends StatelessWidget {
           const SizedBox(height: 40),
           _PlanCards(
             annual: annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
             checkout: checkout,
             narrow: false,
@@ -424,14 +430,14 @@ class _CycleOption extends StatelessWidget {
 class _NarrowBody extends StatelessWidget {
   const _NarrowBody({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
     required this.checkout,
     required this.onCycleChanged,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
   final PlanCheckout checkout;
   final ValueChanged<bool> onCycleChanged;
@@ -485,7 +491,7 @@ class _NarrowBody extends StatelessWidget {
           const SizedBox(height: 20),
           _PlanCards(
             annual: annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
             checkout: checkout,
             narrow: true,
@@ -634,14 +640,14 @@ class _NarrowCycleOption extends StatelessWidget {
 class _PlanCards extends StatelessWidget {
   const _PlanCards({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
     required this.checkout,
     required this.narrow,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
   final PlanCheckout checkout;
   final bool narrow;
@@ -649,6 +655,12 @@ class _PlanCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const recommended = SubscriptionTier.plan1;
+
+    // «Actual» es el tier EFECTIVO, no el del doc: una baja con el período ya
+    // vencido es Free. Y los días pagos de una baja viajan SÓLO a la tarjeta del
+    // plan actual —es la única en la que tiene sentido «volver a suscribirme»—,
+    // así que ninguna otra puede dibujar la fecha por error.
+    final tierActual = vigencia.tierEfectivo;
 
     // Se ITERA sobre el enum a proposito, y para los DOS layouts. Antes las
     // tarjetas estaban escritas a mano (free, plan1, plan2), asi que agregar un
@@ -661,7 +673,8 @@ class _PlanCards extends StatelessWidget {
             ? _NarrowPlanCard(
                 tier: tier,
                 annual: annual,
-                isCurrent: currentTier == tier,
+                isCurrent: tierActual == tier,
+                pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
                 recommended: tier == recommended,
                 palette: palette,
                 checkout: checkout,
@@ -669,7 +682,8 @@ class _PlanCards extends StatelessWidget {
             : _PlanCard(
                 tier: tier,
                 annual: annual,
-                isCurrent: currentTier == tier,
+                isCurrent: tierActual == tier,
+                pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
                 recommended: tier == recommended,
                 palette: palette,
                 checkout: checkout,
@@ -936,6 +950,7 @@ class _PlanCard extends StatelessWidget {
     required this.tier,
     required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -944,6 +959,9 @@ class _PlanCard extends StatelessWidget {
   final SubscriptionTier tier;
   final bool annual;
   final bool isCurrent;
+
+  /// Ver [_PlanCtaButton.pagadoHasta].
+  final DateTime? pagadoHasta;
   final bool recommended;
   final AppPalette palette;
   final PlanCheckout checkout;
@@ -1125,6 +1143,7 @@ class _PlanCard extends StatelessWidget {
             tier: tier,
             annual: annual,
             isCurrent: isCurrent,
+            pagadoHasta: pagadoHasta,
             recommended: recommended,
             palette: palette,
             checkout: checkout,
@@ -1167,6 +1186,7 @@ class _NarrowPlanCard extends StatelessWidget {
     required this.tier,
     required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -1175,6 +1195,9 @@ class _NarrowPlanCard extends StatelessWidget {
   final SubscriptionTier tier;
   final bool annual;
   final bool isCurrent;
+
+  /// Ver [_PlanCtaButton.pagadoHasta].
+  final DateTime? pagadoHasta;
   final bool recommended;
   final AppPalette palette;
   final PlanCheckout checkout;
@@ -1330,6 +1353,7 @@ class _NarrowPlanCard extends StatelessWidget {
             tier: tier,
             annual: annual,
             isCurrent: isCurrent,
+            pagadoHasta: pagadoHasta,
             recommended: recommended,
             palette: palette,
             checkout: checkout,
@@ -1447,15 +1471,18 @@ class _PopularBadge extends StatelessWidget {
   }
 }
 
-/// El pie de la tarjeta. Tres estados que NO son el mismo con un flag:
-/// "tu plan actual", "gratis" y —según la superficie— comprar o decir dónde se
-/// compra.
+/// El pie de la tarjeta. Cuatro estados que NO son el mismo con un flag:
+/// "tu plan actual", "gratis", y —según la superficie— comprar o decir dónde se
+/// compra. El cuarto es el plan actual DADO DE BAJA con días todavía pagos, y
+/// sólo existe donde se puede cobrar: ahí "tu plan actual" deja de ser un
+/// cartel y pasa a ser «volver a suscribirme».
 class _PlanCtaButton extends StatelessWidget {
   const _PlanCtaButton({
     super.key,
     required this.tier,
     required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
     required this.recommended,
     required this.palette,
     required this.checkout,
@@ -1469,6 +1496,12 @@ class _PlanCtaButton extends StatelessWidget {
   final bool annual;
 
   final bool isCurrent;
+
+  /// Hasta cuándo le dura al PF lo que ya pagó. Sólo llega no-nulo en la tarjeta
+  /// del plan ACTUAL y sólo si lo dio de baja y todavía le quedan días (ver
+  /// [VigenciaDelPlan.pagadoHasta]); en cualquier otro caso es `null` y la
+  /// tarjeta se comporta como siempre.
+  final DateTime? pagadoHasta;
   final bool recommended;
   final AppPalette palette;
 
@@ -1483,14 +1516,53 @@ class _PlanCtaButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isCurrent) {
-      return _CtaBox(
-        minHeight: minHeight,
-        borderColor: palette.border,
-        child: _ctaLabel(
-          'TU PLAN ACTUAL', // i18n: Fase W3
-          palette.textMuted,
-        ),
-      );
+      final hasta = pagadoHasta;
+
+      // Sin días pagos que re-contratar —el plan no está dado de baja— el
+      // actual es un cartel, como siempre. Free también: no hay nada que
+      // cobrar, así que «volver a suscribirme» a un plan sin precio sería
+      // pedirle al servidor un checkout que no existe.
+      if (hasta == null || kTierPricesArs[tier] == null) return _planActual();
+
+      // `switch` sobre el sellado, igual que más abajo, y por el mismo motivo:
+      // una tercera superficie DEJA DE COMPILAR hasta que alguien decida qué
+      // dice acá.
+      //
+      // Todo el texto nuevo de la baja (el botón y la fecha) cuelga de
+      // [PlanCheckoutAvailable] y de nada más. La app móvil muestra lo de
+      // siempre: «TU PLAN ACTUAL», sin botón y sin una palabra sobre volver a
+      // pagar. Bajo 3.1.3(f) invitar a re-contratar es un call to action de
+      // compra aunque no nombre ningún canal ni sea tappable:
+      // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart` cuenta
+      // «reactivalo» entre ellos. Ver también `_kSubscribeElsewhereShort`.
+      return switch (checkout) {
+        PlanCheckoutOnWebOnly() => _planActual(),
+        final PlanCheckoutAvailable disponible => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // El MISMO punto de compra que «ELEGIR PLAN»: llama a `start` con
+              // este tier y el ciclo del toggle, sin un camino de cobro paralelo.
+              _botonDeCompra(
+                context,
+                disponible,
+                'VOLVER A SUSCRIBIRME', // i18n: Fase W3
+              ),
+              const SizedBox(height: AppSpacing.s8),
+              // Lo que cambia la decisión: no se le cobra dos veces los días que
+              // ya pagó. La fecha es `currentPeriodEnd` en calendario argentino.
+              Text(
+                'Pagado hasta el ${fechaDiaMesArg(hasta)}: '
+                'el primer cobro es ese día.', // i18n: Fase W3
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: palette.textMuted,
+                  fontSize: AppTextSize.caption,
+                ),
+              ),
+            ],
+          ),
+      };
     }
 
     // FREE no pasa por el guard: no es una venta apagada, es que no hay nada
@@ -1537,22 +1609,48 @@ class _PlanCtaButton extends StatelessWidget {
             palette.textMuted,
           ),
         ),
-      final PlanCheckoutAvailable disponible => TreinoTappable(
-          onTap: () => disponible.start(context, tier: tier, annual: annual),
-          child: _CtaBox(
-            minHeight: minHeight,
-            fillColor: recommended ? palette.accent : null,
-            borderColor: recommended ? palette.accent : palette.border,
-            child: _ctaLabel(
-              'ELEGIR PLAN', // i18n: Fase W3
-              recommended
-                  ? TreinoButtonTokens.foreground(context)
-                  : palette.textPrimary,
-            ),
-          ),
+      final PlanCheckoutAvailable disponible => _botonDeCompra(
+          context,
+          disponible,
+          'ELEGIR PLAN', // i18n: Fase W3
         ),
     };
   }
+
+  /// El cartel del plan actual: caja con borde, sin `TreinoTappable` ni ruta.
+  Widget _planActual() => _CtaBox(
+        minHeight: minHeight,
+        borderColor: palette.border,
+        child: _ctaLabel(
+          'TU PLAN ACTUAL', // i18n: Fase W3
+          palette.textMuted,
+        ),
+      );
+
+  /// El botón que arranca el checkout. «ELEGIR PLAN» y «VOLVER A SUSCRIBIRME»
+  /// son el MISMO punto de compra con otra etiqueta: comparten acá la llamada a
+  /// [PlanCheckoutAvailable.start] y el estilo, para que no haya un segundo
+  /// camino de cobro que se desincronice del primero. Sólo se puede llamar con
+  /// la capacidad [PlanCheckoutAvailable] en la mano.
+  Widget _botonDeCompra(
+    BuildContext context,
+    PlanCheckoutAvailable disponible,
+    String etiqueta,
+  ) =>
+      TreinoTappable(
+        onTap: () => disponible.start(context, tier: tier, annual: annual),
+        child: _CtaBox(
+          minHeight: minHeight,
+          fillColor: recommended ? palette.accent : null,
+          borderColor: recommended ? palette.accent : palette.border,
+          child: _ctaLabel(
+            etiqueta,
+            recommended
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textPrimary,
+          ),
+        ),
+      );
 
   Widget _ctaLabel(String label, Color color) => Text(
         label,
