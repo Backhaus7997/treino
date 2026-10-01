@@ -386,6 +386,26 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "OJO: si vuelve el flag y Android sigue fallando, el sintoma es un " +
       "reseteo que no llega nunca, sin error visible en ningun lado.",
   },
+  "auth/codigo-de-verificacion:solicitarCodigoDeVerificacion": {
+    permanence: "debt",
+    reason:
+      "El codigo de verificacion es OBLIGATORIO para entrar a la app. Con el " +
+      "flag, el Android que hoy no atesta no podria pedirlo y quedaria afuera " +
+      "para siempre. Exige request.auth y opera solo sobre el uid del token; " +
+      "el cooldown de 60 s acota los mails por cuenta.",
+    exitCondition:
+      "El mismo que requestEmailVerification: cero INVALID por plataforma en " +
+      "jsonPayload.verifications.app. Restaurar junto con verificarCodigoDeMail.",
+  },
+  "auth/codigo-de-verificacion:verificarCodigoDeMail": {
+    permanence: "debt",
+    reason:
+      "Hermano de solicitarCodigoDeVerificacion: gatear uno solo deja a la " +
+      "persona con un codigo en la mano que no puede canjear. Exige " +
+      "request.auth, solo marca el uid del token y tiene 5 intentos por codigo.",
+    exitCondition:
+      "El mismo que solicitarCodigoDeVerificacion. Restaurar los dos a la vez.",
+  },
   "auth/request-auth-email:requestEmailVerification": {
     permanence: "debt",
     reason:
@@ -446,6 +466,8 @@ const EXPECTED_DEPLOYED = [
   "resumeTrainerLink",
   "solicitarArrepentimientoPorMail",
   "solicitarBajaPorMail",
+  "solicitarCodigoDeVerificacion",
+  "verificarCodigoDeMail",
 ] as const;
 
 const describeCallable = (c: DeployedCallable) =>
@@ -654,6 +676,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "auth/request-auth-email",
       symbol: "requestEmailVerification",
       as: "requestEmailVerification",
+      attested: false,
+    },
+    {
+      module: "auth/codigo-de-verificacion",
+      symbol: "solicitarCodigoDeVerificacion",
+      as: "solicitarCodigoDeVerificacion",
+      attested: false,
+    },
+    {
+      module: "auth/codigo-de-verificacion",
+      symbol: "verificarCodigoDeMail",
+      as: "verificarCodigoDeMail",
       attested: false,
     },
   ];

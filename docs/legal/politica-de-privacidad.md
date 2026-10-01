@@ -191,11 +191,11 @@ financiero visible para cualquier usuario de la app. Cargalo sabiendo eso.
 | **Prestarte el servicio** | Guardar rutinas, registrar sesiones, calcular progreso, mostrarte estadísticas |
 | **Vincularte con un entrenador** | Descubrimiento, solicitud de vínculo, chat, agenda, compartir lo que elijas |
 | **Función social** | Feed, seguimientos, reacciones, rankings del gimnasio |
-| **Comunicaciones** | Verificación de cuenta, recuperación de contraseña, avisos operativos |
+| **Comunicaciones** | Verificación de cuenta, recuperación de contraseña, avisos operativos y avisos sobre tu plan y tus pagos, por correo electrónico |
 | **Notificaciones** | Recordatorios y avisos, si los aceptás |
 | **Seguridad** | Prevención de abuso, protección de cuentas, integridad del servicio |
 | **Mejora del producto** | Analítica agregada y diagnóstico de errores |
-| **Facturación** | Sólo para entrenadores con suscripción paga |
+| **Facturación** | Sólo para quien tiene una suscripción paga, entrenador o atleta |
 
 **Lo que NO hacemos:** no vendemos tus datos, no hacemos publicidad, no cedemos
 información a data brokers, no cruzamos tu actividad con fuentes externas para
@@ -258,7 +258,7 @@ instrucciones:
 |---|---|
 | **Google (Firebase / Google Cloud)** | Autenticación, base de datos, archivos, notificaciones, analítica, reportes de error |
 | **Google Places** | Las búsquedas de gimnasios que hacés |
-| **Resend** | Envío de correo transaccional (verificación, recupero de contraseña) |
+| **Resend** | Envío de correo (verificación, recupero de contraseña, avisos sobre tu plan y tus pagos) |
 | **Vercel** | Alojamiento del sitio web y del panel web para entrenadores |
 | **CARTO** | Provee las imágenes del mapa. Al cargarlo, tu dirección IP llega a su servidor |
 | **Apple / Google** | Si iniciás sesión con sus cuentas, o si contratás por sus tiendas |

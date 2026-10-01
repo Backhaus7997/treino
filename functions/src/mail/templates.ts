@@ -655,6 +655,47 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       String(params.actionLink ?? ""),
     );
 
+  // ── El código de 6 dígitos (`auth/codigo-de-verificacion.ts`) ──────────────
+  //
+  // El código va en el ASUNTO y como titular: es lo único que el usuario vino a
+  // buscar, y en la notificación del teléfono se lee sin abrir el mail.
+  //
+  // Y es el ÚNICO lugar donde se le puede decir que los pagos van por mail. La
+  // app no puede: un llamado a pagar afuera, impreso en el binario, tumba la
+  // exención 3.1.3(f) (ver `anti_steering_movil_test.dart`). El mail sí puede, y
+  // pedir el código es lo que garantiza que se abra.
+  case "email-code-athlete":
+  case "email-code-trainer": {
+    const codigo = params.codigo ? String(params.codigo) : "";
+    const esPf = kind === "email-code-trainer";
+    return build(
+      codigo ? `${codigo} es tu código de TREINO` : "Tu código de TREINO", // i18n: email transaccional
+      codigo || "Confirmá tu mail",
+      [
+        [
+          "Es tu código para confirmar tu mail en TREINO. Ingresalo en la app: " +
+            "vence en 15 minutos.",
+        ],
+        [
+          strong("Todo lo de tu plan llega por acá."),
+          esPf ?
+            " Los pagos de tu plan y sus confirmaciones se hacen por mail y " +
+              "desde el Coach Hub web, nunca dentro de la app." :
+            " Los pagos de TREINO Pro y sus confirmaciones se hacen por mail, " +
+              "nunca dentro de la app.",
+        ],
+        [
+          esPf ?
+            "Tocá el botón para ver los planes y elegir el tuyo." :
+            "Cuando quieras pasarte a TREINO Pro, tocá el botón para ver los planes.",
+        ],
+        ["Si no creaste una cuenta en TREINO, ignorá este mail."],
+      ],
+      "VER LOS PLANES",
+      esPf ? trainerWebCheckout() : `${LANDING_URL}/es/suscripcion/checkout`,
+    );
+  }
+
   case "appointment-confirmed":
     return build(
       "Tu sesión quedó confirmada", // i18n: email transaccional
