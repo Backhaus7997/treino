@@ -4,6 +4,7 @@
  */
 
 import {
+  MAX_FREE_TRIAL_DAYS,
   MpApiError,
   createMpClient,
 } from "../subscriptions/mp/client";
@@ -256,6 +257,118 @@ describe("createMpClient — createPreapprovalPlan", () => {
     expect(r.init_point).toBe("https://mp/x");
     expect(r.status).toBe("pending");
   });
+
+  // ── La prueba de dias: el PF que vuelve a suscribirse con dias ya pagos ──
+
+  it("freeTrialDays agrega `free_trial` en DIAS, adentro de auto_recurring", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan({
+      ...ALTA,
+      freeTrialDays: 17,
+    });
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body.auto_recurring.free_trial).toEqual({
+      frequency: 17,
+      frequency_type: "days",
+    });
+    // Lo demas del cobro no se mueve: la prueba difiere el primer cobro, no
+    // cambia cuanto ni cada cuanto se cobra.
+    expect(body.auto_recurring).toMatchObject({
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: 22000,
+      currency_id: "ARS",
+    });
+  });
+
+  it("sin freeTrialDays el cuerpo es EXACTAMENTE el de siempre", async () => {
+    // Es lo que protege a todos los checkouts normales (y al del alumno): el
+    // request que sale a MP no cambia ni en una clave.
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
+
+    expect(llamadas[0].init?.body).toBe(JSON.stringify({
+      reason: ALTA.reason,
+      external_reference: ALTA.externalReference,
+      back_url: ALTA.backUrl,
+      auto_recurring: {
+        frequency: ALTA.frequencyMonths,
+        frequency_type: "months",
+        transaction_amount: ALTA.transactionAmount,
+        currency_id: "ARS",
+      },
+    }));
+    expect(llamadas[0].init?.body).not.toContain("free_trial");
+  });
+
+  it("freeTrialDays explicitamente `undefined` tambien es ausente", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan({
+      ...ALTA,
+      freeTrialDays: undefined,
+    });
+
+    expect(llamadas[0].init?.body).not.toContain("free_trial");
+  });
+
+  it("acepta los dos bordes: 1 dia y el maximo", async () => {
+    for (const dias of [1, MAX_FREE_TRIAL_DAYS]) {
+      const { fn, llamadas } = fakeFetch({
+        status: 201,
+        body: { id: "x", init_point: "https://mp/x" },
+      });
+
+      await createMpClient("t", fn).createPreapprovalPlan({
+        ...ALTA,
+        freeTrialDays: dias,
+      });
+
+      expect(
+        JSON.parse(llamadas[0].init?.body as string).auto_recurring.free_trial
+          .frequency,
+      ).toBe(dias);
+    }
+  });
+
+  const pruebaInvalida: [string, unknown][] = [
+    ["cero", 0],
+    ["negativo", -3],
+    ["fraccionario", 1.5],
+    ["NaN", Number.NaN],
+    ["infinito", Number.POSITIVE_INFINITY],
+    ["pasado del maximo", MAX_FREE_TRIAL_DAYS + 1],
+    ["un string numerico", "7"],
+    ["null", null],
+  ];
+
+  for (const [caso, valor] of pruebaInvalida) {
+    it(`freeTrialDays ${caso} falla SIN salir a la red`, async () => {
+      // Un monto de prueba mal calculado es un cobro adelantado o un cobro
+      // doble: se descubre ACA, no por la reaccion de MP o del PF.
+      const { fn, llamadas } = fakeFetch({ status: 201, body: { id: "x" } });
+
+      await expect(
+        createMpClient("t", fn).createPreapprovalPlan({
+          ...ALTA,
+          freeTrialDays: valor,
+        } as never),
+      ).rejects.toThrow(/freeTrialDays/);
+      expect(llamadas).toHaveLength(0);
+    });
+  }
 
   // Estas cuatro fallan sin tocar la red: son bugs nuestros, y descubrirlos
   // por un 400 de MP los disfraza de problema de ellos.

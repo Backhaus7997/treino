@@ -13,7 +13,9 @@ import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/cancel_subscription_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Facturación TREINO» (paywall Fase 7, PR2 — vista read-only).
@@ -25,6 +27,25 @@ import 'package:treino/features/profile/application/user_providers.dart';
 /// pantalla de cambio de plan (eso es PR3, con el flujo de Mercado Pago) ni
 /// historial de comprobantes (Fase 2). Un PF sin `subscription` en su doc es
 /// Free por definición (sin backfill).
+///
+/// ## Qué plan muestra
+///
+/// El que RIGE, no el que dice el doc ([VigenciaDelPlan]). Una baja con el
+/// período ya vencido es Free, y el servidor no reescribe el tier del doc
+/// cuando eso pasa (`entitlement-triggers.ts`: el límite cae «sin que se
+/// escriba un solo documento»). Leer el tier a secas dejaba esta card diciendo
+/// «Plan 1», «x / 7» y sin la línea de plantillas mientras la pricing page ya
+/// marcaba a Free como el plan actual.
+///
+/// ## La línea de la baja y la app móvil
+///
+/// «Plan dado de baja. Sigue activo hasta el d/m.» es un estado de la cuenta y
+/// no una invitación a pagar, pero eso sólo se sostiene porque la app móvil no
+/// llega a esta pestaña: `/ajustes` vive en el router del Coach Hub web
+/// (`coach_hub_router.dart`) y `router.dart`, el de la app, no lo registra. Lo
+/// fija `test/app/guards/router_movil_sin_ajustes_scan_test.dart`. Si algún día
+/// esta pestaña llega al teléfono, esa línea hay que revisarla contra 3.1.3(f)
+/// antes de mostrarla ahí.
 ///
 /// El uso se computa client-side desde los `trainerLinks` con
 /// [computeWeightedLoad] (active=1.0, paused=0.5) — misma lógica que el gate
@@ -39,9 +60,17 @@ class FacturacionTab extends ConsumerWidget {
 
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final sub = profile?.subscription;
-    // Sin suscripción → Free (sin backfill). Límite del tier vigente.
-    final tier = sub?.tier ?? SubscriptionTier.free;
-    final limit = sub?.weightLimit ?? tier.weightLimit;
+    // Qué plan rige y qué le quedó de una baja. Sin suscripción → Free (sin
+    // backfill); una baja con el período vencido también es Free aunque el doc
+    // siga diciendo otro tier.
+    final vigencia = VigenciaDelPlan.de(sub);
+    final tier = vigencia.tierEfectivo;
+    // El tope cacheado en el doc (`weightLimit`) es el del tier NOMINAL: ya
+    // vencida la baja es el de un plan que el PF no tiene, así que sale de la
+    // tabla del tier efectivo. En cualquier otro caso manda el del doc.
+    final limit = vigencia.vencida
+        ? tier.weightLimit
+        : (sub?.weightLimit ?? tier.weightLimit);
 
     final links = ref.watch(trainerLinksStreamProvider).valueOrNull ?? const [];
     final load = computeWeightedLoad(links);
@@ -69,18 +98,20 @@ class FacturacionTab extends ConsumerWidget {
           load: load,
           limit: limit,
           palette: palette,
+          canceladoHasta: vigencia.pagadoHasta,
         ),
         // ── La baja ──
         //
-        // Sólo con un plan PAGO: un PF en Free no tiene nada que dar de baja, y
-        // ofrecérselo le haría creer que sí. El servidor devuelve
-        // `sin-suscripcion` igual —un botón que no se dibuja no es una
+        // Sólo con un plan PAGO y que no esté ya dado de baja: un PF en Free no
+        // tiene nada que dar de baja, y uno que ya la pidió tampoco —ofrecérsela
+        // otra vez le haría creer que la primera no valió—. El servidor
+        // devuelve `sin-suscripcion` igual —un botón que no se dibuja no es una
         // garantía— pero acá no hay por qué mostrarlo.
         //
         // Fuera de la card y no adentro, a propósito: la card dice lo que el PF
         // TIENE, y esto es una acción destructiva. Meterla ahí la pondría al
         // lado de «CAMBIAR PLAN», que es lo contrario de lo que hace.
-        if (tier != SubscriptionTier.free) ...[
+        if (tier != SubscriptionTier.free && !vigencia.cancelada) ...[
           const SizedBox(height: AppSpacing.s14),
           _CancelSubscriptionLink(palette: palette),
         ],
@@ -95,6 +126,7 @@ class _CurrentPlanCard extends StatelessWidget {
     required this.load,
     required this.limit,
     required this.palette,
+    required this.canceladoHasta,
   });
 
   final SubscriptionTier tier;
@@ -104,12 +136,17 @@ class _CurrentPlanCard extends StatelessWidget {
   final int? limit;
   final AppPalette palette;
 
+  /// Hasta cuándo conserva el plan un PF que ya lo dio de baja. `null` = no hay
+  /// baja, o su período pagado ya venció (ver [VigenciaDelPlan.pagadoHasta]).
+  final DateTime? canceladoHasta;
+
   @override
   Widget build(BuildContext context) {
     // Fracción para la barra, tope en 1.0 aunque esté sobre el límite.
     // Sin límite: la barra queda vacía y nunca hay excedente. Mostrar una
     // barra llena al 100% sugeriría que estás al tope, que es lo contrario.
     final lim = limit;
+    final hasta = canceladoHasta;
     final fraction =
         lim == null || lim == 0 ? 0.0 : (load / lim).clamp(0.0, 1.0);
     final overLimit = lim != null && load > lim;
@@ -150,6 +187,26 @@ class _CurrentPlanCard extends StatelessWidget {
                         letterSpacing: 0.5,
                       ),
                     ),
+                    // Dado de baja pero con días pagos: el plan sigue rigiendo,
+                    // y el PF tiene que poder leer las dos cosas juntas. Sin
+                    // esta línea la card dice «Plan 1» como si nada y la baja
+                    // —que ya no se puede repetir— queda invisible.
+                    //
+                    // «Dado de baja» y no «cancelado»: es el término del link
+                    // «Dar de baja la suscripción», del diálogo y de los
+                    // Términos §7. Dos nombres para lo mismo obligan al PF a
+                    // adivinar si son la misma cosa.
+                    if (hasta != null) ...[
+                      const SizedBox(height: AppSpacing.hairline),
+                      Text(
+                        'Plan dado de baja. '
+                        'Sigue activo hasta el ${fechaDiaMesArg(hasta)}.', // i18n: Fase W3
+                        style: TextStyle(
+                          color: palette.textMuted,
+                          fontSize: AppTextSize.caption,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

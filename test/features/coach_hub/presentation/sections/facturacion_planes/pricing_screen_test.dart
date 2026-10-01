@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
@@ -14,7 +15,12 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
-UserProfile _trainer({SubscriptionTier? tier}) => UserProfile(
+UserProfile _trainer({
+  SubscriptionTier? tier,
+  SubscriptionStatus status = SubscriptionStatus.active,
+  DateTime? currentPeriodEnd,
+}) =>
+    UserProfile(
       uid: 'pf1',
       email: 'pf@test.com',
       displayName: 'Profe',
@@ -25,8 +31,9 @@ UserProfile _trainer({SubscriptionTier? tier}) => UserProfile(
           ? null
           : TrainerSubscription(
               tier: tier,
-              status: SubscriptionStatus.active,
+              status: status,
               weightLimit: tier.weightLimit,
+              currentPeriodEnd: currentPeriodEnd,
             ),
     );
 
@@ -1076,6 +1083,491 @@ void main() {
             'y el guard de superficie no lo ve',
       );
     });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Plan dado de baja — «volver a contratar» y qué cuenta como plan actual
+  //
+  // Una suscripción `cancelled` conserva su tier pago HASTA `currentPeriodEnd`
+  // y después es Free (el servidor: `nowMs < currentPeriodEndMs`). La pantalla
+  // leía el tier del doc a secas, y eso fallaba en las dos puntas:
+  //
+  //   - con días pagos, el plan decía «TU PLAN ACTUAL» y no se podía volver a
+  //     contratar: el actual no se vende;
+  //   - ya vencida, seguía diciendo «TU PLAN ACTUAL» sobre un plan que el PF no
+  //     tiene, y tampoco se podía comprar.
+  //
+  // Lo que se vende y lo que se dice cambia por SUPERFICIE: sólo el Coach Hub
+  // web ofrece «VOLVER A CONTRATAR» y la fecha. La app móvil no gana ni una
+  // palabra (3.1.3(f)): sólo cambia QUÉ tarjeta lleva «TU PLAN ACTUAL».
+  //
+  // El reloj va congelado en `AppClock`: 1/10/2026 12:00. Los fines de período
+  // van en UTC, como los guarda Firestore.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('plan dado de baja', () {
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 1, 12)));
+    tearDown(AppClock.unfreeze);
+
+    // 15:00 UTC = 12:00 ART → «15/10».
+    final conDiasPagos = DateTime.utc(2026, 10, 15, 15);
+    final vencido = DateTime.utc(2026, 9, 30, 15);
+
+    UserProfile cancelado(
+      DateTime? fin, {
+      SubscriptionTier tier = SubscriptionTier.plan1,
+    }) =>
+        _trainer(
+          tier: tier,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: fin,
+        );
+
+    Future<void> pumpEn(
+      WidgetTester tester,
+      Size size,
+      UserProfile profile, {
+      required bool web,
+      double textScale = 1.0,
+    }) async {
+      if (web) _superficieWeb();
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(_harness(profile: profile, textScale: textScale));
+      await tester.pump();
+    }
+
+    /// [matching] DENTRO del pie de la tarjeta de [tier] (`plan_cta_<tier>`).
+    Finder enElPieDe(SubscriptionTier tier, Finder matching) => find.descendant(
+          of: find.byKey(ValueKey('plan_cta_${tier.name}')),
+          matching: matching,
+        );
+
+    /// Todo lo que la pantalla dice y todo lo que se puede tocar, en un árbol
+    /// NUEVO: con el `ProviderScope` anterior el stream del perfil no se
+    /// reemplaza y se compararía una pantalla consigo misma.
+    Future<({List<String> textos, int tappables})> fotoDe(
+      WidgetTester tester,
+      Size size,
+      UserProfile profile, {
+      required bool web,
+    }) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpEn(tester, size, profile, web: web);
+      return (
+        textos: tester
+            .widgetList<Text>(find.byType(Text))
+            .map((t) => t.data ?? '')
+            .toList(),
+        tappables: tester.widgetList(find.byType(TreinoTappable)).length,
+      );
+    }
+
+    // ── Coach Hub web: es donde se puede cobrar ──────────────────────────────
+    for (final (layout, size, etiquetaAnual) in <(String, Size, String)>[
+      ('ancho', _kDesktopSize, 'Anual'),
+      ('angosto', _kMobileSize, 'ANUAL'),
+    ]) {
+      group('web, layout $layout', () {
+        testWidgets(
+            'con días pagos el plan ofrece VOLVER A CONTRATAR, no TU PLAN '
+            'ACTUAL', (tester) async {
+          await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
+
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('VOLVER A CONTRATAR')),
+            findsOneWidget,
+          );
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
+            findsNothing,
+          );
+          // Ninguna otra tarjeta es la actual: Free tampoco, porque el plan
+          // pago sigue rigiendo. Los otros dos planes se venden como siempre.
+          expect(find.text('TU PLAN ACTUAL'), findsNothing);
+          expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
+        });
+
+        // El botón es el MISMO punto de compra que «ELEGIR PLAN»: pide el
+        // checkout de ESTE tier con el ciclo que el toggle tenga puesto.
+        testWidgets(
+            'tocarlo arranca el checkout del mismo plan con el ciclo del '
+            'toggle', (tester) async {
+          await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
+
+          final pedidos = <(SubscriptionTier, bool)>[];
+          final abiertas = <Uri>[];
+          debugPlanCheckoutCreator = ({required tier, required annual}) async {
+            pedidos.add((tier, annual));
+            return 'https://mp/checkout';
+          };
+          debugPlanCheckoutLauncher = (u) async {
+            abiertas.add(u);
+            return true;
+          };
+          addTearDown(() {
+            debugPlanCheckoutCreator = null;
+            debugPlanCheckoutLauncher = null;
+          });
+
+          final volver = find.text('VOLVER A CONTRATAR');
+
+          // Mensual: es el ciclo por default del toggle.
+          await tester.ensureVisible(volver);
+          await tester.tap(volver);
+          await tester.pumpAndSettle();
+          expect(pedidos, [(SubscriptionTier.plan1, false)]);
+
+          // Anual: el mismo botón, otro ciclo. El toggle queda arriba del
+          // botón, así que hay que traerlo a la vista: el `ensureVisible` de
+          // arriba pudo haber scrolleado la página y dejarlo fuera de pantalla
+          // (un `tap` ahí falla en silencio, con un warning, y no cambia nada).
+          await tester.ensureVisible(find.text(etiquetaAnual));
+          await tester.tap(find.text(etiquetaAnual));
+          await tester.pump();
+          await tester.ensureVisible(volver);
+          await tester.tap(volver);
+          await tester.pumpAndSettle();
+
+          expect(pedidos, [
+            (SubscriptionTier.plan1, false),
+            (SubscriptionTier.plan1, true),
+          ]);
+          expect(abiertas, hasLength(2));
+        });
+
+        // EL TEXTO EXACTO, y por qué es un «si». Si el primer cobro se difiere
+        // lo decide el servidor, que además exige ver en MP un cobro real que
+        // respalde esos días (`diferir-primer-cobro.ts`); desde el cliente eso
+        // no se ve. La versión anterior decía «Pagado hasta el 15/10: el primer
+        // cobro es ese día.» y afirmaba un pago que nadie había comprobado.
+        testWidgets(
+            'la nota es condicional: «Si ya pagaste hasta el d/m, el primer '
+            'cobro es ese día.»', (tester) async {
+          await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
+
+          const nota =
+              'Si ya pagaste hasta el 15/10, el primer cobro es ese día.';
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text(nota)),
+            findsOneWidget,
+          );
+          // Una sola, en la tarjeta del plan actual y en ninguna otra.
+          expect(find.textContaining('Si ya pagaste hasta'), findsOneWidget);
+          // Y la afirmación incondicional de antes no volvió.
+          expect(find.textContaining('Pagado hasta'), findsNothing);
+        });
+
+        // ── La nota y el borde de un día ──
+        //
+        // El servidor sólo difiere el primer cobro si falta AL MENOS un día:
+        // con `finMs - nowMs < MIN_DIFERIMIENTO_MS` cobra en el acto
+        // (`queda-menos-de-un-dia`, functions/src/subscriptions/mp/
+        // diferir-primer-cobro.ts). Con menos, la nota sería falsa con
+        // seguridad y no se dibuja. El botón NO depende del borde: volver a
+        // suscribirse sigue siendo válido a una hora del vencimiento.
+        //
+        // El fin se mide contra el «ahora» congelado y no contra un instante
+        // escrito a mano: el borde es una DIFERENCIA, no una fecha.
+        for (final (descripcion, resta, conNota) in <(String, Duration, bool)>[
+          ('14 días', const Duration(days: 14), true),
+          ('24 h y 1 minuto', const Duration(hours: 24, minutes: 1), true),
+          // El servidor descarta con `<`, no con `<=`: con EXACTAMENTE un día
+          // todavía difiere.
+          ('exactamente 24 h', const Duration(hours: 24), true),
+          ('23 h 59 min', const Duration(hours: 23, minutes: 59), false),
+          ('1 hora', const Duration(hours: 1), false),
+          ('1 minuto', const Duration(minutes: 1), false),
+        ]) {
+          testWidgets(
+              'con $descripcion por delante la nota '
+              '${conNota ? 'aparece' : 'se esconde'} y el botón sigue',
+              (tester) async {
+            final fin = AppClock.now().add(resta).toUtc();
+            await pumpEn(tester, size, cancelado(fin), web: true);
+
+            expect(
+              find.textContaining('Si ya pagaste hasta'),
+              conNota ? findsOneWidget : findsNothing,
+              reason: conNota
+                  ? 'con $descripcion el servidor SÍ puede diferir y la nota '
+                      'faltó'
+                  : 'con $descripcion el servidor cobra en el acto y la nota '
+                      'prometió lo contrario',
+            );
+            // Pase lo que pase con la nota, el plan se puede volver a
+            // contratar: es la tarjeta del plan actual, dada de baja.
+            expect(
+              enElPieDe(
+                  SubscriptionTier.plan1, find.text('VOLVER A CONTRATAR')),
+              findsOneWidget,
+            );
+            expect(find.text('TU PLAN ACTUAL'), findsNothing);
+          });
+        }
+
+        // El botón y la nota son dos renglones nuevos en una tarjeta que ya
+        // tenía el precio-héroe. Con el texto grande el botón crece y la nota
+        // se parte en dos líneas: no puede desbordar. Un overflow de layout se
+        // reporta durante el paint, así que `takeException()` es el chequeo.
+        testWidgets('con textScale 1.5 ni el botón ni la nota desbordan',
+            (tester) async {
+          await pumpEn(
+            tester,
+            size,
+            cancelado(conDiasPagos),
+            web: true,
+            textScale: 1.5,
+          );
+
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: 'la tarjeta de un plan dado de baja desborda con '
+                'textScale 1.5',
+          );
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
+          expect(
+            find.textContaining('Si ya pagaste hasta el 15/10'),
+            findsOneWidget,
+          );
+        });
+
+        // `currentPeriodEnd` es un instante UTC: entre las 21:00 y las 23:59
+        // ART su día UTC ya es el siguiente. 01:30 UTC del 16 son las 22:30
+        // ART del 15.
+        testWidgets('la fecha se lee en calendario argentino, no en UTC',
+            (tester) async {
+          await pumpEn(
+            tester,
+            size,
+            cancelado(DateTime.utc(2026, 10, 16, 1, 30)),
+            web: true,
+          );
+
+          expect(
+            find.text(
+                'Si ya pagaste hasta el 15/10, el primer cobro es ese día.'),
+            findsOneWidget,
+          );
+          expect(find.textContaining('16/10'), findsNothing);
+        });
+
+        // No está clavado en Plan 1: lo ofrece el tier que se dio de baja.
+        testWidgets('lo ofrece el plan que se dio de baja, no otro',
+            (tester) async {
+          await pumpEn(
+            tester,
+            size,
+            cancelado(conDiasPagos, tier: SubscriptionTier.plan2),
+            web: true,
+          );
+
+          expect(
+            enElPieDe(SubscriptionTier.plan2, find.text('VOLVER A CONTRATAR')),
+            findsOneWidget,
+          );
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('ELEGIR PLAN')),
+            findsOneWidget,
+          );
+          expect(
+            enElPieDe(SubscriptionTier.plan3, find.text('ELEGIR PLAN')),
+            findsOneWidget,
+          );
+          expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
+        });
+
+        // Vencida, el plan ya no es el del PF: se vende como cualquier otro y
+        // Free pasa a ser el actual.
+        testWidgets(
+            'con el período vencido el plan se elige como cualquier otro y '
+            'Free es el actual', (tester) async {
+          await pumpEn(tester, size, cancelado(vencido), web: true);
+
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('ELEGIR PLAN')),
+            findsOneWidget,
+          );
+          expect(find.text('ELEGIR PLAN'), findsNWidgets(3));
+          expect(
+            enElPieDe(SubscriptionTier.free, find.text('TU PLAN ACTUAL')),
+            findsOneWidget,
+          );
+          expect(find.text('TU PLAN ACTUAL'), findsOneWidget);
+        });
+
+        // El servidor trata una baja sin fecha como ya vencida.
+        testWidgets('una baja sin fecha de fin cuenta como vencida',
+            (tester) async {
+          await pumpEn(tester, size, cancelado(null), web: true);
+
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+          expect(find.text('ELEGIR PLAN'), findsNWidgets(3));
+          expect(
+            enElPieDe(SubscriptionTier.free, find.text('TU PLAN ACTUAL')),
+            findsOneWidget,
+          );
+        });
+
+        // REGRESIÓN: lo que no es una baja queda como estaba.
+        testWidgets('un plan activo sigue siendo TU PLAN ACTUAL, sin botón',
+            (tester) async {
+          await pumpEn(
+            tester,
+            size,
+            _trainer(tier: SubscriptionTier.plan1),
+            web: true,
+          );
+
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
+            findsOneWidget,
+          );
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
+        });
+
+        // Sólo `cancelled` ofrece volver. Un `pending`, `paused` o `grace` es
+        // otra historia (hay un cobro en curso o pausado): no se le ofrece
+        // re-contratar encima, aunque el período del doc esté vencido.
+        for (final status in SubscriptionStatus.values) {
+          if (status == SubscriptionStatus.cancelled) continue;
+
+          testWidgets('$status no ofrece volver a contratar', (tester) async {
+            await pumpEn(
+              tester,
+              size,
+              _trainer(
+                tier: SubscriptionTier.plan1,
+                status: status,
+                currentPeriodEnd: vencido,
+              ),
+              web: true,
+            );
+
+            expect(
+              enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
+              findsOneWidget,
+            );
+            expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+            expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          });
+        }
+      });
+    }
+
+    // ── App móvil: informa, no vende ─────────────────────────────────────────
+    //
+    // Los dos layouts, porque una tablet a 900pt entra por el ancho y sigue
+    // siendo la app. Lo único que puede cambiar acá es QUÉ tarjeta lleva «TU
+    // PLAN ACTUAL»; ni una palabra nueva, ni un botón, ni nada tappable.
+    for (final (layout, size) in <(String, Size)>[
+      ('angosto', _kMobileSize),
+      ('ancho', _kTabletSize),
+    ]) {
+      group('móvil, layout $layout', () {
+        testWidgets(
+            'con días pagos sigue siendo TU PLAN ACTUAL: sin botón y sin '
+            'texto nuevo', (tester) async {
+          await pumpEn(tester, size, cancelado(conDiasPagos), web: false);
+
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
+            findsOneWidget,
+          );
+          expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(find.textContaining('cobro'), findsNothing);
+          expect(find.text('ELEGIR PLAN'), findsNothing);
+          // Los verbos de la compra no entran a la app móvil en ninguna forma.
+          // Bajo 3.1.3(f) «volver a contratar» y «reactivar» son calls to
+          // action igual que «contratá» y «reactivalo»
+          // (`avisos_de_tope_movil_sin_llamado_a_comprar_test` los cuenta
+          // entre sus agujas, con los stems «contrata» y «reactiva»). Acá se
+          // barren sin distinguir mayúsculas y por stem, así que otra
+          // conjugación del mismo verbo cae igual. Los dos van: el botón web
+          // dice uno, y el otro es el que ese test ya trata como llamado.
+          final textos = tester
+              .widgetList<Text>(find.byType(Text))
+              .map((t) => (t.data ?? '').toLowerCase())
+              .toList();
+          for (final stem in const ['volver a contratar', 'reactiv']) {
+            expect(
+              textos.where((t) => t.contains(stem)),
+              isEmpty,
+              reason: 'la app móvil dice «$stem» en algún renglón',
+            );
+          }
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.byType(TreinoTappable)),
+            findsNothing,
+            reason: 'el plan actual dado de baja es tappable en la app móvil',
+          );
+        });
+
+        // El guard que no depende de conocer los strings nuevos: una baja con
+        // días pagos tiene que dibujar EXACTAMENTE lo mismo que el plan activo,
+        // palabra por palabra y tappable por tappable. Cualquier cosa que
+        // alguien cuelgue de la rama equivocada —un texto, un botón— rompe la
+        // igualdad aunque se llame distinto a lo que hoy conocemos.
+        testWidgets('dibuja lo mismo, palabra por palabra, que el plan activo',
+            (tester) async {
+          final activo = await fotoDe(
+            tester,
+            size,
+            _trainer(tier: SubscriptionTier.plan1),
+            web: false,
+          );
+          final baja = await fotoDe(
+            tester,
+            size,
+            cancelado(conDiasPagos),
+            web: false,
+          );
+
+          expect(baja.textos, activo.textos);
+          expect(baja.tappables, activo.tappables);
+        });
+
+        testWidgets(
+            'con el período vencido el plan pago ya no es el actual: lo es '
+            'Free', (tester) async {
+          await pumpEn(tester, size, cancelado(vencido), web: false);
+
+          expect(
+            enElPieDe(SubscriptionTier.plan1, find.text('TU PLAN ACTUAL')),
+            findsNothing,
+          );
+          expect(
+            enElPieDe(SubscriptionTier.free, find.text('TU PLAN ACTUAL')),
+            findsOneWidget,
+          );
+          expect(find.text('TU PLAN ACTUAL'), findsOneWidget);
+          // Sigue sin CTA en la tarjeta del plan pago (sin caja, sin espacio).
+          expect(
+            tester.getSize(find.byKey(const ValueKey('plan_cta_plan1'))),
+            Size.zero,
+          );
+        });
+
+        // Vencida, la pantalla es la de un PF Free: nada más cambia.
+        testWidgets('con el período vencido dibuja lo mismo que un PF Free',
+            (tester) async {
+          final free = await fotoDe(tester, size, _trainer(), web: false);
+          final baja =
+              await fotoDe(tester, size, cancelado(vencido), web: false);
+
+          expect(baja.textos, free.textos);
+          expect(baja.tappables, free.tappables);
+        });
+      });
+    }
   });
 }
 

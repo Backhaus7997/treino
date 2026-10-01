@@ -85,6 +85,15 @@ const STATUS_BAJA = "cancelled";
  */
 const TIMEOUT_MS = 10_000;
 
+/**
+ * Tope de `freeTrialDays`. Es un tope NUESTRO y no un limite documentado de MP
+ * (no aparece en los tipos del SDK): cubre un ciclo anual entero con margen, y
+ * un valor mas alto solo puede ser un bug de quien calculo los dias. Preferimos
+ * que falle ruidoso antes de salir a la red a que MP acepte una prueba de dos
+ * años y nadie se entere.
+ */
+export const MAX_FREE_TRIAL_DAYS = 400;
+
 export class MpApiError extends Error {
   constructor(
     message: string,
@@ -194,6 +203,20 @@ export interface CreatePreapprovalPlanInput {
   transactionAmount: number;
   /** Cada cuantos MESES se cobra. 1 = mensual, 12 = anual. */
   frequencyMonths: number;
+  /**
+   * Dias de prueba antes del PRIMER cobro. Ausente = el plan cobra al autorizar,
+   * que es lo de siempre, y el cuerpo del request queda byte por byte igual.
+   *
+   * Existe para el PF que vuelve a suscribirse mientras todavia le quedan dias
+   * pagos: sin la prueba, MP le cobra el periodo nuevo en el acto y paga dos
+   * veces los mismos dias. Ver `diferir-primer-cobro.ts` para quien decide
+   * cuantos dias y por que.
+   *
+   * Entero entre 1 y [MAX_FREE_TRIAL_DAYS]. Cualquier otra cosa tira ANTES de
+   * salir a la red, igual que el resto de las entradas: un `0` o un `NaN` no son
+   * errores de MP, son bugs nuestros.
+   */
+  freeTrialDays?: number;
 }
 
 export interface MpClient {
@@ -354,6 +377,20 @@ export function createMpClient(
           0,
         );
       }
+      // `undefined` es AUSENTE y pasa; cualquier otra cosa tiene que ser un
+      // entero en rango. Un `null` o un `"7"` colados desde JS no se interpretan:
+      // una prueba de dias mal calculada es un cobro adelantado o un cobro doble.
+      if (
+        input.freeTrialDays !== undefined &&
+        (!Number.isInteger(input.freeTrialDays) ||
+          input.freeTrialDays < 1 ||
+          input.freeTrialDays > MAX_FREE_TRIAL_DAYS)
+      ) {
+        throw new MpApiError(
+          `mp/client: freeTrialDays invalido (${input.freeTrialDays})`,
+          0,
+        );
+      }
 
       // SIN `payer_email`: ese es el punto entero de usar un plan. MP le
       // pregunta al pagador quien es en el checkout.
@@ -366,6 +403,21 @@ export function createMpClient(
           frequency_type: "months",
           transaction_amount: input.transactionAmount,
           currency_id: "ARS",
+          // `free_trial` va DENTRO de `auto_recurring` y en DIAS. Forma tomada de
+          // los tipos del SDK oficial (`sdk-nodejs/src/clients/preApprovalPlan/
+          // commonTypes.ts`: `AutoRecurring.free_trial` y `FreeTrial`, con
+          // `frequency_type` de `days` o `months`), consultados el 2026-10-01.
+          // Verificado ahi y no medido contra la API real.
+          //
+          // Solo se agrega cuando hay prueba: sin ella el cuerpo es el de siempre.
+          ...(input.freeTrialDays === undefined
+            ? {}
+            : {
+              free_trial: {
+                frequency: input.freeTrialDays,
+                frequency_type: "days",
+              },
+            }),
         },
       });
     },

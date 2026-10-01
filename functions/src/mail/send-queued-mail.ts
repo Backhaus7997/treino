@@ -68,6 +68,21 @@ const MAIL_FROM = defineString("MAIL_FROM", {
 /** Past this many attempts a document is declared permanently failed. */
 const MAX_ATTEMPTS = 5;
 
+/**
+ * Params que son secretos de un solo uso: el link de auth con su `oobCode` y el
+ * código de 6 dígitos. La fila de la cola se conserva como registro de envío, no
+ * como copia del secreto, así que se borran apenas el envío se cierra —enviado,
+ * o fallido para siempre—. Un reintento (`pending`) los conserva: los necesita,
+ * y lo mismo un doc que queda `pending` para siempre (ver TODO(mail-sweeper)).
+ * Sobre un documento sin esos campos el delete es un no-op, así que no hace
+ * falta ramificar por kind.
+ */
+const SECRET_PARAMS = ["actionLink", "codigo"] as const;
+
+function sinSecretos(): Record<string, FieldValue> {
+  return Object.fromEntries(SECRET_PARAMS.map((p) => [`params.${p}`, FieldValue.delete()]));
+}
+
 function ensureApp(): App {
   try {
     return getApp();
@@ -174,9 +189,11 @@ export async function sendQueuedMailHandler(
   }
   data = (fresh.data() as MailQueueDoc) ?? data;
 
-  // Re-entry guard: a redelivered event whose send already landed.
-  if (data.status === "sent") {
-    logger.info("sendQueuedMail: already sent, skipping", { mailId });
+  // Re-entry guard: a redelivered event whose send already landed — or that
+  // already failed for good. A `failed` doc had its `SECRET_PARAMS` stripped, so
+  // re-rendering it would send a code mail WITHOUT the code.
+  if (data.status === "sent" || data.status === "failed") {
+    logger.info("sendQueuedMail: already closed, skipping", { mailId, status: data.status });
     return;
   }
 
@@ -187,6 +204,7 @@ export async function sendQueuedMailHandler(
     await ref.update({
       status: "failed",
       lastError: `attempts exhausted (${MAX_ATTEMPTS})`,
+      ...sinSecretos(),
     });
     return;
   }
@@ -205,7 +223,7 @@ export async function sendQueuedMailHandler(
         mailId,
         prefKey: data.prefKey,
       });
-      await ref.update({ status: "failed", lastError: "email channel off" });
+      await ref.update({ status: "failed", lastError: "email channel off", ...sinSecretos() });
       return;
     }
   }
@@ -216,6 +234,7 @@ export async function sendQueuedMailHandler(
       status: "failed",
       attempts,
       lastError: "no email address for uid",
+      ...sinSecretos(),
     });
     return;
   }
@@ -238,6 +257,7 @@ export async function sendQueuedMailHandler(
       status: retriable ? "pending" : "failed",
       attempts,
       lastError: message,
+      ...(retriable ? {} : sinSecretos()),
     });
 
     if (retriable) {
@@ -255,12 +275,8 @@ export async function sendQueuedMailHandler(
     attempts,
     sentAt: FieldValue.serverTimestamp(),
     lastError: FieldValue.delete(),
-    // Los mails de auth llevan en `params.actionLink` un link de un solo uso
-    // con su `oobCode`. Una vez enviado, ese secreto no tiene por qué seguir
-    // viviendo en Firestore: la fila de la cola se conserva como registro de
-    // envío, no como copia del token. Sobre un documento sin ese campo el
-    // delete es un no-op, así que no hace falta ramificar por kind.
-    "params.actionLink": FieldValue.delete(),
+    // `actionLink` y `codigo`: ver `SECRET_PARAMS`.
+    ...sinSecretos(),
   });
 
   logger.info("sendQueuedMail: sent", { mailId, kind: data.kind });
