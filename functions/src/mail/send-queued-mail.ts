@@ -137,6 +137,12 @@ interface DecisionDeBaja {
    */
   prefKeyDelLink?: string;
   /**
+   * El mail necesita el mecanismo de baja y NO hay forma de dárselo: es el motivo
+   * por el que falla cerrado. Hoy, un mail entero comercial (`prefKey`) a una
+   * dirección literal, que no tiene cuenta a la que apuntar la baja.
+   */
+  sinBajaPosible?: string;
+  /**
    * `true`: el link existe sólo por un bloque comercial dentro de un mail
    * operativo (`bloqueComercial`), no porque el mail entero sea comercial
    * (`prefKey`). Decide qué pasa si el link no se puede armar: ver el handler.
@@ -161,9 +167,13 @@ interface DecisionDeBaja {
  * - **Cualquier otro**: no es comercial, no se toca.
  *
  * Un destinatario `toAddress` literal no tiene cuenta, ni preferencias, ni a
- * dónde apuntar una baja: nunca lleva pie. Si encima trae `bloqueComercial`,
- * sale sin el bloque —sin mecanismo de baja no se manda publicidad—. Hoy
- * ningún productor lo hace; es la salida segura si alguno lo hiciera.
+ * dónde apuntar una baja: nunca lleva pie. Sin mecanismo de baja no se manda
+ * publicidad, y qué pasa depende de qué es el mail:
+ * - con `bloqueComercial` sale sin el bloque;
+ * - con un `prefKey` de la allowlist es ENTERAMENTE comercial y no tiene
+ *   versión sin publicidad: falla cerrado, igual que sin clave.
+ * Hoy ningún productor manda ninguno de los dos a una dirección literal; es la
+ * salida segura si alguno lo hiciera.
  *
  * Un `bloqueComercial` fuera de la allowlist tampoco puede llevar link (la
  * callable lo rechazaría: sería un link muerto), así que se trata igual: sin
@@ -175,7 +185,12 @@ async function decidirBaja(
   data: MailQueueDoc,
   literal: boolean,
 ): Promise<DecisionDeBaja> {
-  if (literal) return { comercial: !data.bloqueComercial };
+  if (literal) {
+    if (prefTieneBaja(data.prefKey)) {
+      return { sinBajaPosible: "sin cuenta para la baja", comercial: true };
+    }
+    return { comercial: !data.bloqueComercial };
+  }
 
   if (prefTieneBaja(data.prefKey)) {
     return { prefKeyDelLink: data.prefKey, comercial: true };
@@ -308,10 +323,11 @@ export async function sendQueuedMailHandler(
 
   let bajaDePromocionales: string | undefined;
   let comercial = baja.comercial;
-  if (baja.prefKeyDelLink) {
-    // Sin clave, o con un uid que no entra en la gramática del token (no pasa
-    // con los de Auth, que miden hasta 128), NO hay link que poner. Qué se hace
-    // entonces depende de qué es el mail, y en los dos casos suena la alarma:
+  if (baja.prefKeyDelLink || baja.sinBajaPosible) {
+    // Sin clave, con un uid que no entra en la gramática del token (no pasa con
+    // los de Auth, que miden hasta 128), o con un destinatario sin cuenta a
+    // quien apuntarle la baja, NO hay link que poner. Qué se hace entonces
+    // depende de qué es el mail, y en todos los casos suena la alarma:
     //
     // - **Mail entero comercial (`prefKey`)**: FALLA CERRADO. Un correo
     //   promocional sin el mecanismo de baja es exactamente lo que el Decreto
@@ -327,16 +343,18 @@ export async function sendQueuedMailHandler(
     // Con `defineSecret` el deploy ya falla si el secreto no existe: esto es un
     // cinturón, no el freno principal. Y NUNCA se deja salir la excepción: la
     // plataforma reintentaría una semana un mail que falla idéntico cada vez.
-    let motivo: string | undefined;
+    let motivo: string | undefined = baja.sinBajaPosible;
     let causa: string | undefined;
-    if (!bajaKey) {
-      motivo = "sin clave de baja";
-    } else {
-      try {
-        bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
-      } catch (error: unknown) {
-        motivo = "link de baja no representable";
-        causa = String(error);
+    if (!motivo && baja.prefKeyDelLink) {
+      if (!bajaKey) {
+        motivo = "sin clave de baja";
+      } else {
+        try {
+          bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
+        } catch (error: unknown) {
+          motivo = "link de baja no representable";
+          causa = String(error);
+        }
       }
     }
 

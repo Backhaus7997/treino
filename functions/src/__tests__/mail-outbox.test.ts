@@ -719,6 +719,28 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       expect(doc?.lastError).toBe("link de baja no representable");
     });
 
+    it("a una dirección literal falla cerrado: lo enteramente comercial no sale sin baja", async () => {
+      // Un buzón literal no tiene cuenta a la que apuntar la baja, y un mail con
+      // `prefKey` es comercial de punta a punta: no tiene versión sin publicidad.
+      // Antes de este fix salía entero y sin pie.
+      const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+      await seed({ ...comercial, toUid: "no-existe", toAddress: "equipo@example.com" });
+      const sender = makeOkSender();
+
+      // Ni con clave: no es un problema de clave.
+      await expect(enviar(sender, BAJA_KEY)).resolves.toBeUndefined();
+
+      expect(sender.sent).toHaveLength(0);
+      const doc = await readQueueDoc(mailId);
+      expect(doc?.status).toBe("failed");
+      expect(doc?.lastError).toBe("sin cuenta para la baja");
+      expect(doc?.attempts).toBe(1);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("sin cuenta para la baja"),
+        expect.objectContaining({ mailId, kind: "athlete-coverage-lost" }),
+      );
+    });
+
     it("el mail que falla cerrado NO se reintenta", async () => {
       jest.spyOn(logger, "error").mockImplementation(() => undefined);
       await seed(comercial);
@@ -756,9 +778,16 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
       await algunoSinPie({}, makeOkSender(), "");
     });
 
-    it("destinatario `toAddress` literal, aunque lleve el `prefKey` comercial", async () => {
-      // Un buzón de equipo no tiene cuenta ni preferencias a las que apuntar una baja.
-      await seed({ ...comercial, toUid: "no-existe", toAddress: "equipo@example.com" });
+    it("destinatario `toAddress` literal que NO es comercial: sale, sin pie", async () => {
+      // Un buzón de equipo no tiene cuenta ni preferencias a las que apuntar una
+      // baja, y un mail que no es comercial tampoco la necesita.
+      await seed({
+        kind: "link-requested",
+        params: { athleteName: "Marta" },
+        prefKey: "nueva_solicitud",
+        toUid: "no-existe",
+        toAddress: "equipo@example.com",
+      });
       const sender = makeOkSender();
 
       await enviar(sender, BAJA_KEY);
