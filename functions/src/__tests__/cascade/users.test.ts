@@ -29,6 +29,7 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { deleteUserDocs } from "../../cascade/users";
 import { RETENTION_NOTICES_COLLECTION } from "../../retention/collection";
+import { VERIFICACIONES_COLLECTION } from "../../auth/codigo-de-verificacion";
 
 const db = () => getFirestore(testApp);
 
@@ -57,6 +58,7 @@ async function cleanup(uid: string): Promise<void> {
   await db().collection("userPublicProfiles").doc(uid).delete().catch(() => undefined);
   await db().collection("trainerPublicProfiles").doc(uid).delete().catch(() => undefined);
   await db().collection(RETENTION_NOTICES_COLLECTION).doc(uid).delete().catch(() => undefined);
+  await db().collection(VERIFICACIONES_COLLECTION).doc(uid).delete().catch(() => undefined);
   // recursiveDelete covers users + sub-collections
   await db().recursiveDelete(db().collection("users").doc(uid)).catch(() => undefined);
 }
@@ -253,5 +255,26 @@ describe("retention_notices/{uid}: el registro de la baja automatica", () => {
     // documento de retencion. Si este delete tirara, se llevaria puesto el paso
     // 9 entero — o sea `users` y `userPublicProfiles`.
     await expect(deleteUserDocs(testApp, uid)).resolves.not.toThrow();
+  });
+});
+
+describe("verificaciones_de_mail/{uid}: el código pendiente", () => {
+  const uid = "users-cascade-codigo";
+
+  beforeEach(() => seed(uid));
+  afterEach(() => cleanup(uid));
+
+  // Por ausencia, como el de `retention_notices`: el uid va en el ID y adentro
+  // queda el mail de la cuenta.
+  it("se borra con el resto de los documentos del usuario", async () => {
+    await db().collection(VERIFICACIONES_COLLECTION).doc(uid).set({
+      codigoHash: "x",
+      rol: "athlete",
+      email: "borrame@example.test",
+    });
+
+    await deleteUserDocs(testApp, uid);
+
+    expect((await db().collection(VERIFICACIONES_COLLECTION).doc(uid).get()).exists).toBe(false);
   });
 });
