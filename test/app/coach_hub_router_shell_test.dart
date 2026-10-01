@@ -12,6 +12,9 @@
 // destination (a dummy `refreshListenable` would not re-fire the redirect once
 // providers resolve later).
 
+import 'dart:async';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +26,9 @@ import 'package:treino/app/coach_hub_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/application/email_gate_providers.dart';
+import 'package:treino/features/auth/data/mail_verification_service.dart';
+import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
@@ -40,9 +46,25 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../helpers/mail_test_helpers.dart';
 import '../helpers/onboarding_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
+
+class _MockFunctions extends Mock implements FirebaseFunctions {}
+
+class _MockAuth extends Mock implements FirebaseAuth {}
+
+/// Servicio del código que no toca la red: contesta «ya hay uno vigente», que
+/// no arranca la cuenta regresiva del «Reenviar» (un `Timer` periódico que
+/// mantendría vivo a `pumpAndSettle`).
+class _ServicioQuieto extends MailVerificationService {
+  _ServicioQuieto() : super(functions: _MockFunctions());
+
+  @override
+  Future<ResultadoDeSolicitud> solicitar({bool reenviar = false}) async =>
+      const ResultadoDeSolicitud(SolicitudDeCodigo.vigente);
+}
 
 class _StubAuthNotifier extends AuthNotifier {
   _StubAuthNotifier(this._fixedState);
@@ -89,6 +111,14 @@ Future<GoRouter> _pumpRouter(
   // de la excepción móvil de facturación (ver `mobile_facturacion_shell.dart`)
   // lo pisan con un tamaño de teléfono.
   Size size = const Size(1400, 900),
+  // El interruptor `app_config/email_gate`. Apagado por defecto: sin el
+  // override, el provider real intenta abrir Firestore y solo "anda" porque en
+  // un test falla (y el error lo deja apagado).
+  Stream<bool>? emailGate,
+  // Para los tests que cambian el perfil en vivo y disparan el redirect. El
+  // helper se queda con su ciclo de vida: el test no lo descarta.
+  ValueNotifier<int>? refresh,
+  List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -106,6 +136,9 @@ Future<GoRouter> _pumpRouter(
     sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
     trainerLinksStreamProvider
         .overrideWith((ref) => Stream.value(const <TrainerLink>[])),
+    emailGateEnabledProvider
+        .overrideWith((ref) => emailGate ?? Stream<bool>.value(false)),
+    ...overrides,
   ]);
   addTearDown(container.dispose);
 
@@ -118,12 +151,15 @@ Future<GoRouter> _pumpRouter(
     await container.read(userProfileProvider.future).catchError(
           (_) => null,
         );
+    await container.read(emailGateEnabledProvider.future).catchError(
+          (_) => false,
+        );
   });
 
-  final refresh = ValueNotifier<int>(0);
-  addTearDown(refresh.dispose);
+  final refreshListenable = refresh ?? ValueNotifier<int>(0);
+  addTearDown(refreshListenable.dispose);
   final router = buildCoachHubRouter(
-    refreshListenable: refresh,
+    refreshListenable: refreshListenable,
     read: container.read,
     initialUri: initialUri,
   );
@@ -447,6 +483,81 @@ void main() {
         );
         expect(find.byType(MobileFacturacionShell), findsOneWidget);
         expect(find.byType(MobileBanner), findsNothing);
+      },
+    );
+  });
+
+  // El gate del mail con el router REAL: la ruta existe, vive fuera del shell,
+  // y el destino del mail sobrevive a la confirmación (en
+  // `coach_hub_router_redirect_test.dart` está la misma regla sobre la función
+  // pura; acá se comprueba que go_router re-evalúa el redirect sobre la
+  // ubicación a la que sale el gate).
+  group('Gate del mail con código (router real)', () {
+    const email = 'trainer@example.com';
+
+    testWidgets(
+      'PF sin confirmar, con ?to=facturacion: ve el código sin sidebar y, al '
+      'confirmar, cae en /facturacion/planes',
+      (tester) async {
+        final user = _MockUser();
+        when(() => user.email).thenReturn(email);
+        // La pantalla del código dice a qué mail mandó el código.
+        final auth = _MockAuth();
+        when(() => auth.currentUser).thenReturn(user);
+        final perfil = StreamController<UserProfile?>();
+        addTearDown(perfil.close);
+        perfil.add(_trainerProfile());
+        final refresh = ValueNotifier<int>(0);
+
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(user)),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => perfil.stream,
+          ),
+          emailGate: Stream<bool>.value(true),
+          refresh: refresh,
+          overrides: [
+            firebaseAuthProvider.overrideWithValue(auth),
+            mailVerificationServiceProvider
+                .overrideWithValue(_ServicioQuieto()),
+          ],
+          initialUri: Uri.parse('https://app.gettreino.com/?to=facturacion'),
+        );
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/verificar-mail',
+        );
+        expect(find.byType(VerifyMailScreen), findsOneWidget);
+        expect(find.byType(CoachHubScaffold), findsNothing);
+        expect(find.byType(CoachHubSidebar), findsNothing);
+        expect(tester.takeException(), isNull);
+        // En escritorio el campo no se estira a todo el ancho de la ventana
+        // (sin acotar medía 1360 px en esta de 1400).
+        expect(
+          tester.getSize(find.byKey(const Key('verify_mail_code_field'))).width,
+          lessThanOrEqualTo(480),
+        );
+
+        // Llega el perfil con la marca que escribe el servidor.
+        perfil.add(
+          _trainerProfile().copyWith(
+            emailVerification: mailConfirmadoPara(UserRole.trainer, email),
+          ),
+        );
+        await tester.pump();
+        refresh.value++;
+        await tester.pumpAndSettle();
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/facturacion/planes',
+        );
+        expect(find.byType(VerifyMailScreen), findsNothing);
+        expect(find.byType(PricingScreen), findsOneWidget);
       },
     );
   });
