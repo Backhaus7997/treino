@@ -18,6 +18,10 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// una cuenta creada antes del requisito.
 final _adultBornAt = DateTime.utc(1990, 5, 20);
 
+/// Mail confirmado con el código de 6 dígitos. Sin esto, el gate de
+/// `VerifyMailScreen` manda a /verificar-mail antes que a cualquier otro lado.
+final _mailVerificadoAt = DateTime.utc(2026, 1, 1);
+
 class MockUser extends Mock implements User {}
 
 // ---------------------------------------------------------------------------
@@ -53,6 +57,7 @@ UserProfile _completeProfile() => UserProfile(
       email: 'test@example.com',
       displayName: 'tincho',
       bornAt: _adultBornAt,
+      mailVerificadoAt: _mailVerificadoAt,
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
@@ -329,6 +334,7 @@ void main() {
         email: 'trainer@example.com',
         displayName: 'pf-mauro',
         bornAt: _adultBornAt,
+        mailVerificadoAt: _mailVerificadoAt,
         role: UserRole.trainer,
         createdAt: DateTime.utc(2026, 1, 1),
         updatedAt: DateTime.utc(2026, 1, 1),

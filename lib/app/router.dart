@@ -14,6 +14,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/profile_unavailable_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
+import '../features/auth/presentation/verify_mail_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/application/chat_providers.dart'
     show unreadFromCoachProvider, unreadFromFriendsProvider;
@@ -109,6 +110,13 @@ final GlobalKey<NavigatorState> _shellNavigatorKey =
 /// Tampoco cuelga de `/profile`, que vive dentro del shell de 5 tabs y dejaría
 /// la barra inferior a mano para saltearse el gate.
 const _birthDateRoute = '/birth-date';
+
+/// Gate del mail confirmado con código. Ver [VerifyMailScreen].
+///
+/// Top-level por lo mismo que [_birthDateRoute]: colgado de `/profile-setup`
+/// rebotaría a `/home` en el mismo frame, y colgado de `/profile` dejaría la
+/// barra inferior a mano para saltearlo.
+const _verifyMailRoute = '/verificar-mail';
 
 const _publicRoutes = {
   '/splash',
@@ -256,6 +264,32 @@ String? authRedirect(
     if (enElGateDeEdad && !bornAtNoSirve && !escrituraPendiente) {
       return '/home';
     }
+    // Y mientras el gate de edad no deja salir, nadie más lo saca. Sin esto,
+    // cualquier gate de abajo que dispare desde `/birth-date` arma un rebote
+    // infinito: él manda a su pantalla, y desde ahí el de edad devuelve acá.
+    // Ya pasaba con el del PF incompleto y una fecha inválida; con el del mail,
+    // que dispara para TODAS las cuentas, pasaría el día del deploy.
+    if (enElGateDeEdad) return null;
+
+    // Gate del mail confirmado con código (`VerifyMailScreen`). Para TODAS las
+    // cuentas —también Google y Apple, que traen `emailVerified` en true y por
+    // eso no sirve—: `mailVerificadoAt` lo escribe solo la Cloud Function
+    // `verificarCodigoDeMail` cuando el código coincide.
+    //
+    // Después del de edad (requisito legal, va primero) y antes del
+    // onboarding del PF, que puede esperar un minuto más.
+    //
+    // ENTRADA Y SALIDA contra la MISMA condición, y quedarse mientras no se
+    // pueda salir — el par que el gate de edad aprendió por las malas (ver su
+    // comentario). La salida no necesita esperar escrituras pendientes: el
+    // campo lo escribe el servidor, así que nunca hay un valor optimista.
+    final mailSinConfirmar = profile.mailVerificadoAt == null;
+    final enElGateDelMail = location.startsWith(_verifyMailRoute);
+    if (!isPublic && mailSinConfirmar && !enElGateDelMail) {
+      return _verifyMailRoute;
+    }
+    if (enElGateDelMail && !mailSinConfirmar) return '/home';
+    if (enElGateDelMail) return null;
 
     // ADR-TPO-003: trainer-incomplete onboarding gate.
     // Fires AFTER displayName check and BEFORE the public-route → /home redirect.
@@ -433,6 +467,14 @@ GoRouter buildRouter({
       GoRoute(
         path: _birthDateRoute,
         pageBuilder: (_, __) => _noAnim(const BirthDateGateScreen()),
+      ),
+
+      // Gate del mail confirmado con código. Fullscreen, sin bottom bar, por el
+      // mismo motivo que /birth-date: es un gate, no una pantalla a la que se
+      // navega.
+      GoRoute(
+        path: _verifyMailRoute,
+        pageBuilder: (_, __) => _noAnim(const VerifyMailScreen()),
       ),
 
       // Estado degradado "autenticado pero sin perfil accesible" (#544).

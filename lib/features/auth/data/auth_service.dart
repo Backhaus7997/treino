@@ -91,24 +91,11 @@ class AuthService {
     final user = cred.user!;
 
     try {
-      // Verification is best-effort: a failure here must NOT orphan the
-      // freshly created Auth user. The user can re-send later via
-      // [sendEmailVerification] from the verify-email screen.
-      //
-      // El catch es a TODO a propósito, y el `on FirebaseAuthException` de
-      // antes ya se quedaba corto: el `catch` de rollback vive adentro del
-      // try de `getOrCreate`, así que cualquier excepción que se escape de
-      // acá saltea la creación del perfil Y el rollback. El usuario queda en
-      // Auth, sin doc en Firestore y sin nadie que lo limpie. Con el mail
-      // saliendo por un callable la superficie se ensancha
-      // (FirebaseFunctionsException, AuthFailure, red), así que el catch
-      // tiene que cubrir lo que el comentario ya prometía.
-      try {
-        await sendEmailVerification();
-      } catch (_) {
-        // Swallow — signup continues; verification can be resent.
-      }
-
+      // El alta YA NO manda el mail de verificación con link. Lo reemplaza el
+      // código de 6 dígitos de la pantalla obligatoria (`VerifyMailScreen`), que
+      // pasan todas las cuentas —también Google y Apple— y cuyo mail además
+      // explica cómo se paga. Mandar los dos era confirmar lo mismo con dos
+      // mails distintos, y el del link ni siquiera destraba la pantalla.
       try {
         await _userRepository.getOrCreate(
           uid: user.uid,

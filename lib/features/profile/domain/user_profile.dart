@@ -155,6 +155,18 @@ class UserProfile with _$UserProfile {
     TrainerSubscription? subscription,
     double? weightedLoad,
 
+    // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+    // Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+    // de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+    // `null` ⇒ el router manda a la pantalla del código, a TODOS: también a
+    // Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+    // `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+    // alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false)
+    @TimestampConverter()
+    DateTime? mailVerificadoAt,
+
     // ── Welcome tour seen-flags (issue #627) ────────────────────────────
     // Map of `OnboardingSurface.wireKey` → version of the tour that user
     // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
