@@ -12,11 +12,18 @@ import 'user_providers.dart';
 /// (ver `UserRepository.watchCorreosPromocionales`).
 ///
 /// Devuelve un **`AsyncValue<bool>` a propósito**, y la pantalla lo consume con
-/// `when`/`hasValue`, NO con `valueOrNull ?? true`. Ese atajo colapsa
-/// «todavía no sé» con «sí»: durante la carga el interruptor se vería PRENDIDO,
-/// y un usuario que lo apagara en esa ventana estaría confirmando un valor que
-/// nunca leyó. Mientras no hay respuesta —cargando o con error— el interruptor
-/// va deshabilitado: «no sé» no es «sí».
+/// [CorreosPromocionalesLectura.tieneLecturaVigente], NO con `valueOrNull ??
+/// true`. Ese atajo colapsa «todavía no sé» con «sí»: durante la carga el
+/// interruptor se vería PRENDIDO, y un usuario que lo apagara en esa ventana
+/// estaría confirmando un valor que nunca leyó. Mientras no hay respuesta
+/// —cargando o con error— el interruptor va deshabilitado: «no sé» no es «sí».
+///
+/// **`hasValue` solo tampoco alcanza.** Riverpod conserva el valor anterior
+/// cuando el estado pasa a carga o a error (`copyWithPrevious`): si el stream
+/// falla después de una lectura buena, o si cambia el uid y el provider se
+/// recalcula, `hasValue` sigue en `true` con el valor del documento VIEJO. Un
+/// interruptor habilitado sobre eso deja tocar —y escribir sobre el uid nuevo—
+/// una elección que el usuario hizo mirando otra cosa.
 ///
 /// Sin sesión no hay a quién preguntarle: el stream queda sin emitir y el
 /// provider se queda en carga, que para la pantalla es lo mismo que «no sé».
@@ -33,3 +40,16 @@ final correosPromocionalesProvider = StreamProvider.autoDispose<bool>((ref) {
   if (uid == null) return const Stream<bool>.empty();
   return ref.watch(userRepositoryProvider).watchCorreosPromocionales(uid);
 });
+
+/// ¿Hay una respuesta vigente para el uid de ahora?
+extension CorreosPromocionalesLectura on AsyncValue<bool> {
+  /// `true` sólo si el estado es un dato firme: hay valor, NO se está
+  /// recargando y NO hay un error encima.
+  ///
+  /// Las tres condiciones hacen falta porque `hasValue` también es `true` en un
+  /// `AsyncLoading` o un `AsyncError` que arrastran el valor anterior (ver el
+  /// dartdoc de [correosPromocionalesProvider]). Con sólo `hasValue`, después
+  /// de una lectura buena el switch seguiría habilitado y mostrando el valor
+  /// viejo ante un error del stream o un cambio de cuenta.
+  bool get tieneLecturaVigente => hasValue && !isLoading && !hasError;
+}

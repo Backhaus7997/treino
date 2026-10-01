@@ -49,6 +49,14 @@ class PrivacyScreen extends ConsumerWidget {
     WidgetRef ref, {
     required bool habilitado,
   }) async {
+    // Se vuelve a mirar AL TOCAR, no se confía en lo que dibujó el último
+    // frame: si la cuenta cambió entre ese frame y este toque, el provider
+    // todavía puede estar pendiente de recalcularse con el valor del uid
+    // anterior. `ref.read` fuerza ese recálculo, así que si ya no hay una
+    // lectura vigente NO se escribe — la elección se hizo mirando otro
+    // documento.
+    if (!ref.read(correosPromocionalesProvider).tieneLecturaVigente) return;
+    // El uid se lee acá, en el momento del toque, y no se captura en el build.
     final uid = ref.read(authStateChangesProvider).valueOrNull?.uid;
     // Sin sesión el interruptor ya está deshabilitado: es sólo un cinturón.
     if (uid == null) return;
@@ -165,14 +173,18 @@ class PrivacyScreen extends ConsumerWidget {
                     icon: TreinoIcon.mail,
                     title: l10n.privacyPromoEmailsTitle,
                     subtitle: l10n.privacyPromoEmailsSubtitle,
-                    // `hasValue` y no `valueOrNull ?? true`: el atajo muestra
-                    // PRENDIDO mientras carga. Sin respuesta (cargando o con
-                    // error) el interruptor queda deshabilitado, y lo que
-                    // muestre su perilla no es un dato — por eso tampoco se lo
-                    // anuncia al lector de pantalla (ver `_PrivacySwitchCard`).
-                    value: correos.hasValue ? correos.requireValue : false,
-                    sabeSuValor: correos.hasValue,
-                    onChanged: correos.hasValue
+                    // Ni `valueOrNull ?? true` (muestra PRENDIDO mientras
+                    // carga) ni `hasValue` a secas (sigue en `true` con el
+                    // valor VIEJO tras un error o un cambio de cuenta): ver
+                    // `tieneLecturaVigente`. Sin respuesta vigente el
+                    // interruptor queda deshabilitado, y lo que muestre su
+                    // perilla no es un dato — por eso tampoco se lo anuncia al
+                    // lector de pantalla (ver `_PrivacySwitchCard`).
+                    value: correos.tieneLecturaVigente
+                        ? correos.requireValue
+                        : false,
+                    sabeSuValor: correos.tieneLecturaVigente,
+                    onChanged: correos.tieneLecturaVigente
                         ? (v) => _guardarCorreos(context, ref, habilitado: v)
                         : null,
                   ),

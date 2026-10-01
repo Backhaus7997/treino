@@ -14,6 +14,7 @@ import 'package:treino/core/analytics/analytics_consent.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
+import 'package:treino/features/profile/application/correos_promocionales_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/presentation/privacy_screen.dart';
@@ -30,8 +31,12 @@ import 'package:treino/l10n/app_l10n.dart';
 const _uid = 'uid-privacidad';
 
 class _MockUser extends Mock implements User {
+  _MockUser([this._id = _uid]);
+
+  final String _id;
+
   @override
-  String get uid => _uid;
+  String get uid => _id;
 }
 
 class _MockUserRepository extends Mock implements UserRepository {}
@@ -60,6 +65,7 @@ Future<void> _montar(
   WidgetTester tester, {
   required UserRepository repo,
   _ToggleEspia? espia,
+  Stream<User?>? auth,
   Locale locale = const Locale('es', 'AR'),
   Size size = const Size(390, 844),
   double textScale = 1.0,
@@ -77,7 +83,8 @@ Future<void> _montar(
       overrides: [
         sharedPreferencesOverride(prefs),
         analyticsToggleProvider.overrideWithValue(toggle.call),
-        authStateChangesProvider.overrideWith((_) => Stream.value(_MockUser())),
+        authStateChangesProvider
+            .overrideWith((_) => auth ?? Stream.value(_MockUser())),
         userRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp(
@@ -368,6 +375,166 @@ void main() {
         findsOneWidget,
       );
       expect(_switch(tester, _llaveCorreos).value, isTrue);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Una lectura BUENA que deja de valer. Riverpod conserva el valor anterior
+  // cuando el estado pasa a carga o a error, así que `hasValue` sigue en `true`
+  // con el documento VIEJO: el switch quedaba habilitado, mostrando eso, y un
+  // toque escribía esa elección —hecha mirando otra cosa— sobre el uid de ahora.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — correos promocionales, la lectura deja de ser vigente',
+      () {
+    late _MockUserRepository repo;
+    late StreamController<bool> doc;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      doc = StreamController<bool>.broadcast();
+      addTearDown(doc.close);
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => doc.stream);
+      when(() => repo.setCorreosPromocionales(any(), any()))
+          .thenAnswer((_) async {});
+    });
+
+    ProviderContainer contenedor(WidgetTester tester) =>
+        ProviderScope.containerOf(tester.element(find.byType(PrivacyScreen)));
+
+    testWidgets('un valor y DESPUÉS un error del stream → deshabilitado',
+        (tester) async {
+      await _montar(tester, repo: repo);
+      doc.add(true);
+      await _alDocumento(tester);
+      expect(_switch(tester, _llaveCorreos).onChanged, isNotNull);
+
+      doc.addError(FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'unavailable',
+      ));
+      await _alDocumento(tester);
+
+      // Precondición, para que el test no sea vacío: el estado SIGUE teniendo
+      // el valor viejo. Es lo que engañaba a un `hasValue` a secas.
+      final estado = contenedor(tester).read(correosPromocionalesProvider);
+      expect(estado.hasValue, isTrue);
+      expect(estado.hasError, isTrue);
+
+      final sw = _switch(tester, _llaveCorreos);
+      expect(sw.onChanged, isNull,
+          reason: 'el valor es de antes del error: no es una lectura vigente');
+      expect(sw.value, isFalse,
+          reason:
+              'y tampoco se muestra el valor viejo como si fuera el de ahora');
+
+      await tester.tap(find.byKey(_llaveCorreos), warnIfMissed: false);
+      await tester.pump();
+      verifyNever(() => repo.setCorreosPromocionales(any(), any()));
+    });
+
+    testWidgets(
+        'un valor y DESPUÉS una recarga → deshabilitado hasta que llega',
+        (tester) async {
+      await _montar(tester, repo: repo);
+      doc.add(true);
+      await _alDocumento(tester);
+      expect(_switch(tester, _llaveCorreos).onChanged, isNotNull);
+
+      contenedor(tester).invalidate(correosPromocionalesProvider);
+      await _alDocumento(tester);
+
+      // Precondición: carga CON el valor anterior a cuestas.
+      final estado = contenedor(tester).read(correosPromocionalesProvider);
+      expect(estado.hasValue, isTrue);
+      expect(estado.isLoading, isTrue);
+
+      final sw = _switch(tester, _llaveCorreos);
+      expect(sw.onChanged, isNull);
+      expect(sw.value, isFalse);
+      await tester.tap(find.byKey(_llaveCorreos), warnIfMissed: false);
+      await tester.pump();
+      verifyNever(() => repo.setCorreosPromocionales(any(), any()));
+
+      // Llega la lectura nueva y se habilita con SU valor.
+      doc.add(false);
+      await _alDocumento(tester);
+      final despues = _switch(tester, _llaveCorreos);
+      expect(despues.onChanged, isNotNull);
+      expect(despues.value, isFalse);
+    });
+
+    group('cambio de cuenta', () {
+      late StreamController<User?> auth;
+      late StreamController<bool> docA;
+      late StreamController<bool> docB;
+
+      setUp(() {
+        auth = StreamController<User?>.broadcast();
+        docA = StreamController<bool>.broadcast();
+        docB = StreamController<bool>.broadcast();
+        addTearDown(auth.close);
+        addTearDown(docA.close);
+        addTearDown(docB.close);
+        when(() => repo.watchCorreosPromocionales('uid-a'))
+            .thenAnswer((_) => docA.stream);
+        when(() => repo.watchCorreosPromocionales('uid-b'))
+            .thenAnswer((_) => docB.stream);
+      });
+
+      Future<void> conCuentaA(WidgetTester tester) async {
+        await _montar(tester, repo: repo, auth: auth.stream);
+        auth.add(_MockUser('uid-a'));
+        await _alDocumento(tester);
+        docA.add(true);
+        await _alDocumento(tester);
+        expect(_switch(tester, _llaveCorreos).onChanged, isNotNull);
+      }
+
+      testWidgets(
+          'mientras carga el documento del uid NUEVO: deshabilitado y sin '
+          'escribir; después escribe sobre el uid nuevo', (tester) async {
+        await conCuentaA(tester);
+
+        auth.add(_MockUser('uid-b'));
+        await _alDocumento(tester);
+
+        // Precondición: el provider arrastra el valor de A mientras carga B.
+        final estado = contenedor(tester).read(correosPromocionalesProvider);
+        expect(estado.hasValue, isTrue);
+        expect(estado.isLoading, isTrue);
+
+        expect(_switch(tester, _llaveCorreos).onChanged, isNull);
+        await tester.tap(find.byKey(_llaveCorreos), warnIfMissed: false);
+        await tester.pump();
+        verifyNever(() => repo.setCorreosPromocionales(any(), any()));
+
+        // Llega el documento de B —apagado— y recién ahí se puede tocar.
+        docB.add(false);
+        await _alDocumento(tester);
+        final sw = _switch(tester, _llaveCorreos);
+        expect(sw.onChanged, isNotNull);
+        expect(sw.value, isFalse, reason: 'el valor es el de B, no el de A');
+
+        await tester.tap(find.byKey(_llaveCorreos));
+        await tester.pump();
+        verify(() => repo.setCorreosPromocionales('uid-b', true)).called(1);
+        verifyNever(() => repo.setCorreosPromocionales('uid-a', any()));
+      });
+
+      testWidgets(
+          'un toque justo después del cambio de cuenta, ANTES de que se '
+          'redibuje, tampoco escribe', (tester) async {
+        await conCuentaA(tester);
+
+        // Sin `pump` entre medio: el widget todavía no se enteró de que cambió
+        // la cuenta, así que el switch sigue habilitado con el valor de A.
+        auth.add(_MockUser('uid-b'));
+        await tester.tap(find.byKey(_llaveCorreos));
+        await tester.pump();
+
+        verifyNever(() => repo.setCorreosPromocionales(any(), any()));
+      });
     });
   });
 
