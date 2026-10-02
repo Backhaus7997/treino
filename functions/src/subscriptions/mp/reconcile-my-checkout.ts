@@ -218,11 +218,11 @@ export function estadoDesdeResultados(
   // Todo lo demas —`sin-suscripcion`, `pending`, y CUALQUIER `skipped-*`— es lo
   // mismo para el PF: hay un alta en curso que todavia no se pudo acreditar.
   //
-  // Sin enumerarlos ni contarlos a proposito: la lista crece (el ultimo fue
-  // `skipped-reemplazado`, con la baja de la suscripcion vieja al cambiar de
-  // plan) y un cartel que dice "los tres" envejece mal sin que nadie lo note.
-  // Los `skipped-*` son bugs nuestros o datos raros de MP, y ya se logearon con
-  // detalle adentro del reconciliador; al PF no le sirve saber cual fue.
+  // Sin enumerarlos ni contarlos a proposito: la lista crece (cada guarda nueva
+  // del reconciliador suma un `skipped-*`) y un cartel que dice "los tres" envejece mal sin que nadie lo note.
+  // Los `skipped-*` son guardas del reconciliador —un dato raro de MP, un plan
+  // reemplazado, otro plan que manda— y ya se logearon con detalle adentro; al
+  // PF no le sirve saber cual fue.
   return { estado: "pendiente" };
 }
 

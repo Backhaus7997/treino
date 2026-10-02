@@ -36,7 +36,7 @@
  * Free y el barrido de las 04:00 le bloquearia alumnos. O sea que un dato raro
  * de MP terminaria cortandole el servicio a alumnos que no tienen nada que ver.
  *
- * Por eso hay ocho casos donde esta funcion NO toca el documento:
+ * Por eso hay nueve casos donde esta funcion NO toca el documento:
  *
  *   1. El estado de MP no se entiende (`degraded`).
  *   2. No sabemos de que plan es la suscripcion.
@@ -47,6 +47,12 @@
  *   7. La cuenta del usuario se elimino.
  *   8. El plan ya no es el VIGENTE del PF y lo que trae no le gana a lo que
  *      hay escrito. Ver "EL PLAN VIGENTE" mas abajo.
+ *   9. Solo del ALUMNO: el plan ya no le da acceso, pero OTRO plan suyo si. Es
+ *      el (8) con otro mecanismo, porque su mapa no anota quien lo escribio: ver
+ *      la guarda de los dos planes en `escribirSuscripcionDeAlumno`. Si para
+ *      decidirlo hay que preguntarle a MP por el otro plan y MP no contesta, no
+ *      se corta NI se escribe nada: sale `error-mp` y este plan, que no queda
+ *      `terminal`, lo reintenta el barrido de las 03:00.
  *
  * El (5) protege al PF que cambia de plan. Nada impide abrir un checkout
  * estando ya suscripto, asi que un plan2 que quiere pasar a plan3 queda con DOS
@@ -238,9 +244,13 @@
  *   - Cerrar la carrera entre dos eventos SIMULTANEOS del mismo PF: leer y
  *     escribir `users/{uid}` no es una transaccion. El agujero era un evento
  *     tardio, no uno simultaneo.
- *   - Cubrir al alumno. Su mapa es `{ status }` y nada mas, por decision y con un
- *     test que lo fija (ver `escribirSuscripcionDeAlumno`), asi que anotarle el
- *     plan es otro cambio. Tiene el mismo agujero y queda abierto.
+ *   - Anotar el plan en el mapa del alumno. Su mapa es `{ status }` y nada mas,
+ *     por decision y con un test que lo fija (ver `escribirSuscripcionDeAlumno`),
+ *     asi que esta guarda no lo cubre. El mismo agujero —un plan que ya no
+ *     otorga pisando a otro que si— lo frena el caso (9), con OTRO mecanismo: en
+ *     vez de comparar contra el plan que escribio el mapa, mira lo que dejo
+ *     guardado cada plan del alumno en `mp_plans.ultimoStatus` ([otroPlanQueOtorga]).
+ *     Los dos caminos no comparten reglas ni helpers; unificarlos es otro cambio.
  *
  * ── LA PRUEBA DIFERIDA ──
  *
@@ -268,6 +278,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
 import {
+  SUBSCRIPTION_STATUSES,
   SubscriptionStatus,
   effectiveWeightLimit,
   limitRank,
@@ -335,6 +346,12 @@ export type ReconcileOutcome =
    * despues de que contrato otro.
    */
   | "skipped-plan-no-vigente"
+  /**
+   * Solo del alumno: el plan ya no le da acceso, pero OTRO plan suyo si. Ver la
+   * guarda de los dos planes en `escribirSuscripcionDeAlumno`: escribirlo seria
+   * cortarle el acceso a alguien que lo sigue pagando.
+   */
+  | "skipped-otro-plan-otorga"
   | "sin-suscripcion"
   | "error-mp";
 
@@ -523,8 +540,8 @@ export function resolverFinDePeriodo(
   const derivada = finDePeriodoDesdeAltaMs(i.autoRecurring);
   if (derivada === null) {
     logger.warn(
-      "mp/reconcile: sin fecha de fin de periodo por ningun camino — el PF " +
-        "pierde el plan pago en el acto",
+      "mp/reconcile: sin fecha de fin de periodo por ningun camino — se pierde " +
+        "el acceso pago en el acto",
       { planId: i.planId, status: i.status },
     );
     return null;
@@ -1013,6 +1030,340 @@ async function darDeBajaLosReemplazados(
 }
 
 /**
+ * El campo de `mp_plans` con el estado de MP con el que el escritor del ALUMNO
+ * decidio la ultima vez que llego a ese plan, en el vocabulario de
+ * `effective-limit.ts`. Los caminos de `reconcileSubscription` que salen ANTES
+ * del escritor —estado degradado, sin suscripcion, error de MP, mapeo roto,
+ * plan reemplazado, cuenta eliminada, uid que no coincide— no
+ * lo tocan, y ahi queda el anterior.
+ *
+ * Existe para una sola pregunta: si OTRO plan del mismo alumno le sigue dando
+ * acceso (ver [otroPlanQueOtorga]). Se guarda el estado de MP y no el derecho
+ * ya proyectado porque el derecho de un plan dado de baja depende del reloj
+ * —`active` hasta `currentPeriodEnd`, `expired` despues— y guardado asi se
+ * proyecta al momento de leerlo, con la misma regla que el escritor
+ * ([derechoDelPlan]), en vez de quedarse con el `active` de anoche.
+ *
+ * Vive en el plan y no en `athleteSubscription` por la misma razon que la fecha
+ * de fin: ese mapa tiene UNA clave. `mp_plans` es CF-only por regla, asi que no
+ * cuesta ni una linea de `firestore.rules`.
+ *
+ * ── El despliegue: el primer barrido corre con TODOS los planes sin este campo ──
+ *
+ * Ningun plan lo tiene hasta que el escritor lo visita, y el barrido recorre los
+ * planes de un alumno en cualquier orden: el vencido puede tocar antes que el
+ * hermano que paga. Leer la ausencia como «no otorga» le corta el acceso a quien
+ * lo esta pagando, y el `active` que el hermano restaura despues llega tarde —los
+ * dos triggers de `users/{uid}` no tienen orden y cada uno consume el snapshot de
+ * SU evento—, con un mail falso de perdida de cobertura o el paywall prendido.
+ * Leerla como «otorga» deja acceso para siempre: el plan que vence queda
+ * `terminal` y, si el otro era un checkout abandonado, nadie mas lo corta.
+ *
+ * Entonces la ausencia no se interpreta: se PREGUNTA (ver [otroPlanQueOtorga]),
+ * y la respuesta se guarda aca, asi que cada plan se paga una sola vez.
+ */
+export const CAMPO_ULTIMO_STATUS = "ultimoStatus";
+
+/**
+ * El derecho que un plan le da HOY al alumno: la proyeccion de
+ * `athleteStatusDesde` con el corte del arrepentimiento encima. Devuelve tambien
+ * el momento del arrepentimiento, que el escritor reporta como fin del acceso.
+ *
+ * Es UNA funcion porque la leen dos: el plan que se esta reconciliando, con lo
+ * que MP acaba de contestar, y sus hermanos, con lo que dejaron guardado
+ * ([derechoGuardado]). Si un dia las dos lecturas dijeran cosas distintas, la
+ * guarda de los dos planes compararia dos reglas en vez de dos planes.
+ */
+function derechoDelPlan(i: {
+  status: SubscriptionStatus;
+  periodEndMs: number | null;
+  planDoc: Record<string, unknown> | undefined;
+  nowMs: number;
+}): { derecho: AthleteStatus; arrepentidoAt: number | null } {
+  // El arrepentimiento corta el acceso en el acto y lo mantiene cortado: sin
+  // esto, el próximo evento de MP volvería a calcular «cancelado, con período
+  // hasta el día X» y a devolvérselo. Ver `arrepentidoAtDe`.
+  const arrepentidoAt =
+    i.status === "cancelled" ? arrepentidoAtDe(i.planDoc) : null;
+  return {
+    derecho: arrepentidoAt !== null
+      ? "expired"
+      : athleteStatusDesde(i.status, i.periodEndMs, i.nowMs),
+    arrepentidoAt,
+  };
+}
+
+/**
+ * El derecho que el plan [datos] le da HOY al alumno, leido de lo que el
+ * reconciliador dejo en su documento, o `null` si no hay con que decidirlo.
+ *
+ * El `null` NO quiere decir «no otorga»: quiere decir «esto no lo sabe» —un plan
+ * que nadie reconcilio desde que existe [CAMPO_ULTIMO_STATUS], que es TODO plan
+ * en el primer barrido despues del despliegue—, y quien lo recibe tiene que
+ * preguntarle a MP ([derechoVivoDelHermano]). Ni como «no otorga» (corta a quien
+ * paga) ni como «otorga» (acceso para siempre) se puede resolver en silencio.
+ */
+function derechoGuardado(
+  datos: Record<string, unknown> | undefined,
+  nowMs: number,
+): AthleteStatus | null {
+  const status = datos?.[CAMPO_ULTIMO_STATUS];
+  if (
+    typeof status !== "string" ||
+    !(SUBSCRIPTION_STATUSES as readonly string[]).includes(status)
+  ) {
+    return null;
+  }
+  return derechoDelPlan({
+    status: status as SubscriptionStatus,
+    periodEndMs: comoTimestamp(datos?.currentPeriodEnd)?.toMillis() ?? null,
+    planDoc: datos,
+    nowMs,
+  }).derecho;
+}
+
+/**
+ * Cuanto tiempo despues de abrirse un plan hermano una lista VACIA de MP todavia
+ * no prueba que no hay suscripcion.
+ *
+ * El indice de busqueda de MP tarda en reflejar una alta: medido en ~93 s (ver
+ * [conLaConocidaPrimero]). 15 minutos es un margen de diez veces ese numero, y
+ * el costo esta del lado barato: pasarse de largo solo demora el corte de un
+ * plan vencido hasta el proximo barrido o webhook, mientras que quedarse corto
+ * lo corta por error —un `expired` seguido, segundos despues, del `active` que
+ * restaura el webhook del hermano, con los dos triggers de `users/{uid}` sin
+ * orden—. El caso real es `reconcile-my-checkout`: el mensual vencido y el
+ * alumno todavia `active` hasta las 03:00 compra el anual, y el callable
+ * reconcilia los dos planes sin la suscripcion a mano.
+ */
+const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
+
+/**
+ * El derecho que el plan hermano [hermanoId] le da HOY al alumno, leido de MP en
+ * vivo. Solo para el hermano que no tiene [CAMPO_ULTIMO_STATUS] (ver
+ * [otroPlanQueOtorga]). **Tira** si no puede decidirlo.
+ *
+ * Aplica las MISMAS reglas que el escritor: `mapMpStatus`, la cascada de
+ * `resolverFinDePeriodo` y [derechoDelPlan]. En particular, MP omite
+ * `next_payment_date` en una baja que cobro, asi que un hermano `cancelled` con
+ * dias pagos sale de la fecha que dejo guardada en su plan o, sin ella, de
+ * `start_date + frequency`. **Si ninguna fecha se puede establecer, NO otorga**:
+ * es el mismo piso de `athleteStatusDesde`, y falla hacia cortar el hermano —que
+ * es lo que hace el escritor con ese plan cuando es el unico—.
+ *
+ * ── Varias suscripciones sobre el mismo plan ──
+ *
+ * No deberia pasar, pero el escritor se queda con la primera y avisa. Aca el
+ * hermano solo sirve para NO cortar, asi que otorga si CUALQUIERA de sus
+ * suscripciones otorga: una baja vieja no puede tapar a la que cobra, en el orden
+ * que MP las devuelva. Lo que se guarda en el plan es el estado de la que otorga
+ * y, si ninguna lo hace, el de la que elegiria el escritor (la primera): asi el
+ * `ultimoStatus` no contradice lo que el escritor dejaria al reconciliar ese plan.
+ * Las de otro uid no cuentan (ver abajo), y un estado ininteligible solo tira si
+ * ninguna otra otorga.
+ *
+ * ── Que no otorga, que tira ──
+ *
+ * No otorgan, sin tirar: una lista vacia de un plan que ya tiene mas de
+ * [VENTANA_INDICE_MP_MS] (un checkout que nunca se pago; no hay estado que
+ * guardar, y la pregunta se repite si el cruce vuelve a darse) y las
+ * suscripciones de otro uid (un dato raro: se logea como error y no se las
+ * regalamos a este alumno). Un plan sin `createdAt` legible tampoco recibe el
+ * beneficio de la duda: la lista vacia cuenta como «no hay nada».
+ *
+ * Tiran, para que quien llama no escriba nada: que MP no conteste; que la
+ * respuesta venga rota (`estricto`: una lista vacia de una respuesta sin
+ * `results` no puede afirmar que no hay nada cobrando); un estado ininteligible
+ * —cortar por algo que no entendimos es lo que la politica de
+ * `subscription-state.ts` prohibe—; y una lista vacia de un plan RECIEN abierto,
+ * que puede ser el retraso del indice.
+ *
+ * Guarda lo que aprendio en el plan hermano, igual que lo haria el escritor
+ * (el estado y la fecha), para que el barrido y el proximo cruce no vuelvan a
+ * preguntar.
+ */
+async function derechoVivoDelHermano(
+  app: App,
+  uid: string,
+  hermanoId: string,
+  datos: Record<string, unknown>,
+  deps: ReconcileDeps,
+): Promise<AthleteStatus> {
+  const subs = await deps.mpClient.searchPreapprovalsByPlan(hermanoId, {
+    estricto: true,
+  });
+
+  if (subs.length === 0) {
+    const creadoMs = comoTimestamp(datos.createdAt)?.toMillis() ?? null;
+    if (creadoMs !== null && deps.nowMs - creadoMs < VENTANA_INDICE_MP_MS) {
+      throw new Error(
+        `mp/reconcile: el plan hermano ${hermanoId} es reciente y MP no lo ` +
+          "devuelve todavia — puede ser el retraso del indice, no se decide",
+      );
+    }
+    return "expired";
+  }
+
+  const evaluadas: {
+    status: SubscriptionStatus;
+    derecho: AthleteStatus;
+    periodEnd: Timestamp | null;
+  }[] = [];
+  let ininteligibles = 0;
+  for (const mp of subs) {
+    const externo = mp.external_reference;
+    if (typeof externo === "string" && externo !== "" && externo !== uid) {
+      logger.error("mp/reconcile: el plan hermano trae otro uid — no cuenta", {
+        hermanoId,
+        uid,
+        externalReference: externo,
+      });
+      continue;
+    }
+
+    const { status, degraded } = mapMpStatus({
+      raw: mp.status,
+      cobroPendiente: hayCobroPendiente(mp.summarized),
+      trainerId: uid,
+    });
+    if (degraded) {
+      ininteligibles += 1;
+      continue;
+    }
+
+    const periodEnd = resolverFinDePeriodo({
+      deMp: parsePeriodEnd(mp.next_payment_date, hermanoId),
+      yaGuardada: datos.currentPeriodEnd,
+      autoRecurring: mp.auto_recurring,
+      status,
+      planId: hermanoId,
+    });
+    const { derecho } = derechoDelPlan({
+      status,
+      periodEndMs: periodEnd === null ? null : periodEnd.toMillis(),
+      planDoc: datos,
+      nowMs: deps.nowMs,
+    });
+    evaluadas.push({ status, derecho, periodEnd });
+  }
+
+  const quienOtorga = evaluadas.find((e) => athleteStatusOtorga(e.derecho));
+  // Si ninguna otorga y alguna no se entendio, no se puede afirmar que no hay
+  // acceso: esa podia ser la que cobra.
+  if (quienOtorga === undefined && ininteligibles > 0) {
+    throw new Error(
+      `mp/reconcile: estado de MP ininteligible en el plan hermano ${hermanoId}`,
+    );
+  }
+  // Sin ninguna que otorgue, la que elegiria el escritor: la primera.
+  const elegida = quienOtorga ?? evaluadas[0];
+  if (elegida === undefined) return "expired";
+
+  await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(hermanoId)
+    .set(
+      {
+        [CAMPO_ULTIMO_STATUS]: elegida.status,
+        ...(elegida.periodEnd !== null &&
+        !mismaFecha(elegida.periodEnd, datos.currentPeriodEnd)
+          ? { currentPeriodEnd: elegida.periodEnd }
+          : {}),
+      },
+      { merge: true },
+    );
+  return elegida.derecho;
+}
+
+/**
+ * El id de OTRO plan de [uid] —no [planId]— que todavia le da acceso al alumno,
+ * o `null` si no hay ninguno. **Tira** si hace falta preguntarle a MP y no
+ * contesta: ver [derechoVivoDelHermano].
+ *
+ * Primero lee lo que cada plan dejo guardado ([derechoGuardado]), y solo le
+ * pregunta a MP por los hermanos que NO tienen nada guardado. Dos pasadas a
+ * proposito: un hermano con estado guardado que otorga corta la busqueda antes de
+ * gastar una llamada —y un posible error— en otro.
+ *
+ * Preguntar solo en ese caso, y no siempre, porque lo guardado es la lectura
+ * barata y casi siempre alcanza: preguntar por cada hermano en cada cruce costaria
+ * una llamada por plan en caminos que alguien esta mirando
+ * (`reconcile-my-checkout`, `cancel-my-subscription`), y el indice de busqueda de
+ * MP tarda ~90 s en reflejar un cambio (ver `conLaConocidaPrimero`), asi que
+ * tampoco da un dato mejor justo cuando los flujos que cambian varios planes los
+ * reconcilian de a uno. Pero la AUSENCIA no se puede leer sin preguntar: es el
+ * estado de todos los planes en el primer barrido despues del despliegue, y ver
+ * ahi «no otorga» le corta el acceso a quien paga, mientras que ver «otorga» deja
+ * acceso para siempre al que era un checkout abandonado. Ver
+ * [CAMPO_ULTIMO_STATUS]. Como cada respuesta se guarda, cada plan se paga una vez.
+ *
+ * Lo guardado puede estar atrasado, y la guarda lo tolera porque solo lo usa para
+ * NO revocar: nunca da acceso con eso. El costo de un atraso es acceso de mas
+ * hasta que ese plan vuelva a pasar por el escritor, y a uno que no es `terminal`
+ * el barrido lo visita esa misma noche. Dos casos se quedan sin ese reaseguro: el
+ * checkout abandonado que se pago tarde —es `terminal` por abandono, aca cuenta y
+ * el barrido no lo visita; lo refrescan su webhook o `reconcile-my-checkout`— y
+ * el plan que el barrido visita pero sale antes del escritor (ver
+ * [CAMPO_ULTIMO_STATUS]). En los dos lo guardado queda como estaba, que es el
+ * mismo limite que ya tiene ese plan cuando es el unico del alumno: su propio
+ * corte tampoco se escribiria.
+ *
+ * Limite de la pregunta: un hermano recien pagado puede no estar todavia en el
+ * indice de MP (~90 s). Solo importa si ademas vence otro plan en esa ventana y el
+ * hermano nunca fue reconciliado; su propio webhook lo restaura.
+ *
+ * Se saltean los planes que ya no pueden otorgar nada, digan lo que digan: los
+ * terminales que no son un abandono (ver `puedeSeguirCobrando`), los reemplazados,
+ * los de una cuenta eliminada y los ARREPENTIDOS. La marca del arrepentimiento se
+ * escribe recien despues de que MP confirmo la baja de cada suscripcion viva que
+ * encontro del alumno (paso 3c de `arrepentimiento-por-mail`) y devuelve lo
+ * pagado, asi que ese plan no sostiene acceso aunque lo guardado sea el `active`
+ * de antes de la baja. Sin esto, si la reconciliacion del segundo plan fallaba a mitad del
+ * flujo, el primero no cortaba, y el alumno conservaba hasta el reintento o el
+ * barrido el acceso que acababa de devolver.
+ */
+async function otroPlanQueOtorga(
+  app: App,
+  uid: string,
+  planId: string,
+  deps: ReconcileDeps,
+): Promise<string | null> {
+  // La misma consulta de un solo campo que `darDeBajaLosReemplazados`: indice
+  // automatico, sin compuesto que desplegar, y uno o dos documentos por alumno.
+  const planes = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .where("uid", "==", uid)
+    .get();
+
+  const sinEstado: { id: string; datos: Record<string, unknown> }[] = [];
+  for (const doc of planes.docs) {
+    if (doc.id === planId) continue;
+    const datos = doc.data();
+    if (datos?.producto !== "athlete") continue;
+    if (!puedeSeguirCobrando(datos)) continue;
+    const reemplazadoPor = datos?.[CAMPO_REEMPLAZO];
+    if (typeof reemplazadoPor === "string" && reemplazadoPor !== "") continue;
+    if (typeof datos?.[CAMPO_CUENTA_ELIMINADA] === "number") continue;
+    if (arrepentidoAtDe(datos) !== null) continue;
+
+    const derecho = derechoGuardado(datos, deps.nowMs);
+    if (derecho === null) {
+      sinEstado.push({ id: doc.id, datos });
+    } else if (athleteStatusOtorga(derecho)) {
+      return doc.id;
+    }
+  }
+
+  // De a uno y cortando en el primero que otorga: uno o dos planes por alumno, y
+  // cada llamada de mas es una oportunidad de error que frena el corte.
+  for (const { id, datos } of sinEstado) {
+    const derecho = await derechoVivoDelHermano(app, uid, id, datos, deps);
+    if (athleteStatusOtorga(derecho)) return id;
+  }
+  return null;
+}
+
+/**
  * Reconcilia UNA suscripcion contra MP.
  *
  * Total: nunca tira. Cualquier fallo se reporta en el `outcome` — un barrido
@@ -1020,7 +1371,7 @@ async function darDeBajaLosReemplazados(
  */
 /**
  * Escribe el derecho del ALUMNO. El espejo de lo que el resto de
- * `reconcileSubscription` hace para el PF, con tres diferencias que importan.
+ * `reconcileSubscription` hace para el PF, con cuatro diferencias que importan.
  *
  * ── 1. Escribe UN SOLO CAMPO, y eso es load-bearing ──
  *
@@ -1047,6 +1398,22 @@ async function darDeBajaLosReemplazados(
  *
  * Ver la guarda al final. Es el unico lugar donde este escritor no puede
  * copiar al del PF, y copiarlo le regalaba acceso permanente al alumno.
+ *
+ * ── 4. Un plan que ya no otorga no le revoca al alumno lo que otorga OTRO ──
+ *
+ * El PF tiene un plan que manda: cuando el nuevo se confirma, el viejo se da de
+ * baja y queda `supersededBy`, porque sus planes tienen tiers distintos y alguno
+ * tiene que decidir el cupo. El alumno no tiene tiers, asi que la pregunta es
+ * otra: si ALGUN plan suyo le sigue dando acceso. Es el criterio que ya usa
+ * `estadoDesdeResultados` para la vuelta del checkout: el mejor de los planes,
+ * no el ultimo.
+ *
+ * Hacia falta porque el barrido recorre todos los planes no terminales y el
+ * ultimo en escribir ganaba. El alumno que da de baja el mensual con dias pagos
+ * y contrata el anual —`yaPagaEsteCiclo` solo frena el MISMO ciclo— perdia el
+ * acceso la noche que vencia el mensual, con el anual cobrando. Ver la guarda de
+ * los dos planes, y [otroPlanQueOtorga] para cuando lee lo guardado y cuando le
+ * pregunta a MP.
  */
 async function escribirSuscripcionDeAlumno(i: {
   app: App;
@@ -1080,19 +1447,25 @@ async function escribirSuscripcionDeAlumno(i: {
     planId,
   });
 
-  // El arrepentimiento corta el acceso en el acto y lo mantiene cortado: sin
-  // esto, el próximo evento de MP volvería a calcular «cancelado, con período
-  // hasta el día X» y a devolvérselo. Ver `arrepentidoAtDe`.
-  const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
+  // Con el corte del arrepentimiento adentro: ver [derechoDelPlan].
+  const { derecho: athleteStatus, arrepentidoAt } = derechoDelPlan({
+    status,
+    periodEndMs: periodEnd === null ? null : periodEnd.toMillis(),
+    planDoc,
+    nowMs: deps.nowMs,
+  });
 
-  const athleteStatus: AthleteStatus =
-    arrepentidoAt !== null
-      ? "expired"
-      : athleteStatusDesde(
-        status,
-        periodEnd === null ? null : periodEnd.toMillis(),
-        deps.nowMs,
-      );
+  // ── Lo que MP acaba de decir de ESTE plan queda en su documento ──
+  //
+  // Antes de las guardas de este escritor y en todos sus caminos, tambien en los
+  // que no tocan al alumno: es lo que leen sus hermanos para saber si este plan
+  // otorga (ver [otroPlanQueOtorga]), y un plan que una guarda frena sigue
+  // teniendo un estado. Lo que sale de `reconcileSubscription` antes de llegar
+  // aca no lo toca (ver [CAMPO_ULTIMO_STATUS]). Sin cambios no escribe: casi
+  // todas las noches es el mismo.
+  if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status) {
+    await planRef.set({ [CAMPO_ULTIMO_STATUS]: status }, { merge: true });
+  }
 
   // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un derecho vigente ──
   //
@@ -1125,9 +1498,62 @@ async function escribirSuscripcionDeAlumno(i: {
     };
   }
 
+  // ── GUARDA DE LOS DOS PLANES: lo que no otorga no revoca lo que otorga otro ──
+  //
+  // Solo frena un CORTE: este plan ya no da acceso, lo escrito si, y otro plan
+  // del alumno lo sigue dando. Nunca da acceso: un plan que otorga escribe como
+  // siempre, y un corte sin otro plan que otorgue, tambien. La consulta se paga
+  // solo en ese cruce, no en cada evento.
+  //
+  // Lo que es de ESTE plan se guarda igual —su fecha y su `terminal`, mas
+  // abajo—, porque eso no depende de nadie: un mensual vencido no vuelve a
+  // otorgar. Cuando el otro plan deje de otorgar, el corte lo escribe él al
+  // reconciliarse, con los limites que cuenta [otroPlanQueOtorga].
+  const revocaria =
+    !athleteStatusOtorga(athleteStatus) &&
+    statusPrevio !== undefined &&
+    athleteStatusOtorga(statusPrevio as AthleteStatus);
+  //
+  // Si hay que preguntarle a MP por el otro plan y no contesta, este reconcile no
+  // escribe NADA mas: ni el corte, ni la fecha, ni `terminal`. Un corte sin saber
+  // si otro plan paga es el mismo corte equivocado que la guarda existe para
+  // evitar, y `terminal` sacaria a este plan del barrido que lo reintenta. Sale
+  // `error-mp`, y cada llamador lo trata a su manera: el barrido lo cuenta y
+  // reintenta esta noche; `reconcile-my-checkout` lo muestra como no disponible;
+  // `arrepentimiento-por-mail` tira para que se reintente el tramite; y el webhook
+  // NO lo trata como fallo —marca el evento visto por 10 minutos, logea y contesta
+  // 200, asi que MP no reintenta—: ahi la recuperacion es el barrido de las 03:00,
+  // y este plan sigue en el. Solo queda escrito el `ultimoStatus` de arriba, que es
+  // un hecho de este plan.
+  let otorgaOtro: string | null = null;
+  if (revocaria) {
+    try {
+      otorgaOtro = await otroPlanQueOtorga(app, uid, planId, deps);
+    } catch (e) {
+      logger.error(
+        "mp/reconcile: no se pudo saber si otro plan del alumno otorga — no se corta",
+        {
+          planId,
+          uid,
+          producto: "athlete",
+          mpStatus: (e as Partial<MpApiError>).status,
+          retryable: (e as Partial<MpApiError>).retryable,
+          mensaje: e instanceof Error ? e.message : String(e),
+        },
+      );
+      return { planId, outcome: "error-mp", uid, producto: "athlete", status };
+    }
+  }
+  if (otorgaOtro !== null) {
+    logger.info(
+      "mp/reconcile: el plan ya no otorga, pero otro plan del alumno si — no se corta",
+      { planId, uid, producto: "athlete", status, athleteStatus, otorgaOtro },
+    );
+  }
+
   const sinCambios = statusPrevio === athleteStatus;
 
-  if (!sinCambios) {
+  if (otorgaOtro === null && !sinCambios) {
     await userRef.set(
       // UN SOLO CAMPO. Ver el encabezado — agregarle uno rompe el guard
       // anti-loop de `athletePaywallInputChanged`.
@@ -1175,6 +1601,19 @@ async function escribirSuscripcionDeAlumno(i: {
   // que es exactamente para lo que el barrido existe.
   if (status === "cancelled" && athleteStatus === "expired") {
     await planRef.set({ terminal: true }, { merge: true });
+  }
+
+  if (otorgaOtro !== null) {
+    // Sin `athleteStatus` ni `accesoHastaMs`: no se escribio nada, y el fin del
+    // acceso de ESTE plan no es el del alumno. `cancel-my-subscription` toma la
+    // primera fecha que encuentra para decirle «conservás el acceso hasta…».
+    return {
+      planId,
+      outcome: "skipped-otro-plan-otorga",
+      uid,
+      producto: "athlete",
+      status,
+    };
   }
 
   return {
