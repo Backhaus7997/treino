@@ -29,6 +29,7 @@ import {
   MAX_PLANES_A_REVISAR,
   MAX_PLANES_DEL_ALUMNO_A_REVISAR,
   MIN_DIFERIMIENTO_MS,
+  MIN_PAGO_PARA_CAMBIAR_MS,
   PlanDeLaCuenta,
   PruebaDiferidaInput,
   VENTANA_AUTORIZACION_MS,
@@ -2530,11 +2531,33 @@ describe("decidirCambioDePlanDelAlumno", () => {
     }) });
     expect(tarde).toMatchObject({ diferidoHastaMs: PROXIMO });
 
-    // Y una fecha de proximo cobro que se pasa de lo que el ultimo cobro cubre.
+    // Y una fecha de proximo cobro que se pasa de lo que el ultimo cobro cubre: no
+    // se difiere hasta la menor, se BLOQUEA. El viejo seguiria pago mas alla de la
+    // prueba, y el reconciliador, al confirmarse el nuevo, daria de baja el NUEVO
+    // (`elViejoPagaMasAllaDeLaPrueba`): seria abrir un cambio que despues se deshace.
     const corrida = decidir({ sub: mensualVivo({
       next_payment_date: new Date(PROXIMO + 10 * DIA_MS).toISOString(),
     }) });
-    expect(corrida).toMatchObject({ diferidoHastaMs: PROXIMO });
+    expect(corrida).toMatchObject({ tipo: "bloquear", motivo: "fuentes-no-coinciden" });
+  });
+
+  it("un plan dado de baja que paga mas lejos que el proximo cobro deja diferir igual", () => {
+    // La condicion del reconciliador es contra la fecha a la que se difiere, no
+    // contra la del viejo: con un dado de baja hasta mas tarde no hay solapamiento.
+    const r = decidir({
+      sub: mensualVivo({
+        next_payment_date: new Date(PROXIMO + 10 * DIA_MS).toISOString(),
+      }),
+      planes: [planDeAlumno("baja", 60, {
+        currentPeriodEnd: ts(Date.parse("2026-10-16T12:00:00.000Z")),
+      })],
+      subs: { baja: [pagada("2026-09-16T12:00:00.000Z")] },
+    });
+
+    expect(r).toMatchObject({
+      tipo: "diferir",
+      diferidoHastaMs: Date.parse("2026-10-16T12:00:00.000Z"),
+    });
   });
 
   it("un cobro pendiente (rebotado, MP reintenta) es un periodo que no se pago: se bloquea", () => {
@@ -2559,6 +2582,39 @@ describe("decidirCambioDePlanDelAlumno", () => {
   it("un plan arrepentido con una suscripcion viva es una baja que no termino: se bloquea", () => {
     expect(decidir({ plan: { arrepentidoAtMs: AHORA - DIA_MS } }))
       .toMatchObject({ tipo: "bloquear", motivo: "arrepentido" });
+  });
+
+  it("autorizado con menos de MIN_PAGO_PARA_CAMBIAR_MS (3 dias): carrera con la renovacion, se bloquea", () => {
+    expect(MIN_PAGO_PARA_CAMBIAR_MS).toBe(3 * DIA_MS);
+    for (const queda of [2 * DIA_MS + 23 * 60 * 60 * 1000, 2 * DIA_MS, DIA_MS + 1]) {
+      const cerca = AHORA + queda;
+      const r = decidir({
+        plan: { currentPeriodEnd: ts(cerca) },
+        sub: mensualVivo({
+          next_payment_date: new Date(cerca).toISOString(),
+          summarized: {
+            charged_quantity: 1,
+            last_charged_date: new Date(cerca - 30 * DIA_MS).toISOString(),
+            pending_charge_quantity: 0,
+          },
+        }),
+      });
+      expect(r).toMatchObject({ tipo: "bloquear", motivo: "pago-vence-pronto" });
+    }
+
+    // Con 3 dias justos, difiere.
+    const justo = AHORA + 3 * DIA_MS;
+    expect(decidir({
+      plan: { currentPeriodEnd: ts(justo) },
+      sub: mensualVivo({
+        next_payment_date: new Date(justo).toISOString(),
+        summarized: {
+          charged_quantity: 1,
+          last_charged_date: new Date(justo - 30 * DIA_MS).toISOString(),
+          pending_charge_quantity: 0,
+        },
+      }),
+    })).toEqual({ tipo: "diferir", planViejo: "viejo", diferidoHastaMs: justo });
   });
 
   it("autorizado con menos de un dia: el viejo cobra enseguida y seria una carrera, se bloquea", () => {
@@ -2598,7 +2654,25 @@ describe("decidirCambioDePlanDelAlumno", () => {
         sub: mensualVivo({ status: "paused", next_payment_date: undefined }),
       });
 
-      expect(r).toMatchObject({ tipo: "bloquear", motivo: "pago-vence-pronto" });
+      expect(r).toMatchObject({ tipo: "bloquear", motivo: "fuentes-no-coinciden" });
+    });
+
+    it("le alcanza con un dia: pausado no se renueva, no hay carrera", () => {
+      const cerca = AHORA + 2 * DIA_MS;
+      const r = decidir({
+        plan: { currentPeriodEnd: ts(cerca) },
+        sub: mensualVivo({
+          status: "paused",
+          next_payment_date: new Date(cerca).toISOString(),
+          summarized: {
+            charged_quantity: 1,
+            last_charged_date: new Date(cerca - 30 * DIA_MS).toISOString(),
+            pending_charge_quantity: 0,
+          },
+        }),
+      });
+
+      expect(r).toEqual({ tipo: "diferir", planViejo: "viejo", diferidoHastaMs: cerca });
     });
 
     it("un cobro pendiente no lo frena: pausado, MP no reintenta nada", () => {

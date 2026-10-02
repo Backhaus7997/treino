@@ -1392,7 +1392,31 @@ export type MotivoDelCambioBloqueado =
   | "sin-pago-comprobado"
   | "sin-fecha-de-fin"
   | "pago-vence-pronto"
+  | "fuentes-no-coinciden"
   | "prueba-demasiado-larga";
+
+/**
+ * Cuanto pago le tiene que quedar, como minimo, a un plan viejo AUTORIZADO para que
+ * el alumno se cambie de un paso. Con menos, se bloquea hasta que el viejo se
+ * renueve (su fin se corre un periodo y el cambio difiere normalmente).
+ *
+ * Es el margen que tiene la baja del viejo para confirmarse antes de que MP lo
+ * renueve. El primer intento es el webhook del plan nuevo, segundos despues de que
+ * el alumno autoriza; si MP contesta 429 o 5xx justo ahi, el siguiente es la
+ * reconciliacion de la vuelta del checkout o el barrido de las 03:00, que puede
+ * caer casi un dia despues. Con un dia de margen ([MIN_DIFERIMIENTO_MS]) ese
+ * reintento podia llegar tarde. Tres dias cubren el barrido de esa noche y el de la
+ * siguiente.
+ *
+ * Y si igual se renueva antes de que la baja confirme, no se cobra dos veces: el
+ * reconciliador ve que el viejo paga mas alla de la prueba del nuevo y da de baja
+ * el NUEVO (`elViejoPagaMasAllaDeLaPrueba`, en `reconcile.ts`). Este margen es para
+ * que eso sea la excepcion: el alumno tendria que volver a hacer el cambio.
+ *
+ * Un plan PAUSADO no lo usa: no se renueva mientras siga pausado, asi que no hay
+ * carrera, y le alcanza con [MIN_DIFERIMIENTO_MS] (la prueba mas corta que acepta MP).
+ */
+export const MIN_PAGO_PARA_CAMBIAR_MS = 3 * DIA_MS;
 
 export interface DecidirCambioDePlanDelAlumnoInput {
   uid: string;
@@ -1480,22 +1504,30 @@ function finPagoDeLosDadosDeBaja(
  *      porque cada fuente puede pasarse por su lado (un reintento cobrado tarde corre
  *      `last_charged_date`; una fecha guardada puede estar vieja) y pasarse es regalar
  *      dias.
- *   6. **Con al menos [MIN_DIFERIMIENTO_MS] por delante, se difiere** hasta el mayor
- *      entre ese fin y el de los planes dados de baja ([finPagoDeLosDadosDeBaja]): el
- *      mismo "el plan que mas lejos paga" del que vuelve con dias pagos,
- *      siempre que los dias entren en lo que MP acepta ([MAX_FREE_TRIAL_DAYS]; un
- *      anual entero son 366 como mucho). Si no entraran, se bloquea en vez de recortar
- *      la prueba: recortarla es cobrar antes de que venza lo pago.
+ *   6. **Con al menos [MIN_PAGO_PARA_CAMBIAR_MS] por delante (un pausado:
+ *      [MIN_DIFERIMIENTO_MS]), se difiere** hasta el mayor entre ese fin y el de los
+ *      planes dados de baja ([finPagoDeLosDadosDeBaja]): el mismo "el plan que mas
+ *      lejos paga" del que vuelve con dias pagos, siempre que:
+ *        - el proximo cobro del viejo no pase de esa fecha por mas que
+ *          [ADELANTO_MAXIMO_DEL_COBRO_MS]. Es la MISMA condicion con la que el
+ *          reconciliador, al confirmarse el nuevo, decide dar de baja el NUEVO en vez
+ *          del viejo (`elViejoPagaMasAllaDeLaPrueba`): pasa cuando el ultimo cobro
+ *          respalda menos que el proximo cobro, y diferir ahi seria abrir un cambio
+ *          que despues se deshace. Se bloquea (`fuentes-no-coinciden`);
+ *        - los dias entren en lo que MP acepta ([MAX_FREE_TRIAL_DAYS]; un anual entero
+ *          son 366 como mucho). Si no entraran, se bloquea en vez de recortar la
+ *          prueba: recortarla es cobrar antes de que venza lo pago.
  *   7. **Con menos de eso:**
- *        - `authorized`: se bloquea. El viejo cobra dentro de un dia, y abrir el nuevo
- *          ahi es una carrera entre ese cobro y la baja que dispara el nuevo al
- *          confirmarse: si el cobro gana, el alumno paga un periodo del viejo que
- *          despues se da de baja. Pasado el cobro, el fin se corre un periodo y el
- *          cambio difiere normalmente.
+ *        - `authorized`: se bloquea (`pago-vence-pronto`). El viejo se renueva en
+ *          pocos dias, y abrir el nuevo ahi es una carrera entre esa renovacion y la
+ *          baja que dispara el nuevo al confirmarse (ver [MIN_PAGO_PARA_CAMBIAR_MS]).
+ *          Pasada la renovacion, el fin se corre un periodo y el cambio difiere
+ *          normalmente.
  *        - `paused`: si NINGUNA de las dos fuentes le da un dia por delante, no le
  *          queda nada pago y el viejo no cobra mientras siga pausado. Se difiere igual
  *          si un plan dado de baja tiene dias; si no, `sin-diferir`. Si las fuentes no
- *          coinciden (una con dias y la otra sin), se bloquea: no se sabe cual vale.
+ *          coinciden (una con dias y la otra sin), se bloquea (`fuentes-no-coinciden`):
+ *          no se sabe cual vale.
  *
  * El `paused` cuenta como vivo, y es la decision menos obvia: el pagador lo puede
  * reanudar desde su cuenta de MP y el cobro vuelve solo ([mpSigueCobrando]). Por eso
@@ -1599,14 +1631,22 @@ export function decidirCambioDePlanDelAlumno(
   };
 
   // 6. Con dias por delante, se difiere.
-  if (finDelViejo - nowMs >= MIN_DIFERIMIENTO_MS) {
-    return diferirHasta(Math.max(finDelViejo, dadosDeBaja ?? finDelViejo));
+  const minimo = pausada ? MIN_DIFERIMIENTO_MS : MIN_PAGO_PARA_CAMBIAR_MS;
+  if (finDelViejo - nowMs >= minimo) {
+    const hasta = Math.max(finDelViejo, dadosDeBaja ?? finDelViejo);
+    if (proximo > hasta + ADELANTO_MAXIMO_DEL_COBRO_MS) {
+      return bloquear(planViejo, "fuentes-no-coinciden", {
+        ...contexto,
+        difeririaHastaIso: new Date(hasta).toISOString(),
+      });
+    }
+    return diferirHasta(hasta);
   }
 
   // 7. Sin dias por delante.
   if (!pausada) return bloquear(planViejo, "pago-vence-pronto", contexto);
   if (Math.max(proximo, pago.hastaMs) - nowMs >= MIN_DIFERIMIENTO_MS) {
-    return bloquear(planViejo, "pago-vence-pronto", contexto);
+    return bloquear(planViejo, "fuentes-no-coinciden", contexto);
   }
   if (dadosDeBaja !== null && dadosDeBaja - nowMs >= MIN_DIFERIMIENTO_MS) {
     return diferirHasta(dadosDeBaja);

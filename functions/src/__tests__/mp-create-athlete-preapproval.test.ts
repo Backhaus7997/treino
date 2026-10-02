@@ -1368,6 +1368,33 @@ describe("cambiar de plan con el viejo cobrando", () => {
     expect(escrituras).toEqual([]);
   });
 
+  it("si el viejo se renueva en menos de 3 dias, se bloquea con su propio mensaje", async () => {
+    // La baja del viejo necesita margen para confirmarse antes de la renovacion
+    // (`MIN_PAGO_PARA_CAMBIAR_MS`). Pasada la renovacion el cambio se puede hacer.
+    const cerca = AHORA + 2 * DIA_MS;
+    const mundo = MENSUAL_AL_DIA();
+    (mundo.mp_plans.viejo as Record<string, unknown>).currentPeriodEnd = ts(cerca);
+    const { app, escrituras } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      next_payment_date: new Date(cerca).toISOString(),
+      summarized: {
+        ...(VIVO.summarized as object),
+        last_charged_date: new Date(cerca - 30 * DIA_MS).toISOString(),
+      },
+    }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("se renueva en los proximos dias");
+    // Las palabras que la landing busca para elegir otro copy no aparecen.
+    expect(error.message.toLowerCase()).not.toContain("entrenador");
+    expect(error.message.toLowerCase()).not.toContain("ciclo");
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
   it("con un cobro rebotado (MP reintenta) se bloquea: ese periodo no esta pago", async () => {
     const { app } = fakeApp(MENSUAL_AL_DIA());
     const mp = fakeMp({ subs: { viejo: [{

@@ -434,6 +434,8 @@ export async function runCreateAthletePreapproval(
   //   - con mas de una suscripcion viva (ya hay un cobro doble; un tercer plan no lo
   //     arregla), con el mismo ciclo, o con un estado que no deja cambiar de un paso
   //     (un cobro pendiente, un estado que no conocemos);
+  //   - cuando el viejo autorizado se renueva en menos de `MIN_PAGO_PARA_CAMBIAR_MS`
+  //     (con su propio mensaje: pasada la renovacion, el cambio se puede hacer);
   //   - cuando no se puede establecer hasta cuando esta pago el viejo. NO se cobra
   //     en el acto: con la baja del viejo al confirmar, el alumno perderia los dias
   //     que pago. Se da de baja desde la web y vuelve, y ahi el que vuelve con dias
@@ -475,6 +477,15 @@ export async function runCreateAthletePreapproval(
         motivo: cambio.tipo === "bloquear" ? cambio.motivo : "mismo-ciclo",
       },
     );
+    // El plan viejo se renueva en pocos dias (`MIN_PAGO_PARA_CAMBIAR_MS`): pasada
+    // la renovacion el cambio difiere normalmente, y eso es lo que se le dice.
+    if (cambio.tipo === "bloquear" && cambio.motivo === "pago-vence-pronto") {
+      throw new HttpsError(
+        "failed-precondition",
+        "tu plan actual se renueva en los proximos dias — proba cambiar de plan " +
+          "despues de esa renovacion, o dalo de baja primero desde la web (Suscripcion > Baja)",
+      );
+    }
     throw new HttpsError(
       "failed-precondition",
       "ya tenes un plan que se sigue cobrando — para cambiar de plan, " +
