@@ -1149,7 +1149,7 @@ describe("código de verificación del mail", () => {
   const CON_PIE = { bajaDePromocionales: "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi" };
   const AMBOS = ["email-code-athlete", "email-code-trainer"] as const;
 
-  it.each(AMBOS)("%s lleva el código en el asunto y como titular", (kind) => {
+  it.each(AMBOS)("%s sin los planes lleva el código en el asunto y como titular", (kind) => {
     const out = renderMail(kind, { codigo: CODIGO });
 
     expect(out.subject).toContain(CODIGO);
@@ -1158,12 +1158,95 @@ describe("código de verificación del mail", () => {
     expect(out.text).toContain("vence en 15 minutos");
   });
 
-  it.each(AMBOS)("%s dice que los pagos y sus confirmaciones van por mail", (kind) => {
+  it.each(AMBOS)("%s con los planes dice que los planes y los pagos van por mail", (kind) => {
     const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
-    expect(out.text).toMatch(/pagos .* se hacen por mail/);
+    expect(out.text).toMatch(/los planes y los pagos van por mail/);
     // La etiqueta del botón vive en el HTML; el texto plano lleva la URL.
     expect(out.html).toContain("VER LOS PLANES");
+  });
+
+  // CON los planes el orden se invierte (ver el `case` en `templates.ts`): con
+  // el código en el asunto nadie abre el mail, y lo que vino a decir no existe.
+  it.each(AMBOS)("⚠️ %s con los planes NO lleva el código en el asunto: hay que abrirlo", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.subject).toBe("Tu código para entrar a TREINO");
+    expect(out.subject).not.toContain(CODIGO);
+  });
+
+  it.each(AMBOS)("⚠️ %s con los planes: el aviso es el preheader, y el código no se asoma", (kind) => {
+    // El preheader es lo que se lee en la bandeja y en la notificación, antes de
+    // abrir: ahí tiene que estar el aviso, no el código.
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+    const preheader = out.html.match(/opacity:0;">([^&<]*)/)?.[1] ?? "";
+
+    expect(preheader).toMatch(/^En TREINO, los planes y los pagos van por /);
+    expect(preheader).toContain("todo te llega por acá");
+    expect(preheader).not.toContain(CODIGO);
+  });
+
+  it.each(AMBOS)("⚠️ %s con los planes: el código va DESPUÉS de los planes, y en grande", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+    const ultimoPlan = kind === "email-code-trainer" ? "Plan 3 ·" : "TREINO Pro ·";
+
+    expect(out.text.indexOf(ultimoPlan)).toBeGreaterThan(-1);
+    expect(out.text.indexOf(CODIGO)).toBeGreaterThan(out.text.indexOf(ultimoPlan));
+    // Después de los planes tiene que encontrarse de un vistazo.
+    expect(out.html).toMatch(new RegExp(`font-size:30px[^>]*>${CODIGO}</strong>`));
+  });
+
+  it("el del PF lista los cuatro planes, con cupo y precio", () => {
+    const { text } = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(text).toContain("Free · 2 alumnos");
+    expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
+    expect(text).toMatch(/Plan 2 · 15 alumnos · \$\s?22\.000 por mes/);
+    expect(text).toMatch(/Plan 3 · alumnos sin límite · \$\s?39\.000 por mes/);
+  });
+
+  it("el del alumno lista el gratis y TREINO Pro, con su precio", () => {
+    const { text } = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(text).toContain("Gratis · el que tenés hoy.");
+    expect(text).toMatch(/TREINO Pro · \$\s?3\.500 por mes o \$\s?35\.000 por año\./);
+    // El alumno no ve los planes del PF.
+    expect(text).not.toContain("Plan 1");
+  });
+
+  // Que los números de arriba coincidan con la config de HOY no prueba que el
+  // mail los saque de ahí: un precio escrito a mano también pasaría. Con la
+  // config cambiada, el mail tiene que cambiar.
+  it("⚠️ los planes salen de tier-config y athlete-plan-config, no de números a mano", () => {
+    let pf = "";
+    let alumno = "";
+    jest.isolateModules(() => {
+      jest.doMock("../subscriptions/tier-config", () => ({
+        ...jest.requireActual("../subscriptions/tier-config"),
+        TIER_WEIGHT_LIMITS: { free: 3, plan1: 8, plan2: 16, plan3: null },
+        TIER_PRICES_ARS: {
+          plan1: { monthly: 11111, annual: 1 },
+          plan2: { monthly: 22222, annual: 1 },
+          plan3: { monthly: 33333, annual: 1 },
+        },
+      }));
+      jest.doMock("../subscriptions/athlete-plan-config", () => ({
+        ATHLETE_PRICES_ARS: { monthly: 4444, annual: 44440 },
+      }));
+      // `require` y no `import`: `isolateModules` es sincrónico (ver
+      // `mp-precio-colision.test.ts`).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { renderMail: render } = require("../mail/templates");
+      pf = render("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE).text;
+      alumno = render("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE).text;
+    });
+    jest.dontMock("../subscriptions/tier-config");
+    jest.dontMock("../subscriptions/athlete-plan-config");
+
+    expect(pf).toContain("Free · 3 alumnos");
+    expect(pf).toContain(`Plan 1 · 8 alumnos · ${formatArs(11111)} por mes`);
+    expect(pf).toContain(`Plan 3 · alumnos sin límite · ${formatArs(33333)} por mes`);
+    expect(alumno).toContain(`TREINO Pro · ${formatArs(4444)} por mes o ${formatArs(44440)} por año.`);
   });
 
   it("el del alumno manda al checkout de gettreino.com", () => {
@@ -1470,11 +1553,16 @@ describe("pie de baja de los correos promocionales", () => {
 
     it("sin opciones (o con `comercial: true`) sigue llevando el bloque entero", () => {
       for (const { html, text } of [render(), render({ comercial: true })]) {
-        expect(text).toContain("Si querés seguir sumando, hay planes más grandes.");
+        expect(text).toContain("Si querés seguir sumando, estos planes tienen más lugar:");
+        expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
         expect(html).toContain("VER LOS PLANES");
         expect(ctaHref(html)).toBe(CTA);
         expect(text).toContain(CTA);
       }
+    });
+
+    it("con `comercial: false` tampoco quedan los planes", () => {
+      expect(render({ comercial: false }).text).not.toMatch(/Plan \d/);
     });
 
     it("es independiente del pie de baja", () => {
@@ -1622,7 +1710,9 @@ describe("«Publicidad: » en el asunto de los correos comerciales", () => {
 
         expect(out.html).toContain("VER LOS PLANES");
         expect(out.subject).not.toMatch(/publicidad/i);
-        expect(out.subject).toContain("048213");
+        // Con los planes, el asunto no lleva el código: ver «código de
+        // verificación del mail».
+        expect(out.subject).toBe("Tu código para entrar a TREINO");
       },
     );
   });

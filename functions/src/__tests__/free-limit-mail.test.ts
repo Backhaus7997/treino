@@ -201,29 +201,34 @@ describe("el texto", () => {
     expect(cuerpo).not.toMatch(/\b\d+\s*(rutinas|días|dias|semanas)\b/i);
   });
 
-  it("⚠️ no tiene cuerpo: título y el botón grande", () => {
-    // El mail tiene un solo trabajo: que toque el botón. Si alguien vuelve a
-    // sumarle párrafos, este test le recuerda por qué se sacaron.
+  it("⚠️ invita a mirar, no empuja a pagar: «VER LOS PLANES» con el botón normal", () => {
+    // La versión anterior era un botón gigante de «CONTINUAR AL PAGO»: le
+    // hablaba a alguien que ya decidió pagar, y el que chocó un tope recién se
+    // entera de que Pro existe.
     const { html } = render();
-    expect(html).not.toMatch(/<p /);
-    expect(html).toContain("CONTINUAR AL PAGO");
-    expect(html).toMatch(/display:inline-block;[^"]*font-size:22px[^"]*width:100%/);
+    expect(html).toContain("VER LOS PLANES");
+    expect(html).not.toMatch(/PAGO/i);
+    expect(html).toMatch(/display:inline-block;[^"]*font-size:15px/);
+    expect(html).not.toMatch(/width:100%;box-sizing/);
   });
 
-  it("⚠️ el borde está inline, no sólo en la animación", () => {
-    // Gmail y Outlook descartan `@keyframes`. Si el color viviera sólo en el
-    // keyframe, ahí el botón quedaría sin borde.
-    const { html } = render();
-    expect(html).toMatch(/<a href="[^"]+" style="[^"]*border:4px solid #FFFFFF/);
-    expect(html).toContain("@keyframes treino-cta-borde");
-    expect(html).toContain("prefers-reduced-motion: no-preference");
+  it("una línea y el precio de TREINO Pro, sin párrafos", () => {
+    const { text } = render();
+    expect(text).toContain("Mirá qué incluye y elegí si te sirve.");
+    expect(text).toMatch(/TREINO Pro · \$\s?3\.500 por mes o \$\s?35\.000 por año\./);
   });
 
-  it("los demás mails no cargan la animación", () => {
-    const { html } = renderMail("athlete-coverage-lost", {
-      ctaUrl: `${LANDING_URL}/es/suscripcion/checkout`,
-    });
-    expect(html).not.toContain("<style>");
-    expect(html).not.toContain("treino-cta-borde");
+  it("el preheader sigue la frase del asunto", () => {
+    // Asunto + preheader se leen juntos en la bandeja: «Lo que querías hacer
+    // está en TREINO Pro — Mirá qué incluye y elegí si te sirve.»
+    expect(render().html).toMatch(/opacity:0;">Mirá qué incluye y elegí si te sirve\./);
+  });
+
+  it("ningún mail carga la animación del botón: se sacó con el «hero»", () => {
+    for (const kind of ["free-limit-reached", "athlete-coverage-lost"] as const) {
+      const { html } = renderMail(kind, { ctaUrl: `${LANDING_URL}/es/suscripcion/checkout` });
+      expect(html).not.toContain("<style>");
+      expect(html).not.toContain("treino-cta-borde");
+    }
   });
 });

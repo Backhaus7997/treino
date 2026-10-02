@@ -17,15 +17,20 @@
  */
 
 import { KINDS_DE_PUBLICIDAD, MailKind, MailParams } from "./types";
-// El unico import de `subscriptions/` que hace esta capa, y es a una constante
-// PURA (un mapa de tier→numero, sin Firestore ni admin adentro). Se prefiere a
-// escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
-// dos copias del mismo numero se separan el dia que alguien mueva el plan.
+// Los unicos imports de `subscriptions/` que hace esta capa, y los dos son a
+// constantes PURAS (mapas de tier→numero, sin Firestore ni admin adentro). Se
+// prefieren a escribir los numeros a mano: el limite Free lo lee tambien
+// `effective-limit.ts`, los precios los cobra el checkout, y dos copias del
+// mismo numero se separan el dia que alguien mueva el plan.
 import {
   SubscriptionTier,
+  TIER_CUSTOM_EXERCISE_LIMITS,
   TIER_LABELS,
+  TIER_PRICES_ARS,
+  TIER_TEMPLATE_LIMITS,
   TIER_WEIGHT_LIMITS,
 } from "../subscriptions/tier-config";
+import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
 import { formatArs, formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
@@ -34,34 +39,6 @@ const INK_CARD = "#0F1513";
 const MINT = "#2CE5A2";
 const BONE = "#FFFFFF";
 const MUTED = "#9BA8A1";
-// Mint aclarado: el punto medio del brillo del boton "hero". No es un
-// primitivo de la app; existe solo para que el borde respire dentro del mint.
-const MINT_GLOW = "#9FF5D6";
-
-/**
- * El borde del boton "hero" brilla: va de blanco a mint claro y vuelve.
- *
- * Se queda en la familia del mint a proposito. Un violeta contra el relleno
- * mint chocaba, y ni siquiera era un color de la marca.
- *
- * Es una MEJORA PROGRESIVA, no el diseño. Segun caniemail, `@keyframes` anda
- * en Apple Mail (macOS e iOS) y Samsung Email, y NO en Gmail ni en Outlook:
- * ahi el `<style>` se descarta y queda el borde fijo en `BONE`, que ya esta
- * inline. Por eso el color base va inline y no solo en el keyframe: sin eso,
- * en Gmail no habria borde.
- *
- * Detras de `prefers-reduced-motion`: a quien pidio menos movimiento no se le
- * mueve nada.
- */
-const CTA_BORDE_ANIMADO = [
-  "<style>",
-  "@media (prefers-reduced-motion: no-preference){",
-  "@keyframes treino-cta-borde{",
-  `0%,100%{border-color:${BONE}}`,
-  `50%{border-color:${MINT_GLOW}}`,
-  "}}",
-  "</style>",
-].join("");
 
 const FONT = "Arial,Helvetica,sans-serif";
 
@@ -299,11 +276,13 @@ export function trainerWebCheckout(): string {
  */
 export const LOGO_URL = "https://app.gettreino.com/email/wordmark.png";
 
-/** Tamaño del boton del CTA. Ver `layout()`. */
-type CtaSize = "normal" | "hero";
-
 /**
  * Wraps body markup in the branded shell.
+ *
+ * Hubo un boton "hero" (a todo el ancho, letra grande y borde animado) para el
+ * mail del tope del plan free. Se saco con ese mail: empujaba a pagar a alguien
+ * que recien se enteraba de que Pro existe, y es de lo que se asocia a
+ * Promociones. Todos los mails usan el mismo boton.
  *
  * @param heading  - Large headline, already escaped.
  * @param bodyHtml - Pre-escaped inner markup.
@@ -311,10 +290,6 @@ type CtaSize = "normal" | "hero";
  * @param ctaHref  - Button target. Defaults to the app. The auth mails pass the
  *                   one-time link the Admin SDK minted, which is why this is a
  *                   parameter at all.
- * @param ctaSize  - "hero" dibuja el boton a todo el ancho, con letra grande y
- *                   un borde que brilla de blanco a mint. Es para el mail cuyo
- *                   UNICO trabajo es que toquen el boton (el del tope del plan
- *                   free); el resto usa "normal".
  * @param bajaUrl  - URL de baja de los correos promocionales. Con ella el pie
  *                   cambia (ver `pieDeBaja`); sin ella queda como siempre.
  */
@@ -324,7 +299,6 @@ function layout(
   preheader: string,
   ctaLabel?: string,
   ctaHref: string = APP_ENTRY_ATHLETE,
-  ctaSize: CtaSize = "normal",
   bajaUrl?: string,
 ): string {
   // Hace falta la etiqueta Y el destino. Sin destino, `ctaHref` llega como ""
@@ -336,11 +310,7 @@ function layout(
       "<tr><td style=\"padding:8px 32px 32px 32px;\">",
       `<a href="${esc(ctaHref)}" style="display:inline-block;`,
       `background:${MINT};color:${INK};font-weight:700;`,
-      ctaSize === "hero"
-        ? "font-size:22px;letter-spacing:1px;padding:30px 24px;" +
-          "width:100%;box-sizing:border-box;text-align:center;border-radius:14px;" +
-          `border:4px solid ${BONE};animation:treino-cta-borde 2.4s ease-in-out infinite;`
-        : "font-size:15px;padding:14px 28px;border-radius:8px;",
+      "font-size:15px;padding:14px 28px;border-radius:8px;",
       `text-decoration:none;font-family:${FONT};">${esc(ctaLabel)}</a>`,
       "</td></tr>",
     ].join("")
@@ -352,7 +322,6 @@ function layout(
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
     "<meta name=\"color-scheme\" content=\"dark\">",
     "<title>TREINO</title>",
-    ctaSize === "hero" ? CTA_BORDE_ANIMADO : "",
     "</head>",
     `<body style="margin:0;padding:0;background:${INK};">`,
     // Preheader: la linea gris que la bandeja muestra al lado del asunto. Sin
@@ -488,13 +457,27 @@ function strong(value: string | number | undefined): Highlight {
   return new Highlight(String(value ?? ""));
 }
 
+/**
+ * El código de verificación: un resaltado en grande. Cuando el mail del código
+ * lleva los planes, el código va DESPUÉS de ellos (ver `email-code-*`), y ahí
+ * tiene que encontrarse de un vistazo. En texto plano es un resaltado más.
+ */
+class CodigoGrande extends Highlight {}
+
+/** Marca el código de verificación para dibujarlo en grande. */
+function codigoGrande(value: string): Highlight {
+  return new CodigoGrande(value);
+}
+
 /** Renderiza una línea a HTML. Todo se escapa, venga de donde venga. */
 function lineToHtml(line: Line): string {
   return line
     .map((seg) =>
-      seg instanceof Highlight
-        ? `<strong style="color:${BONE};">${esc(seg.value)}</strong>`
-        : esc(seg),
+      seg instanceof CodigoGrande
+        ? `<strong style="color:${BONE};font-size:30px;letter-spacing:6px;">${esc(seg.value)}</strong>`
+        : seg instanceof Highlight
+          ? `<strong style="color:${BONE};">${esc(seg.value)}</strong>`
+          : esc(seg),
     )
     .join("");
 }
@@ -523,7 +506,6 @@ function buildMail(
   lines: Line[],
   ctaLabel?: string,
   ctaHref?: string,
-  ctaSize?: CtaSize,
   bajaUrl?: string,
 ): RenderedMail {
   const bodyHtml = lines
@@ -544,7 +526,7 @@ function buildMail(
 
   return {
     subject,
-    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref, ctaSize, bajaUrl),
+    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref, bajaUrl),
     text: textLines.join("\n"),
   };
 }
@@ -568,6 +550,86 @@ function buildMail(
 export function cupoLabel(limit: number | null): string {
   if (limit === null) return "alumnos sin límite"; // i18n: email transaccional
   return limit === 1 ? "1 alumno" : `${limit} alumnos`;
+}
+
+/**
+ * Los planes del PF, una línea por plan: «Plan 1 · 7 alumnos · $ 12.000 por mes».
+ *
+ * Nombres, cupos y precios salen de `tier-config.ts`, en el orden de
+ * `TIER_LABELS` (de Free a Plan 3). El anual va en una línea aparte y sin
+ * montos: cuatro precios dobles en el mail que trae un código son ruido, y el
+ * detalle está a un toque, en VER LOS PLANES.
+ */
+function planesDelPf(): Line[] {
+  const tiers = Object.keys(TIER_LABELS) as SubscriptionTier[];
+  return [
+    ...tiers.map((tier): Line => {
+      const linea: Line = [strong(TIER_LABELS[tier]), ` · ${cupoLabel(TIER_WEIGHT_LIMITS[tier])}`];
+      if (tier !== "free") linea.push(` · ${formatArs(TIER_PRICES_ARS[tier].monthly)} por mes`);
+      return linea;
+    }),
+    ["Cada plan también se puede pagar por año."],
+  ];
+}
+
+/**
+ * Los planes del alumno: el gratis y TREINO Pro con su precio, de
+ * `athlete-plan-config.ts`. Sin lista de beneficios: el detalle vive en el
+ * checkout, y cada beneficio escrito acá es una promesa más que mantener a mano.
+ * Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así que
+ * «el que tenés hoy» no miente.
+ */
+function planesDelAlumno(): Line[] {
+  return [[strong("Gratis"), " · el que tenés hoy."], lineaDeTreinoPro()];
+}
+
+/**
+ * Los planes pagos con MÁS lugar que el tope que el PF acaba de chocar:
+ * «Plan 2 · 15 alumnos · $ 22.000 por mes».
+ *
+ * `limites` es el mapa de ESE tope (alumnos, ejercicios o plantillas, de
+ * `tier-config.ts`) y `etiqueta` lo escribe: al que chocó ejercicios le sirve
+ * saber cuántos ejercicios trae cada plan, no cuántos alumnos. Mostrar planes
+ * que no le dan más lugar es mandarlo a elegir uno que no le resuelve nada.
+ *
+ * `actual` viene de `limitParam`, que distingue dos ausencias: `undefined` es
+ * que el doc no trajo el dato, y ahí van todos los pagos; `null` es que su plan
+ * ya no tiene tope, y ahí no va ninguno —ofrecerle «más lugar» sería mentir—.
+ * Vacía, cada mail vuelve a su frase de siempre.
+ */
+function planesConMasLugar(
+  limites: Record<SubscriptionTier, number | null>,
+  etiqueta: (limite: number | null) => string,
+  actual: number | null | undefined,
+): Line[] {
+  if (actual === null) return [];
+  const pagos = Object.keys(TIER_PRICES_ARS) as Exclude<SubscriptionTier, "free">[];
+  return pagos
+    .filter((tier) => {
+      const limite = limites[tier];
+      return actual === undefined || limite === null || limite > actual;
+    })
+    .map((tier): Line => [
+      strong(TIER_LABELS[tier]),
+      ` · ${etiqueta(limites[tier])} · ${formatArs(TIER_PRICES_ARS[tier].monthly)} por mes`,
+    ]);
+}
+
+/**
+ * La venta de los mails de tope del PF: la frase que presenta la lista y los
+ * planes, o —si no hay ninguno con más lugar— la frase de siempre, sola.
+ */
+function ofertaDePlanes(conPlanes: string, sinPlanes: string, planes: Line[]): Line[] {
+  return planes.length > 0 ? [[conPlanes], ...planes] : [[sinPlanes]];
+}
+
+/** «TREINO Pro · $ 3.500 por mes o $ 35.000 por año.» Lo comparten el mail del código y el del tope. */
+function lineaDeTreinoPro(): Line {
+  return [
+    strong("TREINO Pro"),
+    ` · ${formatArs(ATHLETE_PRICES_ARS.monthly)} por mes o ` +
+      `${formatArs(ATHLETE_PRICES_ARS.annual)} por año.`,
+  ];
 }
 
 /**
@@ -741,7 +803,6 @@ export function renderMail(
     lines: Line[],
     ctaLabel?: string,
     ctaHref?: string,
-    ctaSize?: CtaSize,
   ): RenderedMail =>
     buildMail(
       `${prefijoDelAsunto}${subject}`,
@@ -749,7 +810,6 @@ export function renderMail(
       lines,
       ctaLabel,
       ctaHref,
-      ctaSize,
       bajaDePromocionales,
     );
 
@@ -825,15 +885,27 @@ export function renderMail(
 
   // ── El código de 6 dígitos (`auth/codigo-de-verificacion.ts`) ──────────────
   //
-  // El código va en el ASUNTO y como titular: es lo único que el usuario vino a
-  // buscar, y en la notificación del teléfono se lee sin abrir el mail.
+  // Sin los planes, el código va en el ASUNTO y como titular: es lo único que
+  // el usuario vino a buscar, y en la notificación del teléfono se lee sin
+  // abrir el mail.
   //
-  // Y es el ÚNICO lugar donde se le puede decir que los pagos van por mail. La
-  // app no puede: un llamado a pagar afuera, impreso en el binario, tumba la
-  // exención 3.1.3(f) (ver `anti_steering_movil_test.dart`). El mail sí puede, y
-  // pedir el código es lo que garantiza que se abra.
+  // CON los planes, el orden se invierte, y a propósito. Este mail es el ÚNICO
+  // lugar donde se le puede decir que los planes y los pagos van por mail: la
+  // app no puede, porque un llamado a pagar afuera impreso en el binario tumba
+  // la exención 3.1.3(f) (ver `anti_steering_movil_test.dart`). Pero con el
+  // código en el asunto nadie abre el mail: lo copia de la notificación, y el
+  // resto no existe. Por eso, cuando lleva los planes:
+  //   - el asunto NO lleva el código;
+  //   - la primera línea es el aviso, y como el preheader se deriva de ella
+  //     (ver `buildMail`), se lee en la bandeja y en la notificación;
+  //   - los planes van antes que el código: para llegar a él, se pasa por lo
+  //     que el mail vino a decir.
   //
-  // El bloque de pagos va con TRES llaves: `showPlans: "1"` (al encolar: le
+  // Los planes salen de `tier-config.ts` y `athlete-plan-config.ts`: los mismos
+  // números que cobra el checkout. Un precio escrito a mano acá se separa del
+  // real el día que alguien lo mueva.
+  //
+  // El bloque de planes va con TRES llaves: `showPlans: "1"` (al encolar: le
   // sirve, ver `muestraPlanes`), `comercial` (al enviar: no se opuso, ver
   // `bloqueComercial`) y la URL de baja (el pie que `build` agrega con ella).
   // Sin cualquiera, el código y nada más. La tercera hace que el bloque NUNCA
@@ -844,36 +916,37 @@ export function renderMail(
     const codigo = params.codigo ? String(params.codigo) : "";
     const esPf = kind === "email-code-trainer";
     const conPlanes = params.showPlans === "1" && comercial && Boolean(bajaDePromocionales);
-    const planes: Line[] = [
-      [
-        strong("Todo lo de tu plan llega por acá."),
-        esPf ?
-          " Los pagos de tu plan y sus confirmaciones se hacen por mail y " +
-            "desde el Coach Hub web, nunca dentro de la app." :
-          " Los pagos de TREINO Pro y sus confirmaciones se hacen por mail, " +
-            "nunca dentro de la app.",
-      ],
-      [
-        esPf ?
-          "Tocá el botón para ver los planes y elegir el tuyo." :
-          "Cuando quieras pasarte a TREINO Pro, tocá el botón para ver los planes.",
-      ],
-    ];
+    const ignorar: Line = ["Si no creaste una cuenta en TREINO, ignorá este mail."];
+    if (!conPlanes) {
+      return build(
+        codigo ? `${codigo} es tu código de TREINO` : "Tu código de TREINO", // i18n: email transaccional
+        codigo || "Confirmá tu mail",
+        [
+          [
+            "Es tu código para confirmar tu mail en TREINO. Ingresalo en la app: " +
+              "vence en 15 minutos.",
+          ],
+          ignorar,
+        ],
+      );
+    }
     return build(
-      codigo ? `${codigo} es tu código de TREINO` : "Tu código de TREINO", // i18n: email transaccional
-      codigo || "Confirmá tu mail",
+      "Tu código para entrar a TREINO", // i18n: email transaccional
+      "Todo lo de tu plan llega por acá",
       [
         [
-          "Es tu código para confirmar tu mail en TREINO. Ingresalo en la app: " +
-            "vence en 15 minutos.",
+          esPf ?
+            "En TREINO, los planes y los pagos van por mail y por el Coach Hub " +
+              "web: todo te llega por acá." :
+            "En TREINO, los planes y los pagos van por mail: todo te llega por acá.",
         ],
-        ...(conPlanes ? planes : []),
-        ["Si no creaste una cuenta en TREINO, ignorá este mail."],
+        ...(esPf ? planesDelPf() : planesDelAlumno()),
+        ["Tu código para entrar a TREINO (vence en 15 minutos):"],
+        [codigoGrande(codigo)],
+        ignorar,
       ],
-      conPlanes ? "VER LOS PLANES" : undefined,
-      conPlanes ?
-        (esPf ? trainerWebCheckout() : `${LANDING_URL}/es/suscripcion/checkout`) :
-        undefined,
+      "VER LOS PLANES",
+      esPf ? trainerWebCheckout() : `${LANDING_URL}/es/suscripcion/checkout`,
     );
   }
 
@@ -1216,11 +1289,12 @@ export function renderMail(
   // en el downgrade. Son el mismo hecho contado por dos canales: si divergen,
   // el PF cree que son dos problemas distintos.
   //
-  // CON `comercial: false` SE VA EL BLOQUE DE VENTA y nada más: la línea «hay
-  // planes más grandes» y el botón VER LOS PLANES (también su URL en el texto
-  // plano). Lo operativo —el tope, quiénes quedaron en solo lectura, que no
-  // pierden nada— le llega igual a quien se opuso a lo comercial: tiene que
-  // enterarse de que sus alumnos quedaron bloqueados. Ver `bloqueComercial`.
+  // CON `comercial: false` SE VA EL BLOQUE DE VENTA y nada más: la lista de
+  // planes con más lugar (o, si no hay ninguno, la línea «hay planes más
+  // grandes») y el botón VER LOS PLANES (también su URL en el texto plano).
+  // Lo operativo —el tope, quiénes quedaron en solo lectura, que no pierden
+  // nada— le llega igual a quien se opuso a lo comercial: tiene que enterarse
+  // de que sus alumnos quedaron bloqueados. Ver `bloqueComercial`.
   case "limit-reached": {
     const blocked = countParam(params.blockedCount);
     const limit = limitParam(params.limit);
@@ -1247,7 +1321,13 @@ export function renderMail(
       ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
     );
     if (comercial) {
-      lines.push(["Si querés seguir sumando, hay planes más grandes."]);
+      lines.push(
+        ...ofertaDePlanes(
+          "Si querés seguir sumando, estos planes tienen más lugar:",
+          "Si querés seguir sumando, hay planes más grandes.",
+          planesConMasLugar(TIER_WEIGHT_LIMITS, cupoLabel, limit),
+        ),
+      );
     }
 
     return build(
@@ -1293,25 +1373,31 @@ export function renderMail(
   //
   // EL ASUNTO RECONOCE EL INTENTO. Quien recibe esto quiso hacer algo y no
   // pudo, y lo primero que lee —en la bandeja— nombra eso. El cuerpo no lo
-  // repite: el preheader sale del titulo y completa la frase del asunto.
+  // repite: el preheader sale de la primera linea y sigue la frase del asunto.
   //
   // NO PROMETE "SIN LIMITES": Pro tambien tiene techo (`kMaxRoutineDays`,
   // `kMaxRoutineWeeks`).
   //
-  // NO TIENE CUERPO, a proposito: titulo y boton. La primera version explicaba
-  // en cuatro parrafos que el historial no se pierde y que limita el plan
-  // free; eso le habla a alguien con miedo, y el que choco un tope no perdio
-  // nada: quiere seguir. El mail tiene un solo trabajo —que toque el boton— y
-  // cada palabra alrededor le compite. `ctaUrl` es el checkout, por eso el
-  // boton puede decir "pago" sin mentir.
+  // INVITA A MIRAR, NO EMPUJA A PAGAR. La version anterior era titulo y un
+  // boton gigante de «CONTINUAR AL PAGO»: le hablaba a alguien que ya decidio
+  // pagar, y el que choco un tope recien se entera de que Pro existe. Ahora es
+  // una linea, el precio (de `athlete-plan-config.ts`, el mismo que cobra el
+  // checkout) y «VER LOS PLANES» con el boton normal. Sigue sin parrafos: la
+  // primera version explicaba en cuatro que el historial no se pierde, y eso le
+  // habla a alguien con miedo; el que choco un tope no perdio nada, quiere
+  // seguir. El boton a todo el ancho con borde animado es, ademas, de lo que se
+  // asocia a Promociones, donde Gmail no notifica. `ctaUrl` es el checkout, que
+  // muestra los planes: «VER LOS PLANES» no miente.
   case "free-limit-reached":
     return build(
       "Lo que querías hacer está en TREINO Pro", // i18n: email comercial
       "Estás a un paso.",
-      [],
-      "CONTINUAR AL PAGO →",
+      [
+        ["Mirá qué incluye y elegí si te sirve."],
+        lineaDeTreinoPro(),
+      ],
+      "VER LOS PLANES →",
       ctaUrl,
-      "hero",
     );
 
   // ── El PF que chocó el tope de ejercicios propios de su plan ────────────
@@ -1343,7 +1429,15 @@ export function renderMail(
             "editarlos, asignarlos y borrarlos.",
         ],
         ["Lo único que se frena es crear ejercicios nuevos por encima del límite."],
-        ["Si necesitás más lugar, hay planes más grandes."],
+        ...ofertaDePlanes(
+          "Si necesitás más lugar, estos planes tienen más:",
+          "Si necesitás más lugar, hay planes más grandes.",
+          planesConMasLugar(
+            TIER_CUSTOM_EXERCISE_LIMITS,
+            (l) => (l === null ? "ejercicios propios sin límite" : ejerciciosLabel(l)), // i18n: email comercial
+            limit,
+          ),
+        ),
       ],
       "VER LOS PLANES",
       ctaUrl,
@@ -1379,7 +1473,15 @@ export function renderMail(
           "Lo único que se frena es crear plantillas nuevas o restaurar una " +
             "archivada por encima del límite.",
         ],
-        ["Si necesitás más lugar, hay planes más grandes."],
+        ...ofertaDePlanes(
+          "Si necesitás más lugar, estos planes tienen más:",
+          "Si necesitás más lugar, hay planes más grandes.",
+          planesConMasLugar(
+            TIER_TEMPLATE_LIMITS,
+            (l) => (l === null ? "plantillas sin límite" : plantillasLabel(l)), // i18n: email comercial
+            limit,
+          ),
+        ),
       ],
       "VER LOS PLANES",
       ctaUrl,
@@ -1421,7 +1523,11 @@ export function renderMail(
           "No se pudo activar ese vínculo: tus alumnos actuales no " +
             "pierden nada, conservan sus rutinas, su historial y el chat.",
         ],
-        ["Si querés seguir sumando, hay planes más grandes."],
+        ...ofertaDePlanes(
+          "Si querés seguir sumando, estos planes tienen más lugar:",
+          "Si querés seguir sumando, hay planes más grandes.",
+          planesConMasLugar(TIER_WEIGHT_LIMITS, cupoLabel, limit),
+        ),
       ],
       "VER LOS PLANES",
       ctaUrl,
