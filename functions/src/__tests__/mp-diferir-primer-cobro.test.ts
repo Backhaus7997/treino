@@ -43,6 +43,7 @@ import {
   decidirDiferimientoDeAlumno,
   diasDePrueba,
   finPagoDelPlan,
+  finPagoDelPlanVivo,
   evidenciaDePago,
   mpSigueCobrando,
   pagadoHastaDe,
@@ -2337,6 +2338,32 @@ describe("consultarPlanesDelAlumno: la pasada unica por MP", () => {
 // termina en BLOQUEAR (lo de antes, #1305), nunca en cobrar en el acto.
 // ---------------------------------------------------------------------------
 
+describe("finPagoDelPlanVivo: hasta donde llega lo que ya cobro un plan que todavia cobra", () => {
+  const vivo = (over: Partial<MpPreapproval> = {}) =>
+    pagada(ULTIMO_COBRO, { status: "authorized", ...over });
+
+  it("con next_payment_date de MP, esa fecha", () => {
+    expect(finPagoDelPlanVivo(
+      vivo({ next_payment_date: new Date(FIN + DIA_MS).toISOString() }),
+      ts(FIN - 5 * DIA_MS),
+    )).toBe(FIN + DIA_MS);
+  });
+
+  it("sin ella, la MAYOR entre lo guardado y lo que cubre el ultimo cobro", () => {
+    // Guardado viejo: corrige el cobro.
+    expect(finPagoDelPlanVivo(vivo(), ts(FIN - 30 * DIA_MS))).toBe(FIN);
+    // Guardado mas lejos que el cobro: vale lo guardado.
+    expect(finPagoDelPlanVivo(vivo(), ts(FIN + 2 * DIA_MS))).toBe(FIN + 2 * DIA_MS);
+    // Solo una de las dos.
+    expect(finPagoDelPlanVivo(vivo(), undefined)).toBe(FIN);
+    expect(finPagoDelPlanVivo({ status: "authorized" }, ts(FIN))).toBe(FIN);
+  });
+
+  it("sin cobro y sin fechas, null: nunca suma un periodo sin cobro detras", () => {
+    expect(finPagoDelPlanVivo(sinCobro, undefined)).toBeNull();
+  });
+});
+
 describe("finPagoDelPlan: el fin pago de UN plan, la unica cuenta de las dos decisiones", () => {
   it("el menor entre la fecha del plan y lo que cubre su pago mas lejano", () => {
     const corto = pagada("2026-08-01T12:00:00.000Z", { id: "a" });
@@ -2510,13 +2537,25 @@ describe("decidirCambioDePlanDelAlumno", () => {
   });
 
   it("si MP no manda el proximo cobro, vale el que guardo el reconciliador", () => {
-    const guardado = AHORA + 15 * DIA_MS;
+    // Lo guardado coincide con lo que cubre el ultimo cobro (27/8 + 1 mes).
     const r = decidir({
-      plan: { currentPeriodEnd: ts(guardado) },
+      plan: { currentPeriodEnd: ts(PROXIMO) },
       sub: mensualVivo({ next_payment_date: undefined }),
     });
 
-    expect(r).toEqual({ tipo: "diferir", planViejo: "viejo", diferidoHastaMs: guardado });
+    expect(r).toEqual({ tipo: "diferir", planViejo: "viejo", diferidoHastaMs: PROXIMO });
+  });
+
+  it("sin proximo cobro, lo guardado VIEJO y un cobro que cubre mas: se bloquea (como lo veria el reconciliador)", () => {
+    // Lo guardado dice 15 dias, pero el ultimo cobro cubre 20: el viejo esta pago
+    // mas alla de la fecha a la que se diferiria, y al confirmarse el nuevo el
+    // reconciliador lo daria de baja (`finPagoDelPlanVivo`, la misma cuenta).
+    const r = decidir({
+      plan: { currentPeriodEnd: ts(AHORA + 15 * DIA_MS) },
+      sub: mensualVivo({ next_payment_date: undefined }),
+    });
+
+    expect(r).toMatchObject({ tipo: "bloquear", motivo: "fuentes-no-coinciden" });
   });
 
   it("de las dos fuentes vale la MENOR: ninguna puede regalar dias", () => {

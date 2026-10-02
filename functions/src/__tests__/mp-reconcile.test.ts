@@ -5289,6 +5289,49 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       });
     }
 
+    it("⚠️ anual renovado SIN next_payment_date ni fecha guardada, mensual nuevo cobrado: queda el anual, reintegro", async () => {
+      // El caso de Codex: sin fechas, el fin del viejo salia -Infinity, quedaba el
+      // mensual y se daba de baja el anual que ya cubre un año. Lo que cubre su
+      // ultimo cobro (P + 12 meses) lo establece.
+      const mundo = mundoTarde("annual");
+      delete mundo.mp_plans.viejo.currentPeriodEnd;
+      const { app, store } = fakeApp(mundo);
+      const mp = fakeMpMultiPlan({
+        viejo: { ...viejoRenovado(12), next_payment_date: undefined },
+        nuevo: nuevoCobrado(1),
+      });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-nuevo"]);
+      expect(store.mp_plans.viejo.terminal).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("REINTEGRO"),
+        expect.objectContaining({
+          uid: "u1",
+          planNuevo: "nuevo",
+          planViejo: "viejo",
+          finDelNuevoIso: new Date(AHORA + 30 * DIA_MS).toISOString(),
+        }),
+      );
+    });
+
+    it("fecha guardada vieja y un ultimo cobro mas nuevo (sin next_payment_date): el conflicto se detecta", async () => {
+      // Lo guardado es de antes de la renovacion (dice P, que es E). El cobro de P
+      // cubre hasta P + 1 mes: el viejo esta pago mas alla de la prueba.
+      const mundo = mundoTarde("monthly");
+      mundo.mp_plans.viejo.currentPeriodEnd = ts(P);
+      const { app } = fakeApp(mundo);
+      const mp = fakeMpMultiPlan({
+        viejo: { ...viejoRenovado(1), next_payment_date: undefined },
+        nuevo: NUEVO_TARDE,
+      });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-nuevo"]);
+    });
+
     it("sin ninguna fecha del viejo, se mira si cobro despues de abrirse el nuevo", async () => {
       const mundo = mundoTarde("monthly");
       delete mundo.mp_plans.viejo.currentPeriodEnd;

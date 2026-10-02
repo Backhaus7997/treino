@@ -335,7 +335,7 @@ import {
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
   cobrosExitosos,
-  pagadoHastaDe,
+  finPagoDelPlanVivo,
   situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
 import {
@@ -1257,9 +1257,11 @@ function elViejoPagaMasAllaDeLaPrueba(
   const cubreHastaMs =
     typeof e === "number" && Number.isFinite(e) ? e : altaNuevoMs;
 
+  // Hasta donde llega lo que ya cobro: la misma cuenta que usa el checkout
+  // (`finPagoDelPlanVivo`). Sin `next_payment_date`, lo guardado puede estar viejo y
+  // lo que cubre el ultimo cobro lo corrige.
   const deMp = parsePeriodEnd(viejo.next_payment_date, "viejo");
-  const finDelViejo = deMp ?? comoTimestamp(datosViejo.currentPeriodEnd);
-  const finDelViejoMs = finDelViejo === null ? null : finDelViejo.toMillis();
+  const finDelViejoMs = finPagoDelPlanVivo(viejo, datosViejo.currentPeriodEnd);
 
   // Nunca cobro: no puede tener pago mas alla de la prueba.
   if (cobrosExitosos(viejo.summarized) < 1) {
@@ -1290,12 +1292,15 @@ interface SuscripcionViejaDelAlumno {
 }
 
 /**
- * Hasta cuando esta pago el NUEVO, cuando ya cobro: su `next_payment_date` o, si no
- * vino, lo que cubre su ultimo cobro. `null` si no se sabe.
+ * Hasta cuando esta pago el NUEVO, cuando ya cobro: la misma cuenta que el viejo
+ * (`finPagoDelPlanVivo`) pero SOLO con lo que dice MP (`next_payment_date` o lo que
+ * cubre su ultimo cobro), sin el `currentPeriodEnd` guardado. El del nuevo, antes de
+ * su primer cobro, es el fin de la PRUEBA y no de un periodo pago: sumarlo podria
+ * acortar o alargar lo que el nuevo cubre por algo que no es un cobro. `null` si MP
+ * no alcanza para saberlo: ahi la eleccion conserva el nuevo.
  */
 function finPagoDelNuevoMs(nuevo: PlanNuevoDelAlumno): number | null {
-  const deMp = parsePeriodEnd(nuevo.mp.next_payment_date, nuevo.planId);
-  return deMp !== null ? deMp.toMillis() : pagadoHastaDe(nuevo.mp);
+  return finPagoDelPlanVivo(nuevo.mp, null);
 }
 
 /**
@@ -1319,8 +1324,12 @@ async function darDeBajaElNuevoDelAlumno(
   conflictos: SuscripcionViejaDelAlumno[],
   motivo: string,
   deps: ReconcileDeps,
+  /** Lo que se suma al ERROR: la fecha de cada lado, si ya cobraron los dos. */
+  extra: Record<string, unknown> = {},
 ): Promise<BajaDelAlumno> {
+  const yaCobraronLosDos = cobrosExitosos(nuevo.mp.summarized) >= 1;
   const contexto = {
+    ...extra,
     uid,
     planNuevo: nuevo.planId,
     planViejo: conflictos[0]?.planId,
@@ -1350,8 +1359,12 @@ async function darDeBajaElNuevoDelAlumno(
     return { cancelados: 0, fallo: true };
   }
   logger.error(
-    "mp/reconcile: dar de baja el plan viejo del alumno le cobraria dos veces — se " +
-      "da de baja el NUEVO, el viejo sigue; el alumno tiene que volver a hacer el cambio",
+    yaCobraronLosDos
+      ? "mp/reconcile: los dos planes del alumno ya cobraron el solapamiento — se da " +
+        "de baja el NUEVO, que cubre menos, el viejo sigue; corresponde un REINTEGRO " +
+        "de lo que el nuevo cobro de mas"
+      : "mp/reconcile: dar de baja el plan viejo del alumno le cobraria dos veces — se " +
+        "da de baja el NUEVO, el viejo sigue; el alumno tiene que volver a hacer el cambio",
     { ...contexto, preapprovalId },
   );
   return { cancelados: 1, fallo: false };
@@ -1633,12 +1646,13 @@ async function darDeBajaLosReemplazadosDelAlumno(
         conflictos,
         "ya-cobraron-los-dos-y-el-viejo-cubre-mas",
         deps,
+        { finDelNuevoIso: isoDeMs(finDelNuevo), finDelViejoIso: isoDeMs(finDelViejo) },
       );
     }
     logger.error(
       "mp/reconcile: el plan nuevo del alumno ya cobro y el viejo tiene pago mas " +
         "alla de lo que cubria su prueba — el solapamiento ya se cobro dos veces; se " +
-        "da de baja el viejo, que cubre menos (revisar y devolver)",
+        "da de baja el viejo, que cubre menos, y corresponde un REINTEGRO",
       contexto,
     );
   }

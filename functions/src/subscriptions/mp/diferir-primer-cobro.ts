@@ -1450,6 +1450,41 @@ function proximoCobroMs(sub: MpPreapproval): number | null {
 }
 
 /**
+ * Hasta cuando esta pago un plan que TODAVIA COBRA, para decidir si darlo de baja
+ * le haria pagar dos veces al alumno. `null` si no hay con que establecerlo.
+ *
+ * Es otra pregunta que la de la prueba: alla se busca la fecha mas CORTA que todas
+ * las fuentes aceptan (diferir de mas regala dias); aca, hasta donde llega lo que el
+ * plan ya cobro, porque eso es lo que seguiria otorgando dado de baja, y quedarse
+ * corto es no ver un solapamiento que se cobra dos veces. Por eso:
+ *
+ *   - con `next_payment_date` de MP, esa fecha: es la medida exacta de una
+ *     suscripcion viva (la del proximo cobro, hasta donde esta pago);
+ *   - sin ella, la MAYOR entre el `currentPeriodEnd` guardado (esa misma fecha, vista
+ *     la ultima vez: puede estar vieja si despues hubo una renovacion) y lo que cubre
+ *     el ultimo cobro real ([pagadoHastaDe]). Las dos estan respaldadas (una por el
+ *     calendario de MP, la otra por un cobro), asi que no se inventa nada: lo que
+ *     cubre un cobro es exactamente eso, y nunca se suma un periodo sin cobro detras.
+ *
+ * La usan las dos mitades del cambio de plan con la misma cuenta: el reconciliador
+ * para detectar el conflicto y elegir que plan queda (`elViejoPagaMasAllaDeLaPrueba`
+ * y la baja, en `reconcile.ts`), y [decidirCambioDePlanDelAlumno] para no abrir un
+ * cambio que el reconciliador despues desharia.
+ */
+export function finPagoDelPlanVivo(
+  sub: MpPreapproval,
+  currentPeriodEnd: unknown,
+): number | null {
+  const deMp = proximoCobroMs(sub);
+  if (deMp !== null) return deMp;
+  const guardado = msDeTimestamp(currentPeriodEnd);
+  const porCobro = pagadoHastaDe(sub);
+  if (guardado === null) return porCobro;
+  if (porCobro === null) return guardado;
+  return Math.max(guardado, porCobro);
+}
+
+/**
  * El fin pago mas lejano que respalda algun plan DADO DE BAJA del alumno (todas
  * sus suscripciones `cancelled`), o `null` si ninguno.
  *
@@ -1644,7 +1679,10 @@ export function decidirCambioDePlanDelAlumno(
   const minimo = pausada ? MIN_DIFERIMIENTO_MS : MIN_PAGO_PARA_CAMBIAR_MS;
   if (finDelViejo - nowMs >= minimo) {
     const hasta = Math.max(finDelViejo, dadosDeBaja ?? finDelViejo);
-    if (proximo > hasta + ADELANTO_MAXIMO_DEL_COBRO_MS) {
+    // Con la cuenta del reconciliador ([finPagoDelPlanVivo]): si el viejo sigue pago
+    // mas alla de esta fecha, al confirmarse el nuevo se daria de baja el NUEVO.
+    const pagoDelViejo = finPagoDelPlanVivo(sub, plan.currentPeriodEnd) ?? proximo;
+    if (pagoDelViejo > hasta + ADELANTO_MAXIMO_DEL_COBRO_MS) {
       return bloquear(planViejo, "fuentes-no-coinciden", {
         ...contexto,
         difeririaHastaIso: new Date(hasta).toISOString(),
