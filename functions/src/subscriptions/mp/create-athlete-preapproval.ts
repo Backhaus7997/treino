@@ -193,7 +193,8 @@ function mpSigueCobrando(raw: unknown): boolean {
  * del alumno. La unica fuente que sabe si hoy se cobra es MP.
  *
  * Si no se puede preguntar, NO se deja pasar: sin saberlo no se puede descartar
- * el doble cobro, y abrir el checkout igual necesita a MP.
+ * el doble cobro, y abrir el checkout igual necesita a MP. Ver el cuerpo del
+ * callable por los dos casos que esta consulta igual no alcanza a cubrir.
  */
 async function tienePlanQueSigueCobrando(
   app: App,
@@ -213,11 +214,18 @@ async function tienePlanQueSigueCobrando(
     .map((d) => d.id);
   if (planIds.length === 0) return false;
 
+  // SECUENCIAL y cortando en la primera que cobra, a proposito: MP contesta 429
+  // y los planes abandonados se quedan para siempre, asi que un `Promise.all`
+  // creceria con el uso y un solo 429 trabaria al alumno (mismo criterio que
+  // `cancel-my-subscription.ts`). Con el corte, solo importan los planes que
+  // realmente se consultaron: si uno falla antes de encontrar uno vivo, no se
+  // puede descartar el cobro y sale `unavailable`.
   try {
-    const listas = await Promise.all(
-      planIds.map((id) => mpClient.searchPreapprovalsByPlan(id)),
-    );
-    return listas.some((subs) => subs.some((s) => mpSigueCobrando(s.status)));
+    for (const id of planIds) {
+      const subs = await mpClient.searchPreapprovalsByPlan(id);
+      if (subs.some((s) => mpSigueCobrando(s.status))) return true;
+    }
+    return false;
   } catch (e) {
     logger.error("mp/create-athlete: no se pudo verificar el plan vigente", {
       uid,
@@ -321,9 +329,18 @@ export async function runCreateAthletePreapproval(
   // reemplazado al confirmarse el nuevo. Ahi se borra este bloque y la guarda de
   // arriba vuelve a ser la unica.
   //
+  // ⚠️ Es EVENTUALMENTE consistente: reduce el cobro doble, no lo cierra. Quedan
+  // abiertos dos casos hasta que exista esa baja:
+  //   (a) el indice de busqueda de MP llega tarde (~93 s, ver `reconcile.ts`): un
+  //       plan recien pagado puede no aparecer todavia;
+  //   (b) dos `init_point` abiertos (una pestaña vieja sin pagar y el checkout
+  //       nuevo) que se pagan los dos despues: el `init_point` no vence.
+  //
   // El mensaje evita las palabras «entrenador» y «ciclo» a proposito: la landing
   // (`motivoDeLaPrecondicion`, treino-app) decide el copy buscandolas en el texto,
-  // y cualquiera de las dos mostraria un motivo que aca es falso. La baja del\n  // alumno vive en la web (`/suscripcion/baja`, treino-app), no en la app.
+  // y cualquiera de las dos mostraria un motivo que aca es falso.
+  // La baja del alumno vive en la web (`/suscripcion/baja`, treino-app), no en
+  // la app.
   if (await tienePlanQueSigueCobrando(app, uid, deps.mpClient)) {
     throw new HttpsError(
       "failed-precondition",

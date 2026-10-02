@@ -121,6 +121,8 @@ function fakeMp(
     suscripciones: Record<string, { status: string }[]>;
     /** Hace fallar la CONSULTA a MP (no la apertura del checkout). */
     fallaLaBusqueda: Error;
+    /** Hace fallar la consulta de UN plan puntual. */
+    fallaEnPlan: Record<string, Error>;
   }> = {},
 ) {
   const pedidos: Record<string, unknown>[] = [];
@@ -135,6 +137,7 @@ function fakeMp(
         searchPreapprovalsByPlan: async (planId: string) => {
           busquedas.push(planId);
           if (over.fallaLaBusqueda) throw over.fallaLaBusqueda;
+          if (over.fallaEnPlan?.[planId]) throw over.fallaEnPlan[planId];
           return over.suscripciones?.[planId] ?? [];
         },
         cancelPreapproval: async () => ({}),
@@ -705,5 +708,85 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
     expect(mp.pedidos).toEqual([]);
     expect(escrituras).toEqual([]);
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("varios planes: uno cancelado y otro autorizado → se RECHAZA", async () => {
+    // El alumno que se dio de baja del mensual, contrato el anual, y ahora
+    // pide otro. El cancelado no tapa al vivo.
+    // Derecho `expired` para que sea la consulta a MP la que rechaza, no la
+    // guarda del mismo ciclo.
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.nuevo = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: {
+        viejo: [{ status: "cancelled" }],
+        nuevo: [{ status: "authorized" }],
+      },
+    });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("un plan de PF (`producto: trainer`) del mismo uid autorizado NO cuenta", async () => {
+    // No deberia existir —`role` es inmutable— pero si existiera, el cobro de
+    // un entrenador no es el del alumno. Y ni siquiera se le pregunta a MP.
+    const mundo = YA_PAGA("monthly", "expired");
+    (mundo.mp_plans.viejo as Record<string, unknown>).producto = "trainer";
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual([]);
+  });
+
+  it("una suscripcion de MP SIN status bloquea — igual que un estado desconocido", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({
+      suscripciones: { viejo: [{} as unknown as { status: string }] },
+    });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("la consulta es SECUENCIAL: con el primero vivo no se consulta el segundo", async () => {
+    // MP contesta 429 y los planes abandonados se acumulan: cada llamada de
+    // mas es una chance de trabar al alumno.
+    // Derecho `expired` para que la guarda del mismo ciclo no atienda antes.
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.otro = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: {
+        viejo: [{ status: "authorized" }],
+        otro: [{ status: "authorized" }],
+      },
+    });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.busquedas).toEqual(["viejo"]);
+  });
+
+  it("si una consulta falla antes de hallar uno vivo → `unavailable` y no se abre checkout", async () => {
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.otro = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app, escrituras } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: { viejo: [{ status: "cancelled" }] },
+      fallaEnPlan: { otro: new Error("429") },
+    });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject({ code: "unavailable" });
+    expect(mp.busquedas).toEqual(["viejo", "otro"]);
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
   });
 });
