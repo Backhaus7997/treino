@@ -45,7 +45,7 @@ class AthleteAgendaScreen extends ConsumerStatefulWidget {
 }
 
 class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
-  DateTime _focusedDay = DateTime.now();
+  DateTime _focusedDay = nowWall();
   DateTime? _selectedDay;
 
   @override
@@ -265,9 +265,10 @@ class _AgendaCalendar extends StatelessWidget {
     });
   }
 
-  /// Whether [day] is strictly before today (date-level, local TZ).
+  /// Whether [day] is strictly before today (date-level, in the startsAt
+  /// wall-clock frame — ADR-7).
   bool _isDayPast(DateTime day) {
-    final now = DateTime.now();
+    final now = nowWall();
     final today = DateTime(now.year, now.month, now.day);
     return DateTime(day.year, day.month, day.day).isBefore(today);
   }
@@ -277,9 +278,16 @@ class _AgendaCalendar extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     return TableCalendar<void>(
+      // Without it table_calendar formats the month and weekdays in en_US.
+      // Date symbols come from GlobalMaterialLocalizations ('es'; intl falls
+      // back to it for 'es_AR').
+      locale: AppL10n.of(context).localeName,
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // "Today" in the same frame as the dots (startsAt, ADR-7);
+      // table_calendar's default reads the raw clock on its own.
+      currentDay: nowWall(),
       selectedDayPredicate: (day) =>
           selectedDay != null && isSameDay(selectedDay, day),
       onDaySelected: onDaySelected,

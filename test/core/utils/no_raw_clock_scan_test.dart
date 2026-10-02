@@ -59,8 +59,9 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// ## DOS REGÍMENES, porque son dos realidades
 ///
-/// Las cuatro reglas de arriba son el **ratchet** de Coach: deuda alta (80
-/// ocurrencias), allowlist grande, y el único contrato posible es "no crece".
+/// Las cuatro reglas de arriba son el **ratchet** de Coach: deuda alta (la
+/// cifra vigente es `rawClockDebtCeiling`), allowlist grande, y el único
+/// contrato posible es "no crece".
 ///
 /// `core/` es al revés y por eso tiene su propio grupo, con **regla cero**:
 ///
@@ -69,7 +70,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// | deuda al escribir esto | 80 ocurrencias, 37 archivos | **0 líneas de código** |
 /// | contrato | ratchet (sólo baja) | **cero, sin allowlist** |
 /// | qué se cuenta | texto crudo (prosa incluida) | **sólo código** (los `//` se saltean) |
-/// | excepción | 37 archivos | **una**: `app_clock.dart`, el seam |
+/// | excepción | la allowlist (`allowlistCeiling`) | **una**: `app_clock.dart`, el seam |
 ///
 /// Que el segundo grupo cuente sólo código no es un detalle: en `core/` viven
 /// los dartdocs que EXPLICAN por qué no usar el reloj crudo —`argentina_time`,
@@ -141,7 +142,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado al mergear este guard. NUNCA
     /// subirlo: cada migración lo baja.
-    const allowlistCeiling = 37;
+    const allowlistCeiling = 35;
 
     /// Techo de ocurrencias totales. Mismo contrato: sólo baja.
     ///
@@ -153,10 +154,21 @@ void main() {
     /// que este cambio vuelve falso. El scanner es textual y no distingue
     /// código de comentario, así que las cuenta igual.
     ///
+    /// 80 → 74 cuando las dos agendas mobile (PF y alumno) pasaron al seam:
+    /// `nowWall()` para el día enfocado, el seleccionado, el "¿ya pasó?" y el
+    /// `currentDay` del calendario, porque esos días se comparan contra los
+    /// campos de `startsAt` (ADR-7: wall-clock del dispositivo), y
+    /// `AppClock.now()` sólo para la ventana rodante de turnos, que es un
+    /// instante. Ojo: "bucket de día" NO alcanza para elegir `argentinaNow()`.
+    /// Ese helper es para agrupar INSTANTES reales en días ART; un día de la
+    /// agenda va en el frame de `startsAt`, y una versión intermedia de esta
+    /// migración que usó `argentinaNow()` desalineaba el calendario del
+    /// `DayTimeline`.
+    ///
     /// Bajar el techo es obligatorio al migrar: dejarlo arriba de la medición
     /// real regala cupo para regresiones nuevas, que es justo lo que el
     /// ratchet existe para impedir.
-    const rawClockDebtCeiling = 80;
+    const rawClockDebtCeiling = 74;
 
     /// Registro de deuda, rutas relativas a `lib/`.
     const allowlist = {
@@ -170,10 +182,8 @@ void main() {
       'features/coach/data/trainer_link_repository.dart',
       'features/coach/domain/wall_clock.dart',
       'features/coach/presentation/agenda_formatters.dart',
-      'features/coach/presentation/athlete_agenda_screen.dart',
       'features/coach/presentation/athlete_detail_screen.dart',
       'features/coach/presentation/availability_editor_screen.dart',
-      'features/coach/presentation/trainer_agenda_tab.dart',
       'features/coach/presentation/trainer_dashboard_tab.dart',
       'features/coach/presentation/widgets/appointment_detail_sheet.dart',
       'features/coach/presentation/widgets/day_timeline.dart',
