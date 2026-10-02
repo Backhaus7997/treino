@@ -11,6 +11,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -654,6 +655,10 @@ class _ToggleButton extends StatelessWidget {
 /// el tier. `pending` y `paused` siguen mostrando el tier del doc a propósito
 /// (ver «Qué espeja y qué NO» en [VigenciaDelPlan]).
 ///
+/// Se lee de [vigenciaDelPlanProvider] y no de [VigenciaDelPlan.de] porque
+/// este chip está montado toda la sesión: tiene que pasar a Free en el
+/// instante en que vence la baja, no en el próximo rebuild.
+///
 /// `go` y no `push`: Ajustes es una sección del shell, no un sub-flujo. Con
 /// `push` el sidebar quedaría con Ajustes activo encima de la sección
 /// anterior y el back del browser se volvería un laberinto.
@@ -673,7 +678,8 @@ class _ProfileRow extends ConsumerWidget {
     final name = hasName ? displayName : 'Mi cuenta'; // i18n: Fase W1
     // Sin `subscription` en el doc → Free por definición, mismo criterio que
     // FacturacionTab (sin backfill); una baja vencida también es Free.
-    final tier = VigenciaDelPlan.de(profile?.subscription).tierEfectivo;
+    final tier =
+        ref.watch(vigenciaDelPlanProvider.select((v) => v.tierEfectivo));
 
     final avatar = CircleAvatar(
       radius: CoachHubLayoutTokens.sidebarAvatarDiameter / 2,

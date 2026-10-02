@@ -229,6 +229,34 @@ void main() {
         expect(find.byType(PlanUpsellBanner), findsOneWidget);
         expect(find.byKey(const Key('plan_upsell_banner')), findsNothing);
       });
+
+      // Lo que pidió la review del PR #1298: si el PF está en Cuenta cuando
+      // vence la baja, el banner pasa a Free sin esperar un rebuild ajeno. En
+      // ese borde no tiene por qué emitir nadie, ni el perfil ni el reloj.
+      testWidgets('vence con el banner montado: pasa a Free solo',
+          (tester) async {
+        final fin = DateTime.utc(2026, 10, 15, 15);
+        AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+        await _pump(
+          tester,
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.cancelled,
+          fin: fin,
+        );
+        expect(find.text('TU PLAN · PLAN 1'), findsOneWidget);
+
+        // Sólo pasa la hora: el reloj cruza el fin y nada más cambia.
+        AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+        await tester.pump(const Duration(hours: 1));
+        await tester.pump();
+
+        expect(find.text('TU PLAN · FREE'), findsOneWidget);
+        expect(
+          find.text(
+              'Estás en Free, hasta 2 alumnos. Con Plan 1, hasta 7 alumnos.'),
+          findsOneWidget,
+        );
+      });
     });
   });
 }

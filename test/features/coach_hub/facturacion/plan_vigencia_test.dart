@@ -20,6 +20,10 @@
 ///      exactamente un día todavía se difiere. Si el aviso de la pricing page
 ///      dice «se te cobrará al finalizar tu período actual» donde el servidor
 ///      cobra ya, miente.
+///   6. Que [VigenciaDelPlan.proximoCambio] caiga en un instante en que la
+///      vigencia YA cambió. `vigenciaDelPlanProvider` se recalcula ahí. Si
+///      cayera antes del cambio, se volvería a agendar sobre el mismo borde, y
+///      el chip del sidebar no pasaría nunca a Free con la pestaña abierta.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -269,6 +273,94 @@ void main() {
       );
 
       expect(v.vencida, isTrue);
+    });
+  });
+
+  // ── Cuándo deja de valer la foto ──
+  //
+  // Cada borde se prueba de los dos lados: justo antes la vigencia es la misma,
+  // y en `proximoCambio` ya es otra.
+  group('proximoCambio', () {
+    VigenciaDelPlan baja(DateTime fin, {required DateTime ahora}) =>
+        VigenciaDelPlan.de(_sub(SubscriptionStatus.cancelled, fin: fin),
+            now: ahora);
+
+    test('sin suscripción no hay borde', () {
+      expect(VigenciaDelPlan.de(null, now: _ahora).proximoCambio, isNull);
+    });
+
+    // Fuera de una baja la hora no cambia nada, así que no hay nada que esperar
+    // aunque el doc traiga una fecha por delante.
+    for (final status in SubscriptionStatus.values) {
+      if (status == SubscriptionStatus.cancelled) continue;
+
+      test('$status no tiene borde aunque haya fecha por delante', () {
+        final v = VigenciaDelPlan.de(
+          _sub(status, fin: _ahora.add(const Duration(days: 30))),
+          now: _ahora,
+        );
+
+        expect(v.proximoCambio, isNull);
+      });
+    }
+
+    test('una baja vencida o sin fecha ya no tiene borde', () {
+      expect(
+        baja(_ahora.subtract(const Duration(days: 1)), ahora: _ahora)
+            .proximoCambio,
+        isNull,
+      );
+      expect(
+        VigenciaDelPlan.de(_sub(SubscriptionStatus.cancelled), now: _ahora)
+            .proximoCambio,
+        isNull,
+      );
+    });
+
+    // El primer borde es el del diferimiento, que es INCLUSIVO: en el umbral
+    // todavía difiere, así que el cambio cae un milisegundo después.
+    test('con días pagos, el primero es dejar de diferir', () {
+      final fin = _ahora.add(const Duration(days: 14));
+      final umbral = fin.subtract(const Duration(days: 1));
+      final cambio = baja(fin, ahora: _ahora).proximoCambio;
+
+      expect(cambio, umbral.add(const Duration(milliseconds: 1)));
+      expect(baja(fin, ahora: umbral).primerCobroDiferible, isTrue);
+      expect(baja(fin, ahora: cambio!).primerCobroDiferible, isFalse);
+    });
+
+    // Con EXACTAMENTE un día por delante, `ahora` ES el umbral. El cambio
+    // tiene que quedar en el futuro igual, o el provider esperaría cero.
+    test('con exactamente un día por delante, el cambio igual es futuro', () {
+      final fin = _ahora.add(const Duration(days: 1));
+
+      expect(
+        baja(fin, ahora: _ahora).proximoCambio,
+        _ahora.add(const Duration(milliseconds: 1)),
+      );
+    });
+
+    // El segundo borde es el del fin, que es ESTRICTO: en `fin` ya venció.
+    test('pasado el umbral, el siguiente es el fin', () {
+      final fin = _ahora.add(const Duration(hours: 5));
+
+      expect(baja(fin, ahora: _ahora).proximoCambio, fin);
+      expect(
+        baja(fin, ahora: fin.subtract(const Duration(milliseconds: 1)))
+            .tierEfectivo,
+        SubscriptionTier.plan1,
+      );
+      expect(baja(fin, ahora: fin).tierEfectivo, SubscriptionTier.free);
+    });
+
+    // Es lo que recorre el provider: un borde, el siguiente, y nada más.
+    test('encadenados: diferimiento, fin, y después ninguno', () {
+      final fin = _ahora.add(const Duration(days: 14));
+      final primero = baja(fin, ahora: _ahora).proximoCambio!;
+      final segundo = baja(fin, ahora: primero).proximoCambio;
+
+      expect(segundo, fin);
+      expect(baja(fin, ahora: fin).proximoCambio, isNull);
     });
   });
 

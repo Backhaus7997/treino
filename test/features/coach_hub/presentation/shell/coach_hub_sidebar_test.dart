@@ -461,6 +461,27 @@ void main() {
       expect(find.text('Plan 1'), findsOneWidget);
       expect(find.text('Plan Free'), findsNothing);
     });
+
+    // Lo que pidió la review del PR #1298. Este chip está montado toda la
+    // sesión, y en el borde no tiene por qué emitir nadie (ni el perfil ni el
+    // reloj): sin el timer del provider, sigue en «Plan 1» hasta un rebuild
+    // ajeno.
+    testWidgets('vence con el sidebar montado: el chip pasa a Plan Free solo',
+        (tester) async {
+      final fin = DateTime.utc(2026, 10, 15, 15);
+      AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+      await _pumpSidebar(tester, overrides: [perfil(fin: fin)]);
+      expect(find.text('Plan 1'), findsOneWidget);
+
+      // Sólo pasa la hora: el reloj cruza el fin y nada más cambia.
+      AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('Plan Free'), findsOneWidget);
+      expect(find.text('Plan 1'), findsNothing);
+    });
   });
 
   testWidgets('entrada del shell usa TreinoFadeSlideIn (REQ-SH-010)',

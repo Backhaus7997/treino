@@ -8,7 +8,7 @@ import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
-import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
 
 /// Nombre visible del tier. Fuente única de la etiqueta de plan en el hub web
 /// — la pricing page usa su propia variante en MAYÚSCULAS (nombres de card),
@@ -46,15 +46,17 @@ String tierPlanLabel(SubscriptionTier tier) =>
 /// con un Plan 3 vencido lo escondía entero, justo cuando vuelve a haber algo
 /// que ofrecerle. `pending` y `paused` siguen con el tier del doc a propósito
 /// (ver «Qué espeja y qué NO» en [VigenciaDelPlan]).
+///
+/// Se lee de [vigenciaDelPlanProvider]: si el PF está en Cuenta cuando vence
+/// la baja, el banner pasa a Free en ese instante, sin esperar un rebuild.
 class PlanUpsellBanner extends ConsumerWidget {
   const PlanUpsellBanner({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final tier = VigenciaDelPlan.de(
-      ref.watch(userProfileProvider).valueOrNull?.subscription,
-    ).tierEfectivo;
+    final tier =
+        ref.watch(vigenciaDelPlanProvider.select((v) => v.tierEfectivo));
     final next = tier.nextTier;
     if (next == null) return const SizedBox.shrink();
 
