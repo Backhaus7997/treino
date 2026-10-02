@@ -65,11 +65,11 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// el tier al vencer y [AppClock] no avisa. [proximoCambio] dice cuándo deja
 /// de valer, y `vigenciaDelPlanProvider` (`vigencia_del_plan_provider.dart`,
 /// al lado) la recalcula ahí. Lo leen el chip del sidebar, que está montado
-/// toda la sesión, y el banner de upsell. La pricing page y Facturación
-/// todavía la calculan en su build: abiertas al cruzar el borde, muestran la
-/// foto vieja hasta el próximo rebuild. No son las únicas que miran el reloj:
-/// otras pantallas comparan `currentPeriodEnd` contra su propio `now` sin
-/// pasar por esta clase.
+/// toda la sesión, el banner de upsell y el medidor de cupo del tab Coach
+/// móvil. La pricing page y Facturación todavía la calculan en su build:
+/// abiertas al cruzar el borde, muestran la foto vieja hasta el próximo
+/// rebuild. No son las únicas que miran el reloj: otras pantallas comparan
+/// `currentPeriodEnd` contra su propio `now` sin pasar por esta clase.
 final class VigenciaDelPlan {
   const VigenciaDelPlan._({
     required this.tierEfectivo,
