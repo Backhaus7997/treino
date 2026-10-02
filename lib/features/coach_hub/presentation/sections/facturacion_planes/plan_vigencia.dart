@@ -148,8 +148,9 @@ final class VigenciaDelPlan {
   ///
   /// El servidor nunca reescribe el tier del doc cuando esto pasa (el límite
   /// cae «sin que se escriba un solo documento», `entitlement-triggers.ts`),
-  /// así que el tope de alumnos cacheado en `weightLimit` sigue siendo el del
-  /// plan viejo. Quien lo muestre tiene que tomarlo del [tierEfectivo].
+  /// así que el tier del doc sigue siendo el del plan viejo, y también un
+  /// `weightLimit` que el doc trajera. Quien muestre el tope tiene que tomarlo
+  /// del [tierEfectivo].
   bool get vencida => cancelada && pagadoHasta == null;
 
   /// El servidor PUEDE diferir el primer cobro de un checkout nuevo de este

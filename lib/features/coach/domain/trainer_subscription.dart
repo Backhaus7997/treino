@@ -22,13 +22,19 @@ class TrainerSubscription with _$TrainerSubscription {
     required SubscriptionTier tier,
     required SubscriptionStatus status,
     SubscriptionCycle? cycle,
-    // Límite de peso ponderado cacheado (denormalizado) — el CF lo escribe
-    // junto con `tier` para que UI/rules lean sin lookup. Nunca confiar en
-    // un valor client-provisto (rules lo pinnea CF-write-only).
+    // Tope de carga ponderada que el servidor NO escribe, ni escribió nunca:
+    // `git log -S weightLimit -- functions scripts` sólo trae fixtures de
+    // tests de reglas. La única escritura de este mapa, en
+    // functions/src/subscriptions/mp/reconcile.ts, no lo incluye. El cliente
+    // no puede escribirlo (las rules pinnean el mapa entero) y ninguna regla
+    // lo lee. Ningún código de este repo lo pone en un doc.
     //
-    // `null` = SIN LÍMITE (plan3). Ojo: null acá es un valor legítimo, no
-    // una ausencia — no lo colapses con `?? algo` o el plan más caro pasa a
-    // valer menos que el más barato.
+    // Por eso acá `null` es «no está», no «sin límite». El sin límite del
+    // Plan 3 vive en la tabla del tier (`SubscriptionTier.weightLimit`, de
+    // `kTierWeightLimits`), espejo de `TIER_WEIGHT_LIMITS`
+    // (functions/src/subscriptions/tier-config.ts), con la que el servidor
+    // calcula el tope. Si leés este campo, caé a `tier.weightLimit`, nunca a
+    // una constante: con `?? 2` el Plan 3 se quedaría con el cupo del Free.
     int? weightLimit,
     @TimestampConverter() DateTime? currentPeriodEnd,
     @TimestampConverter() DateTime? graceUntil,

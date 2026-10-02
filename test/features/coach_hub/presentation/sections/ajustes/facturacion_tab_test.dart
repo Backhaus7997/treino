@@ -280,9 +280,11 @@ void main() {
       debugPlanCancel = null;
     });
 
-    /// `weightLimit` es el tope CACHEADO en el doc (el del tier nominal). Por
-    /// default es el de la tabla de Plan 1; cada test que quiere distinguir «lo
-    /// que dice el doc» de «lo que dice la tabla» pasa uno distinto.
+    /// `weightLimit` es el campo del doc, que el servidor no escribe (ver
+    /// [TrainerSubscription]). El fixture lo trae igual porque, mientras la
+    /// baja no venza, la card lo prefiere a la tabla. Por default es el de la
+    /// tabla de Plan 1; cada test que quiere distinguir «lo que dice el doc» de
+    /// «lo que dice la tabla» pasa uno distinto.
     UserProfile pf({
       SubscriptionStatus status = SubscriptionStatus.active,
       SubscriptionTier tier = SubscriptionTier.plan1,
@@ -392,8 +394,8 @@ void main() {
     // ── El plan que la card muestra es el que RIGE, no el del doc ──
     //
     // El servidor nunca reescribe el tier cuando una baja vence: el doc sigue
-    // diciendo `plan1` con `weightLimit: 7` para siempre. Antes la card leía
-    // eso a secas y decía «Plan 1», «x / 7» y ninguna línea de plantillas
+    // diciendo `plan1` para siempre. Antes la card leía eso a secas y decía
+    // «Plan 1», «x / 7» (el tope de Plan 1) y ninguna línea de plantillas
     // mientras la pricing page ya marcaba a Free como el actual. Los tests de
     // arriba sólo miran AUSENCIAS (sin línea, sin link); acá va el texto
     // positivo.
@@ -401,8 +403,8 @@ void main() {
       final vencida = DateTime.utc(2026, 9, 30, 15);
       final conDiasPagos = DateTime.utc(2026, 10, 15, 15);
 
-      // El doc trae el tope cacheado del plan viejo (7); nada de lo que se ve
-      // puede salir de ahí una vez que la baja venció.
+      // El doc del fixture trae `weightLimit: 7`, el tope del plan viejo; nada
+      // de lo que se ve puede salir de ahí una vez que la baja venció.
       testWidgets(
           'baja vencida: la card dice Free, con el tope de Free y su línea de '
           'plantillas', (tester) async {
@@ -415,7 +417,7 @@ void main() {
 
         expect(find.text('TREINO Coach · Free'), findsOneWidget);
         expect(find.text('TREINO Coach · Plan 1'), findsNothing);
-        // Tope de Free (2), no el 7 cacheado del plan que ya no rige.
+        // Tope de Free (2), no el 7 del doc: es el del plan que ya no rige.
         expect(find.text('1 / 2'), findsOneWidget);
         expect(find.textContaining('/ 7'), findsNothing);
         // Free tiene tope de plantillas, así que la línea aparece. Con el tier
@@ -436,8 +438,8 @@ void main() {
         expect(find.text('Plantillas: 2 de 3'), findsOneWidget);
       });
 
-      // El doc de un Plan 3 trae `weightLimit: null` (= sin tope). Vencida la
-      // baja, ese «sin tope» no puede sobrevivir: el que rige es el de Free.
+      // Un Plan 3 sin `weightLimit` en el doc: su tier no tiene tope. Vencida
+      // la baja, ese «sin tope» no puede sobrevivir: el que rige es el de Free.
       testWidgets(
           'baja vencida de un Plan 3: el tope es el de Free, no «sin '
           'límite»', (tester) async {
@@ -458,12 +460,12 @@ void main() {
         expect(find.textContaining('sin límite'), findsNothing);
       });
 
-      // El otro lado de la regla: mientras la baja corre, manda el doc. El tope
-      // cacheado es 9, distinto del 7 de la tabla, justamente para que se vea
-      // de dónde sale el número.
+      // El otro lado de la regla: mientras la baja corre, manda el doc. El
+      // fixture pone `weightLimit: 9`, distinto del 7 de la tabla, justamente
+      // para que se vea de dónde sale el número.
       testWidgets(
-          'baja con días pagos: sigue el plan del doc, con SU tope cacheado, '
-          'y sin línea de plantillas', (tester) async {
+          'baja con días pagos: sigue el plan del doc, con el weightLimit del '
+          'doc, y sin línea de plantillas', (tester) async {
         await tester.pumpWidget(_harness(
           links: [_link('a1', TrainerLinkStatus.active)],
           templateUsage: Stream.value((limit: 3, count: 2)),
@@ -484,7 +486,8 @@ void main() {
       });
 
       // REGRESIÓN: un plan activo sigue leyendo el tope del doc.
-      testWidgets('plan activo: sigue el plan del doc con su tope cacheado',
+      testWidgets(
+          'plan activo: sigue el plan del doc con el weightLimit del doc',
           (tester) async {
         await tester.pumpWidget(_harness(
           links: [_link('a1', TrainerLinkStatus.active)],

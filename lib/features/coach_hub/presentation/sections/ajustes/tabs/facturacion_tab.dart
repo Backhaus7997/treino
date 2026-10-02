@@ -65,9 +65,13 @@ class FacturacionTab extends ConsumerWidget {
     // siga diciendo otro tier.
     final vigencia = VigenciaDelPlan.de(sub);
     final tier = vigencia.tierEfectivo;
-    // El tope cacheado en el doc (`weightLimit`) es el del tier NOMINAL: ya
-    // vencida la baja es el de un plan que el PF no tiene, así que sale de la
-    // tabla del tier efectivo. En cualquier otro caso manda el del doc.
+    // Vencida la baja, el tope sale de la tabla del tier efectivo: lo que diga
+    // el doc es de un plan que el PF ya no tiene. En cualquier otro caso manda
+    // el `weightLimit` del doc si está, y si no la tabla. El servidor no
+    // escribe ese campo (ver `TrainerSubscription.weightLimit`), así que en
+    // los docs que escribe él el número sale de la tabla. Ojo: acá no hay
+    // guarda de `tier.isUnlimited` como en el header móvil, así que un Plan 3
+    // cuyo doc trajera `weightLimit` mostraría ese tope.
     final limit = vigencia.vencida
         ? tier.weightLimit
         : (sub?.weightLimit ?? tier.weightLimit);
