@@ -155,11 +155,15 @@ void main() {
     /// código de comentario, así que las cuenta igual.
     ///
     /// 80 → 74 cuando las dos agendas mobile (PF y alumno) pasaron al seam:
-    /// `argentinaNow()` para el día enfocado, el seleccionado y el "¿ya
-    /// pasó?", que son buckets de calendario, y `AppClock.now()` sólo para la
-    /// ventana rodante de turnos, que es un instante. La primera versión de
-    /// esa migración usó `AppClock.now()` en los cinco buckets: el ratchet
-    /// quedaba en verde con los días armados con la hora del dispositivo.
+    /// `nowWall()` para el día enfocado, el seleccionado, el "¿ya pasó?" y el
+    /// `currentDay` del calendario, porque esos días se comparan contra los
+    /// campos de `startsAt` (ADR-7: wall-clock del dispositivo), y
+    /// `AppClock.now()` sólo para la ventana rodante de turnos, que es un
+    /// instante. Ojo: "bucket de día" NO alcanza para elegir `argentinaNow()`.
+    /// Ese helper es para agrupar INSTANTES reales en días ART; un día de la
+    /// agenda va en el frame de `startsAt`, y una versión intermedia de esta
+    /// migración que usó `argentinaNow()` desalineaba el calendario del
+    /// `DayTimeline`.
     ///
     /// Bajar el techo es obligatorio al migrar: dejarlo arriba de la medición
     /// real regala cupo para regresiones nuevas, que es justo lo que el

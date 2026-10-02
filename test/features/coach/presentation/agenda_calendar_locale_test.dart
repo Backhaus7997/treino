@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -68,6 +69,17 @@ void main() {
     }
   }
 
+  /// El «hoy» que resalta el calendario es el mismo día que enfoca: si
+  /// `currentDay` queda en el default de table_calendar, lee la hora real y
+  /// no la congelada.
+  void expectHoyEsElDiaCongelado(WidgetTester tester, DateTime local) {
+    final calendario = tester.widget<TableCalendar>(
+      find.byWidgetPredicate((w) => w is TableCalendar),
+    );
+    expect(isSameDay(calendario.currentDay, local), isTrue,
+        reason: 'currentDay=${calendario.currentDay}, congelado=$local');
+  }
+
   group('agenda del PF (TrainerAgendaTab)', () {
     for (final caso in casos) {
       testWidgets(
@@ -92,6 +104,7 @@ void main() {
         await tester.pump();
 
         expectCalendarioEnEspanol(caso.mes);
+        expectHoyEsElDiaCongelado(tester, caso.local);
       });
     }
   });
@@ -122,6 +135,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expectCalendarioEnEspanol(caso.mes);
+        expectHoyEsElDiaCongelado(tester, caso.local);
       });
     }
   });

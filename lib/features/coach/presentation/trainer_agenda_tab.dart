@@ -7,7 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/app_clock.dart';
-import '../../../core/utils/argentina_time.dart';
+import '../domain/wall_clock.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -41,7 +41,7 @@ class TrainerAgendaTab extends ConsumerStatefulWidget {
 }
 
 class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
-  DateTime _focusedDay = argentinaNow();
+  DateTime _focusedDay = nowWall();
   DateTime? _selectedDay;
 
   // Default to the compact WEEK view so the day timeline below gets most of
@@ -64,7 +64,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final selectedDay = _selectedDay ?? argentinaNow();
+    final selectedDay = _selectedDay ?? nowWall();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -185,9 +185,10 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
 
 // ── Calendar widget ───────────────────────────────────────────────────────────
 
-/// Whether [day] is strictly before today (date-level, ART wall-clock).
+/// Whether [day] is strictly before today (date-level, in the startsAt
+/// wall-clock frame — ADR-7).
 bool _isDayPast(DateTime day) {
-  final now = argentinaNow();
+  final now = nowWall();
   final today = DateTime(now.year, now.month, now.day);
   return DateTime(day.year, day.month, day.day).isBefore(today);
 }
@@ -252,6 +253,9 @@ class _TrainerCalendar extends ConsumerWidget {
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // "Today" in the same frame as the dots and the timeline (startsAt,
+      // ADR-7); table_calendar's default reads the raw clock on its own.
+      currentDay: nowWall(),
       selectedDayPredicate: (d) =>
           selectedDay != null && isSameDay(selectedDay, d),
       onDaySelected: onDaySelected,

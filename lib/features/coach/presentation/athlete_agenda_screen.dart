@@ -6,7 +6,6 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
-import '../../../core/utils/argentina_time.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -46,7 +45,7 @@ class AthleteAgendaScreen extends ConsumerStatefulWidget {
 }
 
 class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
-  DateTime _focusedDay = argentinaNow();
+  DateTime _focusedDay = nowWall();
   DateTime? _selectedDay;
 
   @override
@@ -266,9 +265,10 @@ class _AgendaCalendar extends StatelessWidget {
     });
   }
 
-  /// Whether [day] is strictly before today (date-level, ART wall-clock).
+  /// Whether [day] is strictly before today (date-level, in the startsAt
+  /// wall-clock frame — ADR-7).
   bool _isDayPast(DateTime day) {
-    final now = argentinaNow();
+    final now = nowWall();
     final today = DateTime(now.year, now.month, now.day);
     return DateTime(day.year, day.month, day.day).isBefore(today);
   }
@@ -285,6 +285,9 @@ class _AgendaCalendar extends StatelessWidget {
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // "Today" in the same frame as the dots (startsAt, ADR-7);
+      // table_calendar's default reads the raw clock on its own.
+      currentDay: nowWall(),
       selectedDayPredicate: (day) =>
           selectedDay != null && isSameDay(selectedDay, day),
       onDaySelected: onDaySelected,
