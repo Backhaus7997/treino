@@ -112,19 +112,45 @@ class _TrainerLocationConsentSheetState
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(TreinoIcon.mapPin, color: palette.accent, size: 28),
-                const SizedBox(height: 12),
-                Text(
-                  l10n.trainerLocationConsentSheetTitle,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: palette.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.trainerLocationConsentSheetBody,
-                  style: TextStyle(
-                      color: palette.textMuted, fontSize: AppTextSize.body),
+                // El texto scrollea y los botones quedan fijos abajo. Con la
+                // letra al máximo de accesibilidad el texto solo pasa el alto
+                // del sheet, y en un Column fijo empujaba los dos botones
+                // fuera de la pantalla (327 px en un iPhone 17e): el PF no
+                // podía ni aceptar ni apagar, sólo cerrar arrastrando.
+                //
+                // El costo, a esa escala: arrastrar sobre el texto lo
+                // scrollea en vez de cerrar el sheet. Se cierra desde el borde
+                // de arriba, o contestando. A escala 1 no hay nada que
+                // scrollear y el arrastre cierra desde cualquier lado.
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(
+                          TreinoIcon.mapPin,
+                          color: palette.accent,
+                          size: 28,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.trainerLocationConsentSheetTitle,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(color: palette.textPrimary),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.trainerLocationConsentSheetBody,
+                          style: TextStyle(
+                            color: palette.textMuted,
+                            fontSize: AppTextSize.body,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
