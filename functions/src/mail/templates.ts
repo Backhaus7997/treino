@@ -16,7 +16,7 @@
  *   - User-facing strings are es-AR, matching the notification CFs.
  */
 
-import { MailKind, MailParams } from "./types";
+import { KINDS_DE_PUBLICIDAD, MailKind, MailParams } from "./types";
 // El unico import de `subscriptions/` que hace esta capa, y es a una constante
 // PURA (un mapa de tier→numero, sin Firestore ni admin adentro). Se prefiere a
 // escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
@@ -122,6 +122,15 @@ const AVISO_PROMOCIONAL =
   "Si no querés recibir más, ";
 
 const TEXTO_DEL_LINK_DE_BAJA = "dejá de recibir correos promocionales";
+
+/**
+ * El término que la Disposición DNPDP 4/2009, art. 2, manda poner «en el
+ * encabezado» del correo de publicidad directa no consentida previamente. Se
+ * antepone SÓLO al asunto de los kinds de `KINDS_DE_PUBLICIDAD`: el cuerpo y el
+ * texto plano no cambian. La cita completa, la decisión del 2026-10-02 y el
+ * porqué de los dos mixtos que no lo llevan están en esa constante.
+ */
+const PREFIJO_DE_PUBLICIDAD = "Publicidad: ";
 
 /**
  * Escapes HTML-significant characters.
@@ -699,6 +708,10 @@ function downgradeReason(reason: string | number | undefined): string {
  * Missing params degrade to an empty string rather than throwing: a template
  * gap must not strand a queue document in permanent failure.
  *
+ * El ASUNTO de los kinds de `KINDS_DE_PUBLICIDAD` sale con «Publicidad: »
+ * adelante (Disp. DNPDP 4/2009, art. 2; ver esa constante). Es lo único que
+ * cambia: el cuerpo y el texto plano son los mismos.
+ *
  * @param kind     - Selects the template.
  * @param params   - Template values, as persisted on the queue doc.
  * @param opciones - Lo que `sendQueuedMail` decide al enviar: el pie de baja de
@@ -717,6 +730,11 @@ export function renderMail(
   // los 30 `case` es el campo que el próximo MailKind se va a olvidar de
   // pasar —y el síntoma sería un correo promocional sin el mecanismo de baja—.
   // Así NINGÚN `case` puede olvidarlo, porque no lo ve.
+  //
+  // Lo mismo vale para el «Publicidad: » del asunto: se decide acá, por `kind`,
+  // y no en cada `case`. El próximo kind comercial no tiene que acordarse de
+  // nada más que de entrar en `KINDS_DE_PUBLICIDAD`.
+  const prefijoDelAsunto = KINDS_DE_PUBLICIDAD.includes(kind) ? PREFIJO_DE_PUBLICIDAD : "";
   const build = (
     subject: string,
     heading: string,
@@ -725,7 +743,15 @@ export function renderMail(
     ctaHref?: string,
     ctaSize?: CtaSize,
   ): RenderedMail =>
-    buildMail(subject, heading, lines, ctaLabel, ctaHref, ctaSize, bajaDePromocionales);
+    buildMail(
+      `${prefijoDelAsunto}${subject}`,
+      heading,
+      lines,
+      ctaLabel,
+      ctaHref,
+      ctaSize,
+      bajaDePromocionales,
+    );
 
   // Destino del CTA. Los productores pasan `ctaUrl` cuando el destinatario es
   // el entrenador; el resto cae al landing. Se resuelve una sola vez acá para

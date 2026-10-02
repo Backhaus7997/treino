@@ -46,6 +46,7 @@ import {
 } from "../subscriptions/trainer-limit-mail";
 import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 import { enqueueMail } from "../mail/enqueue-mail";
+import { KINDS_DE_PUBLICIDAD } from "../mail/types";
 import { renderMail, trainerWebCheckout, cupoLabel } from "../mail/templates";
 import { HttpsError } from "firebase-functions/v2/https";
 import type { App } from "firebase-admin/app";
@@ -327,6 +328,16 @@ describe.each(TOPES)("$nombre", (t) => {
       expect(enqueueMock.mock.calls[0][1].prefKey).toBe(TRAINER_LIMIT_PREF_KEY);
       // Mismo valor que el del alumno — ver el encabezado del módulo.
       expect(TRAINER_LIMIT_PREF_KEY).toBe(ATHLETE_PROSPECT_PREF_KEY);
+    });
+
+    it("⚠️ el kind encolado está en KINDS_DE_PUBLICIDAD: sale con «Publicidad: » en el asunto", async () => {
+      // Comercial + opt-out = Disp. DNPDP 4/2009, art. 2 (decisión del
+      // 2026-10-02). Corre para los tres topes (`describe.each(TOPES)`): el
+      // kind que se encola es el de cada uno.
+      usersStore["t1"] = { ...CHOCO_RECIEN };
+      await enqueueTrainerLimitMail(APP, "t1", AHORA);
+      expect(enqueueMock.mock.calls[0][1].kind).toBe(t.mailKind);
+      expect(KINDS_DE_PUBLICIDAD).toContain(enqueueMock.mock.calls[0][1].kind);
     });
 
     it("⚠️ el CTA va al Coach Hub web, no al App Link de la app", async () => {

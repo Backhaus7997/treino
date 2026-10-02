@@ -62,7 +62,8 @@ Lo que hoy promete la política de privacidad y no se cumple:
   ejercerlo, y **la transcripción** de los dos textos de arriba.
 - **Disposición DNPDP 4/2009, art. 2.** Si la comunicación **no fue requerida o
   consentida previamente**, advertir que es publicidad y poner «publicidad» en
-  el encabezado del correo. **No se implementa acá**: ver §9.
+  el encabezado del correo. **No se implementó en el PR original**: la decisión
+  del 2026-10-02 y su implementación están en §9.
 
 Fuentes: `argentina.gob.ar/normativa/nacional/norma-151221/texto` (Disp. 4/2009),
 `…/ley-25326-64790/texto`, `…/decreto-1558-2001-70368/texto`.
@@ -354,19 +355,38 @@ Página nueva `/[locale]/correos-promocionales/baja`, calcada de
 
 ## 9. Fuera de este cambio
 
-- **«publicidad» en el asunto (Disp. 4/2009, art. 2).** Aplica a comunicaciones
-  *no requeridas o consentidas previamente*. La política declara que el
-  consentimiento se presta al crear la cuenta (§5, §7.1), pero el envío es
-  opt-out. Si el art. 2 aplica es una consulta legal, junto con la siguiente.
-- **Base legal de §7.1.** Dice «consentimiento, art. 6(1)(a)» para lo comercial
-  y el código manda salvo oposición. O se cambia la base (interés legítimo con
-  oposición absoluta, que es lo que ya describe §7.3) o se pide consentimiento
-  explícito (y los mails se apagan para toda la base actual). Decisión de
-  negocio y legal, anotada en `athlete-prospect-mail.ts:77-83`. Este cambio
-  **no** la resuelve ni la empeora: los mails comerciales ya salen hoy, sin
-  ningún mecanismo de baja; con este cambio salen con uno. Si la respuesta
-  legal es que hace falta consentimiento previo, el freno es apagar los
-  productores, no este PR.
+- **Base legal de los correos comerciales y «publicidad» en el asunto (Disp.
+  4/2009, art. 2). DECIDIDO el 2026-10-02 por el titular.** Hasta acá era una
+  pregunta abierta: la política decía «consentimiento, art. 6(1)(a)» para lo
+  comercial (§7.1) y el código manda salvo oposición (opt-out). Se eligió la
+  **opción B**: la base es el **interés legítimo con oposición absoluta**, que
+  es lo que el producto ya hace (envío opt-out, link de baja en el pie de cada
+  uno, toggle en la app con la próxima versión de las tiendas) y lo que ya
+  describe §7.3. La opción A, pedir consentimiento explícito, apagaba los mails
+  para toda la base actual y no se tomó. No hace falta re-aceptación: las
+  cuentas actuales son de prueba. Consecuencias:
+  - Rige la Disp. DNPDP 4/2009, art. 2: «cuando se efectúen envíos de
+    comunicaciones de publicidad directa no requeridas o consentidas
+    previamente por el titular del dato personal, deberá advertirse en forma
+    destacada que se trata de una publicidad. En caso de realizarse dicha
+    comunicación a través de un correo electrónico deberá insertarse en su
+    encabezado el término único 'publicidad'.»
+  - Los **cinco** kinds puramente comerciales —los que se encolan con
+    `prefKey: "novedades_plan"`: `athlete-coverage-lost`, `free-limit-reached`,
+    `exercise-limit-reached`, `template-limit-reached` y
+    `student-limit-reached`— salen con **«Publicidad: » al frente del asunto**.
+    Es `KINDS_DE_PUBLICIDAD` en `functions/src/mail/types.ts`; `renderMail` lo
+    aplica en un único lugar, sólo al asunto (el cuerpo y el texto plano no
+    cambian).
+  - **Los dos mixtos quedan SIN prefijo, y es una consulta legal ABIERTA.**
+    `limit-reached` y `email-code-*` (con `bloqueComercial`) son avisos
+    operativos con un bloque de venta adentro: rotularlos «Publicidad: »
+    mentiría sobre el código de verificación y sobre el aviso de solo lectura.
+    Si el art. 2 alcanza al bloque comercial de un mail operativo, o alcanza el
+    pie de §6.2, lo dice el abogado; hasta entonces salen como estaban.
+  - El texto de la política cambia en otra rama (`docs/legal/`): §5, §7.1 y la
+    fila de oposición de §9. Ahí sí se puede nombrar el link del pie, y el
+    toggle recién cuando esté publicado en las tiendas.
 - **Texto legal.** Cuando el pie y el toggle estén vivos, §9 puede nombrar el
   link del pie. Antes no: prometería algo que todavía no existe.
 - **`List-Unsubscribe` / `List-Unsubscribe-Post` (RFC 8058).** El one-click de

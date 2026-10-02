@@ -37,6 +37,7 @@ import {
   ATHLETE_PROSPECT_PREF_KEY,
 } from "../subscriptions/athlete-prospect-mail";
 import { enqueueMail } from "../mail/enqueue-mail";
+import { KINDS_DE_PUBLICIDAD } from "../mail/types";
 import { renderMail, LANDING_URL } from "../mail/templates";
 import type { App } from "firebase-admin/app";
 import { readFileSync } from "fs";
@@ -138,6 +139,22 @@ describe("cuando sí manda", () => {
 
     expect(enqueueMock).toHaveBeenCalledTimes(1);
     expect(enqueueMock.mock.calls[0][1].prefKey).toBe(ATHLETE_PROSPECT_PREF_KEY);
+  });
+
+  it("⚠️ el kind encolado está en KINDS_DE_PUBLICIDAD: sale con «Publicidad: » en el asunto", async () => {
+    // Un mail con este `prefKey` es comercial y el envío es opt-out, así que
+    // rige la Disp. DNPDP 4/2009, art. 2 (decisión del 2026-10-02). Si el kind
+    // no entra en la lista, `renderMail` no le pone el término y la bandeja lo
+    // muestra sin la advertencia que la norma pide.
+    const plan = decideAthleteProspectMail(
+      SE_QUEDO_SIN_COBERTURA,
+      false,
+      "evento",
+      AHORA,
+    )!;
+    await enqueueAthleteProspectMail(APP, "a1", plan);
+
+    expect(KINDS_DE_PUBLICIDAD).toContain(enqueueMock.mock.calls[0][1].kind);
   });
 
   it("⚠️ el CTA va a la LANDING, no a la app", async () => {
