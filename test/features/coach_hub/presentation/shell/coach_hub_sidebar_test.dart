@@ -10,15 +10,21 @@ import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart'
 import 'package:treino/app/theme/tokens/components/coach_hub_sidebar_item_tokens.dart';
 import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/navigator_semantics_boundary.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 import 'package:treino/core/widgets/treino_logo.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 
 /// Monta el sidebar dentro de un `ShellRoute` real (necesita `GoRouterState`).
 /// Resuelve las prefs en el cuerpo del test y overridea
@@ -379,6 +385,82 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('page:/ajustes'), findsOneWidget);
+  });
+
+  // ── El plan del footer en una baja ──
+  //
+  // El servidor le respeta el tier pago a una baja HASTA `currentPeriodEnd` y
+  // después la baja a Free sin reescribir el doc (`effective-limit.ts`). El
+  // chip tiene que decir lo mismo que Facturación y la pricing page.
+  group('footer — plan dado de baja', () {
+    // 1/10/2026 12:00, LOCAL (`AppClock.freeze` lo exige). Los bordes van en
+    // UTC, y el más cercano (`vencida`, en UTC+14) queda 7 h antes del reloj:
+    // ningún timezone del runner los da vuelta.
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 1, 12)));
+    tearDown(AppClock.unfreeze);
+
+    final vencida = DateTime.utc(2026, 9, 30, 15);
+    final conDiasPagos = DateTime.utc(2026, 10, 15, 15);
+
+    /// Un PF en Plan 1 con el tope cacheado de Plan 1, que es lo que queda en
+    /// el doc después de una baja: el servidor no lo reescribe al vencer.
+    Override perfil({
+      SubscriptionStatus status = SubscriptionStatus.cancelled,
+      required DateTime fin,
+    }) =>
+        userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(
+            UserProfile(
+              uid: 'pf1',
+              email: 'sofia@treino.app',
+              displayName: 'Sofía Ramírez',
+              role: UserRole.trainer,
+              createdAt: DateTime(2025, 1, 1),
+              updatedAt: DateTime(2025, 1, 1),
+              subscription: TrainerSubscription(
+                tier: SubscriptionTier.plan1,
+                status: status,
+                weightLimit: SubscriptionTier.plan1.weightLimit,
+                currentPeriodEnd: fin,
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('baja vencida: el chip dice Plan Free', (tester) async {
+      await _pumpSidebar(tester, overrides: [perfil(fin: vencida)]);
+
+      // El nombre prueba que el perfil SE LEYÓ. Sin él este test pasaría
+      // igual: un perfil que no carga también cae a «Plan Free».
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('Plan Free'), findsOneWidget);
+      expect(find.text('Plan 1'), findsNothing);
+    });
+
+    // Control del de arriba: misma baja, mismo reloj, sólo cambia la fecha. Si
+    // el Free saliera de `cancelled` a secas y no del vencimiento, esto también
+    // diría Free.
+    testWidgets('baja con días pagos: el chip sigue en Plan 1', (tester) async {
+      await _pumpSidebar(tester, overrides: [perfil(fin: conDiasPagos)]);
+
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('Plan 1'), findsOneWidget);
+      expect(find.text('Plan Free'), findsNothing);
+    });
+
+    // Control del eje del estado: con el plan ACTIVO el servidor ni mira la
+    // fecha (`limiteDelStatus` devuelve el tope del tier). Por vencimiento sólo
+    // cae una baja.
+    testWidgets('plan activo con el período vencido: el chip sigue en Plan 1',
+        (tester) async {
+      await _pumpSidebar(
+        tester,
+        overrides: [perfil(status: SubscriptionStatus.active, fin: vencida)],
+      );
+
+      expect(find.text('Plan 1'), findsOneWidget);
+      expect(find.text('Plan Free'), findsNothing);
+    });
   });
 
   testWidgets('entrada del shell usa TreinoFadeSlideIn (REQ-SH-010)',
