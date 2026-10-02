@@ -470,7 +470,7 @@ function conTopeDeLaPruebaDiferida(
   if (topeMs === baseMs) return base;
 
   logger.info(
-    "mp/reconcile: el fin de periodo de una prueba diferida se acota a lo " +
+    "mp/reconcile: el fin de periodo de una prueba diferida se ajusta a lo " +
       "que el PF ya pago",
     {
       ...contexto,
@@ -1232,11 +1232,14 @@ export async function reconcileSubscription(
     diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
   };
   if (cobroAntesDeLaPrueba(pruebaDiferida)) {
-    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de un dia para
-    // el fin de lo que el PF tenia pago: MP ignoro o acorto la prueba, y el PF pago
-    // dos veces ese periodo. No cambia el estado (un plan que cobro se lee como
-    // cualquiera), pero es el aviso de que el supuesto central del diferimiento
-    // no se cumplio: hay que revisar ese pago y evaluar apagar el interruptor
+    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de
+    // `MARGEN_DEL_AVISO_DE_COBRO_DOBLE_MS` (dos dias) para el fin de lo que el PF
+    // tenia pago: MP ignoro o acorto la prueba, y el PF pago dos veces ese periodo.
+    // El margen es ancho a proposito: un cobro que cae el mismo dia que E, unas
+    // horas antes de su hora exacta, es lo esperado y no tiene que avisar. No
+    // cambia el estado (un plan que cobro se lee como cualquiera), pero es el
+    // aviso de que el supuesto central del diferimiento no se cumplio: hay que
+    // revisar ese pago y evaluar apagar el interruptor
     // (`DIFERIR_PRIMER_COBRO_ENABLED`, en `diferir-primer-cobro.ts`).
     logger.warn(
       "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el PF " +

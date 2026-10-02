@@ -70,8 +70,16 @@ export interface Plazo {
   diasTranscurridos: number | null;
 }
 
-/** Número de día (desde 1970-01-01) en hora de Argentina. */
-function numeroDeDia(ms: number): number {
+/**
+ * Número de día (desde 1970-01-01) en hora de Argentina.
+ *
+ * Es la definición de «día argentino» SIN `Intl` del repo: aritmética sobre un
+ * UTC-3 fijo, que no depende de los datos de zona horaria ni del locale del
+ * runtime. La usan este plazo y la cuenta de los días de prueba de un plan
+ * diferido (`diasDePrueba`, en `diferir-primer-cobro.ts`): las dos tienen que
+ * coincidir en qué día es, y con una sola función no pueden divergir.
+ */
+export function numeroDeDia(ms: number): number {
   return Math.floor((ms - ART_OFFSET_MS) / DIA_MS);
 }
 
