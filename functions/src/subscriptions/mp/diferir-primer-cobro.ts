@@ -20,14 +20,18 @@
  *
  * ── Lo que se ASUME de MP y NO esta medido ──
  *
- * Nadie probo este flujo contra la API real. Todo lo que sigue es un supuesto,
- * sacado de los tipos del SDK oficial y del sentido comun, y el codigo esta
+ * Cuando se escribio, nadie habia probado este flujo contra la API real. Lo que
+ * sigue salio de los tipos del SDK oficial y del sentido comun, y el codigo esta
  * escrito para no depender de que se cumpla al pie de la letra:
  *
  *   a. Que la API acepte `free_trial` en dias dentro del `auto_recurring` de un
  *      plan (los tipos del SDK lo declaran). Si lo rechazara, el checkout de un PF
  *      con dias pagos fallaria: para eso esta el interruptor
- *      [DIFERIR_PRIMER_COBRO_ENABLED].
+ *      [DIFERIR_PRIMER_COBRO_ENABLED]. MEDIDO en produccion entre el 2026-10-01 y
+ *      el 2026-10-02 (PRs #1290, #1291 y #1293): la API lo acepta, y el checkout
+ *      de MP lo muestra como «¡Tenés N días gratis!». Es el unico de los tres que
+ *      ya se midio: ese checkout se miro pero no se pago, asi que como reconcilia
+ *      una suscripcion en prueba y cuando cae el primer cobro siguen sin medir.
  *   b. Que la prueba corra desde que el pagador AUTORIZA y que sean N corridas
  *      de 24 h. Con N igual a los dias de calendario argentino que faltan
  *      ([diasDePrueba]), el primer cobro caeria el MISMO dia argentino en que vence
@@ -57,11 +61,14 @@
  * Tiene dos mitades que comparten constantes y vocabulario:
  *
  *   1. AL ABRIR EL CHECKOUT (`decidirDiferimiento`): si el PF califica, y hasta
- *      cuando tiene pago el periodo.
+ *      cuando tiene pago el periodo. El alumno tiene su propia entrada
+ *      (`decidirDiferimientoDeAlumno`), con la misma prueba y otra fuente de
+ *      elegibilidad: ver el encabezado de esa seccion.
  *   2. AL RECONCILIAR (`aplicarPruebaDiferidaAlEstado` y
  *      `aplicarPruebaDiferidaAlPeriodo`): como se lee despues un plan que nacio
- *      con prueba. Hace falta porque el link de un checkout no vence y MP no
- *      deja dar de baja un plan. Ver el encabezado de esa seccion.
+ *      con prueba, sea de PF o de alumno. Hace falta porque el link de un checkout
+ *      no vence y MP no deja dar de baja un plan. Ver el encabezado de esa
+ *      seccion.
  *
  * ── Por que el pago se comprueba CONTRA MP y no contra nuestra fecha ──
  *
@@ -87,7 +94,12 @@ import { SubscriptionStatus } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import { MpPreapproval } from "./client";
-import { MOTIVO_ABANDONO } from "./motivos-terminal";
+import { ATHLETE_STATUSES } from "./map-status";
+import {
+  MOTIVO_ABANDONO,
+  arrepentidoAtDe,
+  puedeSeguirCobrando,
+} from "./motivos-terminal";
 import { numeroDeDia } from "./plazo-arrepentimiento";
 
 /**
@@ -136,6 +148,9 @@ export const MIN_DIFERIMIENTO_MS = DIA_MS;
  * caso tiene que estar acotado. El tope se aplica DESPUES de descartar los planes
  * que no pueden ser evidencia (ver [planesARevisar]): cortar antes deja afuera
  * justo al que pago.
+ *
+ * El alumno tiene su propio tope ([MAX_PLANES_DEL_ALUMNO_A_REVISAR]), y no corta
+ * en silencio: con mas planes que eso, no difiere.
  */
 export const MAX_PLANES_A_REVISAR = 3;
 
@@ -560,7 +575,11 @@ export function diasDePrueba(diferidoHastaMs: number, nowMs: number): number {
   return numeroDeDia(diferidoHastaMs) - numeroDeDia(nowMs);
 }
 
-/** Por que NO se difiere. Va al log para poder explicar un cobro en el acto. */
+/**
+ * Por que NO se difiere. Va al log para poder explicar un cobro en el acto.
+ *
+ * Los tres ultimos son solo del alumno ([decidirDiferimientoDeAlumno]).
+ */
 export type MotivoSinDiferir =
   | "deshabilitado"
   | "sin-suscripcion"
@@ -570,7 +589,10 @@ export type MotivoSinDiferir =
   | "sin-fecha-de-fin"
   | "queda-menos-de-un-dia"
   | "sin-pago-comprobado"
-  | "pago-vence-pronto";
+  | "pago-vence-pronto"
+  | "sin-acceso-vigente"
+  | "demasiados-planes"
+  | "sin-respuesta-de-mp";
 
 export type Diferimiento =
   | { diferir: false; motivo: MotivoSinDiferir }
@@ -779,6 +801,332 @@ export async function decidirDiferimiento(
 }
 
 // ---------------------------------------------------------------------------
+// El alumno: la misma decision, con la elegibilidad leida de MP.
+// ---------------------------------------------------------------------------
+//
+// El alumno que se da de baja tambien conserva el acceso hasta el fin de lo que
+// pago (`athleteStatusDesde`, rama `cancelled`), y si vuelve a suscribirse antes
+// de esa fecha paga dos veces los mismos dias. Se cierra con la MISMA prueba
+// (`free_trial`) y, al reconciliar, con las MISMAS reglas de la otra mitad de este
+// archivo. Lo que no se puede copiar del PF es de donde sale la elegibilidad:
+//
+//   - `users/{uid}.athleteSubscription` es `{status}` y nada mas, a proposito (ver
+//     `escribirSuscripcionDeAlumno` en `reconcile.ts`), con tres valores: `active`,
+//     `grace` y `expired`. No existe `cancelled`: un alumno dado de baja con dias
+//     pagos se lee `active`, igual que uno que paga. Tampoco hay tier ni fecha. El
+//     documento sirve para descartar barato, pero no alcanza para decidir.
+//   - La fecha vive en cada plan: `mp_plans/{planId}.currentPeriodEnd`. Que un plan
+//     NO la tenga no prueba que nunca tuvo una suscripcion: el reconciliador no la
+//     escribe si MP no manda `next_payment_date` en una suscripcion viva, ni en un
+//     link diferido pagado tarde (la guarda de `pending` corta antes).
+//   - Un plan de alumno dado de baja NO es `terminal` mientras le queden dias (el
+//     barrido lo tiene que seguir mirando para apagarle el derecho al vencer). El
+//     filtro de evidencia del PF (`terminal === true`) dejaria afuera justo a ese.
+//
+// Por eso "esta dado de baja" se le pregunta a MP, plan por plan y en el mismo
+// pedido: se consultan los planes del alumno que todavia pueden cobrar, tengan o no
+// fecha ([planesDelAlumnoARevisar]), y se difiere solo si ninguno tiene una
+// suscripcion viva. Una viva es alguien que ya paga: diferirle un plan nuevo le
+// sumaria un segundo cobro en E. El PF tiene una red para eso, el alumno no: cuando
+// un plan nuevo confirma, `darDeBajaLosReemplazados` da de baja los viejos, pero
+// corre solo en la rama del PF del reconciliador. Por eso aca no hay atajo del doble
+// click (no le preguntaria nada a MP), y por eso la decision tambien levanta la
+// guarda del mismo ciclo en `create-athlete-preapproval.ts`.
+//
+// El limite que queda: un checkout abandonado (terminal por [MOTIVO_ABANDONO]) sin
+// fecha no se consulta. Cuando el barrido lo cerro no tenia ninguna suscripcion, y
+// si alguien lo pagara despues sin que el reconciliador lo viera, tampoco lo veria
+// el PF.
+
+/**
+ * Cuantos planes del ALUMNO se le consultan a MP, como maximo, para saber si alguno
+ * sigue vivo. Con mas, no se difiere (se cobra en el acto, como antes) y se avisa.
+ *
+ * Mas ancho que [MAX_PLANES_A_REVISAR] porque el alumno no puede filtrar antes por
+ * `terminal` como el PF: entran tambien sus checkouts sin pagar de los ultimos 30
+ * dias. Cada uno es una llamada en el camino del boton, en serie (en paralelo MP
+ * contesta 429), y solo la pagan los alumnos que hoy tienen acceso pago.
+ */
+export const MAX_PLANES_DEL_ALUMNO_A_REVISAR = 5;
+
+/** `unknown` → ms si tiene forma de Timestamp y da un numero finito, si no `null`. */
+function msDeTimestamp(v: unknown): number | null {
+  const t = v as { toMillis?: unknown } | null | undefined;
+  if (t == null || typeof t.toMillis !== "function") return null;
+  const ms = (t.toMillis as () => number)();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Un plan del alumno que puede tener una suscripcion viva, o probar un pago. */
+export interface PlanDelAlumnoARevisar {
+  id: string;
+  /**
+   * `currentPeriodEnd` del plan, en ms: hasta cuando le da acceso ese plan. `null`
+   * si no tiene: un checkout que nadie pago todavia, o uno cuya suscripcion el
+   * reconciliador vio sin fecha (ver el encabezado de esta seccion).
+   */
+  finMs: number | null;
+  /**
+   * Si el REGISTRO del plan le permite ser la evidencia de un pago (lo que diga
+   * MP se mira despues). Ver [planesDelAlumnoARevisar].
+   */
+  puedeSerEvidencia: boolean;
+}
+
+/**
+ * Los planes del alumno que hay que consultarle a MP, del mas nuevo al mas viejo.
+ *
+ * Son los de alumno (`producto === "athlete"`; un plan sin el campo es de PF, ver
+ * el default de `lookupPlan`) que todavia pueden cobrar (`puedeSeguirCobrando`),
+ * TENGAN O NO fecha: que no la tengan no prueba que no haya una suscripcion viva
+ * (ver el encabezado). La unica excepcion es el checkout abandonado sin fecha, que
+ * cuando se cerro no tenia ninguna.
+ *
+ * Entran los checkouts sin pagar de los ultimos 30 dias (despues los cierra el
+ * barrido): MP contesta que no tienen ninguna suscripcion, y eso ya es la
+ * respuesta. Se devuelven TODOS; el tope lo aplica [decidirDiferimientoDeAlumno],
+ * que con mas que eso no difiere: cortar en silencio podria dejar afuera justo a la
+ * suscripcion que todavia cobra.
+ *
+ * `puedeSerEvidencia` descarta lo que no puede probar un pago por mas que MP
+ * muestre un cobro:
+ *
+ *   - **Un plan sin fecha**: no hay contra que acotar lo que cubre ese cobro.
+ *   - **Un plan arrepentido** (`arrepentidoAtDe`): se devolvio todo lo pagado. El
+ *     reconciliador lo marca `terminal` apenas lo procesa, pero si esa corrida
+ *     fallo, el plan sigue aca con su fecha.
+ *   - **Un checkout abandonado que despues se pago** ([MOTIVO_ABANDONO]): mismo
+ *     criterio que el PF (ver [planesARevisar]).
+ *   - **Un plan con prueba que todavia no pudo cobrar**: el mismo filtro 3 del PF.
+ *
+ * Todos se siguen consultando para saber si estan vivos: lo que no prueba un pago
+ * igual puede estar cobrando.
+ */
+export function planesDelAlumnoARevisar(
+  planes: PlanDeLaCuenta[],
+  nowMs: number,
+): PlanDelAlumnoARevisar[] {
+  return planes
+    .filter(({ data }) => data.producto === "athlete" && puedeSeguirCobrando(data))
+    .map(({ id, data }) => {
+      const finMs = msDeTimestamp(data.currentPeriodEnd);
+      const abandonado = data.terminalReason === MOTIVO_ABANDONO;
+      // Cerrado sin ninguna suscripcion, y nadie le vio una despues.
+      if (abandonado && finMs === null) return null;
+
+      const e = data.diferidoHastaMs;
+      const pruebaSinCobrar =
+        typeof e === "number" &&
+        Number.isFinite(e) &&
+        e > nowMs + ADELANTO_MAXIMO_DEL_COBRO_MS;
+      const puedeSerEvidencia =
+        finMs !== null &&
+        arrepentidoAtDe(data) === null &&
+        !abandonado &&
+        !pruebaSinCobrar;
+
+      return { id, finMs, puedeSerEvidencia, creado: creadoEnMs(data.createdAt) };
+    })
+    .filter((p): p is PlanDelAlumnoARevisar & { creado: number } => p !== null)
+    .sort((a, b) => b.creado - a.creado)
+    .map(({ id, finMs, puedeSerEvidencia }) => ({ id, finMs, puedeSerEvidencia }));
+}
+
+export interface DecidirDiferimientoDeAlumnoInput {
+  uid: string;
+  /** `users/{uid}`, tal como salio de Firestore. Se lee `athleteSubscription`. */
+  userData: Record<string, unknown> | undefined;
+  nowMs: number;
+  /**
+   * TODOS los planes de MP de esta cuenta (`mp_plans where uid == uid`). Funcion y
+   * no arreglo por lo mismo que en el PF: solo se llama si el alumno tiene acceso
+   * pago hoy.
+   */
+  leerPlanes: () => Promise<PlanDeLaCuenta[]>;
+  /** Las suscripciones de MP detras de un plan (`searchPreapprovalsByPlan`). */
+  leerSuscripciones: (planId: string) => Promise<MpPreapproval[]>;
+  /** El interruptor [DIFERIR_PRIMER_COBRO_ENABLED]: es el mismo para los dos. */
+  habilitado?: boolean;
+}
+
+/**
+ * Decide si el checkout que el alumno esta por abrir tiene que diferir su primer
+ * cobro, y hasta cuando. Ver el encabezado de esta seccion.
+ *
+ * Se difiere SOLO si todo esto es cierto:
+ *
+ *   0. El interruptor [DIFERIR_PRIMER_COBRO_ENABLED] esta encendido.
+ *   1. `athleteSubscription.status` es `active`. `grace` es una suscripcion viva con
+ *      un cobro rebotado (MP reintenta); `expired`, que no le queda nada pago.
+ *   2. Algun plan suyo que pueda probar un pago le da todavia al menos
+ *      [MIN_DIFERIMIENTO_MS] de acceso.
+ *   3. En ESTE pedido, MP contesto por cada plan suyo que puede cobrar sin ninguna
+ *      suscripcion viva, y por cada plan con fecha con la suscripcion que tuvo. Un
+ *      plan con fecha que vuelve vacio no se da por dado de baja: la busqueda de MP
+ *      llega tarde a una suscripcion recien autorizada, y el cliente trata una
+ *      respuesta rara como vacia.
+ *   4. MP muestra un cobro real que lo respalda ([evidenciaDePago]).
+ *
+ * Vale para cualquier ciclo: el alumno tiene un solo plan, asi que pasar de
+ * mensual a anual paga dos veces los mismos dias igual que volver al mismo.
+ *
+ * El resultado es el MENOR entre el fin del plan que pago y lo que cubre el cobro
+ * de MP, como en el PF. De los planes que se revisan, el pago sale del primero (el
+ * mas nuevo) que pueda probarlo y muestre un cobro, y dentro de ese plan, del pago
+ * mas lejano.
+ *
+ * Sin atajo del doble click (ver el encabezado): un segundo toque vuelve a
+ * verificar contra MP y, si nada cambio, llega a la MISMA fecha, que es lo que
+ * `abrirCheckout` necesita para reusar el checkout abierto.
+ *
+ * Tira si no puede LEER los planes o las suscripciones: ver el encabezado del
+ * archivo. Quien llama lo traduce a un error que el alumno pueda reintentar.
+ */
+export async function decidirDiferimientoDeAlumno(
+  i: DecidirDiferimientoDeAlumnoInput,
+): Promise<Diferimiento> {
+  const { uid, nowMs } = i;
+
+  const sinDiferir = (
+    motivo: MotivoSinDiferir,
+    extra: Record<string, unknown> = {},
+  ): Diferimiento => {
+    logger.info("mp/diferir-primer-cobro: se cobra en el acto", {
+      uid,
+      producto: "athlete",
+      motivo,
+      ...extra,
+    });
+    return { diferir: false, motivo };
+  };
+
+  // El interruptor va primero y corta antes de leer NADA.
+  if (!(i.habilitado ?? DIFERIR_PRIMER_COBRO_ENABLED)) {
+    return sinDiferir("deshabilitado");
+  }
+
+  // ── Elegibilidad barata: solo el documento del usuario, ninguna lectura ──
+  //
+  // Casi todo checkout de alumno corta aca: el que nunca pago no tiene
+  // `athleteSubscription`, y no le cuesta ni una lectura de mas.
+  const sub = i.userData?.athleteSubscription;
+  if (sub == null) return sinDiferir("sin-suscripcion");
+  const status =
+    typeof sub === "object" ? (sub as { status?: unknown }).status : undefined;
+  if (
+    typeof status !== "string" ||
+    !(ATHLETE_STATUSES as readonly string[]).includes(status)
+  ) {
+    return sinDiferir("estado-degradado");
+  }
+  if (status === "expired") return sinDiferir("sin-acceso-vigente");
+  if (status !== "active") return sinDiferir("no-esta-cancelada", { status });
+
+  // Desde aca se lee, y un fallo TIRA (ver el encabezado del archivo).
+  const enLaCuenta = await i.leerPlanes();
+  const aConsultar = planesDelAlumnoARevisar(enLaCuenta, nowMs);
+  const conDias = aConsultar.filter(
+    (p) => p.finMs !== null && p.finMs - nowMs >= MIN_DIFERIMIENTO_MS,
+  );
+  const candidatos = conDias.filter((p) => p.puedeSerEvidencia);
+  // Cuantos planes quedan en cada etapa: es lo que permite explicar despues por
+  // que se cobro en el acto.
+  const alcance = {
+    planesEnLaCuenta: enLaCuenta.length,
+    planesQueCobran: aConsultar.length,
+    candidatos: candidatos.length,
+  };
+
+  // Las tres primeras no le preguntan nada a MP: sin un plan que pueda probar
+  // dias pagos, no hay nada que diferir, este quien este vivo.
+  if (aConsultar.every((p) => p.finMs === null)) {
+    return sinDiferir("sin-fecha-de-fin", alcance);
+  }
+  if (conDias.length === 0) return sinDiferir("queda-menos-de-un-dia", alcance);
+  if (candidatos.length === 0) return sinDiferir("sin-pago-comprobado", alcance);
+
+  // Hay que mirarlos a TODOS (ver [planesDelAlumnoARevisar]): con mas que el tope
+  // no se puede saber si alguno sigue vivo sin pasarse de llamadas, y se cobra en
+  // el acto, como antes. Es raro, y por eso ademas de explicarse, avisa.
+  if (aConsultar.length > MAX_PLANES_DEL_ALUMNO_A_REVISAR) {
+    logger.warn(
+      "mp/diferir-primer-cobro: el alumno tiene mas planes que pueden cobrar " +
+        "que los que se revisan, no se difiere",
+      { uid, ...alcance, tope: MAX_PLANES_DEL_ALUMNO_A_REVISAR },
+    );
+    return sinDiferir("demasiados-planes", alcance);
+  }
+
+  const esCandidato = new Set(candidatos.map((p) => p.id));
+  let pago: EvidenciaDePago | null = null;
+  let conPago: PlanDelAlumnoARevisar | null = null;
+  for (const plan of aConsultar) {
+    const subs = await i.leerSuscripciones(plan.id);
+
+    // Viva es todo lo que no sea `cancelled`, incluido un estado que no
+    // conocemos: es el criterio de `sigueViva` (`reconcile.ts`). Ante la duda de
+    // si el alumno ya paga, se cobra en el acto como antes, nunca se le suma un
+    // segundo cobro en E.
+    if (subs.some((s) => s.status !== "cancelled")) {
+      return sinDiferir("no-esta-cancelada", { ...alcance, planVivo: plan.id });
+    }
+
+    // Un plan con fecha tuvo una suscripcion: si MP no devuelve ninguna, no
+    // contesto por la que sabemos que existe. Puede ser la demora de su busqueda
+    // con una recien autorizada, o una respuesta rara que el cliente convierte en
+    // `[]` ("no hay nada"). Para el PF eso es "sin evidencia" y cobra en el acto;
+    // aca seria dar por dada de baja a una que quiza cobra.
+    if (plan.finMs !== null && subs.length === 0) {
+      return sinDiferir("sin-respuesta-de-mp", { ...alcance, planSinRespuesta: plan.id });
+    }
+
+    if (conPago === null && esCandidato.has(plan.id)) {
+      const evidencias = subs
+        .map(evidenciaDePago)
+        .filter((e): e is EvidenciaDePago => e !== null);
+      if (evidencias.length > 0) {
+        // El pago mas lejano de ese plan.
+        pago = evidencias.reduce((mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor));
+        conPago = plan;
+      }
+    }
+  }
+  if (pago === null || conPago === null || conPago.finMs === null) {
+    return sinDiferir("sin-pago-comprobado", alcance);
+  }
+
+  if (pago.fuente === "alta") {
+    // El mismo parche que en el PF, y grita por lo mismo.
+    logger.warn(
+      "mp/diferir-primer-cobro: MP no mando last_charged_date, el pago se " +
+        "reconstruye desde el alta",
+      { uid, producto: "athlete", planConPago: conPago.id },
+    );
+  }
+
+  const diferidoHastaMs = Math.min(conPago.finMs, pago.hastaMs);
+  if (diferidoHastaMs - nowMs < MIN_DIFERIMIENTO_MS) {
+    return sinDiferir("pago-vence-pronto", {
+      ...alcance,
+      finDePeriodoIso: new Date(conPago.finMs).toISOString(),
+      pagadoHastaIso: new Date(pago.hastaMs).toISOString(),
+      fuenteDelPago: pago.fuente,
+    });
+  }
+
+  logger.info("mp/diferir-primer-cobro: se difiere el primer cobro", {
+    uid,
+    producto: "athlete",
+    ...alcance,
+    planConPago: conPago.id,
+    fuenteDelPago: pago.fuente,
+    diferidoHastaIso: new Date(diferidoHastaMs).toISOString(),
+    diasDePrueba: diasDePrueba(diferidoHastaMs, nowMs),
+  });
+  return { diferir: true, diferidoHastaMs };
+}
+
+// ---------------------------------------------------------------------------
 // La otra mitad: como se LEE, al reconciliar, un plan que nacio con prueba.
 // ---------------------------------------------------------------------------
 //
@@ -818,7 +1166,10 @@ export async function decidirDiferimiento(
 //
 // Lo que NO hacen: no dan de baja nada en MP. El pagador autorizo de buena fe, la
 // baja es terminal, y una decision nuestra equivocada no se puede deshacer. Se
-// limitan a decidir que escribimos en `subscription`.
+// limitan a decidir que escribimos: `subscription` para el PF, y para el alumno
+// su `athleteSubscription` (que sale del estado y la fecha, `athleteStatusDesde`)
+// y el `currentPeriodEnd` del plan. Las reglas son las mismas para los dos: lo que
+// las motiva es como MP cobra una prueba, no quien la paga.
 
 /**
  * Cuanto despues de abrir el checkout puede autorizar el pagador para que la

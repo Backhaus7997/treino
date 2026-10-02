@@ -269,6 +269,10 @@
  * sin cobro (podria estar dando acceso gratis) y el plan con prueba que ya cobro
  * antes de tiempo (MP ignoro o acorto la prueba: el PF pago dos veces). Las
  * reglas, los supuestos y el por que de cada una estan en ese archivo.
+ *
+ * Valen igual para el alumno: su checkout tambien difiere el primer cobro cuando
+ * vuelve con dias pagos, y su escritor pasa por la misma lectura
+ * (`leerPruebaDiferida`) con su propia guarda de `pending`.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -308,7 +312,13 @@ import {
   hayCobroPendiente,
   mapMpStatus,
 } from "./map-status";
-import { MOTIVO_ABANDONO, MOTIVO_REEMPLAZO } from "./motivos-terminal";
+import {
+  CAMPO_ARREPENTIDO,
+  MOTIVO_ABANDONO,
+  MOTIVO_REEMPLAZO,
+  arrepentidoAtDe,
+  puedeSeguirCobrando,
+} from "./motivos-terminal";
 import {
   MP_PLANS_COLLECTION,
   ProductoMp,
@@ -565,7 +575,8 @@ export function resolverFinDePeriodo(
 function conTopeDeLaPruebaDiferida(
   base: Timestamp | null,
   prueba: PruebaDiferidaInput,
-  contexto: { planId: string; uid: string },
+  // `producto` solo lo pasa el alumno: ver `LecturaDeLaPruebaDiferida.producto`.
+  contexto: { planId: string; uid: string; producto?: "athlete" },
 ): Timestamp | null {
   const baseMs = base === null ? null : base.toMillis();
   const topeMs = aplicarPruebaDiferidaAlPeriodo({
@@ -576,7 +587,7 @@ function conTopeDeLaPruebaDiferida(
 
   logger.info(
     "mp/reconcile: el fin de periodo de una prueba diferida se ajusta a lo " +
-      "que el PF ya pago",
+      `que ${quienPagoLaPrueba(contexto.producto)} ya pago`,
     {
       ...contexto,
       desdeIso: baseMs === null ? null : new Date(baseMs).toISOString(),
@@ -584,6 +595,149 @@ function conTopeDeLaPruebaDiferida(
     },
   );
   return topeMs === null ? null : Timestamp.fromMillis(topeMs);
+}
+
+/**
+ * A quien nombran los logs de la prueba diferida. El del PF es el texto de
+ * siempre, y hay tests que fijan sus mensajes enteros.
+ */
+function quienPagoLaPrueba(producto: "athlete" | undefined): string {
+  return producto === "athlete" ? "el alumno" : "el PF";
+}
+
+/**
+ * La entrada de las reglas de la prueba diferida para un plan y su suscripcion.
+ * Pura: la usan [leerPruebaDiferida], que ademas avisa, y [derechoVivoDelHermano],
+ * que lee a un hermano y no tiene que logear cosas de un plan que no esta
+ * reconciliando.
+ */
+function pruebaDiferidaDe(
+  planDoc: Record<string, unknown> | undefined,
+  mp: MpPreapproval,
+  statusDeMp: SubscriptionStatus,
+  nowMs: number,
+): PruebaDiferidaInput {
+  return {
+    diferidoHastaMs: planDoc?.diferidoHastaMs,
+    planCreadoMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
+    mpStatus: mp.status,
+    statusHoy: statusDeMp,
+    summarized: mp.summarized,
+    mpDateCreated: mp.date_created,
+    nowMs,
+  };
+}
+
+/** Lo que [leerPruebaDiferida] necesita de un plan y de su suscripcion. */
+interface LecturaDeLaPruebaDiferida {
+  planId: string;
+  uid: string;
+  planDoc: Record<string, unknown> | undefined;
+  mp: MpPreapproval;
+  /** El estado al que llego el mapeo de siempre (`mapMpStatus`). */
+  statusDeMp: SubscriptionStatus;
+  nowMs: number;
+  /**
+   * Solo lo pasa el alumno, y solo cambia los LOGS: el sujeto de los mensajes
+   * que nombran a quien pago y un `producto` en cada payload. Sin el, los logs del
+   * PF salen exactamente como antes de que el alumno usara esta funcion.
+   */
+  producto?: "athlete";
+}
+
+/**
+ * La prueba diferida de un plan, leida para el reconciliador: el estado ajustado
+ * por sus reglas, y los avisos de los tres casos que piden que alguien mire.
+ *
+ * La usan los DOS escritores, el del PF y el del alumno: las reglas no dependen de
+ * quien paga sino de como MP cobra una prueba (ver `diferir-primer-cobro.ts`), y
+ * dos copias de estos avisos serian dos cosas que hay que acordarse de mover
+ * juntas.
+ *
+ * Para un plan normal (sin `diferidoHastaMs`) o que ya cobro, el estado es
+ * [LecturaDeLaPruebaDiferida.statusDeMp] tal cual y no se loguea nada.
+ */
+function leerPruebaDiferida(i: LecturaDeLaPruebaDiferida): {
+  pruebaDiferida: PruebaDiferidaInput;
+  status: SubscriptionStatus;
+} {
+  const { planId, uid, planDoc, mp, statusDeMp } = i;
+  const quien = quienPagoLaPrueba(i.producto);
+  // Solo para el alumno: los payloads del PF no cambian.
+  const delProducto = i.producto === undefined ? {} : { producto: i.producto };
+
+  const pruebaDiferida = pruebaDiferidaDe(planDoc, mp, statusDeMp, i.nowMs);
+  const situacion = situacionDeLaPrueba(pruebaDiferida);
+  const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
+  const contextoDeLaPrueba = {
+    planId,
+    uid,
+    mpStatus: mp.status,
+    desde: statusDeMp,
+    hacia: status,
+    diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+    ...delProducto,
+  };
+  if (cobroAntesDeLaPrueba(pruebaDiferida)) {
+    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de
+    // `MARGEN_DEL_AVISO_DE_COBRO_DOBLE_MS` (dos dias) para el fin de lo que el
+    // usuario tenia pago: MP ignoro o acorto la prueba, y pago dos veces ese periodo.
+    // El margen es ancho a proposito: un cobro que cae el mismo dia que E, unas
+    // horas antes de su hora exacta, es lo esperado y no tiene que avisar. No
+    // cambia el estado (un plan que cobro se lee como cualquiera), pero es el
+    // aviso de que el supuesto central del diferimiento no se cumplio: hay que
+    // revisar ese pago y evaluar apagar el interruptor
+    // (`DIFERIR_PRIMER_COBRO_ENABLED`, en `diferir-primer-cobro.ts`).
+    logger.warn(
+      `mp/reconcile: un plan con prueba YA cobro antes de que venza lo que ${quien} ` +
+        `tenia pago, MP ignoro o acorto la prueba y ${quien} pago dos veces`,
+      {
+        planId,
+        uid,
+        mpStatus: mp.status,
+        diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
+        cobros: cobrosExitosos(mp.summarized),
+        nowIso: isoDeMs(i.nowMs),
+        ...delProducto,
+      },
+    );
+  }
+  if (situacion === "fuera-de-ventana") {
+    // WARN y no info. Esto deja SIN el plan a alguien que autorizo un pago (hasta
+    // el primer cobro real de MP) y que probablemente crea que ya lo tiene: tiene
+    // que poder verse en el log para atender el reclamo.
+    logger.warn(
+      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
+        "como pending",
+      {
+        ...contextoDeLaPrueba,
+        autorizadaEn: typeof mp.date_created === "string"
+          ? mp.date_created.slice(0, 40)
+          : null,
+        planCreadoIso: isoDeMs(pruebaDiferida.planCreadoMs),
+      },
+    );
+  } else if (situacion === "vencida" && statusDeMp === "active") {
+    // WARN y no info. Pasado el horizonte, sin ningun cobro exitoso y sin un cobro
+    // pendiente, el mapeo de siempre deja `active`: acceso pago sin que MP haya
+    // cobrado ni intentado cobrar nada. No se corrige aca (no hay evidencia de que
+    // sea un error, y bajarlo seria revocar), pero es acceso gratis posible.
+    logger.warn(
+      "mp/reconcile: prueba diferida vencida sin ningun cobro exitoso ni cobro " +
+        "pendiente, posible acceso gratis",
+      {
+        ...contextoDeLaPrueba,
+        // En `vencida`, E es siempre un numero (si no, la situacion seria `no-aplica`).
+        horizonteIso: typeof pruebaDiferida.diferidoHastaMs === "number"
+          ? isoDeMs(pruebaDiferida.diferidoHastaMs + HOLGURA_PRUEBA_MS)
+          : null,
+      },
+    );
+  } else if (status !== statusDeMp) {
+    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", contextoDeLaPrueba);
+  }
+
+  return { pruebaDiferida, status };
 }
 
 /**
@@ -640,63 +794,12 @@ export const CAMPO_CUENTA_ELIMINADA = "cuentaEliminadaAtMs";
 // es el de `status === cancelled`, y que la baja del PF sea la unica SIN motivo es
 // deliberado (ver `puedeSeguirCobrando`).
 
-/**
- * Este plan todavia PUEDE estar cobrandole al PF, asi que hay que mirarlo.
- *
- * `terminal` NO significa "muerto", y confundir las dos cosas fue un bug real de
- * la primera version de la baja: filtraba con `terminal === true` pelado y
- * dejaba afuera al checkout ABANDONADO que despues se pago.
- *
- * Esa poblacion existe y el repo la construyo a proposito. `esAbandonado` marca
- * terminal a los 30 dias, pero el `init_point` de un plan NO VENCE: el PF puede
- * encontrar la pestaña vieja al dia 35 y pagarla. `reconcile-my-checkout.ts` lo
- * documenta y lo rescata justamente por eso — su `planesDelPf` sigue
- * consultando los terminal CON motivo porque «un terminal con motivo es una
- * apuesta sobre el futuro, no un hecho».
- *
- * Con el filtro pelado, ese PF hacia upgrade y su plan viejo —vivo y
- * cobrando— quedaba fuera de la baja PARA SIEMPRE: el barrido tampoco lo
- * reconcilia, asi que ninguna corrida futura lo reintentaba. Cobro doble
- * permanente, justo en el caso que este archivo existe para cerrar.
- *
- * Los otros dos terminal si son hechos y se saltean: una baja del PF (que MP ya
- * confirmo con `cancelled`) y una baja NUESTRA que MP acepto.
- */
-export function puedeSeguirCobrando(datos: Record<string, unknown> | undefined): boolean {
-  if (datos?.terminal !== true) return true;
-  return datos?.terminalReason === MOTIVO_ABANDONO;
-}
-
-/**
- * Campo de `mp_plans/{planId}` con el momento (ms) en que la persona ejerció el
- * ARREPENTIMIENTO. Lo escribe `arrepentimiento-por-mail.ts`, y sólo después de
- * haber cortado la suscripción en Mercado Pago.
- */
-export const CAMPO_ARREPENTIDO = "arrepentidoAtMs";
-
-/**
- * Cuándo se arrepintió, o `null` si este plan no pasó por ahí.
- *
- * ── Por qué el reconciliador tiene que saberlo ──
- *
- * Una baja común conserva el acceso hasta el fin del período pagado: es la
- * rama `cancelled` de `effectiveWeightLimit` / `athleteStatusDesde`, y es lo que
- * prometen los términos §7. El arrepentimiento es lo contrario: se devuelve TODO
- * lo pagado, así que los beneficios terminan en el acto.
- *
- * Cortar el acceso una vez no alcanza. Este reconciliador corre de nuevo con
- * cada evento de Mercado Pago y con el barrido de las 03:00, y cada vez volvería
- * a calcular «cancelado, con período hasta el día X» y a devolverle el acceso.
- * Por eso el corte es un dato del plan y no una escritura suelta.
- *
- * Sólo cuenta con `status === "cancelled"`: si MP dijera otra cosa la
- * suscripción sigue viva y cobrando, y ese caso es una cancelación que falló,
- * no un arrepentimiento.
- */
-export function arrepentidoAtDe(datos: Record<string, unknown> | undefined): number | null {
-  const v = datos?.[CAMPO_ARREPENTIDO];
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
+// `puedeSeguirCobrando` (este plan todavia PUEDE estar cobrando, asi que hay que
+// mirarlo) y el campo del arrepentimiento (`CAMPO_ARREPENTIDO`, `arrepentidoAtDe`)
+// viven en `motivos-terminal.ts`: los lee tambien `diferir-primer-cobro.ts`, y un
+// import hacia este archivo seria circular. Se re-exportan para quienes ya los
+// importaban de aca.
+export { CAMPO_ARREPENTIDO, arrepentidoAtDe, puedeSeguirCobrando };
 
 /**
  * La clave de `users/{uid}.subscription` que dice QUE plan escribio ese estado.
@@ -1143,8 +1246,10 @@ const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
  * vivo. Solo para el hermano que no tiene [CAMPO_ULTIMO_STATUS] (ver
  * [otroPlanQueOtorga]). **Tira** si no puede decidirlo.
  *
- * Aplica las MISMAS reglas que el escritor: `mapMpStatus`, la cascada de
- * `resolverFinDePeriodo` y [derechoDelPlan]. En particular, MP omite
+ * Aplica las MISMAS reglas que el escritor: `mapMpStatus`, la prueba diferida
+ * (`aplicarPruebaDiferidaAlEstado` y `aplicarPruebaDiferidaAlPeriodo`, ver
+ * [pruebaDiferidaDe]), la cascada de `resolverFinDePeriodo` y [derechoDelPlan]. En
+ * particular, MP omite
  * `next_payment_date` en una baja que cobro, asi que un hermano `cancelled` con
  * dias pagos sale de la fecha que dejo guardada en su plan o, sin ella, de
  * `start_date + frequency`. **Si ninguna fecha se puede establecer, NO otorga**:
@@ -1221,7 +1326,7 @@ async function derechoVivoDelHermano(
       continue;
     }
 
-    const { status, degraded } = mapMpStatus({
+    const { status: statusDeMp, degraded } = mapMpStatus({
       raw: mp.status,
       cobroPendiente: hayCobroPendiente(mp.summarized),
       trainerId: uid,
@@ -1231,13 +1336,35 @@ async function derechoVivoDelHermano(
       continue;
     }
 
-    const periodEnd = resolverFinDePeriodo({
+    // La prueba diferida del hermano, con las mismas reglas del escritor (ver el
+    // orden en el encabezado de [escribirSuscripcionDeAlumno]): un hermano que
+    // nacio con prueba otorga por lo que le da HOY al alumno y no por el estado
+    // crudo de MP. Sin esto, una prueba autorizada fuera de ventana (que el
+    // escritor lee `pending` y no otorga) contaria aca como derecho, y le
+    // sostendria al alumno un acceso que ese plan no da. No logea: el que se
+    // reconcilia es otro plan, y sus avisos los da cuando le toque a el.
+    const pruebaDiferida = pruebaDiferidaDe(datos, mp, statusDeMp, deps.nowMs);
+    const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
+
+    const finDeMp = resolverFinDePeriodo({
       deMp: parsePeriodEnd(mp.next_payment_date, hermanoId),
       yaGuardada: datos.currentPeriodEnd,
       autoRecurring: mp.auto_recurring,
       status,
       planId: hermanoId,
     });
+    // El tope de la prueba (sin arrepentimiento, igual que el escritor; el corte
+    // lo aplica [derechoDelPlan]): una prueba cancelada antes de su primer cobro
+    // conserva el acceso hasta E y no hasta un mes que nunca se cobro.
+    const finDeMpMs = finDeMp === null ? null : finDeMp.toMillis();
+    const topeMs =
+      status === "cancelled" && arrepentidoAtDe(datos) !== null
+        ? finDeMpMs
+        : aplicarPruebaDiferidaAlPeriodo({
+          ...pruebaDiferida,
+          periodEndMs: finDeMpMs,
+        });
+    const periodEnd = topeMs === null ? null : Timestamp.fromMillis(topeMs);
     const { derecho } = derechoDelPlan({
       status,
       periodEndMs: periodEnd === null ? null : periodEnd.toMillis(),
@@ -1414,17 +1541,57 @@ async function otroPlanQueOtorga(
  * acceso la noche que vencia el mensual, con el anual cobrando. Ver la guarda de
  * los dos planes, y [otroPlanQueOtorga] para cuando lee lo guardado y cuando le
  * pregunta a MP.
+ *
+ * ── Lo que SI es igual al PF: la prueba diferida ──
+ *
+ * Pasa por la misma lectura que el PF (`leerPruebaDiferida`), y por eso un plan
+ * que nacio con prueba no le da `grace` al alumno durante la prueba ni le estira
+ * el acceso mas alla de lo que pago.
+ *
+ * ── El orden de las dos cosas, y por que importa ──
+ *
+ * Primero la prueba diferida, despues la guarda de los dos planes. El `status`
+ * con el que decide TODO lo demas (el derecho, la fecha, lo que se guarda en
+ * `ultimoStatus` y lo que lee [otroPlanQueOtorga]) es el ya ajustado por la
+ * prueba, no el crudo de MP. Asi un plan en prueba cuenta para sus hermanos
+ * exactamente por lo que le da al alumno HOY: una prueba autorizada a tiempo es
+ * `active` y otorga —el alumno tiene acceso durante la prueba, que es lo que
+ * pago con el plan anterior—; una autorizada fuera de ventana es `pending` y no
+ * otorga; una cancelada antes de su primer cobro conserva el acceso hasta E y no
+ * hasta un mes que nunca se cobro. Si el hermano se leyera con el estado crudo,
+ * el plan de un alumno que vuelve con dias pagos (el caso para el que existe el
+ * diferimiento) podria contar como derecho una autorizacion que el reconciliador
+ * ya trata como `pending`.
  */
 async function escribirSuscripcionDeAlumno(i: {
   app: App;
   planId: string;
   uid: string;
   mp: MpPreapproval;
-  status: SubscriptionStatus;
+  /** El estado al que llego el mapeo de siempre, ANTES de la prueba diferida. */
+  statusDeMp: SubscriptionStatus;
   planDoc: Record<string, unknown> | undefined;
   deps: ReconcileDeps;
 }): Promise<ReconcileResult> {
-  const { app, planId, uid, mp, status, planDoc, deps } = i;
+  const { app, planId, uid, mp, planDoc, deps } = i;
+
+  // ── LA PRUEBA DIFERIDA, con las mismas reglas que el PF ──
+  //
+  // Un plan que nacio con dias de prueba (el alumno volvio a suscribirse con dias
+  // pagos, ver `decidirDiferimientoDeAlumno`) se lee con las reglas de
+  // `diferir-primer-cobro.ts`. Desde aca `status` es el ajustado: una autorizacion
+  // fuera de ventana sale `pending`, y la guarda de no-regresion de abajo le
+  // conserva al alumno lo que ya tenia pago; una prueba a tiempo no pasa a `grace`
+  // por un cobro que todavia no corresponde. Para un plan normal es `statusDeMp`.
+  const { pruebaDiferida, status } = leerPruebaDiferida({
+    planId,
+    uid,
+    planDoc,
+    mp,
+    statusDeMp: i.statusDeMp,
+    nowMs: deps.nowMs,
+    producto: "athlete",
+  });
 
   const db = getFirestore(app);
   const userRef = db.collection("users").doc(uid);
@@ -1439,7 +1606,7 @@ async function escribirSuscripcionDeAlumno(i: {
 
   // La fecha sale de la MISMA cascada que la del PF, cambiando de donde se lee
   // la anterior: del plan y no del usuario.
-  const periodEnd = resolverFinDePeriodo({
+  const finDePeriodo = resolverFinDePeriodo({
     deMp: parsePeriodEnd(mp.next_payment_date, planId),
     yaGuardada: planDoc?.currentPeriodEnd,
     autoRecurring: mp.auto_recurring,
@@ -1447,8 +1614,29 @@ async function escribirSuscripcionDeAlumno(i: {
     planId,
   });
 
-  // Con el corte del arrepentimiento adentro: ver [derechoDelPlan].
-  const { derecho: athleteStatus, arrepentidoAt } = derechoDelPlan({
+  // El corte del arrepentimiento: el instante gana sobre cualquier fin de periodo.
+  // Solo con `cancelled`, como en [derechoDelPlan], que lo vuelve a leer con la
+  // misma regla para el derecho.
+  const arrepentidoAt = status === "cancelled" ? arrepentidoAtDe(planDoc) : null;
+
+  // La fecha de fin de periodo ya esta calculada con el `status` ajustado por la
+  // prueba. El tope de la prueba diferida va aparte, y como en el PF solo sin
+  // arrepentimiento: el instante del arrepentimiento gana sobre cualquier fin de
+  // periodo. Una prueba cancelada conserva el acceso hasta E, que es lo que el
+  // alumno pago con el plan anterior, y no hasta un mes que nunca se cobro. Para
+  // un plan normal no cambia nada.
+  const periodEnd =
+    arrepentidoAt !== null
+      ? finDePeriodo
+      : conTopeDeLaPruebaDiferida(finDePeriodo, pruebaDiferida, {
+        planId,
+        uid,
+        producto: "athlete",
+      });
+
+  // Con el corte del arrepentimiento adentro: ver [derechoDelPlan]. Es la misma
+  // regla que dio `arrepentidoAt` arriba; aca interesa el derecho resultante.
+  const { derecho: athleteStatus } = derechoDelPlan({
     status,
     periodEndMs: periodEnd === null ? null : periodEnd.toMillis(),
     planDoc,
@@ -1463,6 +1651,10 @@ async function escribirSuscripcionDeAlumno(i: {
   // teniendo un estado. Lo que sale de `reconcileSubscription` antes de llegar
   // aca no lo toca (ver [CAMPO_ULTIMO_STATUS]). Sin cambios no escribe: casi
   // todas las noches es el mismo.
+  //
+  // Se guarda el `status` AJUSTADO por la prueba diferida, no el de MP crudo: el
+  // hermano proyecta el derecho desde lo guardado ([derechoGuardado]), y tiene
+  // que ver lo mismo que este escritor dejaria. Ver el orden en el encabezado.
   if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status) {
     await planRef.set({ [CAMPO_ULTIMO_STATUS]: status }, { merge: true });
   }
@@ -1796,8 +1988,8 @@ export async function reconcileSubscription(
     return { planId, outcome: "skipped-uid-no-coincide" };
   }
 
-  // `statusDeMp` y no `status`: el del PF puede ajustarse mas abajo por la prueba
-  // diferida, y el del alumno se queda con el que dijo el mapeo.
+  // `statusDeMp` y no `status`: los dos escritores lo ajustan despues por la
+  // prueba diferida, cada uno en su rama (`leerPruebaDiferida`).
   const { status: statusDeMp, degraded } = mapMpStatus({
     raw: mp.status,
     cobroPendiente: hayCobroPendiente(mp.summarized),
@@ -1842,7 +2034,7 @@ export async function reconcileSubscription(
       planId,
       uid,
       mp,
-      status: statusDeMp,
+      statusDeMp,
       planDoc,
       deps,
     });
@@ -1850,89 +2042,21 @@ export async function reconcileSubscription(
 
   // ── LA PRUEBA DIFERIDA: un plan que nacio con dias de prueba se lee distinto ──
   //
-  // Solo para el PF, y por eso va despues del corte: el checkout del alumno
-  // nunca escribe `diferidoHastaMs`. Va ANTES de la guarda de no-regresion de
-  // abajo porque una suscripcion autorizada fuera de ventana sale de acá como
-  // `pending`, y es esa guarda la que le conserva al PF lo que ya tenia pago.
+  // Va ANTES de la guarda de no-regresion de abajo porque una suscripcion
+  // autorizada fuera de ventana sale de acá como `pending`, y es esa guarda la
+  // que le conserva al PF lo que ya tenia pago.
   //
   // Para un plan normal (sin `diferidoHastaMs`) o que ya cobro, esto devuelve el
-  // mismo `statusDeMp`. Las reglas y su por que: `diferir-primer-cobro.ts`.
-  const pruebaDiferida: PruebaDiferidaInput = {
-    diferidoHastaMs: planDoc?.diferidoHastaMs,
-    planCreadoMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
-    mpStatus: mp.status,
-    statusHoy: statusDeMp,
-    summarized: mp.summarized,
-    mpDateCreated: mp.date_created,
-    nowMs: deps.nowMs,
-  };
-  const situacion = situacionDeLaPrueba(pruebaDiferida);
-  const status = aplicarPruebaDiferidaAlEstado(pruebaDiferida);
-  const contextoDeLaPrueba = {
+  // mismo `statusDeMp`. Las reglas y su por que: `diferir-primer-cobro.ts`. El
+  // alumno pasa por la misma funcion, adentro de `escribirSuscripcionDeAlumno`.
+  const { pruebaDiferida, status } = leerPruebaDiferida({
     planId,
     uid,
-    mpStatus: mp.status,
-    desde: statusDeMp,
-    hacia: status,
-    diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
-  };
-  if (cobroAntesDeLaPrueba(pruebaDiferida)) {
-    // WARN. Un plan con prueba ya cobro cuando todavia faltaba mas de
-    // `MARGEN_DEL_AVISO_DE_COBRO_DOBLE_MS` (dos dias) para el fin de lo que el PF
-    // tenia pago: MP ignoro o acorto la prueba, y el PF pago dos veces ese periodo.
-    // El margen es ancho a proposito: un cobro que cae el mismo dia que E, unas
-    // horas antes de su hora exacta, es lo esperado y no tiene que avisar. No
-    // cambia el estado (un plan que cobro se lee como cualquiera), pero es el
-    // aviso de que el supuesto central del diferimiento no se cumplio: hay que
-    // revisar ese pago y evaluar apagar el interruptor
-    // (`DIFERIR_PRIMER_COBRO_ENABLED`, en `diferir-primer-cobro.ts`).
-    logger.warn(
-      "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el PF " +
-        "tenia pago, MP ignoro o acorto la prueba y el PF pago dos veces",
-      {
-        planId,
-        uid,
-        mpStatus: mp.status,
-        diferidoHastaIso: isoDeMs(planDoc?.diferidoHastaMs),
-        cobros: cobrosExitosos(mp.summarized),
-        nowIso: isoDeMs(deps.nowMs),
-      },
-    );
-  }
-  if (situacion === "fuera-de-ventana") {
-    // WARN y no info. Esto deja SIN el plan a alguien que autorizo un pago (hasta
-    // el primer cobro real de MP) y que probablemente crea que ya lo tiene: tiene
-    // que poder verse en el log para atender el reclamo.
-    logger.warn(
-      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
-        "como pending",
-      {
-        ...contextoDeLaPrueba,
-        autorizadaEn: typeof mp.date_created === "string"
-          ? mp.date_created.slice(0, 40)
-          : null,
-        planCreadoIso: isoDeMs(pruebaDiferida.planCreadoMs),
-      },
-    );
-  } else if (situacion === "vencida" && statusDeMp === "active") {
-    // WARN y no info. Pasado el horizonte, sin ningun cobro exitoso y sin un cobro
-    // pendiente, el mapeo de siempre deja `active`: acceso pago sin que MP haya
-    // cobrado ni intentado cobrar nada. No se corrige aca (no hay evidencia de que
-    // sea un error, y bajarlo seria revocar), pero es acceso gratis posible.
-    logger.warn(
-      "mp/reconcile: prueba diferida vencida sin ningun cobro exitoso ni cobro " +
-        "pendiente, posible acceso gratis",
-      {
-        ...contextoDeLaPrueba,
-        // En `vencida`, E es siempre un numero (si no, la situacion seria `no-aplica`).
-        horizonteIso: typeof pruebaDiferida.diferidoHastaMs === "number"
-          ? isoDeMs(pruebaDiferida.diferidoHastaMs + HOLGURA_PRUEBA_MS)
-          : null,
-      },
-    );
-  } else if (status !== statusDeMp) {
-    logger.info("mp/reconcile: prueba diferida, el estado se ajusta", contextoDeLaPrueba);
-  }
+    planDoc,
+    mp,
+    statusDeMp,
+    nowMs: deps.nowMs,
+  });
 
   const userRef = getFirestore(app).collection("users").doc(uid);
   const userData = (await userRef.get()).data();

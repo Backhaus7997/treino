@@ -76,7 +76,10 @@ import {
 } from "../subscriptions/mp/reconcile";
 import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
 import { ReconcileDeps } from "../subscriptions/mp/reconcile";
-import { decidirDiferimiento } from "../subscriptions/mp/diferir-primer-cobro";
+import {
+  decidirDiferimiento,
+  decidirDiferimientoDeAlumno,
+} from "../subscriptions/mp/diferir-primer-cobro";
 import { MOTIVO_REEMPLAZO } from "../subscriptions/mp/motivos-terminal";
 import { effectiveWeightLimit } from "../subscriptions/effective-limit";
 import { toSubscriptionState } from "../subscriptions/subscription-state";
@@ -3681,33 +3684,60 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(subDe(store).status).toBe("active");
   });
 
-  it("un plan de ALUMNO nunca pasa por estas reglas", async () => {
-    // El checkout del alumno no escribe el marcador, pero aunque alguien lo
-    // pusiera el corte por producto va antes: el alumno se lee con su escritor.
-    const { app, store } = fakeApp({
-      users: { u1: { role: "athlete" } },
-      mp_plans: {
-        a1: {
-          producto: "athlete",
-          uid: "u1",
-          cycle: "monthly",
-          createdAt: ts(AHORA - 4 * DIA_MS),
-          diferidoHastaMs: FIN_PAGO,
-        },
-      },
-    });
+  // ── El alumno pasa por las MISMAS reglas, con su propio escritor ──
+  //
+  // Antes el checkout del alumno no escribia el marcador y este test fijaba que
+  // el alumno nunca pasaba por estas reglas. Ahora su checkout tambien difiere
+  // (`decidirDiferimientoDeAlumno`), asi que el contrato es el contrario: las
+  // reglas son las mismas, y lo que no cambia es que se escribe con el escritor
+  // del alumno y nunca `subscription`. El resto de sus casos, en "la prueba
+  // diferida del alumno", mas abajo.
 
-    const r = await reconcileSubscription(app, "a1", fakeMp({
-      id: "sub-alumno",
-      status: "authorized",
-      external_reference: "u1",
-      date_created: new Date(AHORA - DIA_MS).toISOString(),
-      next_payment_date: new Date(AHORA + 30 * DIA_MS).toISOString(),
-      auto_recurring: { transaction_amount: 4500 },
-      summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
-    }));
+  /** Un plan de alumno con prueba, abierto hace 4 dias y autorizado hace 1. */
+  const ALUMNO_LINK_VIEJO = (): Store => ({
+    users: { u1: { role: "athlete" } },
+    mp_plans: {
+      a1: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 4 * DIA_MS),
+        diferidoHastaMs: FIN_PAGO,
+      },
+    },
+  });
+  const ALUMNO_AUTORIZADA_TARDE: MpPreapproval = {
+    id: "sub-alumno",
+    status: "authorized",
+    external_reference: "u1",
+    date_created: new Date(AHORA - DIA_MS).toISOString(),
+    next_payment_date: new Date(AHORA + 30 * DIA_MS).toISOString(),
+    auto_recurring: { transaction_amount: 4500 },
+    summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+  };
+
+  it("un plan de ALUMNO pasa por las mismas reglas: el link diferido pagado tarde no da acceso", async () => {
+    // Autorizado 3 dias despues de abrir el checkout: fuera de la ventana. Igual
+    // que al PF, no le da nada hasta el primer cobro real de MP.
+    const { app, store } = fakeApp(ALUMNO_LINK_VIEJO());
+
+    const r = await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA_TARDE));
 
     expect(r.producto).toBe("athlete");
+    expect(r.status).toBe("pending");
+    expect(r.athleteStatus).toBe("expired");
+    expect(store.users.u1.athleteSubscription).toEqual({ status: "expired" });
+    expect(store.users.u1.subscription).toBeUndefined();
+  });
+
+  it("el MISMO payload sin el marcador SI da acceso (el control del test anterior)", async () => {
+    // Prueba que es la regla de la prueba, y no otra cosa, la que corta el acceso.
+    const mundo = ALUMNO_LINK_VIEJO();
+    delete mundo.mp_plans.a1.diferidoHastaMs;
+    const { app, store } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA_TARDE));
+
     expect(r.athleteStatus).toBe("active");
     expect(store.users.u1.athleteSubscription).toEqual({ status: "active" });
     expect(store.users.u1.subscription).toBeUndefined();
@@ -4039,6 +4069,280 @@ describe("reconcileSubscription: la prueba diferida", () => {
 });
 
 // ---------------------------------------------------------------------------
+// LA PRUEBA DIFERIDA DEL ALUMNO: las mismas reglas, con su escritor.
+//
+// Su checkout tambien difiere el primer cobro cuando vuelve con dias pagos
+// (`decidirDiferimientoDeAlumno`). Lo que se fija aca es que su reconciliador lee
+// esos planes con las MISMAS reglas que el del PF, escribiendo lo suyo:
+// `athleteSubscription` (una sola clave) y el `currentPeriodEnd` del plan.
+// ---------------------------------------------------------------------------
+
+describe("reconcileSubscription: la prueba diferida del alumno", () => {
+  const HORA_MS = 60 * 60 * 1000;
+  /** E: hasta cuando tenia pago el alumno cuando abrio el checkout diferido. */
+  const FIN_PAGO = AHORA + 13 * DIA_MS;
+  const AUTORIZADA_HACE_30_MIN = new Date(AHORA - 30 * 60 * 1000).toISOString();
+  /** El primer cobro programado: el mismo dia que E, unas horas antes (ver el bloque del PF). */
+  const PRIMER_COBRO = FIN_PAGO - (2 * 60 + 12) * 60 * 1000;
+
+  /**
+   * El alumno dado de baja que vuelve. `a0` es el plan que pago: con su fecha y SIN
+   * `terminal`, como lo deja su reconciliador mientras le queden dias. `a1` es el
+   * checkout diferido que abrio hace 1 hora.
+   */
+  const DIFERIDO_ALUMNO = (): Store => ({
+    users: { u1: { role: "athlete", athleteSubscription: { status: "active" } } },
+    mp_plans: {
+      a0: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 20 * DIA_MS),
+        currentPeriodEnd: ts(FIN_PAGO),
+      },
+      a1: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - HORA_MS),
+        diferidoHastaMs: FIN_PAGO,
+      },
+    },
+  });
+
+  /** La suscripcion de `a1` recien autorizada, en prueba. */
+  const EN_PRUEBA_ALUMNO: MpPreapproval = {
+    id: "sub-prueba-alumno",
+    status: "authorized",
+    external_reference: "u1",
+    date_created: AUTORIZADA_HACE_30_MIN,
+    next_payment_date: new Date(PRIMER_COBRO).toISOString(),
+    auto_recurring: {
+      ...AUTO_RECURRING_REAL,
+      start_date: AUTORIZADA_HACE_30_MIN,
+      transaction_amount: 3500,
+    },
+    summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+  };
+
+  /** La misma, dada de baja ANTES de su primer cobro: MP no manda fecha. */
+  const PRUEBA_CANCELADA: MpPreapproval = {
+    ...EN_PRUEBA_ALUMNO,
+    status: "cancelled",
+    next_payment_date: undefined,
+  };
+
+  const statusDelAlumno = (store: Store) =>
+    (store.users.u1.athleteSubscription as Record<string, unknown>).status;
+  const finDe = (store: Store, planId: string) =>
+    (store.mp_plans[planId].currentPeriodEnd as { toMillis(): number }).toMillis();
+
+  it("a tiempo y con un cobro 'pendiente' queda active, NO grace", async () => {
+    // Sin la regla, el alumno pasaria a `grace` (en la app: "no pudimos cobrar")
+    // por un cobro que todavia no corresponde.
+    const { app, store } = fakeApp(DIFERIDO_ALUMNO());
+
+    const r = await reconcileSubscription(app, "a1", fakeMp({
+      ...EN_PRUEBA_ALUMNO,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }));
+
+    expect(r.producto).toBe("athlete");
+    expect(r.status).toBe("active");
+    expect(r.athleteStatus).toBe("active");
+    expect(statusDelAlumno(store)).toBe("active");
+    expect(store.users.u1.subscription).toBeUndefined();
+  });
+
+  it("el MISMO payload sin el marcador SI es grace (el control del test anterior)", async () => {
+    const mundo = DIFERIDO_ALUMNO();
+    delete mundo.mp_plans.a1.diferidoHastaMs;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "a1", fakeMp({
+      ...EN_PRUEBA_ALUMNO,
+      summarized: { charged_quantity: 0, pending_charge_quantity: 1 },
+    }));
+
+    expect(statusDelAlumno(store)).toBe("grace");
+  });
+
+  it("un link viejo pagado tarde es `pending`, y la guarda le conserva el acceso que le queda", async () => {
+    // El checkout se abrio hace 4 dias y se autorizo hace 1: fuera de la ventana.
+    // El alumno todavia tiene acceso por a0, y un `pending` no lo pisa.
+    const mundo = DIFERIDO_ALUMNO();
+    mundo.mp_plans.a1.createdAt = ts(AHORA - 4 * DIA_MS);
+    const { app, store, escrituras } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "a1", fakeMp({
+      ...EN_PRUEBA_ALUMNO,
+      date_created: new Date(AHORA - DIA_MS).toISOString(),
+    }));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect(r.status).toBe("pending");
+    expect(statusDelAlumno(store)).toBe("active");
+    expect(escrituras.find((e) => e.col === "users")).toBeUndefined();
+    expect(warnSpy).toHaveBeenCalledWith(
+      "mp/reconcile: prueba diferida autorizada fuera de ventana, se trata " +
+        "como pending",
+      expect.objectContaining({ planId: "a1", uid: "u1", producto: "athlete" }),
+    );
+  });
+
+  it("una prueba cancelada antes de su primer cobro conserva el acceso hasta E, no un mes de mas", async () => {
+    // Sin fecha de MP, la cascada deriva alta + un mes: un periodo que nunca se
+    // cobro. El alumno pago hasta E con a0, y hasta ahi llega.
+    const { app, store } = fakeApp(DIFERIDO_ALUMNO());
+
+    const r = await reconcileSubscription(app, "a1", fakeMp(PRUEBA_CANCELADA));
+
+    expect(r.athleteStatus).toBe("active");
+    expect(r.accesoHastaMs).toBe(FIN_PAGO);
+    expect(finDe(store, "a1")).toBe(FIN_PAGO);
+    // Mientras le queden dias, no es terminal: el barrido lo tiene que apagar.
+    expect(store.mp_plans.a1.terminal).toBeUndefined();
+  });
+
+  it("el MISMO payload sin el marcador se lleva el mes entero (el control del test anterior)", async () => {
+    const mundo = DIFERIDO_ALUMNO();
+    delete mundo.mp_plans.a1.diferidoHastaMs;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "a1", fakeMp(PRUEBA_CANCELADA));
+
+    expect(finDe(store, "a1")).toBeGreaterThan(FIN_PAGO + 10 * DIA_MS);
+  });
+
+  it("pasado E, la prueba cancelada se apaga y queda terminal", async () => {
+    const { app, store } = fakeApp(DIFERIDO_ALUMNO());
+
+    const r = await reconcileSubscription(
+      app, "a1", fakeMp(PRUEBA_CANCELADA, FIN_PAGO + DIA_MS),
+    );
+
+    expect(r.athleteStatus).toBe("expired");
+    expect(statusDelAlumno(store)).toBe("expired");
+    expect(store.mp_plans.a1.terminal).toBe(true);
+  });
+
+  it("con el primer cobro real se lee como cualquier plan: un cobro pendiente vuelve a ser grace", async () => {
+    // Desde el primer cobro exitoso las reglas se apagan solas.
+    const { app, store } = fakeApp(DIFERIDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp({
+      ...EN_PRUEBA_ALUMNO,
+      summarized: {
+        charged_quantity: 1,
+        charged_amount: 3500,
+        last_charged_amount: 3500,
+        pending_charge_quantity: 1,
+      },
+    }, FIN_PAGO + DIA_MS));
+
+    expect(statusDelAlumno(store)).toBe("grace");
+  });
+
+  it("un plan con prueba que ya cobro antes de tiempo avisa del cobro doble, nombrando al alumno", async () => {
+    const { app } = fakeApp(DIFERIDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp({
+      ...EN_PRUEBA_ALUMNO,
+      summarized: {
+        charged_quantity: 1,
+        charged_amount: 3500,
+        last_charged_amount: 3500,
+        pending_charge_quantity: 0,
+      },
+    }));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "mp/reconcile: un plan con prueba YA cobro antes de que venza lo que el alumno " +
+        "tenia pago, MP ignoro o acorto la prueba y el alumno pago dos veces",
+      expect.objectContaining({ planId: "a1", uid: "u1", producto: "athlete" }),
+    );
+  });
+});
+
+describe("reconcile + diferimiento: la baja del ALUMNO deja el plan listo para diferir", () => {
+  const FIN_X = Date.parse("2026-09-20T12:00:00.000Z");
+  const COBRO_DE_AGOSTO = "2026-08-20T12:00:00.000Z";
+
+  /** Un alumno que pago el 20/8 con su plan a0, todavia sin darse de baja. */
+  const ALUMNO_QUE_PAGA = (): Store => ({
+    users: { u1: { role: "athlete", athleteSubscription: { status: "active" } } },
+    mp_plans: {
+      a0: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 18 * DIA_MS),
+        currentPeriodEnd: ts(FIN_X),
+      },
+    },
+  });
+
+  /** La suscripcion de a0 despues de la baja. MP omite la fecha de una cancelada que pago. */
+  const BAJA_DE_A0: MpPreapproval = {
+    id: "s0",
+    status: "cancelled",
+    external_reference: "u1",
+    date_created: COBRO_DE_AGOSTO,
+    next_payment_date: undefined,
+    auto_recurring: {
+      ...AUTO_RECURRING_REAL,
+      start_date: COBRO_DE_AGOSTO,
+      transaction_amount: 3500,
+    },
+    summarized: {
+      charged_quantity: 1,
+      charged_amount: 3500,
+      last_charged_date: COBRO_DE_AGOSTO,
+      last_charged_amount: 3500,
+      pending_charge_quantity: 0,
+    },
+  };
+
+  /** `decidirDiferimientoDeAlumno` como lo arma el callable, leyendo del store del reconciliador. */
+  const decidir = (store: Store, deps: ReconcileDeps) =>
+    decidirDiferimientoDeAlumno({
+      uid: "u1",
+      userData: store.users.u1,
+      nowMs: AHORA,
+      habilitado: true,
+      leerPlanes: async () =>
+        Object.entries(store.mp_plans)
+          .filter(([, datos]) => datos.uid === "u1")
+          .map(([id, data]) => ({ id, data })),
+      leerSuscripciones: (planId) => deps.mpClient.searchPreapprovalsByPlan(planId),
+    });
+
+  it("la baja deja el acceso y la fecha, SIN terminal, y el siguiente checkout lleva prueba", async () => {
+    const { app, store } = fakeApp(ALUMNO_QUE_PAGA());
+    const deps = fakeMp(BAJA_DE_A0);
+
+    const r = await reconcileSubscription(app, "a0", deps);
+
+    expect(r.athleteStatus).toBe("active");
+    expect(store.mp_plans.a0.terminal).toBeUndefined();
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN_X });
+  });
+
+  it("si la baja marcara el plan `terminal` como al PF, el diferimiento no lo veria (el control)", async () => {
+    // Prueba que el diferimiento del alumno depende de que su plan dado de baja
+    // siga sin ser terminal: con el filtro del PF no habria a quien preguntarle.
+    const { app, store } = fakeApp(ALUMNO_QUE_PAGA());
+    const deps = fakeMp(BAJA_DE_A0);
+    await reconcileSubscription(app, "a0", deps);
+    store.mp_plans.a0.terminal = true;
+
+    expect(await decidir(store, deps))
+      .toEqual({ diferir: false, motivo: "sin-fecha-de-fin" });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // La baja del PF deja el plan listo para ser evidencia de un pago.
 //
 // El diferimiento solo mira planes `terminal`: es lo que distingue un plan que tuvo
@@ -4276,5 +4580,186 @@ describe("reconcile + diferimiento: la baja del PF deja el plan listo para conta
     };
     expect(await decidir(store, deps, cancelado))
       .toEqual({ diferir: true, diferidoHastaMs: FIN_X });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// La prueba diferida del alumno + la guarda de los dos planes (#1311).
+//
+// Los dos viven en el escritor del alumno y se tienen que poner de acuerdo en una
+// pregunta: ¿un plan que nacio con prueba le da acceso al alumno, para el plan
+// hermano que vence? El orden del escritor es prueba diferida primero, guarda
+// despues, asi que lo que se guarda en `ultimoStatus` (y lo que el hermano lee) es
+// el estado AJUSTADO por la prueba. Cuando el hermano no tiene nada guardado y se
+// le pregunta a MP en vivo, tiene que aplicar las mismas reglas.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("reconcileSubscription: el alumno con un plan en prueba diferida y la guarda de los dos planes", () => {
+  const HORA_MS = 60 * 60 * 1000;
+  /** E: hasta cuando le dura al alumno lo que pago con `a1`. */
+  const E = AHORA + 3 * DIA_MS;
+  /** El momento en que `a1` vence: E mas una hora. */
+  const VENCIDO_A1 = E + HORA_MS;
+  const AUTORIZADA_HACE_30_MIN = new Date(AHORA - 30 * 60 * 1000).toISOString();
+
+  /**
+   * `a1` pago y se dio de baja (sin `terminal`, con su fecha E, como lo deja su
+   * reconciliador mientras le queden dias). `a2` es el checkout diferido que el
+   * alumno abrio hace 1 hora.
+   */
+  const MUNDO = (over: { a1?: Record<string, unknown>; a2?: Record<string, unknown> } = {}): Store => ({
+    users: { u1: { role: "athlete", athleteSubscription: { status: "active" } } },
+    mp_plans: {
+      a1: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - 27 * DIA_MS),
+        currentPeriodEnd: ts(E),
+        ...over.a1,
+      },
+      a2: {
+        producto: "athlete",
+        uid: "u1",
+        cycle: "monthly",
+        createdAt: ts(AHORA - HORA_MS),
+        diferidoHastaMs: E,
+        ...over.a2,
+      },
+    },
+  });
+
+  const BAJA_A1: MpPreapproval = {
+    id: "s-a1",
+    status: "cancelled",
+    external_reference: "u1",
+    auto_recurring: { transaction_amount: 3500 },
+    summarized: { pending_charge_quantity: 0 },
+  };
+
+  const PRUEBA_A2: MpPreapproval = {
+    id: "s-a2",
+    status: "authorized",
+    external_reference: "u1",
+    date_created: AUTORIZADA_HACE_30_MIN,
+    next_payment_date: new Date(E - 2 * HORA_MS).toISOString(),
+    auto_recurring: {
+      ...AUTO_RECURRING_REAL,
+      start_date: AUTORIZADA_HACE_30_MIN,
+      transaction_amount: 3500,
+    },
+    summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+  };
+
+  /** Autorizada cuatro dias despues de abrir el checkout: fuera de ventana. */
+  const FUERA_DE_VENTANA = { createdAt: ts(AHORA - 4 * DIA_MS) };
+
+  describe("lo que `a2` deja guardado cuando se reconcilia (la lectura barata)", () => {
+    it("una prueba autorizada a tiempo guarda `active`, y OTORGA: el vencimiento de `a1` no corta", async () => {
+      const { app, store, escrituras } = fakeApp(MUNDO());
+      await reconcileSubscription(app, "a2", fakeMp(PRUEBA_A2));
+      expect(store.mp_plans.a2.ultimoStatus).toBe("active");
+      const antes = escrituras.length;
+
+      const r = await reconcileSubscription(app, "a1", fakeMp(BAJA_A1, VENCIDO_A1));
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+      expect(escrituras.slice(antes).filter((e) => e.col === "users")).toEqual([]);
+    });
+
+    it("una prueba fuera de ventana guarda `pending` (el AJUSTADO, no el `authorized` de MP) y NO otorga", async () => {
+      const { app, store } = fakeApp(MUNDO({ a2: FUERA_DE_VENTANA }));
+      const r2 = await reconcileSubscription(app, "a2", fakeMp(PRUEBA_A2));
+      // Es `pending`, y la guarda de no-regresion le conserva el acceso que ya tenia.
+      expect(r2.outcome).toBe("skipped-pending-no-pisa");
+      expect(store.mp_plans.a2.ultimoStatus).toBe("pending");
+
+      const r = await reconcileSubscription(app, "a1", fakeMp(BAJA_A1, VENCIDO_A1));
+
+      // Si `ultimoStatus` hubiera guardado el `authorized` crudo (`active`), el
+      // hermano contaria como otorgante un plan que el reconciliador no trata asi.
+      expect(r.outcome).toBe("written");
+      expect(r.athleteStatus).toBe("expired");
+      expect(derechoDe(store)).toBe("expired");
+    });
+  });
+
+  describe("lo que se le pregunta a MP del hermano que no tiene nada guardado", () => {
+    it("una prueba autorizada a tiempo OTORGA y se guarda como la guardaria el escritor", async () => {
+      const { app, store } = fakeApp(MUNDO());
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMpMultiPlan({ a1: BAJA_A1, a2: PRUEBA_A2 }, {}, VENCIDO_A1),
+      );
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+      expect(store.mp_plans.a2.ultimoStatus).toBe("active");
+    });
+
+    it("⚠️ una prueba fuera de ventana NO otorga, aunque MP diga `authorized` (el control de abajo si)", async () => {
+      const { app, store } = fakeApp(MUNDO({ a2: FUERA_DE_VENTANA }));
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMpMultiPlan({ a1: BAJA_A1, a2: PRUEBA_A2 }, {}, VENCIDO_A1),
+      );
+
+      expect(r.outcome).toBe("written");
+      expect(derechoDe(store)).toBe("expired");
+      expect(store.mp_plans.a2.ultimoStatus).toBe("pending");
+    });
+
+    it("el MISMO hermano sin el marcador de la prueba SI otorga (el control del test anterior)", async () => {
+      const mundo = MUNDO({ a2: FUERA_DE_VENTANA });
+      delete mundo.mp_plans.a2.diferidoHastaMs;
+      const { app, store } = fakeApp(mundo);
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMpMultiPlan({ a1: BAJA_A1, a2: PRUEBA_A2 }, {}, VENCIDO_A1),
+      );
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+    });
+
+    it("una prueba cancelada antes de su primer cobro llega hasta E y no mas: pasado E no otorga", async () => {
+      // MP no manda fecha en una cancelada, y la cascada deriva alta + un mes: un
+      // periodo que nunca se cobro. Sin el tope de la prueba, el hermano daria acceso
+      // gratis un mes mas.
+      const { app, store } = fakeApp(MUNDO());
+      const cancelada: MpPreapproval = {
+        ...PRUEBA_A2,
+        status: "cancelled",
+        next_payment_date: undefined,
+      };
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMpMultiPlan({ a1: BAJA_A1, a2: cancelada }, {}, VENCIDO_A1),
+      );
+
+      expect(r.outcome).toBe("written");
+      expect(derechoDe(store)).toBe("expired");
+      expect((store.mp_plans.a2.currentPeriodEnd as { toMillis(): number }).toMillis())
+        .toBe(E);
+    });
+
+    it("el MISMO hermano cancelado sin el marcador regala el mes (el control del test anterior)", async () => {
+      const mundo = MUNDO();
+      delete mundo.mp_plans.a2.diferidoHastaMs;
+      const { app, store } = fakeApp(mundo);
+      const cancelada: MpPreapproval = {
+        ...PRUEBA_A2,
+        status: "cancelled",
+        next_payment_date: undefined,
+      };
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMpMultiPlan({ a1: BAJA_A1, a2: cancelada }, {}, VENCIDO_A1),
+      );
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+    });
   });
 });

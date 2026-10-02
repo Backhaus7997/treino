@@ -207,9 +207,9 @@ export interface CreatePreapprovalPlanInput {
    * Dias de prueba antes del PRIMER cobro. Ausente = el plan cobra al autorizar,
    * que es lo de siempre, y el cuerpo del request queda byte por byte igual.
    *
-   * Existe para el PF que vuelve a suscribirse mientras todavia le quedan dias
-   * pagos: sin la prueba, MP le cobra el periodo nuevo en el acto y paga dos
-   * veces los mismos dias. Ver `diferir-primer-cobro.ts` para quien decide
+   * Existe para el PF (y el alumno) que vuelve a suscribirse mientras todavia le
+   * quedan dias pagos: sin la prueba, MP le cobra el periodo nuevo en el acto y
+   * paga dos veces los mismos dias. Ver `diferir-primer-cobro.ts` para quien decide
    * cuantos dias y por que.
    *
    * Entero entre 1 y [MAX_FREE_TRIAL_DAYS]. Cualquier otra cosa tira ANTES de
