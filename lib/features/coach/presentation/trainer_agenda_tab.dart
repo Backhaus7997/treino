@@ -244,6 +244,10 @@ class _TrainerCalendar extends ConsumerWidget {
         bookedDays.contains(DateTime(day.year, day.month, day.day));
 
     return TableCalendar<dynamic>(
+      // Without it table_calendar formats the month and weekdays in en_US.
+      // Date symbols come from GlobalMaterialLocalizations ('es'; intl falls
+      // back to it for 'es_AR').
+      locale: AppL10n.of(context).localeName,
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
