@@ -7,7 +7,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
-import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
 
 /// Nombre visible del tier. Fuente única de la etiqueta de plan en el hub web
 /// — la pricing page usa su propia variante en MAYÚSCULAS (nombres de card),
@@ -37,6 +38,17 @@ String tierPlanLabel(SubscriptionTier tier) =>
 /// Se auto-oculta cuando no hay nada que vender: `plan3` es el tope, así que
 /// `tier.nextTier == null` → `SizedBox.shrink()`. Un PF sin `subscription` en
 /// su doc es Free por definición (sin backfill), igual que en Facturación.
+///
+/// El tier sale de [VigenciaDelPlan.tierEfectivo], como en Facturación y la
+/// pricing page: una baja con el período pagado vencido es Free aunque el doc
+/// siga diciendo el tier viejo (el servidor no lo reescribe). Leído a secas,
+/// el banner le decía «TU PLAN · PLAN 1» a un PF que ya no lo tiene, y a uno
+/// con un Plan 3 vencido lo escondía entero, justo cuando vuelve a haber algo
+/// que ofrecerle. `pending` y `paused` siguen con el tier del doc a propósito
+/// (ver «Qué espeja y qué NO» en [VigenciaDelPlan]).
+///
+/// Se lee de [vigenciaDelPlanProvider]: si el PF está en Cuenta cuando vence
+/// la baja, el banner pasa a Free en ese instante, sin esperar un rebuild.
 class PlanUpsellBanner extends ConsumerWidget {
   const PlanUpsellBanner({super.key});
 
@@ -44,8 +56,7 @@ class PlanUpsellBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final tier =
-        ref.watch(userProfileProvider).valueOrNull?.subscription?.tier ??
-            SubscriptionTier.free;
+        ref.watch(vigenciaDelPlanProvider.select((v) => v.tierEfectivo));
     final next = tier.nextTier;
     if (next == null) return const SizedBox.shrink();
 

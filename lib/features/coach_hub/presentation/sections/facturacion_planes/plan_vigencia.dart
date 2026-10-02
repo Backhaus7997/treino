@@ -57,12 +57,26 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// suscribirse, y eso lo decide el servidor con una regla que tiene un borde
 /// visible desde acá: un día. [primerCobroDiferible] lo expone, con el mismo
 /// "ahora" que [pagadoHasta] para que las dos cosas no se contradigan.
+///
+/// ## Una foto, no un reloj
+///
+/// La vigencia se calcula una vez y no se entera sola de que pasó un borde: en
+/// ese instante no tiene por qué emitir nadie, porque el servidor no reescribe
+/// el tier al vencer y [AppClock] no avisa. [proximoCambio] dice cuándo deja
+/// de valer, y `vigenciaDelPlanProvider` (`vigencia_del_plan_provider.dart`,
+/// al lado) la recalcula ahí. Lo leen el chip del sidebar, que está montado
+/// toda la sesión, y el banner de upsell. La pricing page y Facturación
+/// todavía la calculan en su build: abiertas al cruzar el borde, muestran la
+/// foto vieja hasta el próximo rebuild. No son las únicas que miran el reloj:
+/// otras pantallas comparan `currentPeriodEnd` contra su propio `now` sin
+/// pasar por esta clase.
 final class VigenciaDelPlan {
   const VigenciaDelPlan._({
     required this.tierEfectivo,
     required this.cancelada,
     required this.pagadoHasta,
     required this.primerCobroDiferible,
+    required this.proximoCambio,
   });
 
   /// Calcula la vigencia de [suscripcion] (`null` = PF sin suscripción, Free
@@ -82,6 +96,8 @@ final class VigenciaDelPlan {
         cancelada: false,
         pagadoHasta: null,
         primerCobroDiferible: false,
+        // Sin baja no hay borde: nada de esto depende de la hora.
+        proximoCambio: null,
       );
     }
 
@@ -98,6 +114,7 @@ final class VigenciaDelPlan {
       // difiere.
       primerCobroDiferible:
           fin != null && fin.difference(ahora) >= _kMinDiferimiento,
+      proximoCambio: fin == null ? null : _proximoCambio(fin, ahora),
     );
   }
 
@@ -140,7 +157,35 @@ final class VigenciaDelPlan {
   /// Espeja `decidirDiferimiento` (`queda-menos-de-un-dia`) en
   /// `functions/src/subscriptions/mp/diferir-primer-cobro.ts`.
   ///
-  /// Se calcula al construir y no hay un timer que lo refresque: una pantalla
-  /// que queda abierta al cruzar el borde lo conserva hasta el próximo rebuild.
+  /// Se calcula al construir, como todo en esta clase (ver «Una foto, no un
+  /// reloj»). La pricing page, que es quien lo usa, lo calcula en su build, y
+  /// abierta al cruzar el borde lo conserva hasta el próximo rebuild.
   final bool primerCobroDiferible;
+
+  /// Cuándo deja de valer esta foto sin que cambie el doc: el próximo borde
+  /// de la baja, a lo sumo un milisegundo después de cruzarlo. Primero deja de
+  /// poder diferirse (un día antes de [pagadoHasta]) y después deja de correr
+  /// (en [pagadoHasta]). `null` si no queda ninguno por delante: sin baja, o
+  /// con la baja vencida o sin fecha.
+  ///
+  /// Es lo que espera `vigenciaDelPlanProvider` para recalcularla sola.
+  final DateTime? proximoCambio;
+}
+
+/// El próximo borde de una baja que vence en [fin], visto desde [ahora]: un
+/// instante en que [VigenciaDelPlan.de] ya devuelve otra cosa. `null` si no
+/// queda ninguno.
+DateTime? _proximoCambio(DateTime fin, DateTime ahora) {
+  // 1. Deja de poder diferirse. Este borde es inclusivo (con EXACTAMENTE un día
+  //    todavía difiere), así que el cambio llega después de él. Un milisegundo
+  //    y no un microsegundo: el `Timer` de web cuenta en milisegundos
+  //    (`inMilliseconds`), y un microsegundo de espera sería un `setTimeout`
+  //    de 0 que podría disparar antes de que el borde pase.
+  final umbral = fin.subtract(_kMinDiferimiento);
+  if (!ahora.isAfter(umbral)) {
+    return umbral.add(const Duration(milliseconds: 1));
+  }
+  // 2. Deja de correr. Este borde es estricto (`isBefore`): en `fin` ya venció.
+  if (ahora.isBefore(fin)) return fin;
+  return null;
 }

@@ -8,9 +8,10 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_badge.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
-import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -648,6 +649,16 @@ class _ToggleButton extends StatelessWidget {
 /// Ahora navega a `/ajustes` (tab Cuenta, el default), donde vive el banner
 /// de upsell, y el subtítulo muestra el tier real vía [tierPlanLabel].
 ///
+/// El tier sale de [VigenciaDelPlan.tierEfectivo], como en Facturación y la
+/// pricing page. Del doc a secas, una baja con el período pagado ya vencido
+/// seguía diciendo «Plan 1»: el servidor la trata como Free pero no reescribe
+/// el tier. `pending` y `paused` siguen mostrando el tier del doc a propósito
+/// (ver «Qué espeja y qué NO» en [VigenciaDelPlan]).
+///
+/// Se lee de [vigenciaDelPlanProvider] y no de [VigenciaDelPlan.de] porque
+/// este chip está montado toda la sesión: tiene que pasar a Free en el
+/// instante en que vence la baja, no en el próximo rebuild.
+///
 /// `go` y no `push`: Ajustes es una sección del shell, no un sub-flujo. Con
 /// `push` el sidebar quedaría con Ajustes activo encima de la sección
 /// anterior y el back del browser se volvería un laberinto.
@@ -666,8 +677,9 @@ class _ProfileRow extends ConsumerWidget {
     final initial = hasName ? displayName.substring(0, 1).toUpperCase() : '?';
     final name = hasName ? displayName : 'Mi cuenta'; // i18n: Fase W1
     // Sin `subscription` en el doc → Free por definición, mismo criterio que
-    // FacturacionTab (sin backfill).
-    final tier = profile?.subscription?.tier ?? SubscriptionTier.free;
+    // FacturacionTab (sin backfill); una baja vencida también es Free.
+    final tier =
+        ref.watch(vigenciaDelPlanProvider.select((v) => v.tierEfectivo));
 
     final avatar = CircleAvatar(
       radius: CoachHubLayoutTokens.sidebarAvatarDiameter / 2,
