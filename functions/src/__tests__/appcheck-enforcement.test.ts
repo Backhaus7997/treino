@@ -288,6 +288,33 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "confirmacion atesta en los navegadores reales: un flag que rompe el " +
       "boton deja a la persona sin un derecho irrenunciable.",
   },
+  "mail/baja-de-promocionales:bajaDeCorreosPromocionales": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de baja de la landing, en el NAVEGADOR y sin sesion: " +
+      "el Decreto 1558/01 (Anexo I, art. 27, parrafo 3) pide el mecanismo de " +
+      "retiro en toda comunicacion de publicidad, sin registracion previa, y la " +
+      "landing no tiene Firebase ni App Check. Aca SI podria atestarse con " +
+      "reCAPTCHA, por eso es `debt` y no `decided`. " +
+      "Lo que la cierra: la unica entrada es un token firmado con HMAC-SHA256 " +
+      "(secreto propio, BAJA_PROMOCIONALES_KEY) que solo llego al buzon de la " +
+      "cuenta; el uid sale del token y nunca del request; la forma se chequea " +
+      "antes de calcular nada; y lo unico que habilita es APAGAR el canal de " +
+      "mail de una preferencia de una lista cerrada (novedades_plan) de esa " +
+      "cuenta — nunca encenderlo, nunca otro campo, nunca otro uid, y nunca " +
+      "crea el documento. " +
+      "Lo que NO la cierra: el token no vence (tiene que servir en el mail de " +
+      "hace meses), asi que uno valido que se filtre o se reenvie se puede " +
+      "REPRODUCIR sin limite. Cada llamada cuesta una LECTURA de users/{uid}; " +
+      "si la preferencia ya estaba apagada no escribe, asi que no dispara los " +
+      "triggers de `users`. maxInstances: 5 limita la concurrencia, NO el total " +
+      "de llamadas. Ver baja-de-promocionales.ts.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca junto con confirmarBajaPorMail. Medir antes que la pagina de " +
+      "baja atesta en los navegadores reales: un flag que rompe el link deja a " +
+      "la persona sin el mecanismo que la norma obliga a ofrecer.",
+  },
   "profile/ensure-athlete-profile:ensureAthleteProfile": {
     permanence: "debt",
     reason:
@@ -446,6 +473,7 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "bajaDeCorreosPromocionales",
   "cancelMySubscription",
   "confirmarArrepentimientoPorMail",
   "confirmarBajaPorMail",
@@ -688,6 +716,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "auth/codigo-de-verificacion",
       symbol: "verificarCodigoDeMail",
       as: "verificarCodigoDeMail",
+      attested: false,
+    },
+    {
+      module: "mail/baja-de-promocionales",
+      symbol: "bajaDeCorreosPromocionales",
+      as: "bajaDeCorreosPromocionales",
       attested: false,
     },
   ];

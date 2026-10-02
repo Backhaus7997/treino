@@ -84,6 +84,20 @@ export { notifyMonthlyReport } from "./notifications/notify-monthly-report";
 // en Secret Manager de PRODUCCIÓN, #826) y que el dominio del remitente esté
 // verificado por DNS en Resend, o cada envío devuelve 403.
 export { sendQueuedMail } from "./mail/send-queued-mail";
+// Baja de los correos promocionales (Decreto 1558/01, Anexo I, art. 27, párr. 3):
+// el link del pie de cada correo comercial. Callable PÚBLICA, sin sesión y sin
+// App Check, que llama la página de la landing con el token del link (un HMAC
+// con BAJA_PROMOCIONALES_KEY) y apaga `notificationPrefs.novedades_plan.email`
+// de la cuenta que firma el token — nunca de una que venga en el request.
+// Diseño: openspec/changes/baja-de-correos-promocionales/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826) y publica un endpoint sin autenticar. OK
+// humano primero, y el secreto ANTES: con `defineSecret`, mergear sin él
+// bloquea todo deploy de functions («Cloud Secret Manager has no latest
+// version»). También lo necesita `sendQueuedMail`, que firma el link al enviar.
+// El orden completo está en el §10 del diseño. Con filtro siempre:
+// `--only functions:bajaDeCorreosPromocionales`.
+export { bajaDeCorreosPromocionales } from "./mail/baja-de-promocionales";
 // Email de auth por Resend. `requestPasswordReset` es un endpoint SIN
 // autenticar que escribe en Firestore; se despliega recien ahora porque
 // `send.gettreino.com` ya esta verificado en Resend y el secret cargado — antes

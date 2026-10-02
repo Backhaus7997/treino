@@ -17,6 +17,9 @@
  *     a cap one malformed document would hammer Resend for a week.
  *   - Re-entry is safe: a document already `sent` short-circuits. That covers
  *     the window where the Resend call succeeded but the status write did not.
+ *   - Los correos promocionales llevan en el pie un link de baja, calculado
+ *     ACÁ al enviar (nunca persistido) y con falla cerrada si falta la clave.
+ *     Ver `decidirBaja` y `baja-de-promocionales.ts`.
  *
  * TODO(mail-sweeper): a `pending` document whose retries are exhausted is only
  * visible in logs. Add a scheduled sweep that reports stuck documents once
@@ -33,6 +36,11 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "./types";
 import { renderMail } from "./templates";
 import { MailSendError, MailSender, createResendSender } from "./resend-client";
+import {
+  BAJA_PROMOCIONALES_KEY,
+  prefTieneBaja,
+  urlDeBaja,
+} from "./baja-de-promocionales";
 
 /**
  * Resend API key. Create it with:
@@ -110,25 +118,45 @@ async function resolveAddress(
   }
 }
 
+/** Lo que el envío necesita saber de `users/{uid}`: si existe y qué prefiere. */
+interface PerfilDeMail {
+  /**
+   * ¿Existe el documento? Importa para lo COMERCIAL: sin perfil no hay dónde
+   * registrar la oposición (la callable de baja nunca crea el documento), así
+   * que no se le puede ofrecer publicidad. Ver `decidirBaja` y el gate del handler.
+   */
+  existe: boolean;
+  prefs?: Record<string, Record<string, boolean> | undefined>;
+}
+
+/**
+ * Lee `users/{uid}` UNA vez. Quien necesite el perfil lo pasa de mano en mano:
+ * no se vuelve a leer para preguntar otra cosa.
+ */
+async function leerPerfil(app: App, uid: string): Promise<PerfilDeMail> {
+  const snap = await getFirestore(app).collection("users").doc(uid).get();
+  return {
+    existe: snap.exists,
+    prefs: snap.data()?.notificationPrefs as PerfilDeMail["prefs"],
+  };
+}
+
 /**
  * Checks the email channel in `users/{uid}.notificationPrefs`.
  *
- * Only consulted when the queue document carries a `prefKey`. Transactional
- * mail omits it and is never gated here.
+ * Only consulted when the queue document carries a `prefKey` (gates the whole
+ * mail) or a `bloqueComercial` (gates only the commercial block; see
+ * `decidirBaja`). Transactional mail omits both and is never gated here.
+ *
+ * Esta es la REGLA, no la lectura: un perfil ausente cuenta como «prendido». Que
+ * además lo comercial exija que el perfil EXISTA no cambia esta regla —los
+ * `prefKey` no comerciales (`nueva_solicitud`, `sesion_cancelada`) siguen
+ * enviándose con el documento ausente—; se chequea aparte.
  *
  * @returns true when the mail may be sent.
  */
-async function emailChannelAllowed(
-  app: App,
-  uid: string,
-  prefKey: string,
-): Promise<boolean> {
-  const snap = await getFirestore(app).collection("users").doc(uid).get();
-  const prefs = snap.data()?.notificationPrefs as
-    | Record<string, Record<string, boolean> | undefined>
-    | undefined;
-
-  const value = prefs?.[prefKey]?.email;
+function emailChannelAllowed(perfil: PerfilDeMail, prefKey: string): boolean {
+  const value = perfil.prefs?.[prefKey]?.email;
   // Absent preference means the user never touched the toggle. Defaults live
   // in the Flutter layer (NotifPrefs._defaultFor); the server errs towards
   // sending, since every producer that passes a prefKey opted into it.
@@ -136,13 +164,114 @@ async function emailChannelAllowed(
 }
 
 /**
+ * Lo que decide cómo se frena un mail, ya resuelto: `prefKey` y `bloqueComercial`
+ * son excluyentes (ver `MailOptOut`), así que a lo sumo uno viene lleno.
+ */
+interface OposicionDelMail {
+  toUid: string;
+  prefKey?: string;
+  bloqueComercial?: string;
+}
+
+/** Qué le falta o le sobra a un mail por la baja de los correos promocionales. */
+interface DecisionDeBaja {
+  /**
+   * La preferencia con la que se firma el link de baja del pie, o `undefined`
+   * si este mail no lleva pie.
+   */
+  prefKeyDelLink?: string;
+  /**
+   * El mail necesita el mecanismo de baja y NO hay forma de dárselo: es el motivo
+   * por el que falla cerrado. Hoy, un mail entero comercial (`prefKey`) a una
+   * dirección literal, que no tiene cuenta a la que apuntar la baja.
+   */
+  sinBajaPosible?: string;
+  /**
+   * `true`: el link existe sólo por un bloque comercial dentro de un mail
+   * operativo (`bloqueComercial`), no porque el mail entero sea comercial
+   * (`prefKey`). Decide qué pasa si el link no se puede armar: ver el handler.
+   */
+  soloElBloque?: boolean;
+  /** `false`: la plantilla omite su bloque de venta. */
+  comercial: boolean;
+}
+
+/**
+ * Decide, AL ENVIAR, si el mail lleva el pie de baja y si lleva su bloque
+ * comercial. Se evalúa acá y no al encolar: si la persona se opone entre que se
+ * encoló y que salió, gana la oposición.
+ *
+ * - **`prefKey` de la allowlist** (el mail ES comercial; el gate de arriba ya
+ *   dejó pasar a quien no se opuso): pie de baja.
+ * - **`bloqueComercial`** (un mail operativo con un bloque comercial adentro):
+ *   preferencia apagada → sin bloque y SIN pie, porque ya no hay nada comercial;
+ *   prendida o ausente → el mail completo CON pie, porque tiene contenido de
+ *   publicidad y la norma pide el mecanismo en toda comunicación así. (Si el
+ *   link no se puede armar, el handler lo degrada a «sin bloque y sin pie».)
+ * - **Cualquier otro**: no es comercial, no se toca.
+ *
+ * Un destinatario `toAddress` literal no tiene cuenta, ni preferencias, ni a
+ * dónde apuntar una baja: nunca lleva pie. Sin mecanismo de baja no se manda
+ * publicidad, y qué pasa depende de qué es el mail:
+ * - con `bloqueComercial` sale sin el bloque;
+ * - con un `prefKey` de la allowlist es ENTERAMENTE comercial y no tiene
+ *   versión sin publicidad: falla cerrado, igual que sin clave.
+ * Hoy ningún productor manda ninguno de los dos a una dirección literal; es la
+ * salida segura si alguno lo hiciera.
+ *
+ * Un `bloqueComercial` fuera de la allowlist tampoco puede llevar link (la
+ * callable lo rechazaría: sería un link muerto), así que se trata igual: sin
+ * bloque. El tipo ya lo impide al encolar; esto cubre el documento que llegó por
+ * otro camino.
+ */
+async function decidirBaja(
+  app: App,
+  { toUid, prefKey, bloqueComercial }: OposicionDelMail,
+  literal: boolean,
+): Promise<DecisionDeBaja> {
+  if (literal) {
+    if (prefTieneBaja(prefKey)) {
+      return { sinBajaPosible: "sin cuenta para la baja", comercial: true };
+    }
+    return { comercial: !bloqueComercial };
+  }
+
+  if (prefTieneBaja(prefKey)) {
+    return { prefKeyDelLink: prefKey, comercial: true };
+  }
+
+  if (bloqueComercial) {
+    let prendida = false;
+    if (prefTieneBaja(bloqueComercial)) {
+      const perfil = await leerPerfil(app, toUid);
+      // SIN PERFIL no se ofrece el bloque: la oposición no tendría dónde
+      // registrarse (la callable de baja no crea `users/{uid}`), y el link del
+      // pie diría «listo» sin que quede nada escrito. Pasa si la identidad de
+      // Auth existe y el documento no (`deleteAccount` borra Firestore antes que
+      // Auth).
+      prendida = perfil.existe && emailChannelAllowed(perfil, bloqueComercial);
+    }
+    return prendida ?
+      { prefKeyDelLink: bloqueComercial, soloElBloque: true, comercial: true } :
+      { comercial: false };
+  }
+
+  return { comercial: true };
+}
+
+/**
  * Pure handler extracted for jest testability, mirroring the notify-* CFs.
  *
- * @param app    - Admin SDK app.
- * @param mailId - Queue document ID; doubles as the Resend idempotency key.
- * @param data   - Queue document contents.
- * @param sender - Injected sender. Tests pass a mock; production builds one
- *                 from the RESEND_API_KEY secret.
+ * @param app     - Admin SDK app.
+ * @param mailId  - Queue document ID; doubles as the Resend idempotency key.
+ * @param data    - Queue document contents.
+ * @param sender  - Injected sender. Tests pass a mock; production builds one
+ *                  from the RESEND_API_KEY secret.
+ * @param bajaKey - Clave del HMAC del link de baja (BAJA_PROMOCIONALES_KEY).
+ *                  Se inyecta como el `sender`. El default es VACÍO a propósito:
+ *                  quien se olvide de pasarla no manda un correo promocional sin
+ *                  el mecanismo de baja: falla cerrado, o sale sin su bloque
+ *                  comercial si el mail sólo lo llevaba adentro.
  */
 export async function sendQueuedMailHandler(
   app: App,
@@ -152,6 +281,7 @@ export async function sendQueuedMailHandler(
   // eslint-disable-next-line no-param-reassign
   data: MailQueueDoc | undefined,
   sender: MailSender,
+  bajaKey = "",
 ): Promise<void> {
   if (!data) {
     logger.warn("sendQueuedMail: empty document, skipping", { mailId });
@@ -215,15 +345,56 @@ export async function sendQueuedMailHandler(
   // no existe haria fallar un mail que sí tiene destino.
   const literal = typeof data.toAddress === "string" && data.toAddress !== "";
 
+  // `prefKey` y `bloqueComercial` son excluyentes en el tipo, pero este es un
+  // documento de Firestore: puede traer los dos. Entonces GANA `bloqueComercial`.
+  // El gate de `prefKey` frena el mail ENTERO, y se comería justo el aviso
+  // operativo que `bloqueComercial` existe para dejar pasar. Se lee con un tipo
+  // plano: el del documento ya no admite el caso, y TypeScript lo daría por
+  // imposible.
+  const crudo = data as { prefKey?: string; bloqueComercial?: string };
+  if (crudo.prefKey && crudo.bloqueComercial) {
+    logger.warn("sendQueuedMail: prefKey y bloqueComercial juntos; gana bloqueComercial", {
+      mailId,
+      kind: data.kind,
+      prefKey: crudo.prefKey,
+    });
+  }
+  const oposicion: OposicionDelMail = {
+    toUid: data.toUid,
+    prefKey: crudo.bloqueComercial ? undefined : crudo.prefKey,
+    bloqueComercial: crudo.bloqueComercial,
+  };
+
   // Opt-out check, when this mail is subject to one.
-  if (data.prefKey && !literal) {
-    const allowed = await emailChannelAllowed(app, data.toUid, data.prefKey);
-    if (!allowed) {
+  if (oposicion.prefKey && !literal) {
+    const perfil = await leerPerfil(app, data.toUid);
+    if (!emailChannelAllowed(perfil, oposicion.prefKey)) {
       logger.info("sendQueuedMail: email channel off, skipping", {
         mailId,
-        prefKey: data.prefKey,
+        prefKey: oposicion.prefKey,
       });
       await ref.update({ status: "failed", lastError: "email channel off", ...sinSecretos() });
+      return;
+    }
+
+    // Lo COMERCIAL exige que `users/{uid}` EXISTA. Sin documento la oposición no
+    // tiene dónde registrarse —la callable de baja contesta `listo` sin crear
+    // nada— y un mail promocional saldría después de que la página dijo «listo».
+    // Pasa si la identidad de Auth existe y el documento no (`deleteAccount`
+    // borra Firestore antes que Auth). Los `prefKey` no comerciales conservan su
+    // comportamiento: documento ausente → se envía.
+    if (!perfil.existe && prefTieneBaja(oposicion.prefKey)) {
+      logger.warn("sendQueuedMail: sin perfil para registrar la oposición, el mail comercial no sale", {
+        mailId,
+        kind: data.kind,
+        uid: data.toUid,
+      });
+      await ref.update({
+        status: "failed",
+        attempts,
+        lastError: "sin perfil para registrar la oposición",
+        ...sinSecretos(),
+      });
       return;
     }
   }
@@ -239,7 +410,74 @@ export async function sendQueuedMailHandler(
     return;
   }
 
-  const rendered = renderMail(data.kind, data.params ?? {});
+  // ── El pie de baja de los correos promocionales ──────────────────────────
+  //
+  // El link se calcula ACÁ, al enviar, y NO se persiste en `mail_queue`: es un
+  // HMAC, se recalcula igual en cada reintento, y guardarlo dejaría en la cola
+  // una credencial por cada mail comercial.
+  const baja = await decidirBaja(app, oposicion, literal);
+
+  let bajaDePromocionales: string | undefined;
+  let comercial = baja.comercial;
+  if (baja.prefKeyDelLink || baja.sinBajaPosible) {
+    // Sin clave, con un uid que no entra en la gramática del token (no pasa con
+    // los de Auth, que miden hasta 128), o con un destinatario sin cuenta a
+    // quien apuntarle la baja, NO hay link que poner. Qué se hace entonces
+    // depende de qué es el mail, y en todos los casos suena la alarma:
+    //
+    // - **Mail entero comercial (`prefKey`)**: FALLA CERRADO. Un correo
+    //   promocional sin el mecanismo de baja es exactamente lo que el Decreto
+    //   1558/01 prohíbe, y mandarlo "igual, sin el link" es la salida que nadie
+    //   va a notar. El mail perdido no se reencola (`sendQueuedMail` sólo
+    //   escucha creaciones); es comercial, y su productor lo vuelve a mandar en
+    //   el próximo disparo, pasado el enfriamiento.
+    // - **Mail operativo con bloque de venta (`bloqueComercial`)**: DEGRADA. Sale
+    //   SIN el bloque y SIN pie, como si la preferencia estuviera apagada. El
+    //   aviso operativo («N alumnos quedaron en solo lectura») le tiene que
+    //   llegar igual, y no sale contenido comercial sin mecanismo de baja.
+    //
+    // Con `defineSecret` el deploy ya falla si el secreto no existe: esto es un
+    // cinturón, no el freno principal. Y NUNCA se deja salir la excepción: la
+    // plataforma reintentaría una semana un mail que falla idéntico cada vez.
+    let motivo: string | undefined = baja.sinBajaPosible;
+    let causa: string | undefined;
+    if (!motivo && baja.prefKeyDelLink) {
+      if (!bajaKey) {
+        motivo = "sin clave de baja";
+      } else {
+        try {
+          bajaDePromocionales = urlDeBaja(data.toUid, baja.prefKeyDelLink, bajaKey);
+        } catch (error: unknown) {
+          motivo = "link de baja no representable";
+          causa = String(error);
+        }
+      }
+    }
+
+    if (motivo) {
+      if (baja.soloElBloque) {
+        logger.error(`sendQueuedMail: ${motivo}, el mail sale sin su bloque comercial`, {
+          mailId,
+          kind: data.kind,
+          ...(causa ? { error: causa } : {}),
+        });
+        comercial = false;
+      } else {
+        logger.error(`sendQueuedMail: ${motivo}, el mail comercial no sale`, {
+          mailId,
+          kind: data.kind,
+          ...(causa ? { error: causa } : {}),
+        });
+        await ref.update({ status: "failed", attempts, lastError: motivo, ...sinSecretos() });
+        return;
+      }
+    }
+  }
+
+  const rendered = renderMail(data.kind, data.params ?? {}, {
+    bajaDePromocionales,
+    comercial,
+  });
 
   try {
     await sender.send({
@@ -290,12 +528,18 @@ export const sendQueuedMail = onDocumentCreated(
   {
     document: `${MAIL_QUEUE_COLLECTION}/{mailId}`,
     region: "southamerica-east1",
-    secrets: [RESEND_API_KEY],
+    secrets: [RESEND_API_KEY, BAJA_PROMOCIONALES_KEY],
     retry: true,
   },
   async (event) => {
     const data = event.data?.data() as MailQueueDoc | undefined;
     const sender = createResendSender(RESEND_API_KEY.value(), MAIL_FROM.value());
-    await sendQueuedMailHandler(ensureApp(), event.params.mailId, data, sender);
+    await sendQueuedMailHandler(
+      ensureApp(),
+      event.params.mailId,
+      data,
+      sender,
+      BAJA_PROMOCIONALES_KEY.value(),
+    );
   },
 );

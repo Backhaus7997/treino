@@ -29,7 +29,12 @@
 import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { MAIL_QUEUE_COLLECTION, MailKind, MailParams } from "./types";
+import {
+  MAIL_QUEUE_COLLECTION,
+  MailKind,
+  MailOptOut,
+  MailParams,
+} from "./types";
 
 /** Firestore gRPC status code for a `create()` on an existing document. */
 const ALREADY_EXISTS = 6;
@@ -59,19 +64,21 @@ export function dedupeKey(kind: MailKind, scope: string, toUid: string): string 
   return `${safe(scope)}__${kind}__${safe(toUid)}`;
 }
 
-/** Everything `enqueueMail` needs to persist one pending mail. */
-export interface EnqueueMailInput {
+/**
+ * Everything `enqueueMail` needs to persist one pending mail.
+ *
+ * `prefKey` (frena el mail ENTERO) y `bloqueComercial` (frena sólo el bloque de
+ * venta de un mail operativo) son excluyentes: ver `MailOptOut`.
+ */
+export type EnqueueMailInput = EnqueueMailBase & MailOptOut;
+
+interface EnqueueMailBase {
   /** Recipient uid. The address is resolved from Auth at send time. */
   toUid: string;
   kind: MailKind;
   /** What this mail is deduped by. See `dedupeKey`. */
   scope: string;
   params: MailParams;
-  /**
-   * Optional `users/{uid}.notificationPrefs` key. Omit for transactional mail
-   * that is not subject to opt-out.
-   */
-  prefKey?: string;
   /**
    * Cuando el dedupe rechaza este mail, ACTUALIZA los params del que ya está
    * encolado en vez de descartarlo — siempre que siga en `pending`.
@@ -169,7 +176,15 @@ export async function enqueueMail(
   app: App,
   input: EnqueueMailInput,
 ): Promise<string | null> {
-  const { toUid, kind, scope, params, prefKey, refreshPendingParams } = input;
+  const {
+    toUid,
+    kind,
+    scope,
+    params,
+    prefKey,
+    bloqueComercial,
+    refreshPendingParams,
+  } = input;
   const id = dedupeKey(kind, scope, toUid);
 
   const doc: Record<string, unknown> = {
@@ -181,6 +196,7 @@ export async function enqueueMail(
     createdAt: FieldValue.serverTimestamp(),
   };
   if (prefKey) doc.prefKey = prefKey;
+  if (bloqueComercial) doc.bloqueComercial = bloqueComercial;
 
   try {
     await getFirestore(app)
