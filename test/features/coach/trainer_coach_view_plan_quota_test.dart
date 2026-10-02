@@ -472,6 +472,31 @@ void main() {
       expect(_headerText(tester), '1 DE 2 · PLAN FREE');
     });
 
+    // El tab puede seguir montado cuando vence la baja, y en ese borde no emite
+    // nadie: el servidor no reescribe `subscription` (el perfil no vuelve a
+    // emitir) y `AppClock` no avisa. Calculada en el build, la vigencia
+    // quedaba en «PLAN 1» hasta un rebuild ajeno. La lee
+    // `vigenciaDelPlanProvider`, que se recalcula solo al llegar al borde.
+    testWidgets('vence con el tab montado: pasa a PLAN FREE solo',
+        (tester) async {
+      final fin = DateTime.utc(2026, 10, 15, 15);
+      AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(fin: fin),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+
+      // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el
+      // perfil ni los vínculos emiten de nuevo).
+      AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      expect(_headerText(tester), '3 DE 2 · PLAN FREE');
+    });
+
     // Control: con días pagos, el Plan 3 sigue sin tope.
     testWidgets('Plan 3 con días pagos: sigue sin denominador', (tester) async {
       await tester.pumpWidget(_harness(

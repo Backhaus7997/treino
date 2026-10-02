@@ -9,7 +9,7 @@ import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
-import '../coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import '../coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
@@ -196,19 +196,22 @@ class _AlumnosTab extends ConsumerWidget {
 /// pero nadie reescribe `subscription` al vencer: leído a secas, el medidor le
 /// decía «3 DE 7 · PLAN 1» a un PF cuyo tope ya era el de Free.
 ///
+/// Se lee de [vigenciaDelPlanProvider] y no de [VigenciaDelPlan.de] porque el
+/// tab puede seguir montado cuando vence la baja: el perfil no emite en ese
+/// borde (el servidor no reescribe `subscription`) y `AppClock` se lee, no
+/// avisa. El provider recalcula solo, y el medidor pasa a Free sin esperar un
+/// rebuild: como máximo un minuto después del borde (o de volver del segundo
+/// plano, porque el timer no corre con el proceso suspendido).
+///
 /// Lo que este medidor TODAVÍA no refleja:
 ///
 /// - `pending` y `paused`: también son Free para el servidor, pero acá siguen
 ///   con el tier del doc, porque [VigenciaDelPlan] espeja sólo la baja (a
 ///   propósito, por las tarjetas de plan).
-/// - El piso prepago, que no se ve desde el cliente. Este punto y el anterior
-///   están en «Qué espeja y qué NO».
-/// - El instante del vencimiento con el tab abierto. La vigencia se calcula en
-///   el build, y en ese borde nada lo reconstruye: el perfil no emite (el
-///   servidor no reescribe `subscription`) y `AppClock` se lee, no avisa. El
-///   medidor sigue en el plan pago hasta el próximo rebuild, por ejemplo
-///   cuando emiten el perfil o los vínculos. Facturación y la pricing page
-///   tienen el mismo hueco.
+/// - El piso prepago, que no se ve desde el cliente: el servidor lo aplica
+///   (`conPisoPrepago` en `effective-limit.ts`) y el medidor puede decir un
+///   tope menor que el real. Es una diferencia sólo visual y aceptada, igual
+///   que en la web. Este punto y el anterior están en «Qué espeja y qué NO».
 ///
 /// Este medidor viaja en el binario móvil: dice el estado de la cuenta y nada
 /// más. Al lado de un «3 DE 2», un «subí de plan» sería un llamado a comprar,
@@ -226,8 +229,14 @@ class _PlanQuotaHeader extends ConsumerWidget {
     // Sin `subscription` en el doc → Free: un PF sin suscripción es Free por
     // definición (no hay backfill). Una baja con el período pagado ya vencido
     // también es Free, aunque el doc siga diciendo el tier viejo.
-    final vigencia = VigenciaDelPlan.de(sub);
-    final tier = vigencia.tierEfectivo;
+    //
+    // `select` sobre el par (tier, vencida): el provider se re-evalúa cada
+    // minuto con una baja por delante y estrena objeto cada vez, pero el par es
+    // un record y compara por valor, así que el medidor sólo se reconstruye
+    // cuando algo cambia de verdad.
+    final (tier, vencida) = ref.watch(
+      vigenciaDelPlanProvider.select((v) => (v.tierEfectivo, v.vencida)),
+    );
     // El TIER decide si hay tope, NO el `weightLimit` del doc. Si un doc que ya
     // es plan3 trae un weightLimit viejo, leerlo de ahí volvería a meter un
     // denominador en el plan ilimitado. `isUnlimited` sale de
@@ -236,7 +245,7 @@ class _PlanQuotaHeader extends ConsumerWidget {
     // de la tabla del tier efectivo, igual que en Facturación.
     final limit = tier.isUnlimited
         ? null
-        : vigencia.vencida
+        : vencida
             ? tier.weightLimit
             : (sub?.weightLimit ?? tier.weightLimit);
 
