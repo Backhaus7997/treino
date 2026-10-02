@@ -222,7 +222,8 @@ async function tienePlanQueSigueCobrando(
   // puede descartar el cobro y sale `unavailable`.
   try {
     for (const id of planIds) {
-      const subs = await mpClient.searchPreapprovalsByPlan(id);
+      // `estricto`: una respuesta rota de MP no puede leerse como "no hay nada".
+      const subs = await mpClient.searchPreapprovalsByPlan(id, { estricto: true });
       if (subs.some((s) => mpSigueCobrando(s.status))) return true;
     }
     return false;

@@ -161,6 +161,34 @@ describe("createMpClient — los errores, y cuáles conviene reintentar", () => 
   });
 });
 
+describe("createMpClient — searchPreapprovalsByPlan y una respuesta sin `results`", () => {
+  it("por defecto la lee como lista vacia: el barrido no se cae por MP", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { paging: {} } });
+
+    await expect(
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1"),
+    ).resolves.toEqual([]);
+  });
+
+  it("en modo estricto FALLA: vacio no puede salir de una respuesta rota", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { results: "no-es-array" } });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1", { estricto: true }),
+    );
+    expect(err).toBeInstanceOf(MpApiError);
+    expect(err.message).toMatch(/results/);
+  });
+
+  it("en modo estricto una lista vacia REAL sigue siendo vacia", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { results: [] } });
+
+    await expect(
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1", { estricto: true }),
+    ).resolves.toEqual([]);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // createPreapproval — el POST que abre la suscripcion.
 //

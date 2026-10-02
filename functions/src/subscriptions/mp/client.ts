@@ -237,8 +237,16 @@ export interface MpClient {
    * suscripcion, a proposito: no esta verificado que la suscripcion herede ese
    * campo del plan, y el plan lo creamos nosotros con un id que ya guardamos.
    * Buscar por lo que sabemos con certeza en vez de por lo que suponemos.
+   *
+   * `estricto`: una respuesta sin `results` como array FALLA en vez de leerse
+   * como lista vacia. Es para quien decide "no hay nada cobrando" a partir de
+   * la lista vacia (la guarda de `create-athlete-preapproval.ts`): ahi la lista
+   * vacia de una respuesta rota abre un segundo cobro. El barrido no lo pide.
    */
-  searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]>;
+  searchPreapprovalsByPlan(
+    planId: string,
+    opciones?: { estricto?: boolean },
+  ): Promise<MpPreapproval[]>;
   /**
    * Da de BAJA una suscripcion. Es lo unico que frena un cobro recurrente.
    *
@@ -422,7 +430,10 @@ export function createMpClient(
       });
     },
 
-    async searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]> {
+    async searchPreapprovalsByPlan(
+      planId: string,
+      opciones?: { estricto?: boolean },
+    ): Promise<MpPreapproval[]> {
       if (!planId) {
         throw new MpApiError("mp/client: planId vacio", 0);
       }
@@ -433,8 +444,16 @@ export function createMpClient(
       const results = (res as { results?: unknown }).results;
       // Un `results` que no es array se trata como vacio y NO como error: MP
       // devolviendo algo raro no puede hacer que el barrido se caiga para
-      // todos los demas PF.
-      return Array.isArray(results) ? (results as MpPreapproval[]) : [];
+      // todos los demas PF. Salvo en modo `estricto`, donde vacio quiere decir
+      // "no hay nada cobrando" y una respuesta rota no puede afirmarlo.
+      if (Array.isArray(results)) return results as MpPreapproval[];
+      if (opciones?.estricto) {
+        throw new MpApiError(
+          "mp/client: /preapproval/search respondio sin `results` como array",
+          0,
+        );
+      }
+      return [];
     },
 
     async cancelPreapproval(preapprovalId: string): Promise<MpPreapproval> {

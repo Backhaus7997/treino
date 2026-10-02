@@ -127,15 +127,18 @@ function fakeMp(
 ) {
   const pedidos: Record<string, unknown>[] = [];
   const busquedas: string[] = [];
+  const opcionesDeBusqueda: unknown[] = [];
   return {
     pedidos,
     busquedas,
+    opcionesDeBusqueda,
     deps: {
       nowMs: AHORA,
       mpClient: {
         getPreapproval: async () => ({}),
-        searchPreapprovalsByPlan: async (planId: string) => {
+        searchPreapprovalsByPlan: async (planId: string, opciones?: unknown) => {
           busquedas.push(planId);
+          opcionesDeBusqueda.push(opciones);
           if (over.fallaLaBusqueda) throw over.fallaLaBusqueda;
           if (over.fallaEnPlan?.[planId]) throw over.fallaEnPlan[planId];
           return over.suscripciones?.[planId] ?? [];
@@ -613,6 +616,9 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
 
     expect(r.status).toBe("created");
     expect(mp.busquedas).toEqual(["viejo"]);
+    // La lista que deja pasar tiene que venir de una respuesta sana: en modo
+    // laxo, un `results` roto de MP tambien se leeria como "no cobra nada".
+    expect(mp.opcionesDeBusqueda).toEqual([{ estricto: true }]);
   });
 
   it("pausado (derecho `expired`) → se RECHAZA: el pagador lo puede reactivar", async () => {
