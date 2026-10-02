@@ -28,6 +28,7 @@
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -126,7 +127,8 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  *
  *   - Sin la del derecho, alguien cuyo plan vencio no podria volver a
  *     suscribirse nunca, porque el documento de `mp_plans` sigue ahi.
- *   - Sin la del ciclo, el que quiere pasar de mensual a anual queda trabado.
+ *   - La del ciclo da el mensaje preciso para el caso comun (apretar de nuevo el
+ *     mismo plan). El cambio de ciclo lo frena `tienePlanQueSigueCobrando`.
  *
  * Lee `mp_plans` con la misma consulta por uid que usa el resto del modulo, y
  * filtra EN MEMORIA: un segundo `where` la convertiria en compuesta y exigiria
@@ -155,6 +157,86 @@ async function yaPagaEsteCiclo(
       datos.cycle === cycle &&
       puedeSeguirCobrando(datos);
   });
+}
+
+/**
+ * Si un estado de MP significa que la suscripcion todavia puede cobrar.
+ *
+ * Solo `cancelled` y `pending` quedan afuera:
+ *
+ *   - `authorized` cobra (incluye el `grace` nuestro: MP lo deja `authorized`
+ *     mientras reintenta un cobro rebotado).
+ *   - `paused` CUENTA, y es la decision menos obvia: la pausa no es una baja, el
+ *     pagador la puede reactivar desde su cuenta de MP y el cobro vuelve solo.
+ *     Dejarlo comprar otro plan ahi es armar el doble cobro con retraso. No lo
+ *     deja encerrado: `cancelMySubscription` da de baja tambien las pausadas, o
+ *     sea que siempre tiene salida.
+ *   - un estado que no conocemos cuenta: entre un bloqueo de mas y un cobro
+ *     doble en silencio, se elige lo primero.
+ *   - `pending` no: todavia no autorizo, no hay cobro. Y bloquearlo le cerraria
+ *     el reintento del checkout que dejo a medias.
+ */
+function mpSigueCobrando(raw: unknown): boolean {
+  return raw !== "cancelled" && raw !== "pending";
+}
+
+/**
+ * Si este alumno tiene una suscripcion que MP TODAVIA cobra, de CUALQUIER ciclo.
+ *
+ * ── Por que se le pregunta a MP y no se mira `users/{uid}` ──
+ *
+ * El derecho del alumno (`athleteSubscription.status`) no alcanza para decidir
+ * esto: un plan dado de baja con periodo pago por delante sigue figurando
+ * `active` hasta que vence (es la promesa de los terminos §7), y una suscripcion
+ * pausada figura `expired` aunque pueda volver a cobrar. Los dos casos son lo
+ * contrario de lo que se necesita. Y `mp_plans` tampoco guarda el estado de MP
+ * del alumno. La unica fuente que sabe si hoy se cobra es MP.
+ *
+ * Si no se puede preguntar, NO se deja pasar: sin saberlo no se puede descartar
+ * el doble cobro, y abrir el checkout igual necesita a MP. Ver el cuerpo del
+ * callable por los dos casos que esta consulta igual no alcanza a cubrir.
+ */
+async function tienePlanQueSigueCobrando(
+  app: App,
+  uid: string,
+  mpClient: MpClient,
+): Promise<boolean> {
+  const snap = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .where("uid", "==", uid)
+    .get();
+
+  // Un plan sin suscripcion en MP (checkout abierto y nunca pagado) devuelve
+  // lista vacia: no cuenta. Los terminales de hecho (baja confirmada) se saltean
+  // para no gastar una llamada; el abandonado NO, porque se puede pagar tarde.
+  const planIds = snap.docs
+    .filter((d) => d.data().producto === "athlete" && puedeSeguirCobrando(d.data()))
+    .map((d) => d.id);
+  if (planIds.length === 0) return false;
+
+  // SECUENCIAL y cortando en la primera que cobra, a proposito: MP contesta 429
+  // y los planes abandonados se quedan para siempre, asi que un `Promise.all`
+  // creceria con el uso y un solo 429 trabaria al alumno (mismo criterio que
+  // `cancel-my-subscription.ts`). Con el corte, solo importan los planes que
+  // realmente se consultaron: si uno falla antes de encontrar uno vivo, no se
+  // puede descartar el cobro y sale `unavailable`.
+  try {
+    for (const id of planIds) {
+      // `estricto`: una respuesta rota de MP no puede leerse como "no hay nada".
+      const subs = await mpClient.searchPreapprovalsByPlan(id, { estricto: true });
+      if (subs.some((s) => mpSigueCobrando(s.status))) return true;
+    }
+    return false;
+  } catch (e) {
+    logger.error("mp/create-athlete: no se pudo verificar el plan vigente", {
+      uid,
+      error: String(e),
+    });
+    throw new HttpsError(
+      "unavailable",
+      "no pudimos verificar tu suscripcion actual, proba de nuevo en un rato",
+    );
+  }
 }
 
 /**
@@ -224,19 +306,47 @@ export async function runCreateAthletePreapproval(
   // alguien que ya paga vuelve a la pagina de precios un mes despues y aprieta
   // de nuevo, porque no se acuerda o porque no hay nada que se lo diga.
   //
-  // Sin esta guarda MP le abre un segundo cobro. El reconciliador lo corrige
-  // despues —`darDeBajaLosReemplazados` da de baja el plan viejo cuando el
-  // nuevo confirma— pero "se corrige despues" significa que en el medio existio
-  // un momento con dos suscripciones vivas, y esa ventana la paga el alumno.
-  //
-  // ⚠️ **Sólo bloquea el MISMO ciclo, y eso es el punto.** Un alumno que paga
-  // mensual y quiere pasarse a anual tiene que poder hacerlo: ese camino es
-  // exactamente para lo que existe `darDeBajaLosReemplazados`, y bloquearlo
-  // seria cerrarle la puerta al que quiere pagarnos mas.
+  // Sin esta guarda MP le abre un segundo cobro.
   if (await yaPagaEsteCiclo(app, uid, userSnap.data(), cycle)) {
     throw new HttpsError(
       "failed-precondition",
       "ya tenes una suscripcion activa con este ciclo",
+    );
+  }
+
+  // ── Y tampoco se abre un plan NUEVO mientras otro siga cobrando ──
+  //
+  // ⚠️ MITIGACION TEMPORAL del cobro doble, no una decision de producto: el que
+  // paga mensual y quiere pasarse a anual (o al reves) hoy tiene que cancelar
+  // primero. Lo ideal es dejarlo cambiar de un paso, y bloquearlo le cierra la
+  // puerta al que quiere pagarnos mas.
+  //
+  // Se bloquea porque la baja del plan reemplazado NO existe para el alumno:
+  // `darDeBajaLosReemplazados` sólo corre en la rama del PF de `reconcile.ts`,
+  // y la del alumno (`escribirSuscripcionDeAlumno`) retorna antes de llegar. Con
+  // el checkout abierto, las DOS suscripciones de MP quedan cobrando.
+  //
+  // Se levanta cuando la rama del alumno de `reconcile.ts` cancele en MP el plan
+  // reemplazado al confirmarse el nuevo. Ahi se borra este bloque y la guarda de
+  // arriba vuelve a ser la unica.
+  //
+  // ⚠️ Es EVENTUALMENTE consistente: reduce el cobro doble, no lo cierra. Quedan
+  // abiertos dos casos hasta que exista esa baja:
+  //   (a) el indice de busqueda de MP llega tarde (~93 s, ver `reconcile.ts`): un
+  //       plan recien pagado puede no aparecer todavia;
+  //   (b) dos `init_point` abiertos (una pestaña vieja sin pagar y el checkout
+  //       nuevo) que se pagan los dos despues: el `init_point` no vence.
+  //
+  // El mensaje evita las palabras «entrenador» y «ciclo» a proposito: la landing
+  // (`motivoDeLaPrecondicion`, treino-app) decide el copy buscandolas en el texto,
+  // y cualquiera de las dos mostraria un motivo que aca es falso.
+  // La baja del alumno vive en la web (`/suscripcion/baja`, treino-app), no en
+  // la app.
+  if (await tienePlanQueSigueCobrando(app, uid, deps.mpClient)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "ya tenes un plan que se sigue cobrando — para cambiar de plan, " +
+        "dalo de baja primero desde la web (Suscripcion > Baja) y despues contrata el nuevo",
     );
   }
 

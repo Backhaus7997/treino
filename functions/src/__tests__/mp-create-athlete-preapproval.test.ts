@@ -56,6 +56,7 @@ import {
   backUrlPara,
   runCreateAthletePreapproval,
 } from "../subscriptions/mp/create-athlete-preapproval";
+import { MOTIVO_ABANDONO } from "../subscriptions/mp/motivos-terminal";
 import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
 import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
 
@@ -113,15 +114,35 @@ const ALUMNO_SUELTO = (): Store => ({
   users: { [UID]: { role: "athlete", displayName: "Ana" } },
 });
 
-function fakeMp(over: Partial<{ falla: Error }> = {}) {
+function fakeMp(
+  over: Partial<{
+    falla: Error;
+    /** Que suscripciones tiene MP por plan. Sin esto, ninguno tiene. */
+    suscripciones: Record<string, { status: string }[]>;
+    /** Hace fallar la CONSULTA a MP (no la apertura del checkout). */
+    fallaLaBusqueda: Error;
+    /** Hace fallar la consulta de UN plan puntual. */
+    fallaEnPlan: Record<string, Error>;
+  }> = {},
+) {
   const pedidos: Record<string, unknown>[] = [];
+  const busquedas: string[] = [];
+  const opcionesDeBusqueda: unknown[] = [];
   return {
     pedidos,
+    busquedas,
+    opcionesDeBusqueda,
     deps: {
       nowMs: AHORA,
       mpClient: {
         getPreapproval: async () => ({}),
-        searchPreapprovalsByPlan: async () => [],
+        searchPreapprovalsByPlan: async (planId: string, opciones?: unknown) => {
+          busquedas.push(planId);
+          opcionesDeBusqueda.push(opciones);
+          if (over.fallaLaBusqueda) throw over.fallaLaBusqueda;
+          if (over.fallaEnPlan?.[planId]) throw over.fallaEnPlan[planId];
+          return over.suscripciones?.[planId] ?? [];
+        },
         cancelPreapproval: async () => ({}),
         createPreapprovalPlan: async (p: Record<string, unknown>) => {
           pedidos.push(p);
@@ -446,16 +467,6 @@ describe("no se puede comprar dos veces el MISMO ciclo", () => {
     expect(mp.pedidos).toEqual([]);
   });
 
-  it("PERMITE cambiar de mensual a anual", async () => {
-    // El contrapeso que evita que la guarda le cierre la puerta al que quiere
-    // pagarnos MAS. De ese camino se encarga `darDeBajaLosReemplazados`.
-    const { app } = fakeApp(YA_PAGA("monthly"));
-
-    const r = await correr(app, { cycle: "annual" }, fakeMp());
-
-    expect(r.status).toBe("created");
-  });
-
   it("PERMITE volver a suscribirse si el derecho ya vencio", async () => {
     // Sin la condicion del derecho, alguien cuyo plan vencio no podria
     // suscribirse NUNCA MAS, porque el documento de `mp_plans` sigue ahi.
@@ -516,14 +527,272 @@ describe("no se puede comprar dos veces el MISMO ciclo", () => {
     expect(r.status).toBe("created");
   });
 
-  it("sin derecho vigente NO consulta mp_plans", async () => {
-    // El orden importa: la condicion barata primero. Un alumno que nunca pago
-    // es el caso NORMAL, y no tiene por que costar una query de mas en el
-    // camino feliz.
-    const { app, queries } = fakeApp(ALUMNO_SUELTO());
+  it("un alumno que nunca pago no le pregunta nada a MP", async () => {
+    // El caso NORMAL no tiene por que costar una llamada de red: sin planes en
+    // `mp_plans` no hay a quien preguntarle.
+    const { app } = fakeApp(ALUMNO_SUELTO());
+    const mp = fakeMp();
 
-    await correr(app, { cycle: "monthly" }, fakeMp());
+    await correr(app, { cycle: "monthly" }, mp);
 
-    expect(queries()).not.toContain("mp_plans");
+    expect(mp.busquedas).toEqual([]);
+  });
+});
+
+describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", () => {
+  // MITIGACION TEMPORAL del cobro doble: la rama del alumno de `reconcile.ts`
+  // no da de baja el plan reemplazado, asi que dos checkouts = dos cobros.
+  // Estos tests se borran cuando esa baja exista.
+
+  const YA_PAGA = (cycle: string, status = "active"): Store => ({
+    users: {
+      [UID]: {
+        role: "athlete",
+        displayName: "Ana",
+        athleteSubscription: { status },
+      },
+    },
+    mp_plans: { viejo: { producto: "athlete", uid: UID, cycle } },
+  });
+
+  const RECHAZADO = { code: "failed-precondition" };
+
+  it("mensual activo → pedir anual se RECHAZA y no se abre checkout", async () => {
+    const { app, escrituras } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+
+    // Lo que importa: MP no recibio ningun pedido de plan y no se escribio nada.
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
+  it("anual activo → pedir mensual se RECHAZA y no se abre checkout", async () => {
+    const { app, escrituras } = fakeApp(YA_PAGA("annual"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
+  it("el mismo ciclo sigue rechazado", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("el mensaje del cambio de ciclo no activa ningun copy equivocado de la landing", async () => {
+    // `motivoDeLaPrecondicion` (treino-app) busca «entrenador» y «ciclo» en el
+    // texto. Con cualquiera de las dos el alumno veria un motivo falso.
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message.toLowerCase()).not.toContain("entrenador");
+    expect(error.message.toLowerCase()).not.toContain("ciclo");
+  });
+
+  it("⚠️ NEGATIVO: plan dado de baja con periodo por delante → SI se puede contratar", async () => {
+    // El derecho sigue `active` hasta que vence (terminos §7), pero MP ya no
+    // cobra. Si la guarda mirara el derecho en vez de a MP, esto quedaria
+    // bloqueado y el que vuelve no podria pagarnos.
+    const mundo = YA_PAGA("monthly", "active");
+    (mundo.mp_plans.viejo as Record<string, unknown>).currentPeriodEnd =
+      AHORA + 10 * 24 * 3600 * 1000;
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "cancelled" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual(["viejo"]);
+    // La lista que deja pasar tiene que venir de una respuesta sana: en modo
+    // laxo, un `results` roto de MP tambien se leeria como "no cobra nada".
+    expect(mp.opcionesDeBusqueda).toEqual([{ estricto: true }]);
+  });
+
+  it("pausado (derecho `expired`) → se RECHAZA: el pagador lo puede reactivar", async () => {
+    // `paused` figura `expired` en nuestro derecho, asi que mirar `users/{uid}`
+    // lo dejaria pasar. Pero MP lo puede reanudar, y ahi cobran los dos.
+    const { app } = fakeApp(YA_PAGA("monthly", "expired"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "paused" }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("en `grace` (MP sigue `authorized` y reintenta) se RECHAZA", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly", "grace"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+  });
+
+  it("un checkout abierto y nunca pagado (sin suscripcion en MP) no bloquea", async () => {
+    // Abrio el mensual, lo abandono, y ahora quiere el anual.
+    const mundo = YA_PAGA("monthly", "expired");
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+  });
+
+  it("una suscripcion `pending` (todavia no autorizo) no bloquea", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly", "expired"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "pending" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+  });
+
+  it("un estado de MP desconocido bloquea: ante la duda, no se arma un cobro doble", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "algo-nuevo" }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+  });
+
+  it("un plan terminal (baja confirmada) no gasta una consulta ni bloquea", async () => {
+    const mundo = YA_PAGA("monthly", "expired");
+    (mundo.mp_plans.viejo as Record<string, unknown>).terminal = true;
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual([]);
+  });
+
+  it("un terminal por ABANDONO se sigue mirando: el init_point no vence y se puede pagar tarde", async () => {
+    const mundo = YA_PAGA("monthly", "expired");
+    Object.assign(mundo.mp_plans.viejo as Record<string, unknown>, {
+      terminal: true, terminalReason: MOTIVO_ABANDONO,
+    });
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+  });
+
+  it("el plan de OTRO alumno no bloquea", async () => {
+    const mundo = YA_PAGA("monthly", "expired");
+    (mundo.mp_plans.viejo as Record<string, unknown>).uid = "otro";
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual([]);
+  });
+
+  it("si no se puede consultar a MP NO se abre checkout: sale `unavailable`", async () => {
+    // Sin saber si hay un cobro vivo no se puede descartar el doble cobro.
+    const { app, escrituras } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({ fallaLaBusqueda: new Error("503") });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject({ code: "unavailable" });
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("varios planes: uno cancelado y otro autorizado → se RECHAZA", async () => {
+    // El alumno que se dio de baja del mensual, contrato el anual, y ahora
+    // pide otro. El cancelado no tapa al vivo.
+    // Derecho `expired` para que sea la consulta a MP la que rechaza, no la
+    // guarda del mismo ciclo.
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.nuevo = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: {
+        viejo: [{ status: "cancelled" }],
+        nuevo: [{ status: "authorized" }],
+      },
+    });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("un plan de PF (`producto: trainer`) del mismo uid autorizado NO cuenta", async () => {
+    // No deberia existir —`role` es inmutable— pero si existiera, el cobro de
+    // un entrenador no es el del alumno. Y ni siquiera se le pregunta a MP.
+    const mundo = YA_PAGA("monthly", "expired");
+    (mundo.mp_plans.viejo as Record<string, unknown>).producto = "trainer";
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.busquedas).toEqual([]);
+  });
+
+  it("una suscripcion de MP SIN status bloquea — igual que un estado desconocido", async () => {
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp({
+      suscripciones: { viejo: [{} as unknown as { status: string }] },
+    });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("la consulta es SECUENCIAL: con el primero vivo no se consulta el segundo", async () => {
+    // MP contesta 429 y los planes abandonados se acumulan: cada llamada de
+    // mas es una chance de trabar al alumno.
+    // Derecho `expired` para que la guarda del mismo ciclo no atienda antes.
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.otro = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: {
+        viejo: [{ status: "authorized" }],
+        otro: [{ status: "authorized" }],
+      },
+    });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject(RECHAZADO);
+    expect(mp.busquedas).toEqual(["viejo"]);
+  });
+
+  it("si una consulta falla antes de hallar uno vivo → `unavailable` y no se abre checkout", async () => {
+    const mundo = YA_PAGA("monthly", "expired");
+    mundo.mp_plans.otro = { producto: "athlete", uid: UID, cycle: "annual" };
+    const { app, escrituras } = fakeApp(mundo);
+    const mp = fakeMp({
+      suscripciones: { viejo: [{ status: "cancelled" }] },
+      fallaEnPlan: { otro: new Error("429") },
+    });
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject({ code: "unavailable" });
+    expect(mp.busquedas).toEqual(["viejo", "otro"]);
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
   });
 });
