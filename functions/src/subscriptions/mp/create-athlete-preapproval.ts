@@ -343,7 +343,7 @@ export async function runCreateAthletePreapproval(
         },
       });
   } catch (e) {
-    const err = e as MpApiError;
+    const err = e as Partial<MpApiError>;
     logger.error(
       "mp/create-athlete-preapproval: no se pudo verificar la suscripcion " +
         "del alumno (plan vigente y dias pagos), no se abre el checkout",
@@ -409,7 +409,13 @@ export async function runCreateAthletePreapproval(
   // ⚠️ Es EVENTUALMENTE consistente: reduce el cobro doble, no lo cierra. Quedan
   // abiertos dos casos hasta que exista esa baja:
   //   (a) el indice de busqueda de MP llega tarde (~93 s, ver `reconcile.ts`): un
-  //       plan recien pagado puede no aparecer todavia;
+  //       plan recien pagado puede no aparecer todavia. Vale tambien para el MISMO
+  //       ciclo y el diferimiento: el alumno autoriza el plan diferido B y aprieta de
+  //       nuevo dentro de esos ~93 s, antes de que el webhook de B escriba su
+  //       `currentPeriodEnd`. B vuelve vacio y sin fecha, asi que se difiere otra vez
+  //       y la guarda del mismo ciclo no corre. Dentro de la ventana de reuso de 30
+  //       minutos vuelve el mismo `init_point`; pasada, se abre un segundo plan con
+  //       prueba y los dos cobran en E. Ventana minuscula, y sin corregir;
   //   (b) dos `init_point` abiertos (una pestaña vieja sin pagar y el checkout
   //       nuevo) que se pagan los dos despues: el `init_point` no vence.
   //

@@ -2671,7 +2671,9 @@ describe("decidirDiferimientoDeAlumno: que planes se consultan y cuales prueban 
     expect(lecturas.suscripciones).toEqual(["c1", "c2", "a0"]);
   });
 
-  it("un checkout abandonado SIN fecha no se consulta: al cerrarse no tenia ninguna suscripcion", async () => {
+  it("un abandonado SIN fecha no prueba un pago, pero se consulta para saber si esta vivo", async () => {
+    // Al cerrarse no tenia ninguna suscripcion: no puede ser evidencia. Pero si MP
+    // le devuelve una cancelada (o nada), el diferimiento sigue como si no estuviera.
     const { input, lecturas } = armarAlumno({
       planes: [
         planDeAlumno("a0", 20),
@@ -2681,7 +2683,37 @@ describe("decidirDiferimientoDeAlumno: que planes se consultan y cuales prueban 
 
     expect(await decidirDiferimientoDeAlumno(input))
       .toEqual({ diferir: true, diferidoHastaMs: FIN });
-    expect(lecturas.suscripciones).toEqual(["a0"]);
+    expect(lecturas.suscripciones).toEqual(["a0", "ab"]);
+  });
+
+  for (const estado of ["pending", "authorized", "paused", "un-estado-nuevo"]) {
+    it(`⚠️ ${estado} en un abandonado SIN fecha frena el diferimiento, como en cualquier otro plan`, async () => {
+      // Si se autoriza despues, cobra desde E junto con el plan nuevo: el mismo
+      // criterio que una `pending` en un plan con fecha o sin ella.
+      const { input } = armarAlumno({
+        planes: [
+          planDeAlumno("a0", 20),
+          sinFecha("ab", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+        ],
+        subs: { ab: [viva({ status: estado })] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    });
+  }
+
+  it("un abandonado SIN fecha que MP no conoce (lista vacia) no frena nada", async () => {
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        sinFecha("ab", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+      ],
+      subs: { ab: [] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
   });
 
   it("sin ningun plan con fecha de fin: sin-fecha-de-fin, sin preguntarle a MP", async () => {

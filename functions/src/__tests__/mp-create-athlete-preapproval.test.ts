@@ -56,6 +56,7 @@ import {
   backUrlPara,
   runCreateAthletePreapproval,
 } from "../subscriptions/mp/create-athlete-preapproval";
+import * as diferir from "../subscriptions/mp/diferir-primer-cobro";
 import { MOTIVO_ABANDONO } from "../subscriptions/mp/motivos-terminal";
 import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
 import { MpPreapproval } from "../subscriptions/mp/client";
@@ -1148,6 +1149,57 @@ describe("volver con dias pagos: el primer cobro se difiere", () => {
         .rejects.toMatchObject({ code: "unavailable" });
       expect(mp.opcionesDeBusqueda).toEqual([{ estricto: true }]);
       expect(mp.pedidos).toEqual([]);
+    });
+
+    it("⚠️ una `pending` en un abandonado sin fecha tampoco habilita la prueba: se cobra en el acto", async () => {
+      // El abandonado sin fecha no prueba un pago, pero si se autoriza despues
+      // cobraria desde E junto con el plan nuevo. Mismo criterio que una `pending`
+      // en cualquier otro plan: el diferimiento no se aplica y el checkout es el de
+      // siempre.
+      const mundo = DADO_DE_BAJA();
+      mundo.mp_plans.abandonado = {
+        producto: "athlete",
+        uid: UID,
+        cycle: "monthly",
+        createdAt: ts(AHORA - 40 * DIA_MS),
+        terminal: true,
+        terminalReason: MOTIVO_ABANDONO,
+      };
+      const { app } = fakeApp(mundo);
+      const pendiente: MpPreapproval = { id: "s-p", status: "pending" };
+      const mp = fakeMp({ subs: { viejo: [BAJA], abandonado: [pendiente] } });
+
+      // Se pide el otro ciclo para que la guarda del mismo ciclo (que no mira a MP)
+      // no tenga nada que decir.
+      const r = await correr(app, { cycle: "annual" }, mp);
+
+      expect(r.status).toBe("created");
+      expect(mp.pedidos[0]).not.toHaveProperty("freeTrialDays");
+      expect(r).not.toHaveProperty("diferidoHastaIso");
+      // Una sola busqueda por plan, abandonado incluido.
+      expect(mp.busquedas.slice().sort()).toEqual(["abandonado", "viejo"]);
+    });
+
+    it("un plan que la decision pide y la pasada no trajo sale `unavailable`, sin abrir nada", async () => {
+      // La invariante del lector: el conjunto de la decision es un subconjunto del
+      // de la pasada. Si un dia dejara de serlo, no se le pregunta a MP por la
+      // espalda: se falla cerrado.
+      const spy = jest
+        .spyOn(diferir, "consultarPlanesDelAlumno")
+        .mockResolvedValueOnce({ vivo: false, suscripciones: new Map() });
+      try {
+        const { app, escrituras } = fakeApp(DADO_DE_BAJA());
+        const mp = fakeMp({ subs: { viejo: [BAJA] } });
+
+        await expect(correr(app, { cycle: "monthly" }, mp))
+          .rejects.toMatchObject({ code: "unavailable" });
+
+        expect(mp.pedidos).toEqual([]);
+        expect(escrituras).toEqual([]);
+        expect(errorSpy).toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it("un plan `pending` no bloquea y tampoco habilita la prueba: se cobra en el acto, como antes", async () => {

@@ -849,10 +849,13 @@ export async function decidirDiferimiento(
 // todavia y bloquearla le cerraria el reintento del checkout que dejo a medias. Para
 // diferir, se pide mas: ante la duda de si ya paga, se cobra en el acto como antes.
 //
-// El limite que queda: un checkout abandonado (terminal por [MOTIVO_ABANDONO]) sin
-// fecha no se consulta. Cuando el barrido lo cerro no tenia ninguna suscripcion, y
+// El checkout abandonado (terminal por [MOTIVO_ABANDONO]) sin fecha no puede ser
+// evidencia de un pago: cuando el barrido lo cerro no tenia ninguna suscripcion, y
 // si alguien lo pagara despues sin que el reconciliador lo viera, tampoco lo veria
-// el PF.
+// el PF. Pero SI se consulta, en la pasada ([consultarPlanesDelAlumno]) y de nuevo
+// al decidir, para saber si esta vivo: lo que MP devuelva ahi frena el diferimiento
+// igual que en cualquier otro plan (una `pending` que se autorice despues cobraria
+// desde E junto con el plan nuevo).
 
 /**
  * Cuantos planes del ALUMNO se consideran, como maximo, para decidir el
@@ -899,7 +902,9 @@ export interface PlanDelAlumnoARevisar {
  * el default de `lookupPlan`) que todavia pueden cobrar (`puedeSeguirCobrando`),
  * TENGAN O NO fecha: que no la tengan no prueba que no haya una suscripcion viva
  * (ver el encabezado). La unica excepcion es el checkout abandonado sin fecha, que
- * cuando se cerro no tenia ninguna.
+ * cuando se cerro no tenia ninguna: no entra aca porque no puede ser evidencia de
+ * un pago, pero [decidirDiferimientoDeAlumno] igual lo consulta para saber si esta
+ * vivo.
  *
  * Entran los checkouts sin pagar de los ultimos 30 dias (despues los cierra el
  * barrido): MP contesta que no tienen ninguna suscripcion, y eso ya es la
@@ -999,7 +1004,9 @@ export type ConsultaDeLosPlanesDelAlumno =
  * y se puede pagar tarde. Es un conjunto mas ancho que el de
  * [planesDelAlumnoARevisar] (que deja afuera al abandonado sin fecha): para BLOQUEAR
  * importa todo lo que pueda estar cobrando, para diferir solo lo que pueda probar un
- * pago, y quien decide el diferimiento filtra de lo que esta pasada deja.
+ * pago. Quien decide el diferimiento filtra la evidencia de lo que esta pasada
+ * deja, pero mira el estado de TODOS: ninguno de los planes consultados puede estar
+ * vivo para que se difiera.
  *
  * ── Como ──
  *
@@ -1151,9 +1158,11 @@ export async function decidirDiferimientoDeAlumno(
   if (conDias.length === 0) return sinDiferir("queda-menos-de-un-dia", alcance);
   if (candidatos.length === 0) return sinDiferir("sin-pago-comprobado", alcance);
 
-  // Hay que mirarlos a TODOS (ver [planesDelAlumnoARevisar]): con mas que el tope
-  // no se puede saber si alguno sigue vivo sin pasarse de llamadas, y se cobra en
-  // el acto, como antes. Es raro, y por eso ademas de explicarse, avisa.
+  // El tope solo acota ESTA decision: la pasada ([consultarPlanesDelAlumno]) ya
+  // consulto todos los planes que pueden cobrar, asi que no hay llamadas que
+  // ahorrar. Con mas planes que el tope no se difiere y se cobra en el acto, como
+  // antes: es la direccion segura (no se suma una prueba sobre una cuenta con tantos
+  // planes que pueden cobrar). Es raro, y por eso ademas de explicarse, avisa.
   if (aConsultar.length > MAX_PLANES_DEL_ALUMNO_A_REVISAR) {
     logger.warn(
       "mp/diferir-primer-cobro: el alumno tiene mas planes que pueden cobrar " +
@@ -1197,6 +1206,25 @@ export async function decidirDiferimientoDeAlumno(
       }
     }
   }
+
+  // Los planes que pueden cobrar y no entraron a `aConsultar` (el checkout
+  // abandonado sin fecha) no prueban ningun pago, pero se miran igual para saber si
+  // estan vivos: cualquier estado que no sea `cancelled` (una `pending` que se
+  // autorice despues) frena el diferimiento, como en el resto de los planes.
+  const consultados = new Set(aConsultar.map((p) => p.id));
+  for (const { id, data } of enLaCuenta) {
+    if (consultados.has(id)) continue;
+    if (data.producto !== "athlete" || !puedeSeguirCobrando(data)) continue;
+    const subs = await i.leerSuscripciones(id);
+    if (subs.some((s) => s.status !== "cancelled")) {
+      return sinDiferir("no-esta-cancelada", {
+        ...alcance,
+        planVivo: id,
+        abandonadoSinFecha: true,
+      });
+    }
+  }
+
   if (pago === null || conPago === null || conPago.finMs === null) {
     return sinDiferir("sin-pago-comprobado", alcance);
   }
