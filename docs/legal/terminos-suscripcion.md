@@ -420,11 +420,14 @@ servidor y cliente). La lista de lo que falta para encenderlo vive en
 
 **Límite de ejercicios propios del entrenador** (agregado el 2026-09-24): el
 texto de §1, §2.1 y §9 ya lo describe. Plan de implementación en
-`docs/limite-ejercicios-pf.md`. El texto se publica **antes** que el código, a
-propósito: no hay entrenadores reales todavía, y con el interruptor apagado el
-texto describe un límite más estricto que el que se aplica. Lo que no puede
-pasar es que se dé de alta el primer entrenador real sin los límites
-encendidos.
+`docs/limite-ejercicios-pf.md`. El texto se publicó **antes** que el código, a
+propósito: no había entrenadores reales todavía, y con el interruptor apagado el
+texto describía un límite más estricto que el que se aplicaba. Lo que no podía
+pasar es que se diera de alta el primer entrenador real sin los límites
+encendidos. ✅ **Encendido desde el 2026-09-29** (#1244): desde entonces el
+texto y el código de `main` dicen lo mismo. Hubo un primer encendido el
+2026-09-25 que un deploy desde `main` revirtió ese mismo día; el detalle está en
+el Estado de `docs/limite-ejercicios-pf.md`.
 
 **Límite de plantillas del entrenador** (agregado el 2026-09-25): el texto de
 §1, §2.1 y §9 ya lo describe, y el detalle está en §8.2.ter de los Términos para
