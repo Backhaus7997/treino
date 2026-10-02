@@ -912,3 +912,49 @@ describe("syncTrainerEntitlements — planLimits.athletes (tope efectivo de alum
     expect(state.users.t1.planLimits).toBeUndefined();
   });
 });
+
+describe("syncTrainerEntitlements — planLimits.athletes coincide con el limite que reconcilia", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const NOW = 10_000;
+  const casos: Array<[string, Record<string, unknown> | undefined, number | null]> = [
+    ["sin suscripcion", undefined, 2],
+    ["active plan2", { tier: "plan2", status: "active" }, 15],
+    ["pending plan2", { tier: "plan2", status: "pending" }, 2],
+    [
+      "paused + piso plan2 vigente",
+      { tier: "plan1", status: "paused", prepaidTier: "plan2", prepaidUntil: ts(50_000) },
+      15,
+    ],
+    [
+      "cancelled dentro del periodo",
+      { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(20_000) },
+      15,
+    ],
+    [
+      "cancelled vencido",
+      { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(NOW - 1) },
+      2,
+    ],
+    ["plan3", { tier: "plan3", status: "active" }, null],
+    [
+      "plan1 con piso plan3",
+      { tier: "plan1", status: "active", prepaidTier: "plan3", prepaidUntil: ts(50_000) },
+      null,
+    ],
+  ];
+
+  it.each(casos)("%s: planLimits.athletes === result.limit", async (_n, subscription, esperado) => {
+    const state = install({
+      users: { t1: subscription ? { subscription } : {} },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    const r = await syncTrainerEntitlements(app, "t1", NOW);
+
+    const pl = state.users.t1.planLimits as Record<string, unknown>;
+    // `toBe` y no `toEqual`: null contra undefined tiene que distinguirse.
+    expect(pl.athletes).toBe(r.limit);
+    expect(r.limit).toBe(esperado);
+  });
+});

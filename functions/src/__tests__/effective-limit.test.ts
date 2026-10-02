@@ -554,3 +554,53 @@ describe("proximoCambioDeLimite", () => {
     ).toBeNull();
   });
 });
+
+describe("proximoCambioDeLimite — invariante sobre toda la matriz de estados", () => {
+  const estados: SubscriptionState[] = [];
+  for (const tier of ["free", "plan1", "plan2", "plan3"] as const) {
+    for (const status of SUBSCRIPTION_STATUSES) {
+      for (const end of [NOW - 1, NOW + 100, NOW + 900, null]) {
+        for (const piso of [null, "plan1", "plan2", "plan3"] as const) {
+          for (const hasta of [NOW - 1, NOW + 100, NOW + 900]) {
+            estados.push({
+              tier,
+              status,
+              currentPeriodEndMs: end,
+              prepaidTier: piso,
+              prepaidUntilMs: piso ? hasta : null,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  it("con cambio: atMs-1 vale lo actual y atMs ya vale `limit`", () => {
+    let conCambio = 0;
+    for (const e of estados) {
+      const c = proximoCambioDeLimite(e, NOW);
+      if (!c) continue;
+      conCambio++;
+      expect(c.atMs).toBeGreaterThan(NOW);
+      expect(effectiveWeightLimit(e, c.atMs - 1)).toBe(effectiveWeightLimit(e, NOW));
+      expect(effectiveWeightLimit(e, c.atMs)).toBe(c.limit);
+      expect(c.limit).not.toBe(effectiveWeightLimit(e, NOW));
+    }
+    // Control: la matriz tiene que ejercitar la rama, si no el test es vacuo.
+    expect(conCambio).toBeGreaterThan(0);
+  });
+
+  it("sin cambio: pasado el ultimo quiebre el limite sigue siendo el actual", () => {
+    let sinCambio = 0;
+    for (const e of estados) {
+      if (proximoCambioDeLimite(e, NOW)) continue;
+      sinCambio++;
+      const quiebres = [e.currentPeriodEndMs, e.prepaidUntilMs].filter(
+        (t): t is number => typeof t === "number",
+      );
+      const despues = Math.max(NOW, ...quiebres) + 1;
+      expect(effectiveWeightLimit(e, despues)).toBe(effectiveWeightLimit(e, NOW));
+    }
+    expect(sinCambio).toBeGreaterThan(0);
+  });
+});

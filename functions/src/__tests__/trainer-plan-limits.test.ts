@@ -289,10 +289,10 @@ describe("resolveAthleteLimits — el tope de alumnos que se publica en planLimi
     expect(r.athletesDespues).toBe(2);
   });
 
-  it("el destino puede ser sin tope: athletesDespues null CON athletesHasta presente", () => {
-    // Un cambio hacia ilimitado por reloj no existe hoy (el piso solo sostiene,
-    // y vencer baja), pero el contrato lo tiene que decir: `athletesHasta` es la
-    // unica clave que dice si hay cambio.
+  it("un paused con piso plan3: athletes null (sin tope) y programa la vuelta a Free", () => {
+    // OJO: `athletesDespues: null` con `athletesHasta` presente es inalcanzable
+    // hoy (vencer solo mantiene o baja el tope). Este test NO cubre esa rama,
+    // solo que el destino de un piso sin tope que vence es Free (2), no null.
     const r = resolveAthleteLimits(
       { tier: "plan1", status: "paused", prepaidTier: "plan3", prepaidUntilMs: NOW + 10 },
       false,

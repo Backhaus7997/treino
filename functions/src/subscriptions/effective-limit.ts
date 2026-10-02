@@ -149,6 +149,17 @@ function conPisoPrepago(
 }
 
 /**
+ * Un cambio de limite por reloj: desde `atMs` rige `limit`. Ver
+ * [proximoCambioDeLimite].
+ */
+export interface CambioDeLimite {
+  /** Instante del cambio, ms desde epoch. Desde ese instante rige [limit]. */
+  atMs: number;
+  /** El limite que rige desde [atMs]. `null` = SIN TOPE. */
+  limit: number | null;
+}
+
+/**
  * El proximo instante en que el limite efectivo CAMBIA solo por el paso del
  * tiempo, y a que valor cambia. `null` = no hay ningun cambio por reloj.
  *
@@ -181,13 +192,6 @@ function conPisoPrepago(
  * quien consuma esto tiene que distinguir "no hay cambio" (el retorno es `null`)
  * de "el limite despues es ilimitado" (`limit === null` adentro del objeto).
  */
-export interface CambioDeLimite {
-  /** Instante del cambio, ms desde epoch. Desde ese instante rige [limit]. */
-  atMs: number;
-  /** El limite que rige desde [atMs]. `null` = SIN TOPE. */
-  limit: number | null;
-}
-
 export function proximoCambioDeLimite(
   sub: SubscriptionState | null | undefined,
   nowMs: number = Date.now(),

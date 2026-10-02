@@ -213,7 +213,12 @@ export function resolvePlanLimits(
  *   `athletesDespues == null` solo se mira cuando `athletesHasta` existe, y ahi
  *   quiere decir "sin tope" (hay que mirar `athletesHasta` primero, porque el
  *   `null` de `athletesDespues` es ambiguo por si solo). Ver
- *   [proximoCambioDeLimite].
+ *   [proximoCambioDeLimite]. Hoy `athletesDespues: null` CON `athletesHasta`
+ *   presente es INALCANZABLE: los dos quiebres posibles (vencer un
+ *   `cancelled`, vencer un piso) solo mantienen o BAJAN el tope, nunca lo
+ *   suben a «sin tope». La lectura queda documentada igual, a proposito y
+ *   como defensa: si algun dia aparece un cambio hacia ilimitado por reloj
+ *   (por ejemplo un alta programada), el contrato ya dice como leerlo.
  *
  * No tiene interruptor: a diferencia de `customExercises`/`templates`, ninguna
  * regla de `firestore.rules` LEE estas claves (el cap de alumnos se enforza en
@@ -238,6 +243,16 @@ export interface AthletePlanLimits {
  * fallback conservador (Free) y no lo que el PF pago. Publicarlo le diria a la
  * app que un PF que capaz pago plan3 tiene 2 alumnos, por un typo NUESTRO. Se
  * omite y queda lo que habia (o ausente, y el cliente cae a su fallback).
+ *
+ * OJO, dicho sin maquillaje: esto NO alinea la UI con el gate en datos
+ * degradados. `promote-link.ts` (~L203-211) IGNORA `degraded` a proposito y
+ * sigue enforzando el limite fallback (Free) para aceptar alumnos nuevos
+ * (fail-closed). Con un `subscription` mal escrito a mano, la app muestra el
+ * valor VIEJO publicado (o su fallback de cliente, si la clave esta ausente)
+ * mientras el gate mide contra el fallback del servidor: pueden discrepar
+ * hasta que alguien arregle el documento. Es el mismo desfasaje que ya
+ * tienen `weightedLoad` y el limite degradado; aca se elige no publicar un
+ * numero que sabemos que es el del fallback.
  *
  * Sano: SIEMPRE el trio completo. Usa el mismo `sub` y el mismo `nowMs` con que
  * `syncTrainerEntitlements` calculo el limite que reconcilia los vinculos, asi

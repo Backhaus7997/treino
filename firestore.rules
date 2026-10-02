@@ -341,7 +341,8 @@ service cloud.firestore {
                     // no se calcula alla, y por eso quien lo escriba manda.
                     && request.resource.data.get('customExerciseVideoUsage', null) == null
                     // planLimits: CF-write-only. Es el mapa de topes vigentes
-                    // del PF (hoy, sólo `customExercises`), que escribe
+                    // del PF (hoy `customExercises`, `templates`, `athletes`,
+                    // `athletesHasta` y `athletesDespues`), que escribe
                     // `syncTrainerEntitlements` (limite-ejercicios-pf.md,
                     // PR1). Mismo peso y mismo modo de falla que
                     // `customExerciseVideoUsage`, dos pins arriba: sin éste,
