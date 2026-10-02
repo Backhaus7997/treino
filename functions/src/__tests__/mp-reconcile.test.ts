@@ -5209,30 +5209,85 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       expect(derecho(store)).toBe("active");
     });
 
-    it("si el nuevo YA cobro, la plata ya se movio: se da de baja el viejo y se avisa", async () => {
+    /** B ya cobro su primer periodo de [meses]: la plata ya se movio. */
+    const nuevoCobrado = (meses: number): MpPreapproval => ({
+      ...NUEVO_TARDE,
+      next_payment_date: new Date(AHORA + meses * 30 * DIA_MS).toISOString(),
+      auto_recurring: { frequency: meses, frequency_type: "months", transaction_amount: 35000 },
+      summarized: {
+        charged_quantity: 1,
+        charged_amount: 35000,
+        last_charged_date: new Date(AHORA - HORA_MS).toISOString(),
+        last_charged_amount: 35000,
+        pending_charge_quantity: 0,
+      },
+    });
+
+    it("los dos ya cobraron y el NUEVO cubre mas (anual vs mensual): baja del viejo", async () => {
       const { app } = fakeApp(mundoTarde("monthly"));
-      const mp = fakeMpMultiPlan({
-        viejo: viejoRenovado(1),
-        nuevo: {
-          ...NUEVO_TARDE,
-          summarized: {
-            charged_quantity: 1,
-            charged_amount: 35000,
-            last_charged_date: new Date(AHORA - HORA_MS).toISOString(),
-            last_charged_amount: 35000,
-            pending_charge_quantity: 0,
-          },
-        },
-      });
+      const mp = fakeMpMultiPlan({ viejo: viejoRenovado(1), nuevo: nuevoCobrado(12) });
 
       await reconcileSubscription(app, "nuevo", mp);
 
       expect(mp.bajas).toEqual(["s-viejo"]);
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("ya se cobro dos veces"),
-        expect.objectContaining({ planViejo: "viejo" }),
+        expect.objectContaining({ uid: "u1", planNuevo: "nuevo", planesViejos: ["viejo"] }),
       );
     });
+
+    it("los dos ya cobraron y el VIEJO cubre mas (anual renovado vs mensual): baja del nuevo", async () => {
+      // Dar de baja el anual dejaria al mensual cobrando todos los meses lo que el
+      // anual ya cubre.
+      const { app, store } = fakeApp(mundoTarde("annual"));
+      const mp = fakeMpMultiPlan({ viejo: viejoRenovado(12), nuevo: nuevoCobrado(1) });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-nuevo"]);
+      expect(store.mp_plans.viejo.terminal).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("se da de baja el NUEVO"),
+        expect.objectContaining({
+          uid: "u1",
+          planNuevo: "nuevo",
+          planViejo: "viejo",
+          motivo: "ya-cobraron-los-dos-y-el-viejo-cubre-mas",
+        }),
+      );
+    });
+
+    for (const orden of [["b1", "viejo", "nuevo"], ["viejo", "b1", "nuevo"]] as const) {
+      it(`con un conflicto no se toca NINGUNA vieja, venga primero la que venga (${orden.join(" → ")})`, async () => {
+        // Dos fases: si se decidiera plan por plan, B1 (sin conflicto) se daba de
+        // baja antes de llegar al viejo renovado, y despues el nuevo: tres bajas.
+        const base = mundoTarde("monthly");
+        const planes: Record<string, Record<string, unknown>> = {
+          ...base.mp_plans,
+          b1: {
+            producto: "athlete",
+            uid: "u1",
+            cycle: "annual",
+            createdAt: ts(P - 3 * DIA_MS),
+            ultimoStatus: "pending",
+          },
+        };
+        const { app, store } = fakeApp({
+          users: base.users,
+          mp_plans: Object.fromEntries(orden.map((id) => [id, planes[id]])),
+        });
+        const mp = fakeMpMultiPlan({
+          viejo: viejoRenovado(1),
+          b1: { id: "s-b1", status: "pending", external_reference: "u1" },
+          nuevo: NUEVO_TARDE,
+        });
+
+        await reconcileSubscription(app, "nuevo", mp);
+
+        expect(mp.bajas).toEqual(["s-nuevo"]);
+        expect(derecho(store)).toBe("active");
+      });
+    }
 
     it("sin ninguna fecha del viejo, se mira si cobro despues de abrirse el nuevo", async () => {
       const mundo = mundoTarde("monthly");
@@ -5330,6 +5385,146 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
 
     expect(sweep.errors).toBe(1);
     expect(sweep.dadosDeBaja).toBe(0);
+  });
+
+  // ── Un checkout del cambio a medias (`pending`) y el viejo: las dos fases ──
+  //
+  // El alumno abre B1, lo deja a medias (MP lo tiene `pending`), vuelve pasada la
+  // ventana de reuso, abre B2 y lo paga. B1 es mas viejo que B2, tiene `ultimoStatus`
+  // (el reconciliador lo vio) pero no fecha, y MP no manda `next_payment_date` de una
+  // `pending`. Nunca cobro, asi que no puede ser conflicto: se dan de baja O y B1, y
+  // B2 queda. Antes, la falta de fechas de B1 se leia como conflicto y, segun el
+  // orden de los documentos, se daba de baja O y DESPUES B2: el alumno sin ningun
+  // plan que se renueve.
+  for (const orden of [["viejo", "b1", "nuevo"], ["b1", "viejo", "nuevo"]] as const) {
+    it(`⚠️ pending a medias + viejo: baja de los dos viejos, el nuevo queda (${orden.join(" → ")})`, async () => {
+      const base = MUNDO();
+      const planes: Record<string, Record<string, unknown>> = {
+        ...base.mp_plans,
+        b1: {
+          producto: "athlete",
+          uid: "u1",
+          cycle: "annual",
+          createdAt: ts(AHORA - 2 * HORA_MS),
+          diferidoHastaMs: PROXIMO,
+          ultimoStatus: "pending",
+        },
+      };
+      const mundo: Store = {
+        users: base.users,
+        mp_plans: Object.fromEntries(orden.map((id) => [id, planes[id]])),
+      };
+      const { app, store, escrituras } = fakeApp(mundo);
+      const mp = fakeMpMultiPlan({
+        viejo: VIEJO_VIVO,
+        b1: {
+          id: "s-b1",
+          status: "pending",
+          external_reference: "u1",
+          summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+        },
+        nuevo: NUEVO_EN_PRUEBA,
+      });
+
+      const r = await reconcileSubscription(app, "nuevo", mp);
+      await reconcileAllSubscriptions(app, mp);
+
+      expect(mp.bajas.slice().sort()).toEqual(["s-b1", "s-viejo"]);
+      expect(r.dadosDeBaja).toBe(2);
+      expect(derecho(store)).toBe("active");
+      expect(cortes(escrituras)).toEqual([]);
+    });
+  }
+
+  it("si una busqueda falla, no se da de baja NADA: sin ver todo no se decide", async () => {
+    const mundo = MUNDO();
+    mundo.mp_plans.otro = {
+      producto: "athlete",
+      uid: "u1",
+      cycle: "annual",
+      createdAt: ts(AHORA - 30 * DIA_MS),
+      ultimoStatus: "cancelled",
+    };
+    const { app } = fakeApp(mundo);
+    const mp = fakeMpMultiPlan({
+      viejo: VIEJO_VIVO,
+      otro: new MpApiError("429", 429),
+      nuevo: NUEVO_EN_PRUEBA,
+    });
+
+    const r = await reconcileSubscription(app, "nuevo", mp);
+
+    expect(mp.bajas).toEqual([]);
+    expect(r.bajaFallida).toBe(true);
+  });
+
+  describe("un checkout abandonado pagado tarde", () => {
+    /** Abandonado: sin suscripcion a los 30 dias, y nunca mas visitado por el barrido. */
+    const abandonado = (edadDias: number): Record<string, unknown> => ({
+      producto: "athlete",
+      uid: "u1",
+      cycle: "annual",
+      createdAt: ts(AHORA - edadDias * DIA_MS),
+      terminal: true,
+      terminalReason: MOTIVO_ABANDONO,
+    });
+    const PAGADO_TARDE: MpPreapproval = {
+      ...VIEJO_VIVO,
+      id: "s-abandonado",
+      next_payment_date: new Date(PROXIMO).toISOString(),
+    };
+
+    it("reciente (marcado hace menos de un mes) SI se busca y se da de baja: su webhook pudo fallar", async () => {
+      const mundo = MUNDO();
+      mundo.mp_plans.abandonado = abandonado(40);
+      const { app } = fakeApp(mundo);
+      const mp = fakeMpMultiPlan({
+        viejo: VIEJO_VIVO,
+        abandonado: PAGADO_TARDE,
+        nuevo: NUEVO_EN_PRUEBA,
+      });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas.slice().sort()).toEqual(["s-abandonado", "s-viejo"]);
+    });
+
+    it("viejo (pasada la ventana) y sin suscripcion vista: ya no se busca", async () => {
+      const mundo = MUNDO();
+      mundo.mp_plans.abandonado = abandonado(90);
+      const { app } = fakeApp(mundo);
+      const mp = fakeMpMultiPlan({
+        viejo: VIEJO_VIVO,
+        abandonado: PAGADO_TARDE,
+        nuevo: NUEVO_EN_PRUEBA,
+      });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-viejo"]);
+    });
+  });
+
+  it("fecha guardada vieja (MP sin proximo cobro): un cobro posterior al nuevo es conflicto", async () => {
+    // El barrido todavia no vio la renovacion: lo guardado dice E, pero el viejo
+    // cobro despues de que se abrio el nuevo.
+    const mundo = MUNDO();
+    const { app } = fakeApp(mundo);
+    const mp = fakeMpMultiPlan({
+      viejo: {
+        ...VIEJO_VIVO,
+        next_payment_date: undefined,
+        summarized: {
+          ...(VIEJO_VIVO.summarized as object),
+          last_charged_date: new Date(AHORA - 10 * 60 * 1000).toISOString(),
+        },
+      },
+      nuevo: NUEVO_EN_PRUEBA,
+    });
+
+    await reconcileSubscription(app, "nuevo", mp);
+
+    expect(mp.bajas).toEqual(["s-nuevo"]);
   });
 
   it("un plan de PF del mismo uid no entra en la baja del alumno", async () => {
