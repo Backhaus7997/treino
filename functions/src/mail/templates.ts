@@ -1549,6 +1549,15 @@ export function renderMail(
           "Lo que cambia es lo que podés armar de acá en adelante: el plan " +
             "gratis tiene topes más chicos para las rutinas que te armás vos.",
         ],
+        // Sin esta línea, «tus rutinas siguen exactamente donde estaban» le
+        // mentía a quien venía entrenando una plantilla paga: queda con candado
+        // (la regla de `athlete_entitlement.dart`, sin excepción para quien ya
+        // la seguía). «Si te pasás», no «si volvés»: también lo recibe quien
+        // estaba cubierto por su PF y nunca pagó.
+        [
+          "Las plantillas del plan pago quedan con candado: las seguís viendo " +
+            "y, si te pasás a Pro, seguís donde estabas.",
+        ],
         ["Si querés seguir sin esos topes, podés suscribirte por tu cuenta."],
       ],
       "VER EL PLAN",

@@ -199,6 +199,14 @@ enum AthleteEntitlement {
 /// revés que `storeAccountToken`, que sí lo era y por eso se generó desde el
 /// principio aunque no se use.
 ///
+/// **2026-10-02 — decidido, también para lo que viene:** sin exención. El día
+/// de encender (solo testers) se confirmó la regla y se extendió a los casos
+/// futuros con el mismo efecto: quien tenía Pro y deja de pagar, o pierde la
+/// cobertura de su PF, ve la plantilla paga con candado. Es lo que hacen las
+/// suscripciones (el contenido pago va con el plan; lo hecho no se borra y
+/// vuelve con él), la baja ya conserva el acceso hasta el fin del período
+/// pagado, y el mail `athlete-coverage-lost` le avisa lo del candado.
+///
 /// ─── Y EL ORDEN, QUE NO ES ARBITRARIO ───
 ///
 /// **Primero el servidor, después el cliente**: encender la CF que escribe

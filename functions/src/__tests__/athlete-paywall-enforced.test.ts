@@ -136,9 +136,10 @@ const ALUMNO: DocumentData = { role: "athlete", uid: "a1" };
 describe("el interruptor esta prendido", () => {
   // Trinquete. Arranco apagado porque prenderlo tiene consecuencias para
   // usuarios que ya existen, y ese repaso se hacia una vez. Se hizo: se prendio
-  // el 2026-10-02 con dos pendientes aceptados mientras solo hay testers (ver
-  // el encabezado del modulo). El que queda abierto es el grandfathering de las
-  // plantillas PAGAS que un alumno ya venia siguiendo.
+  // el 2026-10-02 (ver el encabezado del modulo). Las plantillas PAGAS no tienen
+  // excepcion —sin plan pago quedan con candado, tambien para quien ya venia
+  // entrenando una—, y el unico pendiente aceptado es la version de las tiendas
+  // anterior al build 53, sin la pantalla del tope.
   //
   // Apagarlo es el rollback y es real, pero tambien es una decision: si alguien
   // lo apaga, que rompa este test y deje escrito por que.
