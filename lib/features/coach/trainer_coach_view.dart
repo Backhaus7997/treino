@@ -9,7 +9,7 @@ import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
-import '../coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
+import 'application/vigencia_del_plan_provider.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';

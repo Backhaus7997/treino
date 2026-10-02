@@ -15,8 +15,8 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
-import 'plan_vigencia.dart';
-import 'vigencia_del_plan_provider.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
+import 'package:treino/features/coach/application/vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// La ruta de esta pantalla, en UN solo lugar.

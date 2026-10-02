@@ -15,7 +15,7 @@ import 'package:treino/features/coach_hub/presentation/sections/facturacion_plan
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_copy.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Facturación TREINO» (paywall Fase 7, PR2 — vista read-only).
