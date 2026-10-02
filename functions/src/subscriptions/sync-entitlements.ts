@@ -63,7 +63,7 @@ import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { toSubscriptionState } from "./subscription-state";
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
-import { resolvePlanLimits } from "./trainer-plan-limits";
+import { resolveAthleteLimits, resolvePlanLimits } from "./trainer-plan-limits";
 
 /**
  * Lee los millis de un valor que DEBERIA ser un Timestamp, sin confiar en que
@@ -388,7 +388,8 @@ export async function syncTrainerEntitlements(
     // importan (trigger de suscripcion, linkLoadReconcile, barrido de 04:00).
     //
     // `resolvePlanLimits` devuelve `null` para decir "no tocar" (solo pasa con
-    // `degraded === true`): en ese caso la clave `planLimits` se OMITE del
+    // `degraded === true`): si ADEMAS `resolveAthleteLimits` dice "no tocar" (lo
+    // mismo, con `degraded`), la clave `planLimits` se OMITE del
     // objeto que se mergea, no se escribe como `{planLimits: null}` — con
     // `degraded` no se decide nada sobre un documento que sabemos que leimos
     // mal. Encendido o apagado, `resolvePlanLimits` SIEMPRE devuelve un mapa
@@ -403,13 +404,29 @@ export async function syncTrainerEntitlements(
     // mergea los mapas anidados campo por campo, así que la clave que no viaja
     // queda como estaba (limite-plantillas-pf.md, PR1; ver el dartdoc de
     // `resolvePlanLimits`).
+    //
+    // ── El tope de alumnos viaja en el MISMO mapa ────────────────────────────
+    //
+    // `resolveAthleteLimits` publica el tope efectivo de alumnos
+    // (`planLimits.athletes`, el mismo `effectiveWeightLimit` que `limit` de
+    // arriba, mas el proximo cambio por reloj) para que la app no tenga que
+    // adivinar lo que el servidor resuelve con `pending`/`paused` y con el piso
+    // prepago. Se mezcla con el mapa de los otros dos topes en UN solo objeto y
+    // no en una segunda escritura `planLimits.athletes`: con `merge: true` los
+    // mapas anidados se mergean campo por campo, asi que las claves que este
+    // `set` no nombra (las de una corrida degradada) quedan como estaban, y las
+    // que nombra —aunque valgan `null`— se pisan. Un solo `tx.set`, un solo
+    // camino: este es el UNICO escritor de `planLimits` del repo, y los tres
+    // llamadores (trigger de suscripcion, `linkLoadReconcile` y el barrido de
+    // las 04:00) pasan por aca.
     const planLimits = resolvePlanLimits(sub, degraded, clock);
+    const athleteLimits = resolveAthleteLimits(sub, degraded, clock);
     const trainerUpdate: Record<string, unknown> = {
       weightedLoad,
       blockedAthleteIds: blockedAthleteIdsNow,
     };
-    if (planLimits !== null) {
-      trainerUpdate.planLimits = planLimits;
+    if (planLimits !== null || athleteLimits !== null) {
+      trainerUpdate.planLimits = { ...planLimits, ...athleteLimits };
     }
 
     // `merge: true` con un array REEMPLAZA el array entero, que es justo lo
