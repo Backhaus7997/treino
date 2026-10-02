@@ -22,10 +22,12 @@ import {
   ADELANTO_MAXIMO_DEL_COBRO_MS,
   DIA_MS,
   DIFERIR_PRIMER_COBRO_ENABLED,
+  DecidirDiferimientoDeAlumnoInput,
   DecidirDiferimientoInput,
   HOLGURA_PRUEBA_MS,
   MARGEN_DEL_AVISO_DE_COBRO_DOBLE_MS,
   MAX_PLANES_A_REVISAR,
+  MAX_PLANES_DEL_ALUMNO_A_REVISAR,
   MIN_DIFERIMIENTO_MS,
   PlanDeLaCuenta,
   PruebaDiferidaInput,
@@ -33,12 +35,16 @@ import {
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
+  consultarPlanesDelAlumno,
   cobrosExitosos,
   decidirDiferimiento,
+  decidirDiferimientoDeAlumno,
   diasDePrueba,
   evidenciaDePago,
+  mpSigueCobrando,
   pagadoHastaDe,
   planesARevisar,
+  planesDelAlumnoARevisar,
   situacionDeLaPrueba,
 } from "../subscriptions/mp/diferir-primer-cobro";
 import {
@@ -2080,6 +2086,1009 @@ describe("decidirDiferimiento: el interruptor", () => {
       "mp/diferir-primer-cobro: se cobra en el acto",
       expect.objectContaining({ uid: "t1", motivo: "deshabilitado" }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// decidirDiferimientoDeAlumno: la misma decision para el alumno.
+//
+// Lo que cambia respecto del PF es de donde sale la elegibilidad, y es lo que
+// mas se prueba aca: `athleteSubscription` no distingue al que se dio de baja del
+// que paga (los dos se leen `active`), el plan dado de baja NO es `terminal`
+// mientras le queden dias, y "esta dado de baja" se le pregunta a MP por TODOS los
+// planes que pueden cobrar, tengan o no fecha. Diferirle a alguien con una
+// suscripcion viva le suma un segundo cobro en E, y el alumno no tiene la baja de
+// reemplazados que tiene el PF.
+// ---------------------------------------------------------------------------
+
+/** `users/{uid}` de un alumno, con el `status` que se pida (`active` por defecto). */
+const alumno = (status: unknown = "active"): Record<string, unknown> => ({
+  role: "athlete",
+  athleteSubscription: { status },
+});
+
+/**
+ * Un plan de alumno en el que el reconciliador ya vio una suscripcion: tiene
+ * `currentPeriodEnd`. Por defecto el que pago y se dio de baja: SIN `terminal`,
+ * que es como lo deja el reconciliador del alumno mientras le queden dias.
+ */
+function planDeAlumno(
+  id: string,
+  edadDias: number,
+  data: Record<string, unknown> = {},
+): PlanDeLaCuenta {
+  return {
+    id,
+    data: {
+      producto: "athlete",
+      uid: "u1",
+      cycle: "monthly",
+      createdAt: ts(AHORA - edadDias * DIA_MS),
+      currentPeriodEnd: ts(FIN),
+      ...data,
+    },
+  };
+}
+
+/** Un plan de alumno sin fecha: un checkout sin pagar, o uno que el reconciliador vio sin fecha. */
+const sinFecha = (
+  id: string,
+  edadDias: number,
+  data: Record<string, unknown> = {},
+): PlanDeLaCuenta => planDeAlumno(id, edadDias, { currentPeriodEnd: undefined, ...data });
+
+/** Una suscripcion VIVA: autorizada, con su cobro hecho. */
+const viva = (over: Partial<MpPreapproval> = {}): MpPreapproval =>
+  pagada(ULTIMO_COBRO, { id: "s-viva", status: "authorized", ...over });
+
+/** Una suscripcion dada de baja que nunca cobro (`charged_quantity: 0`). */
+const sinCobro: MpPreapproval = {
+  id: "s-sin-cobro",
+  status: "cancelled",
+  auto_recurring: { frequency: 1, frequency_type: "months" },
+  summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+};
+
+function armarAlumno(
+  opts: {
+    userData?: Record<string, unknown>;
+    planes?: PlanDeLaCuenta[] | Error;
+    subs?: Record<string, MpPreapproval[] | Error>;
+    nowMs?: number;
+  } = {},
+) {
+  const lecturas = { planes: 0, suscripciones: [] as string[] };
+  const input: DecidirDiferimientoDeAlumnoInput = {
+    uid: "u1",
+    userData: "userData" in opts ? opts.userData : alumno(),
+    nowMs: opts.nowMs ?? AHORA,
+    // Explicito, como en el PF: los tests no dependen del valor de la constante.
+    habilitado: true,
+    leerPlanes: async () => {
+      lecturas.planes += 1;
+      if (opts.planes instanceof Error) throw opts.planes;
+      return opts.planes ?? [planDeAlumno("a0", 20)];
+    },
+    leerSuscripciones: async (planId) => {
+      lecturas.suscripciones.push(planId);
+      const r = opts.subs?.[planId];
+      if (r instanceof Error) throw r;
+      // `pagada` viene `cancelled`: es el alumno que se dio de baja.
+      return r ?? (planId === "a0" ? [pagada(ULTIMO_COBRO)] : []);
+    },
+  };
+  return { input, lecturas };
+}
+
+describe("mpSigueCobrando", () => {
+  it("solo `cancelled` y `pending` no cobran", () => {
+    expect(mpSigueCobrando("cancelled")).toBe(false);
+    expect(mpSigueCobrando("pending")).toBe(false);
+  });
+
+  it("autorizada, pausada, un estado nuevo y un estado ausente SI: ante la duda, no se arma un cobro doble", () => {
+    for (const s of ["authorized", "paused", "un-estado-nuevo", undefined, null]) {
+      expect(mpSigueCobrando(s)).toBe(true);
+    }
+  });
+});
+
+describe("consultarPlanesDelAlumno: la pasada unica por MP", () => {
+  function pasada(
+    planes: PlanDeLaCuenta[],
+    subs: Record<string, MpPreapproval[] | Error> = {},
+  ) {
+    const lecturas: string[] = [];
+    return {
+      lecturas,
+      correr: () => consultarPlanesDelAlumno({
+        planes,
+        leerSuscripciones: async (planId) => {
+          lecturas.push(planId);
+          const r = subs[planId];
+          if (r instanceof Error) throw r;
+          return r ?? [];
+        },
+      }),
+    };
+  }
+
+  it("ninguna cobra: devuelve lo que MP contesto por cada plan, para no volver a preguntar", async () => {
+    const { correr, lecturas } = pasada(
+      [planDeAlumno("a0", 20), sinFecha("a1", 2)],
+      { a0: [pagada(ULTIMO_COBRO)] },
+    );
+
+    const r = await correr();
+
+    expect(r.vivo).toBe(false);
+    if (r.vivo) return;
+    expect([...r.suscripciones.keys()]).toEqual(["a0", "a1"]);
+    expect(r.suscripciones.get("a0")).toHaveLength(1);
+    expect(r.suscripciones.get("a1")).toEqual([]);
+    expect(lecturas).toEqual(["a0", "a1"]);
+  });
+
+  it("corta en la primera viva y dice cual es", async () => {
+    const { correr, lecturas } = pasada(
+      [planDeAlumno("a0", 20), planDeAlumno("a1", 5), planDeAlumno("a2", 1)],
+      { a0: [pagada(ULTIMO_COBRO)], a1: [viva()], a2: [viva()] },
+    );
+
+    expect(await correr()).toEqual({ vivo: true, planId: "a1" });
+    expect(lecturas).toEqual(["a0", "a1"]);
+  });
+
+  it("una `pending` no cuenta como viva, pero un estado raro o pausado SI", async () => {
+    const pend = pasada([planDeAlumno("a0", 5)], { a0: [viva({ status: "pending" })] });
+    expect((await pend.correr()).vivo).toBe(false);
+
+    for (const estado of ["paused", "un-estado-nuevo"]) {
+      const p = pasada([planDeAlumno("a0", 5)], { a0: [viva({ status: estado })] });
+      expect((await p.correr()).vivo).toBe(true);
+    }
+  });
+
+  it("solo mira planes de alumno que pueden cobrar: no el de PF ni el terminal de hecho", async () => {
+    const { correr, lecturas } = pasada([
+      planDeAlumno("de-pf", 5, { producto: "trainer" }),
+      planDeAlumno("sin-producto", 5, { producto: undefined }),
+      planDeAlumno("baja-confirmada", 5, { terminal: true }),
+      planDeAlumno("reemplazado", 5, { terminal: true, terminalReason: MOTIVO_REEMPLAZO }),
+      planDeAlumno("a0", 5),
+    ]);
+
+    await correr();
+
+    expect(lecturas).toEqual(["a0"]);
+  });
+
+  it("un checkout abandonado SE mira, con o sin fecha: el init_point no vence y se puede pagar tarde", async () => {
+    const { correr, lecturas } = pasada([
+      sinFecha("abandonado", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+    ], { abandonado: [viva()] });
+
+    expect(await correr()).toEqual({ vivo: true, planId: "abandonado" });
+    expect(lecturas).toEqual(["abandonado"]);
+  });
+
+  it("si MP falla en un plan, tira: sin saber si cobra no se puede descartar nada", async () => {
+    const { correr } = pasada(
+      [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      { a1: new Error("429") },
+    );
+
+    await expect(correr()).rejects.toThrow("429");
+  });
+
+  it("sin planes que puedan cobrar no pregunta nada", async () => {
+    const { correr, lecturas } = pasada([]);
+
+    expect(await correr()).toMatchObject({ vivo: false });
+    expect(lecturas).toEqual([]);
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: cuando SI se difiere", () => {
+  it("dado de baja con dias por delante y un cobro real en MP", async () => {
+    // El plan que pago NO es `terminal` (asi lo deja el reconciliador del alumno
+    // mientras le queden dias): con el filtro del PF no contaria.
+    const { input } = armarAlumno();
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("gana la fecha MENOR: si MP respalda menos que el fin del plan, manda MP", async () => {
+    const { input } = armarAlumno({
+      subs: { a0: [pagada("2026-08-12T12:00:00.000Z")] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input)).toEqual({
+      diferir: true,
+      diferidoHastaMs: Date.parse("2026-09-12T12:00:00.000Z"),
+    });
+  });
+
+  it("gana la fecha MENOR: si el fin del plan es antes que lo que cubre el cobro, manda el plan", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20, { currentPeriodEnd: ts(AHORA + 4 * DIA_MS) })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: AHORA + 4 * DIA_MS });
+  });
+
+  it("el fin que acota es el del plan QUE PAGO, no el de otro plan del alumno", async () => {
+    // a0 pago hasta el 25/9 pero su acceso termina en FIN (20/9); a1, mas nuevo,
+    // se dio de baja sin cobrar nada y tiene un fin mas lejano. Acotar con el fin
+    // de a1 dejaria la prueba en el 25/9: cinco dias que nadie pago con a0.
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        planDeAlumno("a1", 5, { currentPeriodEnd: ts(FIN + 10 * DIA_MS) }),
+      ],
+      subs: {
+        a0: [pagada("2026-08-25T12:00:00.000Z")],
+        a1: [sinCobro],
+      },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  describe("con varios planes que prueban un pago: gana el que mas lejos llega, no el mas nuevo", () => {
+    /** Un anual dado de baja, pago el 15/1/2026: llega hasta el 15/1/2027. */
+    const FIN_ANUAL = Date.parse("2027-01-15T12:00:00.000Z");
+    const anual = (id: string, edadDias: number) => planDeAlumno(id, edadDias, {
+      cycle: "annual",
+      currentPeriodEnd: ts(FIN_ANUAL),
+    });
+    const COBRO_ANUAL = pagada("2026-01-15T12:00:00.000Z", {
+      id: "s-anual",
+      auto_recurring: {
+        frequency: 12,
+        frequency_type: "months",
+        transaction_amount: 220000,
+      },
+    });
+    /** El mensual posterior, pago hasta FIN (20/9/2026). */
+    const mensual = (id: string, edadDias: number) => planDeAlumno(id, edadDias);
+    const COBRO_MENSUAL = pagada(ULTIMO_COBRO, { id: "s-mensual" });
+
+    it("un anual viejo hasta enero y un mensual nuevo hasta septiembre: difiere hasta enero", async () => {
+      // Quedarse con el plan mas nuevo difiere hasta septiembre y le cobra de
+      // septiembre a enero lo que ya pago con el anual.
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("el mismo resultado con los planes en el orden contrario en el store", async () => {
+      const { input } = armarAlumno({
+        planes: [mensual("mensual", 18), anual("anual", 240)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("si el plan mas NUEVO es el que llega mas lejos, gana el nuevo", async () => {
+      const { input } = armarAlumno({
+        planes: [mensual("mensual", 240), anual("anual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("cada plan se acota con SU fin: el cobro de uno no estira el fin del otro", async () => {
+      // El anual cobro hasta enero pero su acceso termina antes (FIN + 3 dias); el
+      // mensual llega hasta FIN. Gana el anual, con SU fin, no con el del cobro.
+      const finAnual = FIN + 3 * DIA_MS;
+      const { input } = armarAlumno({
+        planes: [
+          planDeAlumno("anual", 240, { cycle: "annual", currentPeriodEnd: ts(finAnual) }),
+          mensual("mensual", 18),
+        ],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: finAnual });
+    });
+
+    it("un empate se resuelve por id, no por el orden de lectura", async () => {
+      const dos = [
+        planDeAlumno("b", 30, { currentPeriodEnd: ts(FIN) }),
+        planDeAlumno("a", 10, { currentPeriodEnd: ts(FIN) }),
+      ];
+      for (const planes of [dos, [...dos].reverse()]) {
+        const { input } = armarAlumno({
+          planes,
+          subs: {
+            a: [pagada(ULTIMO_COBRO, { id: "sa" })],
+            b: [pagada(ULTIMO_COBRO, { id: "sb" })],
+          },
+        });
+        expect(await decidirDiferimientoDeAlumno(input))
+          .toEqual({ diferir: true, diferidoHastaMs: FIN });
+      }
+      // Y el plan que nombra el log es el mismo en los dos ordenes.
+      const nombrados = (logger.info as jest.Mock).mock.calls
+        .filter(([m]) => m === "mp/diferir-primer-cobro: se difiere el primer cobro")
+        .slice(-2)
+        .map(([, datos]) => datos.planConPago);
+      expect(nombrados).toEqual(["a", "a"]);
+    });
+
+    it("el log nombra al plan elegido, no al mas nuevo", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      await decidirDiferimientoDeAlumno(input);
+
+      expect(logger.info).toHaveBeenLastCalledWith(
+        "mp/diferir-primer-cobro: se difiere el primer cobro",
+        expect.objectContaining({ planConPago: "anual", fuenteDelPago: "ultimo-cobro" }),
+      );
+    });
+
+    it("un plan SIN fecha con un cobro no cuenta como evidencia: se elige el valido", async () => {
+      // Sin `currentPeriodEnd` no hay contra que acotar lo que cubre ese cobro, asi
+      // que no es candidato por mas que MP lo muestre (semantica de siempre). El que
+      // si tiene fecha y cobro se elige, aunque sea el mas viejo.
+      const { input } = armarAlumno({
+        planes: [
+          sinFecha("sin-fecha", 5, { cycle: "annual" }),
+          mensual("mensual", 40),
+        ],
+        subs: {
+          "sin-fecha": [{ ...COBRO_ANUAL, id: "s-sf" }],
+          mensual: [COBRO_MENSUAL],
+        },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN });
+    });
+
+    it("la viva en CUALQUIERA de los planes sigue frenando, aunque el mas largo este dado de baja", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [{ ...COBRO_MENSUAL, status: "authorized" }] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    });
+
+    it("un plan con fecha cuya lista de MP viene vacia sigue sin diferir, aunque el otro pruebe un pago", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "sin-respuesta-de-mp" });
+    });
+  });
+
+  it("pero NO de un plan que no puede probar un pago, aunque sea el mas nuevo y muestre un cobro", async () => {
+    // a1 se arrepintio (se le devolvio todo) y MP sigue mostrando su cobro, que
+    // cubriria hasta el 27/9. El pago que vale es el de a0, hasta FIN.
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 40),
+        planDeAlumno("a1", 10, {
+          currentPeriodEnd: ts(FIN + 7 * DIA_MS),
+          arrepentidoAtMs: AHORA - DIA_MS,
+        }),
+      ],
+      subs: {
+        a0: [pagada(ULTIMO_COBRO)],
+        a1: [pagada("2026-08-27T12:00:00.000Z", { id: "s-a1" })],
+      },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("dentro del plan que pago, gana el pago MAS LEJANO", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 50, { currentPeriodEnd: ts(FIN + 40 * DIA_MS) })],
+      subs: {
+        a0: [
+          pagada("2026-08-10T12:00:00.000Z", { id: "s-vieja" }),
+          pagada("2026-08-25T12:00:00.000Z", { id: "s-nueva" }),
+        ],
+      },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input)).toEqual({
+      diferir: true,
+      diferidoHastaMs: Date.parse("2026-09-25T12:00:00.000Z"),
+    });
+  });
+
+  it("el borde: exactamente un dia por delante SI se difiere", async () => {
+    const fin = AHORA + MIN_DIFERIMIENTO_MS;
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20, { currentPeriodEnd: ts(fin) })],
+      subs: { a0: [pagada("2026-08-08T12:00:00.000Z")] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: fin });
+  });
+
+  it("loguea la decision con el uid, el producto y la fecha, sin datos personales", async () => {
+    const { input } = armarAlumno();
+
+    await decidirDiferimientoDeAlumno(input);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se difiere el primer cobro",
+      expect.objectContaining({
+        uid: "u1",
+        producto: "athlete",
+        planConPago: "a0",
+        fuenteDelPago: "ultimo-cobro",
+        // Del 7/9 (AHORA, 09:00 ART) al 20/9 (FIN, 09:00 ART): 7 + 13 = 20.
+        diasDePrueba: 13,
+        diferidoHastaIso: "2026-09-20T12:00:00.000Z",
+      }),
+    );
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: el documento corta primero, sin leer nada", () => {
+  // `athleteSubscription` es `{status}` con `active`, `grace` o `expired`. Solo
+  // `active` puede ser alguien dado de baja con dias pagos.
+  const cortes: [string, Record<string, unknown> | undefined, string][] = [
+    ["un alumno que nunca pago", { role: "athlete" }, "sin-suscripcion"],
+    ["un usuario sin documento", undefined, "sin-suscripcion"],
+    ["un acceso vencido", alumno("expired"), "sin-acceso-vigente"],
+    ["una suscripcion en gracia (viva, MP reintenta)", alumno("grace"), "no-esta-cancelada"],
+    // `cancelled` NO existe en el vocabulario del alumno: no es "dado de baja".
+    ["`cancelled`, que no es un estado del alumno", alumno("cancelled"), "estado-degradado"],
+    ["un status que no es un string", alumno(1), "estado-degradado"],
+    ["el mapa como string", { role: "athlete", athleteSubscription: "active" }, "estado-degradado"],
+  ];
+
+  for (const [caso, userData, motivo] of cortes) {
+    it(`${caso}: ${motivo}, sin leer planes ni MP`, async () => {
+      const { input, lecturas } = armarAlumno({ userData });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo });
+      expect(lecturas.planes).toBe(0);
+      expect(lecturas.suscripciones).toEqual([]);
+    });
+  }
+
+  it("el motivo va al log con el producto", async () => {
+    const { input } = armarAlumno({ userData: alumno("expired") });
+
+    await decidirDiferimientoDeAlumno(input);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se cobra en el acto",
+      { uid: "u1", producto: "athlete", motivo: "sin-acceso-vigente" },
+    );
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: NINGUNA suscripcion viva", () => {
+  // Es la mitad de "esta dado de baja" que el documento no dice. Una viva es
+  // alguien que ya paga: diferirle un plan nuevo le suma un segundo cobro en E, y
+  // para el alumno no hay baja de reemplazados que lo corrija.
+
+  it("con una suscripcion viva en otro plan NO difiere, aunque el que pago muestre el cobro", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      subs: { a1: [viva()] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("la misma cuenta con esa suscripcion dada de baja SI difiere (el control del test anterior)", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      subs: { a1: [viva({ status: "cancelled" })] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("si la viva es la del plan que pago (no se dio de baja), tampoco", async () => {
+    // Un alumno que paga y aprieta de nuevo: `active` en el documento, igual que
+    // uno dado de baja. Solo MP los distingue.
+    const { input } = armarAlumno({ subs: { a0: [viva()] } });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("la viva puede ser la SEGUNDA suscripcion del plan: se miran todas", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      subs: { a1: [viva({ id: "s-baja", status: "cancelled" }), viva({ id: "s-otra" })] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("una prueba en curso cuenta como viva: ya va a cobrar en E", async () => {
+    // El alumno ya volvio una vez con prueba (a1, autorizada y sin cobrar) y
+    // aprieta de nuevo. a1 no puede probar un pago, pero SI esta viva.
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        planDeAlumno("a1", 1, { diferidoHastaMs: FIN, currentPeriodEnd: ts(FIN) }),
+      ],
+      subs: {
+        a1: [{
+          id: "s-prueba",
+          status: "authorized",
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: "months",
+            free_trial: { frequency: 13, frequency_type: "days" },
+          },
+          summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+        }],
+      },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("⚠️ un link diferido pagado TARDE queda sin fecha (lo corta la guarda) y se consulta igual", async () => {
+    // El hueco que encontro la revision: el reconciliador lee esa autorizacion
+    // como `pending`, la guarda no escribe nada, y el plan queda SIN fecha aunque
+    // la suscripcion este viva. Filtrar por fecha lo dejaba afuera, y un tercer
+    // checkout le sumaba un segundo cobro.
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("a1", 3, { diferidoHastaMs: FIN })],
+      subs: { a1: [viva({ id: "s-tarde" })] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("⚠️ una suscripcion viva sin fecha (MP no mando next_payment_date) se consulta igual", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("a1", 3)],
+      subs: { a1: [viva({ id: "s-sin-fecha" })] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  for (const estado of ["paused", "pending", "un-estado-nuevo", undefined]) {
+    it(`un estado que no es \`cancelled\` cuenta como viva: ${String(estado)}`, async () => {
+      // El criterio de `sigueViva`: ante la duda de si ya paga, se cobra en el
+      // acto como antes, nunca se le suma un segundo cobro en E.
+      const { input } = armarAlumno({
+        planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+        subs: { a1: [viva({ status: estado })] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    });
+  }
+
+  it("mira TODOS los planes que pueden cobrar, no solo hasta el primero que pago", async () => {
+    // El PF corta en el primer plan con pago; el alumno no puede, porque la viva
+    // puede estar en un plan mas viejo.
+    const { input, lecturas } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 30, { currentPeriodEnd: ts(AHORA + 2 * DIA_MS) }),
+        planDeAlumno("a1", 20),
+        planDeAlumno("a2", 10, { currentPeriodEnd: ts(FIN + DIA_MS) }),
+      ],
+      subs: {
+        a0: [viva()],
+        a1: [pagada(ULTIMO_COBRO)],
+        a2: [sinCobro],
+      },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    // Del mas nuevo al mas viejo, hasta encontrar la viva.
+    expect(lecturas.suscripciones).toEqual(["a2", "a1", "a0"]);
+  });
+
+  it("un checkout abandonado que despues se pago SE consulta: puede estar vivo", async () => {
+    // `terminal` con [MOTIVO_ABANDONO] no es un hecho: el `init_point` no vence.
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        planDeAlumno("a1", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+      ],
+      subs: { a1: [viva()] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+
+  it("loguea cual es el plan vivo", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      subs: { a1: [viva()] },
+    });
+
+    await decidirDiferimientoDeAlumno(input);
+
+    expect(logger.info).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: se cobra en el acto",
+      expect.objectContaining({
+        producto: "athlete",
+        motivo: "no-esta-cancelada",
+        planVivo: "a1",
+      }),
+    );
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: un plan con fecha que MP devuelve vacio NO esta dado de baja", () => {
+  // Un plan con fecha tuvo una suscripcion. Si la busqueda no la trae, MP no
+  // contesto por ella: su indice llega tarde a una recien autorizada, y el cliente
+  // convierte una respuesta rara en `[]`. Para el PF eso es "sin evidencia" y cobra
+  // en el acto; para el alumno seria dar por dada de baja a una que quiza cobra.
+
+  it("⚠️ otro plan con fecha que vuelve vacio: sin-respuesta-de-mp, no se difiere", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      subs: { a1: [] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-respuesta-de-mp" });
+  });
+
+  it("el plan que pago vacio tampoco se da por dado de baja", async () => {
+    const { input } = armarAlumno({ subs: { a0: [] } });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-respuesta-de-mp" });
+  });
+
+  it("un checkout SIN fecha que vuelve vacio es lo normal: no impide diferir", async () => {
+    // Nadie lo pago: que MP no tenga ninguna suscripcion es la respuesta.
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("c1", 1)],
+      subs: { c1: [] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: que planes se consultan y cuales prueban un pago", () => {
+  it("los checkouts sin pagar se consultan (MP dice que no tienen nada) y no impiden diferir", async () => {
+    const { input, lecturas } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("c1", 1), sinFecha("c2", 2)],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toEqual(["c1", "c2", "a0"]);
+  });
+
+  it("un abandonado SIN fecha no prueba un pago, pero se consulta para saber si esta vivo", async () => {
+    // Al cerrarse no tenia ninguna suscripcion: no puede ser evidencia. Pero si MP
+    // le devuelve una cancelada (o nada), el diferimiento sigue como si no estuviera.
+    const { input, lecturas } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        sinFecha("ab", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+      ],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toEqual(["a0", "ab"]);
+  });
+
+  for (const estado of ["pending", "authorized", "paused", "un-estado-nuevo"]) {
+    it(`⚠️ ${estado} en un abandonado SIN fecha frena el diferimiento, como en cualquier otro plan`, async () => {
+      // Si se autoriza despues, cobra desde E junto con el plan nuevo: el mismo
+      // criterio que una `pending` en un plan con fecha o sin ella.
+      const { input } = armarAlumno({
+        planes: [
+          planDeAlumno("a0", 20),
+          sinFecha("ab", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+        ],
+        subs: { ab: [viva({ status: estado })] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    });
+  }
+
+  it("un abandonado SIN fecha que MP no conoce (lista vacia) no frena nada", async () => {
+    const { input } = armarAlumno({
+      planes: [
+        planDeAlumno("a0", 20),
+        sinFecha("ab", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+      ],
+      subs: { ab: [] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("sin ningun plan con fecha de fin: sin-fecha-de-fin, sin preguntarle a MP", async () => {
+    const { input, lecturas } = armarAlumno({ planes: [sinFecha("c1", 1)] });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-fecha-de-fin" });
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("un plan terminal ya no cobra y no se consulta", async () => {
+    // El reconciliador del alumno marca `terminal` cuando el acceso ya vencio.
+    const { input, lecturas } = armarAlumno({
+      planes: [planDeAlumno("a0", 20, { terminal: true })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-fecha-de-fin" });
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("un plan de PF del mismo uid no cuenta, tenga o no el campo `producto`", async () => {
+    // No deberia pasar (`role` es inmutable), pero un plan de PF no dice nada de
+    // la suscripcion del alumno. Sin el campo es de PF: es el default de `lookupPlan`.
+    for (const producto of ["trainer", undefined]) {
+      const { input } = armarAlumno({
+        planes: [planDeAlumno("a0", 20, { producto })],
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "sin-fecha-de-fin" });
+    }
+  });
+
+  it("un plan ARREPENTIDO no prueba un pago: se devolvio entero", async () => {
+    // El reconciliador lo marca `terminal` apenas lo procesa, pero si esa corrida
+    // fallo el plan sigue con su fecha, y MP sigue mostrando el cobro.
+    const { input, lecturas } = armarAlumno({
+      planes: [planDeAlumno("a0", 20, { arrepentidoAtMs: AHORA - DIA_MS })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("un plan con prueba que todavia no pudo cobrar no prueba un pago", async () => {
+    // El filtro 3 del PF: E esta a mas de un dia, el primer cobro no pudo ocurrir.
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 1, { diferidoHastaMs: AHORA + 2 * DIA_MS })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+  });
+
+  it("una prueba que vence dentro del adelanto (menos de un dia) SI puede haber cobrado", async () => {
+    // El primer cobro puede caer hasta [ADELANTO_MAXIMO_DEL_COBRO_MS] antes de E.
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 30, { diferidoHastaMs: AHORA + DIA_MS / 2 })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+  });
+
+  it("un checkout abandonado que despues se pago no prueba un pago", async () => {
+    // Mismo criterio que el PF (ver `planesARevisar`).
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+  });
+
+  it("si a ningun plan le queda un dia: queda-menos-de-un-dia, sin preguntarle a MP", async () => {
+    const { input, lecturas } = armarAlumno({
+      planes: [planDeAlumno("a0", 20, { currentPeriodEnd: ts(AHORA + DIA_MS / 2) })],
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "queda-menos-de-un-dia" });
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("sin un cobro real en MP: sin-pago-comprobado", async () => {
+    const { input } = armarAlumno({ subs: { a0: [sinCobro] } });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "sin-pago-comprobado" });
+  });
+
+  it("si lo que MP respalda vence en menos de un dia: pago-vence-pronto", async () => {
+    // El cobro del 7/8 a las 20:00 cubre hasta el 7/9 a las 20:00: 8 horas.
+    const { input } = armarAlumno({
+      subs: { a0: [pagada("2026-08-07T20:00:00.000Z")] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "pago-vence-pronto" });
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: el tope", () => {
+  const planes = (n: number) => [
+    planDeAlumno("a0", 30),
+    ...Array.from({ length: n - 1 }, (_, k) => sinFecha(`c${k}`, 1 + k)),
+  ];
+
+  it("con mas planes que pueden cobrar que el tope NO difiere, y avisa", async () => {
+    // No se puede saber si alguno sigue vivo sin pasarse de llamadas: se cobra en
+    // el acto, como antes, y queda un warn para que alguien lo mire.
+    const { input, lecturas } = armarAlumno({ planes: planes(MAX_PLANES_DEL_ALUMNO_A_REVISAR + 1) });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "demasiados-planes" });
+    expect(lecturas.suscripciones).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "mp/diferir-primer-cobro: el alumno tiene mas planes que pueden cobrar " +
+        "que los que se revisan, no se difiere",
+      expect.objectContaining({ uid: "u1", tope: MAX_PLANES_DEL_ALUMNO_A_REVISAR }),
+    );
+  });
+
+  it("con exactamente el tope los consulta a todos y difiere", async () => {
+    const { input, lecturas } = armarAlumno({ planes: planes(MAX_PLANES_DEL_ALUMNO_A_REVISAR) });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: true, diferidoHastaMs: FIN });
+    expect(lecturas.suscripciones).toHaveLength(MAX_PLANES_DEL_ALUMNO_A_REVISAR);
+  });
+
+  it("el tope del alumno es mas ancho que el del PF: tiene que contar los checkouts sin pagar", () => {
+    expect(MAX_PLANES_DEL_ALUMNO_A_REVISAR).toBeGreaterThan(MAX_PLANES_A_REVISAR);
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: si no puede LEER, tira", () => {
+  it("si fallan los planes", async () => {
+    const { input } = armarAlumno({ planes: new Error("UNAVAILABLE") });
+
+    await expect(decidirDiferimientoDeAlumno(input)).rejects.toThrow("UNAVAILABLE");
+  });
+
+  it("si falla MP, aunque sea en un plan que no prueba nada", async () => {
+    // Ese plan podria tener la suscripcion viva: no saberlo no es "no hay".
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("c1", 1)],
+      subs: { c1: new Error("503") },
+    });
+
+    await expect(decidirDiferimientoDeAlumno(input)).rejects.toThrow("503");
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: sin atajo del doble click", () => {
+  // El atajo del PF reusa la fecha del checkout abierto sin preguntarle nada a MP.
+  // Para el alumno esa pregunta es la que dice que nadie esta vivo (y la que
+  // levanta la guarda del mismo ciclo): cada toque la vuelve a hacer.
+
+  it("dos toques iguales llegan a la MISMA fecha: es lo que deja reusar el checkout abierto", async () => {
+    const primero = armarAlumno();
+    const segundo = armarAlumno({
+      // El checkout diferido del primer toque, abierto y sin pagar.
+      planes: [planDeAlumno("a0", 20), sinFecha("nuevo", 0, { diferidoHastaMs: FIN })],
+    });
+
+    const a = await decidirDiferimientoDeAlumno(primero.input);
+    const b = await decidirDiferimientoDeAlumno(segundo.input);
+
+    expect(b).toEqual(a);
+    expect(segundo.lecturas.suscripciones).toEqual(["nuevo", "a0"]);
+  });
+
+  it("si en el medio autorizo ese checkout, el segundo toque lo ve vivo y no difiere", async () => {
+    const { input } = armarAlumno({
+      planes: [planDeAlumno("a0", 20), sinFecha("nuevo", 0, { diferidoHastaMs: FIN })],
+      subs: { nuevo: [viva({ id: "s-nueva" })] },
+    });
+
+    expect(await decidirDiferimientoDeAlumno(input))
+      .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+  });
+});
+
+describe("decidirDiferimientoDeAlumno: el interruptor", () => {
+  it("apagado NUNCA difiere y no lee NADA", async () => {
+    const { input, lecturas } = armarAlumno();
+
+    expect(await decidirDiferimientoDeAlumno({ ...input, habilitado: false }))
+      .toEqual({ diferir: false, motivo: "deshabilitado" });
+    expect(lecturas.planes).toBe(0);
+    expect(lecturas.suscripciones).toEqual([]);
+  });
+
+  it("sin pasarlo vale la constante, sea cual sea su valor", async () => {
+    const { input } = armarAlumno();
+    delete (input as { habilitado?: boolean }).habilitado;
+
+    const sinParametro = await decidirDiferimientoDeAlumno(input);
+    const conLaConstante = await decidirDiferimientoDeAlumno({
+      ...input,
+      habilitado: DIFERIR_PRIMER_COBRO_ENABLED,
+    });
+
+    expect(sinParametro).toEqual(conLaConstante);
+  });
+});
+
+describe("planesDelAlumnoARevisar", () => {
+  it("del mas nuevo al mas viejo, con el fin de cada uno, tengan o no fecha", () => {
+    const r = planesDelAlumnoARevisar(
+      [
+        planDeAlumno("viejo", 30),
+        sinFecha("sin-pagar", 1),
+        planDeAlumno("nuevo", 2, { currentPeriodEnd: ts(FIN + DIA_MS) }),
+      ],
+      AHORA,
+    );
+
+    expect(r).toEqual([
+      { id: "sin-pagar", finMs: null, puedeSerEvidencia: false },
+      { id: "nuevo", finMs: FIN + DIA_MS, puedeSerEvidencia: true },
+      { id: "viejo", finMs: FIN, puedeSerEvidencia: true },
+    ]);
+  });
+
+  it("una fecha que no es un Timestamp no cuenta como fecha", () => {
+    for (const currentPeriodEnd of [FIN, "2026-09-20", null, { toMillis: () => NaN }]) {
+      expect(planesDelAlumnoARevisar([planDeAlumno("a0", 20, { currentPeriodEnd })], AHORA))
+        .toEqual([{ id: "a0", finMs: null, puedeSerEvidencia: false }]);
+    }
+  });
+
+  it("deja afuera lo que ya no puede cobrar y el abandonado sin fecha", () => {
+    const r = planesDelAlumnoARevisar(
+      [
+        planDeAlumno("terminal", 30, { terminal: true }),
+        planDeAlumno("reemplazado", 30, { terminal: true, terminalReason: MOTIVO_REEMPLAZO }),
+        sinFecha("abandonado", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+        planDeAlumno("de-pf", 30, { producto: undefined }),
+      ],
+      AHORA,
+    );
+
+    expect(r).toEqual([]);
   });
 });
 

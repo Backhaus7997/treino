@@ -24,6 +24,32 @@
  * El monto **nunca** viene del cliente: la entrada es `{cycle, locale}` y los
  * dos son enums cerrados. El precio sale de `athlete-plan-config.ts`. El uid
  * sale del token y de ningun otro lado.
+ *
+ * ── Si vuelve con dias pagos, el primer cobro se difiere ──
+ *
+ * Igual que el PF: un alumno dado de baja conserva el acceso hasta el fin de lo
+ * que pago, y si vuelve a suscribirse antes, el plan nuevo se abre con una prueba
+ * de tantos dias de calendario argentino como le quedan, para que MP cobre recien
+ * cuando vence lo que ya pago. La decision vive en `diferir-primer-cobro.ts`
+ * (`decidirDiferimientoDeAlumno`), y no alcanza con `athleteSubscription`: ese
+ * mapa no distingue a quien se dio de baja de quien paga, asi que se le pregunta
+ * a MP por cada plan que puede cobrar.
+ *
+ * ── Una sola pasada por MP: bloquea o difiere ──
+ *
+ * Antes de abrir nada el callable recorre en serie los planes del alumno que
+ * pueden cobrar y le pregunta a MP por sus suscripciones
+ * (`consultarPlanesDelAlumno`, con `estricto` y fallando cerrado). De esa lectura
+ * sale una de tres cosas: una suscripcion que MP todavia cobra, y entonces NO se
+ * abre otro checkout (mitigacion temporal del cobro doble, ver el cuerpo); ninguna
+ * cobra pero hay un cobro real con dias por delante, y el plan nuevo difiere su
+ * primer cobro; o ninguna de las dos, y el checkout es el de siempre. Bloquear y
+ * diferir salen del mismo dato, asi que no pueden contradecirse.
+ *
+ * La fecha vuelve en la respuesta (`diferidoHastaIso`) porque el checkout de MP
+ * rinde la prueba como «¡Tenés N días gratis!» (medido en produccion con el del
+ * PF, PR #1291) y no hay un campo que cambie ese texto: la landing la usa para
+ * avisar antes de mandar al alumno ahi.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -41,8 +67,14 @@ import { SubscriptionCycle } from "../tier-config";
 import { CYCLES, MP_PLANS_COLLECTION, frequencyMonthsFor } from "./tier-mapping";
 import { AthleteStatus, athleteStatusOtorga } from "./map-status";
 import { puedeSeguirCobrando } from "./reconcile";
-import { MpClient, createMpClient } from "./client";
+import { MpApiError, MpClient, createMpClient } from "./client";
 import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
+import {
+  Diferimiento,
+  PlanDeLaCuenta,
+  consultarPlanesDelAlumno,
+  decidirDiferimientoDeAlumno,
+} from "./diferir-primer-cobro";
 
 const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
 
@@ -103,6 +135,30 @@ export interface CreateAthletePreapprovalDeps {
   mpClient: MpClient;
   /** Reloj inyectable: el reuso de checkout se testea sin esperar 30 minutos. */
   nowMs: number;
+  /**
+   * El interruptor del diferimiento (`DIFERIR_PRIMER_COBRO_ENABLED`, el mismo del
+   * PF). Ausente vale la constante, que es lo que usa el callable. Existe para que
+   * los tests fijen el estado que prueban, como en `create-preapproval.ts`.
+   */
+  diferirHabilitado?: boolean;
+}
+
+/**
+ * Lo que devuelve el checkout del alumno: el de siempre, mas la fecha del primer
+ * cobro cuando se difiere.
+ */
+export interface CheckoutDelAlumno extends CheckoutAbierto {
+  /**
+   * SOLO cuando el primer cobro se difiere: hasta cuando ya tiene pago el periodo
+   * (E), en ISO 8601. Es el dia en que se espera el primer cobro, y lo que la
+   * landing le muestra al alumno antes de mandarlo a MP. Ausente, el checkout cobra
+   * al autorizar, como siempre.
+   *
+   * Se calcula a partir del mismo valor que se le paso a `abrirCheckout`, asi que
+   * vale igual para un checkout creado que para uno reusado: el reuso exige que
+   * coincida el diferimiento.
+   */
+  diferidoHastaIso?: string;
 }
 
 function ensureApp(): App {
@@ -128,15 +184,16 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  *   - Sin la del derecho, alguien cuyo plan vencio no podria volver a
  *     suscribirse nunca, porque el documento de `mp_plans` sigue ahi.
  *   - La del ciclo da el mensaje preciso para el caso comun (apretar de nuevo el
- *     mismo plan). El cambio de ciclo lo frena `tienePlanQueSigueCobrando`.
+ *     mismo plan). El cambio de ciclo lo frena la pasada por MP que hace el
+ *     callable (`consultarPlanesDelAlumno`).
  *
- * Lee `mp_plans` con la misma consulta por uid que usa el resto del modulo, y
- * filtra EN MEMORIA: un segundo `where` la convertiria en compuesta y exigiria
- * desplegar un indice, para uno o dos documentos por usuario.
+ * Lee `mp_plans` con la misma consulta por uid que usa el resto del modulo
+ * (`leerPlanes`, compartida con el diferimiento), y filtra EN MEMORIA: un
+ * segundo `where` la convertiria en compuesta y exigiria desplegar un indice,
+ * para uno o dos documentos por usuario.
  */
 async function yaPagaEsteCiclo(
-  app: App,
-  uid: string,
+  leerPlanes: () => Promise<PlanDeLaCuenta[]>,
   userData: Record<string, unknown> | undefined,
   cycle: SubscriptionCycle,
 ): Promise<boolean> {
@@ -146,97 +203,10 @@ async function yaPagaEsteCiclo(
     return false;
   }
 
-  const snap = await getFirestore(app)
-    .collection(MP_PLANS_COLLECTION)
-    .where("uid", "==", uid)
-    .get();
-
-  return snap.docs.some((d) => {
-    const datos = d.data();
-    return datos.producto === "athlete" &&
+  return (await leerPlanes()).some(({ data: datos }) =>
+    datos.producto === "athlete" &&
       datos.cycle === cycle &&
-      puedeSeguirCobrando(datos);
-  });
-}
-
-/**
- * Si un estado de MP significa que la suscripcion todavia puede cobrar.
- *
- * Solo `cancelled` y `pending` quedan afuera:
- *
- *   - `authorized` cobra (incluye el `grace` nuestro: MP lo deja `authorized`
- *     mientras reintenta un cobro rebotado).
- *   - `paused` CUENTA, y es la decision menos obvia: la pausa no es una baja, el
- *     pagador la puede reactivar desde su cuenta de MP y el cobro vuelve solo.
- *     Dejarlo comprar otro plan ahi es armar el doble cobro con retraso. No lo
- *     deja encerrado: `cancelMySubscription` da de baja tambien las pausadas, o
- *     sea que siempre tiene salida.
- *   - un estado que no conocemos cuenta: entre un bloqueo de mas y un cobro
- *     doble en silencio, se elige lo primero.
- *   - `pending` no: todavia no autorizo, no hay cobro. Y bloquearlo le cerraria
- *     el reintento del checkout que dejo a medias.
- */
-function mpSigueCobrando(raw: unknown): boolean {
-  return raw !== "cancelled" && raw !== "pending";
-}
-
-/**
- * Si este alumno tiene una suscripcion que MP TODAVIA cobra, de CUALQUIER ciclo.
- *
- * ── Por que se le pregunta a MP y no se mira `users/{uid}` ──
- *
- * El derecho del alumno (`athleteSubscription.status`) no alcanza para decidir
- * esto: un plan dado de baja con periodo pago por delante sigue figurando
- * `active` hasta que vence (es la promesa de los terminos §7), y una suscripcion
- * pausada figura `expired` aunque pueda volver a cobrar. Los dos casos son lo
- * contrario de lo que se necesita. Y `mp_plans` tampoco guarda el estado de MP
- * del alumno. La unica fuente que sabe si hoy se cobra es MP.
- *
- * Si no se puede preguntar, NO se deja pasar: sin saberlo no se puede descartar
- * el doble cobro, y abrir el checkout igual necesita a MP. Ver el cuerpo del
- * callable por los dos casos que esta consulta igual no alcanza a cubrir.
- */
-async function tienePlanQueSigueCobrando(
-  app: App,
-  uid: string,
-  mpClient: MpClient,
-): Promise<boolean> {
-  const snap = await getFirestore(app)
-    .collection(MP_PLANS_COLLECTION)
-    .where("uid", "==", uid)
-    .get();
-
-  // Un plan sin suscripcion en MP (checkout abierto y nunca pagado) devuelve
-  // lista vacia: no cuenta. Los terminales de hecho (baja confirmada) se saltean
-  // para no gastar una llamada; el abandonado NO, porque se puede pagar tarde.
-  const planIds = snap.docs
-    .filter((d) => d.data().producto === "athlete" && puedeSeguirCobrando(d.data()))
-    .map((d) => d.id);
-  if (planIds.length === 0) return false;
-
-  // SECUENCIAL y cortando en la primera que cobra, a proposito: MP contesta 429
-  // y los planes abandonados se quedan para siempre, asi que un `Promise.all`
-  // creceria con el uso y un solo 429 trabaria al alumno (mismo criterio que
-  // `cancel-my-subscription.ts`). Con el corte, solo importan los planes que
-  // realmente se consultaron: si uno falla antes de encontrar uno vivo, no se
-  // puede descartar el cobro y sale `unavailable`.
-  try {
-    for (const id of planIds) {
-      // `estricto`: una respuesta rota de MP no puede leerse como "no hay nada".
-      const subs = await mpClient.searchPreapprovalsByPlan(id, { estricto: true });
-      if (subs.some((s) => mpSigueCobrando(s.status))) return true;
-    }
-    return false;
-  } catch (e) {
-    logger.error("mp/create-athlete: no se pudo verificar el plan vigente", {
-      uid,
-      error: String(e),
-    });
-    throw new HttpsError(
-      "unavailable",
-      "no pudimos verificar tu suscripcion actual, proba de nuevo en un rato",
-    );
-  }
+      puedeSeguirCobrando(datos));
 }
 
 /**
@@ -247,7 +217,7 @@ export async function runCreateAthletePreapproval(
   uid: string,
   raw: unknown,
   deps: CreateAthletePreapprovalDeps,
-): Promise<CheckoutAbierto> {
+): Promise<CheckoutDelAlumno> {
   const body = (raw ?? {}) as Record<string, unknown>;
 
   const cycle = parseCycle(body.cycle);
@@ -299,6 +269,92 @@ export async function runCreateAthletePreapproval(
     );
   }
 
+  // Los planes de la cuenta se leen UNA vez y se comparten: los usan la pasada por
+  // MP, el diferimiento y la guarda del mismo ciclo. Como el bloqueo mira a todo
+  // alumno con planes (tenga o no acceso pago hoy: un plan pausado figura
+  // `expired`), la lectura ya no depende del derecho; es una query por uid de uno
+  // o dos documentos.
+  const db = getFirestore(app);
+  let planes: Promise<PlanDeLaCuenta[]> | null = null;
+  const leerPlanes = (): Promise<PlanDeLaCuenta[]> =>
+    (planes ??= db
+      .collection(MP_PLANS_COLLECTION)
+      .where("uid", "==", uid)
+      .get()
+      .then((snap) => snap.docs.map((d) => ({ id: d.id, data: d.data() }))));
+
+  // ── UNA pasada por MP, y de ahi salen DOS respuestas ──
+  //
+  // Antes de abrir nada se le pregunta a MP, plan por plan y en serie, por las
+  // suscripciones de los planes del alumno que todavia pueden cobrar. De esa misma
+  // lectura sale:
+  //
+  //   1. ¿Hay una que MP TODAVIA cobra? Entonces no se abre otro checkout (el
+  //      bloqueo de abajo).
+  //   2. Si ninguna cobra: ¿hay un cobro real que respalde dias pagos? Entonces el
+  //      plan nuevo difiere su primer cobro (`decidirDiferimientoDeAlumno`, que lee
+  //      de lo que ya se contesto y no vuelve a salir a la red).
+  //
+  // Eran dos consultas independientes sobre las mismas suscripciones. Unidas, cada
+  // plan se paga una vez y las dos decisiones no pueden contradecirse: lo que
+  // bloquea y lo que difiere salen del mismo dato. Va despues del gate de rol y del
+  // vinculo: un PF o un alumno vinculado no tienen que gastar una sola llamada.
+  //
+  // Si algo falla se TIRA, y lo que falla es o la lectura de `mp_plans` o una
+  // consulta a MP. Seguir sin saber si cobra algo es abrir un segundo cobro, y
+  // seguir sin saber si tiene dias pagos es abrir un checkout que cobra en el acto:
+  // el doble cobro que esto viene a cerrar. `unavailable` porque reintentar sirve.
+  //
+  // `estricto`: una respuesta rota de MP (sin `results` como array) falla en vez de
+  // leerse como «no hay nada cobrando», que es lo que abriria el segundo cobro.
+  //
+  // Sin atajo del doble click, a diferencia del PF: el atajo no le pregunta nada a
+  // MP, y aca esa pregunta es la que levanta la guarda del mismo ciclo y la que
+  // frena un segundo toque sobre un checkout diferido que ya se autorizo (su plan
+  // nuevo se consulta, esta vivo, y el bloqueo vuelve). Un doble click que no pago
+  // vuelve a verificar y llega a la misma fecha, que es lo que `abrirCheckout`
+  // necesita para reusar el checkout abierto.
+  let consulta: Awaited<ReturnType<typeof consultarPlanesDelAlumno>>;
+  let diferimiento: Diferimiento;
+  try {
+    consulta = await consultarPlanesDelAlumno({
+      planes: await leerPlanes(),
+      leerSuscripciones: (planId) =>
+        deps.mpClient.searchPreapprovalsByPlan(planId, { estricto: true }),
+    });
+    // Con uno vivo no hay nada que decidir: no se difiere, y mas abajo se bloquea.
+    diferimiento = consulta.vivo
+      ? { diferir: false, motivo: "no-esta-cancelada" }
+      : await decidirDiferimientoDeAlumno({
+        uid,
+        userData: userSnap.data(),
+        nowMs: deps.nowMs,
+        habilitado: deps.diferirHabilitado,
+        leerPlanes,
+        // Lo que la pasada ya trajo. Un plan que no esta es un error de armado de
+        // los dos conjuntos de planes (el de la decision es un subconjunto del de
+        // la pasada), no algo para pedirle a MP por la espalda.
+        leerSuscripciones: async (planId) => {
+          const subs = consulta.vivo ? undefined : consulta.suscripciones.get(planId);
+          if (subs === undefined) {
+            throw new Error(`mp/create-athlete: el plan ${planId} no se consulto`);
+          }
+          return subs;
+        },
+      });
+  } catch (e) {
+    const err = e as Partial<MpApiError>;
+    logger.error(
+      "mp/create-athlete-preapproval: no se pudo verificar la suscripcion " +
+        "del alumno (plan vigente y dias pagos), no se abre el checkout",
+      { uid, cycle, status: err.status, error: String(e) },
+    );
+    throw new HttpsError(
+      "unavailable",
+      "no pudimos verificar tu suscripcion actual, proba de nuevo en un rato",
+    );
+  }
+
   // ── No se puede comprar dos veces el MISMO ciclo ──
   //
   // La ventana de `abrirCheckout` cubre el doble click, pero sólo 30 minutos.
@@ -307,7 +363,23 @@ export async function runCreateAthletePreapproval(
   // de nuevo, porque no se acuerda o porque no hay nada que se lo diga.
   //
   // Sin esta guarda MP le abre un segundo cobro.
-  if (await yaPagaEsteCiclo(app, uid, userSnap.data(), cycle)) {
+  //
+  // Y NO bloquea si el primer cobro se difiere. `decidirDiferimientoDeAlumno`
+  // solo difiere si, en ESTE pedido, MP contesto por cada plan del alumno que
+  // puede cobrar sin ninguna suscripcion viva (salvo los checkouts abandonados
+  // sin fecha, que al cerrarse no tenian ninguna; ver su encabezado). No hay un
+  // segundo cobro que evitar, y el plan nuevo empieza a cobrar recien cuando vence
+  // lo que ya pago. Sin esta excepcion, el que se dio de baja y cambio de idea no
+  // podria volver a su mismo plan hasta que se le corte el acceso, porque su plan
+  // dado de baja sigue sin ser `terminal` hasta entonces.
+  //
+  // Va ANTES del bloqueo de abajo porque con una suscripcion viva en el mismo
+  // ciclo el mensaje preciso es este; el de abajo cubre el resto. Nunca se difiere
+  // con una viva, asi que la excepcion no le abre la puerta a un plan que cobra.
+  if (
+    !diferimiento.diferir &&
+    await yaPagaEsteCiclo(leerPlanes, userSnap.data(), cycle)
+  ) {
     throw new HttpsError(
       "failed-precondition",
       "ya tenes una suscripcion activa con este ciclo",
@@ -327,13 +399,23 @@ export async function runCreateAthletePreapproval(
   // el checkout abierto, las DOS suscripciones de MP quedan cobrando.
   //
   // Se levanta cuando la rama del alumno de `reconcile.ts` cancele en MP el plan
-  // reemplazado al confirmarse el nuevo. Ahi se borra este bloque y la guarda de
-  // arriba vuelve a ser la unica.
+  // reemplazado al confirmarse el nuevo. Ahi se borra este bloque, y la pasada por
+  // MP de arriba queda solo para decidir el diferimiento.
+  //
+  // El diferimiento NO lo esquiva: difiere unicamente cuando la pasada no encontro
+  // ninguna suscripcion viva, que es justo la condicion para no estar aca. Un
+  // alumno con un plan que cobra no recibe prueba ni checkout.
   //
   // ⚠️ Es EVENTUALMENTE consistente: reduce el cobro doble, no lo cierra. Quedan
   // abiertos dos casos hasta que exista esa baja:
   //   (a) el indice de busqueda de MP llega tarde (~93 s, ver `reconcile.ts`): un
-  //       plan recien pagado puede no aparecer todavia;
+  //       plan recien pagado puede no aparecer todavia. Vale tambien para el MISMO
+  //       ciclo y el diferimiento: el alumno autoriza el plan diferido B y aprieta de
+  //       nuevo dentro de esos ~93 s, antes de que el webhook de B escriba su
+  //       `currentPeriodEnd`. B vuelve vacio y sin fecha, asi que se difiere otra vez
+  //       y la guarda del mismo ciclo no corre. Dentro de la ventana de reuso de 30
+  //       minutos vuelve el mismo `init_point`; pasada, se abre un segundo plan con
+  //       prueba y los dos cobran en E. Ventana minuscula, y sin corregir;
   //   (b) dos `init_point` abiertos (una pestaña vieja sin pagar y el checkout
   //       nuevo) que se pagan los dos despues: el `init_point` no vence.
   //
@@ -342,7 +424,12 @@ export async function runCreateAthletePreapproval(
   // y cualquiera de las dos mostraria un motivo que aca es falso.
   // La baja del alumno vive en la web (`/suscripcion/baja`, treino-app), no en
   // la app.
-  if (await tienePlanQueSigueCobrando(app, uid, deps.mpClient)) {
+  if (consulta.vivo) {
+    logger.info(
+      "mp/create-athlete-preapproval: hay un plan que sigue cobrando, no se " +
+        "abre otro checkout",
+      { uid, cycle, planVivo: consulta.planId },
+    );
     throw new HttpsError(
       "failed-precondition",
       "ya tenes un plan que se sigue cobrando — para cambiar de plan, " +
@@ -350,7 +437,11 @@ export async function runCreateAthletePreapproval(
     );
   }
 
-  return abrirCheckout({
+  const diferidoHastaMs = diferimiento.diferir
+    ? diferimiento.diferidoHastaMs
+    : null;
+
+  const checkout = await abrirCheckout({
     app,
     uid,
     // Sin `tier`: el alumno tiene UN plan. La huella del PF es `{tier, cycle}` y
@@ -362,14 +453,21 @@ export async function runCreateAthletePreapproval(
     amount: athleteAmountFor(cycle),
     frequencyMonths: frequencyMonthsFor(cycle),
     mapping: { producto: "athlete", uid, cycle },
+    // `null` es el checkout de siempre. El campo NO va en la huella: ver el
+    // dartdoc de `AbrirCheckoutInput.diferidoHastaMs`.
+    diferidoHastaMs,
     mpClient: deps.mpClient,
     nowMs: deps.nowMs,
   });
+
+  return diferidoHastaMs === null
+    ? checkout
+    : { ...checkout, diferidoHastaIso: new Date(diferidoHastaMs).toISOString() };
 }
 
 export const createAthletePreapproval = functions.onCall(
   { region: "southamerica-east1", secrets: [MP_ACCESS_TOKEN] },
-  async (request): Promise<CheckoutAbierto> => {
+  async (request): Promise<CheckoutDelAlumno> => {
     if (!request.auth?.uid) {
       throw new HttpsError("unauthenticated", "hay que estar logueado");
     }

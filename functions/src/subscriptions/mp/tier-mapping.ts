@@ -219,8 +219,8 @@ export function tierFromAmount(amount: unknown): PreapprovalMapping | null {
  * unico escritor de `mp_plans`, asi que todo documento nuevo lo tiene; los
  * viejos no, y de eso se ocupa el default de [lookupPlan].
  *
- * [diferidoHastaMs] es el dia hasta el que el PF ya tenia pago el periodo cuando
- * se creo este plan CON PRUEBA (ver `diferir-primer-cobro.ts`). Se escribe SOLO
+ * [diferidoHastaMs] es el dia hasta el que el usuario (PF o alumno) ya tenia pago
+ * el periodo cuando se creo este plan CON PRUEBA (ver `diferir-primer-cobro.ts`). Se escribe SOLO
  * cuando hay uno: el documento de un plan normal queda exactamente como siempre,
  * y un `undefined` explicito lo rechazaria Firestore.
  *
