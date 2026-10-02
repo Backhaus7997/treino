@@ -323,12 +323,12 @@ export async function runCreateAthletePreapproval(
   //
   // El mensaje evita las palabras «entrenador» y «ciclo» a proposito: la landing
   // (`motivoDeLaPrecondicion`, treino-app) decide el copy buscandolas en el texto,
-  // y cualquiera de las dos mostraria un motivo que aca es falso.
+  // y cualquiera de las dos mostraria un motivo que aca es falso. La baja del\n  // alumno vive en la web (`/suscripcion/baja`, treino-app), no en la app.
   if (await tienePlanQueSigueCobrando(app, uid, deps.mpClient)) {
     throw new HttpsError(
       "failed-precondition",
       "ya tenes un plan que se sigue cobrando — para cambiar de plan, " +
-        "cancelalo primero desde la app y despues contrata el nuevo",
+        "dalo de baja primero desde la web (Suscripcion > Baja) y despues contrata el nuevo",
     );
   }
 
