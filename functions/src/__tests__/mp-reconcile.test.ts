@@ -1197,7 +1197,7 @@ const FIN_DE_A = Date.parse("2026-09-20T12:00:00.000Z");
 const PROXIMO_DE_B = "2026-10-07T12:00:00.000Z";
 
 /** El PF que se fue y volvio: pA es de hace dos meses, pB lo abrio ayer. */
-const VOLVIO = (tierDeB: "plan2" | "plan3"): Store => ({
+const VOLVIO = (tierDeB: "plan1" | "plan2" | "plan3"): Store => ({
   users: { t1: { role: "trainer", displayName: "Martin" } },
   mp_plans: {
     pA: {
@@ -1211,7 +1211,10 @@ const VOLVIO = (tierDeB: "plan2" | "plan3"): Store => ({
   },
 });
 
-/** La suscripcion de A mientras el PF la pagaba. */
+/**
+ * La suscripcion de A mientras el PF la pagaba. CON un cobro hecho: la baja de un
+ * plan que se pago y la de un checkout que nunca cobro no pesan lo mismo.
+ */
 const A_VIVA: MpPreapproval = {
   id: "sub-a",
   preapproval_plan_id: "pA",
@@ -1219,7 +1222,7 @@ const A_VIVA: MpPreapproval = {
   external_reference: "t1",
   next_payment_date: new Date(FIN_DE_A).toISOString(),
   auto_recurring: { transaction_amount: 22000 },
-  summarized: { pending_charge_quantity: 0 },
+  summarized: { charged_quantity: 1, charged_amount: 22000, pending_charge_quantity: 0 },
 };
 
 /** A despues de la baja del PF. MP omite la fecha de una cancelada que pago. */
@@ -1244,15 +1247,20 @@ const B_DE_BAJA: MpPreapproval = {
   next_payment_date: undefined,
 };
 
-/** B con el medio de pago todavia sin autorizar. */
+/** B con el medio de pago todavia sin autorizar: no cobro nada. */
 const B_PENDIENTE: MpPreapproval = {
   ...B_VIVA,
   status: "pending",
   next_payment_date: undefined,
+  summarized: { pending_charge_quantity: 0 },
 };
 
 /** B cancelada sin haber cobrado nunca: esa SI trae fecha. */
-const B_SIN_PAGAR: MpPreapproval = { ...B_VIVA, status: "cancelled" };
+const B_SIN_PAGAR: MpPreapproval = {
+  ...B_VIVA,
+  status: "cancelled",
+  summarized: { pending_charge_quantity: 0 },
+};
 
 /** El mapa `subscription` tal como quedo, sin interpretar. */
 const suscripcion = (store: Store) =>
@@ -1426,10 +1434,37 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
   });
 
   for (const orden of [["pA", "pB"], ["pB", "pA"]] as const) {
+    it(`la baja con un upgrade a medio camino conserva lo pagado (${orden[0]} primero)`, async () => {
+      // El PF paga plan2 con A y abrio un checkout de plan1 con B, que quedo
+      // `pending`. El boton de baja cancela las DOS y las reconcilia en el orden
+      // que devuelva Firestore. La baja de B nunca cobro: no puede pisar la de A,
+      // que tiene dias pagos. Antes, con A primero, el PF quedaba en plan1 en el
+      // acto. Lo encontro la revision adversarial de esta guarda.
+      const { app, store } = fakeApp(VOLVIO("plan1"));
+      await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+      expect((await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE))).outcome)
+        .toBe("skipped-pending-no-pisa");
+
+      const mp = fakeMpMultiPlan({ pA: A_DE_BAJA, pB: B_SIN_PAGAR });
+      for (const planId of orden) await reconcileSubscription(app, planId, mp);
+
+      const sub = suscripcion(store);
+      expect(sub).toMatchObject({ tier: "plan2", status: "cancelled", mpPlanId: "pA" });
+      expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis()).toBe(FIN_DE_A);
+      expect(limiteDe(store))
+        .toBe(effectiveWeightLimit({ tier: "plan2", status: "active" }, AHORA));
+      // La baja de B igual queda registrada: MP la confirmo.
+      expect(store.mp_plans.pB.terminal).toBe(true);
+    });
+  }
+
+  for (const orden of [["pA", "pB"], ["pB", "pA"]] as const) {
     it(`el arrepentimiento sigue cortando en el acto (${orden[0]} primero)`, async () => {
-      // `cortarElAcceso` marca TODOS los planes de la cuenta y los reconcilia en el
-      // orden que devuelva Firestore. El corte entra por el plan vigente; A, que
-      // no manda, no le cambia el tier.
+      // `cortarElAcceso` marca y reconcilia —en el orden que devuelva Firestore—
+      // los planes que tenian contrato al empezar el tramite: aca, A y B. El corte
+      // entra por el plan vigente; A, que no manda, no le cambia el tier. (El caso
+      // en que el plan vigente NO esta entre esos lo cubre
+      // `mp-arrepentimiento-por-mail.test.ts`, con un upgrade a medio camino.)
       const { app, store } = await seFueYVolvio("plan3");
       const ARREPENTIDO = AHORA - 60_000;
       store.mp_plans.pA.arrepentidoAtMs = ARREPENTIDO;
@@ -1453,8 +1488,8 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
 });
 
 describe("puedePisarAlVigente", () => {
-  const VIEJO = { planId: "pA", altaMs: AHORA - 60 * DIA_MS };
-  const NUEVO = { planId: "pB", altaMs: AHORA - DIA_MS };
+  const VIEJO = { planId: "pA", altaMs: AHORA - 60 * DIA_MS, cobro: true };
+  const NUEVO = { planId: "pB", altaMs: AHORA - DIA_MS, cobro: true };
 
   it("el plan anotado se pisa a si mismo siempre, aunque traiga algo peor", () => {
     // Su baja, su pausa, su cobro rebotado: si no, nadie perderia nunca el plan.
@@ -1476,6 +1511,17 @@ describe("puedePisarAlVigente", () => {
       { ...VIEJO, status: "pending" }, { ...NUEVO, status: "cancelled" }, true],
     ["`grace` vale lo mismo que `active`: decide la fecha",
       { ...VIEJO, status: "grace" }, { ...NUEVO, status: "active" }, false],
+    // La fila de arriba no distingue un `grace` rankeado como `pending`; esta si.
+    ["un `grace` mas nuevo pisa a un `active` mas viejo",
+      { ...NUEVO, status: "grace" }, { ...VIEJO, status: "active" }, true],
+    ["la baja de un checkout que nunca cobro no pisa la de un plan pago, aunque sea mas nueva",
+      { ...NUEVO, status: "cancelled", cobro: false }, { ...VIEJO, status: "cancelled" }, false],
+    ["ni su pausa",
+      { ...NUEVO, status: "paused", cobro: false }, { ...VIEJO, status: "cancelled" }, false],
+    ["la baja de un plan pago SI pisa la de un checkout que nunca cobro, aunque sea mas vieja",
+      { ...VIEJO, status: "cancelled" }, { ...NUEVO, status: "cancelled", cobro: false }, true],
+    ["un `active` que todavia no cobro (una prueba) vale lo mismo que uno que si",
+      { ...NUEVO, status: "active", cobro: false }, { ...VIEJO, status: "active" }, true],
     ["`paused` vale lo mismo que `cancelled`: decide la fecha",
       { ...VIEJO, status: "paused" }, { ...NUEVO, status: "cancelled" }, false],
     ["un estado guardado que no entendemos no protege: lo pisa lo que cobra",

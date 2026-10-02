@@ -187,7 +187,9 @@
  * (`puedePisarAlVigente`):
  *
  *   - Primero por estado: lo que cobra (`active`, `grace`) le gana a lo que esta
- *     naciendo (`pending`), y eso a lo que termino (`cancelled`, `paused`).
+ *     naciendo (`pending`); eso, a la baja (`cancelled`, `paused`) de un plan que
+ *     se pago; y eso, a la baja de un checkout que nunca cobro
+ *     (`cobrosExitosos`).
  *   - Con el mismo estado, el plan mas nuevo por `mp_plans.createdAt`: el mismo
  *     criterio con el que `darDeBajaLosReemplazados` elige a quien cancelar, asi
  *     que las dos decisiones no se pueden contradecir.
@@ -200,6 +202,16 @@
  * siempre pasa por encima de un checkout que no se pago. Y la regla es simetrica:
  * el `cancelled` de un plan nuevo que nunca se pago tampoco pisa el `active` de
  * uno mas viejo que sigue cobrando.
+ *
+ * El ultimo escalon —la baja que cobro contra la que no— lo encontro la revision
+ * adversarial de esta guarda. El boton de baja cancela TODAS las suscripciones
+ * del PF, tambien la `pending` de un upgrade a medio camino, y sin el escalon el
+ * `cancelled` de ese checkout —mas nuevo, sin un peso cobrado— quedaba como
+ * vigente encima de la baja del plan que si se pago: el PF pasaba a tener el tier
+ * de un plan que nunca cobro, con un fin de periodo que nadie habia pagado. En un
+ * arrepentimiento era peor: `cortarElAcceso` solo reconcilia los planes que
+ * tenian contrato al empezar el tramite, asi que el corte de A perdia el
+ * desempate contra B y no entraba.
  *
  * Lo que la guarda NO hace, a proposito:
  *
@@ -672,16 +684,20 @@ const CAMPO_PLAN_VIGENTE = "mpPlanId";
 /**
  * Que tan vigente es un estado, para decidir entre dos planes del mismo PF.
  *
- *   2 — `active` / `grace`: las dos caras del `authorized` de MP. Hay medio de
+ *   3 — `active` / `grace`: las dos caras del `authorized` de MP. Hay medio de
  *       pago cargado y MP le sigue cobrando.
- *   1 — `pending`: un checkout que todavia no se confirmo.
- *   0 — `cancelled`, `paused`, o un estado que no entendemos: no cobra.
+ *   2 — `pending`: un checkout que todavia no se confirmo.
+ *   1 — `cancelled` / `paused` de un plan que COBRO: hubo un periodo pago.
+ *   0 — `cancelled` / `paused` de un checkout que nunca cobro, o un estado que
+ *       no entendemos.
  *
- * Contesta cual de los dos planes es el que el PF sigue PAGANDO, y nada mas.
+ * Contesta cual de los dos planes es el que el PF esta pagando —o el ultimo que
+ * pago—, y nada mas.
  */
-function rangoDeVigencia(status: unknown): number {
-  if (status === "active" || status === "grace") return 2;
-  if (status === "pending") return 1;
+function rangoDeVigencia(status: unknown, cobro: boolean): number {
+  if (status === "active" || status === "grace") return 3;
+  if (status === "pending") return 2;
+  if (status === "cancelled" || status === "paused") return cobro ? 1 : 0;
   return 0;
 }
 
@@ -692,6 +708,13 @@ export interface PlanEnDisputa {
   status: unknown;
   /** `mp_plans/{planId}.createdAt` en ms, o `null` si no se pudo leer. */
   altaMs: number | null;
+  /**
+   * Si la suscripcion tuvo algun cobro exitoso: `cobrosExitosos`, la misma
+   * evidencia de pago que usa la prueba diferida. Solo separa dos bajas —la de un
+   * plan que se pago y la de un checkout que nunca cobro—; con otro estado no
+   * cambia nada.
+   */
+  cobro: boolean;
 }
 
 /**
@@ -710,9 +733,10 @@ export function puedePisarAlVigente(
   if (entrante.planId === vigente.planId) return true;
 
   // Primero el estado. Es lo que deja pasar el pago de una pestaña vieja por
-  // encima de un checkout mas nuevo que nunca se pago.
-  const rangoEntrante = rangoDeVigencia(entrante.status);
-  const rangoVigente = rangoDeVigencia(vigente.status);
+  // encima de un checkout mas nuevo que nunca se pago, y lo que no deja que la
+  // baja de ese checkout pise la de un plan que si se pago.
+  const rangoEntrante = rangoDeVigencia(entrante.status, entrante.cobro);
+  const rangoVigente = rangoDeVigencia(vigente.status, vigente.cobro);
   if (rangoEntrante !== rangoVigente) return rangoEntrante > rangoVigente;
 
   // Mismo estado: manda el mas nuevo, como en `darDeBajaLosReemplazados`. Sin las
@@ -1523,11 +1547,16 @@ export async function reconcileSubscription(
         planId,
         status,
         altaMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
+        cobro: cobrosExitosos(mp.summarized) > 0,
       },
       {
         planId: anotado,
         status: actual?.status,
         altaMs: await altaDelPlanMs(app, anotado),
+        // El mapa no guarda si el vigente cobro, y se asume que si: la duda juega
+        // para lo que ya esta escrito. Aca frenar no puede dejar un pago sin
+        // acreditar, porque el dato solo separa dos bajas.
+        cobro: true,
       },
     );
     if (!pisa) {
