@@ -64,7 +64,9 @@
  *
  * ── El bloque de pagos del mail ──
  *
- * Va solo si le sirve y si se puede decir: ver `muestraPlanes`.
+ * Va solo si le sirve (`muestraPlanes`, al encolar) y si el usuario no se opuso
+ * a lo comercial: eso lo decide `sendQueuedMail` al enviar, con
+ * `bloqueComercial`, y cuando va le agrega el pie de baja.
  */
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
@@ -81,7 +83,6 @@ import {
   ATHLETE_PAYWALL_ENFORCEMENT_ENABLED,
   ENFORCED_FIELD,
 } from "../subscriptions/athlete-paywall-enforced";
-import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 
 /** Un documento por usuario, con el código vigente. Solo servidor. */
 export const VERIFICACIONES_COLLECTION = "verificaciones_de_mail";
@@ -296,12 +297,14 @@ export function decidirEnvio(
 }
 
 /**
- * Si el mail del código lleva el bloque de pagos. Va sin él cuando:
- * - el usuario apagó lo comercial por mail (`novedades_plan`): la política de
- *   privacidad promete la oposición, y este mail es obligatorio;
- * - es alumno y el plan free no le aplica (`athletePaywallEnforced === false`:
- *   ya paga, tiene un PF activo, o el interruptor está apagado). Sin paywall, el
- *   checkout de la landing da 404.
+ * Si al usuario le SIRVE el bloque de pagos del mail del código. Va sin él
+ * cuando es alumno y el plan free no le aplica (`athletePaywallEnforced ===
+ * false`: ya paga, tiene un PF activo, o el interruptor está apagado). Sin
+ * paywall, el checkout de la landing da 404.
+ *
+ * La oposición a lo comercial (`novedades_plan`) NO se mira acá: el mail sale
+ * con `bloqueComercial` y la evalúa `sendQueuedMail` al ENVIAR (#1286). Si se
+ * opuso, el bloque no va; si no, va con el pie de baja.
  *
  * El campo AUSENTE cuenta como que aplica, al revés que en `firestore.rules`
  * (que lo lee como `false` para no bloquear de más): ausente es la cuenta recién
@@ -314,10 +317,6 @@ export function muestraPlanes(
   usuario: Record<string, unknown> | undefined,
   paywallDelAlumnoPrendido: boolean,
 ): boolean {
-  const prefs = usuario?.notificationPrefs as
-    | Record<string, { email?: unknown } | undefined>
-    | undefined;
-  if (prefs?.[ATHLETE_PROSPECT_PREF_KEY]?.email === false) return false;
   return rol === "trainer" || (paywallDelAlumnoPrendido && usuario?.[ENFORCED_FIELD] !== false);
 }
 
@@ -372,14 +371,17 @@ export async function runSolicitarCodigo(
 
   // `enqueueMail` no tira nunca: devuelve `null` si no pudo escribir. Con un
   // `scope` único por envío, `null` solo puede ser una falla.
+  //
+  // Con el bloque de pagos, el mail lleva contenido comercial: `bloqueComercial`
+  // hace que `sendQueuedMail` mire la oposición al enviar y agregue el pie de
+  // baja. Sin el bloque no hay nada comercial, y tampoco pie.
+  const conPlanes = muestraPlanes(rol, usuario, ATHLETE_PAYWALL_ENFORCEMENT_ENABLED);
   const encolado = await enqueueMail(app, {
     toUid: uid,
     kind: rol === "trainer" ? "email-code-trainer" : "email-code-athlete",
     scope: `${uid}_${deps.nowMs}`,
-    params: {
-      codigo,
-      showPlans: muestraPlanes(rol, usuario, ATHLETE_PAYWALL_ENFORCEMENT_ENABLED) ? "1" : "0",
-    },
+    params: { codigo, showPlans: conPlanes ? "1" : "0" },
+    bloqueComercial: conPlanes ? "novedades_plan" : undefined,
   });
   if (encolado === null) {
     // Se borra el código: el mail no salió, así que ese código no le sirve a

@@ -936,6 +936,57 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
     });
   });
 
+  // El mail del código (`auth/codigo-de-verificacion.ts`) sale con
+  // `bloqueComercial` cuando lleva el bloque de pagos: mismo contrato.
+  describe("`email-code-*` con `bloqueComercial`", () => {
+    const delCodigo: Partial<MailQueueDoc> = {
+      kind: "email-code-trainer",
+      params: { codigo: "048213", showPlans: "1" },
+      bloqueComercial: PREF,
+    };
+
+    it("se opuso: el código sale, sin planes y sin pie", async () => {
+      await setPrefs({ [PREF]: { email: false } });
+      await seed(delCodigo);
+      const sender = makeOkSender();
+
+      await enviar(sender, BAJA_KEY);
+
+      expect(sender.sent).toHaveLength(1);
+      const { html, text } = sender.sent[0];
+      expect(text.split("\n")[0]).toBe("048213");
+      expect(html).not.toContain("VER LOS PLANES");
+      for (const huella of SIN_PIE) {
+        expect(html).not.toContain(huella);
+        expect(text).not.toContain(huella);
+      }
+    });
+
+    it("no se opuso: el código con los planes Y el pie de baja", async () => {
+      await setPrefs({ [PREF]: { email: true } });
+      await seed(delCodigo);
+      const sender = makeOkSender();
+
+      await enviar(sender, BAJA_KEY);
+
+      const { html, text } = sender.sent[0];
+      expect(html).toContain("VER LOS PLANES");
+      expect(text).toMatch(URL_DE_BAJA);
+    });
+
+    it("sin la clave de baja: el código sale, sin planes (nunca publicidad sin pie)", async () => {
+      await setPrefs({ [PREF]: { email: true } });
+      await seed(delCodigo);
+      const sender = makeOkSender();
+
+      await enviar(sender, "");
+
+      expect(sender.sent).toHaveLength(1);
+      expect(sender.sent[0].html).not.toContain("VER LOS PLANES");
+      expect(sender.sent[0].text).not.toMatch(URL_DE_BAJA);
+    });
+  });
+
   describe("`bloqueComercial`: se frena el bloque, no el mail", () => {
     const BLOQUE = "Si querés seguir sumando, hay planes más grandes.";
 

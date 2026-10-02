@@ -24,12 +24,14 @@ export type MailKind =
   | "federated-signin-hint"
   | "email-verification"
   // El código de 6 dígitos que confirma el mail (`auth/codigo-de-verificacion.ts`).
-  // Obligatorio para TODOS, también Google y Apple. Con `showPlans: "1"`, además
-  // del código le dice al usuario que los pagos y sus confirmaciones van por
-  // mail, con un botón a los planes: es lo que la app NO puede decir (3.1.3(f)).
+  // Obligatorio para TODOS, también Google y Apple. Con `showPlans: "1"` (y si no
+  // se opuso a lo comercial), además del código le dice al usuario que los
+  // pagos y sus confirmaciones van por mail, con un botón a los planes: es lo
+  // que la app NO puede decir (3.1.3(f)).
   // Uno por rol porque el plan y el lugar donde se paga no son los mismos. Sin
-  // `prefKey`: sin este mail no se puede entrar a la app, así que el opt-out de
-  // `novedades_plan` saca el bloque de pagos (`muestraPlanes`), no el mail.
+  // `prefKey`: sin este mail no se puede entrar a la app. Cuando lleva el bloque
+  // de pagos sale con `bloqueComercial`, así que la oposición a
+  // `novedades_plan` saca el bloque al enviar, no el mail.
   | "email-code-athlete"
   | "email-code-trainer"
   | "appointment-confirmed"
@@ -283,9 +285,10 @@ export type MailOptOut =
   | {
     prefKey?: never;
     /**
-     * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy sólo
+     * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy
      * `limit-reached`: «N alumnos quedaron en solo lectura» + «hay planes más
-     * grandes»). No se puede frenar entero con `prefKey`: quien se opuso a lo
+     * grandes»; y `email-code-*`: el código + los planes). No se puede frenar
+     * entero con `prefKey`: quien se opuso a lo
      * comercial igual tiene que enterarse de lo operativo. Lo que se frena es el
      * BLOQUE.
      *
