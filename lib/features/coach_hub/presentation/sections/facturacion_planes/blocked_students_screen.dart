@@ -16,6 +16,7 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
 import 'plan_vigencia.dart';
+import 'vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// La ruta de esta pantalla, en UN solo lugar.
@@ -134,11 +135,19 @@ class _Loaded extends ConsumerWidget {
     // el de tu plan Plan 2»). Con el efectivo, una baja vencida diría «no con
     // el de tu plan Free».
     final tier = subscription?.tier ?? SubscriptionTier.free;
-    // Una sola lectura del reloj para toda la pantalla: la causa y el aviso de
-    // la baja salen del mismo «ahora» y no se pueden contradecir.
-    final vigencia = VigenciaDelPlan.de(subscription);
+    // Una sola vigencia para toda la pantalla: la causa y el aviso de la baja
+    // salen del mismo «ahora» y no se pueden contradecir. La da el provider y
+    // no un cálculo en el build: abierta al vencer la baja, la pantalla pasa
+    // sola al otro lado de la fecha (ver [_causeOf]). Con `select` sobre lo
+    // único que se usa: el provider se re-evalúa cada minuto mientras hay un
+    // borde por delante, y [VigenciaDelPlan] no define `==`.
+    final (:vencida, :pagadoHasta) = ref.watch(
+      vigenciaDelPlanProvider.select(
+        (v) => (vencida: v.vencida, pagadoHasta: v.pagadoHasta),
+      ),
+    );
     final cause = profileLoaded
-        ? _causeOf(tier: tier, subscription: subscription, vigencia: vigencia)
+        ? _causeOf(tier: tier, subscription: subscription, vencida: vencida)
         : _BlockCause.unknownPlan;
 
     if (blocked.ids.isEmpty) {
@@ -147,7 +156,7 @@ class _Loaded extends ConsumerWidget {
         cause: cause,
         tier: tier,
         subscription: subscription,
-        pagadoHasta: vigencia.pagadoHasta,
+        pagadoHasta: pagadoHasta,
         palette: palette,
       );
     }
@@ -192,7 +201,7 @@ class _Loaded extends ConsumerWidget {
           _conAvisoDeBaja(
             _explanation(cause: cause, tier: tier, count: blocked.ids.length),
             tier: tier,
-            pagadoHasta: vigencia.pagadoHasta,
+            pagadoHasta: pagadoHasta,
           ),
           textAlign: TextAlign.center,
           style:
@@ -401,9 +410,10 @@ bool _ctaFits(_BlockCause cause) =>
 /// `no_raw_clock_scan_test.dart` deja pasar (en `coach_hub/` prohíbe el reloj
 /// crudo, no el seam) y que un test puede congelar. Es el reloj del
 /// DISPOSITIVO, no el del servidor: si están desfasados, cerca de la fecha
-/// pueden decidir distinto. Y se decide en cada build, sin timer: una pantalla
-/// abierta al cruzar la fecha conserva lo que decidió hasta que algo la
-/// reconstruya.
+/// pueden decidir distinto. La vigencia llega de `vigenciaDelPlanProvider`,
+/// que se recalcula sola en [VigenciaDelPlan.proximoCambio]: una pantalla
+/// abierta al cruzar la fecha cambia de causa y de botón sin esperar a que
+/// algo la reconstruya.
 ///
 /// De [VigenciaDelPlan] se usa SÓLO la rama `cancelled`, que es lo único que
 /// espeja (ver su «Qué espeja y qué NO»). Su
@@ -422,13 +432,13 @@ bool _ctaFits(_BlockCause cause) =>
 _BlockCause _causeOf({
   required SubscriptionTier tier,
   required TrainerSubscription? subscription,
-  required VigenciaDelPlan vigencia,
+  required bool vencida,
 }) {
   final entitledToTier = switch (subscription?.status) {
     null || SubscriptionStatus.active || SubscriptionStatus.grace => true,
     // Con el período pagado corriendo rige el tier; vencido, o sin fecha, el
     // servidor ya lo bajó a Free.
-    SubscriptionStatus.cancelled => !vigencia.vencida,
+    SubscriptionStatus.cancelled => !vencida,
     SubscriptionStatus.pending || SubscriptionStatus.paused => false,
   };
   if (!entitledToTier) return _BlockCause.subscriptionInactive;

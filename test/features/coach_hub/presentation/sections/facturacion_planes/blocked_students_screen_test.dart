@@ -711,6 +711,44 @@ void main() {
       expect(text, isNot(contains('no tiene tope de alumnos')));
       expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
     });
+
+    // La pantalla puede seguir abierta cuando vence la baja, y en ese borde no
+    // emite nadie: el servidor no reescribe `subscription` (el perfil no
+    // vuelve a emitir) y `AppClock` no avisa. Calculada en el build, la causa
+    // quedaba en «ampliá tu Plan 2» hasta un rebuild ajeno, con el botón del
+    // lado equivocado de la fecha. La lee `vigenciaDelPlanProvider`, que se
+    // recalcula solo al llegar al borde.
+    testWidgets('vence con la pantalla abierta: pasa a regularizar sola', (
+      tester,
+    ) async {
+      final fin = DateTime.utc(2026, 10, 15, 15);
+      AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: fin,
+        ),
+      );
+      expect(_allText(tester), contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
+
+      // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el
+      // perfil ni la lista emiten de nuevo).
+      AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      // «Límite del plan Free» no sirve de prueba: antes del borde ya lo dice
+      // el aviso de la baja, como lo que viene después.
+      final text = _allText(tester);
+      expect(text, contains('no esté al día'));
+      expect(text, isNot(contains('incluye 15 alumnos')));
+      expect(text, isNot(contains('rige hasta')));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
+      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
+    });
   });
 
   group('BlockedStudentsScreen — salida a facturación', () {
