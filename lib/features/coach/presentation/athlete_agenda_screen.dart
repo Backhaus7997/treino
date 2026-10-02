@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/app_clock.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -45,7 +46,7 @@ class AthleteAgendaScreen extends ConsumerStatefulWidget {
 }
 
 class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
-  DateTime _focusedDay = DateTime.now();
+  DateTime _focusedDay = AppClock.now();
   DateTime? _selectedDay;
 
   @override
@@ -267,7 +268,7 @@ class _AgendaCalendar extends StatelessWidget {
 
   /// Whether [day] is strictly before today (date-level, local TZ).
   bool _isDayPast(DateTime day) {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final today = DateTime(now.year, now.month, now.day);
     return DateTime(day.year, day.month, day.day).isBefore(today);
   }

@@ -141,7 +141,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado al mergear este guard. NUNCA
     /// subirlo: cada migración lo baja.
-    const allowlistCeiling = 37;
+    const allowlistCeiling = 35;
 
     /// Techo de ocurrencias totales. Mismo contrato: sólo baja.
     ///
@@ -153,10 +153,14 @@ void main() {
     /// que este cambio vuelve falso. El scanner es textual y no distingue
     /// código de comentario, así que las cuenta igual.
     ///
+    /// 80 → 74 cuando las dos agendas mobile (PF y alumno) pasaron a
+    /// `AppClock.now()`: el test del locale del calendario necesita congelar
+    /// el mes enfocado, y ese mes sale de la hora.
+    ///
     /// Bajar el techo es obligatorio al migrar: dejarlo arriba de la medición
     /// real regala cupo para regresiones nuevas, que es justo lo que el
     /// ratchet existe para impedir.
-    const rawClockDebtCeiling = 80;
+    const rawClockDebtCeiling = 74;
 
     /// Registro de deuda, rutas relativas a `lib/`.
     const allowlist = {
@@ -170,10 +174,8 @@ void main() {
       'features/coach/data/trainer_link_repository.dart',
       'features/coach/domain/wall_clock.dart',
       'features/coach/presentation/agenda_formatters.dart',
-      'features/coach/presentation/athlete_agenda_screen.dart',
       'features/coach/presentation/athlete_detail_screen.dart',
       'features/coach/presentation/availability_editor_screen.dart',
-      'features/coach/presentation/trainer_agenda_tab.dart',
       'features/coach/presentation/trainer_dashboard_tab.dart',
       'features/coach/presentation/widgets/appointment_detail_sheet.dart',
       'features/coach/presentation/widgets/day_timeline.dart',
