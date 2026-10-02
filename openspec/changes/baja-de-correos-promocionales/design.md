@@ -387,6 +387,17 @@ Página nueva `/[locale]/correos-promocionales/baja`, calcada de
   - El texto de la política cambia en otra rama (`docs/legal/`): §5, §7.1 y la
     fila de oposición de §9. Ahí sí se puede nombrar el link del pie, y el
     toggle recién cuando esté publicado en las tiendas.
+  - **Europa: la opción B NO alcanza, y hoy no aplica.** Para un destinatario
+    del Espacio Económico Europeo, el interés legítimo del RGPD (art. 6(1)(f))
+    no reemplaza el consentimiento previo que exige la Directiva ePrivacy
+    (2002/58/CE, art. 13) para el mail comercial. Su excepción («soft opt-in»)
+    sólo cubre a quien compró, y `free-limit-reached` le escribe justamente a
+    quien no compró (lo marcó el bot de Codex en #1296). El titular confirmó el
+    2026-10-02 que no hay usuarios del EEE ni se apunta a ese mercado por
+    ahora. **Disparador:** antes de publicar en tiendas del EEE o de apuntar a
+    ese mercado, a esos usuarios el toggle les arranca APAGADO (opt-in) y
+    §7.1 vuelve a decir «consentimiento» para ellos. `UserProfile` hoy no
+    guarda el país, así que eso exige registrar el dato primero.
 - **Texto legal.** Cuando el pie y el toggle estén vivos, §9 puede nombrar el
   link del pie. Antes no: prometería algo que todavía no existe.
 - **`List-Unsubscribe` / `List-Unsubscribe-Post` (RFC 8058).** El one-click de
