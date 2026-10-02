@@ -595,7 +595,7 @@ describe("confirmarArrepentimientoPorMail — el acceso termina en el acto", () 
             role: "trainer",
             subscription: {
               tier: "plan1", status: "active", currentPeriodEnd: ts(AHORA + 20 * DIA_MS),
-              prepaidTier: null, prepaidUntil: null, mpPlanId: "pA",
+              prepaidTier: null, prepaidUntil: null, mpPlanId: "pA", mpPlanCobro: true,
             },
           },
         },

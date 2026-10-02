@@ -1354,7 +1354,9 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     });
 
     // Llega A, que SI cobro. Antes empataba contra un B supuesto «pago», perdia
-    // por fecha y quedaba terminal: el periodo pago no se acreditaba nunca.
+    // por fecha y quedaba terminal: ni el tier ni el periodo se acreditaban nunca.
+    // Aca A trae su fecha (`A_PAGO_Y_CANCELADO`); con la forma real de MP, que la
+    // omite, ver el test que sigue.
     const r = await reconcileSubscription(
       app, "pA", fakeMp(A_PAGO_Y_CANCELADO), A_PAGO_Y_CANCELADO);
 
@@ -1366,6 +1368,45 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     });
     expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis()).toBe(FIN_DE_A);
     expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("con la forma real de MP (baja sin fecha) se acredita el tier; el fin es el de la cascada", async () => {
+    // `A_DE_BAJA` es lo que MP contesta de verdad: omite `next_payment_date` en un
+    // plan cancelado que cobro. Sin fecha propia, `resolverFinDePeriodo` cae en la
+    // guardada, que es la de B (un checkout que nunca cobro). Lo que este arreglo
+    // garantiza es que A deje de rechazarse y se le acredite el TIER; el fin de
+    // periodo exacto que A pago NO sale de MP en este camino.
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR);
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(r.outcome).toBe("written");
+    const sub = suscripcion(store);
+    expect(sub).toMatchObject({
+      tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+    // La fecha heredada de B, no la de A: es lo que hoy rinde la cascada.
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse(PROXIMO_DE_B));
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("`mpPlanCobro` no se desanota: el mismo plan con `summarized` atrasado en cero sigue en `true`", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan2"));
+    await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+    expect(suscripcion(store)).toMatchObject({ mpPlanId: "pA", mpPlanCobro: true });
+
+    // El indice de busqueda de MP todavia no ve el cobro, y llega la baja.
+    const ATRASADA: MpPreapproval = {
+      ...A_DE_BAJA, summarized: { pending_charge_quantity: 0 },
+    };
+    const r = await reconcileSubscription(app, "pA", fakeMp(ATRASADA), ATRASADA);
+
+    expect(r.outcome).toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
   });
 
   it("control: si el vigente SI cobro, el `cancelled` de un plan mas viejo sigue perdiendo por fecha", async () => {

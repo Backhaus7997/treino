@@ -220,7 +220,10 @@
  * vigente siempre cobro— era falso: B, un checkout que nunca cobro, queda como vigente
  * con su `cancelled`; el `cancelled` de A, que SI cobro pero nadie reconcilio a
  * tiempo, empataba contra el y perdia por fecha. Se rechazaba y quedaba terminal:
- * el periodo que el PF pago con A no se acreditaba nunca.
+ * lo que el PF pago con A no se acreditaba nunca. Ahora se escribe. OJO con el
+ * alcance: se acredita el TIER de A; su fin de periodo sale de la cascada de
+ * `resolverFinDePeriodo`, y MP omite `next_payment_date` en una baja que cobro, asi
+ * que cae en la fecha guardada —la de B— y no en la que A pago de verdad.
  *
  * Lo que la guarda NO hace, a proposito:
  *
@@ -1668,16 +1671,25 @@ export async function reconcileSubscription(
     );
   }
 
+  // `mpPlanCobro` es MONOTONO por plan: un cobro que ya anotamos no se desanota.
+  // `summarized` puede venir atrasado (el indice de busqueda de MP tarda), y un
+  // re-reconcile del mismo plan que lo viera en cero reescribiria `true` -> `false`;
+  // si eso pasa en la baja, el dato se congela (el plan sale del barrido) y el
+  // plan que llegue despues lo lee mal. Solo aplica al mismo plan: si el estado
+  // lo escribio OTRO, lo que cobro este es lo que corresponde anotar.
+  const cobroAnotar =
+    cobro || (anotado === planId && cobroAnotado === true);
+
   // El plan que escribe es parte de lo escrito. Un estado de antes de que
-  // existiera `mpPlanId` se reescribe UNA vez para anotarlo: dispara
-  // `syncEntitlementsOnSubscription` (compara el mapa serializado), pero no
-  // manda mail ni bloquea a nadie, porque el limite no cambia.
+  // existiera `mpPlanId` o `mpPlanCobro` se reescribe UNA vez para anotarlos:
+  // dispara `syncEntitlementsOnSubscription` (compara el mapa serializado), pero
+  // no manda mail ni bloquea a nadie, porque el limite no cambia.
   const sinCambios =
     actual != null &&
     actual[CAMPO_PLAN_VIGENTE] === planId &&
     // Un `active` cuyo primer cobro cae sin cambio de estado igual tiene que
     // dejar el dato al dia: el que lo lee es el plan que llegue despues.
-    actual[CAMPO_COBRO_DEL_VIGENTE] === cobro &&
+    actual[CAMPO_COBRO_DEL_VIGENTE] === cobroAnotar &&
     actual.tier === mapping.tier &&
     actual.status === status &&
     mismaFecha(periodEnd, actual.currentPeriodEnd) &&
@@ -1697,7 +1709,7 @@ export async function reconcileSubscription(
           prepaidTier: piso === null ? null : piso.tier,
           prepaidUntil,
           [CAMPO_PLAN_VIGENTE]: planId,
-          [CAMPO_COBRO_DEL_VIGENTE]: cobro,
+          [CAMPO_COBRO_DEL_VIGENTE]: cobroAnotar,
         },
       },
       // `merge` y no `set` pelado: el documento de usuario tiene el perfil
