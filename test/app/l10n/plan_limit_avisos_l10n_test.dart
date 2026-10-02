@@ -35,6 +35,7 @@ final Map<String, String Function(AppL10n l)> _claves = {
   'planLimitContactanos': (l) => l.planLimitContactanos,
   'planLimitAlumnosTituloTope': (l) => l.planLimitAlumnosTituloTope,
   'planLimitAlumnosTituloInactiva': (l) => l.planLimitAlumnosTituloInactiva,
+  'planLimitAlumnosTituloBaja': (l) => l.planLimitAlumnosTituloBaja,
   'planLimitAlumnosCuerpoInactivaExplicacion': (l) =>
       l.planLimitAlumnosCuerpoInactivaExplicacion,
   'planLimitAlumnosCuerpoTopeMovilLimitado': (l) =>
@@ -60,6 +61,7 @@ final Map<String, String Function(AppL10n l)> _claves = {
   'planLimitAlumnosBeneficioIlimitado': (l) =>
       l.planLimitAlumnosBeneficioIlimitado,
   'planLimitSuscripcionPausadaMovil': (l) => l.planLimitSuscripcionPausadaMovil,
+  'planLimitSuscripcionBajaMovil': (l) => l.planLimitSuscripcionBajaMovil,
   'planLimitTrainerTituloEjercicios': (l) => l.planLimitTrainerTituloEjercicios,
   'planLimitTrainerTituloPlantillas': (l) => l.planLimitTrainerTituloPlantillas,
   'planLimitTrainerPasadoTopeEjercicios': (l) =>
@@ -372,6 +374,9 @@ void main() {
       expect(es.planLimitVerEstadoMovil, 'VER ESTADO');
       expect(
           es.planLimitSuscripcionPausadaMovil, 'Tu suscripción está pausada.');
+      expect(es.planLimitAlumnosTituloBaja, 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA');
+      expect(es.planLimitSuscripcionBajaMovil,
+          'Tu suscripción está dada de baja.');
       expect(es.planLimitTrainerTituloEjercicios, 'TOPE DE EJERCICIOS PROPIOS');
       expect(es.planLimitTrainerTituloPlantillas, 'TOPE DE PLANTILLAS');
       expect(es.planLimitTrainerBeneficioEjerciciosIlimitado,
@@ -400,6 +405,9 @@ void main() {
       expect(en.planLimitPlanAMedidaTitulo, 'CUSTOM PLAN');
       expect(en.planLimitContactanos, 'CONTACT US');
       expect(en.planLimitVerEstadoMovil, 'VIEW STATUS');
+      expect(en.planLimitAlumnosTituloBaja, 'YOUR SUBSCRIPTION IS CANCELLED');
+      expect(
+          en.planLimitSuscripcionBajaMovil, 'Your subscription is cancelled.');
       expect(en.planLimitTrainerTituloEjercicios, 'CUSTOM EXERCISE LIMIT');
       expect(en.planLimitTrainerTituloPlantillas, 'TEMPLATE LIMIT');
       expect(en.planLimitTrainerBeneficioEjerciciosIlimitado,

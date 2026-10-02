@@ -916,6 +916,28 @@ void main() {
       });
     }
 
+    // Una baja no es una suspensión: con `cancelled` la caja dice «Estado:
+    // cancelada», y un título de suspendida contradecía al modal adentro de sí
+    // mismo (Codex, #1314). Lo mismo el SnackBar, que decía «pausada».
+    testWidgets('baja en inglés: título y SnackBar de baja, no de pausa',
+        (tester) async {
+      await abrirEn(
+        tester,
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        status: SubscriptionStatus.cancelled,
+      );
+
+      expect(find.text('YOUR SUBSCRIPTION IS CANCELLED'), findsOneWidget);
+      expect(find.text('YOUR SUBSCRIPTION IS SUSPENDED'), findsNothing);
+      expect(find.text('Status: cancelled'), findsOneWidget);
+
+      await tester.tap(find.text('VIEW STATUS'));
+      await tester.pumpAndSettle();
+      expect(find.text('Your subscription is cancelled.'), findsOneWidget);
+      expect(find.text('Your subscription is paused.'), findsNothing);
+    });
+
     testWidgets('el castellano del móvil NO cambió: VER ESTADO → SnackBar',
         (tester) async {
       await tester.pumpWidget(_harness(
@@ -954,6 +976,45 @@ void main() {
       expect(find.text('Ahora no'), findsOneWidget);
       expect(find.text('YOU REACHED YOUR PLAN LIMIT'), findsNothing);
       expect(find.text('/month'), findsNothing);
+    });
+  });
+
+  // Una baja no es una suspensión (Codex, #1314): con `cancelled` la caja dice
+  // «Estado: cancelada», y el título y el SnackBar tienen que decir lo mismo.
+  group('suscripción dada de baja', () {
+    for (final form in PlanLimitPaywallForm.values) {
+      testWidgets('baja en ${form.name}: título de baja, no de suspensión',
+          (tester) async {
+        debugPlanLimitPaywallForm = form;
+        addTearDown(() => debugPlanLimitPaywallForm = null);
+        await tester.pumpWidget(_harness(
+          SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          subscriptionStatus: SubscriptionStatus.cancelled,
+        ));
+        await tester.tap(find.text('open'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'), findsOneWidget);
+        expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsNothing);
+        expect(find.text('Estado: cancelada'), findsOneWidget);
+      });
+    }
+
+    testWidgets('baja en castellano: VER ESTADO → SnackBar de baja',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        SubscriptionTier.plan1,
+        reason: PlanLimitReason.subscriptionInactive,
+        subscriptionStatus: SubscriptionStatus.cancelled,
+      ));
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('VER ESTADO'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tu suscripción está dada de baja.'), findsOneWidget);
+      expect(find.text('Tu suscripción está pausada.'), findsNothing);
     });
   });
 }

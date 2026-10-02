@@ -266,6 +266,15 @@ class _PlanLimitPaywallContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final isInactive = reason == PlanLimitReason.subscriptionInactive;
+    // Una baja no es una suspensión: el PF la pidió. Decirle «suspendida» con
+    // «Estado: cancelada» en la caja de abajo es contradecirse en el mismo
+    // modal (Codex, #1314). Acá sólo se mira el status: que la baja ya haya
+    // vencido (y por eso esté inactiva) lo decide quien abre el modal con
+    // [PlanLimitReason.subscriptionInactive]. Los que abren el modal por un
+    // rechazo del servidor no pasan status, y siguen con el título genérico.
+    // El resto de la rama inactiva —cuerpo, caja, CTA— es el mismo.
+    final dadaDeBaja =
+        isInactive && subscriptionStatus == SubscriptionStatus.cancelled;
     // `reason` MANDA sobre el tier: un plan2 con la suscripción suspendida
     // necesita regularizar, no el aviso del plan a-medida del tope.
     final next = isInactive ? null : currentTier.nextTier;
@@ -280,7 +289,10 @@ class _PlanLimitPaywallContent extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        PlanLimitHeader(title: _title(context, isInactive), palette: palette),
+        PlanLimitHeader(
+          title: _title(context, isInactive, dadaDeBaja: dadaDeBaja),
+          palette: palette,
+        ),
         const SizedBox(height: 8),
         Text(
           _body(context, isInactive),
@@ -322,6 +334,7 @@ class _PlanLimitPaywallContent extends StatelessWidget {
         _PrimaryCta(
           hasNext: next != null,
           isInactive: isInactive,
+          dadaDeBaja: dadaDeBaja,
           billingRoute: billingRoute,
           palette: palette,
           isWeb: isWeb,
@@ -340,13 +353,21 @@ class _PlanLimitPaywallContent extends StatelessWidget {
   }
 
   /// Título del aviso.
-  String _title(BuildContext context, bool isInactive) {
+  String _title(
+    BuildContext context,
+    bool isInactive, {
+    required bool dadaDeBaja,
+  }) {
     if (isWeb) {
+      if (dadaDeBaja) {
+        return 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'; // i18n: Fase W3
+      }
       return isInactive
           ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
           : 'LLEGASTE AL LÍMITE DE TU PLAN'; // i18n: Fase W3
     }
     final l10n = AppL10n.of(context);
+    if (dadaDeBaja) return l10n.planLimitAlumnosTituloBaja;
     return isInactive
         ? l10n.planLimitAlumnosTituloInactiva
         : l10n.planLimitAlumnosTituloTope;
@@ -474,6 +495,7 @@ class _PrimaryCta extends StatelessWidget {
   const _PrimaryCta({
     required this.hasNext,
     required this.isInactive,
+    required this.dadaDeBaja,
     required this.billingRoute,
     required this.palette,
     required this.isWeb,
@@ -481,6 +503,10 @@ class _PrimaryCta extends StatelessWidget {
 
   final bool hasNext;
   final bool isInactive;
+
+  /// Rama inactiva con la suscripción `cancelled`: el SnackBar no puede decir
+  /// «pausada» de una baja.
+  final bool dadaDeBaja;
   final String? billingRoute;
   final AppPalette palette;
   final bool isWeb;
@@ -492,9 +518,12 @@ class _PrimaryCta extends StatelessWidget {
       // ya se hizo `pop()` del modal y no se vuelve a leer su contexto. La
       // WEB sigue con el hardcodeado de siempre (`i18n: Fase W3`); el MÓVIL
       // sale de AppL10n.
-      final pausada = isWeb
-          ? 'Tu suscripción está pausada.' // i18n: Fase W3
-          : AppL10n.of(context).planLimitSuscripcionPausadaMovil;
+      final estado = switch ((isWeb, dadaDeBaja)) {
+        (true, true) => 'Tu suscripción está dada de baja.', // i18n: Fase W3
+        (true, false) => 'Tu suscripción está pausada.', // i18n: Fase W3
+        (false, true) => AppL10n.of(context).planLimitSuscripcionBajaMovil,
+        (false, false) => AppL10n.of(context).planLimitSuscripcionPausadaMovil,
+      };
       return PlanLimitAccentButton(
         // "REGULARIZAR" es un verbo de pago — en el móvil, con el SnackBar
         // de abajo ya diciendo el estado, el botón pasa a describir lo que
@@ -548,7 +577,7 @@ class _PrimaryCta extends StatelessWidget {
               // acá: tiene que salir por fuera de la app (un mail), que es lo
               // unico que Apple no gobierna.
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(pausada)),
+                SnackBar(content: Text(estado)),
               );
             case PlanCheckoutAvailable():
               if (route == null) {
@@ -557,7 +586,7 @@ class _PrimaryCta extends StatelessWidget {
                 // una ruta inexistente: el modal decia lo correcto y el boton
                 // no hacia nada. Mejor decirlo que fingirlo.
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(pausada)),
+                  SnackBar(content: Text(estado)),
                 );
                 return;
               }

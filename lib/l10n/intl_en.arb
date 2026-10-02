@@ -2010,6 +2010,7 @@
   "planLimitContactanos": "CONTACT US",
   "planLimitAlumnosTituloTope": "YOU REACHED YOUR PLAN LIMIT",
   "planLimitAlumnosTituloInactiva": "YOUR SUBSCRIPTION IS SUSPENDED",
+  "planLimitAlumnosTituloBaja": "YOUR SUBSCRIPTION IS CANCELLED",
   "planLimitAlumnosCuerpoInactivaExplicacion": "While your subscription isn't up to date, your account works with the Free plan limit. No student is removed.",
   "planLimitAlumnosCuerpoTopeMovilLimitado": "Your {plan} plan includes {limit, plural, =1{1 student} other{{limit} students}}.",
   "@planLimitAlumnosCuerpoTopeMovilLimitado": {
@@ -2072,6 +2073,7 @@
   },
   "planLimitAlumnosBeneficioIlimitado": "Unlimited students",
   "planLimitSuscripcionPausadaMovil": "Your subscription is paused.",
+  "planLimitSuscripcionBajaMovil": "Your subscription is cancelled.",
   "planLimitTrainerTituloEjercicios": "CUSTOM EXERCISE LIMIT",
   "planLimitTrainerTituloPlantillas": "TEMPLATE LIMIT",
   "planLimitTrainerPasadoTopeEjercicios": "You have {count, plural, =1{1 custom exercise} other{{count} custom exercises}} and your plan includes {limit}. You keep them all; to create a new one, delete {toDelete}.",

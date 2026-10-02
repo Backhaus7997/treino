@@ -792,6 +792,35 @@ void main() {
       // Y NO el upsell, que es el mensaje opuesto para quien ya pagó.
       expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
     });
+
+    // La baja vencida también sale por la rama de reactivación, pero no está
+    // suspendida: el modal no puede decir «suspendida» arriba de su propia
+    // caja «Estado: cancelada» (Codex, #1314).
+    testWidgets('con la baja vencida, el modal habla de baja', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 1, 12));
+      addTearDown(AppClock.unfreeze);
+      await tester.pumpWidget(
+        _harness(
+          blocked: const AsyncData(BlockedAthletes.published({'a1'})),
+          subscription: _sub(
+            SubscriptionTier.plan2,
+            status: SubscriptionStatus.cancelled,
+            currentPeriodEnd: DateTime.utc(2026, 9, 30, 15),
+          ),
+          profiles: const {
+            'a1': UserPublicProfile(uid: 'a1', displayName: 'Ana'),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('REGULARIZAR MI SUSCRIPCIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'), findsOneWidget);
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsNothing);
+      expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
+    });
   });
 
   group('BlockedStudentsScreen — layout', () {

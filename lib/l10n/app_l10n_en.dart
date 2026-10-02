@@ -4698,6 +4698,9 @@ class AppL10nEn extends AppL10n {
   String get planLimitAlumnosTituloInactiva => 'YOUR SUBSCRIPTION IS SUSPENDED';
 
   @override
+  String get planLimitAlumnosTituloBaja => 'YOUR SUBSCRIPTION IS CANCELLED';
+
+  @override
   String get planLimitAlumnosCuerpoInactivaExplicacion =>
       'While your subscription isn\'t up to date, your account works with the Free plan limit. No student is removed.';
 
@@ -4780,6 +4783,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get planLimitSuscripcionPausadaMovil => 'Your subscription is paused.';
+
+  @override
+  String get planLimitSuscripcionBajaMovil => 'Your subscription is cancelled.';
 
   @override
   String get planLimitTrainerTituloEjercicios => 'CUSTOM EXERCISE LIMIT';
