@@ -213,6 +213,15 @@
  * tenian contrato al empezar el tramite, asi que el corte de A perdia el
  * desempate contra B y no entraba.
  *
+ * Ese escalon necesita saber si el VIGENTE cobro, y es un dato que la baja ya
+ * escrita no deja ver (`cancelled` es `cancelled`). Por eso el mapa lo guarda al
+ * lado del plan, en `subscription.mpPlanCobro`: lo que el plan que escribio el
+ * estado habia cobrado en ese momento. El supuesto que ocupaba su lugar —que el
+ * vigente siempre cobro— era falso: B, un checkout que nunca cobro, queda como vigente
+ * con su `cancelled`; el `cancelled` de A, que SI cobro pero nadie reconcilio a
+ * tiempo, empataba contra el y perdia por fecha. Se rechazaba y quedaba terminal:
+ * el periodo que el PF pago con A no se acreditaba nunca.
+ *
  * Lo que la guarda NO hace, a proposito:
  *
  *   - Frenar al plan anotado. Su propia baja, su pausa o su cobro rebotado
@@ -682,6 +691,16 @@ export function arrepentidoAtDe(datos: Record<string, unknown> | undefined): num
 const CAMPO_PLAN_VIGENTE = "mpPlanId";
 
 /**
+ * Hermana de [CAMPO_PLAN_VIGENTE], en el mismo mapa y en la misma escritura: si
+ * el plan que escribio el estado habia cobrado (`cobrosExitosos > 0`, booleano).
+ * La guarda lo lee para el escalon «la baja que cobro contra la que no», que sin
+ * este dato tenia que suponer que el vigente siempre cobro (y ese supuesto
+ * rechazaba el periodo pago de un plan viejo). Mismo trato que `mpPlanId` en
+ * `firestore.rules` (el mapa esta pineado entero) y en el cliente (lo ignora).
+ */
+const CAMPO_COBRO_DEL_VIGENTE = "mpPlanCobro";
+
+/**
  * Que tan vigente es un estado, para decidir entre dos planes del mismo PF.
  *
  *   3 — `active` / `grace`: las dos caras del `authorized` de MP. Hay medio de
@@ -712,7 +731,7 @@ export interface PlanEnDisputa {
    * Si la suscripcion tuvo algun cobro exitoso: `cobrosExitosos`, la misma
    * evidencia de pago que usa la prueba diferida. Solo separa dos bajas —la de un
    * plan que se pago y la de un checkout que nunca cobro—; con otro estado no
-   * cambia nada.
+   * cambia nada. Del vigente, lo que anoto `subscription.mpPlanCobro`.
    */
   cobro: boolean;
 }
@@ -1541,22 +1560,27 @@ export async function reconcileSubscription(
   // El `createdAt` del vigente cuesta una lectura, y solo se paga cuando el
   // estado lo escribio OTRO plan: fuera de un cambio de plan, casi nunca.
   const anotado = actual?.[CAMPO_PLAN_VIGENTE];
+  const cobroAnotado = actual?.[CAMPO_COBRO_DEL_VIGENTE];
+  // Lo que ESTE plan cobro, tal como se compara y tal como se anota si escribe.
+  const cobro = cobrosExitosos(mp.summarized) > 0;
   if (typeof anotado === "string" && anotado !== "" && anotado !== planId) {
     const pisa = puedePisarAlVigente(
       {
         planId,
         status,
         altaMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
-        cobro: cobrosExitosos(mp.summarized) > 0,
+        cobro,
       },
       {
         planId: anotado,
         status: actual?.status,
         altaMs: await altaDelPlanMs(app, anotado),
-        // El mapa no guarda si el vigente cobro, y se asume que si: la duda juega
-        // para lo que ya esta escrito. Aca frenar no puede dejar un pago sin
-        // acreditar, porque el dato solo separa dos bajas.
-        cobro: true,
+        // Lo que anoto el plan que escribio el estado. Asumir `true` NO era
+        // inocuo: dejaba perder el periodo pago de un plan viejo contra la baja de
+        // un checkout nuevo que nunca cobro. Sin booleano —inalcanzable por
+        // construccion: `mpPlanId` nace en el mismo `set` que esta clave— se
+        // conserva el `true` de antes.
+        cobro: typeof cobroAnotado === "boolean" ? cobroAnotado : true,
       },
     );
     if (!pisa) {
@@ -1651,6 +1675,9 @@ export async function reconcileSubscription(
   const sinCambios =
     actual != null &&
     actual[CAMPO_PLAN_VIGENTE] === planId &&
+    // Un `active` cuyo primer cobro cae sin cambio de estado igual tiene que
+    // dejar el dato al dia: el que lo lee es el plan que llegue despues.
+    actual[CAMPO_COBRO_DEL_VIGENTE] === cobro &&
     actual.tier === mapping.tier &&
     actual.status === status &&
     mismaFecha(periodEnd, actual.currentPeriodEnd) &&
@@ -1670,6 +1697,7 @@ export async function reconcileSubscription(
           prepaidTier: piso === null ? null : piso.tier,
           prepaidUntil,
           [CAMPO_PLAN_VIGENTE]: planId,
+          [CAMPO_COBRO_DEL_VIGENTE]: cobro,
         },
       },
       // `merge` y no `set` pelado: el documento de usuario tiene el perfil

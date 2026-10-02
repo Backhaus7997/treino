@@ -457,8 +457,9 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
       currentPeriodEnd: ts(Date.parse("2026-10-03T12:00:00.000Z")),
       // Lo escribio p1. Sin la clave, el estado es de antes de que existiera y se
       // reescribe UNA vez para anotarla: ver "el evento tardio de un plan que ya
-      // no manda".
+      // no manda". Y `mpPlanCobro`, lo que cobro ese plan: AUTORIZADA no cobro.
       mpPlanId: "p1",
+      mpPlanCobro: false,
     };
     const { app, escrituras } = fakeApp(mundo);
 
@@ -1083,8 +1084,9 @@ describe("reconcileSubscription — la baja de la suscripcion reemplazada", () =
       tier: "plan3",
       status: "active",
       currentPeriodEnd: ts(Date.parse("2026-10-03T12:00:00.000Z")),
-      // La escribio p2 anoche.
+      // La escribio p2 anoche, sin cobro todavia.
       mpPlanId: "p2",
+      mpPlanCobro: false,
     };
     const { app, store } = fakeApp(mundo);
     const mp = fakeMpMultiPlan(DOS_VIVAS());
@@ -1328,6 +1330,77 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     expect(suscripcion(store)).toMatchObject({
       tier: "plan3", status: "cancelled", mpPlanId: "pB",
     });
+  });
+
+  // ── El vigente guarda si cobro: sin ese dato la guarda lo daba por pago. ──
+
+  /**
+   * Dos checkouts del mismo PF. B, el mas nuevo, nunca cobro y se cayo; A, el mas
+   * viejo, SI cobro y se cancelo antes de que nadie lo reconciliara. A trae su
+   * propio fin de periodo, el que el PF pago.
+   */
+  const A_PAGO_Y_CANCELADO: MpPreapproval = {
+    ...A_DE_BAJA,
+    next_payment_date: new Date(FIN_DE_A).toISOString(),
+  };
+
+  it("el `cancelled` de un checkout que nunca cobro no se come el periodo pago de un plan viejo", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    // B nunca cobro y queda como vigente con su baja.
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR)).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      mpPlanId: "pB", status: "cancelled", mpPlanCobro: false,
+    });
+
+    // Llega A, que SI cobro. Antes empataba contra un B supuesto «pago», perdia
+    // por fecha y quedaba terminal: el periodo pago no se acreditaba nunca.
+    const r = await reconcileSubscription(
+      app, "pA", fakeMp(A_PAGO_Y_CANCELADO), A_PAGO_Y_CANCELADO);
+
+    expect(r.outcome).not.toBe("skipped-plan-no-vigente");
+    expect(r.outcome).toBe("written");
+    const sub = suscripcion(store);
+    expect(sub).toMatchObject({
+      tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis()).toBe(FIN_DE_A);
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("control: si el vigente SI cobro, el `cancelled` de un plan mas viejo sigue perdiendo por fecha", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    // Mismo cuadro, pero B cobro: su baja es la de un plan que se pago.
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_DE_BAJA), B_DE_BAJA)).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ mpPlanId: "pB", mpPlanCobro: true });
+
+    const r = await reconcileSubscription(
+      app, "pA", fakeMp(A_PAGO_Y_CANCELADO), A_PAGO_Y_CANCELADO);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan3", status: "cancelled", mpPlanId: "pB", mpPlanCobro: true,
+    });
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("anota si cobro en cada escritura, y el primer cobro sin cambio de estado tambien se escribe", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan2"));
+    const A_SIN_COBRAR: MpPreapproval = {
+      ...A_VIVA, summarized: { pending_charge_quantity: 0 },
+    };
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_SIN_COBRAR))).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ status: "active", mpPlanCobro: false });
+
+    // Cae el primer cobro: el estado y la fecha son los mismos, el dato no.
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_VIVA))).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ status: "active", mpPlanCobro: true });
+
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_VIVA))).outcome)
+      .toBe("unchanged");
   });
 
   // ── Lo que la guarda NO frena. Cada uno es un pago o una baja de verdad que, si
@@ -3111,8 +3184,9 @@ describe("reconcile + diferimiento: la baja del PF deja el plan listo para conta
           currentPeriodEnd: ts(FIN_X),
           prepaidTier: null,
           prepaidUntil: null,
-          // Lo escribio p0, y el reconciliador lo anota.
+          // Lo escribio p0, y el reconciliador lo anota (junto con lo que cobro).
           mpPlanId: "p0",
+          mpPlanCobro: true,
         },
       },
     },
