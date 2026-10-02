@@ -177,7 +177,8 @@ export { maintainCustomExerciseCount } from "./subscriptions/custom-exercise-cou
 // borrar, archivar, restaurar). Dispara con toda escritura de `routines` y
 // sale en la guarda sin leer nada — ver el encabezado de template-count.ts.
 // Interruptor TRAINER_TEMPLATE_LIMITS_ENABLED (trainer-plan-limits.ts),
-// arranca apagado.
+// ENCENDIDO desde el 2026-09-25 — ver el encabezado de ese modulo antes de
+// tocarlo.
 export { maintainTemplateCount } from "./subscriptions/template-count";
 // Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
 // el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
