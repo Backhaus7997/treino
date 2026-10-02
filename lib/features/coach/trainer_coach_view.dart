@@ -237,8 +237,9 @@ class _PlanQuotaHeader extends ConsumerWidget {
     final (tier, vencida) = ref.watch(
       vigenciaDelPlanProvider.select((v) => (v.tierEfectivo, v.vencida)),
     );
-    // El TIER decide si hay tope, NO el `weightLimit` del doc. Si un doc que ya
-    // es plan3 trae un weightLimit viejo, leerlo de ahí volvería a meter un
+    // El TIER decide si hay tope, NO el `weightLimit` del doc. El servidor no
+    // escribe ese campo (ver `TrainerSubscription.weightLimit`), pero si un
+    // doc de un plan3 lo trajera, leerlo de ahí volvería a meter un
     // denominador en el plan ilimitado. `isUnlimited` sale de
     // kTierWeightLimits, la fuente de verdad client-side. Con la baja vencida,
     // además, un `weightLimit` en el doc sería el del plan viejo: el tope sale

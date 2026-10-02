@@ -50,8 +50,12 @@ UserProfile _trainer(TrainerSubscription? subscription) => UserProfile(
       subscription: subscription,
     );
 
-/// `weightLimit` se deja sin setear a propósito: el header debe resolver el
-/// tope desde el TIER, no desde el denormalizado.
+/// `weightLimit` se deja sin setear a propósito: el servidor no escribe ese
+/// campo (ver [TrainerSubscription]), así que es la forma de los docs que
+/// escribe él. Sin el campo, el header toma el tope de la tabla del tier.
+/// Ojo, eso no quiere decir que lo ignore: si el doc lo trae, el header puede
+/// preferirlo a la tabla (las condiciones están en `_PlanQuotaHeader`). El
+/// Plan 3 que lo trae tiene su propio test.
 TrainerSubscription _sub(SubscriptionTier tier) => TrainerSubscription(
       tier: tier,
       status: SubscriptionStatus.active,
@@ -177,11 +181,11 @@ void main() {
       expect(text.toLowerCase(), isNot(contains('null')));
     });
 
-    testWidgets(
-        'Plan 3 con un weightLimit viejo denormalizado sigue sin denominador',
+    testWidgets('Plan 3 con un weightLimit en el doc sigue sin denominador',
         (tester) async {
-      // El CF puede haber dejado un `weightLimit: 15` de cuando el PF era
-      // Plan 2. El tier manda: si el header leyera el denormalizado, el plan
+      // El servidor no escribe `weightLimit` (ver `TrainerSubscription`), pero
+      // si un doc lo trajera igual, el tier manda: el header pregunta
+      // `tier.isUnlimited` ANTES de mirar el campo. Sin esa guarda, el plan
       // ilimitado mostraría un tope que no existe.
       await tester.pumpWidget(_harness(
         subscription: const TrainerSubscription(
@@ -196,22 +200,35 @@ void main() {
       expect(_headerText(tester), '1 ALUMNO · PLAN 3');
     });
 
-    testWidgets('ningún tier renderiza "null" en el header', (tester) async {
+    // Un testWidgets POR tier, no un loop adentro de uno solo. Re-pumpear
+    // `_harness` en el mismo test reusa el elemento del ProviderScope: el
+    // container sobrevive y sigue sirviendo el perfil de la primera vuelta.
+    // Medido: las cuatro vueltas dibujaban «1.5 DE 2 · PLAN FREE», y el test
+    // pasaba sin haber visto nunca un Plan 3.
+    group('ningún tier renderiza "null" en el header', () {
       for (final tier in SubscriptionTier.values) {
-        await tester.pumpWidget(_harness(
-          subscription: _sub(tier),
-          links: [
-            _link('a1', TrainerLinkStatus.active),
-            _link('a2', TrainerLinkStatus.paused),
-          ],
-        ));
-        await tester.pumpAndSettle();
+        testWidgets(tier.name, (tester) async {
+          await tester.pumpWidget(_harness(
+            subscription: _sub(tier),
+            links: [
+              _link('a1', TrainerLinkStatus.active),
+              _link('a2', TrainerLinkStatus.paused),
+            ],
+          ));
+          await tester.pumpAndSettle();
 
-        expect(
-          _headerText(tester).toLowerCase(),
-          isNot(contains('null')),
-          reason: 'el tier $tier filtró un null al header',
-        );
+          final text = _headerText(tester);
+          // Control: el header es el de ESTE tier. Sin esto, un harness que
+          // dibujara otro perfil pasaría el chequeo de abajo sin probar nada.
+          final etiqueta = switch (tier) {
+            SubscriptionTier.free => 'PLAN FREE',
+            SubscriptionTier.plan1 => 'PLAN 1',
+            SubscriptionTier.plan2 => 'PLAN 2',
+            SubscriptionTier.plan3 => 'PLAN 3',
+          };
+          expect(text, endsWith(etiqueta));
+          expect(text.toLowerCase(), isNot(contains('null')));
+        });
       }
     });
   });
