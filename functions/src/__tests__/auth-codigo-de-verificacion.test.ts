@@ -523,12 +523,13 @@ describe("muestraPlanes: el bloque de pagos del mail", () => {
 
   it.each([
     ["PF", "trainer", {}, false, true],
-    ["PF que apagó novedades_plan", "trainer", apagado, true, false],
+    // La oposición se mira al ENVIAR (`bloqueComercial`), no acá.
+    ["PF que apagó novedades_plan: se decide al enviar", "trainer", apagado, true, true],
     ["alumno, con el interruptor apagado", "athlete", {}, false, false],
     ["alumno recién creado (sin el campo)", "athlete", {}, true, true],
     ["alumno al que el free le aplica", "athlete", { athletePaywallEnforced: true }, true, true],
     ["alumno que ya paga o tiene PF activo", "athlete", { athletePaywallEnforced: false }, true, false],
-    ["alumno que apagó novedades_plan", "athlete", apagado, true, false],
+    ["alumno que apagó novedades_plan: se decide al enviar", "athlete", apagado, true, true],
   ] as const)("%s", (_, rol, usuario, prendido, esperado) => {
     expect(muestraPlanes(rol, usuario, prendido)).toBe(esperado);
   });
@@ -560,7 +561,10 @@ describe("de punta a punta", () => {
     expect(mails(store)).toHaveLength(MAX_ENVIOS_POR_HORA);
   });
 
-  it("al PF le va el bloque de pagos, salvo que haya apagado novedades_plan", async () => {
+  it("con el bloque, el mail sale con bloqueComercial: la oposición la mira el envío", async () => {
+    // El PF que se opuso igual sale con el bloque y `bloqueComercial`: es
+    // `sendQueuedMail` el que lo saca al enviar (y si no se opuso, agrega el
+    // pie de baja). Decidirlo acá dejaría el mail comercial sin pie.
     const mundo = MUNDO();
     mundo.users[OTRA] = { role: "trainer", notificationPrefs: { novedades_plan: { email: false } } };
     const { app, store } = fakeApp(mundo);
@@ -568,18 +572,22 @@ describe("de punta a punta", () => {
     await pedir(app, PROFE, "111111");
     await pedir(app, OTRA, "222222");
 
-    const porUid = Object.fromEntries(
-      mails(store).map((m) => [m.toUid, (m.params as Record<string, unknown>).showPlans]),
-    );
-    expect(porUid).toEqual({ [PROFE]: "1", [OTRA]: "0" });
+    for (const m of mails(store)) {
+      expect((m.params as Record<string, unknown>).showPlans).toBe("1");
+      expect(m.bloqueComercial).toBe("novedades_plan");
+      expect(m.prefKey).toBeUndefined();
+    }
   });
 
-  it("al alumno recién creado, el bloque depende del interruptor del paywall", async () => {
+  it("sin el bloque no hay nada comercial: el mail sale sin bloqueComercial", async () => {
+    // El alumno recién creado depende del interruptor del paywall.
     const { app, store } = fakeApp(MUNDO());
 
     await pedir(app, ALUMNA, "111111");
 
-    expect((mails(store)[0].params as Record<string, unknown>).showPlans)
-      .toBe(ATHLETE_PAYWALL_ENFORCEMENT_ENABLED ? "1" : "0");
+    const [m] = mails(store);
+    const conPlanes = ATHLETE_PAYWALL_ENFORCEMENT_ENABLED;
+    expect((m.params as Record<string, unknown>).showPlans).toBe(conPlanes ? "1" : "0");
+    expect(m.bloqueComercial).toBe(conPlanes ? "novedades_plan" : undefined);
   });
 });

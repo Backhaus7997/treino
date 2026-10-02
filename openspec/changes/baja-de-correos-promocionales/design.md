@@ -302,11 +302,11 @@ sin mecanismo de baja. El fail-closed de §6.1 es sólo para los mails con
 `prefKey`.
 
 Este cambio lo cablea en `limit-reached` (`enqueueProspectMail`). El mail del
-código es de la rama `feat/functions-codigo-topes-y-planes` (D9, apilada sobre
-#1282), que hoy decide el bloque al encolar con `showPlans`; se le avisa del
-mecanismo para que lo adopte y sume el pie. Hasta que eso llegue a producción,
-el mail del código sigue mostrando el bloque de pagos a quien se opuso — es
-precondición del paso 5 de §10.
+código (`email-code-*`, `auth/codigo-de-verificacion.ts`) lo adoptó en un PR de
+seguimiento: cuando lleva el bloque de pagos (`showPlans: "1"`, que ahora solo
+mira rol y paywall) sale con `bloqueComercial`, y su plantilla además exige la
+URL de baja para mostrar el bloque. Así ese bloque nunca sale sin pie, ni
+siquiera desde un documento encolado antes del deploy.
 
 ## 7. La app: toggle en Perfil › Privacidad (PR aparte)
 
@@ -390,9 +390,11 @@ Orden, para que ningún mail salga con un link a una página que no existe:
 4. **IAM** (`treino-dev` no permite `allUsers`):
    `gcloud run services update bajadecorreospromocionales --no-invoker-iam-check --region southamerica-east1 --project treino-dev`.
 5. **Pie**: `firebase deploy --only functions:sendQueuedMail --project prod`.
-   **Precondición**: el D9 del mail del código (§6.3) ya está en producción.
-   Sin eso, la página de baja dice «no te vamos a mandar más correos
-   promocionales» y el próximo mail de código le muestra los planes igual.
+   **Precondición**: `sendQueuedMail` sale en el MISMO deploy que
+   `solicitarCodigoDeVerificacion`, o antes. El productor del mail del código le
+   deja la oposición al envío (§6.3): con un `sendQueuedMail` viejo, quien se
+   opuso vería los planes. Al revés no hay riesgo: con la plantilla nueva, un
+   documento sin `bloqueComercial` sale sin el bloque.
 6. **App**: el toggle llega con la próxima versión de las tiendas.
 
 Con filtro siempre: un `--only functions` pelado poda toda función ausente de

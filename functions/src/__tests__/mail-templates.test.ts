@@ -942,7 +942,9 @@ describe("tildes", () => {
       dueLabel: "26/08/2026",
       // Con el bloque de pagos del mail del código: es el copy más largo.
       showPlans: "1",
-    });
+    }, kind.startsWith("email-code") ?
+      { bajaDePromocionales: "https://gettreino.com/es/correos-promocionales/baja#t=x" } :
+      {});
     // Las URLs quedan afuera: `/suscripcion/checkout` es una ruta, no copy.
     const copy = `${subject}\n${text}`.replace(/https?:\/\/\S+/g, "");
     const palabras = copy.toLowerCase().match(/[a-zñáéíóúü]+/g) ?? [];
@@ -1143,6 +1145,8 @@ describe("Botón de Arrepentimiento", () => {
 // ---------------------------------------------------------------------------
 describe("código de verificación del mail", () => {
   const CODIGO = "048213";
+  /** El bloque de pagos solo va con el pie de baja: sin esta URL no hay bloque. */
+  const CON_PIE = { bajaDePromocionales: "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi" };
   const AMBOS = ["email-code-athlete", "email-code-trainer"] as const;
 
   it.each(AMBOS)("%s lleva el código en el asunto y como titular", (kind) => {
@@ -1155,7 +1159,7 @@ describe("código de verificación del mail", () => {
   });
 
   it.each(AMBOS)("%s dice que los pagos y sus confirmaciones van por mail", (kind) => {
-    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" });
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(out.text).toMatch(/pagos .* se hacen por mail/);
     // La etiqueta del botón vive en el HTML; el texto plano lleva la URL.
@@ -1163,7 +1167,7 @@ describe("código de verificación del mail", () => {
   });
 
   it("el del alumno manda al checkout de gettreino.com", () => {
-    const out = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" });
+    const out = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(out.text).toContain("https://gettreino.com/es/suscripcion/checkout");
   });
@@ -1171,7 +1175,7 @@ describe("código de verificación del mail", () => {
   it("el del entrenador manda a los planes del Coach Hub web, no a la app", () => {
     // La app no vende: un PF que toca el botón en el teléfono tiene que caer en
     // la web, donde se contrata. Ver `trainerWebCheckout`.
-    const out = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" });
+    const out = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(out.text).toContain("https://app.gettreino.com/?to=facturacion");
     expect(out.text).not.toContain("/suscripcion/checkout");
@@ -1190,6 +1194,31 @@ describe("código de verificación del mail", () => {
 
   it.each(AMBOS)("%s sin showPlans tampoco lleva el bloque: ante la duda, nada comercial", (kind) => {
     expect(renderMail(kind, { codigo: CODIGO }).html).not.toContain("VER LOS PLANES");
+  });
+
+  // Al enviar, `sendQueuedMail` pasa `comercial: false` a quien se opuso a
+  // `novedades_plan` (el mail sale con `bloqueComercial`).
+  it.each(AMBOS)("%s con showPlans \"1\" pero comercial: false es solo el código", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, { comercial: false });
+
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).not.toMatch(/pago|plan|Pro\b/i);
+    expect(out.html).not.toContain("VER LOS PLANES");
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it.each(AMBOS)("%s con el bloque lleva también el link de baja", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.html).toContain("VER LOS PLANES");
+    expect(out.html).toContain(`<a href="${CON_PIE.bajaDePromocionales}"`);
+    expect(out.text).toContain(CON_PIE.bajaDePromocionales);
+  });
+
+  it.each(AMBOS)("%s sin la URL de baja no lleva el bloque: nunca publicidad sin pie", (kind) => {
+    // Un doc sin `bloqueComercial` (encolado antes del deploy, reencolado a
+    // mano) o un envío sin la clave de baja.
+    expect(renderMail(kind, { codigo: CODIGO, showPlans: "1" }).html).not.toContain("VER LOS PLANES");
   });
 
   it.each(AMBOS)("%s sin código no rompe ni dice «undefined»", (kind) => {

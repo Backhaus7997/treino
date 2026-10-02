@@ -84,9 +84,10 @@ export interface OpcionesDeMail {
    */
   bajaDePromocionales?: string;
   /**
-   * `false` omite el bloque de venta de un mail operativo (hoy sólo
-   * `limit-reached`: la línea «hay planes más grandes» y el botón VER LOS
-   * PLANES). Los demás kinds no tienen bloque que omitir y lo ignoran.
+   * `false` omite el bloque de venta de un mail operativo (hoy `limit-reached`:
+   * la línea «hay planes más grandes» y el botón VER LOS PLANES; y
+   * `email-code-*`: el bloque de pagos y su botón). Los demás kinds no tienen
+   * bloque que omitir y lo ignoran.
    * Default `true`.
    */
   comercial?: boolean;
@@ -806,14 +807,17 @@ export function renderMail(
   // exención 3.1.3(f) (ver `anti_steering_movil_test.dart`). El mail sí puede, y
   // pedir el código es lo que garantiza que se abra.
   //
-  // El bloque de pagos va solo con `showPlans: "1"` (ver `muestraPlanes`): sin
-  // él, quien apagó lo comercial o no tiene nada que pagar recibe el código y
-  // nada más. Si falta el param, tampoco: ante la duda, sin contenido comercial.
+  // El bloque de pagos va con TRES llaves: `showPlans: "1"` (al encolar: le
+  // sirve, ver `muestraPlanes`), `comercial` (al enviar: no se opuso, ver
+  // `bloqueComercial`) y la URL de baja (el pie que `build` agrega con ella).
+  // Sin cualquiera, el código y nada más. La tercera hace que el bloque NUNCA
+  // salga sin pie: un doc sin `bloqueComercial` (encolado antes del deploy,
+  // reencolado a mano) o un envío sin la clave de baja salen sin publicidad.
   case "email-code-athlete":
   case "email-code-trainer": {
     const codigo = params.codigo ? String(params.codigo) : "";
     const esPf = kind === "email-code-trainer";
-    const conPlanes = params.showPlans === "1";
+    const conPlanes = params.showPlans === "1" && comercial && Boolean(bajaDePromocionales);
     const planes: Line[] = [
       [
         strong("Todo lo de tu plan llega por acá."),
