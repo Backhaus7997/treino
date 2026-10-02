@@ -2338,21 +2338,149 @@ describe("decidirDiferimientoDeAlumno: cuando SI se difiere", () => {
       .toEqual({ diferir: true, diferidoHastaMs: FIN });
   });
 
-  it("el pago sale del plan MAS NUEVO que muestre un cobro", async () => {
-    // Igual que el PF: el cobro mas reciente es el que describe lo que hoy tiene pago.
-    const { input } = armarAlumno({
-      planes: [
-        planDeAlumno("a0", 40),
-        planDeAlumno("a1", 10, { currentPeriodEnd: ts(AHORA + 5 * DIA_MS) }),
-      ],
-      subs: {
-        a0: [pagada(ULTIMO_COBRO)],
-        a1: [pagada("2026-08-12T12:00:00.000Z", { id: "s-a1" })],
+  describe("con varios planes que prueban un pago: gana el que mas lejos llega, no el mas nuevo", () => {
+    /** Un anual dado de baja, pago el 15/1/2026: llega hasta el 15/1/2027. */
+    const FIN_ANUAL = Date.parse("2027-01-15T12:00:00.000Z");
+    const anual = (id: string, edadDias: number) => planDeAlumno(id, edadDias, {
+      cycle: "annual",
+      currentPeriodEnd: ts(FIN_ANUAL),
+    });
+    const COBRO_ANUAL = pagada("2026-01-15T12:00:00.000Z", {
+      id: "s-anual",
+      auto_recurring: {
+        frequency: 12,
+        frequency_type: "months",
+        transaction_amount: 220000,
       },
     });
+    /** El mensual posterior, pago hasta FIN (20/9/2026). */
+    const mensual = (id: string, edadDias: number) => planDeAlumno(id, edadDias);
+    const COBRO_MENSUAL = pagada(ULTIMO_COBRO, { id: "s-mensual" });
 
-    expect(await decidirDiferimientoDeAlumno(input))
-      .toEqual({ diferir: true, diferidoHastaMs: AHORA + 5 * DIA_MS });
+    it("un anual viejo hasta enero y un mensual nuevo hasta septiembre: difiere hasta enero", async () => {
+      // Quedarse con el plan mas nuevo difiere hasta septiembre y le cobra de
+      // septiembre a enero lo que ya pago con el anual.
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("el mismo resultado con los planes en el orden contrario en el store", async () => {
+      const { input } = armarAlumno({
+        planes: [mensual("mensual", 18), anual("anual", 240)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("si el plan mas NUEVO es el que llega mas lejos, gana el nuevo", async () => {
+      const { input } = armarAlumno({
+        planes: [mensual("mensual", 240), anual("anual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN_ANUAL });
+    });
+
+    it("cada plan se acota con SU fin: el cobro de uno no estira el fin del otro", async () => {
+      // El anual cobro hasta enero pero su acceso termina antes (FIN + 3 dias); el
+      // mensual llega hasta FIN. Gana el anual, con SU fin, no con el del cobro.
+      const finAnual = FIN + 3 * DIA_MS;
+      const { input } = armarAlumno({
+        planes: [
+          planDeAlumno("anual", 240, { cycle: "annual", currentPeriodEnd: ts(finAnual) }),
+          mensual("mensual", 18),
+        ],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: finAnual });
+    });
+
+    it("un empate se resuelve por id, no por el orden de lectura", async () => {
+      const dos = [
+        planDeAlumno("b", 30, { currentPeriodEnd: ts(FIN) }),
+        planDeAlumno("a", 10, { currentPeriodEnd: ts(FIN) }),
+      ];
+      for (const planes of [dos, [...dos].reverse()]) {
+        const { input } = armarAlumno({
+          planes,
+          subs: {
+            a: [pagada(ULTIMO_COBRO, { id: "sa" })],
+            b: [pagada(ULTIMO_COBRO, { id: "sb" })],
+          },
+        });
+        expect(await decidirDiferimientoDeAlumno(input))
+          .toEqual({ diferir: true, diferidoHastaMs: FIN });
+      }
+      // Y el plan que nombra el log es el mismo en los dos ordenes.
+      const nombrados = (logger.info as jest.Mock).mock.calls
+        .filter(([m]) => m === "mp/diferir-primer-cobro: se difiere el primer cobro")
+        .slice(-2)
+        .map(([, datos]) => datos.planConPago);
+      expect(nombrados).toEqual(["a", "a"]);
+    });
+
+    it("el log nombra al plan elegido, no al mas nuevo", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [COBRO_MENSUAL] },
+      });
+
+      await decidirDiferimientoDeAlumno(input);
+
+      expect(logger.info).toHaveBeenLastCalledWith(
+        "mp/diferir-primer-cobro: se difiere el primer cobro",
+        expect.objectContaining({ planConPago: "anual", fuenteDelPago: "ultimo-cobro" }),
+      );
+    });
+
+    it("un plan SIN fecha con un cobro no cuenta como evidencia: se elige el valido", async () => {
+      // Sin `currentPeriodEnd` no hay contra que acotar lo que cubre ese cobro, asi
+      // que no es candidato por mas que MP lo muestre (semantica de siempre). El que
+      // si tiene fecha y cobro se elige, aunque sea el mas viejo.
+      const { input } = armarAlumno({
+        planes: [
+          sinFecha("sin-fecha", 5, { cycle: "annual" }),
+          mensual("mensual", 40),
+        ],
+        subs: {
+          "sin-fecha": [{ ...COBRO_ANUAL, id: "s-sf" }],
+          mensual: [COBRO_MENSUAL],
+        },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: true, diferidoHastaMs: FIN });
+    });
+
+    it("la viva en CUALQUIERA de los planes sigue frenando, aunque el mas largo este dado de baja", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [COBRO_ANUAL], mensual: [{ ...COBRO_MENSUAL, status: "authorized" }] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "no-esta-cancelada" });
+    });
+
+    it("un plan con fecha cuya lista de MP viene vacia sigue sin diferir, aunque el otro pruebe un pago", async () => {
+      const { input } = armarAlumno({
+        planes: [anual("anual", 240), mensual("mensual", 18)],
+        subs: { anual: [], mensual: [COBRO_MENSUAL] },
+      });
+
+      expect(await decidirDiferimientoDeAlumno(input))
+        .toEqual({ diferir: false, motivo: "sin-respuesta-de-mp" });
+    });
   });
 
   it("pero NO de un plan que no puede probar un pago, aunque sea el mas nuevo y muestre un cobro", async () => {

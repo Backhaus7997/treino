@@ -1083,10 +1083,12 @@ export interface DecidirDiferimientoDeAlumnoInput {
  * Vale para cualquier ciclo: el alumno tiene un solo plan, asi que pasar de
  * mensual a anual paga dos veces los mismos dias igual que volver al mismo.
  *
- * El resultado es el MENOR entre el fin del plan que pago y lo que cubre el cobro
- * de MP, como en el PF. De los planes que se revisan, el pago sale del primero (el
- * mas nuevo) que pueda probarlo y muestre un cobro, y dentro de ese plan, del pago
- * mas lejano.
+ * Por plan, el fin es el MENOR entre el fin del plan que pago y lo que cubre el cobro
+ * de MP, como en el PF, y dentro de ese plan se toma el pago mas lejano. El
+ * resultado es el MAYOR de esos fines entre todos los planes que pueden probar un
+ * pago y muestran un cobro: el alumno ya tiene pago hasta ahi por el plan que mas
+ * lejos llega, sea el mas nuevo o no. Un empate lo desempata el id del plan, para
+ * no depender del orden de lectura.
  *
  * Sin atajo del doble click (ver el encabezado): un segundo toque vuelve a
  * verificar contra MP y, si nada cambio, llega a la MISMA fecha, que es lo que
@@ -1173,8 +1175,14 @@ export async function decidirDiferimientoDeAlumno(
   }
 
   const esCandidato = new Set(candidatos.map((p) => p.id));
+  // El plan que mas lejos llega, y con que pago. Se evalua CADA candidato y gana el
+  // de fin independiente mas lejano (ver abajo): quedarse con el primero que tenga
+  // evidencia, que es el mas nuevo, deja al alumno pagando de nuevo los dias que ya
+  // cubria otro plan mas largo (un anual cancelado vigente hasta enero y un mensual
+  // posterior vigente hasta septiembre: difiere hasta enero, no hasta septiembre).
   let pago: EvidenciaDePago | null = null;
   let conPago: PlanDelAlumnoARevisar | null = null;
+  let finDelMejor = -Infinity;
   for (const plan of aConsultar) {
     const subs = await i.leerSuscripciones(plan.id);
 
@@ -1195,14 +1203,27 @@ export async function decidirDiferimientoDeAlumno(
       return sinDiferir("sin-respuesta-de-mp", { ...alcance, planSinRespuesta: plan.id });
     }
 
-    if (conPago === null && esCandidato.has(plan.id)) {
+    if (esCandidato.has(plan.id) && plan.finMs !== null) {
       const evidencias = subs
         .map(evidenciaDePago)
         .filter((e): e is EvidenciaDePago => e !== null);
       if (evidencias.length > 0) {
         // El pago mas lejano de ese plan.
-        pago = evidencias.reduce((mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor));
-        conPago = plan;
+        const delPlan = evidencias.reduce(
+          (mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor),
+        );
+        // El fin de ESTE plan, calculado como el del resultado: el menor entre su
+        // fecha de fin y lo que cubre su cobro. Gana el mas lejano; en un empate,
+        // el id menor, para que el resultado no dependa del orden de lectura.
+        const fin = Math.min(plan.finMs, delPlan.hastaMs);
+        if (
+          fin > finDelMejor ||
+          (fin === finDelMejor && conPago !== null && plan.id < conPago.id)
+        ) {
+          finDelMejor = fin;
+          pago = delPlan;
+          conPago = plan;
+        }
       }
     }
   }
@@ -1238,7 +1259,7 @@ export async function decidirDiferimientoDeAlumno(
     );
   }
 
-  const diferidoHastaMs = Math.min(conPago.finMs, pago.hastaMs);
+  const diferidoHastaMs = finDelMejor;
   if (diferidoHastaMs - nowMs < MIN_DIFERIMIENTO_MS) {
     return sinDiferir("pago-vence-pronto", {
       ...alcance,
