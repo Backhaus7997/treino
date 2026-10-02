@@ -209,6 +209,10 @@ progreso y —si vos lo habilitás— compartirlo con tu entrenador.
 Tratamos tus datos, conforme a la Ley 25.326 de Protección de Datos Personales, sobre:
 
 - **Tu consentimiento**, que prestás al aceptar esta política al crear la cuenta.
+- **El interés legítimo** en enviarte comunicaciones comerciales sobre nuestros
+  propios servicios, con los datos que vos mismo nos diste al crear la cuenta
+  (art. 27, inc. 1 de la Ley 25.326). Podés oponerte en cualquier momento y sin
+  costo: ver la sección 9.
 - **Tu consentimiento expreso y específico** para los datos de salud de la
   sección 3.2, que se solicita por separado dentro de la app y podés revocar.
 - **La ejecución del servicio** que solicitás al usar la app.
@@ -300,7 +304,7 @@ y tiene que estar informada. Esta es la tabla completa.
 | Registrar tus medidas, molestias y check-ins | Ejecución del contrato, art. 6(1)(b) | Consentimiento explícito, art. 9(2)(a) |
 | Compartir tus datos con el entrenador al que te vinculaste | Ejecución del contrato, art. 6(1)(b) | Consentimiento explícito, art. 9(2)(a) |
 | Analítica de producto y mejora del servicio | Interés legítimo, art. 6(1)(f) | No usamos datos de salud identificables |
-| Comunicaciones comerciales | Tu consentimiento, art. 6(1)(a) | No aplica |
+| Comunicaciones comerciales | Interés legítimo, art. 6(1)(f) | No aplica |
 | Facturación y respaldo contable | Obligación legal, art. 6(1)(c) | No aplica |
 
 **Podés retirar tu consentimiento cuando quieras**, y hacerlo no afecta la
@@ -374,6 +378,7 @@ En concreto podés:
 | **Rectificar** | Desde el editor de perfil, o escribiéndonos |
 | **Suprimir** | Eliminar tu cuenta desde la app. Ver sección 10 |
 | **Revocar consentimiento** | Desde los ajustes, o escribiéndonos |
+| **Dejar de recibir comunicaciones comerciales** | Con el link al pie de cualquier correo promocional, o escribiéndonos |
 | **Dejar de compartir con tu entrenador** | Desactivando el compartir, o cortando el vínculo |
 | **Salir de los rankings** | Desactivando el opt-in |
 | **Reclamar** | Ante la AAIP |

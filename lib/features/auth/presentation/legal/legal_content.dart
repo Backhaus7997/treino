@@ -23,7 +23,7 @@ class LegalSection {
 const String kTermsLastUpdated = '1 de octubre de 2026';
 
 /// Ultima revision de Política de Privacidad.
-const String kPrivacyLastUpdated = '1 de octubre de 2026';
+const String kPrivacyLastUpdated = '2 de octubre de 2026';
 
 /// Version vigente de Términos y Condiciones, para evidencia de
 /// aceptacion (`UserProfile.accepted...Version`).
@@ -336,6 +336,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '5. BASE LEGAL DEL TRATAMIENTO',
     'Tratamos tus datos, conforme a la Ley 25.326 de Protección de Datos Personales, sobre:\n'
         '• Tu consentimiento, que prestás al aceptar esta política al crear la cuenta.\n'
+        '• El interés legítimo en enviarte comunicaciones comerciales sobre nuestros propios servicios, con los datos que vos mismo nos diste al crear la cuenta (art. 27, inc. 1 de la Ley 25.326). Podés oponerte en cualquier momento y sin costo: ver la sección 9.\n'
         '• Tu consentimiento expreso y específico para los datos de salud de la sección 3.2, que se solicita por separado dentro de la app y podés revocar.\n'
         '• La ejecución del servicio que solicitás al usar la app.\n'
         '• El cumplimiento de obligaciones legales, en particular las registrales y fiscales aplicables a la suscripción de entrenadores.\n'
@@ -398,7 +399,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Para qué: Registrar tus medidas, molestias y check-ins — Base legal: Ejecución del contrato, art. 6(1)(b) — Si hay datos de salud: Consentimiento explícito, art. 9(2)(a)\n'
         '• Para qué: Compartir tus datos con el entrenador al que te vinculaste — Base legal: Ejecución del contrato, art. 6(1)(b) — Si hay datos de salud: Consentimiento explícito, art. 9(2)(a)\n'
         '• Para qué: Analítica de producto y mejora del servicio — Base legal: Interés legítimo, art. 6(1)(f) — Si hay datos de salud: No usamos datos de salud identificables\n'
-        '• Para qué: Comunicaciones comerciales — Base legal: Tu consentimiento, art. 6(1)(a) — Si hay datos de salud: No aplica\n'
+        '• Para qué: Comunicaciones comerciales — Base legal: Interés legítimo, art. 6(1)(f) — Si hay datos de salud: No aplica\n'
         '• Para qué: Facturación y respaldo contable — Base legal: Obligación legal, art. 6(1)(c) — Si hay datos de salud: No aplica\n'
         '\n'
         'Podés retirar tu consentimiento cuando quieras, y hacerlo no afecta la licitud de lo que tratamos antes de que lo retiraras.\n'
@@ -441,6 +442,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Rectificar: Desde el editor de perfil, o escribiéndonos\n'
         '• Suprimir: Eliminar tu cuenta desde la app. Ver sección 10\n'
         '• Revocar consentimiento: Desde los ajustes, o escribiéndonos\n'
+        '• Dejar de recibir comunicaciones comerciales: Con el link al pie de cualquier correo promocional, o escribiéndonos\n'
         '• Dejar de compartir con tu entrenador: Desactivando el compartir, o cortando el vínculo\n'
         '• Salir de los rankings: Desactivando el opt-in\n'
         '• Reclamar: Ante la AAIP\n'
