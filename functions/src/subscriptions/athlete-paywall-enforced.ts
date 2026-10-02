@@ -30,22 +30,26 @@
  * pasa a ser un cambio de valor y nada mas. Apagarlo vuelve a limpiar el campo,
  * o sea que el rollback es real y no un deploy de emergencia.
  *
- * ─── PRENDIDO el 2026-10-02, con dos pendientes aceptados ──────────────────
+ * ─── PRENDIDO el 2026-10-02 ────────────────────────────────────────────────
  *
  * Decision de Martin, con la landing ya prendida (el checkout responde) y sin
- * usuarios reales: lo de abajo hoy les pasa solo a testers.
+ * usuarios reales.
  *
- *   1. El alumno que ya venia siguiendo una plantilla PAGA del catalogo deja de
- *      poder entrenarla: las reglas le rebotan la sesion
- *      (`sesionSobreRutinaLibre`). Es el grandfathering que sigue abierto (ver
- *      `routine_detail_screen.dart`), y hay que resolverlo antes de que haya
- *      alumnos reales, no despues.
- *   2. La version de las tiendas anterior al build 53 no tiene la pantalla del
- *      tope: quien la use y pase un tope recibe el error crudo de la regla.
+ * Las plantillas PAGAS no tienen excepcion: sin plan pago (Pro o un PF que lo
+ * cubra) quedan con candado, tambien para quien ya venia entrenando una — el
+ * que deja de pagar o pierde a su PF. Las reglas le rebotan la sesion
+ * (`sesionSobreRutinaLibre`), la app le muestra el candado y la hoja, y el mail
+ * `athlete-coverage-lost` se lo avisa. Lo hecho no se borra, y con Pro sigue
+ * donde estaba. Es la regla de `athlete_entitlement.dart`, que ya habia cerrado
+ * la exencion el 2026-09-11 (poblacion cero: «maquinaria permanente para
+ * nadie»), extendida a los casos que vienen.
  *
- * Si alguno de los dos muerde a alguien real antes de resolverse, el rollback
- * es este mismo valor en `false` y el deploy de las cuatro functions que lo
- * leen: `syncAthletePaywallOnUser`, `syncAthletePaywallOnTrainerLink`,
+ * Queda UN pendiente aceptado mientras solo hay testers: la version de las
+ * tiendas anterior al build 53 no tiene la pantalla del tope, y quien la use y
+ * pase un tope recibe el error crudo de la regla.
+ *
+ * Rollback: este mismo valor en `false` y el deploy de las cuatro functions que
+ * lo leen: `syncAthletePaywallOnUser`, `syncAthletePaywallOnTrainerLink`,
  * `sweepAthletePaywall` y `solicitarCodigoDeVerificacion`.
  *
  * ─── ANTES DE PRENDERLO: el grandfathering ────────────────────────────────

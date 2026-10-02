@@ -217,6 +217,21 @@ describe("el texto", () => {
     const { html } = render();
     expect(html).toContain(`${LANDING_URL}/es/suscripcion/checkout`);
   });
+
+  it("⚠️ avisa que las plantillas pagas quedan con candado, DESPUÉS de tranquilizar", () => {
+    // «Tus rutinas siguen exactamente donde estaban» le mentía a quien venía
+    // entrenando una plantilla paga: queda con candado, sin excepción para quien
+    // ya la seguía (ver `athlete_entitlement.dart`). Se dice, pero después de
+    // «no perdés nada», y con la salida: el progreso vuelve con Pro.
+    const { text } = render();
+    const tranquiliza = text.indexOf("No perdés nada");
+    const candado = text.indexOf("Las plantillas del plan pago quedan con candado");
+    expect(candado).toBeGreaterThan(-1);
+    expect(tranquiliza).toBeLessThan(candado);
+    expect(text).toContain("seguís donde estabas");
+    // Lo recibe también quien estaba cubierto por su PF y nunca pagó.
+    expect(text).not.toMatch(/volvés a Pro/);
+  });
 });
 
 describe("el cable", () => {

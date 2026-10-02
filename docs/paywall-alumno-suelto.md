@@ -246,8 +246,10 @@ temprano, use catálogo o rutina propia.
 > encender el paywall**». Ya no. El 2026-09-11 aparecieron dos bloqueantes más
 > de este mismo eje, y ninguno es del reloj: el seed que le borraba `isPremium`
 > al catálogo, y el candado de copiar una plantilla paga que vive sólo en el
-> cliente. **El del seed se cerró el 2026-09-14** (`bef1b3b8`); el del candado
-> sigue abierto. La lista al día está en
+> cliente. **El del seed se cerró el 2026-09-14** (`bef1b3b8`), y **el del
+> candado, el 2026-09-16** (#1155: la copia sale sellada con `copiedFrom` y el
+> CREATE de `/routines` la rechaza; este párrafo siguió diciendo «abierto»
+> hasta el 2026-10-02). La lista al día está en
 > `lib/features/paywall/domain/athlete_entitlement.dart`, y se mantiene ahí y
 > en ningún otro lado.
 >

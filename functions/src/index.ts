@@ -187,10 +187,10 @@ export { maintainTemplateCount } from "./subscriptions/template-count";
 // esos no los ve ningun trigger porque no escriben nada).
 //
 // El interruptor ATHLETE_PAYWALL_ENFORCEMENT_ENABLED esta PRENDIDO desde el
-// 2026-10-02, con un pendiente aceptado mientras solo hay testers: el
-// grandfathering de RUTINAS PROPIAS esta resuelto (`noCreceLaForma` en las
-// reglas), pero sigue abierto el de las PLANTILLAS PAGAS que un alumno ya venia
-// siguiendo — ver el encabezado del modulo y `routine_detail_screen.dart`.
+// 2026-10-02. Las RUTINAS PROPIAS fuera de tope las cubre `noCreceLaForma` en
+// las reglas, y las PLANTILLAS PAGAS no tienen excepcion: sin plan pago quedan
+// con candado, tambien para quien ya venia entrenando una. Ver el encabezado
+// del modulo y la lista de `athlete_entitlement.dart`.
 export {
   syncAthletePaywallOnUser,
   syncAthletePaywallOnTrainerLink,
