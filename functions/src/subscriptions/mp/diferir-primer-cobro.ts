@@ -63,7 +63,10 @@
  *   1. AL ABRIR EL CHECKOUT (`decidirDiferimiento`): si el PF califica, y hasta
  *      cuando tiene pago el periodo. El alumno tiene su propia entrada
  *      (`decidirDiferimientoDeAlumno`), con la misma prueba y otra fuente de
- *      elegibilidad: ver el encabezado de esa seccion.
+ *      elegibilidad: ver el encabezado de esa seccion. Y una tercera para el alumno
+ *      que cambia de plan con el viejo todavia cobrando
+ *      (`decidirCambioDePlanDelAlumno`): misma prueba, contada contra lo que el
+ *      viejo ya cobro.
  *   2. AL RECONCILIAR (`aplicarPruebaDiferidaAlEstado` y
  *      `aplicarPruebaDiferidaAlPeriodo`): como se lee despues un plan que nacio
  *      con prueba, sea de PF o de alumno. Hace falta porque el link de un checkout
@@ -82,19 +85,23 @@
  * ── La pregunta de fondo: fallar para que lado ──
  *
  * Todo lo dudoso en este archivo termina en NO diferir, o sea en el
- * comportamiento de antes (cobrar en el acto). Con una sola excepcion, que es
- * deliberada: si no podemos LEER lo que necesitamos para decidir, se tira. Seguir
- * adelante sin saber si el PF tiene dias pagos es exactamente el doble cobro que
- * esto viene a cerrar, y el PF puede reintentar.
+ * comportamiento de antes (cobrar en el acto). Con dos excepciones, deliberadas:
+ *
+ *   - si no podemos LEER lo que necesitamos para decidir, se tira. Seguir adelante
+ *     sin saber si el PF tiene dias pagos es exactamente el doble cobro que esto
+ *     viene a cerrar, y el PF puede reintentar;
+ *   - en el cambio de plan del alumno (`decidirCambioDePlanDelAlumno`), lo dudoso
+ *     termina en BLOQUEAR, que es su comportamiento de antes: ahi cobrar en el acto
+ *     con la baja del viejo al confirmar le haria perder los dias que ya pago.
  */
 
 import { logger } from "firebase-functions";
 
 import { SubscriptionStatus } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
-import { SubscriptionTier } from "../tier-config";
-import { MpPreapproval } from "./client";
-import { ATHLETE_STATUSES } from "./map-status";
+import { SubscriptionCycle, SubscriptionTier } from "../tier-config";
+import { MAX_FREE_TRIAL_DAYS, MpPreapproval } from "./client";
+import { ATHLETE_STATUSES, hayCobroPendiente } from "./map-status";
 import {
   MOTIVO_ABANDONO,
   arrepentidoAtDe,
@@ -825,24 +832,25 @@ export async function decidirDiferimiento(
 //
 // Por eso "esta dado de baja" se le pregunta a MP, plan por plan y en el mismo
 // pedido: se consultan los planes del alumno que todavia pueden cobrar, tengan o no
-// fecha, y se difiere solo si ninguno tiene una suscripcion viva. Una viva es
-// alguien que ya paga: diferirle un plan nuevo le sumaria un segundo cobro en E. El
-// PF tiene una red para eso, el alumno no: cuando un plan nuevo confirma,
-// `darDeBajaLosReemplazados` da de baja los viejos, pero corre solo en la rama del
-// PF del reconciliador. Por eso aca no hay atajo del doble click (no le preguntaria
-// nada a MP), y por eso la decision tambien levanta la guarda del mismo ciclo en
-// `create-athlete-preapproval.ts`.
+// fecha, y esta decision difiere solo si ninguno tiene una suscripcion viva. Una
+// viva es alguien que ya paga, y ese caso no es "volver": es CAMBIAR de plan, y lo
+// decide [decidirCambioDePlanDelAlumno] (mas abajo), que difiere contra el plan que
+// cobra y cuenta con que el reconciliador lo dé de baja cuando el nuevo se confirme
+// (`darDeBajaLosReemplazadosDelAlumno`). Aca no hay atajo del doble click (no le
+// preguntaria nada a MP), y por eso la decision tambien levanta la guarda del mismo
+// ciclo en `create-athlete-preapproval.ts`.
 //
-// ── UNA sola pasada por MP, para dos preguntas ──
+// ── UNA sola pasada por MP, para todas las preguntas ──
 //
-// El callable le hace al alumno dos preguntas sobre las mismas suscripciones de MP:
-// «¿alguna sigue cobrando?» (si es asi, NO se abre otro checkout: es la mitad
-// temporal del cobro doble, [consultarPlanesDelAlumno]) y, si ninguna cobra, «¿hay
-// un cobro real que respalde dias pagos?» ([decidirDiferimientoDeAlumno]). Las dos
-// leen el mismo `searchPreapprovalsByPlan` de los mismos planes, en el mismo
-// pedido, asi que se contesta UNA vez por plan: la pasada recorre en serie todos los
-// planes que pueden cobrar, corta en el primero vivo y deja lo que MP contesto en un
-// mapa; la decision del diferimiento lee de ese mapa y no sale a la red.
+// El callable le hace al alumno varias preguntas sobre las mismas suscripciones de
+// MP: «¿alguna sigue cobrando?» ([consultarPlanesDelAlumno]); si una sola cobra,
+// «¿hasta cuando esta pago y se puede cambiar de un paso?»
+// ([decidirCambioDePlanDelAlumno]); y si ninguna cobra, «¿hay un cobro real que
+// respalde dias pagos?» ([decidirDiferimientoDeAlumno]). Todas leen el mismo
+// `searchPreapprovalsByPlan` de los mismos planes, en el mismo pedido, asi que se
+// contesta UNA vez por plan: la pasada recorre en serie los planes que pueden cobrar,
+// corta recien en la segunda suscripcion viva y deja lo que MP contesto en un mapa;
+// las decisiones leen de ese mapa y no salen a la red.
 //
 // «Viva» no significa lo mismo en las dos, a proposito ([mpSigueCobrando] frente al
 // `!== "cancelled"` de abajo). Para bloquear, una suscripcion `pending` NO cobra
@@ -977,13 +985,30 @@ export function mpSigueCobrando(raw: unknown): boolean {
   return raw !== "cancelled" && raw !== "pending";
 }
 
+/** Una suscripcion que MP todavia cobra, con el plan detras. */
+export interface SuscripcionVivaDelAlumno {
+  planId: string;
+  /** `mp_plans/{planId}`, tal como salio de Firestore. */
+  plan: Record<string, unknown>;
+  sub: MpPreapproval;
+}
+
 /** Lo que dejo [consultarPlanesDelAlumno]. */
 export type ConsultaDeLosPlanesDelAlumno =
   | {
-      /** Hay una suscripcion que MP TODAVIA cobra: no se abre otro checkout. */
+      /** Hay al menos una suscripcion que MP TODAVIA cobra. */
       vivo: true;
-      /** El primer plan donde se encontro. */
+      /** El primer plan donde se encontro una. */
       planId: string;
+      /**
+       * Las suscripciones vivas que se encontraron, en el orden de la pasada. La
+       * pasada corta en la SEGUNDA (con dos ya no hay cambio de plan posible, ver
+       * [decidirCambioDePlanDelAlumno]), asi que con una sola este arreglo es
+       * completo: se consultaron todos los planes que pueden cobrar.
+       */
+      vivas: SuscripcionVivaDelAlumno[];
+      /** Lo que MP contesto por cada plan consultado. Completo con una sola viva. */
+      suscripciones: ReadonlyMap<string, MpPreapproval[]>;
     }
   | {
       /** Ninguna cobra. Lo que MP contesto por cada plan, para no volver a preguntar. */
@@ -1010,12 +1035,16 @@ export type ConsultaDeLosPlanesDelAlumno =
  *
  * ── Como ──
  *
- * SECUENCIAL y cortando en el primero que cobra, a proposito: MP contesta 429 y los
- * planes abandonados se quedan para siempre, asi que un `Promise.all` creceria con
- * el uso y un solo 429 trabaria al alumno (mismo criterio que
- * `cancel-my-subscription.ts`). Con el corte, solo importan los planes que
- * realmente se consultaron: si uno falla antes de encontrar uno vivo, no se puede
- * descartar el cobro.
+ * SECUENCIAL, a proposito: MP contesta 429 y los planes abandonados se quedan para
+ * siempre, asi que un `Promise.all` creceria con el uso y un solo 429 trabaria al
+ * alumno (mismo criterio que `cancel-my-subscription.ts`).
+ *
+ * Corta en la SEGUNDA suscripcion viva, no en la primera. Con una sola, el alumno
+ * puede estar cambiando de plan, y para decidirlo ([decidirCambioDePlanDelAlumno])
+ * hace falta saber que no hay otra cobrando y que dias pagos dejan los planes dados
+ * de baja: la pasada tiene que haber visto todos. Con dos ya no hay nada que
+ * decidir (se bloquea), y seguir preguntando solo suma llamadas y chances de error.
+ * Si una consulta falla antes de ese corte, se tira: no se puede descartar el cobro.
  *
  * **Tira** si MP no contesta (o `leerSuscripciones` lo hace con un error): sin saber
  * si algo cobra no se puede descartar el doble cobro, y abrir el checkout igual
@@ -1028,16 +1057,54 @@ export async function consultarPlanesDelAlumno(i: {
   leerSuscripciones: (planId: string) => Promise<MpPreapproval[]>;
 }): Promise<ConsultaDeLosPlanesDelAlumno> {
   const suscripciones = new Map<string, MpPreapproval[]>();
+  const vivas: SuscripcionVivaDelAlumno[] = [];
   for (const { id, data } of i.planes) {
     if (data.producto !== "athlete" || !puedeSeguirCobrando(data)) continue;
 
     const subs = await i.leerSuscripciones(id);
     suscripciones.set(id, subs);
-    if (subs.some((s) => mpSigueCobrando(s.status))) {
-      return { vivo: true, planId: id };
+    for (const sub of subs) {
+      if (mpSigueCobrando(sub.status)) vivas.push({ planId: id, plan: data, sub });
     }
+    if (vivas.length >= 2) break;
   }
-  return { vivo: false, suscripciones };
+  return vivas.length === 0
+    ? { vivo: false, suscripciones }
+    : { vivo: true, planId: vivas[0].planId, vivas, suscripciones };
+}
+
+/** Lo que [finPagoDelPlan] dice de un plan: hasta cuando, y con que cobro. */
+export interface FinPagoDelPlan {
+  /** Hasta cuando esta pago, en ms. */
+  finMs: number;
+  /** El cobro que lo respalda: el pago mas lejano de ese plan. */
+  pago: EvidenciaDePago;
+}
+
+/**
+ * Hasta cuando esta pago UN plan del alumno, respaldado por si solo, o `null` si
+ * ninguna de sus suscripciones muestra un cobro real ([evidenciaDePago]).
+ *
+ * Es el MENOR entre [finMs] (la fecha que dice el plan) y lo que cubre su pago mas
+ * lejano en MP: cada fuente puede pasarse por su lado, y pasarse es regalar dias.
+ *
+ * Es la UNICA definicion de "el fin pago de un plan" para las dos decisiones del
+ * alumno. [decidirDiferimientoDeAlumno] la aplica a cada plan dado de baja que puede
+ * ser evidencia y se queda con la mas lejana; [decidirCambioDePlanDelAlumno], al
+ * plan que todavia cobra (con su proximo cobro como fecha) y a los dados de baja, y
+ * tambien se queda con la mas lejana. Una sola cuenta para que el que vuelve y el
+ * que cambia de plan no difieran hasta fechas distintas con los mismos planes.
+ */
+export function finPagoDelPlan(
+  finMs: number,
+  subs: readonly MpPreapproval[],
+): FinPagoDelPlan | null {
+  const evidencias = subs
+    .map(evidenciaDePago)
+    .filter((e): e is EvidenciaDePago => e !== null);
+  if (evidencias.length === 0) return null;
+  const pago = evidencias.reduce((mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor));
+  return { finMs: Math.min(finMs, pago.hastaMs), pago };
 }
 
 export interface DecidirDiferimientoDeAlumnoInput {
@@ -1204,26 +1271,18 @@ export async function decidirDiferimientoDeAlumno(
     }
 
     if (esCandidato.has(plan.id) && plan.finMs !== null) {
-      const evidencias = subs
-        .map(evidenciaDePago)
-        .filter((e): e is EvidenciaDePago => e !== null);
-      if (evidencias.length > 0) {
-        // El pago mas lejano de ese plan.
-        const delPlan = evidencias.reduce(
-          (mejor, e) => (e.hastaMs > mejor.hastaMs ? e : mejor),
-        );
-        // El fin de ESTE plan, calculado como el del resultado: el menor entre su
-        // fecha de fin y lo que cubre su cobro. Gana el mas lejano; en un empate,
-        // el id menor, para que el resultado no dependa del orden de lectura.
-        const fin = Math.min(plan.finMs, delPlan.hastaMs);
-        if (
-          fin > finDelMejor ||
-          (fin === finDelMejor && conPago !== null && plan.id < conPago.id)
-        ) {
-          finDelMejor = fin;
-          pago = delPlan;
-          conPago = plan;
-        }
+      // El fin de ESTE plan ([finPagoDelPlan]): el menor entre su fecha de fin y lo
+      // que cubre su pago mas lejano. Gana el mas lejano; en un empate, el id
+      // menor, para que el resultado no dependa del orden de lectura.
+      const delPlan = finPagoDelPlan(plan.finMs, subs);
+      if (
+        delPlan !== null &&
+        (delPlan.finMs > finDelMejor ||
+          (delPlan.finMs === finDelMejor && conPago !== null && plan.id < conPago.id))
+      ) {
+        finDelMejor = delPlan.finMs;
+        pago = delPlan.pago;
+        conPago = plan;
       }
     }
   }
@@ -1279,6 +1338,285 @@ export async function decidirDiferimientoDeAlumno(
     diasDePrueba: diasDePrueba(diferidoHastaMs, nowMs),
   });
   return { diferir: true, diferidoHastaMs };
+}
+
+// ---------------------------------------------------------------------------
+// El alumno que CAMBIA de plan con el viejo todavia cobrando.
+// ---------------------------------------------------------------------------
+//
+// El alumno tiene un solo producto, asi que dos suscripciones vivas son siempre un
+// cobro doble. Cuando pide otro ciclo con un plan que MP todavia cobra, el arreglo
+// tiene dos mitades que viven en dos archivos:
+//
+//   1. AL ABRIR EL CHECKOUT (aca, [decidirCambioDePlanDelAlumno]): el plan nuevo
+//      difiere su primer cobro hasta que vence lo que el viejo ya cobro, con la
+//      MISMA prueba (`free_trial`, dias de calendario argentino, [diasDePrueba]) que
+//      el que vuelve con dias pagos. El alumno sigue usando lo que pago y el plan
+//      nuevo cobra recien desde ahi.
+//   2. CUANDO EL PLAN NUEVO SE CONFIRMA (`reconcile.ts`,
+//      `darDeBajaLosReemplazadosDelAlumno`): el viejo se da de baja en MP. Abrir el
+//      checkout no da de baja nada: si el alumno lo abandona, el viejo sigue
+//      cobrando como siempre.
+//
+// La pregunta de esta mitad es hasta cuando esta PAGO el plan viejo. Si no se puede
+// establecer con lo que MP contesto, NO se cae a cobrar en el acto: con la baja del
+// viejo al confirmar, cobrar en el acto le haria perder al alumno los dias que ya
+// pago (pagaria dos veces el solapamiento). Se BLOQUEA, que es lo de antes de este
+// cambio (la mitigacion del #1305): el alumno se da de baja desde la web y vuelve, y
+// ahi el que vuelve con dias pagos ([decidirDiferimientoDeAlumno]) lo difiere.
+
+/**
+ * Lo que se hace con el checkout de un alumno que tiene UNA suscripcion viva.
+ *
+ *   - `mismo-ciclo`: pide lo que ya tiene. Se bloquea como siempre.
+ *   - `bloquear`: no se puede establecer sin riesgo hasta cuando esta pago, o el
+ *     estado no deja cambiar de un paso. El mensaje de siempre (#1305).
+ *   - `diferir`: el plan nuevo arranca con prueba hasta [diferidoHastaMs].
+ *   - `sin-diferir`: el viejo esta PAUSADO y no le queda nada pago: no hay dias que
+ *     respetar, y el plan nuevo cobra al autorizar.
+ */
+export type CambioDePlanDelAlumno =
+  | { tipo: "mismo-ciclo"; planViejo: string }
+  | { tipo: "bloquear"; planViejo: string | null; motivo: MotivoDelCambioBloqueado }
+  | { tipo: "diferir"; planViejo: string; diferidoHastaMs: number }
+  | { tipo: "sin-diferir"; planViejo: string };
+
+/** Por que un cambio de plan se bloquea. Va al log. */
+export type MotivoDelCambioBloqueado =
+  | "varias-vivas"
+  | "ciclo-desconocido"
+  | "deshabilitado"
+  | "arrepentido"
+  | "estado-que-no-se-difiere"
+  | "cobro-rebotado"
+  | "sin-pago-comprobado"
+  | "sin-fecha-de-fin"
+  | "pago-vence-pronto"
+  | "prueba-demasiado-larga";
+
+export interface DecidirCambioDePlanDelAlumnoInput {
+  uid: string;
+  /** El ciclo que el alumno esta por comprar. */
+  cycle: SubscriptionCycle;
+  /** Las suscripciones vivas que encontro [consultarPlanesDelAlumno]. */
+  vivas: SuscripcionVivaDelAlumno[];
+  /** TODOS los planes de MP de esta cuenta, para los dias de los dados de baja. */
+  planes: PlanDeLaCuenta[];
+  /** Lo que MP contesto por cada plan en la misma pasada. */
+  suscripciones: ReadonlyMap<string, MpPreapproval[]>;
+  nowMs: number;
+  /** El interruptor [DIFERIR_PRIMER_COBRO_ENABLED]: apagado, se bloquea como antes. */
+  habilitado?: boolean;
+}
+
+/** `next_payment_date` de MP en ms, o `null` si no vino o no es una fecha. */
+function proximoCobroMs(sub: MpPreapproval): number | null {
+  const raw = sub.next_payment_date;
+  if (typeof raw !== "string") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * El fin pago mas lejano que respalda algun plan DADO DE BAJA del alumno (todas
+ * sus suscripciones `cancelled`), o `null` si ninguno.
+ *
+ * Es la misma lectura que el que vuelve con dias pagos ([decidirDiferimientoDeAlumno]):
+ * los planes que pueden ser evidencia ([planesDelAlumnoARevisar]), cada uno con su
+ * propio fin ([finPagoDelPlan]), y gana el mas lejano. Un plan que MP devolvio vacio
+ * o con algo que no es `cancelled` no aporta: solo podria alargar la prueba, y ante
+ * la duda se queda corta (alla esos dos casos cortan el diferimiento entero; aca la
+ * decision ya tiene el fin del plan vivo, y lo dudoso solo deja de extenderlo).
+ *
+ * Importa porque esos dias el alumno los tiene pagos y con acceso (un plan dado de
+ * baja otorga hasta su fin): si el plan nuevo cobrara antes, pagaria dos veces el
+ * solapamiento.
+ */
+function finPagoDeLosDadosDeBaja(
+  i: DecidirCambioDePlanDelAlumnoInput,
+  planViejo: string,
+): number | null {
+  let mejor: number | null = null;
+  for (const p of planesDelAlumnoARevisar(i.planes, i.nowMs)) {
+    if (p.id === planViejo || !p.puedeSerEvidencia || p.finMs === null) continue;
+    const subs = i.suscripciones.get(p.id) ?? [];
+    if (subs.length === 0 || subs.some((s) => s.status !== "cancelled")) continue;
+    const delPlan = finPagoDelPlan(p.finMs, subs);
+    if (delPlan !== null && (mejor === null || delPlan.finMs > mejor)) {
+      mejor = delPlan.finMs;
+    }
+  }
+  return mejor;
+}
+
+/**
+ * Decide que hacer con el checkout de un alumno que pide un plan mientras MP le
+ * sigue cobrando otro. Pura: todo lo que lee ya lo trajo la pasada.
+ *
+ * En este orden:
+ *
+ *   1. **Una sola suscripcion viva.** Con dos ya hay un cobro doble que no se arregla
+ *      abriendo un tercero: se bloquea.
+ *   2. **Otro ciclo.** El mismo ciclo es comprar dos veces lo mismo (`mismo-ciclo`),
+ *      y un ciclo que no se entiende no se puede comparar: se bloquea. Va ANTES del
+ *      interruptor: el mismo ciclo se bloquea siempre.
+ *   3. **El interruptor encendido.** Apagado no hay prueba que mandar, y sin prueba
+ *      solo queda cobrar en el acto (el alumno perderia los dias que pago): se
+ *      bloquea, que es el comportamiento del #1305. Es el rollback de esto.
+ *   4. **Un estado que deja cambiar de un paso.** `authorized` sin un cobro
+ *      pendiente, o `paused`. Un cobro pendiente (`grace` para nosotros) es un
+ *      periodo que todavia no se pago, y un estado que no conocemos no se interpreta:
+ *      se bloquea. Un plan arrepentido con una suscripcion viva es una baja que no
+ *      termino: tambien.
+ *   5. **Hasta cuando esta pago el viejo** ([finPagoDelPlan], la misma cuenta que un
+ *      plan dado de baja), de DOS fuentes independientes, y vale la menor:
+ *        - la fecha del proximo cobro: `next_payment_date` de MP en esta misma
+ *          respuesta o, si no vino, el `currentPeriodEnd` que el reconciliador le
+ *          guardo al plan (que es esa misma fecha, leida la ultima vez);
+ *        - lo que cubre el ultimo cobro real ([evidenciaDePago]: un cobro exitoso y un
+ *          periodo que entendemos). Sin cobro no hay dias pagos que respetar: un plan
+ *          en su propia prueba, sin cobrar todavia, cae aca.
+ *      Sin alguna de las dos se bloquea: es el "no se puede establecer". La menor
+ *      porque cada fuente puede pasarse por su lado (un reintento cobrado tarde corre
+ *      `last_charged_date`; una fecha guardada puede estar vieja) y pasarse es regalar
+ *      dias.
+ *   6. **Con al menos [MIN_DIFERIMIENTO_MS] por delante, se difiere** hasta el mayor
+ *      entre ese fin y el de los planes dados de baja ([finPagoDeLosDadosDeBaja]): el
+ *      mismo "el plan que mas lejos paga" del que vuelve con dias pagos,
+ *      siempre que los dias entren en lo que MP acepta ([MAX_FREE_TRIAL_DAYS]; un
+ *      anual entero son 366 como mucho). Si no entraran, se bloquea en vez de recortar
+ *      la prueba: recortarla es cobrar antes de que venza lo pago.
+ *   7. **Con menos de eso:**
+ *        - `authorized`: se bloquea. El viejo cobra dentro de un dia, y abrir el nuevo
+ *          ahi es una carrera entre ese cobro y la baja que dispara el nuevo al
+ *          confirmarse: si el cobro gana, el alumno paga un periodo del viejo que
+ *          despues se da de baja. Pasado el cobro, el fin se corre un periodo y el
+ *          cambio difiere normalmente.
+ *        - `paused`: si NINGUNA de las dos fuentes le da un dia por delante, no le
+ *          queda nada pago y el viejo no cobra mientras siga pausado. Se difiere igual
+ *          si un plan dado de baja tiene dias; si no, `sin-diferir`. Si las fuentes no
+ *          coinciden (una con dias y la otra sin), se bloquea: no se sabe cual vale.
+ *
+ * El `paused` cuenta como vivo, y es la decision menos obvia: el pagador lo puede
+ * reanudar desde su cuenta de MP y el cobro vuelve solo ([mpSigueCobrando]). Por eso
+ * se trata como al autorizado: se le respetan los dias que cobro y se lo da de baja
+ * cuando el nuevo se confirma. Que hoy no le de acceso (un pausado es `expired`, ver
+ * `athleteStatusDesde`) no cambia que esos dias estan pagos: la prueba del plan nuevo
+ * se los devuelve, y nunca pasa de lo que el cobro de MP cubre.
+ */
+export function decidirCambioDePlanDelAlumno(
+  i: DecidirCambioDePlanDelAlumnoInput,
+): CambioDePlanDelAlumno {
+  const { uid, cycle, nowMs } = i;
+
+  const bloquear = (
+    planViejo: string | null,
+    motivo: MotivoDelCambioBloqueado,
+    extra: Record<string, unknown> = {},
+  ): CambioDePlanDelAlumno => {
+    logger.info("mp/diferir-primer-cobro: el cambio de plan del alumno se bloquea", {
+      uid,
+      cycle,
+      planViejo,
+      motivo,
+      ...extra,
+    });
+    return { tipo: "bloquear", planViejo, motivo };
+  };
+
+  // 1. Una sola suscripcion viva.
+  if (i.vivas.length !== 1) {
+    return bloquear(i.vivas[0]?.planId ?? null, "varias-vivas", {
+      vivas: i.vivas.map((v) => v.planId),
+    });
+  }
+  const { planId: planViejo, plan, sub } = i.vivas[0];
+
+  // 2. Otro ciclo.
+  const cicloViejo = plan.cycle;
+  if (cicloViejo === cycle) return { tipo: "mismo-ciclo", planViejo };
+  if (cicloViejo !== "monthly" && cicloViejo !== "annual") {
+    return bloquear(planViejo, "ciclo-desconocido", { cicloViejo: String(cicloViejo) });
+  }
+
+  // 3. El interruptor.
+  if (!(i.habilitado ?? DIFERIR_PRIMER_COBRO_ENABLED)) {
+    return bloquear(planViejo, "deshabilitado");
+  }
+
+  // 4. Un estado que deja cambiar de un paso.
+  if (arrepentidoAtDe(plan) !== null) return bloquear(planViejo, "arrepentido");
+  const pausada = sub.status === "paused";
+  if (!pausada && sub.status !== "authorized") {
+    return bloquear(planViejo, "estado-que-no-se-difiere", {
+      mpStatus: typeof sub.status === "string" ? sub.status : null,
+    });
+  }
+  if (!pausada && hayCobroPendiente(sub.summarized)) {
+    return bloquear(planViejo, "cobro-rebotado");
+  }
+
+  // 5. Hasta cuando esta pago, de dos fuentes: la misma cuenta que un plan dado de
+  // baja ([finPagoDelPlan]), con el proximo cobro como la fecha del plan.
+  // Sin cobro no hay dias que respetar, y sin fecha no hay contra que acotarlo.
+  const proximo = proximoCobroMs(sub) ?? msDeTimestamp(plan.currentPeriodEnd);
+  const delViejo = finPagoDelPlan(proximo ?? Number.POSITIVE_INFINITY, [sub]);
+  if (delViejo === null) return bloquear(planViejo, "sin-pago-comprobado");
+  if (proximo === null) return bloquear(planViejo, "sin-fecha-de-fin");
+  const { finMs: finDelViejo, pago } = delViejo;
+  const dadosDeBaja = finPagoDeLosDadosDeBaja(i, planViejo);
+
+  const contexto = {
+    proximoCobroIso: new Date(proximo).toISOString(),
+    pagadoHastaIso: new Date(pago.hastaMs).toISOString(),
+    fuenteDelPago: pago.fuente,
+    finDeLosDadosDeBajaIso: dadosDeBaja === null ? null : new Date(dadosDeBaja).toISOString(),
+    mpStatus: sub.status,
+  };
+
+  const diferirHasta = (hastaMs: number): CambioDePlanDelAlumno => {
+    const dias = diasDePrueba(hastaMs, nowMs);
+    if (dias > MAX_FREE_TRIAL_DAYS) {
+      return bloquear(planViejo, "prueba-demasiado-larga", { ...contexto, dias });
+    }
+    if (pago.fuente === "alta") {
+      // El mismo parche que en las otras dos decisiones, y grita por lo mismo.
+      logger.warn(
+        "mp/diferir-primer-cobro: MP no mando last_charged_date, el pago se " +
+          "reconstruye desde el alta",
+        { uid, producto: "athlete", planConPago: planViejo },
+      );
+    }
+    logger.info("mp/diferir-primer-cobro: cambio de plan, se difiere el primer cobro", {
+      uid,
+      cycle,
+      planViejo,
+      ...contexto,
+      diferidoHastaIso: new Date(hastaMs).toISOString(),
+      diasDePrueba: dias,
+    });
+    return { tipo: "diferir", planViejo, diferidoHastaMs: hastaMs };
+  };
+
+  // 6. Con dias por delante, se difiere.
+  if (finDelViejo - nowMs >= MIN_DIFERIMIENTO_MS) {
+    return diferirHasta(Math.max(finDelViejo, dadosDeBaja ?? finDelViejo));
+  }
+
+  // 7. Sin dias por delante.
+  if (!pausada) return bloquear(planViejo, "pago-vence-pronto", contexto);
+  if (Math.max(proximo, pago.hastaMs) - nowMs >= MIN_DIFERIMIENTO_MS) {
+    return bloquear(planViejo, "pago-vence-pronto", contexto);
+  }
+  if (dadosDeBaja !== null && dadosDeBaja - nowMs >= MIN_DIFERIMIENTO_MS) {
+    return diferirHasta(dadosDeBaja);
+  }
+  logger.info(
+    "mp/diferir-primer-cobro: cambio de plan desde uno pausado sin dias pagos, " +
+      "se cobra al autorizar",
+    { uid, cycle, planViejo, ...contexto },
+  );
+  return { tipo: "sin-diferir", planViejo };
 }
 
 // ---------------------------------------------------------------------------

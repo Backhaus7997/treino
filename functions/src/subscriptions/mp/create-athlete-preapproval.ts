@@ -35,16 +35,26 @@
  * mapa no distingue a quien se dio de baja de quien paga, asi que se le pregunta
  * a MP por cada plan que puede cobrar.
  *
- * ── Una sola pasada por MP: bloquea o difiere ──
+ * ── Cambiar de plan con el viejo cobrando: el nuevo difiere, el viejo se da de baja ──
+ *
+ * El que paga mensual y pide anual (o al reves) no tiene que darse de baja primero.
+ * El plan nuevo se abre con una prueba hasta que vence lo que el viejo ya cobro
+ * (`decidirCambioDePlanDelAlumno`), y cuando MP lo confirma el reconciliador da de
+ * baja el viejo (`darDeBajaLosReemplazadosDelAlumno`, en `reconcile.ts`). Asi el
+ * alumno usa lo que pago, despues la prueba, despues los cobros del nuevo, sin dos
+ * cobros por el mismo periodo. Si abandona el checkout no se da de baja nada.
+ *
+ * ── Una sola pasada por MP: bloquea, cambia o difiere ──
  *
  * Antes de abrir nada el callable recorre en serie los planes del alumno que
  * pueden cobrar y le pregunta a MP por sus suscripciones
  * (`consultarPlanesDelAlumno`, con `estricto` y fallando cerrado). De esa lectura
- * sale una de tres cosas: una suscripcion que MP todavia cobra, y entonces NO se
- * abre otro checkout (mitigacion temporal del cobro doble, ver el cuerpo); ninguna
- * cobra pero hay un cobro real con dias por delante, y el plan nuevo difiere su
- * primer cobro; o ninguna de las dos, y el checkout es el de siempre. Bloquear y
- * diferir salen del mismo dato, asi que no pueden contradecirse.
+ * sale una de estas cosas: una sola suscripcion que MP todavia cobra, y entonces es
+ * un cambio de plan (que difiere, o se bloquea si no se puede establecer hasta
+ * cuando esta pago; ver el cuerpo); mas de una, y se bloquea; ninguna pero un cobro
+ * real con dias por delante, y el plan nuevo difiere su primer cobro; o ninguna de
+ * las dos, y el checkout es el de siempre. Todo sale del mismo dato, asi que las
+ * decisiones no pueden contradecirse.
  *
  * La fecha vuelve en la respuesta (`diferidoHastaIso`) porque el checkout de MP
  * rinde la prueba como «¡Tenés N días gratis!» (medido en produccion con el del
@@ -70,9 +80,11 @@ import { puedeSeguirCobrando } from "./reconcile";
 import { MpApiError, MpClient, createMpClient } from "./client";
 import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
 import {
+  CambioDePlanDelAlumno,
   Diferimiento,
   PlanDeLaCuenta,
   consultarPlanesDelAlumno,
+  decidirCambioDePlanDelAlumno,
   decidirDiferimientoDeAlumno,
 } from "./diferir-primer-cobro";
 
@@ -184,8 +196,8 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  *   - Sin la del derecho, alguien cuyo plan vencio no podria volver a
  *     suscribirse nunca, porque el documento de `mp_plans` sigue ahi.
  *   - La del ciclo da el mensaje preciso para el caso comun (apretar de nuevo el
- *     mismo plan). El cambio de ciclo lo frena la pasada por MP que hace el
- *     callable (`consultarPlanesDelAlumno`).
+ *     mismo plan). El cambio de ciclo lo decide la pasada por MP que hace el
+ *     callable (`consultarPlanesDelAlumno` y `decidirCambioDePlanDelAlumno`).
  *
  * Lee `mp_plans` con la misma consulta por uid que usa el resto del modulo
  * (`leerPlanes`, compartida con el diferimiento), y filtra EN MEMORIA: un
@@ -283,22 +295,23 @@ export async function runCreateAthletePreapproval(
       .get()
       .then((snap) => snap.docs.map((d) => ({ id: d.id, data: d.data() }))));
 
-  // ── UNA pasada por MP, y de ahi salen DOS respuestas ──
+  // ── UNA pasada por MP, y de ahi salen todas las respuestas ──
   //
   // Antes de abrir nada se le pregunta a MP, plan por plan y en serie, por las
   // suscripciones de los planes del alumno que todavia pueden cobrar. De esa misma
   // lectura sale:
   //
-  //   1. ¿Hay una que MP TODAVIA cobra? Entonces no se abre otro checkout (el
-  //      bloqueo de abajo).
-  //   2. Si ninguna cobra: ¿hay un cobro real que respalde dias pagos? Entonces el
+  //   1. ¿Hay UNA que MP todavia cobra? Es un cambio de plan:
+  //      `decidirCambioDePlanDelAlumno` dice si el nuevo difiere su primer cobro
+  //      hasta que vence lo que el viejo cobro, o si se bloquea (mas abajo).
+  //   2. ¿Mas de una? Se bloquea.
+  //   3. Si ninguna cobra: ¿hay un cobro real que respalde dias pagos? Entonces el
   //      plan nuevo difiere su primer cobro (`decidirDiferimientoDeAlumno`, que lee
   //      de lo que ya se contesto y no vuelve a salir a la red).
   //
-  // Eran dos consultas independientes sobre las mismas suscripciones. Unidas, cada
-  // plan se paga una vez y las dos decisiones no pueden contradecirse: lo que
-  // bloquea y lo que difiere salen del mismo dato. Va despues del gate de rol y del
-  // vinculo: un PF o un alumno vinculado no tienen que gastar una sola llamada.
+  // Cada plan se paga una vez y las decisiones no pueden contradecirse: salen del
+  // mismo dato. Va despues del gate de rol y del vinculo: un PF o un alumno
+  // vinculado no tienen que gastar una sola llamada.
   //
   // Si algo falla se TIRA, y lo que falla es o la lectura de `mp_plans` o una
   // consulta a MP. Seguir sin saber si cobra algo es abrir un segundo cobro, y
@@ -311,10 +324,11 @@ export async function runCreateAthletePreapproval(
   // Sin atajo del doble click, a diferencia del PF: el atajo no le pregunta nada a
   // MP, y aca esa pregunta es la que levanta la guarda del mismo ciclo y la que
   // frena un segundo toque sobre un checkout diferido que ya se autorizo (su plan
-  // nuevo se consulta, esta vivo, y el bloqueo vuelve). Un doble click que no pago
-  // vuelve a verificar y llega a la misma fecha, que es lo que `abrirCheckout`
-  // necesita para reusar el checkout abierto.
+  // nuevo se consulta, esta vivo, y es el mismo ciclo o una segunda viva). Un doble
+  // click que no pago vuelve a verificar y llega a la misma fecha, que es lo que
+  // `abrirCheckout` necesita para reusar el checkout abierto.
   let consulta: Awaited<ReturnType<typeof consultarPlanesDelAlumno>>;
+  let cambio: CambioDePlanDelAlumno | null = null;
   let diferimiento: Diferimiento;
   try {
     consulta = await consultarPlanesDelAlumno({
@@ -322,10 +336,23 @@ export async function runCreateAthletePreapproval(
       leerSuscripciones: (planId) =>
         deps.mpClient.searchPreapprovalsByPlan(planId, { estricto: true }),
     });
-    // Con uno vivo no hay nada que decidir: no se difiere, y mas abajo se bloquea.
-    diferimiento = consulta.vivo
-      ? { diferir: false, motivo: "no-esta-cancelada" }
-      : await decidirDiferimientoDeAlumno({
+    if (consulta.vivo) {
+      // Con una viva no se pregunta por "volver con dias pagos": es un cambio.
+      cambio = decidirCambioDePlanDelAlumno({
+        uid,
+        cycle,
+        vivas: consulta.vivas,
+        planes: await leerPlanes(),
+        suscripciones: consulta.suscripciones,
+        nowMs: deps.nowMs,
+        habilitado: deps.diferirHabilitado,
+      });
+      diferimiento = cambio.tipo === "diferir"
+        ? { diferir: true, diferidoHastaMs: cambio.diferidoHastaMs }
+        : { diferir: false, motivo: "no-esta-cancelada" };
+    } else {
+      const suscripciones = consulta.suscripciones;
+      diferimiento = await decidirDiferimientoDeAlumno({
         uid,
         userData: userSnap.data(),
         nowMs: deps.nowMs,
@@ -335,13 +362,14 @@ export async function runCreateAthletePreapproval(
         // los dos conjuntos de planes (el de la decision es un subconjunto del de
         // la pasada), no algo para pedirle a MP por la espalda.
         leerSuscripciones: async (planId) => {
-          const subs = consulta.vivo ? undefined : consulta.suscripciones.get(planId);
+          const subs = suscripciones.get(planId);
           if (subs === undefined) {
             throw new Error(`mp/create-athlete: el plan ${planId} no se consulto`);
           }
           return subs;
         },
       });
+    }
   } catch (e) {
     const err = e as Partial<MpApiError>;
     logger.error(
@@ -364,18 +392,24 @@ export async function runCreateAthletePreapproval(
   //
   // Sin esta guarda MP le abre un segundo cobro.
   //
-  // Y NO bloquea si el primer cobro se difiere. `decidirDiferimientoDeAlumno`
-  // solo difiere si, en ESTE pedido, MP contesto por cada plan del alumno que
-  // puede cobrar sin ninguna suscripcion viva (salvo los checkouts abandonados
-  // sin fecha, que al cerrarse no tenian ninguna; ver su encabezado). No hay un
-  // segundo cobro que evitar, y el plan nuevo empieza a cobrar recien cuando vence
-  // lo que ya pago. Sin esta excepcion, el que se dio de baja y cambio de idea no
-  // podria volver a su mismo plan hasta que se le corte el acceso, porque su plan
-  // dado de baja sigue sin ser `terminal` hasta entonces.
+  // Y NO bloquea si el primer cobro se difiere. Hay dos formas de llegar ahi, y en
+  // ninguna se compra dos veces lo mismo:
+  //
+  //   - `decidirDiferimientoDeAlumno`: solo difiere si, en ESTE pedido, MP contesto
+  //     por cada plan del alumno que puede cobrar sin ninguna suscripcion viva
+  //     (salvo los checkouts abandonados sin fecha, que al cerrarse no tenian
+  //     ninguna; ver su encabezado). No hay un segundo cobro que evitar, y el plan
+  //     nuevo empieza a cobrar recien cuando vence lo que ya pago. Sin esta
+  //     excepcion, el que se dio de baja y cambio de idea no podria volver a su
+  //     mismo plan hasta que se le corte el acceso, porque su plan dado de baja
+  //     sigue sin ser `terminal` hasta entonces.
+  //   - `decidirCambioDePlanDelAlumno`: solo difiere si la UNICA suscripcion viva
+  //     es de OTRO ciclo (la del mismo sale `mismo-ciclo`), y esa se da de baja
+  //     cuando el nuevo se confirma. Que quede otro plan del ciclo pedido que todavia
+  //     da acceso (uno dado de baja con dias) no es comprarlo dos veces: ya no cobra.
   //
   // Va ANTES del bloqueo de abajo porque con una suscripcion viva en el mismo
-  // ciclo el mensaje preciso es este; el de abajo cubre el resto. Nunca se difiere
-  // con una viva, asi que la excepcion no le abre la puerta a un plan que cobra.
+  // ciclo el mensaje preciso es este; el de abajo cubre el resto.
   if (
     !diferimiento.diferir &&
     await yaPagaEsteCiclo(leerPlanes, userSnap.data(), cycle)
@@ -386,49 +420,60 @@ export async function runCreateAthletePreapproval(
     );
   }
 
-  // ── Y tampoco se abre un plan NUEVO mientras otro siga cobrando ──
+  // ── Y no se abre un plan NUEVO mientras otro siga cobrando, salvo un cambio ──
+  // ── de plan que se pueda hacer sin cobrar dos veces ──
   //
-  // ⚠️ MITIGACION TEMPORAL del cobro doble, no una decision de producto: el que
-  // paga mensual y quiere pasarse a anual (o al reves) hoy tiene que cancelar
-  // primero. Lo ideal es dejarlo cambiar de un paso, y bloquearlo le cierra la
-  // puerta al que quiere pagarnos mas.
+  // Hasta el #1305 esto abria el checkout y las DOS suscripciones quedaban
+  // cobrando, porque la rama del alumno de `reconcile.ts` no daba de baja la vieja.
+  // El #1305 lo bloqueo entero (el alumno tenia que darse de baja primero), y este
+  // bloque era esa mitigacion. Hoy la vieja se da de baja cuando el nuevo se
+  // confirma (`darDeBajaLosReemplazadosDelAlumno`), asi que el cambio de ciclo pasa
+  // en un paso cuando `decidirCambioDePlanDelAlumno` puede diferirlo (o, desde un
+  // plan pausado sin dias pagos, cobrar al autorizar). Se sigue bloqueando:
   //
-  // Se bloquea porque la baja del plan reemplazado NO existe para el alumno:
-  // `darDeBajaLosReemplazados` sólo corre en la rama del PF de `reconcile.ts`,
-  // y la del alumno (`escribirSuscripcionDeAlumno`) retorna antes de llegar. Con
-  // el checkout abierto, las DOS suscripciones de MP quedan cobrando.
+  //   - con mas de una suscripcion viva (ya hay un cobro doble; un tercer plan no lo
+  //     arregla), con el mismo ciclo, o con un estado que no deja cambiar de un paso
+  //     (un cobro pendiente, un estado que no conocemos);
+  //   - cuando no se puede establecer hasta cuando esta pago el viejo. NO se cobra
+  //     en el acto: con la baja del viejo al confirmar, el alumno perderia los dias
+  //     que pago. Se da de baja desde la web y vuelve, y ahi el que vuelve con dias
+  //     pagos se difiere;
+  //   - con el interruptor del diferimiento apagado: sin prueba, lo unico que queda
+  //     es cobrar en el acto, que es el caso anterior.
   //
-  // Se levanta cuando la rama del alumno de `reconcile.ts` cancele en MP el plan
-  // reemplazado al confirmarse el nuevo. Ahi se borra este bloque, y la pasada por
-  // MP de arriba queda solo para decidir el diferimiento.
+  // Los dos huecos que la mitigacion tampoco cerraba siguen abiertos, y esta baja los
+  // achica sin cerrarlos:
   //
-  // El diferimiento NO lo esquiva: difiere unicamente cuando la pasada no encontro
-  // ninguna suscripcion viva, que es justo la condicion para no estar aca. Un
-  // alumno con un plan que cobra no recibe prueba ni checkout.
-  //
-  // ⚠️ Es EVENTUALMENTE consistente: reduce el cobro doble, no lo cierra. Quedan
-  // abiertos dos casos hasta que exista esa baja:
   //   (a) el indice de busqueda de MP llega tarde (~93 s, ver `reconcile.ts`): un
-  //       plan recien pagado puede no aparecer todavia. Vale tambien para el MISMO
-  //       ciclo y el diferimiento: el alumno autoriza el plan diferido B y aprieta de
-  //       nuevo dentro de esos ~93 s, antes de que el webhook de B escriba su
-  //       `currentPeriodEnd`. B vuelve vacio y sin fecha, asi que se difiere otra vez
-  //       y la guarda del mismo ciclo no corre. Dentro de la ventana de reuso de 30
-  //       minutos vuelve el mismo `init_point`; pasada, se abre un segundo plan con
-  //       prueba y los dos cobran en E. Ventana minuscula, y sin corregir;
+  //       plan recien autorizado puede no aparecer todavia. El alumno autoriza el
+  //       plan diferido B y aprieta de nuevo dentro de esos ~93 s: B vuelve vacio, y
+  //       la pasada ve solo al viejo (si su baja tampoco se ve todavia) o a ninguno.
+  //       Dentro de la ventana de reuso de 30 minutos vuelve el mismo `init_point`;
+  //       pasada, se abre un plan C con prueba. Si C tambien se autoriza, cuando se
+  //       confirma da de baja lo MAS VIEJO que cobre (B incluido) y el cobro doble se
+  //       cierra antes del primer cobro, que es en E. Ventana minuscula.
   //   (b) dos `init_point` abiertos (una pestaña vieja sin pagar y el checkout
-  //       nuevo) que se pagan los dos despues: el `init_point` no vence.
+  //       nuevo) que se pagan los dos despues: el `init_point` no vence. El que se
+  //       confirma da de baja solo lo mas viejo que el, asi que si el viejo se paga
+  //       DESPUES, lo da de baja la proxima reconciliacion del nuevo (el barrido de
+  //       las 03:00 lo visita todas las noches); hasta entonces cobran los dos, y si
+  //       el viejo no difiere, ese primer cobro ya salio.
   //
   // El mensaje evita las palabras «entrenador» y «ciclo» a proposito: la landing
   // (`motivoDeLaPrecondicion`, treino-app) decide el copy buscandolas en el texto,
   // y cualquiera de las dos mostraria un motivo que aca es falso.
   // La baja del alumno vive en la web (`/suscripcion/baja`, treino-app), no en
   // la app.
-  if (consulta.vivo) {
+  if (cambio !== null && (cambio.tipo === "bloquear" || cambio.tipo === "mismo-ciclo")) {
     logger.info(
-      "mp/create-athlete-preapproval: hay un plan que sigue cobrando, no se " +
-        "abre otro checkout",
-      { uid, cycle, planVivo: consulta.planId },
+      "mp/create-athlete-preapproval: hay un plan que sigue cobrando y el cambio " +
+        "no se puede hacer de un paso, no se abre otro checkout",
+      {
+        uid,
+        cycle,
+        planVivo: consulta.vivo ? consulta.planId : null,
+        motivo: cambio.tipo === "bloquear" ? cambio.motivo : "mismo-ciclo",
+      },
     );
     throw new HttpsError(
       "failed-precondition",

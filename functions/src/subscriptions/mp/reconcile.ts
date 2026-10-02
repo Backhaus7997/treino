@@ -271,8 +271,9 @@
  * reglas, los supuestos y el por que de cada una estan en ese archivo.
  *
  * Valen igual para el alumno: su checkout tambien difiere el primer cobro cuando
- * vuelve con dias pagos, y su escritor pasa por la misma lectura
- * (`leerPruebaDiferida`) con su propia guarda de `pending`.
+ * vuelve con dias pagos o cuando cambia de plan con el viejo cobrando, y su
+ * escritor pasa por la misma lectura (`leerPruebaDiferida`) con su propia guarda de
+ * `pending`.
  *
  * ── EL CAMBIO DE PLAN DEL ALUMNO ──
  *
@@ -280,12 +281,8 @@
  * (`darDeBajaLosReemplazadosDelAlumno`), con el MISMO criterio de cuando y de
  * cuales que el PF: lo estrictamente mas viejo, con el nuevo ya `authorized` en MP.
  * Hasta que existio, la rama del alumno retornaba antes de llegar a la baja del PF
- * y las dos suscripciones quedaban cobrando. El checkout del alumno todavia no abre
- * un plan nuevo mientras otro cobra (la mitigacion del #1305), asi que hoy esto
- * cierra los dos planes vivos que ese bloqueo no evita: los que ya existian antes de
- * el y los que se cuelan por sus huecos (el retraso del indice de MP, dos
- * `init_point` abiertos que se pagan los dos). Es lo que hace falta para poder
- * levantar el bloqueo.
+ * y las dos suscripciones quedaban cobrando (la mitigacion del #1305 bloqueaba el
+ * checkout para que no pasara).
  *
  * Lo que NO copia, a proposito: `supersededBy` y el `terminal` por reemplazo. El
  * plan viejo del alumno queda como si el alumno se hubiera dado de baja, otorgando
@@ -1177,7 +1174,7 @@ async function darDeBajaLosReemplazados(
  *
  * O sea: dado de baja por nosotros, el plan viejo queda EXACTAMENTE como si el
  * alumno se hubiera dado de baja desde la web, que es lo que la mitigacion del #1305
- * le pide hacer a mano. No hay una regla de acceso nueva.
+ * le pedia hacer a mano. No hay una regla de acceso nueva.
  *
  * Antes del PUT, si la suscripcion esta `authorized`, se guarda en el plan su
  * `next_payment_date` cuando falta o difiere de lo guardado. Es lo que el escritor
@@ -1283,9 +1280,11 @@ async function darDeBajaUnPlanDelAlumno(
  * de baja al alumno el plan que acaba de comprar. Sin la fecha del confirmado, o la
  * del viejo, no se da de baja nada.
  *
- * Mientras el checkout bloquee el cambio de plan (#1305), los dos planes vivos que
- * esto encuentra son los que ese bloqueo no evita (ver "EL CAMBIO DE PLAN DEL
- * ALUMNO" en el encabezado). Si MP falla, cada reconciliacion del nuevo la reintenta.
+ * Es la otra mitad del cambio de plan del alumno: el checkout del nuevo difiere su
+ * primer cobro hasta que vence lo que el viejo cobro
+ * (`decidirCambioDePlanDelAlumno`), y esto hace que el viejo no vuelva a cobrar.
+ * Como la prueba corre hasta ese fin, la baja tiene todo el periodo pago del viejo
+ * para confirmar: si MP falla, cada reconciliacion del nuevo la reintenta.
  *
  * Total: nunca tira (salvo que falle Firestore, como el resto del escritor).
  */

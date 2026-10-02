@@ -4784,10 +4784,9 @@ describe("reconcileSubscription: el alumno con un plan en prueba diferida y la g
 // EL ALUMNO CAMBIA DE PLAN CON EL VIEJO COBRANDO: cuando el nuevo se confirma,
 // el viejo se da de baja en MP.
 //
-// El nuevo nace con prueba hasta que vence lo que el viejo ya cobro, que es como
-// lo va a abrir el checkout cuando deje de bloquear el cambio (#1305); para la
-// baja no cambia nada que la tenga o no. Lo que se prueba es que el viejo deje de
-// cobrar UNA vez, que un fallo de MP se reintente, que
+// El checkout del nuevo difirio su primer cobro hasta que vence lo que el viejo
+// ya cobro (`decidirCambioDePlanDelAlumno`). Lo que se prueba aca es la otra
+// mitad: que el viejo deje de cobrar UNA vez, que un fallo de MP se reintente, que
 // abandonar el checkout no toque nada, y que el acceso sea continuo (lo pago del
 // viejo, la prueba del nuevo, los cobros del nuevo) sin un solo `expired` escrito
 // en el camino, recorra el barrido los planes en el orden que sea.
