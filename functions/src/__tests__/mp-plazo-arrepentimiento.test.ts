@@ -14,6 +14,7 @@ import {
   DIAS_DE_DUDA,
   PLAZO_DIAS,
   evaluarPlazo,
+  numeroDeDia,
 } from "../subscriptions/mp/plazo-arrepentimiento";
 
 /** Un instante en hora de Argentina (UTC-3, sin horario de verano). */
@@ -122,5 +123,40 @@ describe("sin fecha no se decide", () => {
 
   it("una fecha de contratación futura (reloj corrido) no rechaza a nadie", () => {
     expect(evaluarPlazo(art(29), art(28)).estado).toBe("dentro");
+  });
+});
+
+// `numeroDeDia` es la definición de «día argentino» sin `Intl` que comparte la cuenta
+// de los días de prueba de un plan diferido (`diasDePrueba`). Que coincide con la de
+// los mails (`artDateKey`) se prueba en `mp-diferir-primer-cobro.test.ts`.
+describe("numeroDeDia: el día argentino sin Intl", () => {
+  it("es el número de días desde 1970-01-01, en hora de Argentina", () => {
+    // La medianoche argentina del 1/1/1970 son las 03:00 UTC: tres horas antes todavía
+    // es el día anterior.
+    expect(numeroDeDia(Date.parse("1970-01-01T03:00:00.000Z"))).toBe(0);
+    expect(numeroDeDia(Date.parse("1970-01-01T02:59:59.999Z"))).toBe(-1);
+    // Del 1/1/1970 al 2/10/2026 pasan 20728 días.
+    expect(numeroDeDia(Date.parse("2026-10-02T12:00:00.000Z"))).toBe(20728);
+  });
+
+  it("cambia a las 00:00 de Argentina, que son las 03:00 UTC, no a las 00:00 UTC", () => {
+    const medianoche = Date.parse("2026-10-02T03:00:00.000Z");
+
+    expect(numeroDeDia(medianoche - 1)).toBe(20727);
+    expect(numeroDeDia(medianoche)).toBe(20728);
+    // La medianoche UTC todavía es el día anterior en Argentina (21:00 ART).
+    expect(numeroDeDia(Date.parse("2026-10-02T00:00:00.000Z"))).toBe(20727);
+  });
+
+  it("días consecutivos dan números consecutivos, también a través de un 29 de febrero", () => {
+    const mediodia = (iso: string) => numeroDeDia(Date.parse(`${iso}T15:00:00.000Z`));
+
+    expect(mediodia("2028-02-29") - mediodia("2028-02-28")).toBe(1);
+    expect(mediodia("2028-03-01") - mediodia("2028-02-29")).toBe(1);
+    expect(mediodia("2028-02-29")).toBe(21243);
+  });
+
+  it("una entrada que no es una fecha no da un día", () => {
+    expect(Number.isNaN(numeroDeDia(Number.NaN))).toBe(true);
   });
 });

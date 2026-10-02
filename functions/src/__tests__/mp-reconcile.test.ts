@@ -1919,6 +1919,13 @@ describe("reconcileSubscription: la prueba diferida", () => {
   const FIN_PAGO = AHORA + 13 * DIA_MS;
   /** Autorizada hace 30 minutos: el plan se abrio hace 1 hora. */
   const AUTORIZADA_HACE_30_MIN = new Date(AHORA - 30 * 60 * 1000).toISOString();
+  /**
+   * El primer cobro programado de la prueba. Con dias de calendario argentino cae el
+   * mismo dia que E pero a la hora en que se autorizo, o sea ANTES de la hora exacta
+   * de E: en el caso real (autorizada a las 09:35 ART, E a las 11:47 ART) 2 h 12 min
+   * antes. Es lo que MP devuelve como `next_payment_date` durante la prueba.
+   */
+  const PRIMER_COBRO = FIN_PAGO - (2 * 60 + 12) * 60 * 1000;
 
   /**
    * El PF dado de baja que vuelve. `p0` es el plan que pago (terminal, como lo
@@ -1953,13 +1960,13 @@ describe("reconcileSubscription: la prueba diferida", () => {
     },
   });
 
-  /** La suscripcion de `p1` recien autorizada, en prueba: el primer cobro es en E + 1 dia. */
+  /** La suscripcion de `p1` recien autorizada, en prueba: el primer cobro es unas horas antes de E. */
   const EN_PRUEBA_MP: MpPreapproval = {
     id: "sub-prueba",
     status: "authorized",
     external_reference: "t1",
     date_created: AUTORIZADA_HACE_30_MIN,
-    next_payment_date: new Date(FIN_PAGO + DIA_MS).toISOString(),
+    next_payment_date: new Date(PRIMER_COBRO).toISOString(),
     auto_recurring: {
       ...AUTO_RECURRING_REAL,
       start_date: AUTORIZADA_HACE_30_MIN,
@@ -1991,8 +1998,8 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(r.status).toBe("active");
     expect(subDe(store).status).toBe("active");
     expect(subDe(store).tier).toBe("plan2");
-    // El proximo cobro de MP es el fin de la prueba, y eso es lo que se guarda.
-    expect(finDe(store)).toBe(FIN_PAGO + DIA_MS);
+    // El proximo cobro de MP es el primer cobro de la prueba, y eso es lo que se guarda.
+    expect(finDe(store)).toBe(PRIMER_COBRO);
     // Volver a suscribirse no da de baja nada: el plan anterior ya esta cancelado.
     expect(deps.bajas).toEqual([]);
     expect(r.dadosDeBaja).toBe(0);
@@ -2138,14 +2145,15 @@ describe("reconcileSubscription: la prueba diferida", () => {
   /**
    * El PF autorizo el plan diferido y despues lo cancelo, antes del primer cobro.
    * Mientras estaba en prueba el reconciliador le escribio `active` con el
-   * proximo cobro de MP (E + 1 dia): eso es lo que hay guardado.
+   * proximo cobro de MP (el primer cobro de la prueba, unas horas antes de E): eso
+   * es lo que hay guardado.
    */
   const CANCELA_EN_PRUEBA = (): Store => {
     const mundo = DIFERIDO();
     mundo.users.t1.subscription = {
       tier: "plan2",
       status: "active",
-      currentPeriodEnd: ts(FIN_PAGO + DIA_MS),
+      currentPeriodEnd: ts(PRIMER_COBRO),
     };
     return mundo;
   };
@@ -2157,8 +2165,9 @@ describe("reconcileSubscription: la prueba diferida", () => {
     next_payment_date: undefined,
   };
 
-  it("cancelada sin fecha de MP: conserva hasta E, no hasta lo guardado (E + 1 dia)", async () => {
-    // Lo guardado es la fecha del primer cobro, que ya no va a ocurrir.
+  it("cancelada sin fecha de MP: conserva hasta E, no hasta el primer cobro guardado (antes de E)", async () => {
+    // Lo guardado es la fecha del primer cobro, que ya no va a ocurrir, y cae unas
+    // horas ANTES de E: cortar ahi le sacaria al PF horas de un periodo que ya pago.
     const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
 
     const r = await reconcileSubscription(app, "p1", fakeMp(CANCELADA_MP));
@@ -2183,7 +2192,7 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(finDe(store)).toBe(FIN_PAGO);
   });
 
-  it("cancelada CON la fecha del primer cobro de MP (la trae si nunca cobro): se acota a E", async () => {
+  it("cancelada CON una fecha de MP pasada de E (la del primer cobro, si cae despues): se acota a E", async () => {
     const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
 
     await reconcileSubscription(app, "p1", fakeMp({
@@ -2194,7 +2203,22 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(finDe(store)).toBe(FIN_PAGO);
   });
 
-  it("cancelada con una fecha ANTERIOR a E: se respeta, el tope no la estira", async () => {
+  it("cancelada CON la fecha del primer cobro unas horas ANTES de E: conserva hasta E", async () => {
+    // El caso real: MP trae el primer cobro que no ocurrio, 2 h 12 min antes de E. El
+    // PF pago hasta E con el plan anterior, y su acceso no se corta antes.
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    const r = await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      next_payment_date: new Date(PRIMER_COBRO).toISOString(),
+    }));
+
+    expect(subDe(store).status).toBe("cancelled");
+    expect(finDe(store)).toBe(FIN_PAGO);
+    expect(r.accesoHastaMs).toBe(FIN_PAGO);
+  });
+
+  it("cancelada con una fecha MUY anterior a E (5 dias): se respeta, no la explica ningun calendario", async () => {
     const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
 
     await reconcileSubscription(app, "p1", fakeMp({
@@ -2232,6 +2256,19 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(finDe(store)).toBe(FIN_PAGO);
   });
 
+  it("pausada con el primer cobro unas horas ANTES de E tambien conserva hasta E", async () => {
+    const { app, store } = fakeApp(CANCELA_EN_PRUEBA());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      ...CANCELADA_MP,
+      status: "paused",
+      next_payment_date: new Date(PRIMER_COBRO).toISOString(),
+    }));
+
+    expect(subDe(store).status).toBe("paused");
+    expect(finDe(store)).toBe(FIN_PAGO);
+  });
+
   it("el arrepentimiento conserva su precedencia: su instante gana sobre el tope", async () => {
     // Quien se arrepintio pierde el acceso en ese instante; el tope no lo
     // adelanta ni lo atrasa. Aca el arrepentimiento es DESPUES de E a proposito:
@@ -2260,7 +2297,7 @@ describe("reconcileSubscription: la prueba diferida", () => {
       ...CANCELADA_MP,
       summarized: {
         charged_quantity: 1,
-        last_charged_date: new Date(FIN_PAGO + DIA_MS).toISOString(),
+        last_charged_date: new Date(PRIMER_COBRO).toISOString(),
         pending_charge_quantity: 0,
       },
     }));
@@ -2535,8 +2572,11 @@ describe("reconcileSubscription: la prueba diferida", () => {
   // ── MP ignoro o acorto la prueba: el PF cobro antes de tiempo y pago dos veces ──
   //
   // Es la medicion del supuesto central del diferimiento. La suscripcion de un plan
-  // con prueba cobro cuando todavia faltaba mas de un dia para el fin de lo que el
-  // PF tenia pago: pago ese periodo dos veces.
+  // con prueba cobro cuando todavia faltaba mas de dos dias para el fin de lo que
+  // el PF tenia pago: pago ese periodo dos veces. El margen de dos dias es ancho a
+  // proposito: el primer cobro esperado cae el mismo dia que E, hasta casi un dia
+  // antes de su hora exacta, y si MP cuenta en su propio calendario (no esta
+  // medido) puede caer un dia de calendario mas temprano todavia.
 
   const COBRO_ANTES_DE_TIEMPO = {
     charged_quantity: 1,
@@ -2572,12 +2612,10 @@ describe("reconcileSubscription: la prueba diferida", () => {
     expect(subDe(store).status).toBe("active");
   });
 
-  it("el borde: a exactamente un dia de E todavia no avisa, un milisegundo antes si", async () => {
-    // Un dia antes de E es lo mas temprano que suponemos que MP podria cobrar si
-    // cuenta los dias en su propio calendario (-04:00).
+  it("el borde: a exactamente dos dias de E todavia no avisa, un milisegundo antes si", async () => {
     for (const [nowMs, avisa] of [
-      [FIN_PAGO - DIA_MS, false],
-      [FIN_PAGO - DIA_MS - 1, true],
+      [FIN_PAGO - 2 * DIA_MS, false],
+      [FIN_PAGO - 2 * DIA_MS - 1, true],
     ] as const) {
       warnSpy.mockClear();
       const { app } = fakeApp(DIFERIDO());
@@ -2589,6 +2627,27 @@ describe("reconcileSubscription: la prueba diferida", () => {
 
       expect(warnSpy.mock.calls.some((c) => c[0] === MENSAJE_COBRO_DOBLE))
         .toBe(avisa);
+    }
+  });
+
+  it("el primer cobro esperado, unas horas antes de E o en un dia y medio, NO avisa", async () => {
+    // Antes el margen era de un dia justo, a un milisegundo de un cobro legitimo.
+    // PRIMER_COBRO es el del caso real (2 h 12 min antes de E); los otros dos son el
+    // peor caso del modelo (23 h 58 min antes) y un dia y medio, entre los dos margenes.
+    for (const nowMs of [
+      PRIMER_COBRO,
+      FIN_PAGO - (DIA_MS - 2 * 60_000),
+      FIN_PAGO - 1.5 * DIA_MS,
+    ]) {
+      warnSpy.mockClear();
+      const { app } = fakeApp(DIFERIDO());
+
+      await reconcileSubscription(app, "p1", fakeMp({
+        ...EN_PRUEBA_MP,
+        summarized: COBRO_ANTES_DE_TIEMPO,
+      }, nowMs));
+
+      expect(warnSpy).not.toHaveBeenCalledWith(MENSAJE_COBRO_DOBLE, expect.anything());
     }
   });
 

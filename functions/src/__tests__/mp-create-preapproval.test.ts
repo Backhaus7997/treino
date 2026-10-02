@@ -684,7 +684,13 @@ describe("runCreatePreapproval — cuando MP falla", () => {
 describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
   const AHORA = Date.parse("2026-09-07T12:00:00.000Z");
   const DIA_MS = 24 * 60 * 60 * 1000;
-  /** El periodo pago vence en 13 dias, a la misma hora. */
+  /**
+   * El periodo pago vence el 20/9 a las 09:00 ART. `AHORA` es el 7/9 a las 09:00 ART:
+   * del 7/9 al 20/9 son 13 dias de calendario argentino (7 + 13 = 20), y tambien 13
+   * dias de 24 h justos porque la hora del dia es la misma. Por eso en estas
+   * fixtures la cuenta por calendario y la del tiempo exacto coinciden; los casos
+   * donde se separan estan mas abajo, con sus propios instantes.
+   */
   const FIN = Date.parse("2026-09-20T12:00:00.000Z");
   const ts = (ms: number) => ({ toMillis: () => ms });
 
@@ -713,10 +719,11 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
   });
 
   /**
-   * Lo que MP dice del plan p0: un cobro real el 20/8. Con montos POSITIVOS, para
-   * que la rama positiva de la regla de los montos corra en todo el flujo principal.
+   * Lo que MP dice del plan p0 cuando su ultimo cobro fue en la fecha pedida. Con
+   * montos POSITIVOS, para que la rama positiva de la regla de los montos corra en
+   * todo el flujo principal.
    */
-  const COBRO_DE_P0: Record<string, MpPreapproval[]> = {
+  const cobroDeP0El = (ultimoCobroIso: string): Record<string, MpPreapproval[]> => ({
     p0: [{
       id: "s0",
       status: "cancelled",
@@ -724,12 +731,15 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       summarized: {
         charged_quantity: 1,
         charged_amount: 22000,
-        last_charged_date: "2026-08-20T12:00:00.000Z",
+        last_charged_date: ultimoCobroIso,
         last_charged_amount: 22000,
         pending_charge_quantity: 0,
       },
     }],
-  };
+  });
+
+  /** Un cobro real el 20/8: con un periodo mensual cubre hasta `FIN`. */
+  const COBRO_DE_P0 = cobroDeP0El("2026-08-20T12:00:00.000Z");
 
   const deps = (mpClient: MpClient) => ({ mpClient, nowMs: AHORA });
 
@@ -742,8 +752,8 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     }, deps(mp.client));
 
     expect(r.status).toBe("created");
-    // 13 dias exactos: se busca que el primer cobro caiga cuando vence lo que ya
-    // estaba pago.
+    // 13 dias de calendario argentino (7/9 + 13 = 20/9): se busca que el primer
+    // cobro caiga el dia en que vence lo que ya estaba pago.
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(FIN);
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
@@ -770,6 +780,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       tier: "plan2", cycle: "monthly",
     }, deps(mp.client));
 
+    // Mismo vencimiento (20/9), mismos 13 dias de calendario (7/9 + 13 = 20/9).
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(FIN);
   });
@@ -787,6 +798,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       frequencyMonths: number;
       transactionAmount: number;
     };
+    // Los dias salen de lo que ya estaba pago (7/9 a 20/9: 13), no del ciclo nuevo.
     expect(llamada.freeTrialDays).toBe(13);
     // La prueba difiere el primer cobro: el precio y el ciclo son los pedidos.
     expect(llamada.frequencyMonths).toBe(12);
@@ -794,13 +806,69 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
   });
 
   it("los dias salen de la fecha y del reloj del request: hora y media mas tarde, 13 dias igual", async () => {
-    // ceil: a las 13:30 faltan 12 dias y 22.5 horas, que son 13 dias de prueba.
+    // A las 10:30 ART del 7/9 sigue siendo 7/9: del 7/9 al 20/9 son 13 dias de
+    // calendario, aunque el tiempo exacto que falta sean 12 dias y 22,5 horas.
     const { app } = fakeApp(PF_DADO_DE_BAJA());
     const mp = fakeMp(undefined, COBRO_DE_P0);
 
     await runCreatePreapproval(app, "t1", {
       tier: "plan2", cycle: "monthly",
     }, { mpClient: mp.client, nowMs: AHORA + 90 * 60 * 1000 });
+
+    expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
+  });
+
+  it("el caso real: abre el 2/10 a las 09:30 ART y lo pago vence el 1/11: 30 dias de prueba, no 31", async () => {
+    // El PF pago el 1/10 a las 11:47 ART (14:47Z), asi que lo pago vence el 1/11 a
+    // las 11:47 ART. Abre el checkout el 2/10 a las 09:30 ART (12:30Z): faltan 30
+    // dias y 2 h 17 min. En dias de calendario argentino, del 2/10 al 1/11 son 30
+    // (2/10 + 29 = 31/10, y un dia mas es el 1/11). Contar el tiempo exacto con
+    // `ceil` daba 31, y MP mostraba "31 dias gratis".
+    const vence = Date.parse("2026-11-01T14:47:00.000Z");
+    const mundo = PF_DADO_DE_BAJA();
+    (mundo.users.t1.subscription as Record<string, unknown>).currentPeriodEnd = ts(vence);
+    const { app, store } = fakeApp(mundo);
+    const mp = fakeMp(undefined, cobroDeP0El("2026-10-01T14:47:00.000Z"));
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: Date.parse("2026-10-02T12:30:00.000Z") });
+
+    expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(30);
+    expect(store.mp_plans["2c93"].diferidoHastaMs).toBe(vence);
+    expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(vence);
+  });
+
+  it("el dia cambia a las 00:00 ART (03:00Z), no a las 00:00 UTC", async () => {
+    // Misma fecha de vencimiento (FIN: 20/9), dos relojes a un minuto de distancia:
+    //   2026-09-08T02:59Z = 7/9 a las 23:59 ART: 7/9 + 13 = 20/9, 13 dias.
+    //   2026-09-08T03:00Z = 8/9 a las 00:00 ART: 8/9 + 12 = 20/9, 12 dias.
+    // Un corte en la medianoche UTC (el reloj de la function) daria 12 en los dos.
+    for (const [ahoraIso, dias] of [
+      ["2026-09-08T02:59:00.000Z", 13],
+      ["2026-09-08T03:00:00.000Z", 12],
+    ] as const) {
+      const { app } = fakeApp(PF_DADO_DE_BAJA());
+      const mp = fakeMp(undefined, COBRO_DE_P0);
+
+      await runCreatePreapproval(app, "t1", {
+        tier: "plan2", cycle: "monthly",
+      }, { mpClient: mp.client, nowMs: Date.parse(ahoraIso) });
+
+      expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(dias);
+    }
+  });
+
+  it("con horas sobrantes cuenta calendario: abre a las 08:00 ART y vence 13 dias despues a las 09:00", async () => {
+    // 2026-09-07T11:00Z = 7/9 a las 08:00 ART; FIN = 20/9 a las 09:00 ART. Faltan 13
+    // dias y 1 hora, y un `ceil` del tiempo exacto daria 14. Del 7/9 al 20/9 son 13
+    // dias de calendario.
+    const { app } = fakeApp(PF_DADO_DE_BAJA());
+    const mp = fakeMp(undefined, COBRO_DE_P0);
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: Date.parse("2026-09-07T11:00:00.000Z") });
 
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
   });
@@ -846,6 +914,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       diferidoHastaMs: AHORA + 400 * DIA_MS,
     }, deps(mp.client));
 
+    // Los de siempre (7/9 a 20/9: 13), no los 400 del cliente.
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
   });
 
@@ -1069,6 +1138,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
     }, deps(mp.client));
 
     expect(r.status).toBe("created");
+    // 7/9 + 13 = 20/9 (FIN).
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
     // Un checkout normal NO es atajo: se busca el pago en MP como siempre.
@@ -1340,6 +1410,7 @@ describe("runCreatePreapproval: volver a suscribirse con dias pagos", () => {
       diferirHabilitado: true,
     });
 
+    // 7/9 + 13 = 20/9 (FIN).
     expect((mp.llamadas[0] as { freeTrialDays: number }).freeTrialDays).toBe(13);
     expect(store.mp_checkouts.t1.diferidoHastaMs).toBe(FIN);
   });
