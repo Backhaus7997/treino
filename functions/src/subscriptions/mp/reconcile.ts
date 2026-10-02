@@ -1030,7 +1030,8 @@ async function darDeBajaLosReemplazados(
  * El campo de `mp_plans` con el estado de MP con el que el escritor del ALUMNO
  * decidio la ultima vez que llego a ese plan, en el vocabulario de
  * `effective-limit.ts`. Los caminos de `reconcileSubscription` que salen ANTES
- * del escritor —estado degradado, sin suscripcion, error de MP, mapeo roto— no
+ * del escritor —estado degradado, sin suscripcion, error de MP, mapeo roto,
+ * plan reemplazado, cuenta eliminada, uid que no coincide— no
  * lo tocan, y ahi queda el anterior.
  *
  * Existe para una sola pregunta: si OTRO plan del mismo alumno le sigue dando
@@ -1310,7 +1311,7 @@ async function escribirSuscripcionDeAlumno(i: {
   //
   // Lo que es de ESTE plan se guarda igual —su fecha y su `terminal`, mas
   // abajo—, porque eso no depende de nadie: un mensual vencido no vuelve a
-  // otorgar. Cuando el otro plan deje de otorgar, el corte lo escribe el al
+  // otorgar. Cuando el otro plan deje de otorgar, el corte lo escribe él al
   // reconciliarse, con los limites que cuenta [otroPlanQueOtorga].
   const revocaria =
     !athleteStatusOtorga(athleteStatus) &&
