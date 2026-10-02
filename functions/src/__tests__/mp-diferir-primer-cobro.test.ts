@@ -35,11 +35,13 @@ import {
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
+  consultarPlanesDelAlumno,
   cobrosExitosos,
   decidirDiferimiento,
   decidirDiferimientoDeAlumno,
   diasDePrueba,
   evidenciaDePago,
+  mpSigueCobrando,
   pagadoHastaDe,
   planesARevisar,
   planesDelAlumnoARevisar,
@@ -2177,6 +2179,115 @@ function armarAlumno(
   };
   return { input, lecturas };
 }
+
+describe("mpSigueCobrando", () => {
+  it("solo `cancelled` y `pending` no cobran", () => {
+    expect(mpSigueCobrando("cancelled")).toBe(false);
+    expect(mpSigueCobrando("pending")).toBe(false);
+  });
+
+  it("autorizada, pausada, un estado nuevo y un estado ausente SI: ante la duda, no se arma un cobro doble", () => {
+    for (const s of ["authorized", "paused", "un-estado-nuevo", undefined, null]) {
+      expect(mpSigueCobrando(s)).toBe(true);
+    }
+  });
+});
+
+describe("consultarPlanesDelAlumno: la pasada unica por MP", () => {
+  function pasada(
+    planes: PlanDeLaCuenta[],
+    subs: Record<string, MpPreapproval[] | Error> = {},
+  ) {
+    const lecturas: string[] = [];
+    return {
+      lecturas,
+      correr: () => consultarPlanesDelAlumno({
+        planes,
+        leerSuscripciones: async (planId) => {
+          lecturas.push(planId);
+          const r = subs[planId];
+          if (r instanceof Error) throw r;
+          return r ?? [];
+        },
+      }),
+    };
+  }
+
+  it("ninguna cobra: devuelve lo que MP contesto por cada plan, para no volver a preguntar", async () => {
+    const { correr, lecturas } = pasada(
+      [planDeAlumno("a0", 20), sinFecha("a1", 2)],
+      { a0: [pagada(ULTIMO_COBRO)] },
+    );
+
+    const r = await correr();
+
+    expect(r.vivo).toBe(false);
+    if (r.vivo) return;
+    expect([...r.suscripciones.keys()]).toEqual(["a0", "a1"]);
+    expect(r.suscripciones.get("a0")).toHaveLength(1);
+    expect(r.suscripciones.get("a1")).toEqual([]);
+    expect(lecturas).toEqual(["a0", "a1"]);
+  });
+
+  it("corta en la primera viva y dice cual es", async () => {
+    const { correr, lecturas } = pasada(
+      [planDeAlumno("a0", 20), planDeAlumno("a1", 5), planDeAlumno("a2", 1)],
+      { a0: [pagada(ULTIMO_COBRO)], a1: [viva()], a2: [viva()] },
+    );
+
+    expect(await correr()).toEqual({ vivo: true, planId: "a1" });
+    expect(lecturas).toEqual(["a0", "a1"]);
+  });
+
+  it("una `pending` no cuenta como viva, pero un estado raro o pausado SI", async () => {
+    const pend = pasada([planDeAlumno("a0", 5)], { a0: [viva({ status: "pending" })] });
+    expect((await pend.correr()).vivo).toBe(false);
+
+    for (const estado of ["paused", "un-estado-nuevo"]) {
+      const p = pasada([planDeAlumno("a0", 5)], { a0: [viva({ status: estado })] });
+      expect((await p.correr()).vivo).toBe(true);
+    }
+  });
+
+  it("solo mira planes de alumno que pueden cobrar: no el de PF ni el terminal de hecho", async () => {
+    const { correr, lecturas } = pasada([
+      planDeAlumno("de-pf", 5, { producto: "trainer" }),
+      planDeAlumno("sin-producto", 5, { producto: undefined }),
+      planDeAlumno("baja-confirmada", 5, { terminal: true }),
+      planDeAlumno("reemplazado", 5, { terminal: true, terminalReason: MOTIVO_REEMPLAZO }),
+      planDeAlumno("a0", 5),
+    ]);
+
+    await correr();
+
+    expect(lecturas).toEqual(["a0"]);
+  });
+
+  it("un checkout abandonado SE mira, con o sin fecha: el init_point no vence y se puede pagar tarde", async () => {
+    const { correr, lecturas } = pasada([
+      sinFecha("abandonado", 40, { terminal: true, terminalReason: MOTIVO_ABANDONO }),
+    ], { abandonado: [viva()] });
+
+    expect(await correr()).toEqual({ vivo: true, planId: "abandonado" });
+    expect(lecturas).toEqual(["abandonado"]);
+  });
+
+  it("si MP falla en un plan, tira: sin saber si cobra no se puede descartar nada", async () => {
+    const { correr } = pasada(
+      [planDeAlumno("a0", 20), planDeAlumno("a1", 5)],
+      { a1: new Error("429") },
+    );
+
+    await expect(correr()).rejects.toThrow("429");
+  });
+
+  it("sin planes que puedan cobrar no pregunta nada", async () => {
+    const { correr, lecturas } = pasada([]);
+
+    expect(await correr()).toMatchObject({ vivo: false });
+    expect(lecturas).toEqual([]);
+  });
+});
 
 describe("decidirDiferimientoDeAlumno: cuando SI se difiere", () => {
   it("dado de baja con dias por delante y un cobro real en MP", async () => {

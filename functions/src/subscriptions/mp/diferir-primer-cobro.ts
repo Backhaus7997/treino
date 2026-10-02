@@ -825,13 +825,29 @@ export async function decidirDiferimiento(
 //
 // Por eso "esta dado de baja" se le pregunta a MP, plan por plan y en el mismo
 // pedido: se consultan los planes del alumno que todavia pueden cobrar, tengan o no
-// fecha ([planesDelAlumnoARevisar]), y se difiere solo si ninguno tiene una
-// suscripcion viva. Una viva es alguien que ya paga: diferirle un plan nuevo le
-// sumaria un segundo cobro en E. El PF tiene una red para eso, el alumno no: cuando
-// un plan nuevo confirma, `darDeBajaLosReemplazados` da de baja los viejos, pero
-// corre solo en la rama del PF del reconciliador. Por eso aca no hay atajo del doble
-// click (no le preguntaria nada a MP), y por eso la decision tambien levanta la
-// guarda del mismo ciclo en `create-athlete-preapproval.ts`.
+// fecha, y se difiere solo si ninguno tiene una suscripcion viva. Una viva es
+// alguien que ya paga: diferirle un plan nuevo le sumaria un segundo cobro en E. El
+// PF tiene una red para eso, el alumno no: cuando un plan nuevo confirma,
+// `darDeBajaLosReemplazados` da de baja los viejos, pero corre solo en la rama del
+// PF del reconciliador. Por eso aca no hay atajo del doble click (no le preguntaria
+// nada a MP), y por eso la decision tambien levanta la guarda del mismo ciclo en
+// `create-athlete-preapproval.ts`.
+//
+// ── UNA sola pasada por MP, para dos preguntas ──
+//
+// El callable le hace al alumno dos preguntas sobre las mismas suscripciones de MP:
+// «¿alguna sigue cobrando?» (si es asi, NO se abre otro checkout: es la mitad
+// temporal del cobro doble, [consultarPlanesDelAlumno]) y, si ninguna cobra, «¿hay
+// un cobro real que respalde dias pagos?» ([decidirDiferimientoDeAlumno]). Las dos
+// leen el mismo `searchPreapprovalsByPlan` de los mismos planes, en el mismo
+// pedido, asi que se contesta UNA vez por plan: la pasada recorre en serie todos los
+// planes que pueden cobrar, corta en el primero vivo y deja lo que MP contesto en un
+// mapa; la decision del diferimiento lee de ese mapa y no sale a la red.
+//
+// «Viva» no significa lo mismo en las dos, a proposito ([mpSigueCobrando] frente al
+// `!== "cancelled"` de abajo). Para bloquear, una suscripcion `pending` NO cobra
+// todavia y bloquearla le cerraria el reintento del checkout que dejo a medias. Para
+// diferir, se pide mas: ante la duda de si ya paga, se cobra en el acto como antes.
 //
 // El limite que queda: un checkout abandonado (terminal por [MOTIVO_ABANDONO]) sin
 // fecha no se consulta. Cuando el barrido lo cerro no tenia ninguna suscripcion, y
@@ -839,13 +855,16 @@ export async function decidirDiferimiento(
 // el PF.
 
 /**
- * Cuantos planes del ALUMNO se le consultan a MP, como maximo, para saber si alguno
- * sigue vivo. Con mas, no se difiere (se cobra en el acto, como antes) y se avisa.
+ * Cuantos planes del ALUMNO se consideran, como maximo, para decidir el
+ * diferimiento. Con mas, no se difiere (se cobra en el acto, como antes) y se avisa.
  *
  * Mas ancho que [MAX_PLANES_A_REVISAR] porque el alumno no puede filtrar antes por
  * `terminal` como el PF: entran tambien sus checkouts sin pagar de los ultimos 30
- * dias. Cada uno es una llamada en el camino del boton, en serie (en paralelo MP
- * contesta 429), y solo la pagan los alumnos que hoy tienen acceso pago.
+ * dias. Nacio como tope de llamadas en el camino del boton (en serie, porque en
+ * paralelo MP contesta 429). Hoy esas llamadas ya las hizo
+ * [consultarPlanesDelAlumno], que mira todos los planes que pueden cobrar para el
+ * bloqueo, asi que el tope solo acota la decision: con tantos planes, lo seguro es
+ * no sumar una prueba.
  */
 export const MAX_PLANES_DEL_ALUMNO_A_REVISAR = 5;
 
@@ -932,6 +951,88 @@ export function planesDelAlumnoARevisar(
     .map(({ id, finMs, puedeSerEvidencia }) => ({ id, finMs, puedeSerEvidencia }));
 }
 
+/**
+ * Si un estado de MP significa que la suscripcion todavia puede cobrar.
+ *
+ * Solo `cancelled` y `pending` quedan afuera:
+ *
+ *   - `authorized` cobra (incluye el `grace` nuestro: MP lo deja `authorized`
+ *     mientras reintenta un cobro rebotado).
+ *   - `paused` CUENTA, y es la decision menos obvia: la pausa no es una baja, el
+ *     pagador la puede reactivar desde su cuenta de MP y el cobro vuelve solo.
+ *     Dejarlo comprar otro plan ahi es armar el doble cobro con retraso. No lo
+ *     deja encerrado: `cancelMySubscription` da de baja tambien las pausadas, o
+ *     sea que siempre tiene salida.
+ *   - un estado que no conocemos cuenta: entre un bloqueo de mas y un cobro
+ *     doble en silencio, se elige lo primero.
+ *   - `pending` no: todavia no autorizo, no hay cobro. Y bloquearlo le cerraria
+ *     el reintento del checkout que dejo a medias.
+ */
+export function mpSigueCobrando(raw: unknown): boolean {
+  return raw !== "cancelled" && raw !== "pending";
+}
+
+/** Lo que dejo [consultarPlanesDelAlumno]. */
+export type ConsultaDeLosPlanesDelAlumno =
+  | {
+      /** Hay una suscripcion que MP TODAVIA cobra: no se abre otro checkout. */
+      vivo: true;
+      /** El primer plan donde se encontro. */
+      planId: string;
+    }
+  | {
+      /** Ninguna cobra. Lo que MP contesto por cada plan, para no volver a preguntar. */
+      vivo: false;
+      suscripciones: ReadonlyMap<string, MpPreapproval[]>;
+    };
+
+/**
+ * La UNICA pasada por MP del checkout del alumno: le pregunta, plan por plan, por
+ * las suscripciones de los planes que todavia pueden cobrar, y contesta dos cosas a
+ * la vez. Ver "UNA sola pasada por MP" en el encabezado de esta seccion.
+ *
+ * ── Que planes ──
+ *
+ * Los de alumno (`producto === "athlete"`; un plan sin el campo es de PF) que
+ * [puedeSeguirCobrando]. Los terminales de hecho (baja confirmada) se saltean para
+ * no gastar una llamada; el checkout ABANDONADO NO, porque el `init_point` no vence
+ * y se puede pagar tarde. Es un conjunto mas ancho que el de
+ * [planesDelAlumnoARevisar] (que deja afuera al abandonado sin fecha): para BLOQUEAR
+ * importa todo lo que pueda estar cobrando, para diferir solo lo que pueda probar un
+ * pago, y quien decide el diferimiento filtra de lo que esta pasada deja.
+ *
+ * ── Como ──
+ *
+ * SECUENCIAL y cortando en el primero que cobra, a proposito: MP contesta 429 y los
+ * planes abandonados se quedan para siempre, asi que un `Promise.all` creceria con
+ * el uso y un solo 429 trabaria al alumno (mismo criterio que
+ * `cancel-my-subscription.ts`). Con el corte, solo importan los planes que
+ * realmente se consultaron: si uno falla antes de encontrar uno vivo, no se puede
+ * descartar el cobro.
+ *
+ * **Tira** si MP no contesta (o `leerSuscripciones` lo hace con un error): sin saber
+ * si algo cobra no se puede descartar el doble cobro, y abrir el checkout igual
+ * necesita a MP. Quien llama lo traduce a un error reintentable. `leerSuscripciones`
+ * tiene que ser ESTRICTA (`searchPreapprovalsByPlan(id, {estricto: true})`): una
+ * respuesta rota de MP no puede leerse como «no hay nada».
+ */
+export async function consultarPlanesDelAlumno(i: {
+  planes: PlanDeLaCuenta[];
+  leerSuscripciones: (planId: string) => Promise<MpPreapproval[]>;
+}): Promise<ConsultaDeLosPlanesDelAlumno> {
+  const suscripciones = new Map<string, MpPreapproval[]>();
+  for (const { id, data } of i.planes) {
+    if (data.producto !== "athlete" || !puedeSeguirCobrando(data)) continue;
+
+    const subs = await i.leerSuscripciones(id);
+    suscripciones.set(id, subs);
+    if (subs.some((s) => mpSigueCobrando(s.status))) {
+      return { vivo: true, planId: id };
+    }
+  }
+  return { vivo: false, suscripciones };
+}
+
 export interface DecidirDiferimientoDeAlumnoInput {
   uid: string;
   /** `users/{uid}`, tal como salio de Firestore. Se lee `athleteSubscription`. */
@@ -943,7 +1044,12 @@ export interface DecidirDiferimientoDeAlumnoInput {
    * pago hoy.
    */
   leerPlanes: () => Promise<PlanDeLaCuenta[]>;
-  /** Las suscripciones de MP detras de un plan (`searchPreapprovalsByPlan`). */
+  /**
+   * Las suscripciones de MP detras de un plan (`searchPreapprovalsByPlan`). El
+   * callable pasa una lectura de lo que [consultarPlanesDelAlumno] ya contesto en
+   * este pedido, para no preguntarle dos veces a MP lo mismo; quien la llame
+   * suelta, como los tests, hace la consulta de verdad.
+   */
   leerSuscripciones: (planId: string) => Promise<MpPreapproval[]>;
   /** El interruptor [DIFERIR_PRIMER_COBRO_ENABLED]: es el mismo para los dos. */
   habilitado?: boolean;
