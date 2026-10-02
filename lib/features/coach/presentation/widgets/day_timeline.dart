@@ -20,6 +20,13 @@ const double _kHourHeight = 64.0;
 const double _kPxPerMin = _kHourHeight / 60.0;
 const double _kGutter = 52.0;
 const double _kMinBlockH = 30.0;
+const double _kBlockVPad = AppSpacing.hairline;
+
+/// Alto de línea de Barlow y Barlow Condensed en múltiplos del tamaño: 1,2
+/// (ascent 1000 + descent 200 sobre 1000 unidades por em, tabla `hhea` de
+/// `assets/fonts/`). Si la cuenta se queda corta, la hora de inicio va en un
+/// FittedBox y se achica ella: el bloque no desborda.
+const double _kBarlowLineHeight = 1.2;
 const double _kRightPad = 8.0;
 
 // ── Internal data classes ─────────────────────────────────────────────────────
@@ -339,8 +346,22 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
       // Progressive disclosure by block height: the start time always shows,
       // then the name, then the end time last — each only when there's
       // vertical room, which keeps short blocks from overflowing.
-      final fitsName = blockHeight >= 44;
-      final fitsEnd = blockHeight >= 60;
+      //
+      // 44 y 60 eran los únicos umbrales, en píxeles: con la letra al máximo
+      // de accesibilidad (≈3,1×) el bloque de una hora mostraba inicio +
+      // nombre y desbordaba sobre las horas siguientes. Ahora además tiene
+      // que entrar el texto a la escala del usuario. 44 y 60 quedan de piso,
+      // así que a escala 1 se ve igual que antes.
+      //
+      // No alcanzaba con escalar el 44 y el 60: traen holgura, y escalarla
+      // escondía la hora de fin desde 1,08× aunque entrara hasta ~1,3×.
+      final textScaler = MediaQuery.textScalerOf(context);
+      double linea(double fontSize) =>
+          textScaler.scale(fontSize) * _kBarlowLineHeight;
+      final libre = blockHeight - 2 * _kBlockVPad;
+      final conNombre = linea(12) + 2 + linea(11);
+      final fitsName = blockHeight >= 44 && libre >= conNombre;
+      final fitsEnd = blockHeight >= 60 && libre >= conNombre + 1 + linea(11);
 
       return Positioned(
         top: top,
@@ -385,21 +406,31 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
                 // Content
                 Expanded(
                   child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: _kBlockVPad,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          AgendaFormatters.formatTime(appt.startsAt),
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                            color: palette.highlight,
+                        // La hora de inicio nunca se esconde: si no entra en
+                        // el alto del bloque (media hora con la letra grande),
+                        // se achica. Por eso va en un Flexible y no fija.
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              AgendaFormatters.formatTime(appt.startsAt),
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                                color: palette.highlight,
+                              ),
+                              maxLines: 1,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         if (fitsName) ...[
                           const SizedBox(height: 2),

@@ -26,6 +26,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -86,7 +87,14 @@ UserPublicProfile _rankedProfile({
       bestDeadliftKg: bestDeadliftKg,
     );
 
-Widget _buildScreen({required List<Override> overrides}) {
+/// [textScaler] y [barraFlotante] simulan la letra de accesibilidad y el shell:
+/// con `extendBody: true` la barra flotante se dibuja encima del cuerpo y
+/// publica su alto en `MediaQuery.padding.bottom`.
+Widget _buildScreen({
+  required List<Override> overrides,
+  TextScaler textScaler = TextScaler.noScaling,
+  double barraFlotante = 0,
+}) {
   final router = GoRouter(
     initialLocation: '/profile/rankings',
     routes: [
@@ -113,6 +121,16 @@ Widget _buildScreen({required List<Override> overrides}) {
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
       routerConfig: router,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: textScaler,
+            padding: mq.padding.copyWith(bottom: barraFlotante),
+          ),
+          child: child!,
+        );
+      },
     ),
   );
 }
@@ -743,6 +761,103 @@ void main() {
           tester.getSize(find.byType(ElevatedButton)).height,
           greaterThanOrEqualTo(44.0),
         );
+      });
+
+      // ──────────────────────────────────────────────────────────────────
+      // Letra al máximo de accesibilidad (≈3,1× en iOS). La invitación era un
+      // Column centrado sin scroll: el texto pasaba el alto disponible y el
+      // botón quedaba 234 px por debajo del borde — el alumno no podía
+      // sumarse a los rankings (iPhone 17e, 2026-10-02).
+      //
+      // Estructural, no de ancho: `google_fonts` mide con la fuente de
+      // fallback, más ancha, o sea más alta. Si algo, el rojo sale antes.
+      // ──────────────────────────────────────────────────────────────────
+      group('letra al máximo de accesibilidad', () {
+        const barra = 100.0;
+
+        Future<void> pumpInvitacion(WidgetTester tester) async {
+          tester.view.physicalSize = const Size(1170, 2532); // iPhone 17e
+          tester.view.devicePixelRatio = 3;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(_buildScreen(
+            overrides: [
+              ...baseOverrides(rankingOptIn: false),
+              rankingOptInControllerProvider
+                  .overrideWithValue(_FakeRankingOptInController()),
+            ],
+            textScaler: const TextScaler.linear(3.1),
+            barraFlotante: barra,
+          ));
+          await tester.pumpAndSettle();
+        }
+
+        testWidgets(
+            'nada desborda y el botón se alcanza scrolleando, por encima de '
+            'la barra flotante', (tester) async {
+          await pumpInvitacion(tester);
+          expect(tester.takeException(), isNull);
+
+          await tester.drag(
+            find.byKey(const Key('rankings_invitation_state')),
+            const Offset(0, -3000),
+          );
+          await tester.pumpAndSettle();
+
+          final boton = tester.getRect(find.byType(ElevatedButton));
+          expect(boton.bottom, lessThanOrEqualTo(844 - barra));
+        });
+
+        testWidgets(
+            'a escala 1 no scrollea y queda centrada en lo que la barra deja '
+            'ver', (tester) async {
+          tester.view.physicalSize = const Size(1170, 2532);
+          tester.view.devicePixelRatio = 3;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(_buildScreen(
+            overrides: [
+              ...baseOverrides(rankingOptIn: false),
+              rankingOptInControllerProvider
+                  .overrideWithValue(_FakeRankingOptInController()),
+            ],
+            barraFlotante: barra,
+          ));
+          await tester.pumpAndSettle();
+
+          final invitacion = find.byKey(const Key('rankings_invitation_state'));
+          final scroll =
+              find.ancestor(of: invitacion, matching: find.byType(Scrollable));
+          expect(
+            tester
+                .state<ScrollableState>(scroll.first)
+                .position
+                .maxScrollExtent,
+            0,
+            reason: 'a escala 1 no hay nada que scrollear',
+          );
+          final area = tester.getRect(scroll.first);
+          expect(
+            tester.getCenter(invitacion).dy,
+            moreOrLessEquals(area.top + (area.height - barra) / 2,
+                epsilon: 0.5),
+          );
+        });
+
+        testWidgets('el botón crece con el texto en vez de recortarlo',
+            (tester) async {
+          await pumpInvitacion(tester);
+
+          // El alto que el label NECESITA a esa escala, no el que le tocó:
+          // el RenderParagraph se recorta al alto que le da el botón, así que
+          // comparar contra su `size` saldría verde con el botón de 44 fijo.
+          final label = tester.renderObject<RenderParagraph>(
+            find.text('ACTIVAR RANKINGS'),
+          );
+          final necesita = label.getMinIntrinsicHeight(label.size.width);
+          expect(
+            tester.getSize(find.byType(ElevatedButton)).height,
+            greaterThanOrEqualTo(necesita),
+          );
+        });
       });
     });
   });

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -163,15 +165,20 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Row(
             children: [
-              Text(
-                'RANKINGS',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 20,
-                  color: palette.textPrimary,
+              // Expanded y no Text + Spacer: el título rígido desborda la fila
+              // apenas la letra de accesibilidad o la fuente lo hacen más ancho
+              // que la pantalla. Flexible + Spacer tampoco: se reparten el
+              // sobrante y la X de desactivar queda a mitad de la fila.
+              Expanded(
+                child: Text(
+                  'RANKINGS',
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    color: palette.textPrimary,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (rankingOptIn)
                 IconButton(
                   key: const Key('rankings_disable_affordance'),
@@ -264,84 +271,105 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
-    return Center(
-      child: Padding(
-        key: const Key('rankings_invitation_state'),
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(TreinoIcon.ranking, size: 32, color: palette.accent),
-            const SizedBox(height: 14),
-            Text(
-              'SUMATE A LOS RANKINGS',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 20,
-                color: palette.textPrimary,
-              ),
+    // Centrado cuando entra, scrolleable cuando no. Con la letra al máximo de
+    // accesibilidad el texto solo pasa el alto disponible, y en un Column
+    // centrado sin scroll el botón quedaba fuera de la pantalla (234 px en un
+    // iPhone 17e): el alumno no podía sumarse. El alto mínimo descuenta la barra flotante del
+    // shell (extendBody: publica su alto en padding.bottom), y el padding la
+    // despeja al final del scroll — mismo criterio que `_RankingsBody`.
+    final barra = MediaQuery.paddingOf(context).bottom;
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: barra),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: math.max(0, constraints.maxHeight - barra),
+          ),
+          child: Center(child: _invitacion(context, palette)),
+        ),
+      ),
+    );
+  }
+
+  Widget _invitacion(BuildContext context, AppPalette palette) {
+    return Padding(
+      key: const Key('rankings_invitation_state'),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(TreinoIcon.ranking, size: 32, color: palette.accent),
+          const SizedBox(height: 14),
+          Text(
+            'SUMATE A LOS RANKINGS',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 20,
+              color: palette.textPrimary,
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Compará tus rachas, tu volumen y tus levantamientos con la '
-              'gente de tu gym. Activá los rankings para aparecer.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w400,
-                fontSize: 14,
-                color: palette.textMuted,
-              ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Compará tus rachas, tu volumen y tus levantamientos con la '
+            'gente de tu gym. Activá los rankings para aparecer.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 14,
+              color: palette.textMuted,
             ),
-            const SizedBox(height: 20),
-            // Intrinsic width, not `double.infinity`: see the class doc.
-            // 44 is the Apple HIG tap-target floor (the same one
-            // `_kFeedActionTapTarget` pins in feed_screen.dart), which is why
-            // it sits off the 8·12·14·18·20 spacing scale — a11y minimum wins
-            // over the scale, exactly as the 56 it replaces did.
-            SizedBox(
-              height: 44,
-              child: ElevatedButton(
-                onPressed: _enabling ? null : _enable,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  // NOT `palette.bg`. That token inverts between themes, so on
-                  // light it resolves to paper50 over mint accent — 1.57:1,
-                  // failing WCAG AA. `TreinoButtonTokens.foreground` returns
-                  // ink950 invariantly: 12.10:1 in both themes.
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 0.5),
-                  disabledForegroundColor:
-                      TreinoButtonTokens.foreground(context),
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                child: _enabling
-                    ? SizedBox(
-                        key: const Key('rankings_optin_enabling'),
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            TreinoButtonTokens.foreground(context),
-                          ),
-                        ),
-                      )
-                    : Text(
-                        'ACTIVAR RANKINGS',
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          letterSpacing: 1.0,
-                          color: TreinoButtonTokens.foreground(context),
+          ),
+          const SizedBox(height: 20),
+          // Intrinsic width, not `double.infinity`: see the class doc.
+          // 44 is the Apple HIG tap-target floor (the same one
+          // `_kFeedActionTapTarget` pins in feed_screen.dart), which is why
+          // it sits off the 8·12·14·18·20 spacing scale — a11y minimum wins
+          // over the scale, exactly as the 56 it replaces did.
+          //
+          // Es un PISO, no un alto fijo: con `height: 44` el label, que a la
+          // letra de accesibilidad mide bastante más, quedaba recortado
+          // adentro.
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: ElevatedButton(
+              onPressed: _enabling ? null : _enable,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: palette.accent,
+                // NOT `palette.bg`. That token inverts between themes, so on
+                // light it resolves to paper50 over mint accent — 1.57:1,
+                // failing WCAG AA. `TreinoButtonTokens.foreground` returns
+                // ink950 invariantly: 12.10:1 in both themes.
+                foregroundColor: TreinoButtonTokens.foreground(context),
+                disabledBackgroundColor: palette.accent.withValues(alpha: 0.5),
+                disabledForegroundColor: TreinoButtonTokens.foreground(context),
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+              ),
+              child: _enabling
+                  ? SizedBox(
+                      key: const Key('rankings_optin_enabling'),
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          TreinoButtonTokens.foreground(context),
                         ),
                       ),
-              ),
+                    )
+                  : Text(
+                      'ACTIVAR RANKINGS',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        letterSpacing: 1.0,
+                        color: TreinoButtonTokens.foreground(context),
+                      ),
+                    ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
