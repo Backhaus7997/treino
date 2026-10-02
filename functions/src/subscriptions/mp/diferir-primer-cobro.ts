@@ -1405,8 +1405,16 @@ export type MotivoDelCambioBloqueado =
  * el alumno autoriza; si MP contesta 429 o 5xx justo ahi, el siguiente es la
  * reconciliacion de la vuelta del checkout o el barrido de las 03:00, que puede
  * caer casi un dia despues. Con un dia de margen ([MIN_DIFERIMIENTO_MS]) ese
- * reintento podia llegar tarde. Tres dias cubren el barrido de esa noche y el de la
- * siguiente.
+ * reintento podia llegar tarde.
+ *
+ * El margen real es menor que tres dias, y conviene decirlo: MP puede renovar hasta
+ * casi un dia antes de la hora exacta del fin ([ADELANTO_MAXIMO_DEL_COBRO_MS]), y el
+ * alumno puede autorizar hasta un dia despues de abrir el checkout y seguir dentro de
+ * la ventana de la prueba (`VENTANA_AUTORIZACION_MS`). En el peor caso quedan entre
+ * uno y dos dias desde la autorizacion hasta la renovacion: alcanza para al menos un
+ * barrido de las 03:00 despues del webhook fallido, no para dos. Se deja en tres y no
+ * mas porque el costo de subirlo es bloquear el cambio mas dias de cada periodo, y el
+ * caso en que la renovacion igual gana ya no cobra dos veces (ver abajo).
  *
  * Y si igual se renueva antes de que la baja confirme, no se cobra dos veces: el
  * reconciliador ve que el viejo paga mas alla de la prueba del nuevo y da de baja
@@ -1518,11 +1526,13 @@ function finPagoDeLosDadosDeBaja(
  *          son 366 como mucho). Si no entraran, se bloquea en vez de recortar la
  *          prueba: recortarla es cobrar antes de que venza lo pago.
  *   7. **Con menos de eso:**
- *        - `authorized`: se bloquea (`pago-vence-pronto`). El viejo se renueva en
- *          pocos dias, y abrir el nuevo ahi es una carrera entre esa renovacion y la
- *          baja que dispara el nuevo al confirmarse (ver [MIN_PAGO_PARA_CAMBIAR_MS]).
- *          Pasada la renovacion, el fin se corre un periodo y el cambio difiere
- *          normalmente.
+ *        - `authorized`: se bloquea. Si es su proximo cobro el que esta cerca
+ *          (`pago-vence-pronto`), el viejo se renueva en pocos dias, y abrir el nuevo
+ *          ahi es una carrera entre esa renovacion y la baja que dispara el nuevo al
+ *          confirmarse (ver [MIN_PAGO_PARA_CAMBIAR_MS]); pasada la renovacion, el fin
+ *          se corre un periodo y el cambio difiere normalmente. Si el proximo cobro
+ *          esta lejos y lo corto es lo que cubre el ultimo cobro
+ *          (`fuentes-no-coinciden`), esperar no lo arregla.
  *        - `paused`: si NINGUNA de las dos fuentes le da un dia por delante, no le
  *          queda nada pago y el viejo no cobra mientras siga pausado. Se difiere igual
  *          si un plan dado de baja tiene dias; si no, `sin-diferir`. Si las fuentes no
@@ -1643,8 +1653,17 @@ export function decidirCambioDePlanDelAlumno(
     return diferirHasta(hasta);
   }
 
-  // 7. Sin dias por delante.
-  if (!pausada) return bloquear(planViejo, "pago-vence-pronto", contexto);
+  // 7. Sin dias por delante. Un autorizado cuyo PROXIMO COBRO esta cerca se renueva
+  // pronto (`pago-vence-pronto`, se puede volver a intentar despues); si el proximo
+  // cobro esta lejos y lo que se queda corto es lo que cubre el ultimo cobro, las
+  // fuentes no coinciden, y esperar a la renovacion no lo arregla.
+  if (!pausada) {
+    return bloquear(
+      planViejo,
+      proximo - nowMs < minimo ? "pago-vence-pronto" : "fuentes-no-coinciden",
+      contexto,
+    );
+  }
   if (Math.max(proximo, pago.hastaMs) - nowMs >= MIN_DIFERIMIENTO_MS) {
     return bloquear(planViejo, "fuentes-no-coinciden", contexto);
   }

@@ -1395,6 +1395,25 @@ describe("cambiar de plan con el viejo cobrando", () => {
     expect(escrituras).toEqual([]);
   });
 
+  it("si las fuentes no coinciden, el mensaje no promete que esperar lo arregla", async () => {
+    // Proximo cobro dentro de 20 dias, pero el ultimo cobro solo cubre hasta pasado
+    // mañana: no es una renovacion cercana.
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      summarized: { ...(VIVO.summarized as object), last_charged_date: "2026-08-19T12:00:00.000Z" },
+    }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("no pudimos confirmar hasta cuando esta pago");
+    expect(error.message).not.toContain("se renueva");
+    expect(error.message.toLowerCase()).not.toContain("entrenador");
+    expect(error.message.toLowerCase()).not.toContain("ciclo");
+    expect(mp.pedidos).toEqual([]);
+  });
+
   it("con un cobro rebotado (MP reintenta) se bloquea: ese periodo no esta pago", async () => {
     const { app } = fakeApp(MENSUAL_AL_DIA());
     const mp = fakeMp({ subs: { viejo: [{

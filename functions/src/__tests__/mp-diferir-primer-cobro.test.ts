@@ -2617,6 +2617,20 @@ describe("decidirCambioDePlanDelAlumno", () => {
     })).toEqual({ tipo: "diferir", planViejo: "viejo", diferidoHastaMs: justo });
   });
 
+  it("autorizado con el proximo cobro LEJOS pero un ultimo cobro que cubre poco: fuentes-no-coinciden", () => {
+    // No es una renovacion cercana (esperarla no arregla nada): lo que se queda corto
+    // es lo que cubre el ultimo cobro.
+    const r = decidir({ sub: mensualVivo({
+      summarized: {
+        charged_quantity: 3,
+        last_charged_date: "2026-08-08T12:00:00.000Z",
+        pending_charge_quantity: 0,
+      },
+    }) });
+
+    expect(r).toMatchObject({ tipo: "bloquear", motivo: "fuentes-no-coinciden" });
+  });
+
   it("autorizado con menos de un dia: el viejo cobra enseguida y seria una carrera, se bloquea", () => {
     const pronto = AHORA + 6 * 60 * 60 * 1000;
     const r = decidir({

@@ -486,6 +486,17 @@ export async function runCreateAthletePreapproval(
           "despues de esa renovacion, o dalo de baja primero desde la web (Suscripcion > Baja)",
       );
     }
+    // No pudimos establecer hasta cuando esta pago el viejo (lo que dice su ultimo
+    // cobro no coincide con su proximo cobro). Esperar no lo arregla: se lo dice tal
+    // cual y se le ofrece el camino que si funciona.
+    if (cambio.tipo === "bloquear" && cambio.motivo === "fuentes-no-coinciden") {
+      throw new HttpsError(
+        "failed-precondition",
+        "no pudimos confirmar hasta cuando esta pago tu plan actual — para cambiar " +
+          "de plan, dalo de baja primero desde la web (Suscripcion > Baja) y despues " +
+          "contrata el nuevo",
+      );
+    }
     throw new HttpsError(
       "failed-precondition",
       "ya tenes un plan que se sigue cobrando — para cambiar de plan, " +
