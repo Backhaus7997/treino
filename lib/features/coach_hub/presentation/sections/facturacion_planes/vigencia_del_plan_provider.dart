@@ -42,7 +42,8 @@ Duration esperaHasta(DateTime cambio, {required DateTime ahora}) {
 /// [VigenciaDelPlan.de] es una foto. Un widget que la calcula en su build y
 /// sigue montado cuando vence la baja sigue mostrando el plan pago hasta que
 /// algo lo reconstruya. Este provider espera hasta
-/// [VigenciaDelPlan.proximoCambio] y se invalida a sí mismo ahí.
+/// [VigenciaDelPlan.proximoCambio] y se invalida a sí mismo ahí, a lo sumo un
+/// minuto tarde: el timer se re-arma de a [_kTopeDeEspera] (ver arriba).
 ///
 /// `autoDispose` y SIN `keepAlive`, a propósito: el timer se cancela en
 /// `onDispose`. Con `keepAlive`, el provider no se descarta cuando se va el

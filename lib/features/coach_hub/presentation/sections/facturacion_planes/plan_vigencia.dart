@@ -67,7 +67,9 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// al lado) la recalcula ahí. Lo leen el chip del sidebar, que está montado
 /// toda la sesión, y el banner de upsell. La pricing page y Facturación
 /// todavía la calculan en su build: abiertas al cruzar el borde, muestran la
-/// foto vieja hasta el próximo rebuild.
+/// foto vieja hasta el próximo rebuild. No son las únicas que miran el reloj:
+/// otras pantallas comparan `currentPeriodEnd` contra su propio `now` sin
+/// pasar por esta clase.
 final class VigenciaDelPlan {
   const VigenciaDelPlan._({
     required this.tierEfectivo,
