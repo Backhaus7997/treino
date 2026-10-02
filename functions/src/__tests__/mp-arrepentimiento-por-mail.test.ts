@@ -571,6 +571,59 @@ describe("confirmarArrepentimientoPorMail — el acceso termina en el acto", () 
     expect(limiteDe(store, AHORA + 1)).toBe(GRATIS);
   });
 
+  // El PF se arrepiente con un upgrade a medio camino: paga plan1 con A y abrió
+  // un checkout de plan3 (B) cuya suscripción sigue `pending`. La baja cancela
+  // las DOS, pero `cortarElAcceso` sólo reconcilia los planes que tenían contrato
+  // al empezar el trámite, y B no estaba. Si el `cancelled` de B —que nunca
+  // cobró— quedaba como el plan vigente, el corte de A perdía el desempate contra
+  // él y el PF se iba devuelto y con plan3. Lo encontró la revisión adversarial
+  // de la guarda del plan vigente (`puedePisarAlVigente`). Los dos órdenes,
+  // porque Firestore no promete ninguno.
+  for (const bPrimero of [false, true]) {
+    it(`⚠️ con un upgrade a medio camino el corte entra igual (${bPrimero ? "B" : "A"} primero)`, async () => {
+      const pA = {
+        producto: "trainer", uid: UID, tier: "plan1", cycle: "monthly",
+        createdAt: ts(AHORA - 5 * DIA_MS),
+      };
+      const pB = {
+        producto: "trainer", uid: UID, tier: "plan3", cycle: "monthly",
+        createdAt: ts(AHORA - DIA_MS),
+      };
+      const mundo: Store = {
+        users: {
+          [UID]: {
+            role: "trainer",
+            subscription: {
+              tier: "plan1", status: "active", currentPeriodEnd: ts(AHORA + 20 * DIA_MS),
+              prepaidTier: null, prepaidUntil: null, mpPlanId: "pA", mpPlanCobro: true,
+            },
+          },
+        },
+        mp_plans: bPrimero ? { pB, pA } : { pA, pB },
+      };
+      const mp = fakeMp({
+        subs: {
+          pA: [SUB("sa", 5)],
+          pB: [SUB("sb", 0, {
+            status: "pending",
+            next_payment_date: undefined,
+            summarized: { pending_charge_quantity: 0 },
+          })],
+        },
+      });
+      const { app, store } = await conLinkPedido(mundo, mp);
+
+      const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+      expect(r.status).toBe("recibido");
+      expect([...mp.canceladas].sort()).toEqual(["sa", "sb"]);
+      const sub = store.users[UID].subscription as Record<string, unknown>;
+      expect(sub).toMatchObject({ tier: "plan1", status: "cancelled", mpPlanId: "pA" });
+      expect((sub.currentPeriodEnd as { toMillis: () => number }).toMillis()).toBe(AHORA);
+      expect(limiteDe(store, AHORA + 1)).toBe(GRATIS);
+    });
+  }
+
   it("⚠️ el corte lee la suscripción POR ID: una búsqueda desactualizada no lo desarma (alumno)", async () => {
     const mundo: Store = {
       users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },

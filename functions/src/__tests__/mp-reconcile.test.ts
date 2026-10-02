@@ -455,6 +455,11 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
       tier: "plan2",
       status: "active",
       currentPeriodEnd: ts(Date.parse("2026-10-03T12:00:00.000Z")),
+      // Lo escribio p1. Sin la clave, el estado es de antes de que existiera y se
+      // reescribe UNA vez para anotarla: ver "el evento tardio de un plan que ya
+      // no manda". Y `mpPlanCobro`, lo que cobro ese plan: AUTORIZADA no cobro.
+      mpPlanId: "p1",
+      mpPlanCobro: false,
     };
     const { app, escrituras } = fakeApp(mundo);
 
@@ -1079,6 +1084,9 @@ describe("reconcileSubscription — la baja de la suscripcion reemplazada", () =
       tier: "plan3",
       status: "active",
       currentPeriodEnd: ts(Date.parse("2026-10-03T12:00:00.000Z")),
+      // La escribio p2 anoche, sin cobro todavia.
+      mpPlanId: "p2",
+      mpPlanCobro: false,
     };
     const { app, store } = fakeApp(mundo);
     const mp = fakeMpMultiPlan(DOS_VIVAS());
@@ -1164,6 +1172,489 @@ describe("reconcileAllSubscriptions — el cobro doble, en una corrida entera", 
     expect((store.users.t1.subscription as Record<string, unknown>).tier)
       .toBe("plan3");
   });
+});
+
+// ---------------------------------------------------------------------------
+// EL EVENTO TARDIO DE UN PLAN QUE YA NO MANDA.
+//
+// La guarda de reemplazo cubre la baja que decidimos NOSOTROS. La que hace el PF
+// no deja `supersededBy` —`puedeSeguirCobrando` la saltea—, y el webhook TARDIO
+// de ese plan (el dedupe de `mpWebhook` dura 10 minutos) pisaba el plan que el
+// PF contrato despues. Lo encontro la revision del #1290.
+//
+// Los estados se construyen pasando por el reconciliador y no se siembran a mano:
+// la clave que lee la guarda (`mpPlanId`) la tiene que haber escrito el
+// reconciliador, o el test mide la fixture y no el codigo.
+// ---------------------------------------------------------------------------
+
+import {
+  PlanEnDisputa,
+  puedePisarAlVigente,
+} from "../subscriptions/mp/reconcile";
+
+/** Hasta cuando le dura al PF el periodo que pago con A, el plan que dio de baja. */
+const FIN_DE_A = Date.parse("2026-09-20T12:00:00.000Z");
+
+/** El proximo cobro de B, el plan con el que volvio. */
+const PROXIMO_DE_B = "2026-10-07T12:00:00.000Z";
+
+/** El PF que se fue y volvio: pA es de hace dos meses, pB lo abrio ayer. */
+const VOLVIO = (tierDeB: "plan1" | "plan2" | "plan3"): Store => ({
+  users: { t1: { role: "trainer", displayName: "Martin" } },
+  mp_plans: {
+    pA: {
+      uid: "t1", tier: "plan2", cycle: "monthly",
+      createdAt: ts(AHORA - 60 * DIA_MS),
+    },
+    pB: {
+      uid: "t1", tier: tierDeB, cycle: "monthly",
+      createdAt: ts(AHORA - 1 * DIA_MS),
+    },
+  },
+});
+
+/**
+ * La suscripcion de A mientras el PF la pagaba. CON un cobro hecho: la baja de un
+ * plan que se pago y la de un checkout que nunca cobro no pesan lo mismo.
+ */
+const A_VIVA: MpPreapproval = {
+  id: "sub-a",
+  preapproval_plan_id: "pA",
+  status: "authorized",
+  external_reference: "t1",
+  next_payment_date: new Date(FIN_DE_A).toISOString(),
+  auto_recurring: { transaction_amount: 22000 },
+  summarized: { charged_quantity: 1, charged_amount: 22000, pending_charge_quantity: 0 },
+};
+
+/** A despues de la baja del PF. MP omite la fecha de una cancelada que pago. */
+const A_DE_BAJA: MpPreapproval = {
+  ...A_VIVA,
+  status: "cancelled",
+  next_payment_date: undefined,
+};
+
+/** B autorizada: el PF volvio a contratar. */
+const B_VIVA: MpPreapproval = {
+  ...A_VIVA,
+  id: "sub-b",
+  preapproval_plan_id: "pB",
+  next_payment_date: PROXIMO_DE_B,
+};
+
+/** B despues de una baja del PF, ya pagada: sin fecha, igual que A. */
+const B_DE_BAJA: MpPreapproval = {
+  ...B_VIVA,
+  status: "cancelled",
+  next_payment_date: undefined,
+};
+
+/** B con el medio de pago todavia sin autorizar: no cobro nada. */
+const B_PENDIENTE: MpPreapproval = {
+  ...B_VIVA,
+  status: "pending",
+  next_payment_date: undefined,
+  summarized: { pending_charge_quantity: 0 },
+};
+
+/** B cancelada sin haber cobrado nunca: esa SI trae fecha. */
+const B_SIN_PAGAR: MpPreapproval = {
+  ...B_VIVA,
+  status: "cancelled",
+  summarized: { pending_charge_quantity: 0 },
+};
+
+/** El mapa `subscription` tal como quedo, sin interpretar. */
+const suscripcion = (store: Store) =>
+  store.users.t1.subscription as Record<string, unknown>;
+
+/** El limite que el PF tiene con lo que quedo escrito. `null` = sin tope. */
+const limiteDe = (store: Store) =>
+  effectiveWeightLimit(toSubscriptionState(store.users.t1, "t1").state, AHORA);
+
+/**
+ * Los pasos 1 y 2 del agujero, por el reconciliador de verdad: A se paga, el PF
+ * la da de baja —A queda `terminal` y SIN `supersededBy`— y vuelve con B.
+ */
+async function seFueYVolvio(tierDeB: "plan2" | "plan3") {
+  const { app, store, escrituras } = fakeApp(VOLVIO(tierDeB));
+  await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+  await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA));
+  await reconcileSubscription(
+    app, "pB", fakeMpMultiPlan({ pA: A_DE_BAJA, pB: B_VIVA }));
+  return { app, store, escrituras };
+}
+
+describe("reconcileSubscription — el evento tardio de un plan que ya no manda", () => {
+  it("el webhook tardio de A no pisa el `active` de B (decia «Plan dado de baja»)", async () => {
+    const { app, store, escrituras } = await seFueYVolvio("plan2");
+    // Por que la guarda de reemplazo no alcanzaba: la baja fue del PF, asi que A
+    // quedo terminal y SIN `supersededBy`.
+    expect(store.mp_plans.pA.terminal).toBe(true);
+    expect(store.mp_plans.pA.supersededBy).toBeUndefined();
+    const antes = escrituras.length;
+
+    // Con la suscripcion leida por id en la mano, como llega desde `mpWebhook`.
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    // Nada: ni `users` ni `mp_plans`, que A ya era terminal.
+    expect(escrituras.slice(antes)).toEqual([]);
+    const sub = suscripcion(store);
+    expect(sub).toMatchObject({ tier: "plan2", status: "active", mpPlanId: "pB" });
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse(PROXIMO_DE_B));
+  });
+
+  it("con otro tier no le baja el cupo — ahi era el mail de degradacion", async () => {
+    // Volvio con plan3, sin tope. Antes, el evento de A escribia plan2 con la
+    // fecha de B: el limite caia y `syncEntitlementsOnSubscription` mandaba mail.
+    const { app, store } = await seFueYVolvio("plan3");
+    expect(limiteDe(store)).toBeNull();
+
+    await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(suscripcion(store).tier).toBe("plan3");
+    expect(limiteDe(store)).toBeNull();
+  });
+
+  it("si B tambien se dio de baja, A sigue sin pisar: con el mismo estado manda el mas nuevo", async () => {
+    // Los dos `cancelled`, asi que no decide el estado sino `createdAt`. Antes, A
+    // escribia su tier con la fecha que habia dejado B.
+    const { app, store } = await seFueYVolvio("plan3");
+    await reconcileSubscription(app, "pB", fakeMp(B_DE_BAJA));
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan3", status: "cancelled", mpPlanId: "pB",
+    });
+  });
+
+  // ── El vigente guarda si cobro: sin ese dato la guarda lo daba por pago. ──
+
+  /**
+   * Dos checkouts del mismo PF. B, el mas nuevo, nunca cobro y se cayo; A, el mas
+   * viejo, SI cobro y se cancelo antes de que nadie lo reconciliara. A trae su
+   * propio fin de periodo, el que el PF pago.
+   */
+  const A_PAGO_Y_CANCELADO: MpPreapproval = {
+    ...A_DE_BAJA,
+    next_payment_date: new Date(FIN_DE_A).toISOString(),
+  };
+
+  it("el `cancelled` de un checkout que nunca cobro no se come el periodo pago de un plan viejo", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    // B nunca cobro y queda como vigente con su baja.
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR)).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      mpPlanId: "pB", status: "cancelled", mpPlanCobro: false,
+    });
+
+    // Llega A, que SI cobro. Antes empataba contra un B supuesto «pago», perdia
+    // por fecha y quedaba terminal: ni el tier ni el periodo se acreditaban nunca.
+    // Aca A trae su fecha (`A_PAGO_Y_CANCELADO`); con la forma real de MP, que la
+    // omite, ver el test que sigue.
+    const r = await reconcileSubscription(
+      app, "pA", fakeMp(A_PAGO_Y_CANCELADO), A_PAGO_Y_CANCELADO);
+
+    expect(r.outcome).not.toBe("skipped-plan-no-vigente");
+    expect(r.outcome).toBe("written");
+    const sub = suscripcion(store);
+    expect(sub).toMatchObject({
+      tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis()).toBe(FIN_DE_A);
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("con la forma real de MP (baja sin fecha) se acredita el tier; el fin es el de la cascada", async () => {
+    // `A_DE_BAJA` es lo que MP contesta de verdad: omite `next_payment_date` en un
+    // plan cancelado que cobro. Sin fecha propia, `resolverFinDePeriodo` cae en la
+    // guardada, que es la de B (un checkout que nunca cobro). Lo que este arreglo
+    // garantiza es que A deje de rechazarse y se le acredite el TIER; el fin de
+    // periodo exacto que A pago NO sale de MP en este camino.
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR);
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(r.outcome).toBe("written");
+    const sub = suscripcion(store);
+    expect(sub).toMatchObject({
+      tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+    // La fecha heredada de B, no la de A: es lo que hoy rinde la cascada.
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse(PROXIMO_DE_B));
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("`mpPlanCobro` no se desanota: el mismo plan con `summarized` atrasado en cero sigue en `true`", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan2"));
+    await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+    expect(suscripcion(store)).toMatchObject({ mpPlanId: "pA", mpPlanCobro: true });
+
+    // El indice de busqueda de MP todavia no ve el cobro, y llega la baja.
+    const ATRASADA: MpPreapproval = {
+      ...A_DE_BAJA, summarized: { pending_charge_quantity: 0 },
+    };
+    const r = await reconcileSubscription(app, "pA", fakeMp(ATRASADA), ATRASADA);
+
+    expect(r.outcome).toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+  });
+
+  it("control: si el vigente SI cobro, el `cancelled` de un plan mas viejo sigue perdiendo por fecha", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    // Mismo cuadro, pero B cobro: su baja es la de un plan que se pago.
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_DE_BAJA), B_DE_BAJA)).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ mpPlanId: "pB", mpPlanCobro: true });
+
+    const r = await reconcileSubscription(
+      app, "pA", fakeMp(A_PAGO_Y_CANCELADO), A_PAGO_Y_CANCELADO);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan3", status: "cancelled", mpPlanId: "pB", mpPlanCobro: true,
+    });
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("anota si cobro en cada escritura, y el primer cobro sin cambio de estado tambien se escribe", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan2"));
+    const A_SIN_COBRAR: MpPreapproval = {
+      ...A_VIVA, summarized: { pending_charge_quantity: 0 },
+    };
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_SIN_COBRAR))).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ status: "active", mpPlanCobro: false });
+
+    // Cae el primer cobro: el estado y la fecha son los mismos, el dato no.
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_VIVA))).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({ status: "active", mpPlanCobro: true });
+
+    expect((await reconcileSubscription(app, "pA", fakeMp(A_VIVA))).outcome)
+      .toBe("unchanged");
+  });
+
+  // ── Lo que la guarda NO frena. Cada uno es un pago o una baja de verdad que, si
+  // la guarda se pasara de rosca, no llegaria nunca a `users/{uid}`. ──
+
+  it("el plan anotado escribe siempre: la baja de B se escribe y lo marca terminal", async () => {
+    const { app, store } = await seFueYVolvio("plan3");
+
+    const r = await reconcileSubscription(app, "pB", fakeMp(B_DE_BAJA), B_DE_BAJA);
+
+    expect(r.outcome).toBe("written");
+    expect(suscripcion(store)).toMatchObject({ status: "cancelled", mpPlanId: "pB" });
+    expect(store.mp_plans.pB.terminal).toBe(true);
+  });
+
+  it("un plan MAS NUEVO pisa al anotado: el cambio de plan de siempre", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+    const mp = fakeMpMultiPlan({ pA: A_VIVA, pB: B_VIVA });
+
+    const r = await reconcileSubscription(app, "pB", mp);
+
+    expect(r.outcome).toBe("written");
+    expect(suscripcion(store)).toMatchObject({ tier: "plan3", mpPlanId: "pB" });
+    expect(mp.bajas).toEqual(["sub-a"]);
+
+    // Y la guarda de reemplazo sigue yendo primero: el `cancelled` que acabamos
+    // de provocar en A sale como reemplazo, sin salir a la red.
+    const tardio = await reconcileSubscription(
+      app, "pA", fakeMp(new MpApiError("no deberia preguntarse", 500)));
+    expect(tardio.outcome).toBe("skipped-reemplazado");
+  });
+
+  it("la pestaña vieja: un plan MAS VIEJO que cobra pisa a uno mas nuevo que no se pago", async () => {
+    // El caso por el que la regla no puede ser solo `createdAt`. El PF abre A,
+    // despues B —que llega a escribir `pending`— y al final paga la pestaña vieja
+    // de A. Ordenando solo por fecha, A no podia escribir NUNCA: pagaba y no se le
+    // acreditaba.
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE))).outcome)
+      .toBe("written");
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_VIVA), A_VIVA);
+
+    expect(r.outcome).toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan2", status: "active", mpPlanId: "pA",
+    });
+
+    // Y cuando el checkout de B se cae, su `cancelled` ya no pisa el plan que cobra.
+    const caida = await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR);
+    expect(caida.outcome).toBe("skipped-plan-no-vigente");
+    expect(suscripcion(store)).toMatchObject({ tier: "plan2", status: "active" });
+  });
+
+  it("el upgrade que no se paga: su `cancelled` no pisa el plan que cobra, y queda terminal", async () => {
+    // La regla es simetrica. El PF con A activo intenta pasar a B y el pago no se
+    // autoriza. El `pending` ya lo frenaba la guarda de siempre; el `cancelled`
+    // que viene despues no, y escribia {plan3, cancelled, fecha de B} encima de un
+    // plan que sigue cobrando.
+    const { app, store, escrituras } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+
+    // La guarda de `pending` sigue explicando su caso: va antes que esta.
+    expect((await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE))).outcome)
+      .toBe("skipped-pending-no-pisa");
+
+    const antes = escrituras.length;
+    const mp = fakeMpMultiPlan({ pA: A_VIVA, pB: B_SIN_PAGAR });
+    const r = await reconcileSubscription(app, "pB", mp, B_SIN_PAGAR);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan2", status: "active", mpPlanId: "pA",
+    });
+    // La baja de B es un hecho de MP aunque no mande: se marca, y es lo UNICO que
+    // se escribe. A no se toca.
+    expect(escrituras.slice(antes)).toEqual([
+      { col: "mp_plans", id: "pB", data: { terminal: true }, merge: true },
+    ]);
+    expect(mp.bajas).toEqual([]);
+  });
+
+  it("un estado de antes de la guarda (sin `mpPlanId`) se reescribe UNA vez para anotarlo", async () => {
+    // Sin la clave no hay contra que comparar, y se escribe como siempre. La
+    // escritura de mas es una sola: despues, sin cambios.
+    const mundo = MUNDO();
+    mundo.users.t1.subscription = {
+      tier: "plan2",
+      status: "active",
+      currentPeriodEnd: ts(Date.parse("2026-10-03T12:00:00.000Z")),
+    };
+    const { app, store, escrituras } = fakeApp(mundo);
+
+    expect((await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA))).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan2", status: "active", mpPlanId: "p1",
+    });
+
+    expect((await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA))).outcome)
+      .toBe("unchanged");
+    expect(escrituras).toHaveLength(1);
+  });
+
+  for (const orden of [["pA", "pB"], ["pB", "pA"]] as const) {
+    it(`la baja con un upgrade a medio camino conserva lo pagado (${orden[0]} primero)`, async () => {
+      // El PF paga plan2 con A y abrio un checkout de plan1 con B, que quedo
+      // `pending`. El boton de baja cancela las DOS y las reconcilia en el orden
+      // que devuelva Firestore. La baja de B nunca cobro: no puede pisar la de A,
+      // que tiene dias pagos. Antes, con A primero, el PF quedaba en plan1 en el
+      // acto. Lo encontro la revision adversarial de esta guarda.
+      const { app, store } = fakeApp(VOLVIO("plan1"));
+      await reconcileSubscription(app, "pA", fakeMp(A_VIVA));
+      expect((await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE))).outcome)
+        .toBe("skipped-pending-no-pisa");
+
+      const mp = fakeMpMultiPlan({ pA: A_DE_BAJA, pB: B_SIN_PAGAR });
+      for (const planId of orden) await reconcileSubscription(app, planId, mp);
+
+      const sub = suscripcion(store);
+      expect(sub).toMatchObject({ tier: "plan2", status: "cancelled", mpPlanId: "pA" });
+      expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis()).toBe(FIN_DE_A);
+      expect(limiteDe(store))
+        .toBe(effectiveWeightLimit({ tier: "plan2", status: "active" }, AHORA));
+      // La baja de B igual queda registrada: MP la confirmo.
+      expect(store.mp_plans.pB.terminal).toBe(true);
+    });
+  }
+
+  for (const orden of [["pA", "pB"], ["pB", "pA"]] as const) {
+    it(`el arrepentimiento sigue cortando en el acto (${orden[0]} primero)`, async () => {
+      // `cortarElAcceso` marca y reconcilia —en el orden que devuelva Firestore—
+      // los planes que tenian contrato al empezar el tramite: aca, A y B. El corte
+      // entra por el plan vigente; A, que no manda, no le cambia el tier. (El caso
+      // en que el plan vigente NO esta entre esos lo cubre
+      // `mp-arrepentimiento-por-mail.test.ts`, con un upgrade a medio camino.)
+      const { app, store } = await seFueYVolvio("plan3");
+      const ARREPENTIDO = AHORA - 60_000;
+      store.mp_plans.pA.arrepentidoAtMs = ARREPENTIDO;
+      store.mp_plans.pB.arrepentidoAtMs = ARREPENTIDO;
+      const mp = fakeMpMultiPlan({ pA: A_DE_BAJA, pB: B_DE_BAJA });
+
+      const r: Record<string, { outcome: string; accesoHastaMs?: number }> = {};
+      for (const planId of orden) {
+        r[planId] = await reconcileSubscription(app, planId, mp);
+      }
+
+      expect(r.pA.outcome).toBe("skipped-plan-no-vigente");
+      expect(r.pB.accesoHastaMs).toBe(ARREPENTIDO);
+      const sub = suscripcion(store);
+      expect(sub).toMatchObject({ tier: "plan3", status: "cancelled", mpPlanId: "pB" });
+      expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+        .toBe(ARREPENTIDO);
+      expect(limiteDe(store)).toBe(effectiveWeightLimit(null, AHORA));
+    });
+  }
+});
+
+describe("puedePisarAlVigente", () => {
+  const VIEJO = { planId: "pA", altaMs: AHORA - 60 * DIA_MS, cobro: true };
+  const NUEVO = { planId: "pB", altaMs: AHORA - DIA_MS, cobro: true };
+
+  it("el plan anotado se pisa a si mismo siempre, aunque traiga algo peor", () => {
+    // Su baja, su pausa, su cobro rebotado: si no, nadie perderia nunca el plan.
+    expect(puedePisarAlVigente(
+      { ...VIEJO, status: "cancelled" }, { ...VIEJO, status: "active" },
+    )).toBe(true);
+  });
+
+  const casos: [string, PlanEnDisputa, PlanEnDisputa, boolean][] = [
+    ["lo que cobra le gana a lo que termino, aunque sea mas viejo",
+      { ...VIEJO, status: "active" }, { ...NUEVO, status: "cancelled" }, true],
+    ["lo que termino no pisa lo que cobra, aunque sea mas nuevo",
+      { ...NUEVO, status: "cancelled" }, { ...VIEJO, status: "active" }, false],
+    ["lo que cobra le gana a lo que nace",
+      { ...VIEJO, status: "active" }, { ...NUEVO, status: "pending" }, true],
+    ["lo que nace no pisa lo que cobra",
+      { ...NUEVO, status: "pending" }, { ...VIEJO, status: "active" }, false],
+    ["lo que nace le gana a lo que termino",
+      { ...VIEJO, status: "pending" }, { ...NUEVO, status: "cancelled" }, true],
+    ["`grace` vale lo mismo que `active`: decide la fecha",
+      { ...VIEJO, status: "grace" }, { ...NUEVO, status: "active" }, false],
+    // La fila de arriba no distingue un `grace` rankeado como `pending`; esta si.
+    ["un `grace` mas nuevo pisa a un `active` mas viejo",
+      { ...NUEVO, status: "grace" }, { ...VIEJO, status: "active" }, true],
+    ["la baja de un checkout que nunca cobro no pisa la de un plan pago, aunque sea mas nueva",
+      { ...NUEVO, status: "cancelled", cobro: false }, { ...VIEJO, status: "cancelled" }, false],
+    ["ni su pausa",
+      { ...NUEVO, status: "paused", cobro: false }, { ...VIEJO, status: "cancelled" }, false],
+    ["la baja de un plan pago SI pisa la de un checkout que nunca cobro, aunque sea mas vieja",
+      { ...VIEJO, status: "cancelled" }, { ...NUEVO, status: "cancelled", cobro: false }, true],
+    ["un `active` que todavia no cobro (una prueba) vale lo mismo que uno que si",
+      { ...NUEVO, status: "active", cobro: false }, { ...VIEJO, status: "active" }, true],
+    ["`paused` vale lo mismo que `cancelled`: decide la fecha",
+      { ...VIEJO, status: "paused" }, { ...NUEVO, status: "cancelled" }, false],
+    ["un estado guardado que no entendemos no protege: lo pisa lo que cobra",
+      { ...VIEJO, status: "active" }, { ...NUEVO, status: "loquesea" }, true],
+    ["con el mismo estado, el mas nuevo pisa",
+      { ...NUEVO, status: "cancelled" }, { ...VIEJO, status: "cancelled" }, true],
+    ["con el mismo estado, el mas viejo no",
+      { ...VIEJO, status: "cancelled" }, { ...NUEVO, status: "cancelled" }, false],
+    ["sin la fecha del entrante no hay orden: se escribe como antes de la guarda",
+      { ...VIEJO, altaMs: null, status: "cancelled" }, { ...NUEVO, status: "cancelled" }, true],
+    ["sin la fecha del vigente, tampoco",
+      { ...VIEJO, status: "cancelled" }, { ...NUEVO, altaMs: null, status: "cancelled" }, true],
+    ["con la misma fecha, tampoco",
+      { ...VIEJO, status: "cancelled" },
+      { ...NUEVO, altaMs: VIEJO.altaMs, status: "cancelled" }, true],
+  ];
+  for (const [caso, entrante, vigente, esperado] of casos) {
+    it(caso, () => expect(puedePisarAlVigente(entrante, vigente)).toBe(esperado));
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -2734,6 +3225,9 @@ describe("reconcile + diferimiento: la baja del PF deja el plan listo para conta
           currentPeriodEnd: ts(FIN_X),
           prepaidTier: null,
           prepaidUntil: null,
+          // Lo escribio p0, y el reconciliador lo anota (junto con lo que cobro).
+          mpPlanId: "p0",
+          mpPlanCobro: true,
         },
       },
     },
