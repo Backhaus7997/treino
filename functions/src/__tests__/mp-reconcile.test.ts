@@ -2427,23 +2427,6 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
       expect(store.mp_plans.a1.terminal).toBe(true);
     });
 
-    it("un plan sin estado guardado no cuenta como que otorga", async () => {
-      // Es el plan reconciliado antes de que existiera el campo: no hay evidencia
-      // de que otorgue, y la guarda solo frena un corte con evidencia. Contarlo
-      // como que otorga podia dejar acceso PARA SIEMPRE: el mensual queda
-      // `terminal`, y si el anual en realidad no otorgaba, nadie mas lo cortaba.
-      const mundo = MUNDO_DOS_PLANES(["a1", "a2"]);
-      mundo.users.u1.athleteSubscription = { status: "active" };
-      mundo.mp_plans.a1.currentPeriodEnd = ts(VENCE_EL_MENSUAL);
-      mundo.mp_plans.a2.currentPeriodEnd = ts(AHORA + 355 * DIA_MS);
-      const { app, store } = fakeApp(mundo);
-
-      const r = await reconcileSubscription(app, "a1", fakeMp(MENSUAL_DADO_DE_BAJA));
-
-      expect(r.outcome).toBe("written");
-      expect(derechoDe(store)).toBe("expired");
-    });
-
     it("cuando despues deja de otorgar el anual, el acceso SI se apaga", async () => {
       // El mensual quedo `terminal` y no escribe nunca mas, asi que el corte lo
       // tiene que poder hacer el anual solo, sin que el mensual lo frene.
@@ -2490,6 +2473,326 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
         expect(derechoDe(store)).toBe("expired");
       });
     }
+  });
+
+  describe("el despliegue: hermanos sin estado guardado (ningun plan tiene `ultimoStatus`)", () => {
+    // El primer barrido despues del deploy. Ni la ausencia vale «no otorga» (le
+    // corta el acceso a quien paga: el `active` que el hermano restaura llega
+    // tarde, y los dos triggers de `users/{uid}` no tienen orden) ni vale «otorga»
+    // (acceso para siempre al checkout abandonado). Se le pregunta a MP.
+
+    /** Anota cada busqueda por plan y con que opciones salio. */
+    function conRegistro(deps: ReturnType<typeof fakeMpMultiPlan>) {
+      const llamadas: { planId: string; estricto?: boolean }[] = [];
+      const original = deps.mpClient.searchPreapprovalsByPlan;
+      deps.mpClient.searchPreapprovalsByPlan = async (planId, opciones) => {
+        llamadas.push({ planId, estricto: opciones?.estricto });
+        return original(planId, opciones);
+      };
+      return { deps, llamadas };
+    }
+
+    /**
+     * Lo que dejaba el codigo anterior al deploy: el alumno con acceso, el mensual
+     * con su fecha vencida, y NINGUN plan con `ultimoStatus`.
+     */
+    const mundoPreDeploy = (): Store => {
+      const mundo = MUNDO_DOS_PLANES(["a1", "a2"]);
+      mundo.users.u1.athleteSubscription = { status: "active" };
+      mundo.mp_plans.a1.currentPeriodEnd = ts(VENCE_EL_MENSUAL);
+      return mundo;
+    };
+
+    const sinEscrituraEnUsers = (
+      escrituras: { col: string }[],
+      antes: number,
+    ) => escrituras.slice(antes).filter((e) => e.col === "users");
+
+    it("el hermano autorizado SI otorga: el vencimiento no corta y el estado queda guardado", async () => {
+      const { app, store, escrituras } = fakeApp(mundoPreDeploy());
+      const { deps, llamadas } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: ANUAL_AUTORIZADO,
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+      expect(sinEscrituraEnUsers(escrituras, 0)).toEqual([]);
+      // Se pregunto por el hermano, y en modo estricto: una lista vacia de una
+      // respuesta rota no puede afirmar que no hay nada cobrando.
+      expect(llamadas.filter((l) => l.planId === "a2")).toEqual([
+        { planId: "a2", estricto: true },
+      ]);
+      // Y lo aprendido queda en SU plan, con la fecha que le corresponde.
+      expect(store.mp_plans.a2.ultimoStatus).toBe("active");
+      expect((store.mp_plans.a2.currentPeriodEnd as { toMillis(): number }).toMillis())
+        .toBe(AHORA + 355 * DIA_MS);
+      // El mensual SI termino.
+      expect(store.mp_plans.a1.terminal).toBe(true);
+    });
+
+    it("se paga UNA vez por plan: lo que aprendio lo lee la proxima vez", async () => {
+      const { app } = fakeApp(mundoPreDeploy());
+      const { deps, llamadas } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: ANUAL_AUTORIZADO,
+      }));
+
+      await reconcileSubscription(app, "a1", deps);
+      await reconcileSubscription(app, "a1", deps);
+
+      expect(llamadas.filter((l) => l.planId === "a2")).toHaveLength(1);
+    });
+
+    it("sin ese hermano en MP (checkout abandonado: lista vacia), el vencimiento SI corta", async () => {
+      // Tratar la ausencia como «otorga» dejaba acceso para siempre.
+      const { app, store } = fakeApp(mundoPreDeploy());
+      const { deps } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: null,
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("written");
+      expect(derechoDe(store)).toBe("expired");
+      expect(store.mp_plans.a1.terminal).toBe(true);
+      // No hay estado de MP que guardar.
+      expect(store.mp_plans.a2.ultimoStatus).toBeUndefined();
+    });
+
+    it("un hermano `pending` no otorga, y su estado tambien se guarda", async () => {
+      const { app, store } = fakeApp(mundoPreDeploy());
+      const { deps } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: { ...ANUAL_AUTORIZADO, status: "pending" },
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("written");
+      expect(derechoDe(store)).toBe("expired");
+      expect(store.mp_plans.a2.ultimoStatus).toBe("pending");
+    });
+
+    describe("un hermano dado de baja, consultado en vivo", () => {
+      // MP omite `next_payment_date` en una baja que cobro (ver MENSUAL_DADO_DE_BAJA):
+      // el fin del acceso sale de la misma cascada que usa el escritor.
+      const ANUAL_DADO_DE_BAJA: MpPreapproval = {
+        id: "s2",
+        status: "cancelled",
+        external_reference: "u1",
+        auto_recurring: { transaction_amount: 35000 },
+        summarized: { pending_charge_quantity: 0 },
+      };
+
+      it("con la fecha que dejo guardada en su plan: otorga", async () => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.currentPeriodEnd = ts(AHORA + 200 * DIA_MS);
+        const { app, store } = fakeApp(mundo);
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: ANUAL_DADO_DE_BAJA,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("skipped-otro-plan-otorga");
+        expect(derechoDe(store)).toBe("active");
+        expect(store.mp_plans.a2.ultimoStatus).toBe("cancelled");
+      });
+
+      it("sin fecha guardada, con la que sale de `start_date` + periodo: otorga", async () => {
+        const { app, store } = fakeApp(mundoPreDeploy());
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: {
+            ...ANUAL_DADO_DE_BAJA,
+            auto_recurring: {
+              transaction_amount: 35000,
+              start_date: new Date(AHORA - 30 * DIA_MS).toISOString(),
+              frequency: 12,
+              frequency_type: "months",
+            },
+          },
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("skipped-otro-plan-otorga");
+        expect(derechoDe(store)).toBe("active");
+        // La fecha derivada queda guardada, como la dejaria el escritor.
+        expect(store.mp_plans.a2.currentPeriodEnd).toBeDefined();
+      });
+
+      it("si no se puede establecer NINGUNA fecha, no otorga: se corta", async () => {
+        // Falla hacia cortar, igual que `athleteStatusDesde` con `periodEndMs` nulo.
+        const { app, store } = fakeApp(mundoPreDeploy());
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: ANUAL_DADO_DE_BAJA,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+      });
+
+      it("con el periodo ya vencido, no otorga", async () => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.currentPeriodEnd = ts(AHORA - 2 * DIA_MS);
+        const { app, store } = fakeApp(mundo);
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: ANUAL_DADO_DE_BAJA,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+      });
+    });
+
+    it("si MP no contesta, no se escribe NADA: ni el corte ni `terminal`, y el reintento resuelve", async () => {
+      const { app, store, escrituras } = fakeApp(mundoPreDeploy());
+      const caido = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: new MpApiError("MP caido", 503),
+      }));
+
+      const r = await reconcileSubscription(app, "a1", caido.deps);
+
+      expect(r.outcome).toBe("error-mp");
+      expect(r.athleteStatus).toBeUndefined();
+      expect(derechoDe(store)).toBe("active");
+      expect(sinEscrituraEnUsers(escrituras, 0)).toEqual([]);
+      // `terminal` sacaria al mensual del barrido que lo tiene que reintentar.
+      expect(store.mp_plans.a1.terminal).toBeUndefined();
+      // Y no se anoto nada del hermano que no se pudo leer.
+      expect(store.mp_plans.a2.ultimoStatus).toBeUndefined();
+
+      // El barrido de la noche siguiente, con MP de vuelta.
+      const vuelta = fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: ANUAL_AUTORIZADO,
+      });
+      const r2 = await reconcileSubscription(app, "a1", vuelta);
+      expect(r2.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+      expect(store.mp_plans.a1.terminal).toBe(true);
+    });
+
+    it("el barrido cuenta el error y sigue con los demas planes", async () => {
+      const { app, store } = fakeApp(mundoPreDeploy());
+      const { deps } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: new MpApiError("MP caido", 503),
+      }));
+
+      const r = await reconcileAllSubscriptions(app, deps);
+
+      expect(r.errors).toBeGreaterThanOrEqual(1);
+      expect(derechoDe(store)).toBe("active");
+      expect(store.mp_plans.a1.terminal).toBeUndefined();
+    });
+
+    it("una respuesta rota de MP (sin `results` como array) es un error, no una lista vacia", async () => {
+      // El cliente real, en modo `estricto`, tira ante una respuesta asi; sin el
+      // modo la devuelve como `[]`, y eso cortaria el acceso de quien paga.
+      const { app, store, escrituras } = fakeApp(mundoPreDeploy());
+      const base = fakeMpMultiPlan({ a1: MENSUAL_DADO_DE_BAJA, a2: null });
+      const llamadas: (boolean | undefined)[] = [];
+      base.mpClient.searchPreapprovalsByPlan = async (planId, opciones) => {
+        if (planId === "a1") return [MENSUAL_DADO_DE_BAJA];
+        llamadas.push(opciones?.estricto);
+        if (opciones?.estricto) {
+          throw new MpApiError("sin `results` como array", 0);
+        }
+        return [];
+      };
+
+      const r = await reconcileSubscription(app, "a1", base);
+
+      expect(llamadas).toEqual([true]);
+      expect(r.outcome).toBe("error-mp");
+      expect(derechoDe(store)).toBe("active");
+      expect(sinEscrituraEnUsers(escrituras, 0)).toEqual([]);
+      expect(store.mp_plans.a1.terminal).toBeUndefined();
+    });
+
+    it("un estado de MP ininteligible en el hermano tambien es un error", async () => {
+      // Cortar por algo que no entendimos es lo que `subscription-state.ts` prohibe.
+      const { app, store, escrituras } = fakeApp(mundoPreDeploy());
+      const { deps } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a2: { ...ANUAL_AUTORIZADO, status: "algo-nuevo-de-mp" },
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("error-mp");
+      expect(derechoDe(store)).toBe("active");
+      expect(sinEscrituraEnUsers(escrituras, 0)).toEqual([]);
+      expect(store.mp_plans.a1.terminal).toBeUndefined();
+    });
+
+    it("con el estado del hermano ya guardado NO se le pregunta a MP", async () => {
+      const mundo = mundoPreDeploy();
+      mundo.mp_plans.a2.ultimoStatus = "active";
+      mundo.mp_plans.a2.currentPeriodEnd = ts(AHORA + 355 * DIA_MS);
+      const { app, store } = fakeApp(mundo);
+      const { deps, llamadas } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        // Si saliera a la red, daria error: el test lo notaria.
+        a2: new MpApiError("no deberia preguntarse", 500),
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(derechoDe(store)).toBe("active");
+      expect(llamadas.map((l) => l.planId)).toEqual(["a1"]);
+    });
+
+    it("un hermano con estado guardado que otorga corta la busqueda antes de preguntar por otro", async () => {
+      // Tres planes: a3 sin estado (primero en la consulta) y a2 con estado.
+      const mundo = mundoPreDeploy();
+      const { a1, a2 } = mundo.mp_plans;
+      a2.ultimoStatus = "active";
+      a2.currentPeriodEnd = ts(AHORA + 355 * DIA_MS);
+      mundo.mp_plans = {
+        a1,
+        a3: { producto: "athlete", uid: "u1", cycle: "annual", createdAt: ts(AHORA - 12 * DIA_MS) },
+        a2,
+      };
+      const { app } = fakeApp(mundo);
+      const { deps, llamadas } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_DADO_DE_BAJA,
+        a3: new MpApiError("no deberia preguntarse", 500),
+      }));
+
+      const r = await reconcileSubscription(app, "a1", deps);
+
+      expect(r.outcome).toBe("skipped-otro-plan-otorga");
+      expect(llamadas.map((l) => l.planId)).toEqual(["a1"]);
+    });
+
+    it("solo se pregunta cuando el plan que se reconcilia iba a CORTAR", async () => {
+      // Un plan que otorga escribe como siempre: no hay cruce ni consulta.
+      const { app } = fakeApp(mundoPreDeploy());
+      const { deps, llamadas } = conRegistro(fakeMpMultiPlan({
+        a1: MENSUAL_AUTORIZADO,
+        a2: ANUAL_AUTORIZADO,
+      }));
+
+      await reconcileSubscription(app, "a1", deps);
+
+      expect(llamadas.map((l) => l.planId)).toEqual(["a1"]);
+    });
   });
 
   describe("que hermano cuenta como que otorga", () => {
