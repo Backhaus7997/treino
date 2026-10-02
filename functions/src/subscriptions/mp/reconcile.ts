@@ -271,8 +271,39 @@
  * reglas, los supuestos y el por que de cada una estan en ese archivo.
  *
  * Valen igual para el alumno: su checkout tambien difiere el primer cobro cuando
- * vuelve con dias pagos, y su escritor pasa por la misma lectura
- * (`leerPruebaDiferida`) con su propia guarda de `pending`.
+ * vuelve con dias pagos o cuando cambia de plan con el viejo cobrando, y su
+ * escritor pasa por la misma lectura (`leerPruebaDiferida`) con su propia guarda de
+ * `pending`.
+ *
+ * ── EL CAMBIO DE PLAN DEL ALUMNO ──
+ *
+ * El alumno tambien da de baja el plan viejo cuando el nuevo se confirma
+ * (`darDeBajaLosReemplazadosDelAlumno`). CUALES, con el mismo criterio que el PF: lo
+ * estrictamente mas viejo por `createdAt`. CUANDO, con una diferencia: el PF da de
+ * baja cuando el estado del nuevo, YA AJUSTADO por la prueba diferida, es `active` o
+ * `grace`; el alumno, cuando MP dice `authorized`, aunque la prueba lo lea `pending`
+ * (autorizada fuera de ventana). Ver por que en el llamador. Hasta que existio, la
+ * rama del alumno retornaba antes de llegar a la baja del PF y las dos suscripciones
+ * quedaban cobrando (la mitigacion del #1305 bloqueaba el checkout para que no
+ * pasara).
+ *
+ * Lo que NO copia, a proposito: `supersededBy` y el `terminal` por reemplazo. El
+ * plan viejo del alumno queda como si el alumno se hubiera dado de baja, otorgando
+ * hasta el fin de lo que cobro y cortando despues, y lo que evita que ese corte pise
+ * al plan nuevo es la guarda de los dos planes. Ver `darDeBajaUnPlanDelAlumno`.
+ *
+ * Y una cosa que el PF no tiene: si dar de baja el viejo le haria pagar dos veces
+ * al alumno (el viejo ya tiene pago mas alla de la prueba del nuevo, por un link
+ * pagado tarde o una renovacion que gano la carrera), se da de baja el NUEVO, que
+ * todavia no cobro. Ver `elViejoPagaMasAllaDeLaPrueba`.
+ *
+ * Lo que queda sin cubrir: un viejo PAUSADO que el pagador reanuda desde MP entre el
+ * checkout y la confirmacion del nuevo. Si se renueva y su fin pasa la prueba del
+ * nuevo, cae en el caso de arriba (se da de baja el nuevo). Pero si el nuevo no
+ * difirio (un pausado sin dias cobra al autorizar), su cobro pudo haber salido
+ * igual: se da de baja uno de los dos con un ERROR en el log, y el periodo que se
+ * solapa ya se cobro dos veces. No se detecta antes porque el plan nuevo no guarda
+ * en que estado estaba el viejo al abrir el checkout.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -297,12 +328,14 @@ import {
   createMpClient,
 } from "./client";
 import {
+  ADELANTO_MAXIMO_DEL_COBRO_MS,
   HOLGURA_PRUEBA_MS,
   PruebaDiferidaInput,
   aplicarPruebaDiferidaAlEstado,
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
   cobrosExitosos,
+  pagadoHastaDe,
   situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
 import {
@@ -403,6 +436,12 @@ export interface ReconcileResult {
    * dos veces.
    */
   dadosDeBaja?: number;
+  /**
+   * Solo del alumno: la baja de lo que este plan reemplaza no se pudo hacer (MP no
+   * contesto o no confirmo). Se reintenta en la proxima reconciliacion; el barrido
+   * lo cuenta en `errors` para que se vea.
+   */
+  bajaFallida?: boolean;
 }
 
 export interface ReconcileDeps {
@@ -1132,6 +1171,490 @@ async function darDeBajaLosReemplazados(
   return cancelados;
 }
 
+/** El plan del ALUMNO que MP acaba de confirmar, tal como lo ve su baja. */
+interface PlanNuevoDelAlumno {
+  planId: string;
+  /** `mp_plans/{planId}`, tal como salio de Firestore. */
+  planDoc: Record<string, unknown> | undefined;
+  /** La suscripcion de MP que se acaba de confirmar. */
+  mp: MpPreapproval;
+}
+
+/** Lo que dejo la baja del alumno. */
+interface BajaDelAlumno {
+  /** Cuantas suscripciones se dieron de baja en MP (viejas, o la nueva). */
+  cancelados: number;
+  /** Si algo no se pudo leer o no confirmo: el barrido lo cuenta como error. */
+  fallo: boolean;
+}
+
+/** `summarized.last_charged_date` de MP en ms, o `null` si no vino o no se entiende. */
+function ultimoCobroMs(sub: MpPreapproval): number | null {
+  const resumen = sub.summarized as { last_charged_date?: unknown } | null | undefined;
+  const raw = resumen?.last_charged_date;
+  if (typeof raw !== "string") return null;
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * Si dar de baja la suscripcion VIEJA [viejo] le haria pagar dos veces al alumno:
+ * el viejo tiene pago MAS ALLA de lo que cubre la prueba del nuevo, asi que dado de
+ * baja seguiria otorgando (lo que ya cobro) mientras el nuevo empieza a cobrar.
+ *
+ * ── El caso que lo pide ──
+ *
+ * El `init_point` no vence. El alumno abre el anual B dos dias antes de que se
+ * renueve el mensual O (prueba de 2 dias, hasta P), no lo paga, y lo paga una semana
+ * despues. Para entonces MP ya renovo O en P: esta pago hasta P+30. Si se diera de
+ * baja O, otorgaria hasta P+30 (lo que cobro), y la prueba de B, que corre desde que
+ * se autoriza, cobraria a los dos dias: el alumno pagaria dos veces casi un mes (casi
+ * un año si O es anual). Ahi se da de baja B, que todavia no cobro nada, y O sigue
+ * como estaba: es lo unico que no mueve plata. El alumno tiene que volver a hacer el
+ * cambio, y el equipo se entera por un ERROR en el log.
+ *
+ * ── Como se decide ──
+ *
+ * Una suscripcion vieja que NUNCA cobro ([cobrosExitosos] en 0) no es conflicto: no
+ * puede tener pago mas alla de nada. Es tipicamente un checkout del mismo cambio que
+ * el alumno dejo a medias (`pending`) antes de pagar el nuevo, y se da de baja como
+ * siempre. Sin esta regla, la falta de fechas de una `pending` se leia como conflicto
+ * y se daba de baja el plan que el alumno ACABABA de pagar.
+ *
+ * Para una que cobro: lo que cubre la prueba de B es su `diferidoHastaMs` (E); un B
+ * sin prueba cobra al autorizar, y cubre hasta su alta. Hay conflicto si el fin pago
+ * de O pasa de E por mas que el adelanto que ya se tolera en el cobro de una prueba
+ * (`ADELANTO_MAXIMO_DEL_COBRO_MS`). El fin de O es su `next_payment_date` vivo; es la
+ * condicion EXACTA del solapamiento, y por eso es mejor que "O cobro despues de
+ * abrir B": si E viene de un plan dado de baja que paga mas lejos que la renovacion
+ * de O, dar de baja O no solapa nada (esa renovacion ya estaba de mas y no se
+ * recupera dando de baja B).
+ *
+ * Si MP no mando `next_payment_date`, el fin es el `currentPeriodEnd` guardado, que
+ * puede estar viejo (una renovacion que el barrido todavia no vio). Ahi, ademas, es
+ * conflicto que O haya cobrado despues de que se abrio B (`last_charged_date`). Sin
+ * ninguna fecha de O, decide solo eso; y si tampoco se sabe, es conflicto. Las salidas
+ * dudosas terminan en dar de baja B (si no cobro), que no mueve plata: el alumno
+ * vuelve a intentar, O no se toca.
+ *
+ * ── Y la autorizacion fuera de ventana SOLA no es conflicto ──
+ *
+ * Un B pagado tarde sin que O se haya renovado (su fin sigue en E) se trata como
+ * siempre: se da de baja O. Las reglas de la prueba ya lo hacen seguro: O otorga
+ * hasta E; B se lee `pending` (no otorga) hasta su primer cobro, que cae en la
+ * autorizacion mas los dias de prueba, o sea DESPUES de E; y en el medio el alumno no
+ * tiene acceso porque tampoco pago nada. No hay dias gratis ni pagados dos veces, y
+ * el cambio se hace igual. Si mientras tanto O se renueva (la baja no llego antes de
+ * P), su fin pasa de E y la proxima reconciliacion de B cae en el conflicto de arriba.
+ */
+function elViejoPagaMasAllaDeLaPrueba(
+  viejo: MpPreapproval,
+  datosViejo: Record<string, unknown>,
+  nuevo: PlanNuevoDelAlumno,
+): { conflicto: boolean; finDelViejoMs: number | null; cubreHastaMs: number | null } {
+  const altaNuevoMs = comoTimestamp(nuevo.planDoc?.createdAt)?.toMillis() ?? null;
+  const e = nuevo.planDoc?.diferidoHastaMs;
+  const cubreHastaMs =
+    typeof e === "number" && Number.isFinite(e) ? e : altaNuevoMs;
+
+  const deMp = parsePeriodEnd(viejo.next_payment_date, "viejo");
+  const finDelViejo = deMp ?? comoTimestamp(datosViejo.currentPeriodEnd);
+  const finDelViejoMs = finDelViejo === null ? null : finDelViejo.toMillis();
+
+  // Nunca cobro: no puede tener pago mas alla de la prueba.
+  if (cobrosExitosos(viejo.summarized) < 1) {
+    return { conflicto: false, finDelViejoMs, cubreHastaMs };
+  }
+
+  const ultimo = ultimoCobroMs(viejo);
+  const cobroDespuesDeAbrirElNuevo =
+    ultimo === null || altaNuevoMs === null || ultimo > altaNuevoMs;
+
+  if (finDelViejoMs !== null && cubreHastaMs !== null) {
+    const pasaLaPrueba = finDelViejoMs > cubreHastaMs + ADELANTO_MAXIMO_DEL_COBRO_MS;
+    // Con la fecha de MP manda solo ella; con la guardada, que puede estar vieja,
+    // tambien cuenta un cobro posterior a la apertura del nuevo (si se sabe).
+    const cobroPosterior =
+      deMp === null && ultimo !== null && altaNuevoMs !== null && ultimo > altaNuevoMs;
+    return { conflicto: pasaLaPrueba || cobroPosterior, finDelViejoMs, cubreHastaMs };
+  }
+  return { conflicto: cobroDespuesDeAbrirElNuevo, finDelViejoMs, cubreHastaMs };
+}
+
+/** Una suscripcion viva de un plan viejo del alumno, ya evaluada. */
+interface SuscripcionViejaDelAlumno {
+  planId: string;
+  datos: Record<string, unknown>;
+  sub: MpPreapproval;
+  solapa: ReturnType<typeof elViejoPagaMasAllaDeLaPrueba>;
+}
+
+/**
+ * Hasta cuando esta pago el NUEVO, cuando ya cobro: su `next_payment_date` o, si no
+ * vino, lo que cubre su ultimo cobro. `null` si no se sabe.
+ */
+function finPagoDelNuevoMs(nuevo: PlanNuevoDelAlumno): number | null {
+  const deMp = parsePeriodEnd(nuevo.mp.next_payment_date, nuevo.planId);
+  return deMp !== null ? deMp.toMillis() : pagadoHastaDe(nuevo.mp);
+}
+
+/**
+ * Da de baja la suscripcion NUEVA, porque dar de baja la vieja le haria pagar dos
+ * veces al alumno (ver [elViejoPagaMasAllaDeLaPrueba]). Total: nunca tira.
+ *
+ * Deja el acceso como estaba: el viejo sigue cobrando y otorgando. El nuevo dado de
+ * baja otorga a lo sumo hasta lo que ya cubre (antes de su primer cobro, las reglas
+ * de la prueba cancelada lo acotan a E, que el viejo cubre), y su corte no pisa al
+ * viejo por la guarda de los dos planes. No hay vaiven: la proxima reconciliacion
+ * del viejo no da de baja nada (el nuevo es mas nuevo que el), y la del nuevo ve
+ * `cancelled` y no llega aca. Si el PUT no confirma, la proxima reconciliacion del
+ * nuevo vuelve a decidir lo mismo, porque los datos no cambiaron.
+ *
+ * El ERROR lleva el uid, los dos planes y el motivo: el alumno no se entera desde la
+ * app, y alguien tiene que poder explicarselo (o devolver, si ya cobraron los dos).
+ */
+async function darDeBajaElNuevoDelAlumno(
+  uid: string,
+  nuevo: PlanNuevoDelAlumno,
+  conflictos: SuscripcionViejaDelAlumno[],
+  motivo: string,
+  deps: ReconcileDeps,
+): Promise<BajaDelAlumno> {
+  const contexto = {
+    uid,
+    planNuevo: nuevo.planId,
+    planViejo: conflictos[0]?.planId,
+    planesViejos: conflictos.map((c) => c.planId),
+    motivo,
+    finDelViejoIso: isoDeMs(conflictos[0]?.solapa.finDelViejoMs),
+    cubreHastaIso: isoDeMs(conflictos[0]?.solapa.cubreHastaMs),
+  };
+  const preapprovalId = nuevo.mp.id;
+  if (typeof preapprovalId !== "string" || preapprovalId === "") {
+    logger.error(
+      "mp/reconcile: el plan nuevo del alumno solaparia al viejo y su suscripcion " +
+        "vino sin id — no se da de baja nada, puede haber un COBRO DOBLE",
+      contexto,
+    );
+    return { cancelados: 0, fallo: true };
+  }
+  try {
+    await deps.mpClient.cancelPreapproval(preapprovalId);
+  } catch (e) {
+    const err = e as Partial<MpApiError>;
+    logger.error(
+      "mp/reconcile: el plan nuevo del alumno solaparia al viejo y su baja no " +
+        "confirmo — se reintenta, puede haber un COBRO DOBLE",
+      { ...contexto, preapprovalId, status: err.status, body: err.body },
+    );
+    return { cancelados: 0, fallo: true };
+  }
+  logger.error(
+    "mp/reconcile: dar de baja el plan viejo del alumno le cobraria dos veces — se " +
+      "da de baja el NUEVO, el viejo sigue; el alumno tiene que volver a hacer el cambio",
+    { ...contexto, preapprovalId },
+  );
+  return { cancelados: 1, fallo: false };
+}
+
+/**
+ * Da de baja UNA suscripcion vieja del alumno. Total: nunca tira. `true` si MP
+ * confirmo.
+ *
+ * Antes del PUT, si la suscripcion esta `authorized`, se guarda en el plan su
+ * `next_payment_date` cuando falta o difiere de lo guardado. Es lo que el escritor
+ * guardaria para una suscripcion viva (la cascada de [resolverFinDePeriodo] empieza
+ * por ahi), y es la fecha de la que va a depender el acceso del plan viejo: MP omite
+ * `next_payment_date` en una baja que cobro, asi que despues de la baja la cascada
+ * cae en lo guardado. Sin esto, un plan cuya fecha no estaba al dia (un cobro que el
+ * barrido todavia no vio) perderia dias que el alumno pago.
+ */
+async function darDeBajaUnaSuscripcionVieja(
+  app: App,
+  uid: string,
+  vieja: SuscripcionViejaDelAlumno,
+  planVigente: string,
+  deps: ReconcileDeps,
+): Promise<boolean> {
+  const { planId: planViejo, datos, sub } = vieja;
+  const preapprovalId = sub.id;
+  if (typeof preapprovalId !== "string" || preapprovalId === "") {
+    logger.error("mp/reconcile: una suscripcion a dar de baja vino sin id", {
+      planViejo,
+      planVigente,
+      uid,
+      producto: "athlete",
+    });
+    return false;
+  }
+
+  if (sub.status === "authorized") {
+    const proximo = parsePeriodEnd(sub.next_payment_date, planViejo);
+    if (proximo !== null && !mismaFecha(proximo, datos.currentPeriodEnd)) {
+      await getFirestore(app)
+        .collection(MP_PLANS_COLLECTION)
+        .doc(planViejo)
+        .set({ currentPeriodEnd: proximo }, { merge: true });
+    }
+  }
+
+  try {
+    await deps.mpClient.cancelPreapproval(preapprovalId);
+  } catch (e) {
+    const err = e as Partial<MpApiError>;
+    // "No confirmo" y no "MP la rechazo": como en el PF, un timeout con la baja ya
+    // aplicada no se distingue de un 400. La proxima reconciliacion del plan
+    // nuevo le pregunta a MP cual de las dos fue.
+    logger.error(
+      "mp/reconcile: la baja de la suscripcion vieja del alumno no confirmo — " +
+        "puede haber un COBRO DOBLE vivo",
+      {
+        planViejo,
+        planVigente,
+        uid,
+        preapprovalId,
+        status: err.status,
+        retryable: err.retryable,
+        body: err.body,
+      },
+    );
+    return false;
+  }
+
+  logger.info("mp/reconcile: suscripcion vieja del alumno dada de baja en MP", {
+    planViejo,
+    planVigente,
+    uid,
+    preapprovalId,
+  });
+  return true;
+}
+
+/**
+ * Si vale la pena buscar en MP las suscripciones de un plan viejo del alumno para
+ * darlas de baja. Ver "Que planes se miran" en [darDeBajaLosReemplazadosDelAlumno].
+ */
+function puedeTenerUnaSuscripcion(datos: Record<string, unknown>, nowMs: number): boolean {
+  if (datos[CAMPO_ULTIMO_STATUS] !== undefined || datos.currentPeriodEnd != null) {
+    return true;
+  }
+  if (datos.terminalReason !== MOTIVO_ABANDONO) return false;
+  const altaMs = comoTimestamp(datos.createdAt)?.toMillis();
+  return altaMs !== undefined && nowMs - altaMs < VENTANA_DEL_ABANDONADO_PAGADO_TARDE_MS;
+}
+
+/**
+ * Da de baja lo que el plan del ALUMNO [nuevo] —recien confirmado por MP—
+ * reemplaza: los planes de alumno del mismo uid ESTRICTAMENTE MAS VIEJOS, por
+ * `mp_plans.createdAt`, que todavia pueden cobrar. El criterio de CUALES es el de
+ * [darDeBajaLosReemplazados], por las mismas razones (ver "EL CAMBIO DE PLAN" en
+ * el encabezado): se actua sobre lo que MP confirmo y no sobre la intencion de
+ * abrir un checkout, y nunca sobre "los otros", que en el orden del barrido le daria
+ * de baja al alumno el plan que acaba de comprar. Sin la fecha del confirmado, o la
+ * del viejo, no se da de baja nada. El de CUANDO no es el mismo: ver el llamador.
+ *
+ * Es la otra mitad del cambio de plan del alumno: el checkout del nuevo difiere su
+ * primer cobro hasta que vence lo que el viejo cobro
+ * (`decidirCambioDePlanDelAlumno`), y esto hace que el viejo no vuelva a cobrar.
+ * Como la prueba corre hasta ese fin, la baja tiene todo el periodo pago del viejo
+ * para confirmar: si MP falla, cada reconciliacion del nuevo la reintenta.
+ *
+ * ── En dos fases: primero se mira todo, despues se decide UNA vez ──
+ *
+ * Primero se buscan en MP las suscripciones vivas de TODOS los planes viejos y se
+ * evalua cada una ([elViejoPagaMasAllaDeLaPrueba]); recien despues se actua. Las
+ * bajas no se pueden deshacer, y decidir plan por plan en el orden en que vienen los
+ * documentos dejaba resultados que dependian de ese orden: con un checkout a medias
+ * y el viejo, dar de baja el viejo y despues el nuevo por culpa del otro dejaba al
+ * alumno sin ningun plan que se renueve. Si una busqueda falla, no se da de baja
+ * nada: sin ver todo no se puede decidir, y la proxima reconciliacion reintenta.
+ *
+ * La decision:
+ *
+ *   - **Ningun conflicto:** se dan de baja todas las viejas vivas, que es el caso
+ *     normal.
+ *   - **Conflicto y el nuevo todavia no cobro:** se da de baja el NUEVO, que no movio
+ *     plata, y no se toca ninguna vieja.
+ *   - **Conflicto y el nuevo ya cobro** (los dos cobraron el solapamiento: la plata
+ *     ya se movio y hay que devolver, ERROR en cualquier caso): se queda el que mas
+ *     lejos tiene pago y se da de baja el otro. Si el viejo cubre mas (un anual
+ *     renovado contra un mensual nuevo), dar de baja el viejo dejaria al nuevo
+ *     cobrando todos los meses lo que el anual ya cubre; si cubre mas el nuevo, al
+ *     reves. Sin la fecha del nuevo, se queda el nuevo (lo que el alumno eligio).
+ *
+ * ── Que planes se miran ──
+ *
+ * Los que el reconciliador vio alguna vez con una suscripcion (tienen `ultimoStatus`
+ * o `currentPeriodEnd`). Un checkout que nadie pago no tiene nada que dar de baja, y
+ * `puedeSeguirCobrando` deja para siempre a los abandonados (se pueden pagar tarde):
+ * buscar todos costaba una busqueda en MP por cada uno en cada reconciliacion de un
+ * plan activo, todas las noches, para siempre.
+ *
+ * Las dos excepciones, por quien reconcilia un plan pagado tarde:
+ *
+ *   - un checkout sin pagar que NO es `terminal` no se busca: lo reconcilia el
+ *     barrido de las 03:00 todas las noches, y si se pago, desde ahi tiene
+ *     `ultimoStatus` y entra (a mas tardar en la reconciliacion siguiente del nuevo);
+ *   - un abandonado (`terminal` por [MOTIVO_ABANDONO]) SI se busca mientras sea
+ *     reciente ([VENTANA_DEL_ABANDONADO_PAGADO_TARDE_MS]): el barrido no lo visita
+ *     nunca mas, y si su webhook falla antes de escribir `ultimoStatus`, esta baja es
+ *     la unica red. Pasada la ventana, un abandonado que nunca tuvo suscripcion ya no
+ *     se busca, y si se pagara despues y su webhook fallara, cobraria junto al nuevo:
+ *     queda como hueco conocido.
+ *
+ * Una suscripcion de OTRO uid sobre un plan viejo no se toca: es un dato raro (el
+ * plan es de este alumno), se logea como error, y dar de baja el cobro de otra
+ * persona no es una decision que se pueda tomar desde aca. Es el mismo criterio que
+ * [derechoVivoDelHermano], que no la cuenta como derecho de este alumno.
+ *
+ * Lo que NO se marca en los viejos, a proposito, ni `supersededBy` ni `terminal`:
+ *
+ *   - **`supersededBy`** saca al plan de toda escritura (la guarda de reemplazo de
+ *     `reconcileSubscription`), porque en el PF su `cancelled` pisaria el tier del
+ *     nuevo. El alumno no tiene tiers, y el viejo dado de baja TIENE que seguir
+ *     hablando: otorga hasta el fin de lo que cobro (rama `cancelled` de
+ *     `athleteStatusDesde`) y deja de otorgar despues. Si lo silenciaramos, nadie
+ *     cortaria el acceso en ese fin cuando el nuevo no otorga (una prueba autorizada
+ *     fuera de ventana es `pending` hasta su primer cobro: acceso gratis desde el fin
+ *     del viejo hasta ese cobro), y [otroPlanQueOtorga] no lo contaria mientras le
+ *     quedan dias: si el nuevo dejara de otorgar por su cuenta (se corta solo el
+ *     nuevo), el alumno perderia dias que el viejo si cobro. OJO: el tramite de
+ *     arrepentimiento (`arrepentimiento-por-mail.ts`) hoy marca arrepentidos a TODOS
+ *     los planes con una suscripcion contratada, el viejo dado de baja incluido, asi
+ *     que ahi el viejo tambien se corta: eso es de ese tramite, no de esta baja. Lo que
+ *     evita que el corte del viejo pise al nuevo es la guarda de los dos planes de
+ *     [escribirSuscripcionDeAlumno], igual que con cualquier otro par de planes.
+ *   - **`terminal`**: un plan del alumno sale del barrido recien cuando su derecho
+ *     se apago (ver la guarda de `terminal` del escritor), y lo saca su propio
+ *     escritor. Hasta entonces la reconciliacion del nuevo lo vuelve a mirar en cada
+ *     pasada: si la baja no confirmo, se reintenta; si confirmo, MP lo devuelve
+ *     `cancelled` y no se manda ningun PUT. Eso es lo que la hace idempotente.
+ *
+ * O sea: dado de baja por nosotros, el viejo queda EXACTAMENTE como si el alumno se
+ * hubiera dado de baja desde la web, que es lo que la mitigacion del #1305 le pedia
+ * hacer a mano. No hay una regla de acceso nueva.
+ *
+ * Total: nunca tira (salvo que falle Firestore, como el resto del escritor).
+ */
+async function darDeBajaLosReemplazadosDelAlumno(
+  app: App,
+  uid: string,
+  nuevo: PlanNuevoDelAlumno,
+  deps: ReconcileDeps,
+): Promise<BajaDelAlumno> {
+  const planVigente = nuevo.planId;
+  const altaVigente = comoTimestamp(nuevo.planDoc?.createdAt);
+  if (altaVigente === null) {
+    logger.warn(
+      "mp/reconcile: el plan confirmado del alumno no tiene createdAt legible — no " +
+        "se da de baja nada",
+      { planVigente, uid },
+    );
+    return { cancelados: 0, fallo: false };
+  }
+
+  // La misma consulta de un solo campo que el resto del archivo: indice
+  // automatico, uno o dos documentos por alumno.
+  const otros = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .where("uid", "==", uid)
+    .get();
+
+  // ── Fase 1: mirar todo ──
+  const vivas: SuscripcionViejaDelAlumno[] = [];
+  for (const doc of otros.docs) {
+    if (doc.id === planVigente) continue;
+    const datos = doc.data();
+    if (datos?.producto !== "athlete") continue;
+    // NO `terminal === true` a secas: un abandonado puede tener una suscripcion
+    // viva (ver `puedeSeguirCobrando`).
+    if (!puedeSeguirCobrando(datos)) continue;
+    if (!puedeTenerUnaSuscripcion(datos, deps.nowMs)) continue;
+    const alta = comoTimestamp(datos?.createdAt);
+    if (alta === null || alta.toMillis() >= altaVigente.toMillis()) continue;
+
+    let subs: MpPreapproval[];
+    try {
+      // Estricta: una respuesta rota no es «no hay nada que dar de baja».
+      subs = await deps.mpClient.searchPreapprovalsByPlan(doc.id, { estricto: true });
+    } catch (e) {
+      const err = e as Partial<MpApiError>;
+      logger.error(
+        "mp/reconcile: no se pudo buscar que dar de baja del plan reemplazado del " +
+          "alumno — no se da de baja nada hasta poder ver todo",
+        { planViejo: doc.id, planVigente, uid, status: err.status, retryable: err.retryable },
+      );
+      return { cancelados: 0, fallo: true };
+    }
+
+    for (const sub of subs) {
+      if (!sigueViva(sub.status)) continue;
+      const externo = sub.external_reference;
+      if (typeof externo === "string" && externo !== "" && externo !== uid) {
+        logger.error(
+          "mp/reconcile: el plan reemplazado del alumno tiene una suscripcion de OTRO " +
+            "uid — no se da de baja",
+          { planViejo: doc.id, planVigente, uid, externalReference: externo },
+        );
+        continue;
+      }
+      vivas.push({
+        planId: doc.id,
+        datos,
+        sub,
+        solapa: elViejoPagaMasAllaDeLaPrueba(sub, datos, nuevo),
+      });
+    }
+  }
+  if (vivas.length === 0) return { cancelados: 0, fallo: false };
+
+  // ── Fase 2: decidir una vez ──
+  const conflictos = vivas.filter((v) => v.solapa.conflicto);
+  if (conflictos.length > 0) {
+    if (cobrosExitosos(nuevo.mp.summarized) < 1) {
+      return darDeBajaElNuevoDelAlumno(uid, nuevo, conflictos, "viejo-pago-mas-alla", deps);
+    }
+    // Los dos cobraron el solapamiento: se queda el que mas lejos tiene pago.
+    const finDelNuevo = finPagoDelNuevoMs(nuevo);
+    const finDelViejo = Math.max(
+      ...conflictos.map((c) => c.solapa.finDelViejoMs ?? Number.NEGATIVE_INFINITY),
+    );
+    const contexto = {
+      uid,
+      planNuevo: planVigente,
+      planesViejos: conflictos.map((c) => c.planId),
+      finDelNuevoIso: isoDeMs(finDelNuevo),
+      finDelViejoIso: isoDeMs(finDelViejo),
+    };
+    if (finDelNuevo !== null && finDelViejo > finDelNuevo) {
+      return darDeBajaElNuevoDelAlumno(
+        uid,
+        nuevo,
+        conflictos,
+        "ya-cobraron-los-dos-y-el-viejo-cubre-mas",
+        deps,
+      );
+    }
+    logger.error(
+      "mp/reconcile: el plan nuevo del alumno ya cobro y el viejo tiene pago mas " +
+        "alla de lo que cubria su prueba — el solapamiento ya se cobro dos veces; se " +
+        "da de baja el viejo, que cubre menos (revisar y devolver)",
+      contexto,
+    );
+  }
+
+  let cancelados = 0;
+  let fallo = false;
+  for (const vieja of vivas) {
+    if (await darDeBajaUnaSuscripcionVieja(app, uid, vieja, planVigente, deps)) {
+      cancelados += 1;
+    } else {
+      fallo = true;
+    }
+  }
+  return { cancelados, fallo };
+}
+
 /**
  * El campo de `mp_plans` con el estado de MP con el que el escritor del ALUMNO
  * decidio la ultima vez que llego a ese plan, en el vocabulario de
@@ -1537,10 +2060,15 @@ async function otroPlanQueOtorga(
  *
  * Hacia falta porque el barrido recorre todos los planes no terminales y el
  * ultimo en escribir ganaba. El alumno que da de baja el mensual con dias pagos
- * y contrata el anual —`yaPagaEsteCiclo` solo frena el MISMO ciclo— perdia el
- * acceso la noche que vencia el mensual, con el anual cobrando. Ver la guarda de
- * los dos planes, y [otroPlanQueOtorga] para cuando lee lo guardado y cuando le
- * pregunta a MP.
+ * y contrata el anual perdia el acceso la noche que vencia el mensual, con el
+ * anual cobrando. Ver la guarda de los dos planes, y [otroPlanQueOtorga] para
+ * cuando lee lo guardado y cuando le pregunta a MP.
+ *
+ * Es tambien lo que sostiene el cambio de plan con el viejo cobrando: cuando el
+ * nuevo se confirma, `reconcileSubscription` da de baja el viejo
+ * (`darDeBajaLosReemplazadosDelAlumno`) SIN `supersededBy`, asi que el viejo sigue
+ * pasando por este escritor, y el dia que vencen sus dias pagos es esta guarda la
+ * que impide que su corte pise al plan nuevo.
  *
  * ── Lo que SI es igual al PF: la prueba diferida ──
  *
@@ -2029,7 +2557,7 @@ export async function reconcileSubscription(
   // MP, no dos lecturas distintas. Traducir dos veces seria la forma mas facil
   // de que un dia digan cosas diferentes.
   if (mapping.producto === "athlete") {
-    return escribirSuscripcionDeAlumno({
+    const resultado = await escribirSuscripcionDeAlumno({
       app,
       planId,
       uid,
@@ -2038,6 +2566,32 @@ export async function reconcileSubscription(
       planDoc,
       deps,
     });
+
+    // ── LA BAJA DE LO QUE ESTE PLAN REEMPLAZA, del lado del alumno ──
+    //
+    // Con el `authorized` de MP (`active` o `grace` en el mapeo de siempre), y no
+    // con el estado ya ajustado por la prueba diferida. Una prueba autorizada fuera
+    // de ventana se lee `pending` para el ACCESO (no da nada hasta su primer cobro),
+    // pero para MP es una suscripcion confirmada, con medio de pago, que va a
+    // cobrar: si el viejo siguiera vivo cobrarian los dos. Darlo de baja ahi no le
+    // regala nada al alumno: el viejo otorga hasta el fin de lo que cobro y despues
+    // lo corta su propia reconciliacion, porque el nuevo en `pending` no otorga.
+    //
+    // Es la diferencia con el PF, que da de baja con el estado ya ajustado (alli una
+    // prueba fuera de ventana no da de baja nada y los dos planes quedan cobrando).
+    //
+    // Despues del escritor y con cualquier resultado, por lo mismo que en el PF: si
+    // una noche MP rechaza la baja, la corrida siguiente encuentra al nuevo sin
+    // cambios, y colgada del `written` el cobro doble quedaria vivo para siempre.
+    const baja =
+      statusDeMp === "active" || statusDeMp === "grace"
+        ? await darDeBajaLosReemplazadosDelAlumno(app, uid, { planId, planDoc, mp }, deps)
+        : { cancelados: 0, fallo: false };
+    return {
+      ...resultado,
+      dadosDeBaja: baja.cancelados,
+      ...(baja.fallo ? { bajaFallida: true } : {}),
+    };
   }
 
   // ── LA PRUEBA DIFERIDA: un plan que nacio con dias de prueba se lee distinto ──
@@ -2378,6 +2932,23 @@ export interface SweepResult {
  */
 const ABANDONO_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Cuanto despues de su alta se sigue buscando en MP un checkout ABANDONADO que nunca
+ * tuvo suscripcion, cuando el alumno confirma un plan nuevo
+ * (`darDeBajaLosReemplazadosDelAlumno`).
+ *
+ * El barrido marca un plan abandonado recien cuando lleva [ABANDONO_MS] (30 dias) sin
+ * suscripcion, y desde ahi no lo visita mas. Una ventana de 30 dias quedaria vacia:
+ * todo abandonado ya tiene mas. Por eso es [ABANDONO_MS] mas 30 dias: el primer mes
+ * despues de marcarlo. Cuanto vive de verdad un `init_point` no lo sabemos (no vence
+ * mientras no se pruebe lo contrario), y la ventana de reuso de un checkout son 30
+ * minutos, asi que no hay un numero que salga de MP: es un tope de costo. Cada
+ * abandonado reciente cuesta una busqueda por reconciliacion de un plan activo del
+ * alumno, durante un mes; pasado, ya no se busca (ver el hueco que deja en
+ * `darDeBajaLosReemplazadosDelAlumno`).
+ */
+const VENTANA_DEL_ABANDONADO_PAGADO_TARDE_MS = ABANDONO_MS + 30 * 24 * 60 * 60 * 1000;
+
 /** Si un plan sin suscripcion ya es viejo como para dejar de consultarlo. */
 export function esAbandonado(createdAt: unknown, nowMs: number): boolean {
   const ms = comoTimestamp(createdAt)?.toMillis();
@@ -2452,6 +3023,9 @@ export async function reconcileAllSubscriptions(
       else if (res.outcome === "error-mp") r.errors += 1;
       else r.skipped += 1;
       r.dadosDeBaja += res.dadosDeBaja ?? 0;
+      // Solo lo pone el alumno: la baja de su plan reemplazado no se pudo hacer, y
+      // la proxima corrida la reintenta. Un plan del PF nunca lo trae.
+      if (res.bajaFallida === true) r.errors += 1;
 
       if (
         res.outcome === "sin-suscripcion" &&
