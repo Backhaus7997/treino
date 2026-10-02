@@ -11,7 +11,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
 import 'plan_copy.dart';
-import 'plan_vigencia.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.

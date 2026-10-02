@@ -44,12 +44,12 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// ## El reloj
 ///
 /// "Ahora" sale de [AppClock] —el seam que un test puede congelar— y no de un
-/// reloj crudo: `no_raw_clock_scan_test.dart` lo prohíbe en `coach_hub/`, y con
-/// motivo, porque una pantalla que lee la hora real no se puede fotografiar dos
-/// veces igual. La comparación es entre INSTANTES (`isBefore` compara
-/// `microsecondsSinceEpoch`, sin importar el flag UTC), así que no hace falta
-/// pasar nada a calendario argentino; eso sólo se necesita para MOSTRAR la
-/// fecha, y ya lo resuelve `fechaDiaMesArg`.
+/// reloj crudo: `no_raw_clock_scan_test.dart` lo prohíbe en `coach/` y en
+/// `coach_hub/`, y con motivo, porque una pantalla que lee la hora real no se
+/// puede fotografiar dos veces igual. La comparación es entre INSTANTES
+/// (`isBefore` compara `microsecondsSinceEpoch`, sin importar el flag UTC),
+/// así que no hace falta pasar nada a calendario argentino; eso sólo se
+/// necesita para MOSTRAR la fecha, y ya lo resuelve `fechaDiaMesArg`.
 ///
 /// ## El primer cobro
 ///
@@ -63,10 +63,11 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// La vigencia se calcula una vez y no se entera sola de que pasó un borde: en
 /// ese instante no tiene por qué emitir nadie, porque el servidor no reescribe
 /// el tier al vencer y [AppClock] no avisa. [proximoCambio] dice cuándo deja
-/// de valer, y `vigenciaDelPlanProvider` (`vigencia_del_plan_provider.dart`,
-/// al lado) la recalcula ahí. Lo leen el chip del sidebar, que está montado
-/// toda la sesión, el banner de upsell, el medidor de cupo del tab Coach
-/// móvil y la pantalla de alumnos en solo lectura. La pricing page
+/// de valer, y `vigenciaDelPlanProvider`
+/// (`coach/application/vigencia_del_plan_provider.dart`) la recalcula ahí.
+/// Lo leen el chip del sidebar, que está montado toda la sesión, el banner
+/// de upsell, el medidor de cupo del tab Coach móvil y la pantalla de
+/// alumnos en solo lectura. La pricing page
 /// (`pricing_screen.dart`) y Facturación (`facturacion_tab.dart`) todavía la
 /// calculan en su build: abiertas al cruzar el borde, muestran la foto vieja
 /// hasta el próximo rebuild. No son las únicas que miran el reloj: otras

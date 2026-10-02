@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/core/utils/app_clock.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Lo más que espera el timer del próximo borde: un minuto. Hay dos motivos,

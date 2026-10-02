@@ -21,7 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_subscription.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
+import 'package:treino/features/coach/application/vigencia_del_plan_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';

@@ -30,7 +30,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_subscription.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
 
 /// Un instante cualquiera. Los de abajo se miden contra éste.
 final _ahora = DateTime.utc(2026, 10, 1, 15);

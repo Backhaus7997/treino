@@ -10,8 +10,8 @@ import 'package:treino/core/widgets/treino_badge.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
+import 'package:treino/features/coach/application/vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 

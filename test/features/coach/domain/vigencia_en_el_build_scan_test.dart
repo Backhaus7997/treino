@@ -33,8 +33,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// la regla, aplicada a un archivo inventado que la llama sin figurar, da una
 /// violación.
 void main() {
-  const rutaDeLaClase = 'lib/features/coach_hub/presentation/sections/'
-      'facturacion_planes/plan_vigencia.dart';
+  const rutaDeLaClase = 'lib/features/coach/domain/plan_vigencia.dart';
   const titulo = '## Una foto, no un reloj';
 
   late Set<String> listados;

@@ -7,8 +7,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_vigencia.dart';
-import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/vigencia_del_plan_provider.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
+import 'package:treino/features/coach/application/vigencia_del_plan_provider.dart';
 
 /// Nombre visible del tier. Fuente única de la etiqueta de plan en el hub web
 /// — la pricing page usa su propia variante en MAYÚSCULAS (nombres de card),
