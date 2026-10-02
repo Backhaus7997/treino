@@ -72,7 +72,7 @@ maneja tres cosas que conviene que sepas desde el arranque:
 2. **Parte de lo que cargás lo ven otras personas.** Tu entrenador ve lo que
    compartas con él. El feed y los rankings publican contenido a otros usuarios,
    según lo que vos elijas.
-3. **No vendemos tus datos, y no hay publicidad ni rastreadores.** No hay SDK de
+3. **No vendemos tus datos, y no hay publicidad de terceros ni rastreadores.** No hay SDK de
    ads, no hay data brokers, no cruzamos tu información con terceros para
    perfilarte.
 
@@ -191,13 +191,13 @@ financiero visible para cualquier usuario de la app. Cargalo sabiendo eso.
 | **Prestarte el servicio** | Guardar rutinas, registrar sesiones, calcular progreso, mostrarte estadísticas |
 | **Vincularte con un entrenador** | Descubrimiento, solicitud de vínculo, chat, agenda, compartir lo que elijas |
 | **Función social** | Feed, seguimientos, reacciones, rankings del gimnasio |
-| **Comunicaciones** | Verificación de cuenta, recuperación de contraseña, avisos operativos y avisos sobre tu plan y tus pagos, por correo electrónico |
+| **Comunicaciones** | Verificación de cuenta, recuperación de contraseña, avisos operativos, avisos sobre tu plan y tus pagos, y comunicaciones comerciales sobre nuestros propios servicios (te podés dar de baja: ver sección 9), por correo electrónico |
 | **Notificaciones** | Recordatorios y avisos, si los aceptás |
 | **Seguridad** | Prevención de abuso, protección de cuentas, integridad del servicio |
 | **Mejora del producto** | Analítica agregada y diagnóstico de errores |
 | **Facturación** | Sólo para quien tiene una suscripción paga, entrenador o atleta |
 
-**Lo que NO hacemos:** no vendemos tus datos, no hacemos publicidad, no cedemos
+**Lo que NO hacemos:** no vendemos tus datos, no mostramos publicidad de terceros, no cedemos
 información a data brokers, no cruzamos tu actividad con fuentes externas para
 perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu
 progreso y —si vos lo habilitás— compartirlo con tu entrenador.
