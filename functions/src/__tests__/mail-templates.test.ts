@@ -1497,3 +1497,133 @@ describe("pie de baja de los correos promocionales", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// «Publicidad: » en el asunto de los correos comerciales
+//
+// Disposición DNPDP 4/2009, art. 2: la publicidad directa no requerida ni
+// consentida previamente lleva «en su encabezado el término único
+// 'publicidad'». Decisión del titular del 2026-10-02: la base de los correos
+// con `prefKey: "novedades_plan"` es el interés legítimo (opt-out), así que
+// rige. Los dos mixtos —operativos con un bloque de venta— quedan SIN prefijo:
+// consulta legal abierta (`design.md` §9).
+// ---------------------------------------------------------------------------
+describe("«Publicidad: » en el asunto de los correos comerciales", () => {
+  const PREFIJO = "Publicidad: ";
+  const BAJA = "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi";
+
+  /**
+   * Los cinco, ESCRITOS ACÁ con el asunto de antes del prefijo. No se importan
+   * de `types.ts` ni de `templates.ts` a propósito: un test que lee la lista que
+   * prueba pasaría igual con la lista vacía.
+   */
+  const COMERCIALES: ReadonlyArray<{ kind: MailKind; asuntoDeAntes: string }> = [
+    { kind: "athlete-coverage-lost", asuntoDeAntes: "Tu lugar en TREINO ya no está cubierto" },
+    { kind: "free-limit-reached", asuntoDeAntes: "Lo que querías hacer está en TREINO Pro" },
+    {
+      kind: "exercise-limit-reached",
+      asuntoDeAntes: "Llegaste al tope de ejercicios propios de tu plan",
+    },
+    {
+      kind: "template-limit-reached",
+      asuntoDeAntes: "Llegaste al tope de plantillas de tu plan",
+    },
+    { kind: "student-limit-reached", asuntoDeAntes: "Llegaste al tope de alumnos de tu plan" },
+  ];
+  const KINDS_COMERCIALES = COMERCIALES.map((c) => c.kind);
+
+  const PARAMS: MailParams = {
+    tope: "routineCount",
+    limit: 2,
+    ctaUrl: "https://gettreino.com/es/suscripcion/checkout",
+  };
+
+  // Con y sin pie de baja: el mail real sale con él, y la transcripción del
+  // Decreto 1558/01 dice «publicidad» en el cuerpo. El asunto no puede depender
+  // de eso.
+  const CON_Y_SIN_PIE = [
+    { nombre: "sin pie de baja", opciones: {} },
+    { nombre: "con pie de baja", opciones: { bajaDePromocionales: BAJA } },
+  ] as const;
+
+  describe.each(CON_Y_SIN_PIE)("$nombre", ({ opciones }) => {
+    it.each(COMERCIALES)("$kind: el asunto empieza con «Publicidad: »", ({ kind }) => {
+      expect(renderMail(kind, PARAMS, opciones).subject.startsWith(PREFIJO)).toBe(true);
+    });
+
+    it.each(COMERCIALES)(
+      "$kind: después del prefijo, el asunto es el de antes",
+      ({ kind, asuntoDeAntes }) => {
+        expect(renderMail(kind, PARAMS, opciones).subject).toBe(`${PREFIJO}${asuntoDeAntes}`);
+      },
+    );
+
+    // El término va en el ASUNTO. Si se colara al cuerpo el mail diría
+    // «Publicidad:» dos veces y el titular dejaría de ser el titular.
+    it.each(COMERCIALES)("$kind: el cuerpo y el texto plano NO llevan el prefijo", ({ kind }) => {
+      const out = renderMail(kind, PARAMS, opciones);
+
+      expect(out.html).not.toContain("Publicidad:");
+      expect(out.text).not.toContain("Publicidad:");
+    });
+  });
+
+  it("el prefijo es lo único que cambia del asunto: el resto no se toca", () => {
+    for (const { kind, asuntoDeAntes } of COMERCIALES) {
+      const asunto = renderMail(kind, PARAMS).subject;
+
+      expect(asunto.slice(PREFIJO.length)).toBe(asuntoDeAntes);
+      expect(asunto.match(/Publicidad/g)).toHaveLength(1);
+    }
+  });
+
+  // Los restantes: transaccionales, operativos y los dos mixtos. Se renderizan
+  // con el bloque comercial y con el pie de baja puestos, que es la peor
+  // condición para que el prefijo se cuele. `ALL_KINDS` sale de un
+  // `Record<MailKind, true>`: un kind nuevo entra acá el día que entra a la
+  // unión, y si es comercial este test lo marca hasta que se sume a la lista.
+  const RESTO = ALL_KINDS.filter((k) => !KINDS_COMERCIALES.includes(k));
+
+  it("el resto son todos los demás: ni uno menos", () => {
+    expect(RESTO).toHaveLength(ALL_KINDS.length - COMERCIALES.length);
+    expect(RESTO).toContain("limit-reached");
+    expect(RESTO).toContain("email-code-athlete");
+    expect(RESTO).toContain("email-code-trainer");
+  });
+
+  describe.each(CON_Y_SIN_PIE)("⚠️ NINGÚN otro kind lleva «publicidad» en el asunto, $nombre", ({ opciones }) => {
+    it.each(RESTO)("%s", (kind) => {
+      const { subject } = renderMail(kind, { ...PARAMS, codigo: "048213", showPlans: "1" }, opciones);
+
+      expect(subject).not.toMatch(/publicidad/i);
+    });
+  });
+
+  describe("los dos mixtos (operativos con bloque de venta) NO llevan el prefijo", () => {
+    // Pendiente de consulta legal: ver el comentario de `KINDS_DE_PUBLICIDAD`.
+    // Cada caso exige además que el bloque comercial ESTÉ en el mail: sin eso el
+    // test pasaría igual con un mail que ya no tiene nada de venta.
+    it("limit-reached, con su bloque de venta y el pie de baja", () => {
+      const out = renderMail(
+        "limit-reached",
+        { limit: 2, blockedCount: 3, ctaUrl: PARAMS.ctaUrl },
+        { bajaDePromocionales: BAJA },
+      );
+
+      expect(out.html).toContain("VER LOS PLANES");
+      expect(out.subject).not.toMatch(/publicidad/i);
+      expect(out.subject).toBe("Llegaste al tope de alumnos de tu cuenta");
+    });
+
+    it.each(["email-code-athlete", "email-code-trainer"] as const)(
+      "%s, con el bloque de pagos y el pie de baja",
+      (kind) => {
+        const out = renderMail(kind, { codigo: "048213", showPlans: "1" }, { bajaDePromocionales: BAJA });
+
+        expect(out.html).toContain("VER LOS PLANES");
+        expect(out.subject).not.toMatch(/publicidad/i);
+        expect(out.subject).toContain("048213");
+      },
+    );
+  });
+});

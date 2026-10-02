@@ -252,6 +252,42 @@ export type MailKind =
   | "withdrawal-team-notice";
 
 /**
+ * Los cinco kinds PURAMENTE comerciales: los que se encolan con
+ * `prefKey: "novedades_plan"` (`ATHLETE_PROSPECT_PREF_KEY` y
+ * `TRAINER_LIMIT_PREF_KEY`). `renderMail` les antepone «Publicidad: » al asunto.
+ *
+ * POR QUÉ. El 2026-10-02 el titular decidió que la base legal de estos correos
+ * es el INTERÉS LEGÍTIMO con oposición absoluta (opt-out), y no el
+ * consentimiento: así es como ya funciona el producto —el envío sale salvo
+ * oposición, con el link de baja en el pie—. Y entonces rige la Disposición
+ * DNPDP 4/2009, art. 2: «cuando se efectúen envíos de comunicaciones de
+ * publicidad directa no requeridas o consentidas previamente por el titular
+ * del dato personal, deberá advertirse en forma destacada que se trata de una
+ * publicidad. En caso de realizarse dicha comunicación a través de un correo
+ * electrónico deberá insertarse en su encabezado el término único
+ * 'publicidad'.» Decisión y alternativas: `openspec/changes/
+ * baja-de-correos-promocionales/design.md` §9.
+ *
+ * LOS DOS MIXTOS NO ESTÁN ACÁ, a propósito: `limit-reached` y `email-code-*`
+ * (con `bloqueComercial`) son avisos OPERATIVOS que llevan un bloque de venta
+ * adentro. Rotularlos «Publicidad: » le mentiría a quien recibe el código de
+ * verificación o el aviso de que sus alumnos quedaron en solo lectura. Si el
+ * art. 2 alcanza al bloque comercial de un mail operativo es una CONSULTA LEGAL
+ * ABIERTA; hasta que se resuelva, esos dos salen sin el prefijo.
+ *
+ * Un kind comercial nuevo (uno que se encole con ese `prefKey`) se agrega acá
+ * el mismo día: sin entrar a esta lista, sale a la bandeja sin la advertencia
+ * que la norma pide. Los tests de los tres productores lo verifican.
+ */
+export const KINDS_DE_PUBLICIDAD: readonly MailKind[] = [
+  "athlete-coverage-lost",
+  "free-limit-reached",
+  "exercise-limit-reached",
+  "template-limit-reached",
+  "student-limit-reached",
+];
+
+/**
  * Per-kind template parameters.
  *
  * Kept as a flat string/number map (not a discriminated union) because the

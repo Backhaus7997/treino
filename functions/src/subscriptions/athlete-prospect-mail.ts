@@ -74,13 +74,13 @@
  * es ABSOLUTA: si la ejercés, dejamos de enviarlas sin ponderar nada en
  * contra». Un mail comercial sin interruptor convierte esa línea en mentira.
  *
- * ⚠️ Lo que este archivo NO resuelve: `emailChannelAllowed` trata la ausencia
- * de preferencia como «sí» (`value !== false`), o sea **opt-out**. La política
- * declara la base legal como «tu consentimiento», que leído estricto es
- * opt-IN. Las dos cosas no son lo mismo y la diferencia es de abogado, no de
- * código — está anotada en la consulta legal pendiente. Lo que sí queda
- * garantizado desde hoy es el derecho de oposición, que es lo que la política
- * promete de forma absoluta.
+ * LA BASE LEGAL, resuelta el 2026-10-02: `emailChannelAllowed` trata la
+ * ausencia de preferencia como «sí» (`value !== false`), o sea **opt-out**, y
+ * el titular decidió que la base de estos correos es el INTERÉS LEGÍTIMO con
+ * oposición absoluta, no el consentimiento (opt-in). Es lo que el producto ya
+ * hacía. Consecuencia: rige la Disp. DNPDP 4/2009, art. 2, y el asunto sale con
+ * «Publicidad: » (`KINDS_DE_PUBLICIDAD`, en `mail/types.ts`). Decisión y
+ * alternativas: `openspec/changes/baja-de-correos-promocionales/design.md` §9.
  */
 
 import { App } from "firebase-admin/app";
