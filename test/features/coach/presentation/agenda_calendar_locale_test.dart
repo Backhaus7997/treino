@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/utils/app_clock.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
@@ -24,12 +25,17 @@ import 'package:treino/l10n/app_l10n.dart';
 ///
 /// ## Fechas
 ///
-/// El mes del encabezado sale de `AppClock.now()`, así que cada caso congela
-/// el reloj. Los instantes barren el eje del día a propósito: primer día del
-/// mes apenas pasada la medianoche (con semana que empieza en septiembre),
-/// mitad de mes, último día casi a la medianoche, y un cambio de año. Son
-/// locales, como pide `AppClock.freeze`, así que el mes enfocado no depende de
-/// la TZ del runner. Eso se prueba corriendo el archivo, no se supone:
+/// El mes del encabezado es un bucket de calendario: sale de `argentinaNow()`,
+/// no de la hora del dispositivo, igual que los `startsAt` de los turnos
+/// (wall-clock ART, ADR-7). Cada caso congela `AppClock` en el instante cuya
+/// hora ARGENTINA es [artWall], y los instantes barren el eje del día a
+/// propósito: primer día del mes apenas pasada la medianoche (con semana que
+/// empieza en septiembre), mitad de mes, último día casi a la medianoche, y un
+/// cambio de año.
+///
+/// El barrido de TZ es el control de ese bucket, no un trámite: con la hora
+/// del dispositivo, los casos de medianoche caen en el mes vecino en UTC−12 y
+/// en UTC+14 (medido):
 ///
 /// ```bash
 /// for z in UTC Pacific/Kiritimati Etc/GMT+12 \
@@ -38,12 +44,20 @@ import 'package:treino/l10n/app_l10n.dart';
 /// done
 /// ```
 void main() {
-  final casos = <({DateTime ahora, String mes})>[
-    (ahora: DateTime(2026, 10, 1, 0, 30), mes: 'octubre de 2026'),
-    (ahora: DateTime(2026, 10, 14, 12), mes: 'octubre de 2026'),
-    (ahora: DateTime(2026, 10, 31, 23, 30), mes: 'octubre de 2026'),
-    (ahora: DateTime(2027, 1, 1, 0, 30), mes: 'enero de 2027'),
+  // Campos en hora argentina, UTC-flagged como `toArgentina`.
+  final casos = <({DateTime artWall, String mes})>[
+    (artWall: DateTime.utc(2026, 10, 1, 0, 30), mes: 'octubre de 2026'),
+    (artWall: DateTime.utc(2026, 10, 14, 12), mes: 'octubre de 2026'),
+    (artWall: DateTime.utc(2026, 10, 31, 23, 30), mes: 'octubre de 2026'),
+    (artWall: DateTime.utc(2027, 1, 1, 0, 30), mes: 'enero de 2027'),
   ];
+
+  /// Congela el reloj en el instante real cuya hora argentina es [artWall].
+  /// `AppClock.freeze` pide un DateTime local, de ahí el `toLocal()`.
+  void congelarEnArgentina(DateTime artWall) {
+    AppClock.freeze(artWall.add(argentinaUtcOffset).toLocal());
+    addTearDown(AppClock.unfreeze);
+  }
 
   // Abreviaturas de `DateFormat.E('es')`. TableCalendar arranca la semana en
   // domingo por defecto; acá sólo importa que estén las siete en español.
@@ -58,10 +72,10 @@ void main() {
 
   group('agenda del PF (TrainerAgendaTab)', () {
     for (final caso in casos) {
-      testWidgets('${caso.ahora} → «${caso.mes}» y días en español',
-          (tester) async {
-        AppClock.freeze(caso.ahora);
-        addTearDown(AppClock.unfreeze);
+      testWidgets(
+          '${caso.artWall.toIso8601String().substring(0, 16)} ART → '
+          '«${caso.mes}» y días en español', (tester) async {
+        congelarEnArgentina(caso.artWall);
 
         await tester.pumpWidget(
           _app(
@@ -86,10 +100,10 @@ void main() {
 
   group('agenda del alumno (AthleteAgendaScreen)', () {
     for (final caso in casos) {
-      testWidgets('${caso.ahora} → «${caso.mes}» y días en español',
-          (tester) async {
-        AppClock.freeze(caso.ahora);
-        addTearDown(AppClock.unfreeze);
+      testWidgets(
+          '${caso.artWall.toIso8601String().substring(0, 16)} ART → '
+          '«${caso.mes}» y días en español', (tester) async {
+        congelarEnArgentina(caso.artWall);
 
         await tester.pumpWidget(
           _app(
