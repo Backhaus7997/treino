@@ -18,7 +18,8 @@
 ///      `functions/src/subscriptions/mp/diferir-primer-cobro.ts`): con menos de
 ///      un día se cobra en el acto (`finMs - nowMs < MIN_DIFERIMIENTO_MS`), con
 ///      exactamente un día todavía se difiere. Si el aviso de la pricing page
-///      dice «el primer cobro es ese día» donde el servidor cobra ya, miente.
+///      dice «se te cobrará al finalizar tu período actual» donde el servidor
+///      cobra ya, miente.
 library;
 
 import 'package:flutter_test/flutter_test.dart';

@@ -1112,6 +1112,15 @@ void main() {
     final conDiasPagos = DateTime.utc(2026, 10, 15, 15);
     final vencido = DateTime.utc(2026, 9, 30, 15);
 
+    /// La aguja ÚNICA de la nota del primer cobro. Todo test que busque o
+    /// descarte la nota va por acá, NUNCA por «Si ya pagaste» a secas: el
+    /// banner de `acreditacion_al_volver.dart` arranca igual («Si ya pagaste,
+    /// no perdiste nada…») y una aguja corta matchearía los dos.
+    ///
+    /// Va junto al test que fija el texto exacto: si la nota cambia de
+    /// redacción, los dos se mueven juntos.
+    const agujaDeLaNota = 'se te cobrará al finalizar tu período actual';
+
     UserProfile cancelado(
       DateTime? fin, {
       SubscriptionTier tier = SubscriptionTier.plan1,
@@ -1238,25 +1247,38 @@ void main() {
           expect(abiertas, hasLength(2));
         });
 
-        // EL TEXTO EXACTO, y por qué es un «si». Si el primer cobro se difiere
-        // lo decide el servidor, que además exige ver en MP un cobro real que
-        // respalde esos días (`diferir-primer-cobro.ts`); desde el cliente eso
-        // no se ve. La versión anterior decía «Pagado hasta el 15/10: el primer
-        // cobro es ese día.» y afirmaba un pago que nadie había comprobado.
+        // EL TEXTO EXACTO, y por qué dice lo que dice.
+        //
+        // Es un «si»: si el primer cobro se difiere lo decide el servidor, que
+        // además exige ver en MP un cobro real que respalde esos días
+        // (`diferir-primer-cobro.ts`); desde el cliente eso no se ve.
+        //
+        // Y nombra a Mercado Pago: el checkout de MP rinde el `free_trial`
+        // como «¡Tenés N días gratis!», no hay campo para cambiar ese texto, y
+        // la nota es donde se lo encuadra antes de que el PF llegue ahí.
+        //
+        // Este es el ÚNICO test que repite la frase entera; el resto busca por
+        // `agujaDeLaNota`.
         testWidgets(
-            'la nota es condicional: «Si ya pagaste hasta el d/m, el primer '
-            'cobro es ese día.»', (tester) async {
+            'la nota dice, exacto, que se cobra al terminar el período pago y '
+            'que MP lo muestra como días gratis', (tester) async {
           await pumpEn(tester, size, cancelado(conDiasPagos), web: true);
 
-          const nota =
-              'Si ya pagaste hasta el 15/10, el primer cobro es ese día.';
+          const nota = 'Si ya pagaste, se te cobrará al finalizar tu período '
+              'actual: 15/10. Mercado Pago lo muestra como días gratis.';
           expect(
             enElPieDe(SubscriptionTier.plan1, find.text(nota)),
             findsOneWidget,
           );
           // Una sola, en la tarjeta del plan actual y en ninguna otra.
-          expect(find.textContaining('Si ya pagaste hasta'), findsOneWidget);
-          // Y la afirmación incondicional de antes no volvió.
+          expect(find.textContaining(agujaDeLaNota), findsOneWidget);
+          // La redacción anterior no volvió: «Si ya pagaste hasta el d/m, el
+          // primer cobro es ese día.» prometía la fecha sin decir que MP la va
+          // a llamar «días gratis». Y la de antes, «Pagado hasta…», afirmaba un
+          // pago que nadie había comprobado.
+          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(
+              find.textContaining('el primer cobro es ese día'), findsNothing);
           expect(find.textContaining('Pagado hasta'), findsNothing);
         });
 
@@ -1289,7 +1311,7 @@ void main() {
             await pumpEn(tester, size, cancelado(fin), web: true);
 
             expect(
-              find.textContaining('Si ya pagaste hasta'),
+              find.textContaining(agujaDeLaNota),
               conNota ? findsOneWidget : findsNothing,
               reason: conNota
                   ? 'con $descripcion el servidor SÍ puede diferir y la nota '
@@ -1330,7 +1352,7 @@ void main() {
           );
           expect(find.text('VOLVER A CONTRATAR'), findsOneWidget);
           expect(
-            find.textContaining('Si ya pagaste hasta el 15/10'),
+            find.textContaining('$agujaDeLaNota: 15/10'),
             findsOneWidget,
           );
         });
@@ -1348,8 +1370,7 @@ void main() {
           );
 
           expect(
-            find.text(
-                'Si ya pagaste hasta el 15/10, el primer cobro es ese día.'),
+            find.textContaining('$agujaDeLaNota: 15/10.'),
             findsOneWidget,
           );
           expect(find.textContaining('16/10'), findsNothing);
@@ -1388,7 +1409,7 @@ void main() {
           await pumpEn(tester, size, cancelado(vencido), web: true);
 
           expect(find.text('VOLVER A CONTRATAR'), findsNothing);
-          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(find.textContaining(agujaDeLaNota), findsNothing);
           expect(
             enElPieDe(SubscriptionTier.plan1, find.text('ELEGIR PLAN')),
             findsOneWidget,
@@ -1429,7 +1450,7 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('VOLVER A CONTRATAR'), findsNothing);
-          expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+          expect(find.textContaining(agujaDeLaNota), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNWidgets(2));
         });
 
@@ -1456,7 +1477,7 @@ void main() {
               findsOneWidget,
             );
             expect(find.text('VOLVER A CONTRATAR'), findsNothing);
-            expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
+            expect(find.textContaining(agujaDeLaNota), findsNothing);
           });
         }
       });
@@ -1482,22 +1503,33 @@ void main() {
             findsOneWidget,
           );
           expect(find.text('VOLVER A CONTRATAR'), findsNothing);
+          // La nota del primer cobro es de la web: ni su aguja, ni la frase de
+          // la redacción anterior.
+          expect(find.textContaining(agujaDeLaNota), findsNothing);
           expect(find.textContaining('Si ya pagaste hasta'), findsNothing);
           expect(find.textContaining('cobro'), findsNothing);
           expect(find.text('ELEGIR PLAN'), findsNothing);
-          // Los verbos de la compra no entran a la app móvil en ninguna forma.
-          // Bajo 3.1.3(f) «volver a contratar» y «reactivar» son calls to
-          // action igual que «contratá» y «reactivalo»
-          // (`avisos_de_tope_movil_sin_llamado_a_comprar_test` los cuenta
-          // entre sus agujas, con los stems «contrata» y «reactiva»). Acá se
-          // barren sin distinguir mayúsculas y por stem, así que otra
-          // conjugación del mismo verbo cae igual. Los dos van: el botón web
-          // dice uno, y el otro es el que ese test ya trata como llamado.
+          // Los verbos de la compra y la nota del primer cobro no entran a la
+          // app móvil en ninguna forma. Bajo 3.1.3(f) «volver a contratar» y
+          // «reactivar» son calls to action igual que «contratá» y
+          // «reactivalo» (`avisos_de_tope_movil_sin_llamado_a_comprar_test` los
+          // cuenta entre sus agujas, con los stems «contrata» y «reactiva»), y
+          // la nota además nombra a Mercado Pago, que cuenta como nombrar
+          // dónde se paga (`trainer_limit_notice.dart`). Acá se barren sin
+          // distinguir mayúsculas y por stem, así que otra conjugación del
+          // verbo, o una redacción nueva de la nota que siga hablando de lo
+          // mismo, cae igual.
           final textos = tester
               .widgetList<Text>(find.byType(Text))
               .map((t) => (t.data ?? '').toLowerCase())
               .toList();
-          for (final stem in const ['volver a contratar', 'reactiv']) {
+          for (final stem in const [
+            'volver a contratar',
+            'reactiv',
+            'se te cobrará',
+            'mercado pago',
+            'días gratis',
+          ]) {
             expect(
               textos.where((t) => t.contains(stem)),
               isEmpty,

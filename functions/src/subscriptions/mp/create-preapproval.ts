@@ -68,7 +68,7 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
-import { SubscriptionCycle, SubscriptionTier } from "../tier-config";
+import { SubscriptionCycle, SubscriptionTier, TIER_LABELS } from "../tier-config";
 import {
   CYCLES,
   MP_PLANS_COLLECTION,
@@ -312,7 +312,12 @@ export async function runCreatePreapproval(
     // documentos de `mp_checkouts` que hay en produccion tienen esos dos y
     // ninguno mas. Ver el dartdoc de `AbrirCheckoutInput.huella`.
     huella,
-    reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
+    // El nombre que el PF lee en el checkout de MP, en su lista de
+    // suscripciones y en el mail de cada cobro: va la etiqueta, nunca el
+    // código. Nada lo lee de vuelta (el plan se reconoce por `mp_plans`), así
+    // que cambiarlo no toca la reconciliación. Sin fechas a propósito: queda
+    // para siempre en MP y una fecha envejece.
+    reason: `TREINO — ${TIER_LABELS[tier]} (${cycle === "annual" ? "anual" : "mensual"})`,
     backUrl: BACK_URL,
     amount,
     frequencyMonths: frequencyMonthsFor(cycle),
