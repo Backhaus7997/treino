@@ -4736,6 +4736,20 @@ class AppL10nEs extends AppL10n {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
+  String get privacyEntryTitle => 'Analítica y correos';
+
+  @override
+  String get privacyPromoEmailsTitle => 'Correos promocionales';
+
+  @override
+  String get privacyPromoEmailsSubtitle =>
+      'Si lo desactivas, dejamos de enviártelos. Los avisos de tu cuenta te seguirán llegando.';
+
+  @override
+  String get privacyPromoEmailsSaveError =>
+      'No pudimos guardar el cambio. Inténtalo de nuevo.';
+
+  @override
   String customExerciseCounter(int count, int limit) {
     final intl.NumberFormat countNumberFormat =
         intl.NumberFormat.decimalPattern(localeName);
@@ -9724,6 +9738,20 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get privacyAnalyticsCrashNote =>
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
+
+  @override
+  String get privacyEntryTitle => 'Analítica y correos';
+
+  @override
+  String get privacyPromoEmailsTitle => 'Correos promocionales';
+
+  @override
+  String get privacyPromoEmailsSubtitle =>
+      'Si lo apagás, no te mandamos más. Los avisos de tu cuenta te siguen llegando.';
+
+  @override
+  String get privacyPromoEmailsSaveError =>
+      'No pudimos guardar el cambio. Intentá de nuevo.';
 
   @override
   String customExerciseCounter(int count, int limit) {

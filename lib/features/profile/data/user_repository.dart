@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
+import '../domain/notification_pref_keys.dart';
 import '../domain/user_profile.dart';
 import '../domain/user_role.dart';
 
@@ -541,6 +542,68 @@ class UserRepository {
     } catch (_) {
       // Ver el dartdoc: el aviso se muestra igual.
     }
+  }
+
+  /// ¿El usuario acepta correos promocionales? Se lee de
+  /// `users/{uid}.notificationPrefs.novedades_plan.email`.
+  ///
+  /// **Ausente = `true`**, igual que el servidor (`emailChannelAllowed` en
+  /// `functions/src/mail/send-queued-mail.ts`: sólo un `false` EXPLÍCITO frena
+  /// el envío). Si la app asumiera lo contrario, mostraría «apagado» a quien
+  /// sigue recibiendo los correos: un cartel que miente.
+  ///
+  /// Mismo filtro de caché que [watch]: un snapshot de caché de un doc que no
+  /// existe todavía NO es una respuesta, y emitirlo como `true` dejaría
+  /// prender el interruptor sobre un «no sé». Sólo un snapshot confirmado por
+  /// el servidor puede decir que el documento no está.
+  ///
+  /// `distinct()` porque el listener recibe el documento ENTERO: un cambio de
+  /// cualquier otro campo del perfil no tiene que despertar a la pantalla.
+  Stream<bool> watchCorreosPromocionales(String uid) {
+    return _users
+        .doc(uid)
+        .snapshots()
+        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .map((snap) => _correosPromocionalesDe(snap.data()))
+        .distinct();
+  }
+
+  /// Prende o apaga los correos promocionales del usuario.
+  ///
+  /// Escribe el MAPA ANIDADO, no la clave con puntos: en un `set` (a
+  /// diferencia de un `update`) `'notificationPrefs.novedades_plan.email'` se
+  /// guarda como un campo cuyo NOMBRE contiene los puntos, que ni el servidor
+  /// ni la app leen. Con `merge: true` el merge es profundo, así que no pisa
+  /// las demás filas de `notificationPrefs` —la matriz que el Coach Hub guarda
+  /// completa— ni el canal `push` de esta misma fila.
+  ///
+  /// No pasa por [update]: no hay perfil público que espejar ni moderación que
+  /// correr, y [update] lee Firestore para resolver el consentimiento de
+  /// ubicación. Patrón liviano de [registrarTopeTocado].
+  ///
+  /// A diferencia de [registrarTopeTocado], **sí tira**: el que llama tiene
+  /// que enterarse de que no se guardó para no dejarle al usuario un
+  /// interruptor apagado sobre un correo que va a seguir llegando.
+  Future<void> setCorreosPromocionales(String uid, bool habilitado) {
+    return _users.doc(uid).set(
+      <String, Object?>{
+        'notificationPrefs': <String, Object?>{
+          kPrefCorreosPromocionales: <String, Object?>{'email': habilitado},
+        },
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Lee la preferencia de un documento crudo. Sólo un `false` EXPLÍCITO es
+  /// «no»: cualquier otra cosa —campo ausente, mapa vacío, un tipo inesperado—
+  /// es «sí», que es lo que haría el servidor con ese mismo documento.
+  static bool _correosPromocionalesDe(Map<String, Object?>? data) {
+    final prefs = data?['notificationPrefs'];
+    if (prefs is! Map) return true;
+    final fila = prefs[kPrefCorreosPromocionales];
+    if (fila is! Map) return true;
+    return fila['email'] != false;
   }
 
   Future<void> update(

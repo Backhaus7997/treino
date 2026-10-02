@@ -1145,9 +1145,10 @@ GoRouter buildRouter({
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
               ),
-              // Controles de privacidad. Hoy sólo el interruptor de analítica,
-              // que existe porque la Política promete poder revocar el
-              // consentimiento «en cualquier momento» y no había dónde.
+              // Controles de privacidad: el interruptor de analítica (por
+              // dispositivo) y el de correos promocionales (por cuenta). Existen
+              // porque la Política promete poder revocar el consentimiento
+              // «en cualquier momento» y no había dónde.
               GoRoute(
                 path: 'settings/privacidad',
                 builder: (_, __) => _withBg(const PrivacyScreen()),
