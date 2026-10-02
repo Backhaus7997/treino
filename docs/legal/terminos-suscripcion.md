@@ -430,10 +430,12 @@ encendidos.
 §1, §2.1 y §9 ya lo describe, y el detalle está en §8.2.ter de los Términos para
 Entrenadores. Plan de implementación en `docs/limite-plantillas-pf.md` (al
 escribir esto vivía en la rama `docs/limite-plantillas-pf`, sin mergear). Mismo
-criterio que ejercicios: el texto sale **antes** que el código, con el
-interruptor `TRAINER_TEMPLATE_LIMITS_ENABLED` apagado, así que describe un
-límite más estricto que el que se aplica. Y la misma condición: el límite tiene
-que estar encendido antes de dar de alta al primer entrenador real.
+criterio que ejercicios: el texto salió **antes** que el código, con el
+interruptor `TRAINER_TEMPLATE_LIMITS_ENABLED` apagado, así que describía un
+límite más estricto que el que se aplicaba. Y la misma condición: el límite
+tenía que estar encendido antes de dar de alta al primer entrenador real.
+✅ **Encendido desde el 2026-09-25** (#1258): desde entonces el texto y el
+código de `main` dicen lo mismo.
 
 ⚠️ **Lo que decía este anexo y ya no vale:** *«Para el alumno no hace falta nada
 de eso: la tienda gestiona baja y reembolso.»* Con el cobro por web, la baja y el
