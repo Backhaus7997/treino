@@ -148,6 +148,64 @@ function conPisoPrepago(
   return limitRank(piso) > limitRank(base) ? piso : base;
 }
 
+/**
+ * El proximo instante en que el limite efectivo CAMBIA solo por el paso del
+ * tiempo, y a que valor cambia. `null` = no hay ningun cambio por reloj.
+ *
+ * ── PARA QUE EXISTE ──
+ *
+ * `effectiveWeightLimit` depende del reloj en exactamente DOS lugares: el
+ * vencimiento de un `cancelled` (`currentPeriodEndMs`) y el vencimiento del
+ * piso prepago (`prepaidUntilMs`). Ninguno de los dos escribe un documento al
+ * cumplirse, o sea que ningun trigger los ve y el valor que el servidor dejo
+ * publicado en `users/{uid}.planLimits.athletes` queda viejo hasta el barrido de
+ * las 04:00. Con este dato el cliente puede cambiar de tope en el instante
+ * exacto en vez de esperar al barrido (ver `resolveAthleteLimits`).
+ *
+ * ── POR QUE SE EVALUA LA FUNCION Y NO SE REPLICA LA MATRIZ ──
+ *
+ * Los unicos puntos de quiebre posibles son esos dos instantes, asi que se
+ * evalua [effectiveWeightLimit] en cada uno (en orden) y se devuelve el primero
+ * cuyo valor DIFIERA del actual. Un candidato que no cambia nada —el
+ * `currentPeriodEndMs` de un `active`, que pasa de largo hasta que MP avisa; o
+ * el vencimiento de un piso que ya no sostiene nada porque el plan actual es
+ * igual o mayor— se saltea solo, sin una sola regla duplicada que se pueda
+ * desincronizar del switch de status. Es la misma garantia de
+ * `effective-tier.test.ts`: una unica fuente de verdad.
+ *
+ * Solo el PRIMER cambio. Si despues viene otro (un `cancelled` que vence y
+ * debajo todavia un piso, que vence mas tarde), lo publica el sync que corre
+ * en cualquier escritura de la suscripcion o, a mas tardar, el barrido diario.
+ *
+ * `null` en `limit` es SIN TOPE (plan3), igual que en [effectiveWeightLimit]:
+ * quien consuma esto tiene que distinguir "no hay cambio" (el retorno es `null`)
+ * de "el limite despues es ilimitado" (`limit === null` adentro del objeto).
+ */
+export interface CambioDeLimite {
+  /** Instante del cambio, ms desde epoch. Desde ese instante rige [limit]. */
+  atMs: number;
+  /** El limite que rige desde [atMs]. `null` = SIN TOPE. */
+  limit: number | null;
+}
+
+export function proximoCambioDeLimite(
+  sub: SubscriptionState | null | undefined,
+  nowMs: number = Date.now(),
+): CambioDeLimite | null {
+  if (!sub) return null;
+
+  const actual = effectiveWeightLimit(sub, nowMs);
+  const candidatos = [sub.currentPeriodEndMs, sub.prepaidUntilMs]
+    .filter((t): t is number => typeof t === "number" && Number.isFinite(t) && t > nowMs)
+    .sort((a, b) => a - b);
+
+  for (const atMs of candidatos) {
+    const despues = effectiveWeightLimit(sub, atMs);
+    if (despues !== actual) return { atMs, limit: despues };
+  }
+  return null;
+}
+
 /** El limite que sale del status, o sea el modulo entero antes del piso. */
 function limiteDelStatus(
   sub: SubscriptionState,

@@ -9,10 +9,11 @@
 import {
   customExerciseLimitFor,
   PlanLimitSwitches,
+  resolveAthleteLimits,
   resolvePlanLimits,
   templateLimitFor,
 } from "../subscriptions/trainer-plan-limits";
-import { SubscriptionState } from "../subscriptions/effective-limit";
+import { effectiveWeightLimit, SubscriptionState } from "../subscriptions/effective-limit";
 
 const NOW = 1_000_000;
 
@@ -235,5 +236,70 @@ describe("resolvePlanLimits — degraded", () => {
     const r = resolvePlanLimits(plan2, true, NOW, SOLO_PLANTILLAS);
     expect(r).toEqual({ customExercises: null });
     expect(r).not.toHaveProperty("templates");
+  });
+});
+
+describe("resolveAthleteLimits — el tope de alumnos que se publica en planLimits", () => {
+  const ms = (t: { toMillis: () => number } | null) => (t ? t.toMillis() : null);
+
+  it("degradado → null («no tocar»), nunca el fallback conservador", () => {
+    expect(resolveAthleteLimits(sub("plan3", "active"), true, NOW)).toBeNull();
+    expect(resolveAthleteLimits(null, true, NOW)).toBeNull();
+  });
+
+  it("sano: SIEMPRE las tres claves, con null explicito donde no hay valor", () => {
+    const r = resolveAthleteLimits(sub("plan3", "active"), false, NOW)!;
+    expect(Object.keys(r).sort()).toEqual(["athletes", "athletesDespues", "athletesHasta"]);
+    expect(r.athletes).toBeNull(); // sin tope
+    expect(r.athletesHasta).toBeNull();
+    expect(r.athletesDespues).toBeNull();
+  });
+
+  it("sin suscripcion → Free (2)", () => {
+    expect(resolveAthleteLimits(null, false, NOW)!.athletes).toBe(2);
+  });
+
+  it("coincide con effectiveWeightLimit en toda la matriz de estados", () => {
+    // Oraculo: lo que se publica ES lo que el servidor enforza.
+    const estados: SubscriptionState[] = [];
+    for (const tier of ["free", "plan1", "plan2", "plan3"] as const) {
+      for (const status of ["active", "grace", "pending", "paused", "cancelled"] as const) {
+        for (const end of [NOW - 1, NOW + 1, null]) {
+          for (const piso of [null, "plan1", "plan3"] as const) {
+            estados.push({
+              tier,
+              status,
+              currentPeriodEndMs: end,
+              prepaidTier: piso,
+              prepaidUntilMs: piso ? NOW + 5 : null,
+            });
+          }
+        }
+      }
+    }
+    for (const e of estados) {
+      expect(resolveAthleteLimits(e, false, NOW)!.athletes).toBe(effectiveWeightLimit(e, NOW));
+    }
+  });
+
+  it("con cambio por reloj: athletesHasta es un Timestamp en ese instante y athletesDespues el valor nuevo", () => {
+    const r = resolveAthleteLimits(sub("plan2", "cancelled", NOW + 1000), false, NOW)!;
+    expect(r.athletes).toBe(15);
+    expect(ms(r.athletesHasta)).toBe(NOW + 1000);
+    expect(r.athletesDespues).toBe(2);
+  });
+
+  it("el destino puede ser sin tope: athletesDespues null CON athletesHasta presente", () => {
+    // Un cambio hacia ilimitado por reloj no existe hoy (el piso solo sostiene,
+    // y vencer baja), pero el contrato lo tiene que decir: `athletesHasta` es la
+    // unica clave que dice si hay cambio.
+    const r = resolveAthleteLimits(
+      { tier: "plan1", status: "paused", prepaidTier: "plan3", prepaidUntilMs: NOW + 10 },
+      false,
+      NOW,
+    )!;
+    expect(r.athletes).toBeNull();
+    expect(ms(r.athletesHasta)).toBe(NOW + 10);
+    expect(r.athletesDespues).toBe(2);
   });
 });

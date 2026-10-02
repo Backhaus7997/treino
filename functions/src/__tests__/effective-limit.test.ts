@@ -4,6 +4,7 @@
 
 import {
   effectiveWeightLimit,
+  proximoCambioDeLimite,
   suscripcionInactiva,
   SubscriptionState,
   SubscriptionStatus,
@@ -450,5 +451,106 @@ describe("limitRank y tierLimit — la trampa de null=SIN TOPE, ya exportada", (
     // "toString" existe en el prototipo: con `in` devolvia una FUNCION tipada
     // como number|null y rompia toda comparacion aguas abajo, en silencio.
     expect(tierLimit("toString" as never)).toBe(2);
+  });
+});
+
+describe("proximoCambioDeLimite", () => {
+  const conPiso = (
+    base: SubscriptionState,
+    prepaidTier: SubscriptionState["tier"],
+    prepaidUntilMs: number,
+  ): SubscriptionState => ({ ...base, prepaidTier, prepaidUntilMs });
+
+  it("sin suscripcion, o un active/grace/pending/paused sin piso → null (nada por reloj)", () => {
+    expect(proximoCambioDeLimite(null, NOW)).toBeNull();
+    expect(proximoCambioDeLimite(undefined, NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "active"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "grace"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "pending"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "paused"), NOW)).toBeNull();
+  });
+
+  it("un active con currentPeriodEnd futuro NO es un cambio: el periodo pasa de largo hasta que MP avisa", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "active", NOW + 1000), NOW)).toBeNull();
+  });
+
+  it("cancelled dentro del periodo → cae a Free exactamente en currentPeriodEnd", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "cancelled", NOW + 1000), NOW)).toEqual({
+      atMs: NOW + 1000,
+      limit: 2,
+    });
+  });
+
+  it("cancelled ya vencido → null", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "cancelled", NOW - 1), NOW)).toBeNull();
+  });
+
+  it("el instante exacto del vencimiento YA es el valor nuevo (cancelled: nowMs < end)", () => {
+    // En `atMs` el limite efectivo ya es `limit`: el cliente puede cambiar en `>=`.
+    const c = proximoCambioDeLimite(sub("plan2", "cancelled", NOW + 1000), NOW)!;
+    expect(effectiveWeightLimit(sub("plan2", "cancelled", NOW + 1000), c.atMs)).toBe(c.limit);
+    expect(effectiveWeightLimit(sub("plan2", "cancelled", NOW + 1000), c.atMs - 1)).toBe(15);
+  });
+
+  it("piso prepago vigente sobre un paused → vuelve a Free al vencer el piso", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan1", "paused"), "plan2", NOW + 500), NOW),
+    ).toEqual({ atMs: NOW + 500, limit: 2 });
+  });
+
+  it("piso vigente de plan3 sobre un plan1 active → baja a 7 (el nominal), no a Free", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan1", "active"), "plan3", NOW + 500), NOW),
+    ).toEqual({ atMs: NOW + 500, limit: 7 });
+  });
+
+  it("un candidato que no cambia nada (el cancelled vence con el piso sin tope aun vigente) se saltea", () => {
+    // plan1 cancelled hasta NOW+100 (→ Free) pero piso plan3 (sin tope) hasta
+    // NOW+900: en NOW+100 el limite sigue siendo sin tope; el cambio real es
+    // NOW+900, y baja a Free.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan1", "cancelled", NOW + 100), "plan3", NOW + 900),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("piso que no sostiene nada (el plan actual es igual o mayor) no genera cambio", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan2", "active"), "plan1", NOW + 500), NOW),
+    ).toBeNull();
+  });
+
+  it("cancelled que vence ANTES que el piso: el candidato que no cambia nada se saltea y gana el que si", () => {
+    // plan1 cancelled hasta NOW+100 (→ Free), piso plan2 hasta NOW+900.
+    // Limite actual 15 (piso). En NOW+100 sigue 15 → no es cambio. En NOW+900 → 2.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan1", "cancelled", NOW + 100), "plan2", NOW + 900),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("piso que vence ANTES que el cancelled: gana el primero que cambia", () => {
+    // plan2 cancelled hasta NOW+900, piso plan1 hasta NOW+100: actual 15.
+    // En NOW+100 el piso (7) ya no importa, el cancelled sostiene 15: sin cambio.
+    // En NOW+900 → 2.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan2", "cancelled", NOW + 900), "plan1", NOW + 100),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("ignora fechas pasadas y no numericas", () => {
+    expect(
+      proximoCambioDeLimite(
+        { tier: "plan2", status: "cancelled", currentPeriodEndMs: NaN, prepaidTier: "plan3", prepaidUntilMs: NOW - 5 },
+        NOW,
+      ),
+    ).toBeNull();
   });
 });

@@ -69,9 +69,14 @@
  */
 
 import { App } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
-import { effectiveTier, SubscriptionState } from "./effective-limit";
+import {
+  effectiveTier,
+  effectiveWeightLimit,
+  proximoCambioDeLimite,
+  SubscriptionState,
+} from "./effective-limit";
 import { TIER_CUSTOM_EXERCISE_LIMITS, TIER_TEMPLATE_LIMITS } from "./tier-config";
 
 /** El interruptor. Ver el encabezado antes de tocarlo. */
@@ -176,6 +181,82 @@ export function resolvePlanLimits(
   else if (!degraded) limits.templates = templateLimitFor(tier);
 
   return Object.keys(limits).length > 0 ? limits : null;
+}
+
+/**
+ * La parte de `planLimits` que habla del TOPE DE ALUMNOS del PF: lo que el
+ * servidor decidio que el PF puede tener HOY, mas el proximo cambio por reloj.
+ *
+ * ── Por que se publica (y por que lo calcula el servidor) ──
+ *
+ * El cliente no puede saber el tope REAL: el servidor trata distinto estados
+ * que la app solo ve como `status` — `pending`/`paused` valen Free, y el piso
+ * prepago (`prepaidTier`/`prepaidUntil`, ver `conPisoPrepago`) puede sostener
+ * un plan que la suscripcion actual ya no tiene. Replicarlo en Dart es la
+ * segunda matriz que se desincroniza. `syncTrainerEntitlements` ya calcula
+ * `effectiveWeightLimit` en la misma transaccion que escribe `weightedLoad`;
+ * ahora tambien lo deja publicado, igual que `customExercises`/`templates`.
+ *
+ * ── Representacion (la MISMA que el resto de `planLimits`) ──
+ *
+ * - `athletes`: el tope efectivo en unidades de PESO (activo = 1, pausado =
+ *   0.5; ver `weighted-load.ts`). `null` = SIN TOPE (plan3), igual que
+ *   `customExercises: null` y `templates: null`.
+ * - Las TRES claves viajan SIEMPRE, explicitas, aunque sean `null`: con
+ *   `merge: true` omitir una clave es "no tocar", y un valor viejo quedaria
+ *   pegado. Ademas es lo que le permite al cliente distinguir AUSENTE ("el
+ *   servidor todavia no lo calculo": el PF nunca paso por un sync, o esta
+ *   degradado) de `null` ("sin tope").
+ * - `athletesHasta`/`athletesDespues`: el proximo cambio por reloj (un
+ *   `cancelled` que vence, un piso prepago que vence). `athletesHasta == null`
+ *   significa "no hay cambio programado" y es la UNICA clave que decide eso:
+ *   `athletesDespues == null` solo se mira cuando `athletesHasta` existe, y ahi
+ *   quiere decir "sin tope" (hay que mirar `athletesHasta` primero, porque el
+ *   `null` de `athletesDespues` es ambiguo por si solo). Ver
+ *   [proximoCambioDeLimite].
+ *
+ * No tiene interruptor: a diferencia de `customExercises`/`templates`, ninguna
+ * regla de `firestore.rules` LEE estas claves (el cap de alumnos se enforza en
+ * `promote-link`/`sync-entitlements` contra `effectiveWeightLimit`, no contra
+ * este campo), asi que publicarlas es informativo y no puede abrir ni cerrar
+ * nada. El pin de `planLimits` en las reglas (CF-write-only, mapa entero) ya
+ * las cubre.
+ */
+export interface AthletePlanLimits {
+  athletes: number | null;
+  /** Instante del proximo cambio. `null` = no hay ninguno programado. */
+  athletesHasta: Timestamp | null;
+  /** Tope desde `athletesHasta`. `null` = SIN TOPE, y solo vale si hay `athletesHasta`. */
+  athletesDespues: number | null;
+}
+
+/**
+ * Que tope de alumnos publicar en `planLimits`, o `null` para «no tocar nada».
+ *
+ * `degraded` => `null`, por el mismo criterio que [resolvePlanLimits]: si el
+ * mapa `subscription` no se entendio, el `limit` que sale de ahi es el
+ * fallback conservador (Free) y no lo que el PF pago. Publicarlo le diria a la
+ * app que un PF que capaz pago plan3 tiene 2 alumnos, por un typo NUESTRO. Se
+ * omite y queda lo que habia (o ausente, y el cliente cae a su fallback).
+ *
+ * Sano: SIEMPRE el trio completo. Usa el mismo `sub` y el mismo `nowMs` con que
+ * `syncTrainerEntitlements` calculo el limite que reconcilia los vinculos, asi
+ * que lo que se publica y lo que se enforza salen del mismo plan en el mismo
+ * instante.
+ */
+export function resolveAthleteLimits(
+  sub: SubscriptionState | null | undefined,
+  degraded: boolean,
+  nowMs: number,
+): AthletePlanLimits | null {
+  if (degraded) return null;
+
+  const proximo = proximoCambioDeLimite(sub, nowMs);
+  return {
+    athletes: effectiveWeightLimit(sub, nowMs),
+    athletesHasta: proximo ? Timestamp.fromMillis(proximo.atMs) : null,
+    athletesDespues: proximo ? proximo.limit : null,
+  };
 }
 
 export interface RecountResult {
