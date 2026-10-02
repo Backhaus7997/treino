@@ -196,10 +196,11 @@ export async function abrirCheckout(
   }
 
   // Los dias de prueba salen de aca y de ningun otro lado, a partir de la fecha
-  // y del reloj de ESTE request. `diasDePrueba` redondea hacia arriba para no
-  // adelantar el cobro, pero que MP cuente la prueba como suponemos (N dias
-  // corridos desde la autorizacion) NO esta medido: ver "Lo que se ASUME de MP"
-  // en `diferir-primer-cobro.ts`.
+  // y del reloj de ESTE request. `diasDePrueba` cuenta los dias de CALENDARIO
+  // ARGENTINO entre hoy y el dia en que vence lo que el PF ya pago (del 2/10 al
+  // 1/11 son 30). Que MP cuente la prueba como suponemos (N corridas de 24 h desde
+  // la autorizacion, o sea que el primer cobro cae ese mismo dia argentino) NO esta
+  // medido: ver "Lo que se ASUME de MP" en `diferir-primer-cobro.ts`.
   const freeTrialDays =
     diferidoHastaMs === null ? undefined : diasDePrueba(diferidoHastaMs, nowMs);
 

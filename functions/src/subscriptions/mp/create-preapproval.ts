@@ -55,10 +55,11 @@
  * abrir un checkout que quiza cobre dos veces (ver el handler).
  *
  * Un PF dado de baja que vuelve al mismo plan antes de que venza lo que ya pago
- * abre un plan con prueba, y se espera que MP cobre recien cuando ese periodo
- * termina. Eso ultimo es un supuesto que NO esta medido (ver "Lo que se ASUME de
- * MP" en `diferir-primer-cobro.ts`); sin la prueba, paga dos veces los mismos
- * dias. La regla entera vive en ese archivo.
+ * abre un plan con prueba de tantos dias de calendario argentino como le quedan, y
+ * se espera que MP cobre recien el dia en que ese periodo termina. Eso ultimo es un
+ * supuesto que NO esta medido (ver "Lo que se ASUME de MP" en
+ * `diferir-primer-cobro.ts`); sin la prueba, paga dos veces los mismos dias. La
+ * regla entera vive en ese archivo.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";

@@ -16,7 +16,8 @@ jest.mock("firebase-functions", () => ({
 
 import { logger } from "firebase-functions";
 
-import { MpPreapproval } from "../subscriptions/mp/client";
+import { artDateKey } from "../mail/format";
+import { MAX_FREE_TRIAL_DAYS, MpPreapproval } from "../subscriptions/mp/client";
 import {
   ADELANTO_MAXIMO_DEL_COBRO_MS,
   DIA_MS,
@@ -671,47 +672,188 @@ describe("pagadoHastaDe: una autorizacion de $0 no es evidencia de pago", () => 
 });
 
 // ---------------------------------------------------------------------------
-// diasDePrueba: la cuenta de los dias. Bajo el supuesto de dias corridos de 24 h
-// desde la autorizacion (NO medido contra MP), el cobro cae en la fecha o apenas
-// despues; el test fija el redondeo, no el comportamiento de MP.
+// diasDePrueba: la cuenta de los dias, en CALENDARIO ARGENTINO.
+//
+// Antes era `ceil(tiempo exacto / 24 h)`, que le sumaba un dia a cualquiera con
+// horas sobrantes. El caso real: un plan pago hasta el 1/11/2026 a las 11:47 ART y
+// el checkout abierto el 2/10 a las 09:30 ART. Faltaban 30 dias y 2 horas, el
+// `ceil` daba 31, MP mostraba "31 dias gratis" y el primer cobro caia el 2/11. Del
+// 2/10 al 1/11 son 30.
+//
+// Ahora es la fecha argentina de E menos la de hoy. Los instantes van en UTC con su
+// hora argentina al lado (ART = UTC-3, sin horario de verano) para poder recalcular
+// cada numero a mano: los esperados salen de CONTAR dias de calendario, no de
+// ajustar la formula hasta que de verde. Lo que se espera de MP (N corridas de 24 h
+// desde la autorizacion) NO esta medido: estos tests fijan la cuenta, no a MP.
 // ---------------------------------------------------------------------------
 
-describe("diasDePrueba", () => {
-  it("un multiplo exacto de dias da esos dias", () => {
+describe("diasDePrueba: dias de calendario argentino", () => {
+  /** Vence el 1/11/2026 a las 14:47 UTC = 11:47 ART: el caso real. */
+  const E_REAL = Date.parse("2026-11-01T14:47:00.000Z");
+  const desde = (ahoraIso: string, e: number = E_REAL) =>
+    diasDePrueba(e, Date.parse(ahoraIso));
+
+  // ── Los numeros del caso real ──
+
+  it("el caso real: del 2/10 (09:31 ART) al 1/11 (11:47 ART) son 30 dias, no 31", () => {
+    // Calendario: octubre tiene 31 dias, asi que 2/10 + 29 = 31/10 y + 1 = 1/11: 30.
+    // El tiempo exacto es 30 dias y 2 h 16 min, que con `ceil` daba 31.
+    expect(desde("2026-10-02T12:31:00.000Z")).toBe(30);
+  });
+
+  it("desde el 8/10 a las 09:00 ART son 24", () => {
+    // 8/10 + 23 = 31/10 y + 1 = 1/11: 24. Con `ceil` hubieran sido 25.
+    expect(desde("2026-10-08T12:00:00.000Z")).toBe(24);
+  });
+
+  it("desde el 1/10 a las 15:50 ART son 31", () => {
+    // 1/10 + 30 = 31/10 y + 1 = 1/11: 31. Aca E cae mas temprano en el dia que hoy
+    // (11:47 contra 15:50), asi que no sobran horas: pasan 30 dias y 19 h 57 min, y el
+    // calendario y el `ceil` coinciden.
+    expect(desde("2026-10-01T18:50:00.000Z")).toBe(31);
+  });
+
+  // ── La medianoche es la ARGENTINA, no la de UTC ──
+
+  it("a las 23:59 ART del 1/10 todavia es 1/10: 31", () => {
+    // 2026-10-02T02:59Z = 1/10 a las 23:59 ART.
+    expect(desde("2026-10-02T02:59:00.000Z")).toBe(31);
+  });
+
+  it("un minuto despues, a las 00:00 ART del 2/10, ya es 2/10: 30", () => {
+    // 2026-10-02T03:00Z = 2/10 a las 00:00 ART. El dia argentino cambia a las 03:00
+    // UTC, y la function corre en UTC.
+    expect(desde("2026-10-02T03:00:00.000Z")).toBe(30);
+  });
+
+  it("la medianoche UTC NO es el borde: a las 21:00 ART del 1/10 sigue siendo 1/10", () => {
+    // 2026-10-02T00:00Z ya es 2/10 en UTC, pero en Argentina son las 21:00 del 1/10.
+    // Una cuenta con fechas UTC daria 30 aca.
+    expect(desde("2026-10-02T00:00:00.000Z")).toBe(31);
+  });
+
+  // ── Hora sobrante: de E al final del dia o al principio ──
+
+  it("E al final del dia argentino y hoy al principio: cuentan los dias, no las horas", () => {
+    // Hoy 2/10 a las 00:01 ART (03:01Z); vence el 1/11 a las 23:59 ART (02:59Z del
+    // 2/11). Pasan 30 dias y 23 h 58 min, pero del 2/10 al 1/11 son 30 dias de
+    // calendario. Con `ceil` hubieran sido 31.
+    const e = Date.parse("2026-11-02T02:59:00.000Z");
+
+    expect(desde("2026-10-02T03:01:00.000Z", e)).toBe(30);
+  });
+
+  it("E al principio del dia argentino y hoy al final: 31 dias de calendario", () => {
+    // Hoy 1/10 a las 23:59 ART (02:59Z del 2/10); vence el 1/11 a las 00:01 ART
+    // (03:01Z). Pasan 30 dias y 2 min; del 1/10 al 1/11 son 31 dias de calendario.
+    const e = Date.parse("2026-11-01T03:01:00.000Z");
+
+    expect(desde("2026-10-02T02:59:00.000Z", e)).toBe(31);
+  });
+
+  it("un multiplo exacto de dias da esos dias, y un milisegundo menos tambien", () => {
+    // AHORA es el lunes 7/9 a las 09:00 ART: 10 dias despues es el 17/9 a las 09:00.
     expect(diasDePrueba(AHORA + 10 * DIA_MS, AHORA)).toBe(10);
-  });
-
-  it("un milisegundo de mas sube UN dia: ceil, nunca round", () => {
-    // Con `floor` o `round` el cobro caeria antes de que venza lo que el PF ya
-    // pago, que es el bug entero.
-    expect(diasDePrueba(AHORA + 10 * DIA_MS + 1, AHORA)).toBe(11);
-  });
-
-  it("un milisegundo de menos sigue dando los 10", () => {
     expect(diasDePrueba(AHORA + 10 * DIA_MS - 1, AHORA)).toBe(10);
   });
 
-  it("medio dia son 1 dia", () => {
-    expect(diasDePrueba(AHORA + DIA_MS / 2, AHORA)).toBe(1);
+  it("un milisegundo de mas NO suma un dia: sigue siendo el mismo dia de calendario", () => {
+    // El `ceil` pasaba de 10 a 11 con un solo milisegundo.
+    expect(diasDePrueba(AHORA + 10 * DIA_MS + 1, AHORA)).toBe(10);
   });
 
-  it("el minimo diferible (1 dia exacto) son 1 dia", () => {
-    expect(diasDePrueba(AHORA + MIN_DIFERIMIENTO_MS, AHORA)).toBe(1);
+  // ── El minimo: 24 h por delante garantizan al menos 1 dia ──
+
+  it("con exactamente MIN_DIFERIMIENTO_MS por delante da 1, a cualquier hora del dia", () => {
+    // Sumar 24 h corre la fecha argentina exactamente un dia. Barrido cada 15 minutos
+    // durante dos dias.
+    for (let min = 0; min < 2 * 24 * 60; min += 15) {
+      const ahora = Date.parse("2026-10-02T00:00:00.000Z") + min * 60_000;
+
+      expect(diasDePrueba(ahora + MIN_DIFERIMIENTO_MS, ahora)).toBe(1);
+    }
   });
 
-  it("un anual entero son 365 dias", () => {
-    expect(diasDePrueba(AHORA + 365 * DIA_MS, AHORA)).toBe(365);
+  it("con MAS de MIN_DIFERIMIENTO_MS da al menos 1, nunca 0", () => {
+    // Cada 15 minutos, con distintas horas sobrantes (de 1 ms a casi un dia).
+    for (const sobra of [1, 60_000, 6 * 60 * 60 * 1000, DIA_MS - 1]) {
+      for (let min = 0; min < 2 * 24 * 60; min += 15) {
+        const ahora = Date.parse("2026-10-02T00:00:00.000Z") + min * 60_000;
+
+        expect(diasDePrueba(ahora + MIN_DIFERIMIENTO_MS + sobra, ahora))
+          .toBeGreaterThanOrEqual(1);
+      }
+    }
   });
 
-  it("con dias corridos de 24 h el cobro no cae antes de la fecha, para cualquier hora", () => {
-    // Barrido del REDONDEO, no de MP: si la prueba corre `dias * 24 h` desde ahora,
-    // el cobro cae a `ahora + dias`. Tiene que ser >= la fecha.
-    for (let horas = 1; horas <= 24 * 40; horas += 7) {
-      const fin = AHORA + horas * 60 * 60 * 1000 + 123;
-      const cobro = AHORA + diasDePrueba(fin, AHORA) * DIA_MS;
-      expect(cobro).toBeGreaterThanOrEqual(fin);
-      // Y no se pasa por mas de un dia.
-      expect(cobro - fin).toBeLessThan(DIA_MS);
+  it("por debajo del minimo SI puede dar 0: por eso no se difiere", () => {
+    // Hoy 2/10 a las 09:00 ART; vence ese mismo dia a las 22:00 ART (01:00Z del 3/10):
+    // 13 horas, 0 dias de calendario. El cliente de MP no manda una prueba de 0.
+    expect(desde("2026-10-02T12:00:00.000Z", Date.parse("2026-10-03T01:00:00.000Z")))
+      .toBe(0);
+  });
+
+  // ── Un anual ──
+
+  it("un anual recien cobrado: del 2/10/2026 al 1/10/2027 son 364 dias", () => {
+    // Cobro el 1/10/2026 a las 11:47 ART + 12 meses = 1/10/2027 a las 11:47 ART
+    // (14:47Z). Del 2/10/2026 al 2/10/2027 son 365 dias (no hay 29/2 en el medio),
+    // menos uno: 364. Con `ceil` hubieran sido 365.
+    const dias = desde("2026-10-02T12:31:00.000Z", Date.parse("2027-10-01T14:47:00.000Z"));
+
+    expect(dias).toBe(364);
+    // Y entra en el maximo que acepta el cliente de MP.
+    expect(dias).toBeLessThanOrEqual(MAX_FREE_TRIAL_DAYS);
+  });
+
+  it("un anual que cruza un 29 de febrero: 365", () => {
+    // Del 2/10/2027 al 2/10/2028 son 366 dias (incluye el 29/2/2028), menos uno.
+    const dias = desde("2027-10-02T12:31:00.000Z", Date.parse("2028-10-01T14:47:00.000Z"));
+
+    expect(dias).toBe(365);
+    expect(dias).toBeLessThanOrEqual(MAX_FREE_TRIAL_DAYS);
+  });
+
+  // ── La propiedad que importa, barrida ──
+
+  it("barrido: para cualquier hora del dia, ahora + N * 24 h cae el MISMO dia argentino que E", () => {
+    // Si MP cuenta N corridas de 24 h desde la autorizacion (NO medido), el primer
+    // cobro cae en `ahora + N * 24 h`. Se compara con `artDateKey`, la definicion de
+    // "dia argentino" del repo, y no con la implementacion que se prueba.
+    for (let min = 0; min < 3 * 24 * 60; min += 7) {
+      const ahora = Date.parse("2026-10-01T00:00:00.000Z") + min * 60_000;
+      const n = diasDePrueba(E_REAL, ahora);
+      const cobro = ahora + n * DIA_MS;
+
+      expect(artDateKey(cobro)).toBe(artDateKey(E_REAL));
+      // Y a menos de un dia de la hora exacta de E, hacia cualquiera de los dos lados.
+      expect(Math.abs(cobro - E_REAL)).toBeLessThan(DIA_MS);
+    }
+  });
+
+  it("barrido: lo mismo variando la hora de E y el mes", () => {
+    // Mas de mil pares (hoy, E): E en tres fechas distintas (una es un 29/2) y a todas
+    // las horas del dia, hoy tambien a todas las horas. Siempre hay al menos 24 h.
+    for (const diaDeE of ["2026-11-01", "2027-03-15", "2028-02-29"]) {
+      for (let minE = 0; minE < 24 * 60; minE += 97) {
+        const e = Date.parse(`${diaDeE}T00:00:00.000Z`) + minE * 60_000;
+        for (let minAhora = 0; minAhora < 24 * 60; minAhora += 53) {
+          const ahora = Date.parse("2026-10-02T00:00:00.000Z") + minAhora * 60_000;
+          const n = diasDePrueba(e, ahora);
+
+          expect(n).toBeGreaterThanOrEqual(1);
+          expect(artDateKey(ahora + n * DIA_MS)).toBe(artDateKey(e));
+          expect(Math.abs(ahora + n * DIA_MS - e)).toBeLessThan(DIA_MS);
+        }
+      }
+    }
+  });
+
+  it("un valor que no es una fecha da NaN y NO tira: el cliente de MP lo rechaza como siempre", () => {
+    // Sin esto, un `RangeError` crudo de `Intl` saldria en medio del checkout.
+    for (const malo of [Number.NaN, Number.POSITIVE_INFINITY, 9e15]) {
+      expect(Number.isNaN(diasDePrueba(malo, AHORA))).toBe(true);
+      expect(Number.isNaN(diasDePrueba(AHORA, malo))).toBe(true);
     }
   });
 });
@@ -964,8 +1106,10 @@ describe("planesARevisar: el plan que pago no se cae del tope", () => {
   });
 
   it("el borde: con E a exactamente un dia SI entra, con un milisegundo mas no", () => {
-    // Un dia es el adelanto maximo que suponemos (MP podria contar en su propio
-    // calendario, -04:00): hasta ahi todavia pudo haber cobrado.
+    // Un dia es el adelanto maximo que suponemos: con dias de calendario argentino el
+    // primer cobro cae el mismo dia que E pero a la hora en que se autorizo, o sea
+    // hasta casi un dia ANTES de la hora exacta de E (hoy a las 00:01 ART y E a las
+    // 23:59 de ese dia: 23 h 58 min antes). Hasta ahi el plan entra, por las dudas.
     expect(ids([plan("justo", 1, { diferidoHastaMs: AHORA + ADELANTO_MAXIMO_DEL_COBRO_MS })]))
       .toEqual(["justo"]);
     expect(ids([plan("lejos", 1, {
@@ -1000,7 +1144,12 @@ describe("planesARevisar: el plan que pago no se cae del tope", () => {
 // decidirDiferimiento: la decision completa, con las dos lecturas inyectadas.
 // ---------------------------------------------------------------------------
 
-/** Un fin de periodo en el futuro: 13 dias adelante, a la misma hora. */
+/**
+ * Un fin de periodo en el futuro: el 20/9/2026 a las 09:00 ART. `AHORA` es el 7/9 a
+ * las 09:00 ART, asi que son 13 dias de calendario (7/9 + 13 = 20/9) y tambien 13
+ * dias de 24 h exactos: la misma hora del dia, por eso la cuenta por calendario y la
+ * del tiempo exacto coinciden en estas fixtures.
+ */
 const FIN = Date.parse("2026-09-20T12:00:00.000Z");
 /** El ultimo cobro que respalda ese fin con un periodo mensual. */
 const ULTIMO_COBRO = "2026-08-20T12:00:00.000Z";
@@ -1155,6 +1304,7 @@ describe("decidirDiferimiento: cuando SI se difiere", () => {
         tier: "plan2",
         planConPago: "p0",
         fuenteDelPago: "ultimo-cobro",
+        // Del 7/9 (AHORA, 09:00 ART) al 20/9 (FIN, 09:00 ART): 7 + 13 = 20.
         diasDePrueba: 13,
         diferidoHastaIso: "2026-09-20T12:00:00.000Z",
       }),
@@ -2411,8 +2561,10 @@ describe("cobroAntesDeLaPrueba", () => {
   });
 
   it("el borde: a exactamente el adelanto maximo de E todavia no avisa", () => {
-    // Un dia antes de E es lo mas temprano que suponemos que MP podria cobrar si
-    // cuenta los dias en su propio calendario (-04:00).
+    // Con dias de calendario argentino el primer cobro cae el mismo dia que E, a la
+    // hora en que se autorizo: lo mas temprano que el modelo permite es casi un dia
+    // antes de la hora exacta de E (hoy a las 00:01 ART y E a las 23:59 de ese dia),
+    // y a ese margen exacto todavia no se avisa.
     expect(cobroAntesDeLaPrueba(entrada(FIN - ADELANTO_MAXIMO_DEL_COBRO_MS)))
       .toBe(false);
   });

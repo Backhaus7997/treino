@@ -2573,8 +2573,10 @@ describe("reconcileSubscription: la prueba diferida", () => {
   });
 
   it("el borde: a exactamente un dia de E todavia no avisa, un milisegundo antes si", async () => {
-    // Un dia antes de E es lo mas temprano que suponemos que MP podria cobrar si
-    // cuenta los dias en su propio calendario (-04:00).
+    // Con dias de calendario argentino el primer cobro cae el mismo dia que E, a la
+    // hora en que se autorizo: lo mas temprano que el modelo permite es casi un dia
+    // antes de la hora exacta de E (hoy a las 00:01 ART y E a las 23:59 de ese dia).
+    // A un dia justo todavia no se avisa; un milisegundo antes, si.
     for (const [nowMs, avisa] of [
       [FIN_PAGO - DIA_MS, false],
       [FIN_PAGO - DIA_MS - 1, true],

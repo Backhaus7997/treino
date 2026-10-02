@@ -13,9 +13,10 @@
  * ── El arreglo ──
  *
  * El plan nuevo se crea con una prueba de N dias (`auto_recurring.free_trial`),
- * donde N es lo que le queda al periodo pago. La idea es que MP cobre por primera
- * vez cuando la prueba termina, o sea cuando lo que ya estaba pago vence. Que MP
- * se comporte asi NO esta medido: ver la seccion siguiente.
+ * donde N son los dias de CALENDARIO ARGENTINO que le quedan al periodo pago,
+ * contados como los cuenta una persona: del 2/10 al 1/11 son 30. La idea es que MP
+ * cobre por primera vez el dia en que vence lo que ya estaba pago. Que MP se
+ * comporte asi NO esta medido: ver la seccion siguiente.
  *
  * ── Lo que se ASUME de MP y NO esta medido ──
  *
@@ -27,16 +28,20 @@
  *      plan (los tipos del SDK lo declaran). Si lo rechazara, el checkout de un PF
  *      con dias pagos fallaria: para eso esta el interruptor
  *      [DIFERIR_PRIMER_COBRO_ENABLED].
- *   b. Que la prueba corra desde que el pagador AUTORIZA y que sean N dias
- *      corridos. Si MP los cuenta en su propio calendario (-04:00), el primer
- *      cobro podria caer hasta un dia ANTES de la fecha que calculamos. El `ceil`
- *      de [diasDePrueba] apunta a que no caiga antes, pero solo vale bajo este
- *      supuesto: ninguna otra regla depende de ello (el reconciliador deja
- *      holgura, y un plan con prueba se descarta como evidencia solo si le faltan
- *      mas de [ADELANTO_MAXIMO_DEL_COBRO_MS] para cobrar). Si MP ignorara o
- *      acortara la prueba, el reconciliador lo avisa con un warn
- *      ([cobroAntesDeLaPrueba]): con el interruptor encendido, el primer PF real
- *      que vuelva a suscribirse con dias pagos es la medicion de este supuesto.
+ *   b. Que la prueba corra desde que el pagador AUTORIZA y que sean N corridas
+ *      de 24 h. Con N igual a los dias de calendario argentino que faltan
+ *      ([diasDePrueba]), el primer cobro caeria el MISMO dia argentino en que vence
+ *      lo que el PF ya pago, a la hora del dia en que autorizo: algunas horas antes
+ *      o despues de la hora exacta de ese vencimiento (hasta casi un dia hacia
+ *      cualquiera de los dos lados), pero no otro dia. Si MP los cuenta de otra
+ *      forma (en su propio calendario, -04:00), podria caer mas lejos. Ninguna otra
+ *      regla depende de que se cumpla al pie de la letra: el reconciliador deja
+ *      holgura ([HOLGURA_PRUEBA_MS]), y un plan con prueba se descarta como
+ *      evidencia solo si le faltan mas de [ADELANTO_MAXIMO_DEL_COBRO_MS] para
+ *      cobrar. Si MP ignorara o acortara la prueba, el reconciliador lo avisa con
+ *      un warn ([cobroAntesDeLaPrueba]): con el interruptor encendido, el primer
+ *      PF real que vuelva a suscribirse con dias pagos es la medicion de este
+ *      supuesto.
  *   c. Que `date_created` de la suscripcion sea el momento de la autorizacion, y
  *      que `pending_charge_quantity` pueda contar el primer cobro programado.
  *
@@ -74,6 +79,7 @@
 
 import { logger } from "firebase-functions";
 
+import { artDateKey } from "../../mail/format";
 import { SubscriptionStatus } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
@@ -111,6 +117,11 @@ export const DIA_MS = 24 * 60 * 60 * 1000;
  * El solapamiento que se evita seria menor que un dia, y la prueba mas corta que
  * podemos mandar es de un dia: diferir por horas le regalaria al PF casi un dia
  * entero para ahorrarle unas pocas horas, y le suma un caso borde a un cobro.
+ *
+ * Es tambien lo que garantiza que [diasDePrueba] de al menos 1: con 24 h o mas por
+ * delante, el vencimiento cae por lo menos un dia de calendario despues de hoy.
+ * Con menos puede dar 0 (vence hoy mismo, en Argentina), y nuestro cliente de MP no
+ * manda una prueba de 0 dias (`freeTrialDays` va de 1 a `MAX_FREE_TRIAL_DAYS`).
  */
 export const MIN_DIFERIMIENTO_MS = DIA_MS;
 
@@ -125,13 +136,19 @@ export const MIN_DIFERIMIENTO_MS = DIA_MS;
 export const MAX_PLANES_A_REVISAR = 3;
 
 /**
- * Cuanto antes de E suponemos, como maximo, que MP puede cobrar el primer cobro
- * de un plan con prueba.
+ * Cuanto antes de E suponemos, como maximo, que puede caer el primer cobro de un
+ * plan con prueba.
  *
- * Los dias de prueba se calculan para que el cobro caiga en E. Si MP los cuenta en
- * su propio calendario (-04:00) y no en tramos de 24 h (no esta medido), el cobro
- * puede caer hasta un dia antes. Se usa para decidir que un plan con prueba
- * TODAVIA NO PUDO COBRAR (ver [planesARevisar]); es un margen, no una garantia.
+ * Los dias de prueba son los de CALENDARIO ARGENTINO (ver [diasDePrueba]), asi que
+ * el primer cobro caeria el mismo dia argentino que E pero a la hora en que se
+ * autorizo: puede ser hasta un dia, menos un instante, ANTES de la hora exacta de E
+ * (hoy a las 00:01 y E a las 23:59 de ese dia). Este margen es exactamente ese peor
+ * caso, y no deja holgura para nada mas: si MP cuenta los dias en su propio
+ * calendario (-04:00, no esta medido), el cobro podria caer algo mas lejos.
+ *
+ * Se usa para decidir que un plan con prueba TODAVIA NO PUDO COBRAR (ver
+ * [planesARevisar]) y para avisar de un cobro antes de tiempo
+ * ([cobroAntesDeLaPrueba]). Es un margen, no una garantia.
  */
 export const ADELANTO_MAXIMO_DEL_COBRO_MS = DIA_MS;
 
@@ -229,8 +246,10 @@ export interface PlanesARevisar {
  *      cambie el motivo el filtro dejaria de reconocerlo sin que nada falle.
  *
  *   3. **Si el plan se abrio con prueba, que haya podido cobrar.** Un plan
- *      diferido (`diferidoHastaMs` = E) no cobra antes de E, salvo por el adelanto
- *      que suponemos como maximo ([ADELANTO_MAXIMO_DEL_COBRO_MS], no esta medido).
+ *      diferido (`diferidoHastaMs` = E) no cobra antes de E menos el adelanto que
+ *      suponemos como maximo ([ADELANTO_MAXIMO_DEL_COBRO_MS]: con dias de calendario
+ *      el cobro puede caer hasta un dia antes de la hora exacta de E, no esta
+ *      medido).
  *      Volver a suscribirse y cancelar dentro del mismo periodo deja un plan
  *      terminal por vuelta, ninguno llega a cobrar, y todos comparten E (el fin del
  *      periodo pago): tres vueltas empujarian fuera al plan que si pago.
@@ -462,23 +481,62 @@ export function pagadoHastaDe(sub: MpPreapproval): number | null {
 }
 
 /**
- * Cuantos dias de prueba hay que mandarle a MP para que, SI cuenta N dias corridos
- * de 24 h desde la autorizacion, el primer cobro caiga en [diferidoHastaMs] o
- * apenas despues.
+ * El dia de calendario argentino de [ms], como un entero (los dias desde el
+ * 1/1/1970 de esa fecha), o `NaN` si [ms] no es una fecha.
  *
- * El "si" es un supuesto que NO esta medido (ver "Lo que se ASUME de MP"): si MP
- * cuenta los dias en su propio calendario (-04:00), el cobro podria caer hasta un
- * dia ANTES de esa fecha, y este calculo no lo puede evitar. Lo que SI evita es
- * empeorarlo por redondeo: `ceil` y no `round`, porque redondear hacia abajo
- * adelantaria el cobro y el PF pagaria antes de que venza lo que ya pago, que es
- * el bug entero. El costo de redondear hacia arriba es que el cobro cae hasta un
- * dia despues, que es el lado barato de equivocarse.
+ * Usa `artDateKey`, la definicion de "dia argentino" que ya tiene el repo
+ * (`mail/format.ts`, con `Intl` y America/Argentina/Buenos_Aires): ninguna
+ * compensacion de -3 h escrita a mano. El `NaN` es para que un valor imposible llegue
+ * al cliente de MP como siempre (que lo rechaza) y no como un `RangeError` crudo de
+ * `Intl` en medio del checkout.
+ */
+function diaArgentino(ms: number): number {
+  const fecha = new Date(ms);
+  if (Number.isNaN(fecha.getTime())) return Number.NaN;
+  const [anio, mes, dia] = artDateKey(fecha).split("-").map(Number);
+  return Date.UTC(anio, mes - 1, dia) / DIA_MS;
+}
+
+/**
+ * Cuantos dias de prueba hay que mandarle a MP: los dias de CALENDARIO ARGENTINO
+ * entre hoy y el dia en que vence lo que el PF ya pago. Es la fecha argentina de
+ * [diferidoHastaMs] menos la de [nowMs].
+ *
+ * ── Por que calendario y no el tiempo exacto que falta ──
+ *
+ * La primera version hacia `ceil(tiempo restante / 24 h)`, y le sumaba un dia a
+ * cualquiera con horas sobrantes. Un caso real: un plan pago hasta el 1/11 a las
+ * 11:47, y el checkout abierto el 2/10 a las 09:30. Faltaban 30 dias y 2 horas, el
+ * `ceil` daba 31, MP mostraba "31 dias gratis" y el primer cobro caia el 2/11.
+ * Nadie cuenta asi: del 2/10 al 1/11 son 30 dias, y desde el 8/10 serian 24. Lo
+ * que el PF espera ver, y lo que se le explica, son dias de calendario.
+ *
+ * ── Que se espera de MP (NO esta medido) ──
+ *
+ * Si MP cuenta N corridas de 24 h desde que el pagador AUTORIZA, el primer cobro
+ * cae en `autorizacion + N * 24 h`. Con N de calendario, eso es el MISMO dia
+ * argentino en que vence el periodo (siempre que el pagador autorice el mismo dia
+ * en que se abrio el checkout), a la hora del dia en que autorizo: puede ser
+ * algunas horas antes o despues de la hora exacta de E, hasta casi un dia hacia
+ * cualquiera de los dos lados, pero nunca otro dia. Para que 24 h sean siempre un
+ * dia de calendario hace falta que Argentina no tenga horario de verano, y no lo
+ * tiene desde 2009 (ver `mail/format.ts`).
+ *
+ * Si MP los cuenta de otra forma (en su propio calendario, -04:00), no lo sabemos:
+ * ver "Lo que se ASUME de MP".
+ *
+ * ── Lo que garantiza ──
+ *
+ * Con [MIN_DIFERIMIENTO_MS] o mas por delante da AL MENOS 1: sumarle 24 h a un
+ * instante corre su fecha argentina exactamente un dia. Con menos puede dar 0 (vence
+ * hoy mismo), que el cliente de MP rechaza; por eso `decidirDiferimiento` no
+ * difiere por debajo de ese minimo.
  *
  * Vive aca y la llama `abrir-checkout.ts`: los dias salen de UN solo lugar, a
  * partir de `diferidoHastaMs` y del reloj del request.
  */
 export function diasDePrueba(diferidoHastaMs: number, nowMs: number): number {
-  return Math.ceil((diferidoHastaMs - nowMs) / DIA_MS);
+  return diaArgentino(diferidoHastaMs) - diaArgentino(nowMs);
 }
 
 /** Por que NO se difiere. Va al log para poder explicar un cobro en el acto. */
@@ -498,8 +556,9 @@ export type Diferimiento =
   | {
       diferir: true;
       /**
-       * Hasta cuando esta pago el periodo, en ms. Es la fecha en la que se busca
-       * que caiga el primer cobro (ver [diasDePrueba] por lo que no esta medido).
+       * Hasta cuando esta pago el periodo, en ms. Es el dia (argentino) en el que se
+       * busca que caiga el primer cobro (ver [diasDePrueba] por lo que no esta
+       * medido).
        */
       diferidoHastaMs: number;
     };
@@ -729,7 +788,8 @@ export async function decidirDiferimiento(
 //      el PF solo pago hasta E (a traves del plan anterior): el ultimo le regala
 //      un mes que nunca se cobro, y los otros pueden pasarse de E (si MP manda
 //      `next_payment_date` en una prueba cancelada, que no esta medido, seria el
-//      primer cobro que no ocurrio, redondeado a dias).
+//      primer cobro que no ocurrio: el mismo dia argentino que E, pero hasta casi
+//      un dia despues de su hora exacta).
 //
 // Lo que NO hacen: no dan de baja nada en MP. El pagador autorizo de buena fe, la
 // baja es terminal, y una decision nuestra equivocada no se puede deshacer. Se
@@ -742,8 +802,10 @@ export async function decidirDiferimiento(
  * Los dias se contaron desde el momento en que se abrio el checkout. Asumimos que
  * MP los cuenta desde que el pagador AUTORIZA (no esta medido), asi que el primer
  * cobro caeria `autorizacion + dias`. Autorizando a las pocas horas la diferencia
- * es chica y entra en [HOLGURA_PRUEBA_MS]; autorizando varios dias despues, el
- * cobro se correria esos mismos dias y dejaria de ser el que le corresponde.
+ * es chica y entra en [HOLGURA_PRUEBA_MS] (si se autoriza pasada la medianoche
+ * argentina, el cobro cae un dia de calendario despues del de E); autorizando
+ * varios dias despues, el cobro se correria esos mismos dias y dejaria de ser el
+ * que le corresponde.
  */
 export const VENTANA_AUTORIZACION_MS = 24 * 60 * 60 * 1000;
 
@@ -751,15 +813,17 @@ export const VENTANA_AUTORIZACION_MS = 24 * 60 * 60 * 1000;
  * Cuanto despues de E se sigue tratando como "en prueba" a una suscripcion que
  * todavia no cobro.
  *
- * Bajo el supuesto de que MP cuenta N dias corridos desde la autorizacion (no esta
- * medido), el primer cobro caeria en E o hasta un dia despues (por el `ceil` de
- * [diasDePrueba]) mas lo que tardo el pagador en autorizar (hasta
+ * Bajo el supuesto de que MP cuenta N corridas de 24 h desde la autorizacion (no
+ * esta medido), el primer cobro caeria el mismo dia argentino que E, hasta casi un
+ * dia DESPUES de su hora exacta (por contar dias de calendario, ver
+ * [diasDePrueba]), mas lo que tardo el pagador en autorizar (hasta
  * [VENTANA_AUTORIZACION_MS]), y MP puede demorarse en intentarlo. Tres dias
- * cubren eso con aire; pasados, un cobro pendiente vuelve a leerse como `grace`
- * y el aviso de "no pudimos cobrar" es verdad.
+ * cubren eso con aire (el peor caso es E mas dos dias); pasados, un cobro
+ * pendiente vuelve a leerse como `grace` y el aviso de "no pudimos cobrar" es
+ * verdad.
  *
- * Si MP cuenta en su propio calendario y el cobro cae ANTES de E
- * ([ADELANTO_MAXIMO_DEL_COBRO_MS]), nada de esto se rompe: apenas hay un cobro
+ * El cobro tambien puede caer ANTES de la hora exacta de E, hasta un dia
+ * ([ADELANTO_MAXIMO_DEL_COBRO_MS]): no rompe nada, porque apenas hay un cobro
  * exitoso el plan deja de leerse como prueba y vale el mapeo de siempre.
  */
 export const HOLGURA_PRUEBA_MS = 3 * DIA_MS;
@@ -861,8 +925,9 @@ export function situacionDeLaPrueba(i: PruebaDiferidaInput): SituacionDeLaPrueba
  * periodo que ya tenia pago y el que acaba de cobrar el plan nuevo. Es la medicion
  * del supuesto (b) de "Lo que se ASUME de MP". El cobro ocurrio en algun momento
  * anterior o igual a `nowMs`, asi que si `nowMs` ya esta antes de E menos el
- * adelanto, el cobro cayo antes de lo que cualquier forma de contar los dias
- * podria explicar.
+ * adelanto, el cobro cayo antes de lo que explica contar los dias de calendario
+ * argentino: el mas temprano posible es casi un dia antes de la hora exacta de E
+ * (ver [ADELANTO_MAXIMO_DEL_COBRO_MS]).
  *
  * No cambia ningun estado ni ninguna fecha: el plan que ya cobro se lee como
  * cualquier otro. Es solo para que el reconciliador avise.
