@@ -66,11 +66,18 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// de valer, y `vigenciaDelPlanProvider` (`vigencia_del_plan_provider.dart`,
 /// al lado) la recalcula ahí. Lo leen el chip del sidebar, que está montado
 /// toda la sesión, el banner de upsell, el medidor de cupo del tab Coach
-/// móvil y la pantalla de alumnos en solo lectura. La pricing page y
-/// Facturación todavía la calculan en su build: abiertas al cruzar el borde,
-/// muestran la foto vieja hasta el próximo rebuild. No son las únicas que
-/// miran el reloj: otras pantallas comparan `currentPeriodEnd` contra su
-/// propio `now` sin pasar por esta clase.
+/// móvil y la pantalla de alumnos en solo lectura. La pricing page
+/// (`pricing_screen.dart`) y Facturación (`facturacion_tab.dart`) todavía la
+/// calculan en su build: abiertas al cruzar el borde, muestran la foto vieja
+/// hasta el próximo rebuild. No son las únicas que miran el reloj: otras
+/// pantallas comparan `currentPeriodEnd` contra su propio `now` sin pasar por
+/// esta clase.
+///
+/// Los `.dart` de `lib/` nombrados entre backticks en esta sección son
+/// EXACTAMENTE los que llaman a [VigenciaDelPlan.de], y lo verifica
+/// `vigencia_en_el_build_scan_test.dart`: quien sume una pantalla que la
+/// calcule en su build la tiene que nombrar acá, y quien la pase al provider,
+/// sacarla.
 final class VigenciaDelPlan {
   const VigenciaDelPlan._({
     required this.tierEfectivo,
