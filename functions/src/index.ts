@@ -186,12 +186,11 @@ export { maintainTemplateCount } from "./subscriptions/template-count";
 // instante, y el barrido hace el backfill de los alumnos que ya existian (a
 // esos no los ve ningun trigger porque no escriben nada).
 //
-// Hoy escriben `false` en todos lados: el interruptor
-// ATHLETE_PAYWALL_ENFORCEMENT_ENABLED arranca apagado. Ver el encabezado del
-// modulo antes de prenderlo: el grandfathering de RUTINAS PROPIAS ya esta
-// resuelto (`noCreceLaForma` en las reglas), pero sigue abierto el de las
-// PLANTILLAS PAGAS que un alumno ya venia siguiendo — ver
-// `routine_detail_screen.dart`.
+// El interruptor ATHLETE_PAYWALL_ENFORCEMENT_ENABLED esta PRENDIDO desde el
+// 2026-10-02, con un pendiente aceptado mientras solo hay testers: el
+// grandfathering de RUTINAS PROPIAS esta resuelto (`noCreceLaForma` en las
+// reglas), pero sigue abierto el de las PLANTILLAS PAGAS que un alumno ya venia
+// siguiendo — ver el encabezado del modulo y `routine_detail_screen.dart`.
 export {
   syncAthletePaywallOnUser,
   syncAthletePaywallOnTrainerLink,

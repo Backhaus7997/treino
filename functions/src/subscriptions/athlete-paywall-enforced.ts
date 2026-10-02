@@ -21,14 +21,32 @@
  * CF-write-only — lo pinea `firestore.rules` en el create y en el update de
  * `users/{uid}`, porque si no el alumno se auto-exime escribiendose `false`.
  *
- * ─── El interruptor, y por que arranca APAGADO ──────────────────────────────
+ * ─── El interruptor, y por que arranco APAGADO ──────────────────────────────
  *
- * [ATHLETE_PAYWALL_ENFORCEMENT_ENABLED] arranca en `false`, espejando
+ * [ATHLETE_PAYWALL_ENFORCEMENT_ENABLED] arranco en `false`, espejando
  * `kAthletePaywallEnabled` del cliente. Con el interruptor apagado esta CF
  * igual corre y escribe `false` en todos lados: la plomeria queda ejercitada y
  * OBSERVABLE en produccion antes de que cobre importancia, y prender el paywall
  * pasa a ser un cambio de valor y nada mas. Apagarlo vuelve a limpiar el campo,
  * o sea que el rollback es real y no un deploy de emergencia.
+ *
+ * ─── PRENDIDO el 2026-10-02, con dos pendientes aceptados ──────────────────
+ *
+ * Decision de Martin, con la landing ya prendida (el checkout responde) y sin
+ * usuarios reales: lo de abajo hoy les pasa solo a testers.
+ *
+ *   1. El alumno que ya venia siguiendo una plantilla PAGA del catalogo deja de
+ *      poder entrenarla: las reglas le rebotan la sesion
+ *      (`sesionSobreRutinaLibre`). Es el grandfathering que sigue abierto (ver
+ *      `routine_detail_screen.dart`), y hay que resolverlo antes de que haya
+ *      alumnos reales, no despues.
+ *   2. La version de las tiendas anterior al build 53 no tiene la pantalla del
+ *      tope: quien la use y pase un tope recibe el error crudo de la regla.
+ *
+ * Si alguno de los dos muerde a alguien real antes de resolverse, el rollback
+ * es este mismo valor en `false` y el deploy de las cuatro functions que lo
+ * leen: `syncAthletePaywallOnUser`, `syncAthletePaywallOnTrainerLink`,
+ * `sweepAthletePaywall` y `solicitarCodigoDeVerificacion`.
  *
  * ─── ANTES DE PRENDERLO: el grandfathering ────────────────────────────────
  *
@@ -79,7 +97,7 @@ function ensureApp(): App {
 }
 
 /** El interruptor. Ver el encabezado antes de tocarlo. */
-export const ATHLETE_PAYWALL_ENFORCEMENT_ENABLED = false;
+export const ATHLETE_PAYWALL_ENFORCEMENT_ENABLED = true;
 
 /** El campo que escribe este modulo, y nadie mas. */
 export const ENFORCED_FIELD = "athletePaywallEnforced";

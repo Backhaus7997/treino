@@ -406,8 +406,11 @@ class _FollowTemplateBar extends ConsumerWidget {
     // siguiendo una premium de antes del gate ve el candado acá Y en la acción
     // de EMPEZAR — las dos superficies dicen lo mismo. Que ese alumno quede sin
     // poder entrenar lo que ya tenía activo es un problema de grandfathering
-    // que SIGUE ABIERTO, y se resuelve antes de prender el interruptor, no
-    // dejando que una pantalla prometa lo que la otra rebota.
+    // que SIGUE ABIERTO, y se resuelve en el gate, no dejando que una pantalla
+    // prometa lo que la otra rebota. El interruptor del servidor se prendió
+    // igual el 2026-10-02, con solo testers (ver el encabezado de
+    // `athlete-paywall-enforced.ts`): esto tiene que estar resuelto antes de
+    // que haya alumnos reales.
     //
     // OJO, es OTRO que el que se cerró el 2026-09-11. Aquél era de FORMA: una
     // rutina PROPIA fuera de tope no se podía ni renombrar, y lo arregla
