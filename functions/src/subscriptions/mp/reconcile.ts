@@ -36,7 +36,7 @@
  * Free y el barrido de las 04:00 le bloquearia alumnos. O sea que un dato raro
  * de MP terminaria cortandole el servicio a alumnos que no tienen nada que ver.
  *
- * Por eso hay seis casos donde esta funcion NO toca el documento:
+ * Por eso hay ocho casos donde esta funcion NO toca el documento:
  *
  *   1. El estado de MP no se entiende (`degraded`).
  *   2. No sabemos de que plan es la suscripcion.
@@ -44,6 +44,9 @@
  *   4. Lo que ibamos a escribir es identico a lo que ya esta.
  *   5. Es un `pending` y el PF ya tiene un entitlement pago vigente.
  *   6. El plan fue REEMPLAZADO por otro y lo dimos de baja nosotros.
+ *   7. La cuenta del usuario se elimino.
+ *   8. El plan ya no es el VIGENTE del PF y lo que trae no le gana a lo que
+ *      hay escrito. Ver "EL PLAN VIGENTE" mas abajo.
  *
  * El (5) protege al PF que cambia de plan. Nada impide abrir un checkout
  * estando ya suscripto, asi que un plan2 que quiere pasar a plan3 queda con DOS
@@ -161,6 +164,60 @@
  *     aunque tenga periodo pago. Es la misma injusticia de forma, pero es otra
  *     decision de politica y meterla acá seria cambiarla de contrabando.
  *
+ * ── EL PLAN VIGENTE, Y POR QUE EL MAPA ANOTA QUIEN LO ESCRIBIO ──
+ *
+ * La guarda (6) solo cubre la baja que decidimos NOSOTROS. La que hace el PF no
+ * deja `supersededBy` —`puedeSeguirCobrando` la saltea, porque no hay nada que
+ * cancelar— y eso dejaba un agujero (lo encontro la revision del #1290):
+ *
+ *   1. El PF da de baja el plan A: `cancelled`, y A queda `terminal`.
+ *   2. Vuelve a contratar con el plan B: `active`.
+ *   3. Llega TARDE un webhook de A (el dedupe de `mpWebhook` dura 10 minutos).
+ *   4. Se reconcilia A. MP contesta `cancelled` sin fecha, la cascada de
+ *      `resolverFinDePeriodo` cae en la fecha guardada —que ya es la de B— y se
+ *      escribe {tier de A, cancelled, fecha de B} encima del `active` de B.
+ *
+ * Con el mismo tier, la pantalla dice "Plan dado de baja" y le ofrece VOLVER A
+ * CONTRATAR a alguien que esta suscripto. Con otro tier le baja el cupo y le
+ * manda el mail de degradacion. El barrido reafirma B esa noche, porque A es
+ * terminal y no lo visita — pero el mail ya salio.
+ *
+ * Por eso `subscription.mpPlanId` dice QUE plan escribio el estado, y un plan
+ * que no es ese solo lo pisa si lo que trae le GANA a lo que hay
+ * (`puedePisarAlVigente`):
+ *
+ *   - Primero por estado: lo que cobra (`active`, `grace`) le gana a lo que esta
+ *     naciendo (`pending`), y eso a lo que termino (`cancelled`, `paused`).
+ *   - Con el mismo estado, el plan mas nuevo por `mp_plans.createdAt`: el mismo
+ *     criterio con el que `darDeBajaLosReemplazados` elige a quien cancelar, asi
+ *     que las dos decisiones no se pueden contradecir.
+ *
+ * Ordenar SOLO por `createdAt` parece suficiente y no lo es: esa fecha es cuando
+ * se ABRIO el checkout, no cuando se pago, y el `init_point` no vence. El PF que
+ * abre A, abre B —que llega a escribir un `pending` y despues se cae— y al final
+ * paga la pestaña vieja de A, quedaba con A cobrando y sin acreditar NUNCA:
+ * ningun evento de A volvia a poder escribir. Con el estado primero, un pago real
+ * siempre pasa por encima de un checkout que no se pago. Y la regla es simetrica:
+ * el `cancelled` de un plan nuevo que nunca se pago tampoco pisa el `active` de
+ * uno mas viejo que sigue cobrando.
+ *
+ * Lo que la guarda NO hace, a proposito:
+ *
+ *   - Frenar al plan anotado. Su propia baja, su pausa o su cobro rebotado
+ *     escriben siempre — si no, nadie perderia nunca el plan.
+ *   - Saltearse la marca `terminal`. Que un plan no mande no cambia que MP haya
+ *     confirmado su baja.
+ *   - Decidir sin datos. Un estado escrito antes de que existiera la clave, o dos
+ *     planes que no se pueden ordenar porque a uno le falta la fecha, se escriben
+ *     como antes de la guarda. Frenar ahi podria dejar sin acreditar un pago para
+ *     siempre, que es el peor de los dos errores.
+ *   - Cerrar la carrera entre dos eventos SIMULTANEOS del mismo PF: leer y
+ *     escribir `users/{uid}` no es una transaccion. El agujero era un evento
+ *     tardio, no uno simultaneo.
+ *   - Cubrir al alumno. Su mapa es `{ status }` y nada mas, por decision y con un
+ *     test que lo fija (ver `escribirSuscripcionDeAlumno`), asi que anotarle el
+ *     plan es otro cambio. Tiene el mismo agujero y queda abierto.
+ *
  * ── LA PRUEBA DIFERIDA ──
  *
  * Un plan que nacio con dias de prueba (`mp_plans.diferidoHastaMs`, ver
@@ -247,6 +304,13 @@ export type ReconcileOutcome =
    * eliminada: escribir acá recrearia un `users/{uid}` vacio.
    */
   | "skipped-cuenta-eliminada"
+  /**
+   * El plan no es el que escribio el estado del PF (`subscription.mpPlanId`) y
+   * lo que trae no le gana a lo que hay. Ver la guarda del plan vigente: el caso
+   * tipico es el webhook TARDIO de un plan que el PF dio de baja, llegando
+   * despues de que contrato otro.
+   */
+  | "skipped-plan-no-vigente"
   | "sin-suscripcion"
   | "error-mp";
 
@@ -591,6 +655,102 @@ export const CAMPO_ARREPENTIDO = "arrepentidoAtMs";
 export function arrepentidoAtDe(datos: Record<string, unknown> | undefined): number | null {
   const v = datos?.[CAMPO_ARREPENTIDO];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * La clave de `users/{uid}.subscription` que dice QUE plan escribio ese estado.
+ * Ver "EL PLAN VIGENTE" en el encabezado.
+ *
+ * Va adentro del mapa y no como campo hermano en `users/{uid}`: el mapa ya esta
+ * pineado entero en `firestore.rules` (null en el create, igual al guardado en el
+ * update), asi que la clave no cuesta ni una linea de reglas. El cliente la
+ * ignora: `TrainerSubscription` no la declara y `json_serializable` descarta lo
+ * que no conoce.
+ */
+const CAMPO_PLAN_VIGENTE = "mpPlanId";
+
+/**
+ * Que tan vigente es un estado, para decidir entre dos planes del mismo PF.
+ *
+ *   2 — `active` / `grace`: las dos caras del `authorized` de MP. Hay medio de
+ *       pago cargado y MP le sigue cobrando.
+ *   1 — `pending`: un checkout que todavia no se confirmo.
+ *   0 — `cancelled`, `paused`, o un estado que no entendemos: no cobra.
+ *
+ * Contesta cual de los dos planes es el que el PF sigue PAGANDO, y nada mas.
+ */
+function rangoDeVigencia(status: unknown): number {
+  if (status === "active" || status === "grace") return 2;
+  if (status === "pending") return 1;
+  return 0;
+}
+
+/** Un plan del PF, tal como lo compara [puedePisarAlVigente]. */
+export interface PlanEnDisputa {
+  planId: string;
+  /** En el vocabulario del PF. Del vigente, lo que hay escrito hoy. */
+  status: unknown;
+  /** `mp_plans/{planId}.createdAt` en ms, o `null` si no se pudo leer. */
+  altaMs: number | null;
+}
+
+/**
+ * Si el estado que trae [entrante] puede pisar al que escribio [vigente] —el plan
+ * anotado en `subscription.mpPlanId`—.
+ *
+ * Pura y total. El por que de cada regla esta en "EL PLAN VIGENTE", en el
+ * encabezado, y los `if` van en el mismo orden.
+ */
+export function puedePisarAlVigente(
+  entrante: PlanEnDisputa,
+  vigente: PlanEnDisputa,
+): boolean {
+  // El plan que escribio el estado lo actualiza siempre: su baja, su pausa, su
+  // cobro rebotado. Si no, nadie perderia nunca el plan.
+  if (entrante.planId === vigente.planId) return true;
+
+  // Primero el estado. Es lo que deja pasar el pago de una pestaña vieja por
+  // encima de un checkout mas nuevo que nunca se pago.
+  const rangoEntrante = rangoDeVigencia(entrante.status);
+  const rangoVigente = rangoDeVigencia(vigente.status);
+  if (rangoEntrante !== rangoVigente) return rangoEntrante > rangoVigente;
+
+  // Mismo estado: manda el mas nuevo, como en `darDeBajaLosReemplazados`. Sin las
+  // dos fechas —o con la misma— no hay orden, y se escribe como antes de la
+  // guarda: frenar podria dejar un pago sin acreditar para siempre.
+  if (entrante.altaMs === null || vigente.altaMs === null) return true;
+  return entrante.altaMs >= vigente.altaMs;
+}
+
+/** `mp_plans/{planId}.createdAt` en ms, o `null` si el plan no existe o no la tiene. */
+async function altaDelPlanMs(app: App, planId: string): Promise<number | null> {
+  const snap = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
+    .get();
+  return comoTimestamp(snap.data()?.createdAt)?.toMillis() ?? null;
+}
+
+/**
+ * Marca `terminal` —sin motivo, que es lo que distingue a la baja (ver
+ * `motivos-terminal.ts`)— cuando MP confirmo que el plan esta `cancelled`.
+ * Idempotente: si ya estaba, no escribe.
+ *
+ * La llaman los dos caminos que reconcilian un PF: el que escribe su estado y el
+ * del plan que ya no es el vigente. Que un plan no mande no cambia que MP haya
+ * confirmado su baja.
+ */
+async function marcarTerminalSiSeDioDeBaja(
+  app: App,
+  planId: string,
+  status: SubscriptionStatus,
+  planDoc: Record<string, unknown> | undefined,
+): Promise<void> {
+  if (status !== "cancelled" || planDoc?.terminal === true) return;
+  await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
+    .set({ terminal: true }, { merge: true });
 }
 
 /**
@@ -1344,6 +1504,53 @@ export async function reconcileSubscription(
     }
   }
 
+  // ── GUARDA DEL PLAN VIGENTE: un plan que ya no manda no pisa el estado ──
+  //
+  // Ver "EL PLAN VIGENTE" en el encabezado: el caso es el webhook TARDIO de un
+  // plan que el PF dio de baja, llegando despues de que contrato otro.
+  //
+  // Va DESPUES de la de `pending`, que ya explicaba sus casos (el upgrade en
+  // curso sigue saliendo como `skipped-pending-no-pisa`), y ANTES de todo lo que
+  // viene: la fecha, el piso y la baja de los reemplazados le tocan al plan que
+  // manda, no a este.
+  //
+  // El `createdAt` del vigente cuesta una lectura, y solo se paga cuando el
+  // estado lo escribio OTRO plan: fuera de un cambio de plan, casi nunca.
+  const anotado = actual?.[CAMPO_PLAN_VIGENTE];
+  if (typeof anotado === "string" && anotado !== "" && anotado !== planId) {
+    const pisa = puedePisarAlVigente(
+      {
+        planId,
+        status,
+        altaMs: comoTimestamp(planDoc?.createdAt)?.toMillis() ?? null,
+      },
+      {
+        planId: anotado,
+        status: actual?.status,
+        altaMs: await altaDelPlanMs(app, anotado),
+      },
+    );
+    if (!pisa) {
+      logger.info("mp/reconcile: el plan ya no es el vigente del PF — no pisa su estado", {
+        planId,
+        uid,
+        planVigente: anotado,
+        status,
+        statusVigente: actual?.status,
+      });
+      // La baja de ESTE plan sigue siendo un hecho de MP, aunque no mande.
+      await marcarTerminalSiSeDioDeBaja(app, planId, status, planDoc);
+      return {
+        planId,
+        outcome: "skipped-plan-no-vigente",
+        uid,
+        producto: "trainer",
+        tier: mapping.tier,
+        status,
+      };
+    }
+  }
+
   // El arrepentimiento devuelve TODO lo pagado, así que el acceso de ESTE plan
   // termina en el momento en que se confirmó: el fin de período es ese instante
   // (ver `arrepentidoAtDe`). Sin esto, el próximo evento de MP recalcularía
@@ -1408,8 +1615,13 @@ export async function reconcileSubscription(
     );
   }
 
+  // El plan que escribe es parte de lo escrito. Un estado de antes de que
+  // existiera `mpPlanId` se reescribe UNA vez para anotarlo: dispara
+  // `syncEntitlementsOnSubscription` (compara el mapa serializado), pero no
+  // manda mail ni bloquea a nadie, porque el limite no cambia.
   const sinCambios =
     actual != null &&
+    actual[CAMPO_PLAN_VIGENTE] === planId &&
     actual.tier === mapping.tier &&
     actual.status === status &&
     mismaFecha(periodEnd, actual.currentPeriodEnd) &&
@@ -1428,6 +1640,7 @@ export async function reconcileSubscription(
           // apostar a un comportamiento que no existe.
           prepaidTier: piso === null ? null : piso.tier,
           prepaidUntil,
+          [CAMPO_PLAN_VIGENTE]: planId,
         },
       },
       // `merge` y no `set` pelado: el documento de usuario tiene el perfil
@@ -1461,12 +1674,7 @@ export async function reconcileSubscription(
   // Ahora se escribe siempre que MP diga `cancelled` y el plan no la tenga. Es
   // idempotente (`merge`, sin motivo): la unica clase de `terminal` sin motivo
   // es justamente la baja (ver `motivos-terminal.ts`).
-  if (status === "cancelled" && planDoc?.terminal !== true) {
-    await getFirestore(app)
-      .collection(MP_PLANS_COLLECTION)
-      .doc(planId)
-      .set({ terminal: true }, { merge: true });
-  }
+  await marcarTerminalSiSeDioDeBaja(app, planId, status, planDoc);
 
   // ── LA BAJA DE LO QUE ESTE PLAN REEMPLAZA ──
   //
