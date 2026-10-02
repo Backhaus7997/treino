@@ -2674,6 +2674,11 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
       expect(store.mp_plans.a1.terminal).toBeUndefined();
       // Y no se anoto nada del hermano que no se pudo leer.
       expect(store.mp_plans.a2.ultimoStatus).toBeUndefined();
+      // Lo unico que quedo escrito es un hecho de ESTE plan, y la fecha no se movio.
+      expect(store.mp_plans.a1.ultimoStatus).toBe("cancelled");
+      expect(
+        (store.mp_plans.a1.currentPeriodEnd as { toMillis(): number }).toMillis(),
+      ).toBe(VENCE_EL_MENSUAL);
 
       // El barrido de la noche siguiente, con MP de vuelta.
       const vuelta = fakeMpMultiPlan({
@@ -2687,17 +2692,169 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
     });
 
     it("el barrido cuenta el error y sigue con los demas planes", async () => {
+      // a2 solo falla cuando se le pregunta por el EN MODO ESTRICTO, o sea desde la
+      // guarda: cuando el barrido lo reconcilia a el, MP contesta bien. Asi el
+      // unico error posible es el de a1.
       const { app, store } = fakeApp(mundoPreDeploy());
       const { deps } = conRegistro(fakeMpMultiPlan({
         a1: MENSUAL_DADO_DE_BAJA,
-        a2: new MpApiError("MP caido", 503),
+        a2: ANUAL_AUTORIZADO,
       }));
+      const bien = deps.mpClient.searchPreapprovalsByPlan;
+      deps.mpClient.searchPreapprovalsByPlan = async (planId, opciones) => {
+        if (planId === "a2" && opciones?.estricto) {
+          throw new MpApiError("MP caido", 503);
+        }
+        return bien(planId, opciones);
+      };
+
+      // El plan devuelve `error-mp`: no es una excepcion que se coma el `catch`
+      // del barrido.
+      await expect(reconcileSubscription(app, "a1", deps)).resolves.toMatchObject({
+        outcome: "error-mp",
+      });
 
       const r = await reconcileAllSubscriptions(app, deps);
 
-      expect(r.errors).toBeGreaterThanOrEqual(1);
+      expect(r.errors).toBe(1);
       expect(derechoDe(store)).toBe("active");
       expect(store.mp_plans.a1.terminal).toBeUndefined();
+      // a2 se reconcilio normalmente.
+      expect(store.mp_plans.a2.ultimoStatus).toBe("active");
+    });
+
+    describe("varias suscripciones sobre el plan hermano", () => {
+      const BAJA_VIEJA: MpPreapproval = {
+        id: "s2-vieja",
+        status: "cancelled",
+        external_reference: "u1",
+        auto_recurring: { transaction_amount: 35000 },
+        summarized: { pending_charge_quantity: 0 },
+      };
+
+      for (const [nombre, subs] of [
+        ["la baja vieja primero", [BAJA_VIEJA, ANUAL_AUTORIZADO]],
+        ["la autorizada primero", [ANUAL_AUTORIZADO, BAJA_VIEJA]],
+      ] as const) {
+        it(`otorga si CUALQUIERA otorga, en el orden que MP las devuelva (${nombre})`, async () => {
+          const { app, store } = fakeApp(mundoPreDeploy());
+          const { deps } = conRegistro(fakeMpMultiPlan({
+            a1: MENSUAL_DADO_DE_BAJA,
+            a2: null,
+          }));
+          const base = deps.mpClient.searchPreapprovalsByPlan;
+          deps.mpClient.searchPreapprovalsByPlan = async (planId, opciones) =>
+            planId === "a2" ? [...subs] : base(planId, opciones);
+
+          const r = await reconcileSubscription(app, "a1", deps);
+
+          expect(r.outcome).toBe("skipped-otro-plan-otorga");
+          expect(derechoDe(store)).toBe("active");
+          // Se guarda el estado de la que otorga.
+          expect(store.mp_plans.a2.ultimoStatus).toBe("active");
+        });
+      }
+
+      it("si ninguna otorga, se guarda el de la que elegiria el escritor (la primera) y se corta", async () => {
+        const { app, store } = fakeApp(mundoPreDeploy());
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }));
+        const base = deps.mpClient.searchPreapprovalsByPlan;
+        deps.mpClient.searchPreapprovalsByPlan = async (planId, opciones) =>
+          planId === "a2"
+            ? [{ ...ANUAL_AUTORIZADO, status: "pending" }, BAJA_VIEJA]
+            : base(planId, opciones);
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+        expect(store.mp_plans.a2.ultimoStatus).toBe("pending");
+      });
+
+      it("una suscripcion de OTRO uid no cuenta, aunque este autorizada", async () => {
+        const { app, store } = fakeApp(mundoPreDeploy());
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: { ...ANUAL_AUTORIZADO, external_reference: "u-otro" },
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+        expect(store.mp_plans.a2.ultimoStatus).toBeUndefined();
+      });
+    });
+
+    describe("el hermano recien abierto: el indice de busqueda de MP llega tarde", () => {
+      // `reconcile-my-checkout`: el mensual vencio, el alumno sigue `active` hasta
+      // las 03:00 y compra el anual. El callable reconcilia los dos sin la
+      // suscripcion a mano, y la busqueda todavia no ve la nueva.
+      const recien = (min: number) => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.createdAt = ts(AHORA - min * 60 * 1000);
+        return mundo;
+      };
+
+      it("lista vacia de un plan de hace 2 minutos: error-mp, no se corta", async () => {
+        const { app, store, escrituras } = fakeApp(recien(2));
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("error-mp");
+        expect(derechoDe(store)).toBe("active");
+        expect(sinEscrituraEnUsers(escrituras, 0)).toEqual([]);
+        expect(store.mp_plans.a1.terminal).toBeUndefined();
+        expect(store.mp_plans.a2.ultimoStatus).toBeUndefined();
+      });
+
+      it("la misma lista vacia de un plan de hace una hora SI corta: es un checkout abandonado", async () => {
+        const { app, store } = fakeApp(recien(60));
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+      });
+
+      it("un plan reciente que MP SI devuelve se decide normalmente", async () => {
+        const { app, store } = fakeApp(recien(2));
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: ANUAL_AUTORIZADO,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("skipped-otro-plan-otorga");
+        expect(derechoDe(store)).toBe("active");
+      });
+
+      it("sin `createdAt` legible no hay beneficio de la duda: la lista vacia corta", async () => {
+        const mundo = mundoPreDeploy();
+        delete mundo.mp_plans.a2.createdAt;
+        const { app, store } = fakeApp(mundo);
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("written");
+        expect(derechoDe(store)).toBe("expired");
+      });
     });
 
     it("una respuesta rota de MP (sin `results` como array) es un error, no una lista vacia", async () => {
