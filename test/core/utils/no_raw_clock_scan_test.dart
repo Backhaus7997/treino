@@ -154,9 +154,12 @@ void main() {
     /// que este cambio vuelve falso. El scanner es textual y no distingue
     /// código de comentario, así que las cuenta igual.
     ///
-    /// 80 → 74 cuando las dos agendas mobile (PF y alumno) pasaron a
-    /// `AppClock.now()`: el test del locale del calendario necesita congelar
-    /// el mes enfocado, y ese mes sale de la hora.
+    /// 80 → 74 cuando las dos agendas mobile (PF y alumno) pasaron al seam:
+    /// `argentinaNow()` para el día enfocado, el seleccionado y el "¿ya
+    /// pasó?", que son buckets de calendario, y `AppClock.now()` sólo para la
+    /// ventana rodante de turnos, que es un instante. La primera versión de
+    /// esa migración usó `AppClock.now()` en los cinco buckets: el ratchet
+    /// quedaba en verde con los días armados con la hora del dispositivo.
     ///
     /// Bajar el techo es obligatorio al migrar: dejarlo arriba de la medición
     /// real regala cupo para regresiones nuevas, que es justo lo que el

@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/app_clock.dart';
+import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -40,7 +41,7 @@ class TrainerAgendaTab extends ConsumerStatefulWidget {
 }
 
 class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
-  DateTime _focusedDay = AppClock.now();
+  DateTime _focusedDay = argentinaNow();
   DateTime? _selectedDay;
 
   // Default to the compact WEEK view so the day timeline below gets most of
@@ -63,7 +64,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final selectedDay = _selectedDay ?? AppClock.now();
+    final selectedDay = _selectedDay ?? argentinaNow();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -184,9 +185,9 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
 
 // ── Calendar widget ───────────────────────────────────────────────────────────
 
-/// Whether [day] is strictly before today (date-level, local TZ).
+/// Whether [day] is strictly before today (date-level, ART wall-clock).
 bool _isDayPast(DateTime day) {
-  final now = AppClock.now();
+  final now = argentinaNow();
   final today = DateTime(now.year, now.month, now.day);
   return DateTime(day.year, day.month, day.day).isBefore(today);
 }
