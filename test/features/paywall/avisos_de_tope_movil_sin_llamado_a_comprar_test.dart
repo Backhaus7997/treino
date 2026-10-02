@@ -310,6 +310,17 @@ final List<({String nombre, _Abrir abrir})> _variantes = [
           status: SubscriptionStatus.paused,
         ),
   ),
+  // Una baja tiene su propio título (`planLimitAlumnosTituloBaja`).
+  (
+    nombre: 'alumnos, suscripción dada de baja',
+    abrir: (t, l) => _alumnos(
+          t,
+          l,
+          tier: SubscriptionTier.plan1,
+          reason: PlanLimitReason.subscriptionInactive,
+          status: SubscriptionStatus.cancelled,
+        ),
+  ),
   // ── Ejercicios propios ──
   (
     nombre: 'ejercicios propios, en el tope',
@@ -398,22 +409,29 @@ void main() {
 
       // Los SnackBars que disparan los botones del aviso de ALUMNOS también
       // son texto que el PF lee dentro del binario móvil.
-      testWidgets(
-          'alumnos, suscripción inactiva: el SnackBar de VER ESTADO '
-          '(${locale.languageCode})', (tester) async {
-        await _alumnos(
-          tester,
-          locale,
-          tier: SubscriptionTier.plan1,
-          reason: PlanLimitReason.subscriptionInactive,
-          status: SubscriptionStatus.paused,
-        );
-        await tester.tap(find.byType(PlanLimitAccentButton));
-        await tester.pumpAndSettle();
+      // `paused` y `cancelled` tienen SnackBars distintos
+      // (`planLimitSuscripcionPausadaMovil` / `planLimitSuscripcionBajaMovil`).
+      for (final status in [
+        SubscriptionStatus.paused,
+        SubscriptionStatus.cancelled,
+      ]) {
+        testWidgets(
+            'alumnos, suscripción ${status.name}: el SnackBar de VER ESTADO '
+            '(${locale.languageCode})', (tester) async {
+          await _alumnos(
+            tester,
+            locale,
+            tier: SubscriptionTier.plan1,
+            reason: PlanLimitReason.subscriptionInactive,
+            status: status,
+          );
+          await tester.tap(find.byType(PlanLimitAccentButton));
+          await tester.pumpAndSettle();
 
-        expect(find.byType(SnackBar), findsOneWidget);
-        _verificar(tester, 'el SnackBar de VER ESTADO', locale);
-      });
+          expect(find.byType(SnackBar), findsOneWidget);
+          _verificar(tester, 'el SnackBar de VER ESTADO', locale);
+        });
+      }
 
       testWidgets(
           'alumnos, plan a medida: el SnackBar de CONTACTANOS '

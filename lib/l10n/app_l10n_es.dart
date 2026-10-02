@@ -4795,6 +4795,9 @@ class AppL10nEs extends AppL10n {
   String get planLimitAlumnosTituloInactiva => 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
 
   @override
+  String get planLimitAlumnosTituloBaja => 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA';
+
+  @override
   String get planLimitAlumnosCuerpoInactivaExplicacion =>
       'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.';
 
@@ -4877,6 +4880,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get planLimitSuscripcionPausadaMovil => 'Tu suscripción está pausada.';
+
+  @override
+  String get planLimitSuscripcionBajaMovil =>
+      'Tu suscripción está dada de baja.';
 
   @override
   String get planLimitTrainerTituloEjercicios => 'TOPE DE EJERCICIOS PROPIOS';
@@ -9799,6 +9806,9 @@ class AppL10nEsAr extends AppL10nEs {
   String get planLimitAlumnosTituloInactiva => 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
 
   @override
+  String get planLimitAlumnosTituloBaja => 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA';
+
+  @override
   String get planLimitAlumnosCuerpoInactivaExplicacion =>
       'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.';
 
@@ -9881,6 +9891,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get planLimitSuscripcionPausadaMovil => 'Tu suscripción está pausada.';
+
+  @override
+  String get planLimitSuscripcionBajaMovil =>
+      'Tu suscripción está dada de baja.';
 
   @override
   String get planLimitTrainerTituloEjercicios => 'TOPE DE EJERCICIOS PROPIOS';

@@ -15,6 +15,8 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
+import 'plan_vigencia.dart';
+import 'vigencia_del_plan_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// La ruta de esta pantalla, en UN solo lugar.
@@ -126,9 +128,26 @@ class _Loaded extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Sin suscripción en un perfil que SÍ cargó → Free (sin backfill), igual
     // que la tab de Facturación.
+    //
+    // El tier del DOC y no [VigenciaDelPlan.tierEfectivo], a propósito: las
+    // causas con derecho al tier pago lo usan cuando los dos coinciden, y la
+    // de suscripción caída lo nombra como el plan que dejó de regir («no con
+    // el de tu plan Plan 2»). Con el efectivo, una baja vencida diría «no con
+    // el de tu plan Free».
     final tier = subscription?.tier ?? SubscriptionTier.free;
+    // Una sola vigencia para toda la pantalla: la causa y el aviso de la baja
+    // salen del mismo «ahora» y no se pueden contradecir. La da el provider y
+    // no un cálculo en el build: abierta al vencer la baja, la pantalla pasa
+    // sola al otro lado de la fecha (ver [_causeOf]). Con `select` sobre lo
+    // único que se usa: el provider se re-evalúa cada minuto mientras hay un
+    // borde por delante, y [VigenciaDelPlan] no define `==`.
+    final (:vencida, :pagadoHasta) = ref.watch(
+      vigenciaDelPlanProvider.select(
+        (v) => (vencida: v.vencida, pagadoHasta: v.pagadoHasta),
+      ),
+    );
     final cause = profileLoaded
-        ? _causeOf(tier: tier, subscription: subscription)
+        ? _causeOf(tier: tier, subscription: subscription, vencida: vencida)
         : _BlockCause.unknownPlan;
 
     if (blocked.ids.isEmpty) {
@@ -137,6 +156,7 @@ class _Loaded extends ConsumerWidget {
         cause: cause,
         tier: tier,
         subscription: subscription,
+        pagadoHasta: pagadoHasta,
         palette: palette,
       );
     }
@@ -178,11 +198,10 @@ class _Loaded extends ConsumerWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          _explanation(
-            cause: cause,
+          _conAvisoDeBaja(
+            _explanation(cause: cause, tier: tier, count: blocked.ids.length),
             tier: tier,
-            count: blocked.ids.length,
-            subscription: subscription,
+            pagadoHasta: pagadoHasta,
           ),
           textAlign: TextAlign.center,
           style:
@@ -228,6 +247,7 @@ class _EmptyState extends StatelessWidget {
     required this.cause,
     required this.tier,
     required this.subscription,
+    required this.pagadoHasta,
     required this.palette,
   });
 
@@ -235,6 +255,11 @@ class _EmptyState extends StatelessWidget {
   final _BlockCause cause;
   final SubscriptionTier tier;
   final TrainerSubscription? subscription;
+
+  /// [VigenciaDelPlan.pagadoHasta]: no-nulo sólo con la baja pedida y el
+  /// período pagado todavía corriendo.
+  final DateTime? pagadoHasta;
+
   final AppPalette palette;
 
   @override
@@ -283,18 +308,6 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
-      // Igual que con la lista: se nombra el hecho y no el límite vigente.
-      // «No fue por el cupo de tu plan» acá sería falso si la fecha ya pasó.
-      _BlockCause.subscriptionCancelled => _Message(
-          icon: TreinoIcon.users,
-          title: 'NINGUNO', // i18n: Fase W3
-          body: 'Ninguno de tus alumnos quedó fuera de tu cupo. Cancelaste tu '
-              'suscripción: tu plan ${tierName(tier)} rige hasta el '
-              '${fechaDiaMesArg(subscription!.currentPeriodEnd!)} y después tu '
-              'cuenta funciona con el límite del plan Free '
-              '(${cupoTexto(SubscriptionTier.free)}).', // i18n: Fase W3
-          palette: palette,
-        ),
       // Sin el doc del PF no se puede nombrar su cupo. Se dice lo que sí se
       // sabe y se calla lo que no.
       _BlockCause.unknownPlan => _Message(
@@ -311,9 +324,17 @@ class _EmptyState extends StatelessWidget {
           // La segunda frase es el valor real de este estado vacío: le dice al
           // PF que dejó de tener sentido mirar su plan. Sin ella, el que llegó
           // desde un error se queda sin saber qué mirar.
-          body: 'Ninguno de tus alumnos quedó fuera del cupo de tu plan '
-              '${tierName(tier)} (${cupoTexto(tier)}). Si aun así te rebotó '
-              'una acción, no fue por el cupo de tu plan.', // i18n: Fase W3
+          //
+          // Con una baja pedida también es cierta, porque a esta rama sólo se
+          // llega con el período pagado corriendo ([_causeOf]); lo que agrega
+          // el aviso es hasta cuándo.
+          body: _conAvisoDeBaja(
+            'Ninguno de tus alumnos quedó fuera del cupo de tu plan '
+            '${tierName(tier)} (${cupoTexto(tier)}). Si aun así te rebotó '
+            'una acción, no fue por el cupo de tu plan.', // i18n: Fase W3
+            tier: tier,
+            pagadoHasta: pagadoHasta,
+          ),
           palette: palette,
         ),
     };
@@ -323,29 +344,24 @@ class _EmptyState extends StatelessWidget {
 /// Por qué hay alumnos afuera del cupo, hasta donde el cliente PUEDE probarlo.
 ///
 /// La pantalla no adivina: cada rama sale de un dato que está en el doc del
-/// PF, y las que no se pueden explicar se llaman [unexplained] / [unknownPlan]
-/// en vez de asumir la causa más probable.
+/// PF —una baja, comparada además contra el reloj— y las que no se pueden
+/// explicar se llaman [unexplained] / [unknownPlan] en vez de asumir la causa
+/// más probable.
 enum _BlockCause {
-  /// La suscripción no está al día, así que el límite EFECTIVO cayó a Free.
-  /// Problema de cobro: ofrecerle un plan más caro es el mensaje equivocado.
+  /// La suscripción no da derecho al tier pago, así que el límite EFECTIVO
+  /// cayó a Free —salvo un piso prepago, que el cliente no ve (ver
+  /// [_causeOf])—: `pending`, `paused`, o una baja cuyo período pagado ya
+  /// terminó (o nunca tuvo fecha). No es un problema de cupo: ofrecerle un
+  /// plan más caro es el mensaje equivocado.
   subscriptionInactive,
 
-  /// Cancelada, con un `currentPeriodEnd` que el PF pagó.
-  ///
-  /// El servidor le respeta el tier pago HASTA esa fecha y después lo baja a
-  /// Free (`effective-limit.ts`), así que de qué lado de la fecha estamos
-  /// decide la causa — y el cliente no lo puede saber sin leer el reloj, que
-  /// en el módulo Coach está prohibido (`no_raw_clock_scan_test.dart`). En vez
-  /// de adivinar se dice el HECHO, que es cierto de los dos lados: cancelaste,
-  /// y tu plan rige hasta tal fecha.
-  subscriptionCancelled,
-
-  /// Suscripción al día y el tier tiene tope: se quedó chico. Problema de
+  /// Con derecho al tier pago —al día, en gracia, o una baja con el período
+  /// todavía corriendo— y el tier tiene tope: se quedó chico. Problema de
   /// upsell.
   planLimit,
 
-  /// Suscripción al día y tier SIN LÍMITE. No debería poder pasar; si pasa,
-  /// el cupo no lo explica y decir «llegaste al límite» sería mentira.
+  /// Con derecho al tier pago y tier SIN LÍMITE. No debería poder pasar; si
+  /// pasa, el cupo no lo explica y decir «llegaste al límite» sería mentira.
   unexplained,
 
   /// El doc del PF no cargó. No se sabe el tier ni el estado de cobro, así que
@@ -356,16 +372,17 @@ enum _BlockCause {
 /// El CTA sólo aparece cuando se sabe QUÉ ofrecer.
 ///
 /// En [_BlockCause.unexplained] ampliar no destraba nada (el plan ya es
-/// ilimitado y está al día) y en [_BlockCause.unknownPlan] no se sabe si
-/// corresponde upsell o regularizar — y las dos mitades son el mensaje
-/// equivocado para la otra. Un botón que promete un arreglo que no arregla es
-/// peor que no tener botón.
+/// ilimitado y rige) y en [_BlockCause.unknownPlan] no se sabe si corresponde
+/// upsell o regularizar — y las dos mitades son el mensaje equivocado para la
+/// otra. Un botón que promete un arreglo que no arregla es peor que no tener
+/// botón.
 ///
-/// [_BlockCause.subscriptionCancelled] cae en la misma bolsa por una razón
-/// distinta: DENTRO del período pagado el tier sigue vigente, así que lo que
-/// falta es cupo y reactivar no destraba nada; PASADA la fecha sí hace falta
-/// reactivar. Sin reloj no se sabe cuál de las dos, y las dos se venden con
-/// botones opuestos.
+/// Una baja no necesita rama propia: llega acá ya resuelta por fecha
+/// ([_causeOf]). DENTRO del período pagado el tier sigue rigiendo, así que lo
+/// que falta es cupo y reactivar no destraba nada ([_BlockCause.planLimit], o
+/// [_BlockCause.unexplained] y ningún botón si el tier no tiene tope); PASADA
+/// la fecha rige Free y hace falta volver a suscribirse
+/// ([_BlockCause.subscriptionInactive]).
 bool _ctaFits(_BlockCause cause) =>
     cause == _BlockCause.planLimit || cause == _BlockCause.subscriptionInactive;
 
@@ -378,53 +395,52 @@ bool _ctaFits(_BlockCause cause) =>
 /// `subscription` en el doc, el PF es Free/active por definición y la causa es
 /// el cupo.
 ///
-/// ## `cancelled` es el que no se puede resolver acá, y por qué
+/// ## `cancelled` se decide por fecha
 ///
 /// El servidor conserva el tier pago HASTA `currentPeriodEnd` y recién después
-/// baja a Free (`effective-limit.test.ts`: «cancelled before currentPeriodEnd
-/// → still paid tier»). O sea que la causa depende de de qué lado de esa fecha
-/// estamos, y eso pide el reloj.
+/// baja a Free; sin fecha no lo conserva nunca (`limiteDelStatus`, con `<`
+/// estricto). Esa pregunta ya la contesta [VigenciaDelPlan] con el mismo borde,
+/// así que acá no se re-implementa: con el período corriendo la baja tiene
+/// derecho al tier, y vencida es una suscripción caída. Decidirlo importa por
+/// el botón: ampliar y regularizar son arreglos opuestos, y cada uno sirve de
+/// un solo lado de la fecha ([_ctaFits]); nombrar sólo la fecha dejaba al PF
+/// sin ninguno.
 ///
-/// Ninguna de las tres herramientas de reloj del módulo sirve, y conviene ser
-/// preciso sobre por qué, porque «no se puede» a secas sería falso:
-///   - el reloj crudo (`DateTime.now` pelado, sin parentesis a proposito:
-///     el escaner hace regex sobre el TEXTO del archivo y este comentario
-///     tambien contaria) lo prohíbe `no_raw_clock_scan_test.dart` en
-///     archivos nuevos de `coach/` y `coach_hub/`, y su allowlist es un ratchet
-///     que no crece;
-///   - `argentinaNow()` sería PEOR que el problema: devuelve el instante
-///     corrido tres horas para que los campos de calendario lean en ART, así
-///     que compararlo contra un instante real da tres horas de ventana
-///     equivocada. Lo dice `argentina_time.dart` textual: «INSTANTS
-///     (createdAt, paidAt, "has it ended yet") stay in true UTC»;
-///   - `wallClockNow()` tampoco: existe para comparar contra `startsAt`, que se
-///     guarda en wall-clock UTC, y su propio doc aclara que es distinto de un
-///     instante real.
+/// El «ahora» lo lee [VigenciaDelPlan] de `AppClock`, el seam de `core/` que
+/// `no_raw_clock_scan_test.dart` deja pasar (en `coach_hub/` prohíbe el reloj
+/// crudo, no el seam) y que un test puede congelar. Es el reloj del
+/// DISPOSITIVO, no el del servidor: si están desfasados, cerca de la fecha
+/// pueden decidir distinto. La vigencia llega de `vigenciaDelPlanProvider`,
+/// que se recalcula sola en [VigenciaDelPlan.proximoCambio]: una pantalla
+/// abierta al cruzar la fecha cambia de causa y de botón sin esperar a que
+/// algo la reconstruya.
 ///
-/// SÍ se podría con un proveedor de reloj en `core/` —el escáner solo mira
-/// `features/coach*`, así que sería legal y además correcto—, y eso habilitaría
-/// un CTA distinto según de qué lado de la fecha estamos. No se hace acá porque
-/// agregar una abstracción de reloj al núcleo excede este slice; queda anotado
-/// como la salida real, no como imposible.
+/// De [VigenciaDelPlan] se usa SÓLO la rama `cancelled`, que es lo único que
+/// espeja (ver su «Qué espeja y qué NO»). Su
+/// [VigenciaDelPlan.tierEfectivo] no es el límite de la cuenta: para `pending`
+/// y `paused` devuelve el tier del doc, y acá esos son Free. Por eso la matriz
+/// de status sigue escrita acá.
 ///
-/// Así que no se decide: se devuelve [_BlockCause.subscriptionCancelled], que
-/// dice el hecho comprobable (cancelaste, tu plan rige hasta tal fecha) y no
-/// afirma ningún límite ni ofrece ningún CTA. Es la misma regla del resto de
-/// la pantalla aplicada a un dato que falta: el reloj.
+/// ## Lo que el cliente no ve
+///
+/// El PISO PREPAGO (`conPisoPrepago`, en el mismo `effective-limit.ts`):
+/// `TrainerSubscription` no trae `prepaidTier`/`prepaidUntil`. Un piso sólo
+/// SUBE el límite, así que en cualquier rama el servidor puede estar aplicando
+/// más cupo que el que esta pantalla nombra; y donde dice Free —la suscripción
+/// caída, y el «después» del aviso de baja— un PF con un piso vigente no está
+/// en Free.
 _BlockCause _causeOf({
   required SubscriptionTier tier,
   required TrainerSubscription? subscription,
+  required bool vencida,
 }) {
-  final status = subscription?.status;
-  final entitledToTier = switch (status) {
+  final entitledToTier = switch (subscription?.status) {
     null || SubscriptionStatus.active || SubscriptionStatus.grace => true,
-    // Sin `currentPeriodEnd` no hay período pagado que respetar, así que no
-    // hay ambigüedad: el servidor ya lo bajó a Free.
-    SubscriptionStatus.cancelled =>
-      subscription?.currentPeriodEnd == null ? false : null,
+    // Con el período pagado corriendo rige el tier; vencido, o sin fecha, el
+    // servidor ya lo bajó a Free.
+    SubscriptionStatus.cancelled => !vencida,
     SubscriptionStatus.pending || SubscriptionStatus.paused => false,
   };
-  if (entitledToTier == null) return _BlockCause.subscriptionCancelled;
   if (!entitledToTier) return _BlockCause.subscriptionInactive;
   return tier.isUnlimited ? _BlockCause.unexplained : _BlockCause.planLimit;
 }
@@ -433,19 +449,8 @@ String _explanation({
   required _BlockCause cause,
   required SubscriptionTier tier,
   required int count,
-  required TrainerSubscription? subscription,
 }) =>
     switch (cause) {
-      // Cierto de los dos lados de la fecha, que es lo que lo hace decible sin
-      // reloj. No se afirma cuál límite rige HOY, porque eso sí dependería de
-      // saberlo.
-      _BlockCause.subscriptionCancelled =>
-        'Cancelaste tu suscripción: tu plan ${tierName(tier)} rige hasta el '
-            '${fechaDiaMesArg(subscription!.currentPeriodEnd!)} y después tu '
-            'cuenta funciona con el límite del plan Free '
-            '(${cupoTexto(SubscriptionTier.free)}). Sobre estos $count pasás '
-            'a solo lectura: los seguís viendo y podés chatear, pero no podés '
-            'editarles rutinas ni notas.', // i18n: Fase W3
       _BlockCause.subscriptionInactive =>
         'Mientras tu suscripción no esté al día, tu cuenta funciona con el '
             'límite del plan Free (${cupoTexto(SubscriptionTier.free)}). '
@@ -475,6 +480,25 @@ String _explanation({
             'ni notas. No pudimos leer tu plan, así que no podemos decirte si '
             'el cupo lo explica.', // i18n: Fase W3
     };
+
+/// [texto] con el aviso de la baja al final, cuando hay una con días pagos.
+///
+/// Es un HECHO, no una causa: con el período corriendo la causa sale igual que
+/// para un plan activo ([_causeOf]), y el aviso sólo agrega hasta cuándo rige
+/// el tier y qué viene después. Pasada la fecha [pagadoHasta] es `null` y no
+/// agrega nada: la pantalla ya está en [_BlockCause.subscriptionInactive], que
+/// dice Free en presente.
+String _conAvisoDeBaja(
+  String texto, {
+  required SubscriptionTier tier,
+  required DateTime? pagadoHasta,
+}) =>
+    pagadoHasta == null
+        ? texto
+        : '$texto Cancelaste tu suscripción: tu plan ${tierName(tier)} rige '
+            'hasta el ${fechaDiaMesArg(pagadoHasta)} y después tu cuenta '
+            'funciona con el límite del plan Free '
+            '(${cupoTexto(SubscriptionTier.free)}).'; // i18n: Fase W3
 
 /// Lo que el alumno conserva. Afirmación fuerte y verificable: el enforcement
 /// del paywall sólo frena escrituras DEL PF.

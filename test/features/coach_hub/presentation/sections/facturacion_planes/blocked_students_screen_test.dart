@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/blocked_athletes_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/trainer_subscription.dart';
@@ -416,51 +417,12 @@ void main() {
       expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
     });
 
-    testWidgets('cancelada con período pagado: dice el hecho, no el límite', (
-      tester,
-    ) async {
-      // Antes esto caía en «suscripción caída» y decía dos cosas falsas: que
-      // su límite era el de Free (2) mientras el servidor le aplicaba 15
-      // (`effective-limit.test.ts`: «cancelled before currentPeriodEnd → still
-      // paid tier»), y «REGULARIZAR MI SUSCRIPCIÓN» a alguien que dentro del
-      // período pagado lo que necesita es un plan más grande.
-      //
-      // De qué lado de `currentPeriodEnd` estamos pide el reloj, y el reloj
-      // crudo está prohibido en Coach (ratchet de `no_raw_clock_scan_test`).
-      // Así que no se decide: se dice lo comprobable.
-      await pumpOne(
-        tester,
-        subscription: _sub(
-          SubscriptionTier.plan2,
-          status: SubscriptionStatus.cancelled,
-          // Instante elegido para que UTC y ART NO coincidan: 01:30 UTC del
-          // 16/3 son las 22:30 ART del 15/3. Con una fecha de mediodía el
-          // test pasaría igual leyendo los campos crudos y no probaría nada.
-          currentPeriodEnd: DateTime.utc(2026, 3, 16, 1, 30),
-        ),
-      );
-
-      final text = _allText(tester);
-      expect(text, contains('Cancelaste tu suscripción'));
-      // El día ARGENTINO, no el UTC: entre las 21:00 y las 23:59 ART el día
-      // UTC ya es el siguiente, y el PF leería su vencimiento corrido un día.
-      expect(text, isNot(contains('16/3')));
-      expect(text, contains('15/3'));
-      // Ninguna de las dos afirmaciones de límite, porque cuál rige HOY es
-      // justo lo que no se sabe.
-      expect(text, isNot(contains('Tu plan Plan 2 incluye')));
-      expect(text, isNot(contains('Mientras tu suscripción no esté al día')));
-      // Y ningún CTA: los dos lados de la fecha se arreglan con botones
-      // opuestos.
-      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
-      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
-    });
-
     testWidgets('cancelada SIN período pagado sí cayó a Free', (
       tester,
     ) async {
       // Sin `currentPeriodEnd` no hay período que el servidor tenga que
-      // respetar, así que no hay ambigüedad y la causa vuelve a ser de cobro.
+      // respetar: la trata igual que a una baja vencida (`limiteDelStatus`), y
+      // la pantalla también. Las bajas CON fecha están en «plan dado de baja».
       await pumpOne(
         tester,
         subscription: _sub(
@@ -526,6 +488,269 @@ void main() {
     });
   });
 
+  // Una baja con fecha se decide de qué lado está: el servidor le respeta el
+  // tier pago HASTA `currentPeriodEnd` y después lo baja a Free
+  // (`limiteDelStatus` en `effective-limit.ts`). Esta pantalla no lo decidía
+  // —decía que pedía un reloj que el módulo no tenía— y hablaba en presente de
+  // una fecha que podía haber pasado, sin botón para ninguno de los dos lados.
+  group('BlockedStudentsScreen — plan dado de baja', () {
+    // 1/10/2026 12:00, LOCAL (`AppClock.freeze` lo exige). Los bordes van en
+    // UTC, y el más cercano (`vencida`, en UTC+14) queda 7 h antes del reloj:
+    // ningún timezone del runner los da vuelta.
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 1, 12)));
+    tearDown(AppClock.unfreeze);
+
+    final vencida = DateTime.utc(2026, 9, 30, 15);
+    // 01:30 UTC del 16/10 son las 22:30 ART del 15/10: con el día UTC y el
+    // argentino distintos, la fecha que se muestra prueba el huso. Con una de
+    // mediodía el test pasaría igual leyendo los campos crudos.
+    final conDiasPagos = DateTime.utc(2026, 10, 16, 1, 30);
+
+    Future<void> pump(
+      WidgetTester tester, {
+      required TrainerSubscription subscription,
+      Set<String> blocked = const {'a1'},
+    }) async {
+      await tester.pumpWidget(
+        _harness(
+          blocked: AsyncData(BlockedAthletes.published(blocked)),
+          subscription: subscription,
+          profiles: const {
+            'a1': UserPublicProfile(uid: 'a1', displayName: 'Ana'),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('baja vencida: rige Free y ofrece regularizar', (tester) async {
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: vencida,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('límite del plan Free (2 alumnos)'));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
+      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
+      // Ni el tope del Plan 2, que ya no rige, ni la fecha en presente («rige
+      // hasta el 30/9») que el PF tenía que restar contra el día de hoy.
+      expect(text, isNot(contains('incluye 15 alumnos')));
+      expect(text, isNot(contains('rige hasta')));
+    });
+
+    // Control del de arriba: misma baja, mismo reloj, sólo cambia la fecha. Es
+    // el caso que NO puede caer en «suscripción caída»: dentro del período el
+    // servidor le aplica los 15 del Plan 2 (`effective-limit.test.ts`:
+    // «cancelled before currentPeriodEnd → still paid tier»), y lo que le
+    // falta es un plan más grande, no regularizar.
+    testWidgets('baja con días pagos: el Plan 2 todavía rige', (tester) async {
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: conDiasPagos,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
+      // Free aparece sólo como lo que viene DESPUÉS (el aviso), nunca como lo
+      // que rige hoy.
+      expect(text, isNot(contains('no esté al día')));
+      // El aviso de la baja, con el día ARGENTINO: entre las 21:00 y las 23:59
+      // ART el día UTC ya es el siguiente, y el PF leería su vencimiento
+      // corrido un día.
+      expect(text, contains('Cancelaste tu suscripción'));
+      expect(text, contains('rige hasta el 15/10'));
+      expect(text, isNot(contains('16/10')));
+    });
+
+    // Control del eje del estado: con el plan ACTIVO el servidor ni mira la
+    // fecha (`limiteDelStatus` devuelve el tope del tier), así que un período
+    // vencido no lo baja. Por vencimiento sólo cae una baja.
+    testWidgets('plan activo con el período vencido sigue en Plan 2', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        subscription: _sub(SubscriptionTier.plan2, currentPeriodEnd: vencida),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
+      expect(text, isNot(contains('Cancelaste')));
+    });
+
+    // El mismo eje, del otro lado de la fecha: un plan que NO está dado de baja
+    // también trae `currentPeriodEnd`, y con el período corriendo esa fecha
+    // está en el futuro. El aviso sale de `VigenciaDelPlan.pagadoHasta`, que
+    // sólo existe para una baja; si saliera de la fecha a secas, todo PF al
+    // día leería «Cancelaste tu suscripción».
+    for (final status in [
+      SubscriptionStatus.active,
+      SubscriptionStatus.grace,
+      SubscriptionStatus.pending,
+      SubscriptionStatus.paused,
+    ]) {
+      testWidgets('${status.name} con el período por delante: sin aviso', (
+        tester,
+      ) async {
+        await pump(
+          tester,
+          subscription: _sub(
+            SubscriptionTier.plan2,
+            status: status,
+            currentPeriodEnd: conDiasPagos,
+          ),
+        );
+
+        // Que llegó a la lista: sin esto, las dos ausencias de abajo pasarían
+        // también sobre un skeleton.
+        expect(find.text('ALUMNOS EN SOLO LECTURA'), findsOneWidget);
+        final text = _allText(tester);
+        expect(text, isNot(contains('Cancelaste')));
+        expect(text, isNot(contains('rige hasta')));
+      });
+    }
+
+    // Sin alumnos afuera es donde más cuesta equivocarse: «no fue por el cupo
+    // de tu plan» despide al PF de facturación, y con la baja vencida es justo
+    // el que tiene que mirarla — su cupo ya es el de Free.
+    testWidgets('sin alumnos afuera y la baja vencida: no lo despide', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        blocked: const {},
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: vencida,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(find.text('NINGUNO'), findsOneWidget);
+      expect(text, contains('límite del plan Free (2 alumnos)'));
+      expect(text, isNot(contains('no fue por el cupo de tu plan')));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
+      // El plan que dejó de regir se nombra con el tier del DOC: con
+      // `tierEfectivo` diría «no con el de tu plan Free».
+      expect(text, contains('no con el de tu plan Plan 2'));
+    });
+
+    // Su control: con días pagos el cupo sigue siendo el del Plan 2, así que
+    // descartarlo como causa es cierto — y el aviso dice hasta cuándo.
+    testWidgets('sin alumnos afuera con días pagos: descarta el cupo y avisa', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        blocked: const {},
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: conDiasPagos,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('del cupo de tu plan Plan 2 (15 alumnos)'));
+      expect(text, contains('no fue por el cupo de tu plan'));
+      expect(text, contains('rige hasta el 15/10'));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
+      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
+    });
+
+    // Un Plan 3 con días pagos no tiene tope: si igual hay alumnos afuera, el
+    // cupo no lo explica. Ampliar no destraba nada, y regularizar tampoco,
+    // porque el plan todavía rige.
+    testWidgets('baja de un Plan 3 con días pagos: el cupo no lo explica', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan3,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: conDiasPagos,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('no tiene tope de alumnos'));
+      expect(text, contains('rige hasta el 15/10'));
+      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsNothing);
+    });
+
+    // Su control: vencida, el Plan 3 ya no rige y el PF está en Free como
+    // cualquier otro. Si la pantalla mirara «sin tope» antes que la fecha,
+    // esto diría que el cupo no lo explica.
+    testWidgets('baja vencida de un Plan 3: rige Free', (tester) async {
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan3,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: vencida,
+        ),
+      );
+
+      final text = _allText(tester);
+      expect(text, contains('límite del plan Free (2 alumnos)'));
+      expect(text, isNot(contains('no tiene tope de alumnos')));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
+    });
+
+    // La pantalla puede seguir abierta cuando vence la baja, y en ese borde no
+    // emite nadie: el servidor no reescribe `subscription` (el perfil no
+    // vuelve a emitir) y `AppClock` no avisa. Calculada en el build, la causa
+    // quedaba en «ampliá tu Plan 2» hasta un rebuild ajeno, con el botón del
+    // lado equivocado de la fecha. La lee `vigenciaDelPlanProvider`, que se
+    // recalcula solo al llegar al borde.
+    testWidgets('vence con la pantalla abierta: pasa a regularizar sola', (
+      tester,
+    ) async {
+      final fin = DateTime.utc(2026, 10, 15, 15);
+      AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+      await pump(
+        tester,
+        subscription: _sub(
+          SubscriptionTier.plan2,
+          status: SubscriptionStatus.cancelled,
+          currentPeriodEnd: fin,
+        ),
+      );
+      expect(_allText(tester), contains('Tu plan Plan 2 incluye 15 alumnos'));
+      expect(find.text('AMPLIAR MI PLAN'), findsOneWidget);
+
+      // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el
+      // perfil ni la lista emiten de nuevo).
+      AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      // «Límite del plan Free» no sirve de prueba: antes del borde ya lo dice
+      // el aviso de la baja, como lo que viene después.
+      final text = _allText(tester);
+      expect(text, contains('no esté al día'));
+      expect(text, isNot(contains('incluye 15 alumnos')));
+      expect(text, isNot(contains('rige hasta')));
+      expect(find.text('REGULARIZAR MI SUSCRIPCIÓN'), findsOneWidget);
+      expect(find.text('AMPLIAR MI PLAN'), findsNothing);
+    });
+  });
+
   group('BlockedStudentsScreen — salida a facturación', () {
     testWidgets('el CTA abre el paywall de plan', (tester) async {
       await tester.pumpWidget(
@@ -565,6 +790,35 @@ void main() {
 
       expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsOneWidget);
       // Y NO el upsell, que es el mensaje opuesto para quien ya pagó.
+      expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
+    });
+
+    // La baja vencida también sale por la rama de reactivación, pero no está
+    // suspendida: el modal no puede decir «suspendida» arriba de su propia
+    // caja «Estado: cancelada» (Codex, #1314).
+    testWidgets('con la baja vencida, el modal habla de baja', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 1, 12));
+      addTearDown(AppClock.unfreeze);
+      await tester.pumpWidget(
+        _harness(
+          blocked: const AsyncData(BlockedAthletes.published({'a1'})),
+          subscription: _sub(
+            SubscriptionTier.plan2,
+            status: SubscriptionStatus.cancelled,
+            currentPeriodEnd: DateTime.utc(2026, 9, 30, 15),
+          ),
+          profiles: const {
+            'a1': UserPublicProfile(uid: 'a1', displayName: 'Ana'),
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('REGULARIZAR MI SUSCRIPCIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'), findsOneWidget);
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsNothing);
       expect(find.text('LLEGASTE AL LÍMITE DE TU PLAN'), findsNothing);
     });
   });

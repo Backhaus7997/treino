@@ -4263,6 +4263,10 @@
   "@planLimitAlumnosTituloInactiva": {
     "description": "Título del aviso de ALUMNOS cuando la suscripción del PF no está activa (PlanLimitReason.subscriptionInactive), forma MÓVIL."
   },
+  "planLimitAlumnosTituloBaja": "TU SUSCRIPCIÓN ESTÁ DADA DE BAJA",
+  "@planLimitAlumnosTituloBaja": {
+    "description": "Título del aviso de ALUMNOS con la suscripción inactiva cuando el status es cancelled (una baja, no una suspensión), forma MÓVIL. La caja de abajo dice «Estado: cancelada»: con el título de suspendida el modal se contradecía."
+  },
   "planLimitAlumnosCuerpoInactivaExplicacion": "Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.",
   "@planLimitAlumnosCuerpoInactivaExplicacion": {
     "description": "Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés."
@@ -4363,6 +4367,10 @@
   "planLimitSuscripcionPausadaMovil": "Tu suscripción está pausada.",
   "@planLimitSuscripcionPausadaMovil": {
     "description": "SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva, forma MÓVIL (PlanCheckoutOnWebOnly — la única superficie de cobro en el móvil es informar el estado). Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart."
+  },
+  "planLimitSuscripcionBajaMovil": "Tu suscripción está dada de baja.",
+  "@planLimitSuscripcionBajaMovil": {
+    "description": "SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva y status cancelled, forma MÓVIL. Hermano de planLimitSuscripcionPausadaMovil: informa el estado, sin llamado a comprar. Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart."
   },
   "planLimitTrainerTituloEjercicios": "TOPE DE EJERCICIOS PROPIOS",
   "@planLimitTrainerTituloEjercicios": {

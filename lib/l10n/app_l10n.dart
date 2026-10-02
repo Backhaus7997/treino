@@ -8259,6 +8259,12 @@ abstract class AppL10n {
   /// **'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'**
   String get planLimitAlumnosTituloInactiva;
 
+  /// Título del aviso de ALUMNOS con la suscripción inactiva cuando el status es cancelled (una baja, no una suspensión), forma MÓVIL. La caja de abajo dice «Estado: cancelada»: con el título de suspendida el modal se contradecía.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'**
+  String get planLimitAlumnosTituloBaja;
+
   /// Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés.
   ///
   /// In es_AR, this message translates to:
@@ -8360,6 +8366,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Tu suscripción está pausada.'**
   String get planLimitSuscripcionPausadaMovil;
+
+  /// SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva y status cancelled, forma MÓVIL. Hermano de planLimitSuscripcionPausadaMovil: informa el estado, sin llamado a comprar. Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción está dada de baja.'**
+  String get planLimitSuscripcionBajaMovil;
 
   /// Título del aviso de tope de EJERCICIOS PROPIOS del PF, forma MÓVIL. La WEB sigue con el string hardcodeado idéntico (i18n Fase W3).
   ///
