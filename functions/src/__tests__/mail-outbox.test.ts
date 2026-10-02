@@ -988,7 +988,8 @@ describe("sendQueuedMailHandler: pie de baja de los correos promocionales", () =
   });
 
   describe("`bloqueComercial`: se frena el bloque, no el mail", () => {
-    const BLOQUE = "Si querés seguir sumando, hay planes más grandes.";
+    // Con `limit: 2` (el Free) hay planes con más lugar: el bloque abre la lista.
+    const BLOQUE = "Si querés seguir sumando, estos planes tienen más lugar:";
 
     it("preferencia APAGADA: el mail sale SIN el bloque de venta y SIN pie", async () => {
       await setPrefs({ [PREF]: { email: false } });

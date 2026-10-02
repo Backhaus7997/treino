@@ -1238,11 +1238,23 @@ describe("el texto", () => {
       expect(text.toLowerCase()).not.toMatch(/perdés|perdes|se borra tu|se eliminan tus/);
     });
 
-    it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
+    it("el CTA ofrece ver planes, con cuerpo", () => {
       const { html } = render(20);
       expect(html).toContain("VER LOS PLANES");
-      // A diferencia de free-limit-reached, este SÍ lleva cuerpo — no es hero.
       expect(html).toMatch(/<p /);
+    });
+
+    it("lista sólo los planes con MÁS ejercicios propios, con su cupo y su precio", () => {
+      // Al que chocó ejercicios le sirve saber cuántos ejercicios trae cada
+      // plan, no cuántos alumnos.
+      const desdeFree = render(20).text;
+      expect(desdeFree).toContain("Si necesitás más lugar, estos planes tienen más:");
+      expect(desdeFree).toMatch(/Plan 1 · 60 ejercicios propios · \$\s?12\.000 por mes/);
+      expect(desdeFree).toContain("Plan 3 · ejercicios propios sin límite");
+
+      const desdePlan1 = render(60).text;
+      expect(desdePlan1).not.toContain("Plan 1 ·");
+      expect(desdePlan1).toContain("Plan 2 · 120 ejercicios propios");
     });
   });
 
@@ -1285,11 +1297,17 @@ describe("el texto", () => {
       expect(text.toLowerCase()).not.toMatch(/perdés|perdes|se borra tu|se eliminan tus/);
     });
 
-    it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
+    it("el CTA ofrece ver planes, con cuerpo", () => {
       const { html } = render(3);
       expect(html).toContain("VER LOS PLANES");
-      // A diferencia de free-limit-reached, este SÍ lleva cuerpo — no es hero.
       expect(html).toMatch(/<p /);
+    });
+
+    it("lista los planes con más plantillas: hoy, los tres pagos sin límite", () => {
+      const { text } = render(3);
+      expect(text).toContain("Si necesitás más lugar, estos planes tienen más:");
+      expect(text).toMatch(/Plan 1 · plantillas sin límite · \$\s?12\.000 por mes/);
+      expect(text).toContain("Plan 3 · plantillas sin límite");
     });
   });
 
@@ -1327,10 +1345,36 @@ describe("el texto", () => {
       expect(text.toLowerCase()).not.toMatch(/se borra tu|se eliminan tus/);
     });
 
-    it("el CTA ofrece ver planes, no un botón hero sin cuerpo", () => {
+    it("el CTA ofrece ver planes, con cuerpo", () => {
       const { html } = render(7);
       expect(html).toContain("VER LOS PLANES");
       expect(html).toMatch(/<p /);
+    });
+
+    it("lista sólo los planes con MÁS alumnos que el suyo", () => {
+      // Con 7 (Plan 1), ofrecerle el Plan 1 es mandarlo a elegir lo que ya tiene.
+      const { text } = render(7);
+      expect(text).toContain("Si querés seguir sumando, estos planes tienen más lugar:");
+      expect(text).not.toContain("Plan 1 ·");
+      expect(text).toMatch(/Plan 2 · 15 alumnos · \$\s?22\.000 por mes/);
+      expect(text).toContain("Plan 3 · alumnos sin límite");
+    });
+
+    it("sin el dato del tope ofrece todos los pagos", () => {
+      const { text } = renderMail("student-limit-reached", { ctaUrl: trainerWebCheckout() });
+      expect(text).toContain("Plan 1 ·");
+      expect(text).toContain("Plan 3 ·");
+    });
+
+    it("⚠️ con el plan sin tope no ofrece «más lugar»: vuelve a la frase de siempre", () => {
+      // `limitParam` distingue «sin tope» (null) de «sin dato» (undefined).
+      // Confundirlos le ofrecería planes a quien ya tiene el más grande.
+      const { text } = renderMail("student-limit-reached", {
+        limit: "sin-tope",
+        ctaUrl: trainerWebCheckout(),
+      });
+      expect(text).not.toMatch(/Plan \d ·/);
+      expect(text).toContain("Si querés seguir sumando, hay planes más grandes.");
     });
   });
 });
