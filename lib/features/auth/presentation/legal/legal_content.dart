@@ -23,7 +23,7 @@ class LegalSection {
 const String kTermsLastUpdated = '1 de octubre de 2026';
 
 /// Ultima revision de Política de Privacidad.
-const String kPrivacyLastUpdated = '1 de octubre de 2026';
+const String kPrivacyLastUpdated = '2 de octubre de 2026';
 
 /// Version vigente de Términos y Condiciones, para evidencia de
 /// aceptacion (`UserProfile.accepted...Version`).
@@ -249,7 +249,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     'TREINO es una app de entrenamiento con una parte social y un espacio donde entrenadores personales (PF) ofrecen sus servicios. Eso significa que la app maneja tres cosas que conviene que sepas desde el arranque:\n'
         '• Recolectamos datos sobre tu salud y tu cuerpo. Medidas corporales, peso, dolores que reportás, cómo te sentís cada día. Son datos sensibles y los tratamos como tales.\n'
         '• Parte de lo que cargás lo ven otras personas. Tu entrenador ve lo que compartas con él. El feed y los rankings publican contenido a otros usuarios, según lo que vos elijas.\n'
-        '• No vendemos tus datos, y no hay publicidad ni rastreadores. No hay SDK de ads, no hay data brokers, no cruzamos tu información con terceros para perfilarte.\n'
+        '• No vendemos tus datos, y no hay publicidad de terceros ni rastreadores. No hay SDK de ads, no hay data brokers, no cruzamos tu información con terceros para perfilarte.\n'
         '\n'
         'El resto de este documento es el detalle de eso.',
   ),
@@ -324,18 +324,19 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '• Prestarte el servicio: Guardar rutinas, registrar sesiones, calcular progreso, mostrarte estadísticas\n'
         '• Vincularte con un entrenador: Descubrimiento, solicitud de vínculo, chat, agenda, compartir lo que elijas\n'
         '• Función social: Feed, seguimientos, reacciones, rankings del gimnasio\n'
-        '• Comunicaciones: Verificación de cuenta, recuperación de contraseña, avisos operativos y avisos sobre tu plan y tus pagos, por correo electrónico\n'
+        '• Comunicaciones: Verificación de cuenta, recuperación de contraseña, avisos operativos, avisos sobre tu plan y tus pagos, y comunicaciones comerciales sobre nuestros propios servicios (te podés dar de baja: ver sección 9), por correo electrónico\n'
         '• Notificaciones: Recordatorios y avisos, si los aceptás\n'
         '• Seguridad: Prevención de abuso, protección de cuentas, integridad del servicio\n'
         '• Mejora del producto: Analítica agregada y diagnóstico de errores\n'
         '• Facturación: Sólo para quien tiene una suscripción paga, entrenador o atleta\n'
         '\n'
-        'Lo que NO hacemos: no vendemos tus datos, no hacemos publicidad, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador.',
+        'Lo que NO hacemos: no vendemos tus datos, no mostramos publicidad de terceros, no cedemos información a data brokers, no cruzamos tu actividad con fuentes externas para perfilarte, y no usamos tus datos de salud para nada que no sea mostrarte tu progreso y —si vos lo habilitás— compartirlo con tu entrenador.',
   ),
   LegalSection(
     '5. BASE LEGAL DEL TRATAMIENTO',
     'Tratamos tus datos, conforme a la Ley 25.326 de Protección de Datos Personales, sobre:\n'
         '• Tu consentimiento, que prestás al aceptar esta política al crear la cuenta.\n'
+        '• El interés legítimo en enviarte comunicaciones comerciales sobre nuestros propios servicios, con los datos que vos mismo nos diste al crear la cuenta (art. 27, inc. 1 de la Ley 25.326). Podés oponerte en cualquier momento y sin costo: ver la sección 9.\n'
         '• Tu consentimiento expreso y específico para los datos de salud de la sección 3.2, que se solicita por separado dentro de la app y podés revocar.\n'
         '• La ejecución del servicio que solicitás al usar la app.\n'
         '• El cumplimiento de obligaciones legales, en particular las registrales y fiscales aplicables a la suscripción de entrenadores.\n'
@@ -398,7 +399,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Para qué: Registrar tus medidas, molestias y check-ins — Base legal: Ejecución del contrato, art. 6(1)(b) — Si hay datos de salud: Consentimiento explícito, art. 9(2)(a)\n'
         '• Para qué: Compartir tus datos con el entrenador al que te vinculaste — Base legal: Ejecución del contrato, art. 6(1)(b) — Si hay datos de salud: Consentimiento explícito, art. 9(2)(a)\n'
         '• Para qué: Analítica de producto y mejora del servicio — Base legal: Interés legítimo, art. 6(1)(f) — Si hay datos de salud: No usamos datos de salud identificables\n'
-        '• Para qué: Comunicaciones comerciales — Base legal: Tu consentimiento, art. 6(1)(a) — Si hay datos de salud: No aplica\n'
+        '• Para qué: Comunicaciones comerciales — Base legal: Interés legítimo, art. 6(1)(f) — Si hay datos de salud: No aplica\n'
         '• Para qué: Facturación y respaldo contable — Base legal: Obligación legal, art. 6(1)(c) — Si hay datos de salud: No aplica\n'
         '\n'
         'Podés retirar tu consentimiento cuando quieras, y hacerlo no afecta la licitud de lo que tratamos antes de que lo retiraras.\n'
@@ -441,6 +442,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         '• Rectificar: Desde el editor de perfil, o escribiéndonos\n'
         '• Suprimir: Eliminar tu cuenta desde la app. Ver sección 10\n'
         '• Revocar consentimiento: Desde los ajustes, o escribiéndonos\n'
+        '• Dejar de recibir comunicaciones comerciales: Con el link al pie de cualquier correo promocional, o escribiéndonos\n'
         '• Dejar de compartir con tu entrenador: Desactivando el compartir, o cortando el vínculo\n'
         '• Salir de los rankings: Desactivando el opt-in\n'
         '• Reclamar: Ante la AAIP\n'
