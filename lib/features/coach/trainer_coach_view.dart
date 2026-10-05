@@ -462,6 +462,9 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                               reason: error.reason == 'subscription-inactive'
                                   ? PlanLimitReason.subscriptionInactive
                                   : PlanLimitReason.planLimit,
+                              subscriptionStatus: ref.read(
+                                currentTrainerSubscriptionStatusProvider,
+                              ),
                             );
                             return;
                           }

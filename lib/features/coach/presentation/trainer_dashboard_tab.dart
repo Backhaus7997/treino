@@ -443,6 +443,8 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
           reason: failure.reason == 'subscription-inactive'
               ? PlanLimitReason.subscriptionInactive
               : PlanLimitReason.planLimit,
+          subscriptionStatus:
+              ref.read(currentTrainerSubscriptionStatusProvider),
         ),
       );
     } on LinkPromotionFailure$PromotionPrecondition {

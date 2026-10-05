@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -7,6 +8,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../l10n/app_l10n.dart';
 import '../../../../coach/domain/subscription_tier.dart';
+import '../../../../profile/application/user_providers.dart';
 import 'plan_checkout.dart';
 import 'plan_copy.dart';
 import 'plan_limit_shared.dart';
@@ -44,6 +46,31 @@ enum PlanLimitReason { planLimit, subscriptionInactive }
 ///   redondeado sólo arriba, descartable deslizando. Es la forma de MÓVIL: el
 ///   pulgar llega al CTA y el gesto de descarte es el nativo del sistema.
 enum PlanLimitPaywallForm { dialog, sheet }
+
+/// Estado de suscripción del perfil del PF, para explicar un rechazo
+/// `subscription-inactive` del servidor.
+///
+/// Los rechazos del servidor no incluyen el estado, así que los callsites leen
+/// este provider en el `catch`, no durante build. Mantener la extracción acá
+/// evita que cada pantalla interprete el perfil de una manera distinta.
+///
+/// `active` y `grace` dan `null`: contradicen el rechazo. Pasa con un status
+/// ausente o desconocido, que el servidor normaliza a `paused`
+/// (`subscription-state.ts`) y Dart a `active` (`SubscriptionStatusX.fromJson`).
+/// Pasarlo haría que el modal dijera «suspendida» con «Estado: activa» abajo;
+/// sin status dice «suspendida» sin la caja, como antes de #1314.
+final currentTrainerSubscriptionStatusProvider =
+    Provider<SubscriptionStatus?>((ref) {
+  final status = ref.watch(
+    userProfileProvider.select(
+      (profile) => profile.valueOrNull?.subscription?.status,
+    ),
+  );
+  return switch (status) {
+    SubscriptionStatus.active || SubscriptionStatus.grace => null,
+    _ => status,
+  };
+});
 
 /// Fuerza la forma del paywall. SÓLO para tests.
 ///
