@@ -124,9 +124,9 @@ Cubre: REQ-CHW-ONB-005/006/007/008/013 (parte), 011; SCENARIO-020 (W), 021, 022,
 Commit: `feat(coach-hub): servicio de búsqueda de lugares para el PF`
 Cubre: REQ-CHW-ONB-010 (servicio); SCENARIO-065. Independiente de B5/B6; condicionado a Task 0.
 
-- [ ] 7.1 **RED** — `test/features/coach_hub/data/lugar_search_service_test.dart` (`MockClient`): request con key, fieldMask `places.displayName,places.formattedAddress,places.location`, `languageCode: 'es'`; mapea `location.latitude/longitude` a `lat/lng`; busca solo desde 3 caracteres; key vacía ⇒ error de configuración y NINGÚN mensaje contiene la key (065).
-- [ ] 7.2 **GREEN** — `lib/features/coach_hub/data/lugar_search_service.dart` (`buscar(String) → List<LugarCandidato{label, direccion, lat, lng}>`, key por `String.fromEnvironment('PLACES_WEB_CLIENT_KEY', defaultValue: <key actual>)`) + provider. Sin paquetes nuevos; sin `geolocator`.
-- [ ] 7.3 **GATE** — test del servicio; analyze acotado; format.
+- [x] 7.1 **RED** — `test/features/coach_hub/data/lugar_search_service_test.dart` (`MockClient`): request con key, fieldMask `places.displayName,places.formattedAddress,places.location`, `languageCode: 'es'`; mapea `location.latitude/longitude` a `lat/lng`; busca solo desde 3 caracteres; key vacía ⇒ error de configuración y NINGÚN mensaje contiene la key (065).
+- [x] 7.2 **GREEN** — `lib/features/coach_hub/data/lugar_search_service.dart` (`buscar(String) → List<LugarCandidato{label, direccion, lat, lng}>`, key por `String.fromEnvironment('PLACES_WEB_CLIENT_KEY', defaultValue: <key actual>)`) + provider. Sin paquetes nuevos; sin `geolocator`.
+- [x] 7.3 **GATE** — test del servicio; analyze acotado; format.
 
 ## Batch 8 — Paso PF: bio, especialidad, tarifa, modalidad y editor de ubicación
 
