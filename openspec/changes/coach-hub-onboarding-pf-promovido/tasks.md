@@ -99,14 +99,14 @@ Cubre: REQ-CHW-ONB-008 (helper), 009 (validadores); SCENARIO-062, 064. Independi
 Commit: `feat(coach-hub): controller del onboarding con escrituras atómicas`
 Cubre: REQ-CHW-ONB-006/007/008/009/010 (escritura), 011; SCENARIO-024, 025, 027, 028 (U), 030, 031, 032, 038 (U), 039 (U), 041 (U), 042, 048, 061, 063. Depende de: B1, B4.
 
-- [ ] 5.1 **RED** — `test/features/coach_hub/application/hub_onboarding_controller_test.dart` (fake_cloud_firestore):
+- [x] 5.1 **RED** — `test/features/coach_hub/application/hub_onboarding_controller_test.dart` (fake_cloud_firestore):
   - `guardarEdad`: solo `bornAt`, nada más; `permission-denied` ⇒ error visible, estado sin colgar (027, 028).
   - `guardarIdentidad`: UNA escritura con `firstName`, `lastName`, `displayName == 'Ana Pérez'`, 3 campos `terms*`; espeja `displayName` a `userPublicProfiles`; sin `username` ni `role` (024, 025, 030, 048).
   - términos: `getFromServer` null ⇒ estampa; ya con `termsAcceptedAt` T0/V0 ⇒ NO pisa y sí escribe nombre (031); `getFromServer` falla ⇒ no estampa + error (032); moderación rechaza ⇒ error, sin términos, etapa sigue (061).
   - `guardarPerfilPf`: partial incluye `displayName` ⇒ `trainerPublicProfiles/{uid}.displayName` (063); rechaza «sin modalidad»; ubicación `custom` con `lat/lng` exactos, `geohash5`, `gymId == null`, `trainerGeohashes` + espejo (038, 039); consentimiento en el MISMO batch con `grantLocationConsent: true` (041); consentimiento previo no se pisa (042).
-- [ ] 5.2 **GREEN** — `lib/features/coach_hub/application/hub_onboarding_controller.dart` (`Notifier<AsyncValue<void>>`; `guardarEdad`, `guardarIdentidad`, `guardarPerfilPf`; `displayName` derivado como `cuenta_tab.dart:211-221`; payload de ubicación = `profile_edit_trainer_screen.dart:342-357`, id `custom-<ms>`).
-- [ ] 5.3 **GATE** — test del controller; analyze acotado; format.
-- [ ] 5.4 **Controles negativos** (commit antes de cada uno; confirmar con `git diff`): (a) sacar `displayName` del partial PF ⇒ 063 en rojo; (b) estampar siempre ⇒ 031 en rojo; revertir cada uno.
+- [x] 5.2 **GREEN** — `lib/features/coach_hub/application/hub_onboarding_controller.dart` (`Notifier<AsyncValue<void>>`; `guardarEdad`, `guardarIdentidad`, `guardarPerfilPf`; `displayName` derivado como `cuenta_tab.dart:211-221`; payload de ubicación = `profile_edit_trainer_screen.dart:342-357`, id `custom-<ms>`).
+- [x] 5.3 **GATE** — test del controller; analyze acotado; format.
+- [x] 5.4 **Controles negativos** (commit antes de cada uno; confirmar con `git diff`): (a) sacar `displayName` del partial PF ⇒ 063 en rojo; (b) estampar siempre ⇒ 031 en rojo; revertir cada uno.
 
 ## Batch 6 — Pantalla `/completar-perfil`: shell, sign-out, pasos edad e identidad, ARB
 
