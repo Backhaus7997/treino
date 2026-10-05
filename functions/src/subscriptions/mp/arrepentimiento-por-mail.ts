@@ -358,8 +358,10 @@ const esContratada = (s: MpPreapproval): boolean =>
   typeof s.status === "string" && CONTRATADAS.has(s.status);
 
 /**
- * Termina los beneficios en el momento: marca los planes como arrepentidos y
- * reconcilia para que el derecho se escriba ya.
+ * Termina los beneficios de los planes cuya contratación más reciente está
+ * dentro de SU propio plazo: los marca como arrepentidos y reconcilia para que
+ * el derecho se escriba ya. Un plan anterior, dado de baja pero con días pagos,
+ * no se marca ni se reconcilia: este trámite no devuelve esa contratación.
  *
  * ── Por qué es un marcador y no una escritura suelta ──
  *
@@ -445,7 +447,7 @@ export async function runConfirmarArrepentimientoPorMail(
     // ── 1. Qué contrató, según Mercado Pago ──
     const planes = await planesDeLaCuenta(app, uid);
     const todas: MpPreapproval[] = [];
-    /** Las contrataciones de cada plan que tiene alguna: es lo que hay que cortar. */
+    /** Las contrataciones de cada plan que tiene alguna. */
     const planesConContrato = new Map<string, MpPreapproval[]>();
     for (const { planId } of planes) {
       // Secuencial, como el resto: en paralelo son N requests a MP y contesta 429.
@@ -536,6 +538,22 @@ export async function runConfirmarArrepentimientoPorMail(
       return { status: "en-revision" };
     }
 
+    // El plazo global lo decide la contratación más reciente de la cuenta, pero
+    // el corte se decide PLAN POR PLAN. Si A se dio de baja hace 40 días y aún
+    // tiene período pago, y B se contrató hace 2, marcar A le quitaría días que
+    // este trámite no devuelve. `contrato` sale de estas mismas listas: como su
+    // plazo es `dentro`, el plan que disparó esta rama queda incluido siempre.
+    const planesDentroDePlazo = new Map<string, MpPreapproval[]>();
+    for (const [planId, subs] of planesConContrato) {
+      const delPlan = contratoMasReciente(subs);
+      if (
+        delPlan !== null &&
+        evaluarPlazo(delPlan.contratoMs, deps.nowMs).estado === "dentro"
+      ) {
+        planesDentroDePlazo.set(planId, subs);
+      }
+    }
+
     // ── 3c. Dentro de plazo: se corta la suscripción y se avisa al equipo ──
     const baja = await runCancelMySubscription(app, uid, deps);
     if (baja.estado === "no-disponible" || baja.enfriando === true) {
@@ -556,7 +574,10 @@ export async function runConfirmarArrepentimientoPorMail(
     //    posterior —el evento de MP por esta misma cancelación, o el barrido— lo
     //    respeta.
     await avisarAlEquipo(app, ref.id, uid, datosDelAviso("dentro", baja.canceladas ?? 0), deps.nowMs);
-    await cortarElAcceso(app, planesConContrato, deps);
+    // Los planes viejos no se reconcilian acá: la baja ya reconcilió los que
+    // seguían vivos, y volver a visitar uno fuera de plazo sólo podría tocar un
+    // derecho pago que este arrepentimiento debe conservar.
+    await cortarElAcceso(app, planesDentroDePlazo, deps);
     await ref
       .update({ resultado: "recibido", canceladas: baja.canceladas ?? 0 })
       .catch(() => undefined);

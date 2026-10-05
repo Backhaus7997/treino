@@ -503,6 +503,48 @@ describe("confirmarArrepentimientoPorMail — el acceso termina en el acto", () 
     expect(store.users[UID].athleteSubscription).toEqual({ status: "expired" });
   });
 
+  it("⚠️ alumno: sólo corta el plan que está dentro de SU plazo", async () => {
+    // A se dio de baja hace rato, pero todavía tiene días pagos. B se contrató
+    // hace 2 días. El arrepentimiento de B no devuelve lo pagado por A, así que
+    // marcar A también le robaría al alumno ese resto pago.
+    const hastaA = AHORA + 20 * DIA_MS;
+    const mundo: Store = {
+      users: { [UID]: { role: "athlete", athleteSubscription: { status: "active" } } },
+      mp_plans: {
+        pA: {
+          producto: "athlete",
+          uid: UID,
+          cycle: "monthly",
+          ultimoStatus: "cancelled",
+          currentPeriodEnd: ts(hastaA),
+        },
+        pB: { producto: "athlete", uid: UID, cycle: "monthly" },
+      },
+    };
+    const mp = fakeMp({
+      subs: {
+        pA: [
+          SUB("vieja", 40, {
+            status: "cancelled",
+            next_payment_date: new Date(hastaA).toISOString(),
+          }),
+        ],
+        pB: [SUB("nueva", 2)],
+      },
+    });
+    const { app, store } = await conLinkPedido(mundo, mp);
+
+    const r = await runConfirmarArrepentimientoPorMail(app, { token: TOKEN }, mp.deps);
+
+    expect(r.status).toBe("recibido");
+    expect(mp.canceladas).toEqual(["nueva"]);
+    expect(store.mp_plans.pB[CAMPO_ARREPENTIDO]).toBe(AHORA);
+    expect(store.mp_plans.pA[CAMPO_ARREPENTIDO]).toBeUndefined();
+    expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
+    const [aviso] = mails(store, "withdrawal-team-notice");
+    expect(aviso.params.suscripciones).toBe("vieja, nueva");
+  });
+
   it("CONTROL: una baja común, en cambio, conserva el acceso hasta el fin del período", async () => {
     // Es lo que este test protege de mezclarse: la baja NO devuelve plata, y por
     // eso el alumno sigue teniendo lo que pagó.
