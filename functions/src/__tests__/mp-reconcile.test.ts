@@ -3059,6 +3059,43 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
         expect(derechoDe(store)).toBe("expired");
       });
 
+      it("la marca se limpia cuando el plan vuelve a otorgar: un corte de meses despues tiene su propia ventana", async () => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.createdAt = ts(AHORA - 2 * 60 * 1000);
+        const { app, store } = fakeApp(mundo);
+
+        // Primer episodio: se posterga el corte y queda la marca.
+        expect((await reconcileSubscription(app, "a1", fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }))).outcome).toBe("error-mp");
+        expect(store.mp_plans.a1.indiceMpDiferidoAtMs).toBe(AHORA);
+
+        // El plan vuelve a otorgar (MP lo muestra autorizado): la marca se limpia.
+        await reconcileSubscription(app, "a1", fakeMpMultiPlan({
+          a1: MENSUAL_AUTORIZADO,
+          a2: null,
+        }, {}, AHORA + 60 * 1000));
+        expect(store.mp_plans.a1.indiceMpDiferidoAtMs).toBeNull();
+
+        // Meses despues vence de nuevo justo cuando el alumno abre otro plan: ese
+        // corte recibe su propia ventana en vez de heredar el tope viejo.
+        const MESES = 90 * DIA_MS;
+        store.mp_plans.a3 = {
+          producto: "athlete",
+          uid: "u1",
+          cycle: "annual",
+          createdAt: ts(AHORA + MESES - 60 * 1000),
+        };
+        delete store.mp_plans.a2;
+        const tarde = await reconcileSubscription(app, "a1", fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a3: null,
+        }, {}, AHORA + MESES));
+        expect(tarde.outcome).toBe("error-mp");
+        expect(store.mp_plans.a1.indiceMpDiferidoAtMs).toBe(AHORA + MESES);
+      });
+
       it("un plan vencido difiere como mucho una ventana aunque aparezcan hermanos siempre recientes", async () => {
         const mundo = mundoPreDeploy();
         mundo.mp_plans.a2.createdAt = ts(AHORA - 2 * 60 * 1000);

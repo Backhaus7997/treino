@@ -2322,8 +2322,24 @@ async function escribirSuscripcionDeAlumno(i: {
   // Se guarda el `status` AJUSTADO por la prueba diferida, no el de MP crudo: el
   // hermano proyecta el derecho desde lo guardado ([derechoGuardado]), y tiene
   // que ver lo mismo que este escritor dejaria. Ver el orden en el encabezado.
-  if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status) {
-    await planRef.set({ [CAMPO_ULTIMO_STATUS]: status }, { merge: true });
+  //
+  // En la misma escritura se limpia [CAMPO_INDICE_MP_DIFERIDO_AT_MS] cuando este
+  // plan vuelve a otorgar: la marca acota UN corte, y un corte independiente de
+  // meses despues (pausa → activo → vencido) merece su propia ventana. Sin esto,
+  // la marca vieja le negaria el beneficio de la duda a un hermano pago que el
+  // indice de MP todavia no muestra. Se escribe `null` y no se borra: la lectura
+  // ya trata cualquier cosa que no sea un numero como «sin marca».
+  const limpiarMarcaDelIndice =
+    typeof planDoc?.[CAMPO_INDICE_MP_DIFERIDO_AT_MS] === "number" &&
+    athleteStatusOtorga(athleteStatus);
+  if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status || limpiarMarcaDelIndice) {
+    await planRef.set(
+      {
+        [CAMPO_ULTIMO_STATUS]: status,
+        ...(limpiarMarcaDelIndice ? { [CAMPO_INDICE_MP_DIFERIDO_AT_MS]: null } : {}),
+      },
+      { merge: true },
+    );
   }
 
   // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un derecho vigente ──
