@@ -6,7 +6,8 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 
-/// Card shown at the bottom of LoginScreen for trainer access inquiry.
+/// Card shown at the bottom of LoginScreen and RegisterScreen for trainer
+/// access inquiry.
 /// Tapping opens an AlertDialog with the team email.
 class TrainerInquiryCard extends StatelessWidget {
   const TrainerInquiryCard({super.key});

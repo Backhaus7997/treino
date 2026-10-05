@@ -12,6 +12,7 @@ import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart'
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/password_strength_bar.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_checkbox.dart';
+import 'package:treino/features/auth/presentation/widgets/trainer_inquiry_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockUser extends Mock implements User {}
@@ -103,6 +104,15 @@ void main() {
     await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
     await tester.pumpAndSettle();
     expect(find.byType(TermsCheckbox), findsOneWidget);
+  });
+
+  // ---------------------------------------------------------------------------
+  // TrainerInquiryCard is visible (same entry point as LoginScreen)
+  // ---------------------------------------------------------------------------
+  testWidgets('TrainerInquiryCard is rendered', (tester) async {
+    await tester.pumpWidget(_buildApp(notifier: _TestAuthNotifier()));
+    await tester.pumpAndSettle();
+    expect(find.byType(TrainerInquiryCard), findsOneWidget);
   });
 
   // ---------------------------------------------------------------------------
