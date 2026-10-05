@@ -376,6 +376,85 @@ class AuthService {
     return cred.user!;
   }
 
+  /// Entra con Google por popup. **Sólo web** (Coach Hub): en mobile se usa
+  /// [signInWithGoogle]. No lleva `assert(kIsWeb)`; en una plataforma sin popup
+  /// el SDK falla solo.
+  ///
+  /// `select_account` fuerza el selector: sin él, tras un sign-out el popup
+  /// reentra silencioso con la última cuenta.
+  ///
+  /// Invariante: ningún `await` entre el tap y `signInWithPopup`. Si lo hay, el
+  /// navegador pierde la activación del usuario y bloquea la ventana.
+  Future<User> signInWithGooglePopup() => _signInWithPopup(
+        GoogleAuthProvider()
+          ..setCustomParameters(const {'prompt': 'select_account'}),
+        'signInWithGooglePopup',
+      );
+
+  /// Entra con Apple por popup. **Sólo web** (Coach Hub): en mobile se usa
+  /// [signInWithApple]. Mismo invariante de activación que
+  /// [signInWithGooglePopup].
+  Future<User> signInWithApplePopup() => _signInWithPopup(
+        OAuthProvider('apple.com')
+          ..addScope('email')
+          ..addScope('name'),
+        'signInWithApplePopup',
+      );
+
+  Future<User> _signInWithPopup(AuthProvider provider, String camino) async {
+    final UserCredential cred;
+    try {
+      cred = await _auth.signInWithPopup(provider);
+    } on FirebaseAuthException catch (e, st) {
+      throw _failureFromPopup(e, st, camino);
+    }
+
+    final user = cred.user!;
+    // Mismo backfill best-effort que los logins mobile. Apple puede no traer
+    // email después del primer ingreso: `?? ''`.
+    try {
+      await _userRepository.createIfAbsent(
+        uid: user.uid,
+        email: user.email ?? '',
+      );
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, camino);
+    }
+    return user;
+  }
+
+  /// Mapeo acotado al camino del popup: NO vive en [AuthFailure.fromFirebase]
+  /// porque `operation-not-allowed` e `invalid-credential` significan otra
+  /// cosa en el login/alta por email.
+  AuthFailure _failureFromPopup(
+    FirebaseAuthException e,
+    StackTrace st,
+    String camino,
+  ) {
+    switch (e.code) {
+      case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
+      case 'user-cancelled':
+        return const AuthFailure.signInCancelled();
+      case 'popup-blocked':
+        return const AuthFailure.popupBlocked();
+      case 'unauthorized-domain':
+      case 'operation-not-allowed':
+      case 'invalid-credential':
+        // Configuración rota (consola / dominio): no es culpa de la persona,
+        // así que se reporta. En popup `invalid-credential` es el rechazo de
+        // Firebase a la credencial del IdP, no una contraseña.
+        unawaited(_reportNonFatal(
+          e,
+          st,
+          reason: 'AuthService.$camino: proveedor no disponible (${e.code})',
+        ));
+        return const AuthFailure.providerUnavailable();
+      default:
+        return AuthFailure.fromFirebase(e);
+    }
+  }
+
   // ── Re-auth helpers (Fase 6 Etapa 3 — account-deletion PR#3) ────────────────
   //
   // Per ADR-ACCDEL-009: AuthService stays thin. These methods expose Firebase

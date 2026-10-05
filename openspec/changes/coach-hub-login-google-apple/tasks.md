@@ -85,7 +85,7 @@ Cubre: REQ-CHW-AUTH-001/002/003/004; SCENARIO-CHW-AUTH-001, 002, 005, 006, 007, 
 014, 026, 027, 028.
 Depende de: B1.
 
-- [ ] 2.1 **RED** — `test/features/auth/data/auth_service_test.dart` (mocktail,
+- [x] 2.1 **RED** — `test/features/auth/data/auth_service_test.dart` (mocktail,
   `registerFallbackValue(GoogleAuthProvider())`, `captureAny` en `signInWithPopup`):
   - 001: Google ⇒ `GoogleAuthProvider` con custom param `prompt=select_account`; nunca
     `signInWithCredential`.
@@ -107,7 +107,7 @@ Depende de: B1.
     autenticado.
   - 028: code desconocido ⇒ fallback `AuthFailure.fromFirebase`.
   Ver rojo (métodos inexistentes).
-- [ ] 2.2 **GREEN** — `lib/features/auth/data/auth_service.dart`: `signInWithGooglePopup()`
+- [x] 2.2 **GREEN** — `lib/features/auth/data/auth_service.dart`: `signInWithGooglePopup()`
   y `signInWithApplePopup()` (camino `'signInWithGooglePopup'`/`'signInWithApplePopup'`),
   helper privado `_signInWithPopup`, `_failureFromPopup(e, st, camino)` con cancel set D2 y
   config set D3, `createIfAbsent(uid, email ?? '')` best-effort con `_reportarAltaFallida`.
@@ -115,9 +115,9 @@ Depende de: B1.
   `OAuthProvider('apple.com')..addScope('email')..addScope('name')`. Dartdoc «web-only», sin
   `assert(kIsWeb)`. Sin `await` previo a `signInWithPopup`. No reutilizar
   `signInWithGoogle`/`signInWithApple`.
-- [ ] 2.3 **REFACTOR** — deduplicar el try/catch entre ambos métodos solo si sigue
+- [x] 2.3 **REFACTOR** — deduplicar el try/catch entre ambos métodos solo si sigue
   legible; los tests de mobile del archivo siguen verdes.
-- [ ] 2.4 **GATE** — correr `auth_service_test.dart` completo; analyze acotado; format.
+- [x] 2.4 **GATE** — correr `auth_service_test.dart` completo; analyze acotado; format.
 - [ ] 2.5 **Control negativo** (tras commit): quitar `invalid-credential` del set de config
   y confirmar rojo en el test 027; revertir.
 

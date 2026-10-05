@@ -54,6 +54,7 @@ class _MockAppleSignInGateway extends Mock implements AppleSignInGateway {}
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
+    registerFallbackValue(GoogleAuthProvider());
     registerFallbackValue(<AppleIDAuthorizationScopes>[]);
   });
 
@@ -857,6 +858,186 @@ void main() {
       expect(result, user);
       expect(reportados.single, contains('signInWithApple'));
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // signInWithGooglePopup / signInWithApplePopup (web — Coach Hub)
+  // ---------------------------------------------------------------------------
+  group('AuthService popup (web)', () {
+    final caminos = <String, Future<User> Function(AuthService)>{
+      'signInWithGooglePopup': (s) => s.signInWithGooglePopup(),
+      'signInWithApplePopup': (s) => s.signInWithApplePopup(),
+    };
+
+    setUp(() {
+      when(() => fbAuth.signInWithPopup(any())).thenAnswer((_) async => cred);
+    });
+
+    test(
+        'SCENARIO-001: Google usa GoogleAuthProvider con select_account y '
+        'nunca signInWithCredential', () async {
+      await sut.signInWithGooglePopup();
+
+      final provider =
+          verify(() => fbAuth.signInWithPopup(captureAny())).captured.single;
+      expect(provider, isA<GoogleAuthProvider>());
+      expect(
+        (provider as GoogleAuthProvider).parameters,
+        {'prompt': 'select_account'},
+      );
+      verifyNever(() => fbAuth.signInWithCredential(any()));
+    });
+
+    test(
+        'SCENARIO-002: Apple usa OAuthProvider apple.com con scopes '
+        'email y name y nunca signInWithCredential', () async {
+      await sut.signInWithApplePopup();
+
+      final provider =
+          verify(() => fbAuth.signInWithPopup(captureAny())).captured.single;
+      expect(provider, isA<OAuthProvider>());
+      expect((provider as OAuthProvider).providerId, 'apple.com');
+      expect(provider.scopes, ['email', 'name']);
+      verifyNever(() => fbAuth.signInWithCredential(any()));
+    });
+
+    for (final entry in caminos.entries) {
+      final camino = entry.key;
+      final entrar = entry.value;
+
+      group(camino, () {
+        test(
+            'SCENARIO-005: éxito ⇒ createIfAbsent una vez y devuelve el '
+            'usuario', () async {
+          final result = await entrar(sut);
+
+          expect(result, user);
+          verify(
+            () => mockRepo.createIfAbsent(uid: 'uid-test', email: 'a@b.c'),
+          ).called(1);
+          expect(reportados, isEmpty);
+        });
+
+        test('createIfAbsent con email nulo escribe cadena vacía', () async {
+          when(() => user.email).thenReturn(null);
+
+          await entrar(sut);
+
+          verify(() => mockRepo.createIfAbsent(uid: 'uid-test', email: ''))
+              .called(1);
+        });
+
+        test(
+            'SCENARIO-006: createIfAbsent tirando no rompe el login y se '
+            'reporta', () async {
+          when(
+            () => mockRepo.createIfAbsent(
+              uid: any(named: 'uid'),
+              email: any(named: 'email'),
+            ),
+          ).thenThrow(Exception('Firestore down'));
+
+          final result = await entrar(sut);
+
+          expect(result, user);
+          expect(
+            reportados.single,
+            'AuthService.$camino: createIfAbsent falló después del login',
+          );
+        });
+
+        for (final code in const [
+          'popup-closed-by-user', // SCENARIO-009
+          'cancelled-popup-request', // SCENARIO-010
+          'user-cancelled', // SCENARIO-026
+        ]) {
+          test(
+              'cancelación ($code) ⇒ signInCancelled, sin alta y sin '
+              'reporte', () async {
+            when(() => fbAuth.signInWithPopup(any()))
+                .thenThrow(FirebaseAuthException(code: code));
+
+            await expectLater(
+              entrar(sut),
+              throwsA(const AuthFailure.signInCancelled()),
+            );
+            verifyNever(
+              () => mockRepo.createIfAbsent(
+                uid: any(named: 'uid'),
+                email: any(named: 'email'),
+              ),
+            );
+            expect(reportados, isEmpty);
+          });
+        }
+
+        test('popup-blocked ⇒ popupBlocked, sin reporte', () async {
+          when(() => fbAuth.signInWithPopup(any()))
+              .thenThrow(FirebaseAuthException(code: 'popup-blocked'));
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.popupBlocked()),
+          );
+          expect(reportados, isEmpty);
+        });
+
+        test('account-exists-with-different-credential ⇒ sin reporte',
+            () async {
+          when(() => fbAuth.signInWithPopup(any())).thenThrow(
+            FirebaseAuthException(
+              code: 'account-exists-with-different-credential',
+            ),
+          );
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.accountExistsWithDifferentCredential()),
+          );
+          expect(reportados, isEmpty);
+        });
+
+        for (final code in const [
+          'unauthorized-domain', // SCENARIO-014
+          'operation-not-allowed',
+          'invalid-credential', // SCENARIO-027
+        ]) {
+          test('config rota ($code) ⇒ providerUnavailable + non-fatal',
+              () async {
+            when(() => fbAuth.signInWithPopup(any()))
+                .thenThrow(FirebaseAuthException(code: code));
+
+            await expectLater(
+              entrar(sut),
+              throwsA(const AuthFailure.providerUnavailable()),
+            );
+            expect(
+              reportados.single,
+              'AuthService.$camino: proveedor no disponible ($code)',
+            );
+            verifyNever(
+              () => mockRepo.createIfAbsent(
+                uid: any(named: 'uid'),
+                email: any(named: 'email'),
+              ),
+            );
+          });
+        }
+
+        test('SCENARIO-028: code desconocido ⇒ fallback fromFirebase',
+            () async {
+          when(() => fbAuth.signInWithPopup(any())).thenThrow(
+            FirebaseAuthException(code: 'network-request-failed'),
+          );
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.networkError()),
+          );
+          expect(reportados, isEmpty);
+        });
+      });
+    }
   });
 
   // ---------------------------------------------------------------------------
