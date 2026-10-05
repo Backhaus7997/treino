@@ -348,6 +348,7 @@ import {
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
   cobrosExitosos,
+  evidenciaDePago,
   finPagoDelPlanVivo,
   situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
@@ -569,6 +570,10 @@ interface FinDePeriodoInput {
   autoRecurring: unknown;
   status: SubscriptionStatus;
   planId: string;
+  /** El plan al que pertenece `yaGuardada`, si se conoce. */
+  planIdYaGuardado?: unknown;
+  /** La suscripcion de MP cuya evidencia de cobro puede reconstruir el fin. */
+  mp?: MpPreapproval;
 }
 
 /**
@@ -579,14 +584,24 @@ interface FinDePeriodoInput {
  * periodo entero, asi que la cascada existe para no llegar nunca ahi:
  *
  *   1. `next_payment_date`, si MP lo mando.
- *   2. La que ya teniamos. Cubre al PF que estuvo meses suscripto: el barrido
+ *   2. Si la fecha guardada es de OTRO plan, el fin que respalda el ULTIMO
+ *      COBRO medido del plan que se reconcilia (`last_charged_date + frequency`,
+ *      ver [evidenciaDePago]). Solo esa fuente: el respaldo desde el alta
+ *      (`alta + cobros * frequency`) es una cota INFERIOR —una pausa o una
+ *      renovacion demorada la adelantan— y escribirla como fin podria cortar en
+ *      el acto un periodo que el usuario pago. Sin ultimo cobro, sigue la
+ *      cascada de antes.
+ *   3. La que ya teniamos. Cubre al PF que estuvo meses suscripto: el barrido
  *      diario la fue refrescando mientras estaba activo.
- *   3. `start_date + frequency`. Cubre la baja el MISMO DIA, antes de que el
+ *      Si pertenece a otro plan y no hay evidencia suficiente, se conserva como
+ *      ultimo recurso: no prueba el periodo actual, pero evita cortar en el acto
+ *      un acceso que puede estar pago.
+ *   4. `start_date + frequency`. Cubre la baja el MISMO DIA, antes de que el
  *      barrido corriera una sola vez — ahi no hay nada guardado que conservar,
  *      y "me suscribi, me arrepenti, cancelo" es un comportamiento normal.
- *   4. `null`, y recien ahi nos rendimos.
+ *   5. `null`, y recien ahi nos rendimos.
  *
- * Los pasos 2 y 3 solo corren si MP ya dijo algo terminal. Mientras la
+ * Los pasos 2 a 4 solo corren si MP ya dijo algo terminal. Mientras la
  * suscripcion sigue viva, que falte la fecha es informacion —no la sabemos— y
  * conservar una vieja seria inventar un periodo que quizas no se pago.
  */
@@ -595,6 +610,17 @@ export function resolverFinDePeriodo(
 ): Timestamp | null {
   if (i.deMp !== null) return i.deMp;
   if (i.status !== "cancelled" && i.status !== "paused") return null;
+
+  const fechaEsDeOtroPlan =
+    typeof i.planIdYaGuardado === "string" &&
+    i.planIdYaGuardado.length > 0 &&
+    i.planIdYaGuardado !== i.planId;
+  if (fechaEsDeOtroPlan && i.mp !== undefined) {
+    const evidencia = evidenciaDePago(i.mp);
+    if (evidencia?.fuente === "ultimo-cobro") {
+      return Timestamp.fromMillis(evidencia.hastaMs);
+    }
+  }
 
   const previa = comoTimestamp(i.yaGuardada);
   if (previa !== null) return previa;
@@ -2822,6 +2848,8 @@ export async function reconcileSubscription(
           autoRecurring: mp.auto_recurring,
           status,
           planId,
+          planIdYaGuardado: anotado,
+          mp,
         }),
         pruebaDiferida,
         { planId, uid },

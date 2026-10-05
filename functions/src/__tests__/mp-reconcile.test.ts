@@ -1253,6 +1253,25 @@ const A_DE_BAJA: MpPreapproval = {
   next_payment_date: undefined,
 };
 
+/**
+ * La misma baja con el ultimo cobro medido por MP (`last_charged_date`) y el
+ * ciclo: es lo que fecha lo que A pago (`last_charged_date + frequency`).
+ */
+const A_DE_BAJA_CON_EVIDENCIA: MpPreapproval = {
+  ...A_DE_BAJA,
+  auto_recurring: {
+    frequency: 1,
+    frequency_type: "months",
+    transaction_amount: 22000,
+  },
+  summarized: {
+    charged_quantity: 1,
+    charged_amount: 22000,
+    pending_charge_quantity: 0,
+    last_charged_date: "2026-08-20T12:00:00.000Z",
+  },
+};
+
 /** B autorizada: el PF volvio a contratar. */
 const B_VIVA: MpPreapproval = {
   ...A_VIVA,
@@ -1389,25 +1408,28 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     expect(store.mp_plans.pA.terminal).toBe(true);
   });
 
-  it("con la forma real de MP (baja sin fecha) se acredita el tier; el fin es el de la cascada", async () => {
+  it("con la forma real de MP (baja sin fecha) acredita el tier y el periodo pago de A", async () => {
     // `A_DE_BAJA` es lo que MP contesta de verdad: omite `next_payment_date` en un
-    // plan cancelado que cobro. Sin fecha propia, `resolverFinDePeriodo` cae en la
-    // guardada, que es la de B (un checkout que nunca cobro). Lo que este arreglo
-    // garantiza es que A deje de rechazarse y se le acredite el TIER; el fin de
-    // periodo exacto que A pago NO sale de MP en este camino.
+    // plan cancelado que cobro. Como no tenemos medida la fecha del ultimo cobro,
+    // el respaldo usa alta + cantidad de cobros por frecuencia; supone que el
+    // primero se cobro al autorizar. La fecha guardada es de B y no debe ganar.
     const { app, store } = fakeApp(VOLVIO("plan3"));
     await reconcileSubscription(app, "pB", fakeMp(B_SIN_PAGAR), B_SIN_PAGAR);
 
-    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+    const r = await reconcileSubscription(
+      app,
+      "pA",
+      fakeMp(A_DE_BAJA_CON_EVIDENCIA),
+      A_DE_BAJA_CON_EVIDENCIA,
+    );
 
     expect(r.outcome).toBe("written");
     const sub = suscripcion(store);
     expect(sub).toMatchObject({
       tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
     });
-    // La fecha heredada de B, no la de A: es lo que hoy rinde la cascada.
     expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
-      .toBe(Date.parse(PROXIMO_DE_B));
+      .toBe(FIN_DE_A);
     expect(store.mp_plans.pA.terminal).toBe(true);
   });
 
@@ -1892,14 +1914,82 @@ describe("resolverFinDePeriodo — la cascada", () => {
     expect(r?.toMillis()).toBe(1_000);
   });
 
-  it("2. sin fecha de MP, gana la que ya teniamos", () => {
+  it("3. sin fecha de MP, gana la que ya teniamos", () => {
     // El caso del PF que estuvo meses suscripto: el barrido diario le fue
     // refrescando la fecha mientras estaba activo.
     const r = resolverFinDePeriodo({ ...base, yaGuardada: ts(9_999) });
     expect(r?.toMillis()).toBe(9_999);
   });
 
-  it("3. sin nada guardado, se deriva del alta — la baja el MISMO DIA", () => {
+  it("2. si la fecha guardada es de otro plan, usa el periodo respaldado por el cobro", () => {
+    const r = resolverFinDePeriodo({
+      ...base,
+      yaGuardada: ts(9_999),
+      planIdYaGuardado: "otro-plan",
+      mp: {
+        status: "cancelled",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: {
+          charged_quantity: 1,
+          charged_amount: 22000,
+          last_charged_date: "2026-08-20T12:00:00.000Z",
+        },
+      },
+    });
+    expect(r?.toMillis()).toBe(Date.parse("2026-09-20T12:00:00.000Z"));
+  });
+
+  it("3. si la fecha guardada es del mismo plan, no cambia la cascada", () => {
+    const r = resolverFinDePeriodo({
+      ...base,
+      yaGuardada: ts(9_999),
+      planIdYaGuardado: "p1",
+      mp: {
+        status: "cancelled",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: {
+          charged_quantity: 1,
+          charged_amount: 22000,
+          last_charged_date: "2026-08-20T12:00:00.000Z",
+        },
+      },
+    });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("3. con otro plan y solo el respaldo desde el alta, NO lo usa: es una cota inferior", () => {
+    // Alta 1/6, dos cobros mensuales: la estimacion da 1/8. Si hubo una pausa en
+    // el medio, el segundo cobro pudo cubrir hasta mucho despues, y escribir 1/8
+    // cortaria un periodo pago. Sin ultimo cobro medido, sigue la cascada.
+    const r = resolverFinDePeriodo({
+      ...base,
+      yaGuardada: ts(9_999),
+      planIdYaGuardado: "otro-plan",
+      mp: {
+        status: "cancelled",
+        date_created: "2026-06-01T12:00:00.000Z",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: { charged_quantity: 2, charged_amount: 44000 },
+      },
+    });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("3. con otro plan pero sin evidencia de cobro conserva el fallback anterior", () => {
+    const r = resolverFinDePeriodo({
+      ...base,
+      yaGuardada: ts(9_999),
+      planIdYaGuardado: "otro-plan",
+      mp: {
+        status: "cancelled",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: { charged_quantity: 0 },
+      },
+    });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("4. sin nada guardado, se deriva del alta — la baja el MISMO DIA", () => {
     // Este es el agujero que encontro la prueba real: se suscribio y cancelo
     // antes de que el barrido corriera una sola vez, asi que no hay nada que
     // conservar. Sin esta rama pierde el mes que pago.
@@ -1907,7 +1997,7 @@ describe("resolverFinDePeriodo — la cascada", () => {
     expect(r?.toMillis()).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
   });
 
-  it("4. si no hay ningun camino, null y un warn que lo grita", () => {
+  it("5. si no hay ningun camino, null y un warn que lo grita", () => {
     const r = resolverFinDePeriodo({ ...base, autoRecurring: null });
     expect(r).toBeNull();
     expect(errorSpy.mock.calls.length + warnSpy.mock.calls.length)
