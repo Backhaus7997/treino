@@ -47,9 +47,13 @@ sealed class TopeDeAlumnosPublicado {
   ///   `athletesDespues` no viene o no se entiende. El contrato publica las
   ///   tres claves juntas, así que eso es un doc roto, y adivinar el tope
   ///   posterior sería inventarlo.
+  /// - `athletesHasta` no es `null` ni `Timestamp`: mismo criterio, un cambio
+  ///   programado que no se puede leer.
+  /// - Un tope (`athletes` o `athletesDespues`) menor o igual a cero: el
+  ///   servidor no publica topes así (los de la tabla son 2, 7, 15 o sin
+  ///   tope), y mostrar «0 DE 0» sería afirmar algo que nadie calculó.
   ///
-  /// Un `athletesHasta` que NO es `Timestamp` se toma como «sin cambio
-  /// programado»: `athletes` sigue siendo un dato bueno.
+  /// `athletesHasta` ausente o `null` es «sin cambio programado».
   factory TopeDeAlumnosPublicado.leer(Object? planLimits) {
     if (planLimits is! Map || !planLimits.containsKey('athletes')) {
       return const TopeNoPublicado();
@@ -59,9 +63,11 @@ sealed class TopeDeAlumnosPublicado {
     if (athletes != null && limite == null) return const TopeNoPublicado();
 
     final hasta = planLimits['athletesHasta'];
-    if (hasta is! Timestamp) {
-      return TopePublicado(limite: limite);
-    }
+    if (hasta == null) return TopePublicado(limite: limite);
+    // Un `athletesHasta` que no es `Timestamp` es un doc roto, igual que un
+    // `Timestamp` con un `athletesDespues` que no se entiende: no se adivina
+    // cuándo cambia el tope, y se cae al cálculo del cliente.
+    if (hasta is! Timestamp) return const TopeNoPublicado();
 
     // `athletesDespues: null` CON `athletesHasta` es «sin tope» (ver el
     // dartdoc del servidor): se mira SIEMPRE `athletesHasta` primero.
@@ -85,6 +91,15 @@ sealed class TopeDeAlumnosPublicado {
 /// del lado del cliente, como antes de que existiera `planLimits.athletes`.
 final class TopeNoPublicado extends TopeDeAlumnosPublicado {
   const TopeNoPublicado();
+
+  // Igualdad por valor y no por identidad: `.distinct()` en el provider no
+  // tiene que depender de que todos los `TopeNoPublicado` sean el mismo
+  // `const`.
+  @override
+  bool operator ==(Object other) => other is TopeNoPublicado;
+
+  @override
+  int get hashCode => (TopeNoPublicado).hashCode;
 }
 
 /// El tope que el servidor publicó, con su próximo cambio por reloj.
@@ -130,15 +145,17 @@ final class TopePublicado extends TopeDeAlumnosPublicado {
   int get hashCode => Object.hash(limite, hasta, despues);
 }
 
-/// Un tope de la forma que escribe el servidor: entero, o `null`. Lo demás
-/// (texto, decimales) devuelve `null` y el llamador lo distingue del `null`
-/// legítimo mirando el valor crudo.
+/// Un tope de la forma que escribe el servidor: entero POSITIVO, o `null`. Lo
+/// demás (texto, decimales, cero o negativos) devuelve `null` y el llamador lo
+/// distingue del `null` legítimo mirando el valor crudo.
 int? _comoTope(Object? crudo) {
-  if (crudo is int) return crudo;
-  if (crudo is num && crudo.isFinite && crudo == crudo.truncateToDouble()) {
-    return crudo.toInt();
-  }
-  return null;
+  final n = switch (crudo) {
+    int() => crudo,
+    num() when crudo.isFinite && crudo == crudo.truncateToDouble() =>
+      crudo.toInt(),
+    _ => null,
+  };
+  return n != null && n > 0 ? n : null;
 }
 
 /// El tier cuya tabla ([kTierWeightLimits]) tiene exactamente [tope] de cupo, o

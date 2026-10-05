@@ -342,6 +342,31 @@ void main() {
       });
     });
 
+    // El timer va un milisegundo DESPUÉS del borde: el `Timer` de web trunca a
+    // milisegundos, y uno que dispara antes vería que el borde no llegó y se
+    // reagendaría en loop.
+    test('con el borde a menos de un minuto, espera lo que falta + 1 ms',
+        () async {
+      final firestore = await _firestore({
+        'athletes': 7,
+        'athletesHasta': Timestamp.fromDate(
+          ahora.add(const Duration(seconds: 20)),
+        ),
+        'athletesDespues': 2,
+      });
+      fakeAsync((async) {
+        final container =
+            _container(firestore, sub: _sub(SubscriptionTier.plan1));
+        _escuchar(async, container);
+
+        expect(
+          async.pendingTimers.single.duration,
+          const Duration(seconds: 20, milliseconds: 1),
+        );
+        container.dispose();
+      });
+    });
+
     test('cuando se va el último que lo mira, el timer se cancela', () async {
       final firestore = await _firestore(conBorde());
       fakeAsync((async) {

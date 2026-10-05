@@ -200,9 +200,10 @@ class _AlumnosTab extends ConsumerWidget {
 /// Si el número no coincide con ningún plan de la tabla, el medidor muestra el
 /// tope y no nombra ninguno.
 ///
-/// Mientras el servidor no haya publicado el tope (clave ausente: el PF nunca
-/// pasó por un sync, o su doc está degradado, o todavía está cargando) el
-/// provider cae al cálculo de siempre con [VigenciaDelPlan]. Una baja con el
+/// Mientras no haya un tope publicado que usar (clave ausente: el PF nunca
+/// pasó por un sync, o su doc está degradado; o el doc todavía carga, la
+/// lectura falló, o lo publicado no se entiende) el provider cae al cálculo
+/// de siempre con [VigenciaDelPlan]. Una baja con el
 /// período pagado ya vencido es Free para el servidor, pero nadie reescribe
 /// `subscription` al vencer: leído a secas, el medidor le decía «3 DE 7 ·
 /// PLAN 1» a un PF cuyo tope ya era el de Free. En ese camino siguen valiendo
@@ -218,6 +219,13 @@ class _AlumnosTab extends ConsumerWidget {
 /// medidor cambia sin esperar un rebuild: como máximo un minuto después del
 /// borde (o de volver del segundo plano, porque el timer no corre con el
 /// proceso suspendido).
+///
+/// Dos límites de lo publicado. El servidor anuncia SÓLO el primer cambio por
+/// reloj (`proximoCambioDeLimite`): tras un segundo borde (un plan cancelado
+/// que vence y, más tarde, un piso prepago que termina) el medidor conserva
+/// `athletesDespues` hasta el próximo sync o el barrido de las 04:00. Y con la
+/// clave presente, un cambio de plan llega al medidor con la latencia de la CF
+/// de sincronización, no al instante.
 ///
 /// Este medidor viaja en el binario móvil: dice el estado de la cuenta y nada
 /// más. Al lado de un «3 DE 2», un «subí de plan» sería un llamado a comprar,

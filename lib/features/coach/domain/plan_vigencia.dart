@@ -77,7 +77,9 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// tab Coach móvil ya no la lee directo: pide el tope a
 /// `limiteDeAlumnosProvider`, que toma el que el servidor publica en
 /// `planLimits.athletes` (con su propio borde, `athletesHasta`) y sólo cae a
-/// esta clase —vía `vigenciaDelPlanProvider`— mientras esa clave no está. La
+/// esta clase —vía `vigenciaDelPlanProvider`— cuando no hay un tope publicado
+/// que usar: la clave no está, el doc todavía carga, la lectura falló o lo
+/// publicado no se entiende. La
 /// pricing page
 /// (`pricing_screen.dart`) y Facturación (`facturacion_tab.dart`) todavía la
 /// calculan en su build: abiertas al cruzar el borde, muestran la foto vieja

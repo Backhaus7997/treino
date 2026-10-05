@@ -120,15 +120,87 @@ void main() {
       );
     });
 
-    test('un `athletesHasta` que no es Timestamp: sin cambio programado', () {
+    test('un `athletesHasta` que no es Timestamp: doc roto, no publicado', () {
+      for (final raro in <Object>['mañana', 1790000000000, true]) {
+        expect(
+          TopeDeAlumnosPublicado.leer({
+            'athletes': 7,
+            'athletesHasta': raro,
+            'athletesDespues': 2,
+          }),
+          isA<TopeNoPublicado>(),
+          reason: '$raro',
+        );
+      }
+    });
+
+    test('`athletesHasta` null o ausente: sin cambio programado', () {
       expect(
-        TopeDeAlumnosPublicado.leer({
-          'athletes': 7,
-          'athletesHasta': 'mañana',
-          'athletesDespues': 2,
-        }),
+        TopeDeAlumnosPublicado.leer({'athletes': 7, 'athletesHasta': null}),
         const TopePublicado(limite: 7),
       );
+      expect(
+        TopeDeAlumnosPublicado.leer({'athletes': 7}),
+        const TopePublicado(limite: 7),
+      );
+    });
+  });
+
+  group('TopeDeAlumnosPublicado.leer — topes no positivos', () {
+    test('`athletes` en 0 o negativo: no publicado, no «0 DE 0»', () {
+      for (final raro in <Object>[0, -1, -7, 0.0]) {
+        expect(
+          TopeDeAlumnosPublicado.leer({'athletes': raro}),
+          isA<TopeNoPublicado>(),
+          reason: '$raro',
+        );
+      }
+    });
+
+    test('`athletesDespues` en 0 o negativo con borde: no publicado', () {
+      for (final raro in <Object>[0, -2]) {
+        expect(
+          TopeDeAlumnosPublicado.leer({
+            'athletes': 7,
+            'athletesHasta': Timestamp.fromDate(borde),
+            'athletesDespues': raro,
+          }),
+          isA<TopeNoPublicado>(),
+          reason: '$raro',
+        );
+      }
+    });
+
+    test('el borde inferior válido es 1', () {
+      expect(
+        TopeDeAlumnosPublicado.leer({'athletes': 1}),
+        const TopePublicado(limite: 1),
+      );
+    });
+  });
+
+  group('igualdad por valor', () {
+    test('dos TopeNoPublicado son iguales aunque no sean el mismo const', () {
+      // ignore: prefer_const_constructors
+      final a = TopeNoPublicado();
+      // ignore: prefer_const_constructors
+      final b = TopeNoPublicado();
+
+      expect(identical(a, b), isFalse);
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+    });
+
+    test('no publicado y publicado nunca son iguales', () {
+      expect(const TopeNoPublicado(), isNot(const TopePublicado(limite: null)));
+    });
+
+    test('dos TopePublicado con los mismos campos comparten hashCode', () {
+      final a = TopePublicado(limite: 7, hasta: borde, despues: 2);
+      final b = TopePublicado(limite: 7, hasta: borde, despues: 2);
+
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
     });
   });
 

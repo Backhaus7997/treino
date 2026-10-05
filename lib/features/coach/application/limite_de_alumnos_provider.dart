@@ -69,7 +69,8 @@ final _topePublicadoProvider =
 /// 2. **El cálculo de siempre** (`vigenciaDelPlanProvider` + la tabla de
 ///    tiers), cuando la clave no está: el PF nunca pasó por un sync desde que
 ///    el servidor publica el tope, o su doc está degradado. También mientras
-///    el doc todavía carga o si falla la lectura: el medidor no se puede
+///    el doc todavía carga, si falla la lectura, o si lo publicado no se
+///    entiende (ver [TopeDeAlumnosPublicado.leer]): el medidor no se puede
 ///    quedar mudo, y esa era su respuesta antes de que existiera la clave.
 ///    Ausente NO es «sin tope».
 ///
@@ -83,6 +84,18 @@ final _topePublicadoProvider =
 /// sumo un minuto ([esperaHasta], por la web y por el timer tardío) y sin
 /// emisión del perfil. Pasado el borde usa `athletesDespues`, aunque el doc
 /// siga con el valor viejo.
+///
+/// ## Lo que NO cubre
+///
+/// - El servidor publica SÓLO el primer cambio por reloj
+///   (`proximoCambioDeLimite` en `effective-limit.ts`). Si después de ese
+///   borde viene otro (un plan cancelado que vence y, más tarde, el fin de un
+///   piso prepago), este provider se queda con `athletesDespues` hasta que el
+///   servidor vuelva a publicar: el próximo sync o, a más tardar, el barrido
+///   de las 04:00.
+/// - Con la clave presente, el número se mueve con el doc: un cambio de plan
+///   llega al medidor cuando la CF de sincronización termina de escribir, no
+///   en el instante de la compra o la baja.
 ///
 /// `autoDispose` y SIN `keepAlive`, por el mismo motivo que
 /// [vigenciaDelPlanProvider]: el timer se cancela en `onDispose`.
