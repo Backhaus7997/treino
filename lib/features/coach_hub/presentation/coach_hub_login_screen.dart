@@ -6,7 +6,10 @@ import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/primitives.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../auth/domain/auth_failure.dart';
+import '../../auth/presentation/widgets/terms_notice_text.dart';
+import '../../../core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_brand_logo.dart';
 
@@ -30,11 +33,14 @@ class CoachHubLoginScreen extends ConsumerStatefulWidget {
       _CoachHubLoginScreenState();
 }
 
+/// Qué método de ingreso tiene una operación en curso.
+enum _Metodo { email, google, apple }
+
 class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _submitting = false;
+  _Metodo? _enCurso;
   String? _error;
 
   @override
@@ -45,30 +51,55 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (_submitting) return;
+    if (_enCurso != null) return;
     if (!_formKey.currentState!.validate()) return;
+    await _ingresar(
+      _Metodo.email,
+      () => ref.read(authNotifierProvider.notifier).signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          ),
+    );
+  }
+
+  /// Google/Apple por popup. El navegador sólo concede la ventana si se abre
+  /// dentro del gesto del usuario: NO puede haber un `await` entre el tap y
+  /// la llamada al notifier. Por eso es un método síncrono que arranca la
+  /// llamada de inmediato.
+  void _entrarConGoogle() => _ingresar(
+        _Metodo.google,
+        () => ref.read(authNotifierProvider.notifier).signInWithGooglePopup(),
+      );
+
+  void _entrarConApple() => _ingresar(
+        _Metodo.apple,
+        () => ref.read(authNotifierProvider.notifier).signInWithApplePopup(),
+      );
+
+  /// Marca el método en curso, dispara [accion] (síncrono hasta su primer
+  /// await) y espera el resultado.
+  Future<void> _ingresar(_Metodo metodo, Future<void> Function() accion) async {
+    if (_enCurso != null) return;
     setState(() {
-      _submitting = true;
+      _enCurso = metodo;
       _error = null;
     });
-    await ref.read(authNotifierProvider.notifier).signIn(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+    await accion();
     // El notifier captura errores internamente (AsyncValue.guard) y los
     // pone en state. Después del await leemos el state actual: si hay
-    // error, lo mostramos; si no, el router redirige automáticamente al
-    // /dashboard o /not-allowed via el authStateChangesProvider.
+    // error, lo mostramos; si no (éxito o cancel del popup, que el notifier
+    // restaura en silencio), el router redirige solo al /dashboard o
+    // /not-allowed via el authStateChangesProvider.
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state.hasError) {
       final l10n = AppL10n.of(context);
       setState(() {
         _error = _humanizeError(state.error!, l10n);
-        _submitting = false;
+        _enCurso = null;
       });
     } else {
-      setState(() => _submitting = false);
+      setState(() => _enCurso = null);
     }
   }
 
@@ -188,8 +219,65 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     TreinoButton(
                       label: l10n.coachHubLoginSubmit,
                       expand: true,
-                      loading: _submitting,
-                      onPressed: _submit,
+                      loading: _enCurso == _Metodo.email,
+                      onPressed: _enCurso == null ? _submit : null,
+                    ),
+                    const SizedBox(height: AppSpacing.s18),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: palette.border)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s12,
+                          ),
+                          child: Text(
+                            l10n.authLoginContinueWith,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: AppTextSize.caption,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: palette.border)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.s14),
+                    // Google/Apple crean una cuenta TREINO como el registro:
+                    // el aviso va ANTES de los botones.
+                    const TermsNoticeText(),
+                    const SizedBox(height: AppSpacing.s14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TreinoButton(
+                            label: l10n.authGoogleLabel,
+                            icon: TreinoIcon.googleLogo,
+                            variant: TreinoButtonVariant.secondary,
+                            expand: true,
+                            loading: _enCurso == _Metodo.google,
+                            onPressed:
+                                _enCurso == null || _enCurso == _Metodo.google
+                                    ? _entrarConGoogle
+                                    : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: TreinoButton(
+                            label: l10n.authAppleLabel,
+                            icon: TreinoIcon.appleLogo,
+                            variant: TreinoButtonVariant.secondary,
+                            expand: true,
+                            loading: _enCurso == _Metodo.apple,
+                            onPressed:
+                                _enCurso == null || _enCurso == _Metodo.apple
+                                    ? _entrarConApple
+                                    : null,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     Text(
