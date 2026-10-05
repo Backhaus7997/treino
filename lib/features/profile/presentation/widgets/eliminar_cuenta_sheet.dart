@@ -119,7 +119,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     AppL10n.of(context).eliminarCuentaSheetTitle,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
-                      fontSize: 20,
+                      fontSize: AppTextSize.titleLarge,
                       color: palette.danger,
                     ),
                     textAlign: TextAlign.center,
@@ -133,7 +133,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                         text: TextSpan(
                           style: GoogleFonts.barlow(
                             fontWeight: FontWeight.w400,
-                            fontSize: 14,
+                            fontSize: AppTextSize.body,
                             color: palette.textMuted,
                           ),
                           children: [
@@ -158,7 +158,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
                       fontWeight: FontWeight.w400,
-                      fontSize: 13,
+                      fontSize: AppTextSize.bodyDense,
                       color: palette.textMuted,
                     ),
                   ),
@@ -170,7 +170,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                       textAlign: TextAlign.center,
                       style: GoogleFonts.barlow(
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: AppTextSize.bodyDense,
                         color: palette.textPrimary,
                       ),
                     ),
@@ -184,7 +184,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                         textAlign: TextAlign.center,
                         style: GoogleFonts.barlow(
                           fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                          fontSize: AppTextSize.bodyDense,
                           color: palette.danger,
                         ),
                       ),
@@ -200,7 +200,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                           AppL10n.of(context).eliminarCuentaSheetRetryLabel,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
-                            fontSize: 16,
+                            fontSize: AppTextSize.bodyLarge,
                             color: palette.accentText,
                           ),
                         ),
@@ -225,7 +225,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                       AppL10n.of(context).eliminarCuentaSheetDeleteCta,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                        fontSize: AppTextSize.bodyLarge,
                         color: palette.bg,
                       ),
                     ),
@@ -238,7 +238,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                       AppL10n.of(context).eliminarCuentaSheetCancelCta,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                        fontSize: AppTextSize.bodyLarge,
                         color: palette.textMuted,
                       ),
                     ),
@@ -263,7 +263,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                       AppL10n.of(context).eliminarCuentaSheetLoadingLabel,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
-                        fontSize: 18,
+                        fontSize: AppTextSize.title,
                         color: palette.textPrimary,
                       ),
                     ),
@@ -271,7 +271,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     Text(
                       AppL10n.of(context).eliminarCuentaSheetLoadingSubtitle,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: AppTextSize.body,
                         color: palette.textMuted,
                       ),
                     ),
