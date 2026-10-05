@@ -42,6 +42,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../helpers/coach_hub_profiles.dart';
 import '../helpers/onboarding_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
@@ -56,15 +57,24 @@ final _kLinkDelMail = Uri.parse('https://app.gettreino.com/?to=facturacion');
 /// excepción móvil de facturación.
 const _kTelefono = Size(390, 844);
 
-UserProfile _perfil(UserRole role) => UserProfile(
-      onboardingSeen: allSurfacesSeen(),
-      uid: 'pf-1',
-      email: 'pf@example.com',
-      displayName: 'Mateo',
-      role: role,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-    );
+/// El PF sale de `trainerCompleto()`: el gate de `/completar-perfil` lo deja
+/// pasar, así que estos tests siguen midiendo la secuencia de pantallas y no el
+/// onboarding. El atleta no tiene perfil profesional que completar.
+UserProfile _perfil(UserRole role) => role == UserRole.trainer
+    ? trainerCompleto(
+        uid: 'pf-1',
+        email: 'pf@example.com',
+        onboardingSeen: allSurfacesSeen(),
+      )
+    : UserProfile(
+        onboardingSeen: allSurfacesSeen(),
+        uid: 'pf-1',
+        email: 'pf@example.com',
+        displayName: 'Mateo',
+        role: role,
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
 
 /// Anota, en CADA frame que se dibuja, qué pantalla hay. Sólo guarda los
 /// cambios, así que el resultado es la secuencia de pantallas que vio el

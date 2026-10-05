@@ -13,6 +13,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../helpers/coach_hub_profiles.dart';
 import '../helpers/mail_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
@@ -33,14 +34,7 @@ class _LoadingAuthNotifier extends AuthNotifier {
   Future<User?> build() => Completer<User?>().future;
 }
 
-UserProfile _trainerProfile() => UserProfile(
-      uid: 'test-uid',
-      email: 'trainer@example.com',
-      displayName: 'Mateo',
-      role: UserRole.trainer,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-    );
+UserProfile _trainerProfile() => trainerCompleto();
 
 UserProfile _athleteProfile() => UserProfile(
       uid: 'test-uid',

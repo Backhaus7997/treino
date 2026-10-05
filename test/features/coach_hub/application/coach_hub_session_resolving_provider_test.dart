@@ -11,6 +11,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../../../helpers/coach_hub_profiles.dart';
 import '../../../helpers/onboarding_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
@@ -26,15 +27,23 @@ class _ControlledAuth extends AuthNotifier {
   Future<User?> build() => result.future;
 }
 
-UserProfile _profile(UserRole role) => UserProfile(
-      onboardingSeen: allSurfacesSeen(),
-      uid: 'test-uid',
-      email: 'pf@example.com',
-      displayName: 'Mateo',
-      role: role,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-    );
+/// El PF sale de `trainerCompleto()` (etapa `done`): estos tests miden la
+/// resolución de la sesión, no el onboarding.
+UserProfile _profile(UserRole role) => role == UserRole.trainer
+    ? trainerCompleto(
+        uid: 'test-uid',
+        email: 'pf@example.com',
+        onboardingSeen: allSurfacesSeen(),
+      )
+    : UserProfile(
+        onboardingSeen: allSurfacesSeen(),
+        uid: 'test-uid',
+        email: 'pf@example.com',
+        displayName: 'Mateo',
+        role: role,
+        createdAt: DateTime.utc(2026, 1, 1),
+        updatedAt: DateTime.utc(2026, 1, 1),
+      );
 
 ProviderContainer _container({
   required Completer<User?> auth,
