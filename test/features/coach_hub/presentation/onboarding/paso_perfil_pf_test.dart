@@ -69,6 +69,7 @@ const _onlineKey = Key('onboarding-pf-online');
 const _busquedaKey = Key('onboarding-pf-lugar-busqueda');
 const _buscarKey = Key('onboarding-pf-lugar-buscar');
 const _reintentarKey = Key('onboarding-pf-lugar-reintentar');
+const _resultadosKey = Key('onboarding-pf-lugar-resultados');
 const _finalizarKey = Key('onboarding-pf-finalizar');
 const _consentKey = Key('onboarding-pf-consent');
 
@@ -422,6 +423,58 @@ void main() {
         expect(requests, 1);
         expect(find.byKey(const Key('onboarding-pf-lugar-resultado-0')),
             findsOneWidget);
+      });
+
+      // Política de Places: el contenido de Places fuera de un mapa de Google
+      // exige la atribución textual «Google Maps» visible junto a los resultados.
+      testWidgets('con resultados se atribuye a «Google Maps» en el contenedor',
+          (tester) async {
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+
+        final contenedor = find.byKey(_resultadosKey);
+        expect(contenedor, findsOneWidget);
+        expect(find.text('Google Maps'), findsOneWidget);
+        expect(
+          find.descendant(of: contenedor, matching: find.text('Google Maps')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('sin resultados, error de config o de red no hay atribución',
+          (tester) async {
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        expect(find.text('Google Maps'), findsNothing);
+
+        places = (_) async => _json({'places': []});
+        await escribir(tester, _busquedaKey, 'zzzzzz');
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+        expect(find.text('Google Maps'), findsNothing);
+
+        places = (_) async => _json({'error': 'x'}, 503);
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+        expect(find.byKey(_reintentarKey), findsOneWidget);
+        expect(find.text('Google Maps'), findsNothing);
+      });
+
+      testWidgets('con la key de Places ausente tampoco hay atribución',
+          (tester) async {
+        apiKey = '';
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+        expect(
+            find.text(l10nDe(tester).coachHubOnboardingPfLocationConfigError),
+            findsOneWidget);
+        expect(find.text('Google Maps'), findsNothing);
       });
 
       // SCENARIO-CHW-ONB-041

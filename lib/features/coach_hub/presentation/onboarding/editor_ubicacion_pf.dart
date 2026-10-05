@@ -216,6 +216,7 @@ class _Resultados extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return Padding(
+      key: const Key('onboarding-pf-lugar-resultados'),
       padding: const EdgeInsets.only(top: AppSpacing.s12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -262,8 +263,23 @@ class _Resultados extends StatelessWidget {
               ),
             ),
           ],
+          // Política de Places: el contenido de Places mostrado fuera de un mapa
+          // de Google exige la atribución textual visible. Es el nombre de marca:
+          // no se traduce, por eso es una constante y no una clave ARB.
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            _atribucionGoogleMaps,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.barlow(
+              color: palette.textMuted,
+              fontSize: AppTextSize.bodyDense,
+            ),
+          ),
         ],
       ),
     );
   }
 }
+
+/// Atribución textual exigida por la política de Google Places.
+const _atribucionGoogleMaps = 'Google Maps';
