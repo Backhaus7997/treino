@@ -4418,6 +4418,42 @@ abstract class AppL10n {
   /// **'No pudimos cerrar sesión. Probá de nuevo.'**
   String get coachHubSignOutError;
 
+  /// Coach Hub not-allowed screen — headline shown to a signed-in user without the trainer role.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SOLO PARA ENTRENADORES'**
+  String get coachHubNotAllowedTitle;
+
+  /// Coach Hub not-allowed screen — explains the web is trainers-only and points to the mobile app. App Store and Play Store are named WITHOUT links (the app is not published yet).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El Coach Hub es solo para entrenadores. Descargá la app de TREINO desde App Store o Play Store e iniciá sesión ahí.'**
+  String get coachHubNotAllowedBody;
+
+  /// Coach Hub not-allowed screen — line above the contact button for people who want to become a trainer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Querés ser entrenador? Escribile al equipo.'**
+  String get coachHubNotAllowedContactPrompt;
+
+  /// Coach Hub not-allowed screen — label of the button that opens a mailto: to the team.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contactar al equipo'**
+  String get coachHubNotAllowedContactCta;
+
+  /// Coach Hub not-allowed screen — subject of the mailto: draft. Contains spaces on purpose; encoded as %20.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quiero ser entrenador en TREINO'**
+  String get coachHubNotAllowedMailSubject;
+
+  /// Coach Hub not-allowed screen — inline message when the mailto: cannot be opened; points to the visible address.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir tu correo. Escribinos a la dirección de arriba.'**
+  String get coachHubNotAllowedContactFallback;
+
   /// Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account.
   ///
   /// In es_AR, this message translates to:

@@ -43,9 +43,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Coach Hub MVP NO usa Google Sign-In (decisión #2 del propose). Solo
-  // email/password. Por eso NO inicializamos `GoogleSignIn.instance` acá
-  // — el plugin web es scope aparte (Etapa 7.5 o follow-up).
+  // Google y Apple entran por `FirebaseAuth.signInWithPopup`, que no necesita
+  // el plugin `google_sign_in`. Por eso NO inicializamos `GoogleSignIn.instance`
+  // acá a propósito: `AuthService.signOut()` espera ese `initialize()` y, si
+  // nunca ocurre, se cuelga. El sign-out de `/not-allowed` va directo a
+  // `FirebaseAuth` (ver `coach_hub_not_allowed_screen.dart`).
 
   const useEmulator = bool.fromEnvironment(
     'USE_EMULATOR',

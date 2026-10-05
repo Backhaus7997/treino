@@ -66,7 +66,7 @@ class _TermsNoticeTextState extends State<TermsNoticeText> {
       height: 1.4,
     );
     final linkStyle = baseStyle.copyWith(
-      color: palette.accent,
+      color: palette.accentText,
       decoration: TextDecoration.underline,
     );
 

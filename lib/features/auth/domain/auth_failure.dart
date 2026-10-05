@@ -24,6 +24,8 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.signInCancelled() = _SignInCancelled;
   const factory AuthFailure.accountExistsWithDifferentCredential() =
       _AccountExistsWithDifferentCredential;
+  const factory AuthFailure.popupBlocked() = _PopupBlocked;
+  const factory AuthFailure.providerUnavailable() = _ProviderUnavailable;
   const factory AuthFailure.unknown(String code) = _Unknown;
   const factory AuthFailure.profileCreateFailed({Object? cause}) =
       _ProfileCreateFailed;
@@ -64,7 +66,14 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
           'Sin conexión. Revisá tu internet e intentá de nuevo',
         _SignInCancelled() => 'Cancelaste el inicio de sesión',
         _AccountExistsWithDifferentCredential() =>
-          'Ya existe una cuenta con ese email usando otro método de inicio',
+          'Ya tenés una cuenta con ese email. Entrá con el método que usaste '
+              'al registrarte',
+        _PopupBlocked() =>
+          'Tu navegador bloqueó la ventana. Permití ventanas emergentes y '
+              'probá de nuevo',
+        _ProviderUnavailable() =>
+          'Este método no está disponible. Entrá con email o escribinos al '
+              'equipo',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',

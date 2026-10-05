@@ -2403,6 +2403,28 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t sign you out. Please try again.';
 
   @override
+  String get coachHubNotAllowedTitle => 'TRAINERS ONLY';
+
+  @override
+  String get coachHubNotAllowedBody =>
+      'The Coach Hub is only for trainers. Download the TREINO app from the App Store or Play Store and sign in there.';
+
+  @override
+  String get coachHubNotAllowedContactPrompt =>
+      'Want to become a trainer? Get in touch with the team.';
+
+  @override
+  String get coachHubNotAllowedContactCta => 'Contact the team';
+
+  @override
+  String get coachHubNotAllowedMailSubject =>
+      'I want to be a trainer on TREINO';
+
+  @override
+  String get coachHubNotAllowedContactFallback =>
+      'We couldn\'t open your email app. Write to us at the address above.';
+
+  @override
   String get coachHubLoginPrompt =>
       'Sign in with the same account you use on the mobile app.';
 
