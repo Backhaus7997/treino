@@ -907,6 +907,16 @@ void main() {
 
       group(camino, () {
         test(
+            'invariante de activación: signInWithPopup se invoca de forma '
+            'síncrona, sin ningún await previo', () async {
+          final future = entrar(sut);
+          // Antes de cualquier await/pump: si el camino cede el control al
+          // event loop antes del popup, esto falla.
+          verify(() => fbAuth.signInWithPopup(any())).called(1);
+          await future;
+        });
+
+        test(
             'SCENARIO-005: éxito ⇒ createIfAbsent una vez y devuelve el '
             'usuario', () async {
           final result = await entrar(sut);

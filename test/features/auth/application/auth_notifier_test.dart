@@ -354,6 +354,20 @@ void main() {
         await container.read(authNotifierProvider.future);
       });
 
+      test(
+          'invariante de activación: el servicio se invoca de forma síncrona, '
+          'sin ningún await previo', () async {
+        when(() => entry.value.servicio(mockService))
+            .thenAnswer((_) async => mockUser);
+
+        final future =
+            entry.value.accion(container.read(authNotifierProvider.notifier));
+        // Antes de cualquier await/pump: si el notifier cede el control antes
+        // de llamar al servicio, el popup pierde la activación del usuario.
+        verify(() => entry.value.servicio(mockService)).called(1);
+        await future;
+      });
+
       test('ok → AsyncData(user)', () async {
         when(() => entry.value.servicio(mockService)).thenAnswer((_) async {
           streamController.add(mockUser);
