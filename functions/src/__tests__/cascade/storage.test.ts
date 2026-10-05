@@ -321,4 +321,34 @@ describe("SC-PSD-16: deleteTrainerStorage", () => {
   it("is a no-op for a uid with no files", async () => {
     await expect(deleteTrainerStorage(testApp, "psd-st-nobody")).resolves.toBeUndefined();
   });
+
+  it("bounds the number of concurrent deletes", async () => {
+    const bucket = getStorage(testApp).bucket();
+    const many = Array.from({ length: 45 }, (_, i) => `athleteFiles/${pf}_bulk/f${i}.txt`);
+    await Promise.all(many.map((n) => bucket.file(n).save(Buffer.from("x"))));
+
+    const proto = Object.getPrototypeOf(bucket.file("probe")) as { delete: (...a: unknown[]) => Promise<unknown> };
+    const realDelete = proto.delete;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const spy = jest.spyOn(proto, "delete").mockImplementation(async function (this: unknown, ...args: unknown[]) {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        return await realDelete.apply(this, args);
+      } finally {
+        inFlight--;
+      }
+    });
+
+    try {
+      await deleteTrainerStorage(testApp, pf);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(maxInFlight).toBeGreaterThan(0);
+    expect(maxInFlight).toBeLessThanOrEqual(20);
+    expect(await exists(many[44])).toBe(false);
+  });
 });

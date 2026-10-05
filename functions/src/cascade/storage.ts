@@ -106,6 +106,9 @@ export async function deleteAthleteStorage(
   return { deleted };
 }
 
+/** Tope de DELETEs concurrentes de `deleteTrainerStorage`. */
+const TRAINER_DELETE_CHUNK = 20;
+
 /**
  * T3 (#1333) — deletes the objects the PF authored for their athletes:
  * `athleteFiles/{trainerId}_{athleteId}/**`, matched by the `{uid}_` prefix.
@@ -124,5 +127,9 @@ export async function deleteTrainerStorage(
 ): Promise<void> {
   const bucket = getStorage(app).bucket();
   const [files] = await bucket.getFiles({ prefix: `athleteFiles/${uid}_` });
-  await Promise.all(files.map((f) => f.delete()));
+  // Un PF con cientos de alumnos y varios archivos cada uno: un `Promise.all`
+  // sin tope abre todos los DELETE a la vez. Se borra por tandas.
+  for (let i = 0; i < files.length; i += TRAINER_DELETE_CHUNK) {
+    await Promise.all(files.slice(i, i + TRAINER_DELETE_CHUNK).map((f) => f.delete()));
+  }
 }
