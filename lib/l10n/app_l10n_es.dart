@@ -2455,6 +2455,23 @@ class AppL10nEs extends AppL10n {
       'No pudimos cerrar sesión. Inténtalo de nuevo.';
 
   @override
+  String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';
+
+  @override
+  String get coachHubNotAllowedBody =>
+      'El Coach Hub es solo para entrenadores. Descarga la app de treino desde App Store o Play Store e inicia sesión allí.';
+
+  @override
+  String get coachHubNotAllowedContactPrompt =>
+      '¿Quieres ser entrenador? Ponte en contacto con el equipo.';
+
+  @override
+  String get coachHubNotAllowedContactCta => 'Contactar al equipo';
+
+  @override
+  String get coachHubNotAllowedMailSubject => 'Quiero ser entrenador en treino';
+
+  @override
   String get coachHubLoginPrompt =>
       'Ingresa con la cuenta que ya usas en la app móvil.';
 
@@ -7468,6 +7485,23 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubSignOutError =>
       'No pudimos cerrar sesión. Probá de nuevo.';
+
+  @override
+  String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';
+
+  @override
+  String get coachHubNotAllowedBody =>
+      'El Coach Hub es solo para entrenadores. Descargá la app de treino desde App Store o Play Store e iniciá sesión ahí.';
+
+  @override
+  String get coachHubNotAllowedContactPrompt =>
+      '¿Querés ser entrenador? Escribile al equipo.';
+
+  @override
+  String get coachHubNotAllowedContactCta => 'Contactar al equipo';
+
+  @override
+  String get coachHubNotAllowedMailSubject => 'Quiero ser entrenador en treino';
 
   @override
   String get coachHubLoginPrompt =>

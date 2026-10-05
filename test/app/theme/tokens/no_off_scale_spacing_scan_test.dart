@@ -83,10 +83,10 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo.
-    const allowlistCeiling = 163;
+    const allowlistCeiling = 160;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const offScaleDebtCeiling = 982;
+    const offScaleDebtCeiling = 962;
 
     /// Allowlist de rutas relativas a `lib/` con spacing fuera de escala. Es
     /// un REGISTRO DE DEUDA, no una licencia.
@@ -136,7 +136,6 @@ void main() {
       'features/coach/presentation/widgets/trainers_map_bottom_sheet.dart',
       'features/coach/presentation/widgets/trainers_map_view.dart',
       'features/coach/trainer_coach_view.dart',
-      'features/coach_hub/presentation/coach_hub_not_allowed_screen.dart',
       'features/coach_hub/presentation/coach_hub_plan_preview_screen.dart',
       'features/coach_hub/presentation/coach_hub_upload_plan_screen.dart',
       'features/coach_hub/presentation/sections/agenda/agenda_time_grid.dart',

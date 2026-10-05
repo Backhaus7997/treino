@@ -211,6 +211,11 @@ void main() {
               'Viaja en el binario móvil pero es inalcanzable desde ahí — el '
               'tipo sellado no expone `start` en la superficie móvil. Ver el '
               'comentario de arriba y el encabezado de plan_checkout.dart',
+      'lib/features/coach_hub/presentation/coach_hub_not_allowed_screen.dart':
+          'sólo Coach Hub WEB: abre un `mailto:` a `kLegalContactEmail` para '
+              'que un usuario sin rol de PF contacte al equipo. Es contacto, '
+              'no compra, y el destino lo fija la propia pantalla (no viene de '
+              'datos). Tampoco linkea a las stores: la app no está publicada',
     };
 
     test('la lista de archivos que abren URLs es exactamente la declarada', () {
