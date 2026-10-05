@@ -20,8 +20,18 @@ const double _kBrandLogoSize = 48;
 
 /// Login screen del Coach Hub web.
 ///
-/// Solo email/password — sin Google Sign-In (decisión #2 del propose,
-/// google_sign_in_web es scope aparte).
+/// Tres caminos de ingreso: email/password, Google y Apple. Google y Apple
+/// entran por popup de Firebase Auth (`signInWithPopup`), no por redirect:
+/// el Hub se sirve desde dos hosts y, según el análisis del change, el
+/// redirect sufre el particionado de storage de terceros mientras el popup
+/// funciona cross-origin. El popup exige que `signInWithPopup` se invoque
+/// sin ningún `await` previo al tap, o el navegador lo bloquea.
+///
+/// La pantalla NO decide a dónde se va después del ingreso: lo decide el
+/// router (`coachHubRedirect`) al cambiar el estado de auth.
+///
+/// Ver `openspec/changes/coach-hub-login-google-apple/`, que supera la
+/// decisión #2 de `coach-hub-bootstrap` (solo email/password).
 ///
 /// Layout: form centrado max-width 400px sobre fondo dark. Funciona ok
 /// en desktop y tablet — sin breakpoints responsivos en MVP (decisión #4).

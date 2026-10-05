@@ -245,18 +245,18 @@ Depende de: B3, B4 (y B5 solo por convención de ARB).
 Commit: `docs(coach-hub): el login del Hub ya no es solo email/password`
 Cubre: REQ-CHW-AUTH-007; SCENARIO-CHW-AUTH-022, 025.
 
-- [ ] 7.1 Dartdoc de `lib/features/coach_hub/presentation/coach_hub_login_screen.dart:18-21`:
+- [x] 7.1 Dartdoc de `lib/features/coach_hub/presentation/coach_hub_login_screen.dart:18-21`:
   reemplazar «email/password solamente» por los tres caminos y el porqué del popup (sin
   afirmaciones nuevas sin evidencia; AGENTS.md §11.1: citar design/evidencia).
-- [ ] 7.2 Comentario de `lib/main_coach_hub.dart:46-48`: popup, y por qué el sign-out de
+- [x] 7.2 Comentario de `lib/main_coach_hub.dart:46-48`: popup, y por qué el sign-out de
   `/not-allowed` no pasa por `AuthService` (`GoogleSignIn.signOut()` espera un
   `initialize()` que el Hub nunca hace). Solo comentario, cero cambio de código.
-- [ ] 7.3 `openspec/changes/coach-hub-bootstrap/propose.md:89` (fila decisión #2): agregar
+- [x] 7.3 `openspec/changes/coach-hub-bootstrap/propose.md:89` (fila decisión #2): agregar
   nota «Superada por coach-hub-login-google-apple (#1318)».
-- [ ] 7.4 **Verificación de diff (025)** — `git diff --stat main...HEAD`: no aparecen
+- [x] 7.4 **Verificación de diff (025)** — `git diff --stat main...HEAD`: no aparecen
   `functions/`, `firestore.rules`, `coach_hub_router.dart`, `pubspec.yaml`. `rg -i "solo
   email|email/password solamente"` en los tres archivos: sin afirmaciones vigentes falsas.
-- [ ] 7.5 **GATE final de apply** — `flutter analyze lib test` acotado a los directorios
+- [x] 7.5 **GATE final de apply** — `flutter analyze lib test` acotado a los directorios
   tocados, `dart format --set-exit-if-changed` solo sobre los archivos tocados, y corrida
   agregada SOLO de los tests listados en B1-B6 (no la suite completa de ~40 min).
 

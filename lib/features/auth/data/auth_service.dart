@@ -410,8 +410,8 @@ class AuthService {
     }
 
     final user = cred.user!;
-    // Mismo backfill best-effort que los logins mobile. Apple puede no traer
-    // email después del primer ingreso: `?? ''`.
+    // Mismo backfill best-effort que los logins mobile. `User.email` es
+    // nullable en firebase_auth, de ahí el `?? ''`.
     try {
       await _userRepository.createIfAbsent(
         uid: user.uid,
