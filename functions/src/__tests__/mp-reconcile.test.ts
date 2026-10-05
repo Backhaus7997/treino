@@ -228,7 +228,16 @@ function fakeMp(
  */
 function fakeMpMultiPlan(
   porPlan: Record<string, MpPreapproval | Error | null>,
-  opts: { fallaLaBaja?: MpApiError } = {},
+  opts: {
+    fallaLaBaja?: MpApiError;
+    /** Con `fallaLaBaja`: solo falla el PUT de estos ids (una baja parcial). */
+    soloEn?: string[];
+    /**
+     * Lo que MP contesta a una lectura por id (`getPreapproval`), por id de
+     * suscripcion: el estado "de ahora", que puede haber cambiado desde la busqueda.
+     */
+    alReLeer?: Record<string, MpPreapproval>;
+  } = {},
   nowMs: number = AHORA,
 ): ReconcileDeps & { bajas: string[] } {
   const estado: Record<string, MpPreapproval | Error | null> = { ...porPlan };
@@ -237,7 +246,7 @@ function fakeMpMultiPlan(
     nowMs,
     bajas,
     mpClient: {
-      getPreapproval: async () => ({}),
+      getPreapproval: async (id: string) => opts.alReLeer?.[id] ?? {},
       createPreapprovalPlan: async () => ({}),
       searchPreapprovalsByPlan: async (planId: string) => {
         const r = estado[planId];
@@ -246,7 +255,9 @@ function fakeMpMultiPlan(
       },
       cancelPreapproval: async (preapprovalId: string) => {
         bajas.push(preapprovalId);
-        if (opts.fallaLaBaja) throw opts.fallaLaBaja;
+        if (opts.fallaLaBaja && (!opts.soloEn || opts.soloEn.includes(preapprovalId))) {
+          throw opts.fallaLaBaja;
+        }
         for (const [plan, sub] of Object.entries(estado)) {
           if (sub !== null && !(sub instanceof Error) && sub.id === preapprovalId) {
             estado[plan] = { ...sub, status: "cancelled" };
@@ -5781,6 +5792,171 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       expect(r.bajaFallida).toBe(true);
       expect(mp.bajas).toEqual([]);
       expect(mails(store, "plan-change-cancelled")).toHaveLength(0);
+    });
+
+    it("los dos cobraron y el fin del nuevo no se sabe: se queda el nuevo, ERROR de reintegro", async () => {
+      // Sin `next_payment_date` ni frecuencia, lo que cubre el cobro del nuevo es
+      // `null`: no se puede probar que el viejo cubra mas, asi que se respeta lo que
+      // el alumno eligio y se da de baja el viejo.
+      const { app } = fakeApp(mundoTarde("monthly"));
+      const sinFin: MpPreapproval = {
+        ...nuevoCobrado(1),
+        next_payment_date: undefined,
+        auto_recurring: { transaction_amount: 35000 },
+      };
+      const mp = fakeMpMultiPlan({ viejo: viejoRenovado(1), nuevo: sinFin });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-viejo"]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("REINTEGRO"),
+        expect.objectContaining({ uid: "u1", planNuevo: "nuevo", planesViejos: ["viejo"] }),
+      );
+    });
+
+    it("el nuevo ya cobro y el viejo NO paga mas alla de la prueba: baja del viejo, sin reintegro", async () => {
+      // Caracterizacion del camino normal con el nuevo cobrado: no hay conflicto.
+      const { app } = fakeApp(MUNDO());
+      const mp = fakeMpMultiPlan({ viejo: VIEJO_VIVO, nuevo: NUEVO_COBRADO });
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-viejo"]);
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("REINTEGRO"),
+        expect.anything(),
+      );
+    });
+
+    it("una baja parcial (falla el PUT de uno solo) cuenta el que salio y reintenta SOLO el que fallo", async () => {
+      const base = MUNDO();
+      const mundo: Store = {
+        users: base.users,
+        mp_plans: {
+          ...base.mp_plans,
+          b1: {
+            producto: "athlete",
+            uid: "u1",
+            cycle: "annual",
+            createdAt: ts(AHORA - 2 * HORA_MS),
+            diferidoHastaMs: PROXIMO,
+            ultimoStatus: "pending",
+          },
+        },
+      };
+      const { app } = fakeApp(mundo);
+      const subB1: MpPreapproval = {
+        id: "s-b1",
+        status: "pending",
+        external_reference: "u1",
+        summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+      };
+      const mp = fakeMpMultiPlan(
+        { viejo: VIEJO_VIVO, b1: subB1, nuevo: NUEVO_EN_PRUEBA },
+        { fallaLaBaja: new MpApiError("503", 503), soloEn: ["s-b1"] },
+      );
+
+      const r = await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas.slice().sort()).toEqual(["s-b1", "s-viejo"]);
+      expect(r.dadosDeBaja).toBe(1);
+      expect(r.bajaFallida).toBe(true);
+
+      // El reintento ve al viejo ya `cancelled` (sin PUT) y solo vuelve a B1.
+      const despues = fakeMpMultiPlan({
+        viejo: { ...VIEJO_VIVO, status: "cancelled" },
+        b1: subB1,
+        nuevo: NUEVO_EN_PRUEBA,
+      });
+      const r2 = await reconcileSubscription(app, "nuevo", despues);
+      expect(despues.bajas).toEqual(["s-b1"]);
+      expect(r2.bajaFallida).toBeFalsy();
+    });
+
+    it("⚠️ el viejo se renueva ENTRE la lectura y su baja: no se cancela, se re-decide", async () => {
+      // La busqueda ve el viejo sin renovar (sin conflicto: se daria de baja). Pero
+      // antes del PUT, la lectura por id lo muestra cobrado de nuevo: cancelarlo ahora
+      // deja al alumno con el nuevo cobrando lo que el viejo ya cubre.
+      const { app } = fakeApp(MUNDO());
+      const renovado: MpPreapproval = {
+        ...VIEJO_VIVO,
+        next_payment_date: new Date(PROXIMO + 30 * DIA_MS).toISOString(),
+        summarized: {
+          ...(VIEJO_VIVO.summarized as object),
+          charged_quantity: 4,
+          last_charged_date: new Date(AHORA - 60 * 1000).toISOString(),
+        },
+      };
+      const mp = fakeMpMultiPlan(
+        { viejo: VIEJO_VIVO, nuevo: NUEVO_EN_PRUEBA },
+        { alReLeer: { "s-viejo": renovado } },
+      );
+
+      const r = await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual([]);
+      expect(r.bajaFallida).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("COBRO DOBLE"),
+        expect.objectContaining({ uid: "u1", planViejo: "viejo", preapprovalId: "s-viejo" }),
+      );
+
+      // La proxima reconciliacion ve el viejo renovado: conflicto, se cancela el NUEVO.
+      const despues = fakeMpMultiPlan({ viejo: renovado, nuevo: NUEVO_EN_PRUEBA });
+      await reconcileSubscription(app, "nuevo", despues);
+      expect(despues.bajas).toEqual(["s-nuevo"]);
+    });
+
+    it("⚠️ el nuevo cobra ENTRE la lectura y su baja: no se cancela, se re-decide", async () => {
+      // Se lee sin cobrar (se daria de baja el nuevo, que no movio plata). Antes del
+      // PUT ya cobro: el aviso diria "no se cobro nada" y el que cubre mas puede ser el
+      // nuevo. La proxima reconciliacion decide con los dos cobrados.
+      const { app, store } = fakeApp(mundoTarde("monthly"));
+      const mp = fakeMpMultiPlan(
+        { viejo: viejoRenovado(1), nuevo: NUEVO_TARDE },
+        { alReLeer: { "s-nuevo": nuevoCobrado(12) } },
+      );
+
+      const r = await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual([]);
+      expect(r.bajaFallida).toBe(true);
+      expect(mails(store, "plan-change-cancelled")).toHaveLength(0);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("COBRO DOBLE"),
+        expect.objectContaining({ uid: "u1", planNuevo: "nuevo" }),
+      );
+
+      // Ahora los dos cobrados y el nuevo (anual) cubre mas: se baja el viejo.
+      const despues = fakeMpMultiPlan({ viejo: viejoRenovado(1), nuevo: nuevoCobrado(12) });
+      await reconcileSubscription(app, "nuevo", despues);
+      expect(despues.bajas).toEqual(["s-viejo"]);
+    });
+  });
+
+  describe("una busqueda que falla siempre bloquea las bajas: se avisa a la tercera", () => {
+    const fallos = (store: Store) => store.mp_plans.viejo.bajaBusquedaFallosSeguidos;
+
+    it("cuenta fallos seguidos, ERROR al llegar a 3 y se reinicia al primer exito", async () => {
+      const { app, store } = fakeApp(MUNDO());
+      const roto = () => fakeMpMultiPlan({ viejo: new MpApiError("429", 429), nuevo: NUEVO_EN_PRUEBA });
+      const alerta = () =>
+        errorSpy.mock.calls.filter(([m]) => String(m).includes("BLOQUEADAS")).length;
+
+      await reconcileSubscription(app, "nuevo", roto());
+      await reconcileSubscription(app, "nuevo", roto());
+      expect(fallos(store)).toBe(2);
+      expect(alerta()).toBe(0);
+
+      await reconcileSubscription(app, "nuevo", roto());
+      expect(fallos(store)).toBe(3);
+      expect(alerta()).toBe(1);
+
+      const sano = fakeMpMultiPlan({ viejo: VIEJO_VIVO, nuevo: NUEVO_EN_PRUEBA });
+      await reconcileSubscription(app, "nuevo", sano);
+      expect(sano.bajas).toEqual(["s-viejo"]);
+      expect(fallos(store)).toBe(0);
     });
   });
 

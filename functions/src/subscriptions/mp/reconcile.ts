@@ -1381,6 +1381,42 @@ function finPagoDelNuevoMs(nuevo: PlanNuevoDelAlumno): number | null {
 }
 
 /**
+ * Entre que se MIRO una suscripcion (la busqueda de la fase 1) y su PUT de baja pasan
+ * segundos, y MP puede cobrarla justo ahi: la decision se tomo con una foto vieja y
+ * la baja podria dejar al alumno con dos cobros que nadie vio (sin ERROR). No se
+ * puede cerrar del todo (MP no tiene un PUT condicional), pero si se puede achicar:
+ * se vuelve a leer POR ID —que no sufre el atraso del indice de busqueda— y, si
+ * aparecio un cobro nuevo (mas cobros exitosos o un `last_charged_date` posterior),
+ * NO se cancela: se loguea el ERROR y la proxima reconciliacion decide con la foto
+ * nueva. Es barato porque abortar es seguro: la suscripcion sigue como estaba y el
+ * plan nuevo vuelve a pasar por la misma decision (que ahora ve el cobro).
+ *
+ * Si la relectura falla o no trae resumen, no se puede afirmar que cobro: se sigue
+ * con la baja, que es lo que se hacia antes (bloquearla por una lectura caida
+ * dejaria el cambio colgado). `true` si hubo un cobro desde la lectura.
+ */
+async function cobroDesdeLaLectura(
+  sub: MpPreapproval,
+  preapprovalId: string,
+  deps: ReconcileDeps,
+): Promise<boolean> {
+  let fresca: MpPreapproval;
+  try {
+    fresca = await deps.mpClient.getPreapproval(preapprovalId);
+  } catch (error: unknown) {
+    logger.warn("mp/reconcile: no se pudo releer la suscripcion antes de darla de baja", {
+      preapprovalId,
+      error,
+    });
+    return false;
+  }
+  if (cobrosExitosos(fresca?.summarized) > cobrosExitosos(sub.summarized)) return true;
+  const antes = ultimoCobroMs(sub);
+  const ahora = ultimoCobroMs(fresca ?? {});
+  return ahora !== null && (antes === null || ahora > antes);
+}
+
+/**
  * Da de baja la suscripcion NUEVA, porque dar de baja la vieja le haria pagar dos
  * veces al alumno (ver [elViejoPagaMasAllaDeLaPrueba]). Total: nunca tira.
  *
@@ -1422,6 +1458,15 @@ async function darDeBajaElNuevoDelAlumno(
       "mp/reconcile: el plan nuevo del alumno solaparia al viejo y su suscripcion " +
         "vino sin id — no se da de baja nada, puede haber un COBRO DOBLE",
       contexto,
+    );
+    return { cancelados: 0, fallo: true };
+  }
+  if (await cobroDesdeLaLectura(nuevo.mp, preapprovalId, deps)) {
+    logger.error(
+      "mp/reconcile: el plan nuevo del alumno COBRO entre la decision y su baja — no " +
+        "se cancela, la proxima reconciliacion decide con los dos cobrados; puede " +
+        "haber un COBRO DOBLE",
+      { ...contexto, preapprovalId },
     );
     return { cancelados: 0, fallo: true };
   }
@@ -1598,6 +1643,18 @@ async function darDeBajaUnaSuscripcionVieja(
     }
   }
 
+  if (await cobroDesdeLaLectura(sub, preapprovalId, deps)) {
+    // Se renovo despues de que se la miro: dar de baja el viejo, que ahora cubre mas,
+    // dejaria al nuevo cobrando lo que ya esta pago. La proxima reconciliacion del
+    // nuevo la ve renovada y decide (conflicto: baja el NUEVO si no cobro).
+    logger.error(
+      "mp/reconcile: la suscripcion vieja del alumno COBRO entre la decision y su " +
+        "baja — no se cancela, la proxima reconciliacion decide; puede haber un " +
+        "COBRO DOBLE",
+      { planViejo, planVigente, uid, preapprovalId, producto: "athlete" },
+    );
+    return false;
+  }
   try {
     await deps.mpClient.cancelPreapproval(preapprovalId);
   } catch (e) {
@@ -1641,6 +1698,72 @@ function puedeTenerUnaSuscripcion(datos: Record<string, unknown>, nowMs: number)
   if (datos.terminalReason !== MOTIVO_ABANDONO) return false;
   const altaMs = comoTimestamp(datos.createdAt)?.toMillis();
   return altaMs !== undefined && nowMs - altaMs < VENTANA_DEL_ABANDONADO_PAGADO_TARDE_MS;
+}
+
+/**
+ * Cuantas veces SEGUIDAS fallo la busqueda en MP de un plan viejo del alumno, guardado
+ * en su documento. Una busqueda que falla frena TODAS las bajas del cambio de plan
+ * (sin ver todo no se decide), y el unico rastro era `bajaFallida`, que se pierde en
+ * el conteo de errores del barrido. Es un contador y no un log por intento porque un
+ * 429 suelto es normal; lo que importa es que sea siempre el mismo plan.
+ */
+const CAMPO_FALLOS_DE_BUSQUEDA = "bajaBusquedaFallosSeguidos";
+/** A cuantos fallos seguidos se avisa con un ERROR (una sola vez, al llegar). */
+const FALLOS_DE_BUSQUEDA_PARA_ALERTAR = 3;
+
+function fallosPrevios(datos: Record<string, unknown>): number {
+  const n = datos[CAMPO_FALLOS_DE_BUSQUEDA];
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/** Total: el contador es una ayuda, no puede convertir su falla en otra baja fallida. */
+async function contarFalloDeBusqueda(
+  app: App,
+  planViejo: string,
+  datos: Record<string, unknown>,
+  contexto: { planVigente: string; uid: string },
+): Promise<void> {
+  const fallos = fallosPrevios(datos) + 1;
+  try {
+    await getFirestore(app)
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planViejo)
+      .set({ [CAMPO_FALLOS_DE_BUSQUEDA]: fallos }, { merge: true });
+  } catch (error: unknown) {
+    logger.warn("mp/reconcile: no se pudo guardar el conteo de busquedas fallidas", {
+      planViejo,
+      error,
+    });
+    return;
+  }
+  if (fallos === FALLOS_DE_BUSQUEDA_PARA_ALERTAR) {
+    logger.error(
+      "mp/reconcile: las bajas del cambio de plan del alumno estan BLOQUEADAS — la " +
+        `busqueda del plan viejo fallo ${fallos} veces seguidas; mientras siga rota ` +
+        "no se da de baja nada y puede haber un COBRO DOBLE",
+      { planViejo, ...contexto, fallos },
+    );
+  }
+}
+
+/** Una busqueda que anduvo reinicia la cuenta. Solo escribe si habia algo que reiniciar. */
+async function reiniciarFallosDeBusqueda(
+  app: App,
+  planViejo: string,
+  datos: Record<string, unknown>,
+): Promise<void> {
+  if (fallosPrevios(datos) === 0) return;
+  try {
+    await getFirestore(app)
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planViejo)
+      .set({ [CAMPO_FALLOS_DE_BUSQUEDA]: 0 }, { merge: true });
+  } catch (error: unknown) {
+    logger.warn("mp/reconcile: no se pudo reiniciar el conteo de busquedas fallidas", {
+      planViejo,
+      error,
+    });
+  }
 }
 
 /**
@@ -1701,6 +1824,16 @@ function puedeTenerUnaSuscripcion(datos: Record<string, unknown>, nowMs: number)
  *     la unica red. Pasada la ventana, un abandonado que nunca tuvo suscripcion ya no
  *     se busca, y si se pagara despues y su webhook fallara, cobraria junto al nuevo:
  *     queda como hueco conocido.
+ *
+ * Hueco conocido que NO se cierra aca: un abandonado A pagado tarde que es el que
+ * genera el conflicto (A cobro y paga mas alla de la prueba de B). Se da de baja B y
+ * quedan O y A cobrando hasta que A reconcilie por su webhook (el barrido no visita
+ * los abandonados). Cerrarlo desde aca exigiria elegir entre O y A sin la foto de
+ * A con su propia reconciliacion (cual es mas nuevo, cual el alumno quiso, si A ya
+ * cobro dos veces): una baja que no se puede deshacer sobre un dato dudoso. Se deja
+ * al webhook de A, cuya reconciliacion da de baja a O (mas viejo) con la regla de
+ * siempre; si ese webhook falla, el ERROR de "se da de baja el NUEVO" ya nombra los
+ * planes viejos para que alguien lo vea.
  *
  * Una suscripcion de OTRO uid sobre un plan viejo no se toca: es un dato raro (el
  * plan es de este alumno), se logea como error, y dar de baja el cobro de otra
@@ -1784,8 +1917,10 @@ async function darDeBajaLosReemplazadosDelAlumno(
           "alumno — no se da de baja nada hasta poder ver todo",
         { planViejo: doc.id, planVigente, uid, status: err.status, retryable: err.retryable },
       );
+      await contarFalloDeBusqueda(app, doc.id, datos, { planVigente, uid });
       return { cancelados: 0, fallo: true };
     }
+    await reiniciarFallosDeBusqueda(app, doc.id, datos);
 
     for (const sub of subs) {
       if (!sigueViva(sub.status)) continue;
@@ -1816,6 +1951,18 @@ async function darDeBajaLosReemplazadosDelAlumno(
         app, uid, nuevo, conflictos, "viejo-pago-mas-alla", deps);
     }
     // Los dos cobraron el solapamiento: se queda el que mas lejos tiene pago.
+    //
+    // Los DOS fines salen de `finPagoDelPlanVivo`, o sea con el mismo respaldo: sin
+    // `next_payment_date`, lo que cubre el ultimo cobro ([pagadoHastaDe]). El del
+    // viejo ademas suma su `currentPeriodEnd` guardado (el del nuevo no: antes de su
+    // primer cobro ese es el fin de la prueba). El respaldo "desde el alta" es una
+    // COTA INFERIOR (una pausa lo corre hacia atras: ver [evidenciaDePago]), y aca es
+    // seguro que lo sea: solo puede hacer que un plan parezca cubrir MENOS de lo que
+    // cubre. Para el viejo, eso inclina hacia quedarse con el nuevo y dar de baja el
+    // viejo, que es lo que se hace tambien cuando no se sabe el fin del nuevo (se
+    // respeta lo que el alumno eligio); se paga con, a lo sumo, un reintegro de mas,
+    // que ya se loguea como ERROR. Elegir mal el que se queda no le quita acceso al
+    // alumno (el que sigue, sigue otorgando); lo que puede costar es ese reintegro.
     const finDelNuevo = finPagoDelNuevoMs(nuevo);
     const finDelViejo = Math.max(
       ...conflictos.map((c) => c.solapa.finDelViejoMs ?? Number.NEGATIVE_INFINITY),
