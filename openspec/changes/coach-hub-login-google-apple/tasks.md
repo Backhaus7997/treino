@@ -75,7 +75,7 @@ Cubre: REQ-CHW-AUTH-004 (copy), SCENARIO-CHW-AUTH-012 (parte F), 013, 014 (F), 0
 - [x] 1.4 **GATE** — correr `auth_failure_test.dart`, `auth_failure_exclusion_test.dart`
   (ADR-I18N-002: el copy NO va a ARB) y los tests que citaban el copy. `flutter analyze lib
   test` acotado. `dart format` solo en tocados.
-- [ ] 1.5 **Control negativo** (tras commit): mover el copy de `popupBlocked` a una clave ARB
+- [x] 1.5 **Control negativo** (tras commit): mover el copy de `popupBlocked` a una clave ARB
   y confirmar que `auth_failure_exclusion_test.dart` se pone rojo; revertir.
 
 ## Batch 2 — AuthService: popup Google/Apple + mapeo de errores
