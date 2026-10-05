@@ -1,21 +1,26 @@
 /**
  * deleteAccount — Firebase Callable Cloud Function handler.
  *
- * Full cascade handler (PR#2): handles auth guard, anti-spoofing, trainer role guard,
- * audit log, full Firestore/Storage cascade, and Auth user deletion (last).
+ * Full cascade handler (PR#2): handles auth guard, anti-spoofing, audit log,
+ * full Firestore/Storage cascade, and Auth user deletion (last).
+ *
+ * Trainers (role == 'trainer') delete their account like anyone else (#1333,
+ * Apple 5.1.1(v)). There is NO role guard: the trainer steps (T1-T5, from
+ * `cascade/trainer-data.ts`) run on EVERY call and are no-ops for an athlete.
  *
  * Cascade order (REQ-ACCDEL-CF-012: Auth MUST be last):
  *   1. Validate + anti-spoof (callable wrapper)
- *   2. Trainer role guard
  *  2b. Cancel live Mercado Pago subscriptions — FAIL-CLOSED: if MP cannot be
  *      reached the account is NOT touched (see cascade/subscriptions.ts)
  *   3. Audit log: started
  *   4. Sweep follows
  *   5. Delete posts
- *   6. Terminate trainer links
- *   7. Cancel future appointments
+ *   6. Terminate trainer links (as athlete)            + T1 as trainer
+ *   7. Cancel future appointments (as athlete)         + T2 as trainer
  *   8. Delete storage avatar
- *  8d. Delete the athlete's routines (assigned plans + own routines)
+ *  8b. Athlete storage                                 + T3 trainer storage
+ *  8c. Athlete-owned data                              + T4 trainer data
+ *  8d. Delete the athlete's routines                   + T5 trainer templates
  *   9. Delete user docs (users + userPublicProfiles + trainerPublicProfiles)
  *  10. Update audit log with cascade results
  *  11. Delete Auth user (LAST — REQ-ACCDEL-CF-012)
@@ -28,7 +33,6 @@
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
@@ -37,7 +41,17 @@ import { sweepFollows } from "./cascade/friendships";
 import { deletePosts } from "./cascade/posts";
 import { terminateTrainerLinks } from "./cascade/trainer-links";
 import { cancelFutureAppointments } from "./cascade/appointments";
-import { deleteAvatar, deleteAthleteStorage } from "./cascade/storage";
+import {
+  deleteAvatar,
+  deleteAthleteStorage,
+  deleteTrainerStorage,
+} from "./cascade/storage";
+import {
+  cancelFutureAppointmentsAsTrainer,
+  deleteTrainerOwnedData,
+  deleteTrainerTemplates,
+  terminateLinksAsTrainer,
+} from "./cascade/trainer-data";
 import { deleteAthleteOwnedData } from "./cascade/athlete-data";
 import { deleteAthleteRoutines } from "./cascade/routines";
 import { deleteUserDocs } from "./cascade/users";
@@ -99,20 +113,6 @@ export async function runDeleteAccount(
   provider: string,
   deps: DeleteAccountDeps = depsReales()
 ): Promise<DeleteAccountResponse> {
-  const db = getFirestore(app);
-
-  // ── Guard: trainers cannot self-delete (REQ-ACCDEL-CF-003) ─────────────
-  const userSnap = await db.collection("users").doc(uid).get();
-  if (userSnap.exists) {
-    const role = userSnap.data()?.role as string | undefined;
-    if (role === "trainer") {
-      throw new HttpsError(
-        "permission-denied",
-        "trainers cannot self-delete"
-      );
-    }
-  }
-
   // ── Paso 2b: dar de baja las suscripciones de Mercado Pago — FAIL-CLOSED ──
   // A diferencia de todo lo que sigue, NO acumula el error y sigue: si no se
   // pudo cancelar, tira y la cuenta queda intacta. Borrarla con el cobro vivo
@@ -155,12 +155,29 @@ export async function runDeleteAccount(
     errors.push(`trainer_links: ${(err as Error).message ?? String(err)}`);
   }
 
+  // ── T1: Terminate the links where this uid is the TRAINER (#1333) ──────
+  // Reason `trainer-account-deleted`: notify-link-change tells each athlete.
+  try {
+    await terminateLinksAsTrainer(app, uid);
+    deletedCollections.push("trainer-links");
+  } catch (err: unknown) {
+    errors.push(`trainer-links: ${(err as Error).message ?? String(err)}`);
+  }
+
   // ── Step 7: Cancel future appointments ────────────────────────────────
   try {
     await cancelFutureAppointments(app, uid);
     deletedCollections.push("appointments");
   } catch (err: unknown) {
     errors.push(`appointments: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── T2: Cancel the trainer's future appointments + availability ────────
+  try {
+    await cancelFutureAppointmentsAsTrainer(app, uid);
+    deletedCollections.push("trainer-appointments");
+  } catch (err: unknown) {
+    errors.push(`trainer-appointments: ${(err as Error).message ?? String(err)}`);
   }
 
   // ── Step 8: Delete storage avatar ─────────────────────────────────────
@@ -181,6 +198,14 @@ export async function runDeleteAccount(
     errors.push(`storage-athlete: ${(err as Error).message ?? String(err)}`);
   }
 
+  // ── T3: Delete the files the trainer authored for athletes ─────────────
+  try {
+    await deleteTrainerStorage(app, uid);
+    deletedCollections.push("trainer-storage");
+  } catch (err: unknown) {
+    errors.push(`trainer-storage: ${(err as Error).message ?? String(err)}`);
+  }
+
   // ── Step 8c: Delete athlete-owned Firestore data (QA-CMP-003) ──────────
   // measurements, performance_tests, profile_shares, session_shares,
   // athlete_billing, athlete_notes, follow_up_entries, nutrition_plans.
@@ -189,6 +214,15 @@ export async function runDeleteAccount(
     deletedCollections.push("athlete-data");
   } catch (err: unknown) {
     errors.push(`athlete-data: ${(err as Error).message ?? String(err)}`);
+  }
+
+  // ── T4: Delete the data the trainer wrote/was granted about athletes ───
+  // payments are RETAINED (fiscal). See cascade/trainer-data.ts.
+  try {
+    await deleteTrainerOwnedData(app, uid);
+    deletedCollections.push("trainer-data");
+  } catch (err: unknown) {
+    errors.push(`trainer-data: ${(err as Error).message ?? String(err)}`);
   }
 
   // ── Step 8d: Delete the athlete's routines (QA-CMP-004) ────────────────
@@ -203,6 +237,15 @@ export async function runDeleteAccount(
     errors.push(`routines: ${(err as Error).message ?? String(err)}`);
   }
 
+  // ── T5: Delete the trainer's templates (published too) ─────────────────
+  // Plans assigned to athletes stay with them. See cascade/trainer-data.ts.
+  try {
+    await deleteTrainerTemplates(app, uid);
+    deletedCollections.push("trainer-templates");
+  } catch (err: unknown) {
+    errors.push(`trainer-templates: ${(err as Error).message ?? String(err)}`);
+  }
+
   // ── Step 9: Delete user docs ───────────────────────────────────────────
   try {
     await deleteUserDocs(app, uid);
@@ -213,7 +256,7 @@ export async function runDeleteAccount(
   }
 
   // ── Step 10-11: Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────
-  // MUST be last — so role guard still works if retry happens mid-cascade.
+  // MUST be last — so a retry after a mid-cascade failure still finds the account.
   try {
     await getAuth(app).deleteUser(uid);
     deletedCollections.push("users-auth");
