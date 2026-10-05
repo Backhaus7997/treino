@@ -14,6 +14,9 @@
  *       active → paused → notify athlete (pausada), deepLink "/coach"
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
  *       terminated + reason 'account-deleted' → NO notifica, pero purga
+ *       terminated + reason 'trainer-account-deleted' (#1333, el PF borró su
+ *         cuenta) → notify SOLO al ATLETA, deepLink "/coach", sin mail; una
+ *         solicitud pendiente además se purga
  *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
  *       terminated + reason 'cancelled-by-athlete' → notify TRAINER,
  *         deepLink al centro de notificaciones
@@ -39,6 +42,7 @@ import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { resolveAthleteName, resolveTrainerName } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import {
   clasificarTerminacion,
   purgeRejectedLinkHandler,
@@ -336,7 +340,30 @@ export async function notifyOnLinkChangeHandler(
     // vínculos que ESTA rama, en el mismo frame, acababa de tratar como reales.
     causaTerminacion = clasificarTerminacion(after);
 
-    if (causaTerminacion === "rechazo") {
+    if (reason === TRAINER_ACCOUNT_DELETED_REASON) {
+      // #1333: el PF cerró su cuenta y la cascada le terminó el vínculo. Antes
+      // que la rama genérica porque la genérica le avisaría "a los dos" —y el
+      // PF ya no existe—, y porque el texto tiene que decir qué pasó.
+      //
+      // SIN NOMBRE del PF a propósito: este trigger es asíncrono y puede correr
+      // después de `deleteUserDocs`, así que el nombre podría no resolverse.
+      // Tampoco `actorUid`: no hay actor al que atribuirle el aviso. Y SIN
+      // MAIL: push + historial in-app alcanza (decisión del dueño, #1341).
+      //
+      // Dos copias según lo que era el vínculo. Para una solicitud que nunca se
+      // aceptó, "tu entrenador" es falso: el alumno sólo había pedido.
+      recipientUids = [athleteId];
+      if (beforeStatus === "pending") {
+        title = "Solicitud sin efecto"; // i18n: #1333
+        body = "El entrenador al que le pediste vincularte cerró su cuenta. " +
+          "Podés buscar otro."; // i18n: #1333
+      } else {
+        title = "Tu entrenador cerró su cuenta"; // i18n: #1333
+        body = "El vínculo terminó. Tus rutinas, tu historial y el chat " +
+          "siguen en tu cuenta. Si tenían turnos agendados, quedaron " +
+          "cancelados."; // i18n: #1333
+      }
+    } else if (causaTerminacion === "rechazo") {
       // El PF rechazó una solicitud. Avisarle a ÉL de su propia acción es ruido.
       const trainerName = await resolveTrainerName(app, trainerId);
       recipientUids = [athleteId];

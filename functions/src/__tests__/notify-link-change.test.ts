@@ -25,6 +25,7 @@ import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { trainerEntry } from "../mail/templates";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -544,6 +545,119 @@ describe("no-op: after document missing (delete event)", () => {
     await expect(
       notifyOnLinkChangeHandler(testApp, "link-test", undefined, undefined, mock),
     ).resolves.not.toThrow();
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1333 — el PF borra su cuenta: reason === 'trainer-account-deleted'
+// SC-PSD-07 / SC-PSD-26
+// ---------------------------------------------------------------------------
+describe("SC-PSD-07: reason=trainer-account-deleted → aviso SOLO al alumno", () => {
+  const trainerId = "trainer-link-psd7";
+  const athleteId = "athlete-link-psd7";
+  const linkId = "link-psd7";
+  const reason = TRAINER_ACCOUNT_DELETED_REASON;
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-psd7"]);
+    await seedUser(athleteId, ["athlete-token-psd7"]);
+    await db().collection("trainer_links").doc(linkId).set({ trainerId, athleteId, status: "terminated", reason });
+  });
+  afterEach(async () => {
+    await db().collection("trainer_links").doc(linkId).delete().catch(() => undefined);
+    const hist = await db().collection("users").doc(athleteId).collection("notifications").get();
+    await Promise.all(hist.docs.map((d) => d.ref.delete()));
+    await cleanup(trainerId, athleteId);
+  });
+
+  const sent = (mock: Messaging) =>
+    (mock.sendEachForMulticast as jest.Mock).mock.calls.map((c) => c[0] as MulticastMessage);
+
+  it("vinculo activo: un solo push al alumno, deepLink /coach, sin mail", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "active", acceptedAt: new Date() },
+      { trainerId, athleteId, status: "terminated", reason, acceptedAt: new Date() },
+      mock,
+    );
+
+    const calls = sent(mock);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].tokens).toEqual(["athlete-token-psd7"]);
+    expect(calls[0].notification?.title).toBe("Tu entrenador cerró su cuenta");
+    expect(calls[0].notification?.body).toContain("Tus rutinas, tu historial y el chat siguen en tu cuenta");
+    expect(calls[0].data?.deepLink).toBe("/coach");
+    // sin mail
+    const queued = await db().collection(MAIL_QUEUE_COLLECTION).where("toUid", "==", athleteId).get();
+    expect(queued.size).toBe(0);
+    // un vinculo real no se purga
+    expect((await db().collection("trainer_links").doc(linkId).get()).exists).toBe(true);
+  });
+
+  it("vinculo pausado: mismo aviso que el activo", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "paused", acceptedAt: new Date() },
+      { trainerId, athleteId, status: "terminated", reason, acceptedAt: new Date() },
+      mock,
+    );
+    expect(sent(mock)[0].notification?.title).toBe("Tu entrenador cerró su cuenta");
+    expect(sent(mock)[0].tokens).toEqual(["athlete-token-psd7"]);
+  });
+
+  it("solicitud pendiente: copy 'Solicitud sin efecto' y el doc se purga", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "pending" },
+      { trainerId, athleteId, status: "terminated", reason },
+      mock,
+    );
+
+    const calls = sent(mock);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].tokens).toEqual(["athlete-token-psd7"]);
+    expect(calls[0].notification?.title).toBe("Solicitud sin efecto");
+    expect(calls[0].notification?.body).toContain("cerró su cuenta");
+    expect(calls[0].data?.deepLink).toBe("/coach");
+    expect((await db().collection("trainer_links").doc(linkId).get()).exists).toBe(false);
+  });
+
+  it("el historial del alumno registra el aviso (kind link-change)", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "active", acceptedAt: new Date() },
+      { trainerId, athleteId, status: "terminated", reason, acceptedAt: new Date() },
+      mock,
+    );
+    const snap = await db().collection("users").doc(athleteId).collection("notifications").get();
+    expect(snap.size).toBe(1);
+    expect(snap.docs[0].data().kind).toBe("link-change");
+  });
+
+  it("idempotencia: una reescritura sin cambio de status no vuelve a avisar", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "terminated", reason },
+      { trainerId, athleteId, status: "terminated", reason },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("SC-PSD-26: el 'account-deleted' del ATLETA sigue sin avisarle al PF", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnLinkChangeHandler(
+      testApp, linkId,
+      { trainerId, athleteId, status: "active" },
+      { trainerId, athleteId, status: "terminated", reason: "account-deleted" },
+      mock,
+    );
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });

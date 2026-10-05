@@ -69,6 +69,7 @@
 import { App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "./cascade/trainer-data";
 
 /**
  * Las DOS únicas razones que el cliente escribe sobre un vínculo en `pending`
@@ -124,7 +125,18 @@ export function clasificarTerminacion(
   //
   // Una solicitud que nunca fue aceptada, de alguien que ya no existe, es
   // basura por la misma definición que un rechazo.
-  if (after.reason === "account-deleted") return "cuenta-borrada";
+  //
+  // #1333: lo mismo cuando quien borra la cuenta es el PF.
+  // `cascade/trainer-data.ts` termina SUS vinculos con
+  // `reason: 'trainer-account-deleted'`; una solicitud sin aceptar cuyo
+  // destinatario ya no existe es basura por la misma definicion. Con
+  // `acceptedAt` ya salimos arriba: un vinculo real se conserva.
+  if (
+    after.reason === "account-deleted" ||
+    after.reason === TRAINER_ACCOUNT_DELETED_REASON
+  ) {
+    return "cuenta-borrada";
+  }
   if (!RAZONES_DE_NO_VINCULO.has(after.terminationReason as string)) {
     // Razón ausente, desconocida o que no es string. No se puede afirmar que
     // nunca hubo vínculo, así que se conserva: el modo de falla de todo esto
