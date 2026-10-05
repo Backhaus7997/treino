@@ -2435,8 +2435,60 @@ class AppL10nEn extends AppL10n {
   String get coachHubOnboardingPfTitle => 'YOUR PROFESSIONAL PROFILE';
 
   @override
-  String get coachHubOnboardingPfPlaceholder =>
-      'Your professional profile is still incomplete. This step is not available on the web yet.';
+  String get coachHubOnboardingPfBody =>
+      'This is what students see when they look for you. You can change it any time.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'SPECIALTY';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'MONTHLY RATE (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALITY';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'I teach online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Turn on online classes or add a training place.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'TRAINING PLACES';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'SEARCH A PLACE';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint => 'Address or place name';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Search';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'We couldn\'t find that place. Try the full address.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'We couldn\'t search for the place. Check your connection and try again.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'Place search is not available right now. If you teach online, you can still finish.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Retry';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Remove place';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finish';
 
   @override
   String get coachHubOnboardingContinue => 'Continue';

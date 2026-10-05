@@ -2487,8 +2487,61 @@ class AppL10nEs extends AppL10n {
   String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
 
   @override
-  String get coachHubOnboardingPfPlaceholder =>
-      'Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.';
+  String get coachHubOnboardingPfBody =>
+      'Esto es lo que ven los alumnos cuando te buscan. Lo puedes cambiar cuando quieras.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'ESPECIALIDAD';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'TARIFA MENSUAL (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALIDAD';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'Doy clases online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Activa las clases online o suma un lugar de entrenamiento.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'LUGARES DE ENTRENAMIENTO';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'BUSCAR UN LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint =>
+      'Dirección o nombre del lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Buscar';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'No encontramos ese lugar. Prueba con la dirección completa.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'No pudimos buscar el lugar. Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'La búsqueda de lugares no está disponible en este momento. Si das clases online, puedes finalizar igual.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finalizar';
 
   @override
   String get coachHubOnboardingContinue => 'Continuar';
@@ -7566,8 +7619,61 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
 
   @override
-  String get coachHubOnboardingPfPlaceholder =>
-      'Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.';
+  String get coachHubOnboardingPfBody =>
+      'Esto es lo que ven los alumnos cuando te buscan. Lo podés cambiar cuando quieras.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'ESPECIALIDAD';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'TARIFA MENSUAL (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALIDAD';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'Doy clases online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Activá las clases online o sumá un lugar de entrenamiento.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'LUGARES DE ENTRENAMIENTO';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'BUSCAR UN LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint =>
+      'Dirección o nombre del lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Buscar';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'No encontramos ese lugar. Probá con la dirección completa.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'La búsqueda de lugares no está disponible en este momento. Si das clases online, podés finalizar igual.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finalizar';
 
   @override
   String get coachHubOnboardingContinue => 'Continuar';

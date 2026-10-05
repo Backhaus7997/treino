@@ -279,8 +279,10 @@ void main() {
         final u = await usuario();
         expect(u['displayName'], 'Ana Pérez');
         expect(u['termsAcceptedAt'], isNotNull);
-        // La etapa recalculada es `pf`: ya no hay campos de nombre.
-        expect(find.byType(AuthInput), findsNothing);
+        // La etapa recalculada es `pf`: ya no hay campos de nombre (el
+        // `AuthInput` que queda es el buscador de lugares, no el de identidad).
+        expect(find.text(l10n.coachHubOnboardingFirstNameLabel), findsNothing);
+        expect(find.byKey(const Key('onboarding-pf-bio')), findsOneWidget);
       });
 
       testWidgets('identidad: con evidencia previa no muestra el checkbox',
