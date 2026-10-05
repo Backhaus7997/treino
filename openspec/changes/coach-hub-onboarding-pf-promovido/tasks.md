@@ -56,10 +56,10 @@ el CORS. B11 al final. Regla dura: el gate NO se mergea antes de la migración d
 Commit: `feat(coach-hub): predicado puro de etapa del onboarding del PF`
 Cubre: REQ-CHW-ONB-001; SCENARIO-001..006; SCENARIO-TPO-WEB-001.
 
-- [ ] 1.1 **RED** — `test/features/coach_hub/domain/hub_onboarding_stage_test.dart`: orden age→identity→pf→done (001), edad antes que identidad (002), legacy con handle sin términos = `done` (003), `bornAt` nulo = `age` + borde de cumpleaños 13 con `now` fijo barrido en día Y zona horaria (004), `displayName` en blanco = `identity` (005), sin campos de alumno/avatar = `done` (006), `done ⇒ trainerProfileComplete` (TPO-WEB-001). Rojo por símbolo inexistente.
-- [ ] 1.2 **GREEN** — `lib/features/coach_hub/domain/hub_onboarding_stage.dart`: `enum HubOnboardingStage {age, identity, pf, done}` + `hubOnboardingStage(UserProfile, {DateTime? now})` (sin Riverpod ni `DateTime.now()` oculto); usa `validateBornAt`, `displayName?.trim()`, `trainerProfileComplete`. No mira `firstName/lastName`, `termsAcceptedAt`.
-- [ ] 1.3 **GATE** — test del predicado; analyze acotado a `lib/features/coach_hub/domain test/features/coach_hub/domain`; format.
-- [ ] 1.4 **Control negativo** (tras commit): identidad por `firstName` en vez de `displayName` ⇒ 003 en rojo; revertir.
+- [x] 1.1 **RED** — `test/features/coach_hub/domain/hub_onboarding_stage_test.dart`: orden age→identity→pf→done (001), edad antes que identidad (002), legacy con handle sin términos = `done` (003), `bornAt` nulo = `age` + borde de cumpleaños 13 con `now` fijo barrido en día Y zona horaria (004), `displayName` en blanco = `identity` (005), sin campos de alumno/avatar = `done` (006), `done ⇒ trainerProfileComplete` (TPO-WEB-001). Rojo por símbolo inexistente.
+- [x] 1.2 **GREEN** — `lib/features/coach_hub/domain/hub_onboarding_stage.dart`: `enum HubOnboardingStage {age, identity, pf, done}` + `hubOnboardingStage(UserProfile, {DateTime? now})` (sin Riverpod ni `DateTime.now()` oculto); usa `validateBornAt`, `displayName?.trim()`, `trainerProfileComplete`. No mira `firstName/lastName`, `termsAcceptedAt`.
+- [x] 1.3 **GATE** — test del predicado; analyze acotado a `lib/features/coach_hub/domain test/features/coach_hub/domain`; format.
+- [x] 1.4 **Control negativo** (tras commit): identidad por `firstName` en vez de `displayName` ⇒ 003 en rojo; revertir.
 
 ## Batch 2 — Fixture «trainer completo» y migración de la suite del Hub (ANTES del gate)
 
