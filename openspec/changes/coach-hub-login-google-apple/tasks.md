@@ -204,7 +204,7 @@ Cubre: REQ-CHW-AUTH-001/003/004/006/008; SCENARIO-CHW-AUTH-003, 011 (parte L), 0
 021, 024.
 Depende de: B3, B4 (y B5 solo por convención de ARB).
 
-- [ ] 6.1 **RED** — `test/features/coach_hub/presentation/coach_hub_login_screen_test.dart`
+- [x] 6.1 **RED** — `test/features/coach_hub/presentation/coach_hub_login_screen_test.dart`
   (override de `authNotifierProvider` con un fake; dark y light):
   - 003: se ven formulario email, botón Google y botón Apple; tap en cada uno llama
     `signInWithGooglePopup`/`signInWithApplePopup`; mientras uno está en curso solo ese
@@ -215,23 +215,30 @@ Depende de: B3, B4 (y B5 solo por convención de ARB).
   - tras éxito la pantalla NO navega por sí misma.
   Los tests existentes (sin overrides, `:12-24`, contraste `:71-80`) siguen verdes (D11).
   Ver rojo.
-- [ ] 6.2 ARB — claves de pantalla del login: botones «Google»/«Apple» (verificar si ya
+- [x] 6.2 ARB — claves de pantalla del login: botones «Google»/«Apple» (verificar si ya
   existen claves de mobile reutilizables antes de crear nuevas) y divisor «O CONTINUÁ CON»
   en los 3 ARB, misma clave; `flutter gen-l10n`.
-- [ ] 6.3 **GREEN** — `coach_hub_login_screen.dart`: debajo de INGRESAR, divisor →
+- [x] 6.3 **GREEN** — `coach_hub_login_screen.dart`: debajo de INGRESAR, divisor →
   `TermsNoticeText` → fila de `TreinoButton(variant: secondary, icon: TreinoIcon.googleLogo
   / appleLogo)` (D12); estado local `_Metodo? _enCurso` (email/google/apple) sin
   `ref.watch(authNotifierProvider)` en el build (D11); errores vía el mecanismo existente de
   la pantalla (sin SnackBar persistente); sin `await` entre `onPressed` y el notifier;
   tokens del kit, sin literales nuevos de `fontSize`/`Radius.circular`.
-- [ ] 6.4 **GATE** — test de login completo, `terms_notice_text_test.dart`, los cinco scans
+- [x] 6.4 **GATE** — test de login completo, `terms_notice_text_test.dart`, los cinco scans
   de UI de SCENARIO-024, paridad ARB, `auth_failure_exclusion_test.dart`; si los scans
   cambiaron de conteo por literales preexistentes, medir (no calcular); analyze acotado;
   format.
-- [ ] 6.5 **Control negativo** (tras commit): insertar un `await Future<void>.delayed(...)`
+- [x] 6.5 **Control negativo** (tras commit): insertar un `await Future<void>.delayed(...)`
   entre `onPressed` y el notifier solo si el test de orden síncrono lo detecta; si el test
   no lo puede detectar, documentarlo como cubierto solo por verificación manual (paso 3 del
   checklist de usuario). Revertir.
+
+  Nota de apply: 6.2 no creó claves ARB — se reusaron `authLoginContinueWith`,
+  `authGoogleLabel` y `authAppleLabel` de mobile (ya en los 3 ARB). 6.5: el test de orden
+  síncrono (`onPressed!()` y mirar el fake sin ceder al event loop) SÍ detecta el `await`
+  (control negativo: 7 rojos). Lo que no cubre el unit test — que el navegador conceda el
+  popup y la cadena real notifier → servicio — queda en la verificación manual (paso 3 del
+  checklist de usuario).
 
 ## Batch 7 — Docs y decisión superada
 
