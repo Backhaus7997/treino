@@ -803,8 +803,9 @@ class UserRepository {
   Stream<bool> watchHasPendingWrites(String uid) {
     return _users
         .doc(uid)
-        .snapshots()
-        .map((snap) => snap.metadata.hasPendingWrites);
+        .snapshots(includeMetadataChanges: true)
+        .map((snap) => snap.metadata.hasPendingWrites)
+        .distinct();
   }
 
   Future<void> delete(String uid) async {
