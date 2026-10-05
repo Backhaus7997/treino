@@ -133,3 +133,26 @@ no hace falta limpiar nada. Con el revert vuelve la restricción operativa de #1
 - [ ] Se levanta la restricción de #1318.
 
 **Tamaño estimado:** ~900-1300 líneas (código + tests + fixture), PR con `size:exception`.
+
+## Decisiones del usuario (2026-10-05) — PREVALECEN sobre lo anterior
+
+1. **Modalidad:** «online» es opcional. **Se suma un editor web de ubicación presencial, sin geolocalización del dispositivo:**
+   - el PF escribe la dirección del lugar donde trabaja;
+   - se busca con Places Text Search (como `lib/features/gyms/data/places_text_search_service.dart`);
+   - elige el resultado sugerido;
+   - se guarda como `TrainerLocation` de tipo `custom`, con `customLabel` y con `lat`, `lng` y `geohash` del resultado.
+
+   El texto libre sin coordenadas queda descartado: `TrainerLocation` exige `lat`, `lng` y `geohash` (`lib/features/coach/domain/trainer_location.dart:27-29`), y sin ellos el PF no aparece en el mapa ni en las búsquedas. Publicar una ubicación pide el consentimiento de ubicación también en la web (`trainerLocationConsentAt`, igual que mobile).
+
+   **A verificar en design:**
+   - si Places (New) acepta llamadas desde el navegador (CORS y key restringida por referrer);
+   - si no las acepta, usar `functions/src/places-search.ts` como proxy;
+   - cómo se calcula el geohash (reusar el helper de mobile).
+
+   La etapa PF del onboarding pide bio, especialidad, tarifa y **al menos una modalidad**: online o una ubicación. Con eso, la salida del gate coincide con `trainerProfileComplete`.
+2. **Nombre:** se piden nombre y apellido (`firstName`, `lastName`), y `displayName` se deriva como ya hace `cuenta_tab.dart:211-221`. No se pide `@handle`. El conflicto previo «`displayName` = handle en mobile» queda fuera de alcance y va a una issue aparte.
+3. **Supuestos confirmados:**
+   - `bornAt` es obligatorio para todo trainer que no tenga uno válido;
+   - los términos se exigen solo cuando falta la identidad;
+   - el avatar es opcional (se carga desde `/ajustes`).
+4. **Se saltean los datos de alumno:** gym, experiencia, género, peso y altura.
