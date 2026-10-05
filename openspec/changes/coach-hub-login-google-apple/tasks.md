@@ -118,7 +118,7 @@ Depende de: B1.
 - [x] 2.3 **REFACTOR** — deduplicar el try/catch entre ambos métodos solo si sigue
   legible; los tests de mobile del archivo siguen verdes.
 - [x] 2.4 **GATE** — correr `auth_service_test.dart` completo; analyze acotado; format.
-- [ ] 2.5 **Control negativo** (tras commit): quitar `invalid-credential` del set de config
+- [x] 2.5 **Control negativo** (tras commit): quitar `invalid-credential` del set de config
   y confirmar rojo en el test 027; revertir.
 
 ## Batch 3 — AuthNotifier: métodos popup y helper
