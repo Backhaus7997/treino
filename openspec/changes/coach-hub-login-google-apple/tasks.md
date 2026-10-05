@@ -155,11 +155,11 @@ Commit: `feat(coach-hub): /not-allowed nombra las stores y ofrece contacto por m
 Cubre: REQ-CHW-AUTH-005, 008; SCENARIO-CHW-AUTH-015, 016, 017, 018, 019, 020, 023, 024, 029.
 Independiente de B1-B3.
 
-- [ ] 5.1 **RED (guard)** — `test/features/paywall/superficie_de_cobro_alumno_test.dart`:
+- [x] 5.1 **RED (guard)** — `test/features/paywall/superficie_de_cobro_alumno_test.dart`:
   sumar `coach_hub_not_allowed_screen.dart` a `permitidos` («sólo web: `mailto:` de
   contacto, no compra»). Verlo pasar es trivial; el rojo real está en 5.2 (la pantalla aún
   no abre URL). SCENARIO-029 se completa en 5.6.
-- [ ] 5.2 **RED** — nuevo `test/features/coach_hub/presentation/coach_hub_not_allowed_screen_test.dart`
+- [x] 5.2 **RED** — nuevo `test/features/coach_hub/presentation/coach_hub_not_allowed_screen_test.dart`
   (dark y light):
   - 015: aparece «App Store» y «Play Store»; ningún widget tappable de link a store.
   - 016: tap en contacto ⇒ `abrirUrl` recibe `Uri` `mailto` con path `kLegalContactEmail` y
@@ -168,11 +168,11 @@ Independiente de B1-B3.
     `AuthService.signOut`/`AuthNotifier.signOut` (sin overrides del notifier, monta limpio);
     si `cerrarSesion` falla ⇒ `coachHubSignOutError`.
   Ver rojo.
-- [ ] 5.3 ARB — `lib/l10n/intl_en.arb`, `intl_es.arb`, `intl_es_AR.arb`:
+- [x] 5.3 ARB — `lib/l10n/intl_en.arb`, `intl_es.arb`, `intl_es_AR.arb`:
   `coachHubNotAllowedTitle`, `coachHubNotAllowedBody`, `coachHubNotAllowedContactPrompt`,
   `coachHubNotAllowedContactCta`, `coachHubNotAllowedMailSubject` (es_AR en voseo). Correr
   `flutter gen-l10n`. Reusar `coachHubSignOutError` existente.
-- [ ] 5.4 **GREEN** — `coach_hub_not_allowed_screen.dart`:
+- [x] 5.4 **GREEN** — `coach_hub_not_allowed_screen.dart`:
   `CoachHubNotAllowedScreen({abrirUrl = launchUrl, cerrarSesion = _cerrarSesionFirebase})`
   con tear-offs const (D10); mailto con
   `Uri(scheme:'mailto', path: kLegalContactEmail, query:'subject=${Uri.encodeComponent(..)}')`
@@ -180,22 +180,22 @@ Independiente de B1-B3.
   `AppSpacing`/`AppTextSize`/`AppPalette.of`/`TreinoButton`/`TreinoIcon`; sin hex, sin
   Phosphor directo, sin SnackBar persistente fuera de convención. El router la sigue
   construyendo `const` (sin tocar el router).
-- [ ] 5.5 **Router (verificación, sin código)** — correr
+- [x] 5.5 **Router (verificación, sin código)** — correr
   `test/app/coach_hub_router_redirect_test.dart` sin modificar: 018 (athlete, `:251-295`),
   019 (sin doc, `:298`), 020 (sin shell) y 008 (athlete nuevo ⇒ `/not-allowed`). Si falta
   alguna ruta de 018 (`/dashboard`, `/upload-plan`, `/pagos`, `/login`), EXTENDER el test
   (no el router).
-- [ ] 5.6 **Scans y paridad** — correr `superficie_de_cobro_alumno_test.dart` (029),
+- [x] 5.6 **Scans y paridad** — correr `superficie_de_cobro_alumno_test.dart` (029),
   `no_raw_font_size_scan_test`, `no_off_scale_spacing_scan_test`, `no_raw_radius_scan_test`,
   `no_material_button_scan_test`, `no_animated_hover_scan_test`,
   `snackbar_persist_scan_test`, test de paridad de ARB y `auth_failure_exclusion_test`
   (023, 024). Si `/not-allowed` quedó sin literales, sacarla de las allowlists de font-size
   y spacing y bajar los techos con el valor MEDIDO.
-- [ ] 5.7 **Control negativo** (tras commit): (a) agregar un `fontSize: 13` crudo a
+- [x] 5.7 **Control negativo** (tras commit): (a) agregar un `fontSize: 13` crudo a
   `coach_hub_not_allowed_screen.dart` y confirmar que el scan se pone rojo; (b) sacar la
   pantalla de `permitidos` y confirmar que el guard de URLs falla (vía `launchUrl`);
   confirmar que cada mutación efectivamente entró; revertir.
-- [ ] 5.8 **GATE** — tests de 5.2, router, scans; analyze acotado; format.
+- [x] 5.8 **GATE** — tests de 5.2, router, scans; analyze acotado; format.
 
 ## Batch 6 — Login del Hub: botones, aviso de términos, estado por botón
 
