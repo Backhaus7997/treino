@@ -222,3 +222,7 @@ Primero `app.gettreino.com`, luego `coach-treino-dev.web.app`:
 - [x] M2 — un lugar `gym` legacy muestra «Gimnasio» en vez de una fila en blanco (`coachHubOnboardingPfLocationGymFallback`)
 - [x] L — `LugarSearchConfigError` ya no ofrece «Reintentar» (el error de red sí)
 - [x] NIT — parámetro `pideTerminos` muerto en `paso_identidad.dart`; doc comment colgado en `terms_stamp.dart`
+
+## Fixes de Codex (PR #1337)
+
+- [x] P1 — los resultados de Places muestran la atribución textual «Google Maps» (constante, no ARB) dentro del contenedor de resultados y solo ahí; ausente en vacío/error de config/error de red (test en light y dark; control negativo rojo)
