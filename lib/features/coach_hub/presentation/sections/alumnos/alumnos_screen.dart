@@ -1138,6 +1138,8 @@ class _RowActionsState extends ConsumerState<_RowActions> {
           reason: failure.reason == 'subscription-inactive'
               ? PlanLimitReason.subscriptionInactive
               : PlanLimitReason.planLimit,
+          subscriptionStatus:
+              ref.read(currentTrainerSubscriptionStatusProvider),
           // El Coach Hub SI tiene vista de facturacion; la app movil no, y
           // por eso el default es null (ver showPlanLimitPaywall).
           billingRoute: '/ajustes',

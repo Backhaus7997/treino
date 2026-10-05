@@ -16,9 +16,15 @@ import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/coach_hub/presentation/sections/invitaciones/invitaciones_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
@@ -43,6 +49,19 @@ TrainerLink _link(
 UserPublicProfile _prof(String uid, String name) =>
     UserPublicProfile(uid: uid, displayName: name);
 
+UserProfile _trainer(SubscriptionStatus status) => UserProfile(
+      uid: 't1',
+      email: 'profe@test.com',
+      displayName: 'Profe',
+      role: UserRole.trainer,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      subscription: TrainerSubscription(
+        tier: SubscriptionTier.plan1,
+        status: status,
+      ),
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   Stream<List<TrainerLink>>? linksStream,
@@ -50,6 +69,7 @@ Future<void> _pump(
   List<UserPublicProfile> profiles = const [],
   TrainerLinkRepository? repo,
   TrainerLinkPromotionService? promotionService,
+  SubscriptionStatus? subscriptionStatus,
   // `false` cuando el stream de links queda colgado en loading a propósito
   // (TreinoShimmer corre en loop infinito — pumpAndSettle no termina nunca).
   bool settle = true,
@@ -71,6 +91,10 @@ Future<void> _pump(
         userPublicProfileProvider.overrideWith(
           (ref, uid) => Stream.value(profileByUid[uid]),
         ),
+        if (subscriptionStatus != null)
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_trainer(subscriptionStatus)),
+          ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
         if (promotionService != null)
           trainerLinkPromotionServiceProvider
@@ -380,6 +404,53 @@ void main() {
   });
 
   group('InvitacionesScreen — acciones aceptar/rechazar', () {
+    for (final status in [
+      SubscriptionStatus.cancelled,
+      SubscriptionStatus.paused,
+    ]) {
+      testWidgets(
+          'subscription-inactive + ${status.name} usa el estado actual del perfil',
+          (tester) async {
+        debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+        addTearDown(() => debugPlanLimitPaywallForm = null);
+        final svc = _MockPromotionService();
+        when(() => svc.accept(any())).thenThrow(
+          const LinkPromotionFailure$PlanLimitReached(
+            reason: 'subscription-inactive',
+            tier: SubscriptionTier.plan1,
+            limit: 2,
+            currentLoad: 2,
+            projectedLoad: 3,
+          ),
+        );
+
+        await _pump(
+          tester,
+          links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
+          profiles: [_prof('a1', 'Ana García')],
+          promotionService: svc,
+          subscriptionStatus: status,
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(InvitacionesScreen)),
+          listen: false,
+        );
+        await container.read(userProfileProvider.future);
+
+        await tester.tap(find.byKey(const Key('accept_l1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('dialog_primary_button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pumpAndSettle();
+
+        final expected = status == SubscriptionStatus.cancelled
+            ? 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'
+            : 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
+        expect(find.text(expected), findsOneWidget);
+      });
+    }
+
     testWidgets(
         'aceptar → dialog de confirmación → svc.accept + snackbar de éxito',
         (tester) async {
