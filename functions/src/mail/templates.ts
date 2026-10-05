@@ -40,6 +40,13 @@ const MINT = "#2CE5A2";
 const BONE = "#FFFFFF";
 const MUTED = "#9BA8A1";
 
+// Las cards de planes (`planesToHtml`): `white06` (relleno) y `white10` (borde)
+// de AppColorPrimitives, compuestos sobre `INK_CARD`. El kit despega una
+// superficie de la card que la contiene subiendo el relleno, sin sombras. Van
+// resueltos a hex porque Outlook no respeta el alpha ni en fondos ni en bordes.
+const PLAN_CARD = "#1D2321";
+const PLAN_CARD_BORDE = "#343938";
+
 const FONT = "Arial,Helvetica,sans-serif";
 
 /** A rendered message, ready to hand to the sender. */
@@ -490,6 +497,96 @@ function lineToText(line: Line): string {
 }
 
 /**
+ * Un plan como card: el nombre chico arriba, lo que trae en grande y —si es
+ * pago— el precio a la derecha. Al que chocó un tope lo que le decide la compra
+ * es cuánto lugar trae cada plan, y por eso va en grande.
+ *
+ * La card es SÓLO cómo se ve en HTML. En text/plain el plan sigue siendo la
+ * línea de siempre (`linea`), así que no hay un segundo copy que mantener: las
+ * dos salen de los mismos datos de `tier-config.ts`.
+ */
+interface PlanCard {
+  nombre: string;
+  detalle: string;
+  precio?: { monto: string; periodo: string };
+  linea: Line;
+}
+
+/** Varios planes seguidos, dibujados como cards apiladas. */
+class Planes {
+  constructor(readonly cards: PlanCard[]) {}
+}
+
+/** Lo que va en el cuerpo de un mail: un párrafo, o un grupo de planes. */
+type Block = Line | Planes;
+
+/**
+ * Las cards, una debajo de la otra. Con hasta cuatro planes y ~456px de ancho
+ * útil, dos columnas obligarían a media queries que Gmail no siempre respeta.
+ * Tablas e inline styles por lo mismo que el resto del layout, y nada de
+ * imágenes ni botones propios: cuanto más se parece a un folleto, más fácil cae
+ * en Promociones (ver `free-limit-reached`). Todo pasa por `esc()`, aunque hoy
+ * los valores salgan de constantes nuestras.
+ */
+function planesToHtml(planes: Planes): string {
+  const cards = planes.cards.map((c) => {
+    const precio = c.precio
+      ? [
+        "<td align=\"right\" valign=\"middle\" style=\"padding:14px 16px 14px 8px;white-space:nowrap;\">",
+        `<div style="font-size:18px;font-weight:700;line-height:1.3;color:${BONE};">`,
+        `${esc(c.precio.monto)}</div>`,
+        `<div style="font-size:12px;line-height:1.4;color:${MUTED};">${esc(c.precio.periodo)}</div>`,
+        "</td>",
+      ].join("")
+      : "";
+    return [
+      "<tr><td style=\"padding:0 0 8px 0;\">",
+      "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
+      ` style="border-collapse:separate;background:${PLAN_CARD};border:1px solid ${PLAN_CARD_BORDE};`,
+      `border-radius:12px;font-family:${FONT};"><tr>`,
+      "<td valign=\"middle\" style=\"padding:14px 16px;\">",
+      "<div style=\"font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;",
+      `line-height:1.4;color:${MINT};">${esc(c.nombre)}</div>`,
+      `<div style="padding-top:2px;font-size:16px;font-weight:700;line-height:1.35;color:${BONE};">`,
+      `${esc(comoTitulo(c.detalle))}</div>`,
+      "</td>",
+      precio,
+      "</tr></table>",
+      "</td></tr>",
+    ].join("");
+  });
+  return [
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
+    " style=\"margin:4px 0 12px 0;\">",
+    ...cards,
+    "</table>",
+  ].join("");
+}
+
+/**
+ * «alumnos sin límite» → «Alumnos sin límite». Las etiquetas (`cupoLabel` y
+ * sus hermanas) van en minúscula porque se escriben DENTRO de una frase; en la
+ * card son un título y van en mayúscula. Sólo acá: el texto plano sigue igual.
+ */
+function comoTitulo(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/** Un bloque a HTML: el párrafo de siempre, o las cards. */
+function blockToHtml(block: Block): string {
+  return block instanceof Planes
+    ? planesToHtml(block)
+    : `<p style="margin:0 0 12px 0;">${lineToHtml(block)}</p>`;
+}
+
+/** Un bloque a text/plain: una línea por párrafo y una por plan, como siempre. */
+function blockToText(block: Block): string[] {
+  return block instanceof Planes
+    ? block.cards.map((c) => lineToText(c.linea))
+    : [lineToText(block)];
+}
+
+/**
  * Builds both MIME parts from a heading, body lines, and an optional CTA.
  *
  * When the CTA points somewhere other than the app, the raw URL is appended to
@@ -503,16 +600,14 @@ function lineToText(line: Line): string {
 function buildMail(
   subject: string,
   heading: string,
-  lines: Line[],
+  lines: Block[],
   ctaLabel?: string,
   ctaHref?: string,
   bajaUrl?: string,
 ): RenderedMail {
-  const bodyHtml = lines
-    .map((l) => `<p style="margin:0 0 12px 0;">${lineToHtml(l)}</p>`)
-    .join("");
+  const bodyHtml = lines.map(blockToHtml).join("");
 
-  const textLines = [heading, "", ...lines.map(lineToText)];
+  const textLines = [heading, "", ...lines.flatMap(blockToText)];
   if (ctaHref) textLines.push("", ctaHref);
   if (bajaUrl) textLines.push(...pieDeBajaEnTexto(bajaUrl));
 
@@ -522,7 +617,7 @@ function buildMail(
   // previa con basura en la bandeja— no lo agarra ningun test que no lo busque
   // a proposito. Derivarlo lo hace imposible de olvidar, y la primera linea ES
   // el resumen del mail: si no lo fuera, el problema seria el copy.
-  const preheader = lines.length > 0 ? lineToText(lines[0]) : heading;
+  const preheader = (lines.length > 0 ? blockToText(lines[0])[0] : undefined) ?? heading;
 
   return {
     subject,
@@ -553,21 +648,34 @@ export function cupoLabel(limit: number | null): string {
 }
 
 /**
- * Los planes del PF, una línea por plan: «Plan 1 · 7 alumnos · $ 12.000 por mes».
+ * Un plan del PF como card: el nombre, lo que trae (`detalle`) y, si es pago,
+ * el precio por mes. En texto plano: «Plan 1 · 7 alumnos · $ 12.000 por mes».
+ * El Free no lleva precio, ni en la card ni en la línea.
+ */
+function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
+  const nombre = TIER_LABELS[tier];
+  if (tier === "free") return { nombre, detalle, linea: [strong(nombre), ` · ${detalle}`] };
+  const monto = formatArs(TIER_PRICES_ARS[tier].monthly);
+  return {
+    nombre,
+    detalle,
+    precio: { monto, periodo: "por mes" },
+    linea: [strong(nombre), ` · ${detalle} · ${monto} por mes`],
+  };
+}
+
+/**
+ * Los planes del PF, una card por plan, con su cupo de alumnos.
  *
  * Nombres, cupos y precios salen de `tier-config.ts`, en el orden de
  * `TIER_LABELS` (de Free a Plan 3). El anual va en una línea aparte y sin
  * montos: cuatro precios dobles en el mail que trae un código son ruido, y el
  * detalle está a un toque, en VER LOS PLANES.
  */
-function planesDelPf(): Line[] {
+function planesDelPf(): Block[] {
   const tiers = Object.keys(TIER_LABELS) as SubscriptionTier[];
   return [
-    ...tiers.map((tier): Line => {
-      const linea: Line = [strong(TIER_LABELS[tier]), ` · ${cupoLabel(TIER_WEIGHT_LIMITS[tier])}`];
-      if (tier !== "free") linea.push(` · ${formatArs(TIER_PRICES_ARS[tier].monthly)} por mes`);
-      return linea;
-    }),
+    new Planes(tiers.map((tier) => cardDePlanPf(tier, cupoLabel(TIER_WEIGHT_LIMITS[tier])))),
     ["Cada plan también se puede pagar por año."],
   ];
 }
@@ -579,13 +687,18 @@ function planesDelPf(): Line[] {
  * Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así que
  * «el que tenés hoy» no miente.
  */
-function planesDelAlumno(): Line[] {
-  return [[strong("Gratis"), " · el que tenés hoy."], lineaDeTreinoPro()];
+function planesDelAlumno(): Block[] {
+  return [
+    new Planes([
+      { nombre: "Gratis", detalle: "El que tenés hoy", linea: [strong("Gratis"), " · el que tenés hoy."] },
+      cardDeTreinoPro(),
+    ]),
+  ];
 }
 
 /**
- * Los planes pagos con MÁS lugar que el tope que el PF acaba de chocar:
- * «Plan 2 · 15 alumnos · $ 22.000 por mes».
+ * Los planes pagos con MÁS lugar que el tope que el PF acaba de chocar, como
+ * cards. En texto plano: «Plan 2 · 15 alumnos · $ 22.000 por mes».
  *
  * `limites` es el mapa de ESE tope (alumnos, ejercicios o plantillas, de
  * `tier-config.ts`) y `etiqueta` lo escribe: al que chocó ejercicios le sirve
@@ -601,7 +714,7 @@ function planesConMasLugar(
   limites: Record<SubscriptionTier, number | null>,
   etiqueta: (limite: number | null) => string,
   actual: number | null | undefined,
-): Line[] {
+): PlanCard[] {
   if (actual === null) return [];
   const pagos = Object.keys(TIER_PRICES_ARS) as Exclude<SubscriptionTier, "free">[];
   return pagos
@@ -609,27 +722,38 @@ function planesConMasLugar(
       const limite = limites[tier];
       return actual === undefined || limite === null || limite > actual;
     })
-    .map((tier): Line => [
-      strong(TIER_LABELS[tier]),
-      ` · ${etiqueta(limites[tier])} · ${formatArs(TIER_PRICES_ARS[tier].monthly)} por mes`,
-    ]);
+    .map((tier) => cardDePlanPf(tier, etiqueta(limites[tier])));
 }
 
 /**
- * La venta de los mails de tope del PF: la frase que presenta la lista y los
- * planes, o —si no hay ninguno con más lugar— la frase de siempre, sola.
+ * La venta de los mails de tope del PF: la frase que presenta los planes y sus
+ * cards, o —si no hay ninguno con más lugar— la frase de siempre, sola.
  */
-function ofertaDePlanes(conPlanes: string, sinPlanes: string, planes: Line[]): Line[] {
-  return planes.length > 0 ? [[conPlanes], ...planes] : [[sinPlanes]];
+function ofertaDePlanes(conPlanes: string, sinPlanes: string, planes: PlanCard[]): Block[] {
+  return planes.length > 0 ? [[conPlanes], new Planes(planes)] : [[sinPlanes]];
 }
 
-/** «TREINO Pro · $ 3.500 por mes o $ 35.000 por año.» Lo comparten el mail del código y el del tope. */
+/** «TREINO Pro · $ 3.500 por mes o $ 35.000 por año.» El texto plano de su card. */
 function lineaDeTreinoPro(): Line {
   return [
     strong("TREINO Pro"),
     ` · ${formatArs(ATHLETE_PRICES_ARS.monthly)} por mes o ` +
       `${formatArs(ATHLETE_PRICES_ARS.annual)} por año.`,
   ];
+}
+
+/**
+ * TREINO Pro como card, con los dos precios en el detalle: el ciclo se elige en
+ * el checkout. Lo comparten el mail del código y el del tope.
+ */
+function cardDeTreinoPro(): PlanCard {
+  return {
+    nombre: "TREINO Pro",
+    detalle:
+      `${formatArs(ATHLETE_PRICES_ARS.monthly)} por mes o ` +
+      `${formatArs(ATHLETE_PRICES_ARS.annual)} por año`,
+    linea: lineaDeTreinoPro(),
+  };
 }
 
 /**
@@ -800,7 +924,7 @@ export function renderMail(
   const build = (
     subject: string,
     heading: string,
-    lines: Line[],
+    lines: Block[],
     ctaLabel?: string,
     ctaHref?: string,
   ): RenderedMail =>
@@ -1299,7 +1423,7 @@ export function renderMail(
     const blocked = countParam(params.blockedCount);
     const limit = limitParam(params.limit);
 
-    const lines: Line[] = [
+    const lines: Block[] = [
       limit === undefined || limit === null
         ? ["Llegaste al tope de alumnos de tu cuenta."]
         : ["Llegaste al tope de tu cuenta: ", strong(cupoLabel(limit)), "."],
@@ -1381,8 +1505,9 @@ export function renderMail(
   // INVITA A MIRAR, NO EMPUJA A PAGAR. La version anterior era titulo y un
   // boton gigante de «CONTINUAR AL PAGO»: le hablaba a alguien que ya decidio
   // pagar, y el que choco un tope recien se entera de que Pro existe. Ahora es
-  // una linea, el precio (de `athlete-plan-config.ts`, el mismo que cobra el
-  // checkout) y «VER LOS PLANES» con el boton normal. Sigue sin parrafos: la
+  // una linea, la card de TREINO Pro con su precio (de `athlete-plan-config.ts`,
+  // el mismo que cobra el checkout) y «VER LOS PLANES» con el boton normal. Una
+  // sola card, sin imagen ni boton propio: sigue sin parrafos. La
   // primera version explicaba en cuatro que el historial no se pierde, y eso le
   // habla a alguien con miedo; el que choco un tope no perdio nada, quiere
   // seguir. El boton a todo el ancho con borde animado es, ademas, de lo que se
@@ -1394,7 +1519,7 @@ export function renderMail(
       "Estás a un paso.",
       [
         ["Mirá qué incluye y elegí si te sirve."],
-        lineaDeTreinoPro(),
+        new Planes([cardDeTreinoPro()]),
       ],
       "VER LOS PLANES →",
       ctaUrl,
