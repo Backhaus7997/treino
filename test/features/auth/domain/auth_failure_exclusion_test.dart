@@ -56,5 +56,22 @@ void main() {
         'Demasiados intentos. Esperá unos minutos e intentá de nuevo',
       );
     });
+
+    // coach-hub-login-google-apple B1: the new web-login variants are also
+    // hardcoded es-AR (ADR-I18N-002), never routed through ARB.
+    test('popupBlocked userMessage is hardcoded es-AR', () {
+      expect(
+        const AuthFailure.popupBlocked().userMessage,
+        'Tu navegador bloqueó la ventana. Permití ventanas emergentes y '
+        'probá de nuevo',
+      );
+    });
+
+    test('providerUnavailable userMessage is hardcoded es-AR', () {
+      expect(
+        const AuthFailure.providerUnavailable().userMessage,
+        'Este método no está disponible. Entrá con email o escribinos',
+      );
+    });
   });
 }

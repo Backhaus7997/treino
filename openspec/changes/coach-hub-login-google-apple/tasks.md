@@ -58,21 +58,21 @@ las de `/not-allowed`; B6 suma las del login). B7 al final.
 Commit: `feat(auth): AuthFailure suma popupBlocked y providerUnavailable`
 Cubre: REQ-CHW-AUTH-004 (copy), SCENARIO-CHW-AUTH-012 (parte F), 013, 014 (F), 027 (F), 028.
 
-- [ ] 1.1 **RED** — `test/features/auth/domain/auth_failure_test.dart`: tests de
+- [x] 1.1 **RED** — `test/features/auth/domain/auth_failure_test.dart`: tests de
   `AuthFailure.popupBlocked().userMessage`, `AuthFailure.providerUnavailable().userMessage`
   (copy exacto de design) y nuevo copy de `accountExistsWithDifferentCredential` (actualizar
   el test existente de ~:134-140). Agregar control: `fromFirebase('invalid-credential')`
   sigue siendo `wrongPassword` y `fromFirebase('operation-not-allowed')` NO es
   `providerUnavailable` (SCENARIO-027 parte F, SCENARIO-028). Ver rojo por símbolo/copy
   inexistente.
-- [ ] 1.2 **GREEN** — `lib/features/auth/domain/auth_failure.dart`: variantes freezed
+- [x] 1.2 **GREEN** — `lib/features/auth/domain/auth_failure.dart`: variantes freezed
   `popupBlocked()` y `providerUnavailable()`, `userMessage` hardcodeado es-AR; nuevo copy de
   account-exists («Ya tenés una cuenta con ese email. Entrá con el método que usaste al
   registrarte»). NO tocar `fromFirebase` (D1). Regenerar con
   `dart run build_runner build --delete-conflicting-outputs`.
-- [ ] 1.3 Buscar y actualizar cualquier test de mobile que cite el copy viejo de
+- [x] 1.3 Buscar y actualizar cualquier test de mobile que cite el copy viejo de
   account-exists (`rg` en `test/`). Cubre SCENARIO-013 (mismo mensaje en mobile).
-- [ ] 1.4 **GATE** — correr `auth_failure_test.dart`, `auth_failure_exclusion_test.dart`
+- [x] 1.4 **GATE** — correr `auth_failure_test.dart`, `auth_failure_exclusion_test.dart`
   (ADR-I18N-002: el copy NO va a ARB) y los tests que citaban el copy. `flutter analyze lib
   test` acotado. `dart format` solo en tocados.
 - [ ] 1.5 **Control negativo** (tras commit): mover el copy de `popupBlocked` a una clave ARB

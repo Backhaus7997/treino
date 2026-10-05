@@ -28,6 +28,8 @@ mixin _$AuthFailure {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -47,6 +49,8 @@ mixin _$AuthFailure {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -66,6 +70,8 @@ mixin _$AuthFailure {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -87,6 +93,8 @@ mixin _$AuthFailure {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -107,6 +115,8 @@ mixin _$AuthFailure {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -127,6 +137,8 @@ mixin _$AuthFailure {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -209,6 +221,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -231,6 +245,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -253,6 +269,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -280,6 +298,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -303,6 +323,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -326,6 +348,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -396,6 +420,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -418,6 +444,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -440,6 +468,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -467,6 +497,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -490,6 +522,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -513,6 +547,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -583,6 +619,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -605,6 +643,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -627,6 +667,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -654,6 +696,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -677,6 +721,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -700,6 +746,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -770,6 +818,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -792,6 +842,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -814,6 +866,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -841,6 +895,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -864,6 +920,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -887,6 +945,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -957,6 +1017,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -979,6 +1041,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1001,6 +1065,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1028,6 +1094,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1051,6 +1119,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1074,6 +1144,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1144,6 +1216,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -1166,6 +1240,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1188,6 +1264,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1215,6 +1293,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1238,6 +1318,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1261,6 +1343,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1331,6 +1415,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -1353,6 +1439,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1375,6 +1463,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1402,6 +1492,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1425,6 +1517,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1448,6 +1542,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1518,6 +1614,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -1540,6 +1638,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1562,6 +1662,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1589,6 +1691,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1612,6 +1716,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1635,6 +1741,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1705,6 +1813,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -1727,6 +1837,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1749,6 +1861,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1776,6 +1890,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1799,6 +1915,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1822,6 +1940,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -1897,6 +2017,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -1919,6 +2041,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -1941,6 +2065,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -1968,6 +2094,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -1991,6 +2119,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2014,6 +2144,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2032,6 +2164,405 @@ abstract class _AccountExistsWithDifferentCredential extends AuthFailure {
   const factory _AccountExistsWithDifferentCredential() =
       _$AccountExistsWithDifferentCredentialImpl;
   const _AccountExistsWithDifferentCredential._() : super._();
+}
+
+/// @nodoc
+abstract class _$$PopupBlockedImplCopyWith<$Res> {
+  factory _$$PopupBlockedImplCopyWith(
+          _$PopupBlockedImpl value, $Res Function(_$PopupBlockedImpl) then) =
+      __$$PopupBlockedImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$PopupBlockedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$PopupBlockedImpl>
+    implements _$$PopupBlockedImplCopyWith<$Res> {
+  __$$PopupBlockedImplCopyWithImpl(
+      _$PopupBlockedImpl _value, $Res Function(_$PopupBlockedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$PopupBlockedImpl extends _PopupBlocked {
+  const _$PopupBlockedImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.popupBlocked()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType && other is _$PopupBlockedImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+  }) {
+    return popupBlocked();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+  }) {
+    return popupBlocked?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (popupBlocked != null) {
+      return popupBlocked();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+  }) {
+    return popupBlocked(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+  }) {
+    return popupBlocked?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (popupBlocked != null) {
+      return popupBlocked(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _PopupBlocked extends AuthFailure {
+  const factory _PopupBlocked() = _$PopupBlockedImpl;
+  const _PopupBlocked._() : super._();
+}
+
+/// @nodoc
+abstract class _$$ProviderUnavailableImplCopyWith<$Res> {
+  factory _$$ProviderUnavailableImplCopyWith(_$ProviderUnavailableImpl value,
+          $Res Function(_$ProviderUnavailableImpl) then) =
+      __$$ProviderUnavailableImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$ProviderUnavailableImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$ProviderUnavailableImpl>
+    implements _$$ProviderUnavailableImplCopyWith<$Res> {
+  __$$ProviderUnavailableImplCopyWithImpl(_$ProviderUnavailableImpl _value,
+      $Res Function(_$ProviderUnavailableImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$ProviderUnavailableImpl extends _ProviderUnavailable {
+  const _$ProviderUnavailableImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.providerUnavailable()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$ProviderUnavailableImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+  }) {
+    return providerUnavailable();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+  }) {
+    return providerUnavailable?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (providerUnavailable != null) {
+      return providerUnavailable();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+  }) {
+    return providerUnavailable(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+  }) {
+    return providerUnavailable?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    required TResult orElse(),
+  }) {
+    if (providerUnavailable != null) {
+      return providerUnavailable(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _ProviderUnavailable extends AuthFailure {
+  const factory _ProviderUnavailable() = _$ProviderUnavailableImpl;
+  const _ProviderUnavailable._() : super._();
 }
 
 /// @nodoc
@@ -2112,6 +2643,8 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -2134,6 +2667,8 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -2156,6 +2691,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -2183,6 +2720,8 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -2206,6 +2745,8 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2229,6 +2770,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2333,6 +2876,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -2355,6 +2900,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -2377,6 +2924,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -2404,6 +2953,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -2427,6 +2978,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2450,6 +3003,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2530,6 +3085,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -2552,6 +3109,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -2574,6 +3133,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -2601,6 +3162,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -2624,6 +3187,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2647,6 +3212,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2745,6 +3312,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -2767,6 +3336,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -2789,6 +3360,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -2816,6 +3389,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -2839,6 +3414,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2862,6 +3439,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -2966,6 +3545,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     required TResult Function() networkError,
     required TResult Function() signInCancelled,
     required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
     required TResult Function(String code) unknown,
     required TResult Function(Object? cause) profileCreateFailed,
     required TResult Function() requiresRecentLogin,
@@ -2988,6 +3569,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult? Function()? networkError,
     TResult? Function()? signInCancelled,
     TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
     TResult? Function(String code)? unknown,
     TResult? Function(Object? cause)? profileCreateFailed,
     TResult? Function()? requiresRecentLogin,
@@ -3010,6 +3593,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult Function()? networkError,
     TResult Function()? signInCancelled,
     TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
     TResult Function(String code)? unknown,
     TResult Function(Object? cause)? profileCreateFailed,
     TResult Function()? requiresRecentLogin,
@@ -3037,6 +3622,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     required TResult Function(_SignInCancelled value) signInCancelled,
     required TResult Function(_AccountExistsWithDifferentCredential value)
         accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
     required TResult Function(_Unknown value) unknown,
     required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
@@ -3060,6 +3647,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult? Function(_SignInCancelled value)? signInCancelled,
     TResult? Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
     TResult? Function(_Unknown value)? unknown,
     TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
@@ -3083,6 +3672,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult Function(_SignInCancelled value)? signInCancelled,
     TResult Function(_AccountExistsWithDifferentCredential value)?
         accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
     TResult Function(_Unknown value)? unknown,
     TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
