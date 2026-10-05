@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 
 import '../../auth/presentation/legal/legal_content.dart';
 
-/// Estampado de la evidencia de consentimiento legal. Lo comparten el alta de
-/// mobile ([ProfileSetupNotifier]) y el onboarding del Hub: dos copias
-/// divergirían en las versiones.
+// Estampado de la evidencia de consentimiento legal. Lo comparten el alta de
+// mobile (ProfileSetupNotifier) y el onboarding del Hub: dos copias
+// divergirían en las versiones.
 
 /// ¿Hay que estampar los términos en esta escritura?
 ///

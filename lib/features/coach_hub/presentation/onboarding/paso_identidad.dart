@@ -42,7 +42,7 @@ class _PasoIdentidadState extends ConsumerState<PasoIdentidad> {
     super.dispose();
   }
 
-  Future<void> _continuar(bool pideTerminos) async {
+  Future<void> _continuar() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     await ref.read(hubOnboardingControllerProvider.notifier).guardarIdentidad(
           nombre: _nombre.text,
@@ -109,7 +109,7 @@ class _PasoIdentidadState extends ConsumerState<PasoIdentidad> {
             label: l10n.coachHubOnboardingContinue,
             expand: true,
             loading: escritura.isLoading,
-            onPressed: puedeContinuar ? () => _continuar(pideTerminos) : null,
+            onPressed: puedeContinuar ? _continuar : null,
           ),
         ],
       ),
