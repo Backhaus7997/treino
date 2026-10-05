@@ -21,9 +21,11 @@
  *   The case worth fearing — a PUBLIC trainer template that other athletes are
  *   using — can never be a `createdBy` document. Templates are keyed by
  *   `assignedBy` (firestore.rules CREATE branch 1; `createdBy` is only written
- *   by CREATE branch 2, which pins `source == 'user-created'`), and a trainer
- *   cannot reach this cascade at all: `runDeleteAccount` refuses `role ==
- *   'trainer'` before step 1. `Routine.createdBy` says the same thing from the
+ *   by CREATE branch 2, which pins `source == 'user-created'`),. A trainer
+ *   now DOES reach deleteAccount (#1333), but their templates are swept by
+ *   `cascade/trainer-data.ts` keyed on `assignedBy`, never by this `createdBy`
+ *   query, and a template is never a `createdBy` document.
+ *   `Routine.createdBy` says the same thing from the
  *   model side — "null para plantillas del sistema y planes asignados por PF".
  *
  *   A `user-created` routine CAN be `visibility: 'public'` (REQ-USR-012,
@@ -39,11 +41,22 @@
  *   from the athlete's OWN routine list.
  *
  * Why `assignedBy` is deliberately NOT swept (the dangerous predicate):
- *   The trainer role guard reads `users/{uid}`. On an idempotent RE-RUN after
- *   a partial failure — `deleteUserDocs` succeeded, Auth deletion did not
- *   (REQ-ACCDEL-CF-013) — that document is already gone and the guard CANNOT
- *   fire. A cascade keyed on `assignedBy` would then delete every template the
- *   trainer owns plus every plan they ever assigned to every one of their
+ *   UPDATE (#1333, trainers can now delete their account): the role guard this
+ *   paragraph talks about NO LONGER EXISTS, and `assignedBy` IS now swept — but
+ *   NOT here and NOT as a bare predicate. `cascade/trainer-data.ts`
+ *   (`deleteTrainerTemplates`) runs on every deleteAccount call and filters
+ *   `assignedBy == uid AND source == 'trainer-template'`. That second filter is
+ *   what keeps it safe: assigned plans are `source == 'trainer-assigned'`, so
+ *   they are never matched and stay with the athlete, on a first run and on a
+ *   re-run after `users/{uid}` is gone alike. NEVER widen that query to a bare
+ *   `assignedBy == uid`: it would delete every plan the trainer ever assigned.
+ *
+ *   The original reasoning, kept because it still explains why THIS module
+ *   leaves `assignedBy` alone: on an idempotent RE-RUN after a partial failure
+ *   — `deleteUserDocs` succeeded, Auth deletion did not (REQ-ACCDEL-CF-013) —
+ *   `users/{uid}` is already gone, so nothing here can tell a trainer from an
+ *   athlete. A cascade keyed on `assignedBy` would then delete every template
+ *   the trainer owns plus every plan they ever assigned to every one of their
  *   athletes. `assignedTo` and `createdBy` are both immune to that scenario:
  *   neither field ever carries a trainer uid in well-formed data.
  *   The residue this leaves is a forged athlete-held `trainer-template` (an
