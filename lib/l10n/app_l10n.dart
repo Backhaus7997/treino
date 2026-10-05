@@ -4418,6 +4418,84 @@ abstract class AppL10n {
   /// **'No pudimos cerrar sesión. Probá de nuevo.'**
   String get coachHubSignOutError;
 
+  /// Coach Hub onboarding, age step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNDO NACISTE?'**
+  String get coachHubOnboardingAgeTitle;
+
+  /// Coach Hub onboarding, age step explanation (minimum age 13).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.'**
+  String get coachHubOnboardingAgeBody;
+
+  /// Coach Hub onboarding, label above the date of birth field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FECHA DE NACIMIENTO'**
+  String get coachHubOnboardingAgeLabel;
+
+  /// Coach Hub onboarding, identity step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE LLAMÁS?'**
+  String get coachHubOnboardingIdentityTitle;
+
+  /// Coach Hub onboarding, identity step explanation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este es el nombre con el que te van a ver tus alumnos.'**
+  String get coachHubOnboardingIdentityBody;
+
+  /// Coach Hub onboarding, first name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE'**
+  String get coachHubOnboardingFirstNameLabel;
+
+  /// Coach Hub onboarding, last name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APELLIDO'**
+  String get coachHubOnboardingLastNameLabel;
+
+  /// Coach Hub onboarding, inline error for an empty first name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu nombre'**
+  String get coachHubOnboardingFirstNameRequired;
+
+  /// Coach Hub onboarding, inline error for an empty last name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu apellido'**
+  String get coachHubOnboardingLastNameRequired;
+
+  /// Coach Hub onboarding, professional profile step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL PROFESIONAL'**
+  String get coachHubOnboardingPfTitle;
+
+  /// Coach Hub onboarding, professional profile step body until the form ships.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.'**
+  String get coachHubOnboardingPfPlaceholder;
+
+  /// Coach Hub onboarding, continue button of the age and identity steps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Continuar'**
+  String get coachHubOnboardingContinue;
+
+  /// Coach Hub onboarding, inline error when saving a step fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tus datos. Probá de nuevo.'**
+  String get coachHubOnboardingSaveError;
+
   /// Coach Hub not-allowed screen — headline shown to a signed-in user without the trainer role.
   ///
   /// In es_AR, this message translates to:

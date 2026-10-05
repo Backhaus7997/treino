@@ -2455,6 +2455,49 @@ class AppL10nEs extends AppL10n {
       'No pudimos cerrar sesión. Inténtalo de nuevo.';
 
   @override
+  String get coachHubOnboardingAgeTitle => '¿CUÁNDO NACISTE?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tienes que tener 13 años o más.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'FECHA DE NACIMIENTO';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => '¿CÓMO TE LLAMAS?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'Este es el nombre con el que te verán tus alumnos.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'NOMBRE';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'APELLIDO';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Ingresa tu nombre';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Ingresa tu apellido';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get coachHubOnboardingPfPlaceholder =>
+      'Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continuar';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'No pudimos guardar tus datos. Inténtalo de nuevo.';
+
+  @override
   String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';
 
   @override
@@ -7489,6 +7532,49 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubSignOutError =>
       'No pudimos cerrar sesión. Probá de nuevo.';
+
+  @override
+  String get coachHubOnboardingAgeTitle => '¿CUÁNDO NACISTE?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'FECHA DE NACIMIENTO';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => '¿CÓMO TE LLAMÁS?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'Este es el nombre con el que te van a ver tus alumnos.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'NOMBRE';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'APELLIDO';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Ingresá tu nombre';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Ingresá tu apellido';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get coachHubOnboardingPfPlaceholder =>
+      'Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continuar';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'No pudimos guardar tus datos. Probá de nuevo.';
 
   @override
   String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';

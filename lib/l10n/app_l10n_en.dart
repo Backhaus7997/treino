@@ -2403,6 +2403,49 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t sign you out. Please try again.';
 
   @override
+  String get coachHubOnboardingAgeTitle => 'WHEN WERE YOU BORN?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'We need your date of birth to activate your trainer account. You must be 13 or older.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'DATE OF BIRTH';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => 'WHAT\'S YOUR NAME?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'This is the name your clients will see.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'FIRST NAME';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'LAST NAME';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Enter your first name';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Enter your last name';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'YOUR PROFESSIONAL PROFILE';
+
+  @override
+  String get coachHubOnboardingPfPlaceholder =>
+      'Your professional profile is still incomplete. This step is not available on the web yet.';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continue';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'We couldn\'t save your details. Please try again.';
+
+  @override
   String get coachHubNotAllowedTitle => 'TRAINERS ONLY';
 
   @override

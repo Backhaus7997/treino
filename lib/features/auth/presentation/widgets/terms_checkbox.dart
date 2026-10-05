@@ -70,8 +70,10 @@ class _TermsCheckboxState extends State<TermsCheckbox> {
       fontSize: 14,
       color: palette.textPrimary,
     );
+    // `accentText` y no `accent`: el link es TINTA sobre el fondo, y el mint
+    // pleno compone 1,57:1 en light (`AGENTS.md` §2). En dark son el mismo color.
     final linkStyle = baseStyle.copyWith(
-      color: palette.accent,
+      color: palette.accentText,
       decoration: TextDecoration.underline,
     );
 

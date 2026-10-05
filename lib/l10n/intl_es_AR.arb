@@ -1684,6 +1684,58 @@
   "@coachHubSignOutError": {
     "description": "Inline error on the coach-hub not-allowed screen when signOut() fails (finding 8)."
   },
+  "coachHubOnboardingAgeTitle": "¿CUÁNDO NACISTE?",
+  "@coachHubOnboardingAgeTitle": {
+    "description": "Coach Hub onboarding, age step headline."
+  },
+  "coachHubOnboardingAgeBody": "Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.",
+  "@coachHubOnboardingAgeBody": {
+    "description": "Coach Hub onboarding, age step explanation (minimum age 13)."
+  },
+  "coachHubOnboardingAgeLabel": "FECHA DE NACIMIENTO",
+  "@coachHubOnboardingAgeLabel": {
+    "description": "Coach Hub onboarding, label above the date of birth field."
+  },
+  "coachHubOnboardingIdentityTitle": "¿CÓMO TE LLAMÁS?",
+  "@coachHubOnboardingIdentityTitle": {
+    "description": "Coach Hub onboarding, identity step headline."
+  },
+  "coachHubOnboardingIdentityBody": "Este es el nombre con el que te van a ver tus alumnos.",
+  "@coachHubOnboardingIdentityBody": {
+    "description": "Coach Hub onboarding, identity step explanation."
+  },
+  "coachHubOnboardingFirstNameLabel": "NOMBRE",
+  "@coachHubOnboardingFirstNameLabel": {
+    "description": "Coach Hub onboarding, first name field label."
+  },
+  "coachHubOnboardingLastNameLabel": "APELLIDO",
+  "@coachHubOnboardingLastNameLabel": {
+    "description": "Coach Hub onboarding, last name field label."
+  },
+  "coachHubOnboardingFirstNameRequired": "Ingresá tu nombre",
+  "@coachHubOnboardingFirstNameRequired": {
+    "description": "Coach Hub onboarding, inline error for an empty first name."
+  },
+  "coachHubOnboardingLastNameRequired": "Ingresá tu apellido",
+  "@coachHubOnboardingLastNameRequired": {
+    "description": "Coach Hub onboarding, inline error for an empty last name."
+  },
+  "coachHubOnboardingPfTitle": "TU PERFIL PROFESIONAL",
+  "@coachHubOnboardingPfTitle": {
+    "description": "Coach Hub onboarding, professional profile step headline."
+  },
+  "coachHubOnboardingPfPlaceholder": "Falta completar tu perfil profesional. Este paso todavía no está disponible en la web.",
+  "@coachHubOnboardingPfPlaceholder": {
+    "description": "Coach Hub onboarding, professional profile step body until the form ships."
+  },
+  "coachHubOnboardingContinue": "Continuar",
+  "@coachHubOnboardingContinue": {
+    "description": "Coach Hub onboarding, continue button of the age and identity steps."
+  },
+  "coachHubOnboardingSaveError": "No pudimos guardar tus datos. Probá de nuevo.",
+  "@coachHubOnboardingSaveError": {
+    "description": "Coach Hub onboarding, inline error when saving a step fails."
+  },
   "coachHubNotAllowedTitle": "SOLO PARA ENTRENADORES",
   "@coachHubNotAllowedTitle": {
     "description": "Coach Hub not-allowed screen \u2014 headline shown to a signed-in user without the trainer role."
