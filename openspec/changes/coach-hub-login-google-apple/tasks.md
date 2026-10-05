@@ -127,13 +127,13 @@ Commit: `feat(auth): AuthNotifier expone el login por popup con restauración si
 Cubre: REQ-CHW-AUTH-001/003; SCENARIO-CHW-AUTH-011 (parte N).
 Depende de: B2.
 
-- [ ] 3.1 **RED** — `test/features/auth/application/auth_notifier_test.dart`: para
+- [x] 3.1 **RED** — `test/features/auth/application/auth_notifier_test.dart`: para
   `signInWithGooglePopup` y `signInWithApplePopup`: cancel ⇒ estado final = `AsyncData(previo)`
   (no `AsyncError`); error ⇒ `AsyncError`; ok ⇒ `AsyncData(user)`.
-- [ ] 3.2 **GREEN** — `lib/features/auth/application/auth_notifier.dart`: helper privado
+- [x] 3.2 **GREEN** — `lib/features/auth/application/auth_notifier.dart`: helper privado
   `_socialSignIn(Future<User> Function())` (D8) usado por los 4 métodos sociales; dos
   métodos nuevos. Sin `await` previo al servicio.
-- [ ] 3.3 **GATE** — correr `auth_notifier_test.dart` completo (blindan el refactor de
+- [x] 3.3 **GATE** — correr `auth_notifier_test.dart` completo (blindan el refactor de
   mobile, `:238+`); analyze acotado; format.
 
 ## Batch 4 — TermsNoticeText: contraste de links en light

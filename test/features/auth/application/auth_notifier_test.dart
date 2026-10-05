@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
@@ -315,6 +316,94 @@ void main() {
       expect(state.error, const AuthFailure.networkError());
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // signInWithGooglePopup / signInWithApplePopup (web, Coach Hub)
+  // ---------------------------------------------------------------------------
+  final popupMethods = <String,
+      ({
+    Future<User> Function(MockAuthService) servicio,
+    Future<void> Function(AuthNotifier) accion,
+  })>{
+    'signInWithGooglePopup': (
+      servicio: (s) => s.signInWithGooglePopup(),
+      accion: (n) => n.signInWithGooglePopup(),
+    ),
+    'signInWithApplePopup': (
+      servicio: (s) => s.signInWithApplePopup(),
+      accion: (n) => n.signInWithApplePopup(),
+    ),
+  };
+
+  for (final entry in popupMethods.entries) {
+    group('AuthNotifier.${entry.key}', () {
+      late StreamController<User?> streamController;
+      late ProviderContainer container;
+
+      setUp(() async {
+        streamController = StreamController<User?>();
+        container = buildContainer(
+          mockService: mockService,
+          authStream: streamController.stream,
+        );
+        addTearDown(() {
+          container.dispose();
+          streamController.close();
+        });
+        streamController.add(null);
+        await container.read(authNotifierProvider.future);
+      });
+
+      test('ok → AsyncData(user)', () async {
+        when(() => entry.value.servicio(mockService)).thenAnswer((_) async {
+          streamController.add(mockUser);
+          return mockUser;
+        });
+
+        await entry.value.accion(container.read(authNotifierProvider.notifier));
+
+        final state = container.read(authNotifierProvider);
+        expect(state.hasValue, isTrue);
+        expect(state.valueOrNull, mockUser);
+      });
+
+      test('cancel → AsyncData(previo), nunca AsyncError', () async {
+        when(() => entry.value.servicio(mockService))
+            .thenThrow(const AuthFailure.signInCancelled());
+
+        await entry.value.accion(container.read(authNotifierProvider.notifier));
+
+        final state = container.read(authNotifierProvider);
+        expect(state.hasError, isFalse,
+            reason: 'cancel must not surface as an error');
+        expect(state, const AsyncData<User?>(null));
+      });
+
+      test('cancel con usuario previo → restaura ese usuario', () async {
+        streamController.add(mockUser);
+        await Future<void>.delayed(Duration.zero);
+        when(() => entry.value.servicio(mockService))
+            .thenThrow(const AuthFailure.signInCancelled());
+
+        await entry.value.accion(container.read(authNotifierProvider.notifier));
+
+        final state = container.read(authNotifierProvider);
+        expect(state.hasError, isFalse);
+        expect(state.valueOrNull, mockUser);
+      });
+
+      test('error → AsyncError con la falla', () async {
+        when(() => entry.value.servicio(mockService))
+            .thenThrow(const AuthFailure.popupBlocked());
+
+        await entry.value.accion(container.read(authNotifierProvider.notifier));
+
+        final state = container.read(authNotifierProvider);
+        expect(state.hasError, isTrue);
+        expect(state.error, const AuthFailure.popupBlocked());
+      });
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // signOut
