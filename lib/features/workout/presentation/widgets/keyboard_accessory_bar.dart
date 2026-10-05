@@ -265,6 +265,9 @@ class _BotonPaso extends StatelessWidget {
       // El glifo del botón —"+1", "−2.5"— es redundante con el label y sin
       // esto se anuncian los dos: "Sumar 1 repeticiones, +1".
       excludeSemantics: true,
+      // `excludeSemantics` descarta la acción de tap del GestureDetector hijo:
+      // sin esto el lector de pantalla ve el botón pero no puede activarlo.
+      onTap: enabled ? onTap : null,
       child: GestureDetector(
         key: claveGesto,
         behavior: HitTestBehavior.opaque,
@@ -367,6 +370,8 @@ class _BotonSiguiente extends StatelessWidget {
       button: true,
       label: l10n.routineEditorNextCellA11y,
       excludeSemantics: true,
+      // Ver `_BotonPaso`: excludeSemantics se lleva el tap del hijo.
+      onTap: onTap,
       child: GestureDetector(
         key: const Key('accessory_next'),
         behavior: HitTestBehavior.opaque,

@@ -97,6 +97,22 @@ final _rango = _rutina(
   ],
 );
 
+/// Dos ejercicios: el primero en rango y el segundo en modo normal, para
+/// poder cambiarle el modo al segundo con "Copiar sets del anterior".
+final _dosModos = () {
+  final rango = _rango.days.first.slots.first;
+  final normal = _normal.days.first.slots.first;
+  return _normal.copyWith(
+    id: 'r-2',
+    days: [
+      _normal.days.first.copyWith(slots: [
+        rango,
+        normal.copyWith(exerciseId: 'incline-press', exerciseName: 'Inclinado'),
+      ]),
+    ],
+  );
+}();
+
 final _duracion = _rutina(
   id: 'r-d',
   repMode: RepMode.single,
@@ -266,5 +282,63 @@ void main() {
     await enfocarCelda(tester, find.byType(TextField).last);
 
     expect(_sig, findsNothing);
+  });
+
+  testWidgets(
+      'borrar el set enfocado y tocar SIG.: sin excepción ni foco '
+      'en un nodo muerto', (tester) async {
+    await _abrir(tester, _normal);
+    await enfocarCelda(tester, _celda('kg', 1));
+    expect(_enfocada(tester, _celda('kg', 1)), isTrue);
+
+    // Borra el set del medio, el mismo que tiene el foco.
+    await tester.tap(find.byTooltip('Cerrar').at(1));
+    await tester.pumpAndSettle();
+    expect(celdasConHint('kg'), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+
+    // Si la barra sobrevive al borrado, SIG. tiene que seguir siendo seguro.
+    if (_sig.evaluate().isNotEmpty) {
+      await tester.tap(_sig);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    final primario = FocusManager.instance.primaryFocus;
+    expect(primario?.context, anyOf(isNull, isA<Element>()));
+    if (primario?.context != null) {
+      expect((primario!.context! as Element).mounted, isTrue,
+          reason: 'el foco no puede quedar en un campo desmontado');
+    }
+  });
+
+  testWidgets('cambiar de modo (normal → rango) con una celda enfocada',
+      (tester) async {
+    await _abrir(tester, _dosModos);
+    // Segundo ejercicio: celdas kg/reps con índice 2.. (el primero tiene 2
+    // sets en rango, que usan mín/máx y no "reps").
+    await enfocarCelda(tester, _celda('reps', 0));
+    expect(_enfocada(tester, _celda('reps', 0)), isTrue);
+
+    final menu = find.byKey(const Key('slot_menu_button_1'));
+    await tester.ensureVisible(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(menu);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copiar sets del anterior'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('copy_prescription_confirm_button')));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(celdasConHint('reps'), findsNothing,
+        reason: 'los dos ejercicios quedaron en rango');
+    expect(celdasConHint('mín'), findsNWidgets(4));
+
+    // SIG. no puede apuntar a la columna "reps" que ya no existe.
+    if (_sig.evaluate().isNotEmpty) {
+      await tester.tap(_sig);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
   });
 }
