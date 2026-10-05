@@ -60,11 +60,13 @@ const kCoachHubOnboardingRoute = '/completar-perfil';
 ///
 /// Diferencias clave vs `authRedirect` mobile:
 /// 1. NO hay `/welcome`, `/register`, `/forgot-password`, `/splash` — el hub
-///    es solo para PFs ya registrados desde mobile (signup vive en mobile).
+///    es solo para PFs ya registrados (el signup vive en mobile).
 /// 2. **Role gating**: usuarios con `role != trainer` se redirigen a
 ///    `/not-allowed`. Athletes que entran por accidente ven una info page.
-/// 3. NO hay flow de profile-setup — si el PF llegó al hub es porque ya
-///    tiene profile completo desde mobile.
+/// 3. NO hay flow de profile-setup propio de la app móvil, pero el PF puede
+///    llegar INCOMPLETO (una cuenta web promovida a trainer): el Hub tiene su
+///    propio gate, que manda a [kCoachHubOnboardingRoute] mientras
+///    `hubOnboardingStage` no devuelva `done`.
 ///
 /// [initialDestination] es el destino fino que trajo un mail —
 /// `/abrir/profe?to=...` en Vercel redirige a `app.gettreino.com/?to=...`
