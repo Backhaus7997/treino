@@ -46,17 +46,38 @@ void main() {
     expect(snap.data()!['uid'], 'pf-1');
   });
 
-  test('PF sin tarjeta previa: la crea con uid (la rule lo exige)', () async {
+  test('PF sin tarjeta previa: NO la crea (la crea el paso pf del onboarding)',
+      () async {
     await seed('pf-2', UserRole.trainer);
 
     await repo.update('pf-2', {'displayName': 'Ana Gómez'});
 
     final snap =
         await firestore.collection('trainerPublicProfiles').doc('pf-2').get();
-    expect(snap.exists, isTrue);
-    expect(snap.data()!['uid'], 'pf-2');
-    expect(snap.data()!['displayNameLowercase'], 'ana gómez');
+    expect(snap.exists, isFalse);
+    final user = await firestore.collection('users').doc('pf-2').get();
+    expect(user.data()!['displayName'], 'Ana Gómez');
   });
+
+  for (final nombre in <String?>[null, '', '   ']) {
+    test(
+        'PF: displayName ${nombre == null ? 'null' : "'$nombre'"} no se '
+        'espeja a la tarjeta', () async {
+      await seed('pf-4', UserRole.trainer);
+      await firestore.collection('trainerPublicProfiles').doc('pf-4').set({
+        'uid': 'pf-4',
+        'displayName': 'Viejo Nombre',
+        'displayNameLowercase': 'viejo nombre',
+      });
+
+      await repo.update('pf-4', {'displayName': nombre});
+
+      final snap =
+          await firestore.collection('trainerPublicProfiles').doc('pf-4').get();
+      expect(snap.data()!['displayName'], 'Viejo Nombre');
+      expect(snap.data()!['displayNameLowercase'], 'viejo nombre');
+    });
+  }
 
   test('alumno: displayName solo NO toca trainerPublicProfiles (#58)',
       () async {

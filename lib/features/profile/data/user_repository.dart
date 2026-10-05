@@ -616,8 +616,15 @@ class UserRepository {
   /// condición que exige la rule de `trainerPublicProfiles`. Un alumno nunca
   /// entra, así que #58 sigue cerrado.
   ///
-  /// Cuesta una lectura, sólo cuando el partial trae `displayName` y no hay
-  /// otro disparador. `uid` va en el body porque la rule de `create` lo exige.
+  /// SÓLO ACTUALIZA: si `trainerPublicProfiles/{uid}` no existe no lo crea. Un
+  /// partial de nombre solo no es una tarjeta completa, y `listAll()` no filtra
+  /// por completitud: crearla acá metería una tarjeta pelada al descubrimiento
+  /// (el paso `cuenta` del onboarding corre antes que `pf`, que es quien la
+  /// crea). Tampoco espeja un nombre vacío: anularía `displayNameLowercase` y
+  /// la tarjeta saldría del `orderBy`.
+  ///
+  /// Cuesta dos lecturas, sólo cuando el partial trae `displayName` y no hay
+  /// otro disparador.
   Future<Map<String, Object?>?> _trainerNameOnlySubset(
     String uid,
     Map<String, Object?> partial,
@@ -625,11 +632,14 @@ class UserRepository {
     if (!partial.containsKey('displayName')) return null;
     final snap = await _users.doc(uid).get();
     if (snap.data()?['role'] != UserRole.trainer.name) return null;
-    final name = partial['displayName'] as String?;
+    final name = (partial['displayName'] as String?)?.trim();
+    if (name == null || name.isEmpty) return null;
+    final card = await _trainerPublicProfiles.doc(uid).get();
+    if (!card.exists) return null;
     return {
       'uid': uid,
-      'displayName': name,
-      'displayNameLowercase': name?.trim().toLowerCase(),
+      'displayName': partial['displayName'],
+      'displayNameLowercase': name.toLowerCase(),
     };
   }
 
