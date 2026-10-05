@@ -72,7 +72,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
           'Tu navegador bloqueó la ventana. Permití ventanas emergentes y '
               'probá de nuevo',
         _ProviderUnavailable() =>
-          'Este método no está disponible. Entrá con email o escribinos',
+          'Este método no está disponible en este momento. Probá más tarde.',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',

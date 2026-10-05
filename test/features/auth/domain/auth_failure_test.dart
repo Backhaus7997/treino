@@ -155,7 +155,7 @@ void main() {
       expect(
         const AuthFailure.providerUnavailable().userMessage,
         equals(
-          'Este método no está disponible. Entrá con email o escribinos',
+          'Este método no está disponible en este momento. Probá más tarde.',
         ),
       );
     });
