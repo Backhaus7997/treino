@@ -19,6 +19,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/domain/perfil_pf_validators.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -56,12 +57,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
 
   // Mismo criterio que profile_edit_trainer_screen.dart: no vacía, ≥20
   // caracteres — evita bios "muertas" tipo "hola" en Coach Discovery.
-  String? get _bioError {
-    final value = _bio.text.trim();
-    if (value.isEmpty) return 'Escribí una bio.'; // i18n: Fase 11
-    if (value.length < 20) return 'Al menos 20 caracteres.'; // i18n: Fase 11
-    return null;
-  }
+  String? get _bioError => validarBio(_bio.text);
 
   bool get _canSave => _dirty && _bioError == null;
 
@@ -211,7 +207,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
               key: const Key('identidad_card_bio_field'),
               controller: _bio,
               maxLines: 4,
-              maxLength: 280,
+              maxLength: kBioMaxLength,
               enabled: !_saving,
               onChanged: (_) => setState(() {}),
               style: TextStyle(color: palette.textPrimary, fontSize: 14),

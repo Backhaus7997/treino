@@ -1,12 +1,10 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart'
     show authStateChangesProvider, firebaseAuthProvider;
-import '../../auth/presentation/legal/legal_content.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/application/user_providers.dart';
@@ -16,6 +14,7 @@ import '../domain/profile_setup_draft.dart';
 import '../domain/profile_setup_validators.dart';
 import 'profile_setup_providers.dart' show avatarUploadServiceProvider;
 import 'terms_consent_provider.dart';
+import 'terms_stamp.dart';
 
 /// Estado de la verificación async de disponibilidad del username (handle
 /// público) en step 1. El handle se persiste como `displayName` y se renderiza
@@ -327,8 +326,11 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       // consentimiento sobre un dato que no se pudo confirmar.
       final repo = ref.read(userRepositoryProvider);
       final yaHayEvidencia = ref.read(termsConsentRequiredProvider) == false;
-      final needsTermsConsent = !yaHayEvidencia &&
-          (await repo.getFromServer(uid))?.termsAcceptedAt == null;
+      final needsTermsConsent = await needsTermsStamp(
+        observedHasEvidence: yaHayEvidencia,
+        acceptedAtFromServer: () async =>
+            (await repo.getFromServer(uid))?.termsAcceptedAt,
+      );
       if (needsTermsConsent && !state.termsAccepted) {
         // Mismo patrón que 'username-taken': cortamos el spinner acá y
         // dejamos que el catch de abajo setee submitError con esta excepción.
@@ -385,13 +387,9 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
         // Email accounts already carry the original signup consent — NEVER
         // overwrite that evidence with a later ProfileSetup timestamp.
-        if (needsTermsConsent) ...{
-          'termsAcceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
-          // consentimiento-legal-versionado (R3): mismo checkbox, misma
-          // escritura — estampa las 2 versiones vigentes junto al timestamp.
-          'acceptedTermsVersion': kTermsVersion,
-          'acceptedPrivacyVersion': kPrivacyVersion,
-        },
+        // consentimiento-legal-versionado (R3): mismo checkbox, misma
+        // escritura — estampa las 2 versiones vigentes junto al timestamp.
+        if (needsTermsConsent) ...termsStampFields(),
       };
       await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);
