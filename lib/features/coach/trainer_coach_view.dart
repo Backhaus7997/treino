@@ -9,8 +9,7 @@ import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
-import 'application/vigencia_del_plan_provider.dart';
-import '../profile/application/user_providers.dart';
+import 'application/limite_de_alumnos_provider.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
@@ -190,28 +189,35 @@ class _AlumnosTab extends ConsumerWidget {
 /// se enteraba del límite recién cuando el gate le rebotaba un alta, y ahí ya
 /// era tarde (el alumno quedó afuera y hay que explicárselo).
 ///
-/// El tier y el tope salen de [VigenciaDelPlan], como en Facturación de la
-/// web. Una baja con el período pagado ya vencido es Free para el servidor
-/// (`limiteDelStatus` en `functions/src/subscriptions/effective-limit.ts`),
-/// pero nadie reescribe `subscription` al vencer: leído a secas, el medidor le
-/// decía «3 DE 7 · PLAN 1» a un PF cuyo tope ya era el de Free.
+/// El tope sale de [limiteDeAlumnosProvider]: el que el servidor HACE CUMPLIR
+/// (`planLimits.athletes`, publicado por `syncTrainerEntitlements`), y no una
+/// reconstrucción en Dart. Eso cubre lo que el cliente no veía: `pending` y
+/// `paused` valen Free para el servidor, y el piso prepago (`conPisoPrepago` en
+/// `functions/src/subscriptions/effective-limit.ts`) puede sostener un plan que
+/// la suscripción ya no tiene. Un PF `paused` con Plan 2 en el doc ve «DE 2 ·
+/// PLAN FREE», y uno con un piso de Plan 3 ve «ALUMNOS · PLAN 3»: el nombre
+/// del plan se deduce del número publicado, para que los dos digan lo mismo.
+/// Si el número no coincide con ningún plan de la tabla, el medidor muestra el
+/// tope y no nombra ninguno.
 ///
-/// Se lee de [vigenciaDelPlanProvider] y no de [VigenciaDelPlan.de] porque el
-/// tab puede seguir montado cuando vence la baja: el perfil no emite en ese
-/// borde (el servidor no reescribe `subscription`) y `AppClock` se lee, no
-/// avisa. El provider recalcula solo, y el medidor pasa a Free sin esperar un
-/// rebuild: como máximo un minuto después del borde (o de volver del segundo
-/// plano, porque el timer no corre con el proceso suspendido).
+/// Mientras el servidor no haya publicado el tope (clave ausente: el PF nunca
+/// pasó por un sync, o su doc está degradado, o todavía está cargando) el
+/// provider cae al cálculo de siempre con [VigenciaDelPlan]. Una baja con el
+/// período pagado ya vencido es Free para el servidor, pero nadie reescribe
+/// `subscription` al vencer: leído a secas, el medidor le decía «3 DE 7 ·
+/// PLAN 1» a un PF cuyo tope ya era el de Free. En ese camino siguen valiendo
+/// las dos limitaciones de antes: `pending` y `paused` se muestran con el tier
+/// del doc, y el piso prepago no se ve (el medidor puede decir un tope menor
+/// que el real). Son parte de «Qué espeja y qué NO» en [VigenciaDelPlan], y
+/// desaparecen en cuanto el servidor publica `athletes`.
 ///
-/// Lo que este medidor TODAVÍA no refleja:
-///
-/// - `pending` y `paused`: también son Free para el servidor, pero acá siguen
-///   con el tier del doc, porque [VigenciaDelPlan] espeja sólo la baja (a
-///   propósito, por las tarjetas de plan).
-/// - El piso prepago, que no se ve desde el cliente: el servidor lo aplica
-///   (`conPisoPrepago` en `effective-limit.ts`) y el medidor puede decir un
-///   tope menor que el real. Es una diferencia sólo visual y aceptada, igual
-///   que en la web. Este punto y el anterior están en «Qué espeja y qué NO».
+/// El tab puede seguir montado cuando cambia el tope por reloj (vence la baja
+/// o el piso): el perfil no emite en ese borde y `AppClock` se lee, no avisa.
+/// El provider espera hasta ese instante (`athletesHasta` del servidor, o
+/// [VigenciaDelPlan.proximoCambio] en el fallback) y recalcula solo, y el
+/// medidor cambia sin esperar un rebuild: como máximo un minuto después del
+/// borde (o de volver del segundo plano, porque el timer no corre con el
+/// proceso suspendido).
 ///
 /// Este medidor viaja en el binario móvil: dice el estado de la cuenta y nada
 /// más. Al lado de un «3 DE 2», un «subí de plan» sería un llamado a comprar,
@@ -225,30 +231,9 @@ class _PlanQuotaHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final sub = ref.watch(userProfileProvider).valueOrNull?.subscription;
-    // Sin `subscription` en el doc → Free: un PF sin suscripción es Free por
-    // definición (no hay backfill). Una baja con el período pagado ya vencido
-    // también es Free, aunque el doc siga diciendo el tier viejo.
-    //
-    // `select` sobre el par (tier, vencida): el provider se re-evalúa cada
-    // minuto con una baja por delante y estrena objeto cada vez, pero el par es
-    // un record y compara por valor, así que el medidor sólo se reconstruye
-    // cuando algo cambia de verdad.
-    final (tier, vencida) = ref.watch(
-      vigenciaDelPlanProvider.select((v) => (v.tierEfectivo, v.vencida)),
-    );
-    // El TIER decide si hay tope, NO el `weightLimit` del doc. El servidor no
-    // escribe ese campo (ver `TrainerSubscription.weightLimit`), pero si un
-    // doc de un plan3 lo trajera, leerlo de ahí volvería a meter un
-    // denominador en el plan ilimitado. `isUnlimited` sale de
-    // kTierWeightLimits, la fuente de verdad client-side. Con la baja vencida,
-    // además, un `weightLimit` en el doc sería el del plan viejo: el tope sale
-    // de la tabla del tier efectivo, igual que en Facturación.
-    final limit = tier.isUnlimited
-        ? null
-        : vencida
-            ? tier.weightLimit
-            : (sub?.weightLimit ?? tier.weightLimit);
+    // `null` en `limit` = SIN TOPE, y en `tier` = «ningún plan de la tabla dice
+    // este número». Son DOS preguntas distintas: no se deduce una de la otra.
+    final (tope: limit, :tier) = ref.watch(limiteDeAlumnosProvider);
 
     // Carga PONDERADA: activo 1.0, pausado 0.5. Por eso el contador puede dar
     // 1.5 y no es un error de redondeo.
@@ -261,9 +246,9 @@ class _PlanQuotaHeader extends ConsumerWidget {
     // acá renderiza el string "null" — ya pasó en producción. El singular sale
     // solo en el 1 exacto: 0.5 y 1.5 van en plural, como en castellano.
     final label = limit == null
-        ? '${formatWeightedLoad(load)} ${load == 1 ? 'ALUMNO' : 'ALUMNOS'} '
-            '· ${_tierLabel(tier)}'
-        : '${formatWeightedLoad(load)} DE $limit · ${_tierLabel(tier)}';
+        ? '${formatWeightedLoad(load)} ${load == 1 ? 'ALUMNO' : 'ALUMNOS'}'
+            '${_sufijoDeTier(tier)}'
+        : '${formatWeightedLoad(load)} DE $limit${_sufijoDeTier(tier)}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -293,6 +278,11 @@ class _PlanQuotaHeader extends ConsumerWidget {
     );
   }
 }
+
+/// « · PLAN X» al final del medidor, o nada si no hay un plan que diga lo
+/// mismo que el número (ver [LimiteDeAlumnos]).
+String _sufijoDeTier(SubscriptionTier? tier) =>
+    tier == null ? '' : ' · ${_tierLabel(tier)}';
 
 /// Nombre del tier dentro del medidor — UPPERCASE, es un eyebrow.
 String _tierLabel(SubscriptionTier tier) => switch (tier) {

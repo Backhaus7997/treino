@@ -41,6 +41,13 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// con un piso vigente puede tener en el servidor un límite MAYOR que el que
 /// sale de este helper.
 ///
+/// Para el TOPE de alumnos eso ya tiene salida: el servidor publica el límite
+/// efectivo (con `pending`, `paused` y el piso resueltos) en
+/// `users/{uid}.planLimits.athletes`, y `limiteDeAlumnosProvider` lo lee. Esta
+/// clase sigue sin espejar nada de eso: es el fallback de ese provider para
+/// cuando la clave no está, y lo que usan las pantallas que muestran el PLAN
+/// (tarjetas, chip, banner) y no el cupo.
+///
 /// ## El reloj
 ///
 /// "Ahora" sale de [AppClock] —el seam que un test puede congelar— y no de un
@@ -66,8 +73,12 @@ const Duration _kMinDiferimiento = Duration(days: 1);
 /// de valer, y `vigenciaDelPlanProvider`
 /// (`coach/application/vigencia_del_plan_provider.dart`) la recalcula ahí.
 /// Lo leen el chip del sidebar, que está montado toda la sesión, el banner
-/// de upsell, el medidor de cupo del tab Coach móvil y la pantalla de
-/// alumnos en solo lectura. La pricing page
+/// de upsell y la pantalla de alumnos en solo lectura. El medidor de cupo del
+/// tab Coach móvil ya no la lee directo: pide el tope a
+/// `limiteDeAlumnosProvider`, que toma el que el servidor publica en
+/// `planLimits.athletes` (con su propio borde, `athletesHasta`) y sólo cae a
+/// esta clase —vía `vigenciaDelPlanProvider`— mientras esa clave no está. La
+/// pricing page
 /// (`pricing_screen.dart`) y Facturación (`facturacion_tab.dart`) todavía la
 /// calculan en su build: abiertas al cruzar el borde, muestran la foto vieja
 /// hasta el próximo rebuild. No son las únicas que miran el reloj: otras
