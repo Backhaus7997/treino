@@ -167,10 +167,10 @@ Condición: Task 0 sin `access-control-allow-origin`. Si no, OMITIR. Registrar a
 Commit: `docs(coach-hub): el PF puede llegar incompleto desde la web`
 Cubre: REQ-CHW-ONB-014; SCENARIO-050, 054.
 
-- [ ] 11.1 Corregir comentario de `lib/app/coach_hub_router.dart:61-63` y dartdoc de `lib/features/coach_hub/application/coach_hub_tour_gate.dart:20-23`: hoy afirman «PF llega completo desde mobile»; ahora lo gatea `hubOnboardingStage` (citar design D1/D3, AGENTS.md §11.1: sin afirmaciones sin evidencia). `rg -i "llega completo"` en `lib/`.
-- [ ] 11.2 **Verificación de diff (054)** — `git diff --stat main...HEAD`: NO aparecen `firestore.rules`, `functions/src/subscriptions/`, `pubspec.yaml`, `router_refresh_notifier.dart`; cualquier cambio en `functions/` justificado en design (solo B10).
-- [ ] 11.3 **GATE final de apply** — `flutter analyze` acotado a los dirs tocados, `dart format --set-exit-if-changed` solo sobre los archivos tocados, corrida agregada SOLO de los tests de B1-B9 + `test/features/coach_hub/` + `test/app/coach_hub_router*` + `test/app/theme/tokens` + `test/app/guards` (no la suite completa de ~40 min). Leer los paths absolutos del output.
-- [ ] 11.4 Los goldens del gate visual (`test/visual_gate`, solo Linux) no se verifican en Mac: dejar anotado que el CI es el que corre; si cae, bajar el artefacto y leer la imagen.
+- [x] 11.1 Corregir comentario de `lib/app/coach_hub_router.dart:61-63` y dartdoc de `lib/features/coach_hub/application/coach_hub_tour_gate.dart:20-23`: hoy afirman «PF llega completo desde mobile»; ahora lo gatea `hubOnboardingStage` (citar design D1/D3, AGENTS.md §11.1: sin afirmaciones sin evidencia). `rg -i "llega completo"` en `lib/`.
+- [x] 11.2 **Verificación de diff (054)** — `git diff --stat main...HEAD`: NO aparecen `firestore.rules`, `functions/src/subscriptions/`, `pubspec.yaml`, `router_refresh_notifier.dart`; cualquier cambio en `functions/` justificado en design (solo B10).
+- [x] 11.3 **GATE final de apply** — `flutter analyze` acotado a los dirs tocados, `dart format --set-exit-if-changed` solo sobre los archivos tocados, corrida agregada SOLO de los tests de B1-B9 + `test/features/coach_hub/` + `test/app/coach_hub_router*` + `test/app/theme/tokens` + `test/app/guards` (no la suite completa de ~40 min). Leer los paths absolutos del output.
+- [x] 11.4 Los goldens del gate visual (`test/visual_gate`, solo Linux) no se verifican en Mac: dejar anotado que el CI es el que corre; si cae, bajar el artefacto y leer la imagen.
 
 ---
 
