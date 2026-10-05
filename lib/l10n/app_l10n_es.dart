@@ -5136,6 +5136,25 @@ class AppL10nEs extends AppL10n {
   @override
   String get planLimitTrainerPlanAMedidaCuerpo =>
       'Estás en el plan más grande. Estamos preparando un plan a tu medida.';
+
+  @override
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Se van a desvincular $count alumnos. Les avisamos.',
+      one: 'Se va a desvincular 1 alumno. Le avisamos.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get eliminarCuentaSheetErrorSubscriptionCancel =>
+      'No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Inténtalo de nuevo en unos minutos.';
+
+  @override
+  String get eliminarCuentaSheetErrorNotAllowed =>
+      'No pudimos eliminar tu cuenta desde la app. Escríbenos y lo resolvemos.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10267,4 +10286,23 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get planLimitTrainerPlanAMedidaCuerpo =>
       'Estás en el plan más grande. Estamos preparando un plan a tu medida.';
+
+  @override
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Se van a desvincular $count alumnos. Les avisamos.',
+      one: 'Se va a desvincular 1 alumno. Le avisamos.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get eliminarCuentaSheetErrorSubscriptionCancel =>
+      'No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.';
+
+  @override
+  String get eliminarCuentaSheetErrorNotAllowed =>
+      'No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.';
 }

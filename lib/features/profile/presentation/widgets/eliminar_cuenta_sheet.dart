@@ -4,8 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
 import 'package:treino/features/profile/application/account_deletion_notifier.dart';
+import 'package:treino/features/profile/application/trainer_unlink_impact_provider.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Destructive confirmation bottom sheet for account deletion (Fase 6 Etapa 3).
@@ -13,7 +17,7 @@ import 'package:treino/l10n/app_l10n.dart';
 /// Shows irreversible-action copy, CANCELAR + ELIMINAR buttons.
 /// On ELIMINAR: calls [AccountDeletionNotifier.deleteAccount].
 /// Loading overlay: shows "Eliminando tu cuenta..." during [AsyncLoading].
-/// Error: shows SnackBar with "Reintentar" action.
+/// Error: shows the message INSIDE the sheet with a "Reintentar" action.
 class EliminarCuentaSheet extends ConsumerWidget {
   const EliminarCuentaSheet({super.key});
 
@@ -62,48 +66,23 @@ class EliminarCuentaSheet extends ConsumerWidget {
       },
     );
 
-    ref.listen<AsyncValue<void>>(
-      accountDeletionNotifierProvider,
-      (previous, next) {
-        // El cierre del sheet en el camino feliz lo hace el listener de
-        // `accountDeletedFlagProvider` de arriba, a mano. Acá sólo queda el
-        // error: si el borrado falla el sheet TIENE que seguir abierto, con su
-        // snackbar y su "Reintentar".
+    // El error NO va en un SnackBar: este sheet se abre en el Navigator RAÍZ
+    // (`useRootNavigator: true`) y un SnackBar cuelga del Scaffold de la página
+    // de abajo, o sea que el modal lo tapa y el usuario no ve por qué no se
+    // borró su cuenta. El mensaje vive acá adentro, con su "Reintentar".
+    final failure = notifierState.hasError ? notifierState.error : null;
 
-        next.whenOrNull(
-          error: (e, _) {
-            final l10n = AppL10n.of(context);
-            final message = e is AuthFailure
-                ? e.userMessage
-                : l10n.eliminarCuentaSheetErrorFallback;
-
-            final messenger = ScaffoldMessenger.of(context);
-            messenger.hideCurrentSnackBar();
-            messenger.showSnackBar(
-              SnackBar(
-                content: Text(message),
-                behavior: SnackBarBehavior.floating,
-                // `persist: false` A MANO. `SnackBar` hace
-                // `persist = persist ?? action != null`: con acción es eterno por
-                // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-                // se queda hasta recargar la página.
-                persist: false,
-                duration: const Duration(seconds: 6),
-                action: SnackBarAction(
-                  label: l10n.eliminarCuentaSheetRetryLabel,
-                  onPressed: () {
-                    messenger.hideCurrentSnackBar();
-                    ref
-                        .read(accountDeletionNotifierProvider.notifier)
-                        .retry(context);
-                  },
-                ),
-              ),
-            );
-          },
-        );
-      },
+    // Sólo el PF ve cuántos alumnos se desvinculan. `hasValue` y no
+    // `valueOrNull`: sin conteo cargado no se afirma ninguno, y la baja nunca
+    // espera a este valor.
+    final isTrainer = ref.watch(
+      userProfileProvider.select(
+        (a) => a.valueOrNull?.role == UserRole.trainer,
+      ),
     );
+    final impact = isTrainer ? ref.watch(trainerUnlinkImpactProvider) : null;
+    final unlinkCount =
+        (impact != null && impact.hasValue) ? impact.requireValue : 0;
 
     final isLoading = notifierState.isLoading;
 
@@ -174,6 +153,49 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     color: palette.textMuted,
                   ),
                 ),
+                if (unlinkCount > 0) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  Text(
+                    AppL10n.of(context)
+                        .eliminarCuentaSheetTrainerUnlinkNotice(unlinkCount),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ],
+                if (failure != null) ...[
+                  const SizedBox(height: AppSpacing.s12),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      _errorMessage(AppL10n.of(context), failure),
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.barlow(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: palette.danger,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: isLoading
+                        ? null
+                        : () => ref
+                            .read(accountDeletionNotifierProvider.notifier)
+                            .retry(context),
+                    child: Text(
+                      AppL10n.of(context).eliminarCuentaSheetRetryLabel,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: palette.accentText,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 ElevatedButton(
                   // Do NOT pop the sheet here — the notifier's flow needs
@@ -250,4 +272,19 @@ class EliminarCuentaSheet extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Mensaje del error de borrado. Las dos fallas que el servidor distingue
+/// (`unavailable` y `permission-denied`) van por l10n; el resto conserva el
+/// `userMessage` del dominio (es-AR, ADR-I18N-002).
+String _errorMessage(AppL10n l10n, Object failure) {
+  if (failure == const AuthFailure.subscriptionCancelFailed()) {
+    return l10n.eliminarCuentaSheetErrorSubscriptionCancel;
+  }
+  if (failure == const AuthFailure.deletionNotAllowed()) {
+    return l10n.eliminarCuentaSheetErrorNotAllowed;
+  }
+  return failure is AuthFailure
+      ? failure.userMessage
+      : l10n.eliminarCuentaSheetErrorFallback;
 }

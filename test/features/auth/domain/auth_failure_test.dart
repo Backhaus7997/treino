@@ -66,6 +66,18 @@ void main() {
   });
 
   group('AuthFailure.userMessage', () {
+    test('subscriptionCancelFailed y deletionNotAllowed tienen copy propio',
+        () {
+      expect(
+        const AuthFailure.subscriptionCancelFailed().userMessage,
+        contains('suscripción'),
+      );
+      expect(
+        const AuthFailure.deletionNotAllowed().userMessage,
+        isNot(const AuthFailure.deletionFailed().userMessage),
+      );
+    });
+
     test('invalidEmail returns Spanish message', () {
       expect(
         const AuthFailure.invalidEmail().userMessage,

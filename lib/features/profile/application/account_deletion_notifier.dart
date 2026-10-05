@@ -68,7 +68,7 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       state = AsyncError(e, StackTrace.current);
     } catch (e, st) {
       debugPrint('[AccountDeletion] unexpected error: $e\n$st');
-      state = AsyncError(AuthFailure.deletionFailed(cause: e), st);
+      state = AsyncError(_mapError(e), st);
     }
   }
 
@@ -179,15 +179,35 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     );
   }
 
+  /// Traduce lo que tira el callable a un [AuthFailure].
+  ///
+  /// [AccountDeletionService] envuelve el error del callable en
+  /// [AccountDeletionFailure$Server]: ESA es la forma que llega hasta acá en
+  /// producción. La [FirebaseFunctionsException] cruda se sigue aceptando por
+  /// si algún camino la deja pasar.
   AuthFailure _mapError(Object e) {
-    if (e is FirebaseFunctionsException) {
-      if (e.code == 'unauthenticated' ||
-          (e.code == 'permission-denied' &&
-              (e.message?.contains('recent-login') ?? false))) {
-        return const AuthFailure.requiresRecentLogin();
-      }
-    }
     if (e is AuthFailure) return e;
+    final (code, message) = switch (e) {
+      AccountDeletionFailure$Server(:final code, :final message) => (
+          code,
+          message,
+        ),
+      FirebaseFunctionsException(:final code, :final message) => (
+          code,
+          message ?? '',
+        ),
+      _ => (null, ''),
+    };
+    switch (code) {
+      case 'unauthenticated':
+        return const AuthFailure.requiresRecentLogin();
+      case 'permission-denied':
+        return message.contains('recent-login')
+            ? const AuthFailure.requiresRecentLogin()
+            : const AuthFailure.deletionNotAllowed();
+      case 'unavailable':
+        return const AuthFailure.subscriptionCancelFailed();
+    }
     return AuthFailure.deletionFailed(cause: e);
   }
 }

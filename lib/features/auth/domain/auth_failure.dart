@@ -35,6 +35,15 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.reAuthFailed({String? provider}) = _ReAuthFailed;
   const factory AuthFailure.deletionFailed({Object? cause}) = _DeletionFailed;
 
+  /// El servidor rechazó el borrado con `permission-denied` (y no por login
+  /// reciente). Con el servidor viejo es lo que recibía un entrenador.
+  const factory AuthFailure.deletionNotAllowed() = _DeletionNotAllowed;
+
+  /// No se pudo dar de baja la suscripción de Mercado Pago (`unavailable`):
+  /// el servidor falla cerrado y NO borró la cuenta. Reintentar es lo correcto.
+  const factory AuthFailure.subscriptionCancelFailed() =
+      _SubscriptionCancelFailed;
+
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
         'user-disabled' => const AuthFailure.userDisabled(),
@@ -84,5 +93,12 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _ReAuthFailed() => 'No pudimos verificar tu identidad. Probá de nuevo.',
         // i18n: Fase 6 Etapa 3
         _DeletionFailed() => 'No pudimos eliminar tu cuenta. Probá de nuevo.',
+        // i18n: la hoja de eliminar cuenta muestra estas dos por l10n.
+        _DeletionNotAllowed() =>
+          'No pudimos eliminar tu cuenta desde la app. Escribinos y lo '
+              'resolvemos.',
+        _SubscriptionCancelFailed() =>
+          'No pudimos cancelar tu suscripción, así que tu cuenta no se '
+              'eliminó. Probá de nuevo en unos minutos.',
       };
 }

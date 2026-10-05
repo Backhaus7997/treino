@@ -94,6 +94,30 @@ void main() {
       );
     });
 
+    // SC-PSD-27/28: el código del callable llega intacto al notifier, que es
+    // quien decide el mensaje. Si el servicio lo perdiera, el mapeo del
+    // notifier se probaría contra algo que producción nunca entrega.
+    for (final code in ['permission-denied', 'unavailable', 'internal']) {
+      test('preserva el código `$code` del callable en Server', () async {
+        when(() => mockCallable.call<Map<String, dynamic>>(any())).thenThrow(
+          FirebaseFunctionsException(
+            code: code,
+            message: 'mensaje-$code',
+            details: null,
+          ),
+        );
+
+        await expectLater(
+          () => sut.call(uid: 'uid-test'),
+          throwsA(
+            isA<AccountDeletionFailure$Server>()
+                .having((f) => f.code, 'code', code)
+                .having((f) => f.message, 'message', 'mensaje-$code'),
+          ),
+        );
+      });
+    }
+
     // SCENARIO-563
     test('SCENARIO-563: unknown error propagates as AccountDeletionFailure',
         () async {

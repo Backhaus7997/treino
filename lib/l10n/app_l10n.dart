@@ -8682,6 +8682,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Estás en el plan más grande. Estamos preparando un plan a tu medida.'**
   String get planLimitTrainerPlanAMedidaCuerpo;
+
+  /// Aviso en la hoja de eliminar cuenta del entrenador: cuántos alumnos quedan desvinculados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}'**
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count);
+
+  /// No description provided for @eliminarCuentaSheetErrorSubscriptionCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.'**
+  String get eliminarCuentaSheetErrorSubscriptionCancel;
+
+  /// No description provided for @eliminarCuentaSheetErrorNotAllowed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.'**
+  String get eliminarCuentaSheetErrorNotAllowed;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -1104,5 +1104,8 @@
   "privacyPromoEmailsSubtitle": "Si lo desactivas, dejamos de enviártelos. Los avisos de tu cuenta te seguirán llegando.",
   "privacyPromoEmailsSaveError": "No pudimos guardar el cambio. Inténtalo de nuevo.",
   "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.",
-  "@moderationBlockedMessage": {}
+  "@moderationBlockedMessage": {},
+  "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}",
+  "eliminarCuentaSheetErrorSubscriptionCancel": "No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Inténtalo de nuevo en unos minutos.",
+  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escríbenos y lo resolvemos."
 }
