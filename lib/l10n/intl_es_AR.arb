@@ -1788,6 +1788,10 @@
   "@coachHubOnboardingPfLocationRemove": {
     "description": "Coach Hub onboarding, tooltip of the remove-place button."
   },
+  "coachHubOnboardingPfLocationGymFallback": "Gimnasio",
+  "@coachHubOnboardingPfLocationGymFallback": {
+    "description": "Coach Hub onboarding, label of a legacy gym-type location that has no custom label."
+  },
   "coachHubOnboardingPfFinish": "Finalizar",
   "@coachHubOnboardingPfFinish": {
     "description": "Coach Hub onboarding, final button of the professional profile step."

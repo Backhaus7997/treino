@@ -233,6 +233,7 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
             indice: i,
             lugar: _locations[i],
             tooltip: l10n.coachHubOnboardingPfLocationRemove,
+            etiquetaGym: l10n.coachHubOnboardingPfLocationGymFallback,
             onQuitar: () => setState(() => _locations.removeAt(i)),
           ),
         if (_locations.isNotEmpty) const SizedBox(height: AppSpacing.s8),
@@ -313,12 +314,17 @@ class _FilaLugar extends StatelessWidget {
     required this.indice,
     required this.lugar,
     required this.tooltip,
+    required this.etiquetaGym,
     required this.onQuitar,
   });
 
   final int indice;
   final TrainerLocation lugar;
   final String tooltip;
+
+  /// Rótulo de un lugar legacy `type == gym`: no lleva `customLabel` (apunta a
+  /// `gyms/{gymId}`) y no se resuelve el nombre del gym para no sumar lecturas.
+  final String etiquetaGym;
   final VoidCallback onQuitar;
 
   @override
@@ -342,7 +348,7 @@ class _FilaLugar extends StatelessWidget {
             const SizedBox(width: AppSpacing.s12),
             Expanded(
               child: Text(
-                lugar.customLabel ?? '',
+                lugar.customLabel ?? etiquetaGym,
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
                   fontSize: AppTextSize.body,

@@ -4574,6 +4574,12 @@ abstract class AppL10n {
   /// **'Quitar lugar'**
   String get coachHubOnboardingPfLocationRemove;
 
+  /// Coach Hub onboarding, label of a legacy gym-type location that has no custom label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio'**
+  String get coachHubOnboardingPfLocationGymFallback;
+
   /// Coach Hub onboarding, final button of the professional profile step.
   ///
   /// In es_AR, this message translates to:

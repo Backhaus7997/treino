@@ -421,6 +421,7 @@
   "coachHubOnboardingPfLocationConfigError": "La búsqueda de lugares no está disponible en este momento. Si das clases online, puedes finalizar igual.",
   "coachHubOnboardingPfLocationRetry": "Reintentar",
   "coachHubOnboardingPfLocationRemove": "Quitar lugar",
+  "coachHubOnboardingPfLocationGymFallback": "Gimnasio",
   "coachHubOnboardingPfFinish": "Finalizar",
   "coachHubOnboardingContinue": "Continuar",
   "coachHubOnboardingSaveError": "No pudimos guardar tus datos. Inténtalo de nuevo.",

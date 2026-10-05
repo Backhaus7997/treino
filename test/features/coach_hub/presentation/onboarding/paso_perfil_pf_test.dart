@@ -519,7 +519,8 @@ void main() {
         expect(find.text(l10n.coachHubOnboardingPfLocationConfigError),
             findsOneWidget);
         expect(find.text(l10n.coachHubOnboardingPfLocationEmpty), findsNothing);
-        expect(find.byKey(_reintentarKey), findsOneWidget);
+        // Reintentar contra una key ausente nunca puede funcionar: no se ofrece.
+        expect(find.byKey(_reintentarKey), findsNothing);
         expect(find.textContaining('KEY'), findsNothing);
         expect(finalizarHabilitado(tester), isFalse);
 
@@ -529,6 +530,29 @@ void main() {
         await finalizar(tester);
         expect(repo.updates, 1);
         expect((await usuario())['trainerOffersOnline'], isTrue);
+      });
+
+      testWidgets(
+          'un lugar legacy de tipo gym (sin customLabel) no es una fila en blanco',
+          (tester) async {
+        await sembrar(extra: {
+          'trainerLocations': [
+            {
+              'id': 'gym-1',
+              'type': 'gym',
+              'gymId': 'g1',
+              'lat': -34.6,
+              'lng': -58.4,
+              'geohash': '69y7p',
+            },
+          ],
+        });
+        await pump(tester, theme: entry.value());
+
+        final l10n = l10nDe(tester);
+        expect(find.text(l10n.coachHubOnboardingPfLocationGymFallback),
+            findsOneWidget);
+        expect(l10n.coachHubOnboardingPfLocationGymFallback, isNotEmpty);
       });
 
       testWidgets('quitar un lugar lo saca de la lista y de la escritura',

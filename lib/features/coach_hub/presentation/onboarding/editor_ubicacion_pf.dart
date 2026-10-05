@@ -15,7 +15,9 @@ import 'package:treino/l10n/app_l10n.dart';
 /// Estado de la búsqueda. Cada caso se pinta distinto a propósito: sobre todo
 /// [_Estado.errorConfig] y [_Estado.vacio], que NUNCA deben confundirse (una
 /// key mal armada que dice «no encontramos ese lugar» manda al PF a buscar una
-/// dirección que sí existe).
+/// dirección que sí existe
+/// dirección que sí existe). [_Estado.errorConfig] además NO ofrece reintentar:
+/// con la key ausente nunca puede funcionar.
 enum _Estado { inicial, cargando, resultados, vacio, errorConfig, errorRed }
 
 /// Buscador de un lugar de entrenamiento POR DIRECCIÓN (design D9/D10).
@@ -146,7 +148,6 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
           _Estado.errorConfig => _Aviso(
               mensaje: l10n.coachHubOnboardingPfLocationConfigError,
               esError: true,
-              onReintentar: _buscar,
             ),
           _Estado.errorRed => _Aviso(
               mensaje: l10n.coachHubOnboardingPfLocationNetworkError,

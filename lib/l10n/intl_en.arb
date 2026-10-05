@@ -981,6 +981,7 @@
   "coachHubOnboardingPfLocationConfigError": "Place search is not available right now. If you teach online, you can still finish.",
   "coachHubOnboardingPfLocationRetry": "Retry",
   "coachHubOnboardingPfLocationRemove": "Remove place",
+  "coachHubOnboardingPfLocationGymFallback": "Gym",
   "coachHubOnboardingPfFinish": "Finish",
   "coachHubOnboardingContinue": "Continue",
   "coachHubOnboardingSaveError": "We couldn't save your details. Please try again.",

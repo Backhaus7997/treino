@@ -2541,6 +2541,9 @@ class AppL10nEs extends AppL10n {
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
 
   @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gimnasio';
+
+  @override
   String get coachHubOnboardingPfFinish => 'Finalizar';
 
   @override
@@ -7671,6 +7674,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gimnasio';
 
   @override
   String get coachHubOnboardingPfFinish => 'Finalizar';

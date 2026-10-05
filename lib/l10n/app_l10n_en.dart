@@ -2488,6 +2488,9 @@ class AppL10nEn extends AppL10n {
   String get coachHubOnboardingPfLocationRemove => 'Remove place';
 
   @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gym';
+
+  @override
   String get coachHubOnboardingPfFinish => 'Finish';
 
   @override
