@@ -66,10 +66,10 @@ Cubre: REQ-CHW-ONB-001; SCENARIO-001..006; SCENARIO-TPO-WEB-001.
 Commit: `test(coach-hub): fixture compartido de trainer completo para los tests del redirect`
 Cubre: REQ-CHW-ONB-012; SCENARIO-049, 050. Depende de: B1.
 
-- [ ] 2.1 **RED** — `test/helpers/coach_hub_profiles_test.dart` (o dentro del test del predicado): `hubOnboardingStage(trainerCompleto()) == done` y `trainerProfileComplete(...)`; `trainerRecienPromovido()` ⇒ `age` (049). Rojo: helper inexistente.
-- [ ] 2.2 **GREEN** — `test/helpers/coach_hub_profiles.dart`: `trainerCompleto()` (`bornAt` 1990-01-01 UTC, bio ≥ 20, specialty, rate, online) y `trainerRecienPromovido()`.
-- [ ] 2.3 Migrar a `trainerCompleto()` SIN relajar aserciones: `test/app/coach_hub_router_redirect_test.dart` (`:36-43`), `coach_hub_router_shell_test.dart`, `coach_hub_router_resolving_test.dart`, `test/features/coach_hub/application/coach_hub_session_resolving_provider_test.dart`, `coach_hub_scaffold_test.dart`, `coach_hub_dashboard_in_shell_test.dart`, y `test/visual_gate/gate_harness.dart` (solo corre en Linux: migrar a ciegas y leer el diff dos veces; `rg 'UserProfile\(' test/visual_gate`).
-- [ ] 2.4 **GATE** — correr esos 6 tests (en verde antes y después, aún sin gate); analyze acotado a `test/helpers test/app test/features/coach_hub test/visual_gate`; format. Leer los paths del output.
+- [x] 2.1 **RED** — `test/helpers/coach_hub_profiles_test.dart` (o dentro del test del predicado): `hubOnboardingStage(trainerCompleto()) == done` y `trainerProfileComplete(...)`; `trainerRecienPromovido()` ⇒ `age` (049). Rojo: helper inexistente.
+- [x] 2.2 **GREEN** — `test/helpers/coach_hub_profiles.dart`: `trainerCompleto()` (`bornAt` 1990-01-01 UTC, bio ≥ 20, specialty, rate, online) y `trainerRecienPromovido()`.
+- [x] 2.3 Migrar a `trainerCompleto()` SIN relajar aserciones: `test/app/coach_hub_router_redirect_test.dart` (`:36-43`), `coach_hub_router_shell_test.dart`, `coach_hub_router_resolving_test.dart`, `test/features/coach_hub/application/coach_hub_session_resolving_provider_test.dart`, `coach_hub_scaffold_test.dart`, `coach_hub_dashboard_in_shell_test.dart`, y `test/visual_gate/gate_harness.dart` (solo corre en Linux: migrar a ciegas y leer el diff dos veces; `rg 'UserProfile\(' test/visual_gate`).
+- [x] 2.4 **GATE** — correr esos 6 tests (en verde antes y después, aún sin gate); analyze acotado a `test/helpers test/app test/features/coach_hub test/visual_gate`; format. Leer los paths del output.
 
 ## Batch 3 — Pendientes de escritura: repo + refresh listenable del Hub (ANTES del gate)
 
