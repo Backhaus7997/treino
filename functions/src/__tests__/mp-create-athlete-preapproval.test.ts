@@ -572,10 +572,13 @@ describe("no se puede comprar dos veces el MISMO ciclo", () => {
   });
 });
 
-describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", () => {
-  // MITIGACION TEMPORAL del cobro doble: la rama del alumno de `reconcile.ts`
-  // no da de baja el plan reemplazado, asi que dos checkouts = dos cobros.
-  // Estos tests se borran cuando esa baja exista.
+describe("un plan vivo: lo que no se puede cambiar de un paso se bloquea", () => {
+  // Hasta que la rama del alumno de `reconcile.ts` dio de baja el plan
+  // reemplazado, dos checkouts eran dos cobros y el #1305 bloqueaba todo cambio.
+  // Hoy el cambio de ciclo difiere (ver «cambiar de plan con el viejo cobrando»,
+  // mas abajo), pero solo si se puede establecer hasta cuando esta pago el viejo.
+  // Las suscripciones de estos tests traen solo `status`, sin ningun cobro: no se
+  // puede, y el bloqueo de siempre es lo correcto.
 
   const YA_PAGA = (cycle: string, status = "active"): Store => ({
     users: {
@@ -590,7 +593,7 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
 
   const RECHAZADO = { code: "failed-precondition" };
 
-  it("mensual activo → pedir anual se RECHAZA y no se abre checkout", async () => {
+  it("mensual activo sin un cobro que diga hasta cuando pago → pedir anual se RECHAZA, sin checkout", async () => {
     const { app, escrituras } = fakeApp(YA_PAGA("monthly"));
     const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
 
@@ -602,7 +605,7 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
     expect(escrituras).toEqual([]);
   });
 
-  it("anual activo → pedir mensual se RECHAZA y no se abre checkout", async () => {
+  it("anual activo sin un cobro que diga hasta cuando pago → pedir mensual se RECHAZA", async () => {
     const { app, escrituras } = fakeApp(YA_PAGA("annual"));
     const mp = fakeMp({ suscripciones: { viejo: [{ status: "authorized" }] } });
 
@@ -654,7 +657,7 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
     expect(mp.opcionesDeBusqueda).toEqual([{ estricto: true }]);
   });
 
-  it("pausado (derecho `expired`) → se RECHAZA: el pagador lo puede reactivar", async () => {
+  it("pausado (derecho `expired`) sin cobros que establezcan sus dias → se RECHAZA: se puede reactivar", async () => {
     // `paused` figura `expired` en nuestro derecho, asi que mirar `users/{uid}`
     // lo dejaria pasar. Pero MP lo puede reanudar, y ahi cobran los dos.
     const { app } = fakeApp(YA_PAGA("monthly", "expired"));
@@ -794,9 +797,10 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
     expect(mp.pedidos).toEqual([]);
   });
 
-  it("la consulta es SECUENCIAL: con el primero vivo no se consulta el segundo", async () => {
+  it("la consulta es SECUENCIAL y corta en la SEGUNDA viva: con dos no hay cambio posible", async () => {
     // MP contesta 429 y los planes abandonados se acumulan: cada llamada de
-    // mas es una chance de trabar al alumno.
+    // mas es una chance de trabar al alumno. Con una sola viva hay que seguir
+    // (el cambio de plan necesita haber visto todos); con dos, no.
     // Derecho `expired` para que la guarda del mismo ciclo no atienda antes.
     const mundo = YA_PAGA("monthly", "expired");
     mundo.mp_plans.otro = { producto: "athlete", uid: UID, cycle: "annual" };
@@ -810,7 +814,7 @@ describe("mitigacion: un solo plan vivo — no se abre otro mientras MP cobra", 
 
     await expect(correr(app, { cycle: "annual" }, mp))
       .rejects.toMatchObject(RECHAZADO);
-    expect(mp.busquedas).toEqual(["viejo"]);
+    expect(mp.busquedas).toEqual(["viejo", "otro"]);
   });
 
   it("si una consulta falla antes de hallar uno vivo → `unavailable` y no se abre checkout", async () => {
@@ -925,20 +929,20 @@ describe("volver con dias pagos: el primer cobro se difiere", () => {
     expect(r.diferidoHastaIso).toBe(new Date(FIN).toISOString());
   });
 
-  it("con la suscripcion viva, cambiar de ciclo se BLOQUEA: ni prueba ni cobro en el acto", async () => {
+  it("con la suscripcion VIVA, cambiar de ciclo difiere hasta que vence lo que pago (no cobra dos veces)", async () => {
     // Antes de la mitigacion (#1305) esto abria el checkout y cobraba en el acto
-    // mientras el plan viejo seguia cobrando. Ahora la pasada por MP encuentra la
-    // viva y no se abre nada: el diferimiento no puede esquivar el bloqueo.
-    const { app, store, escrituras } = fakeApp(DADO_DE_BAJA());
+    // mientras el plan viejo seguia cobrando; con la mitigacion se bloqueaba. Hoy
+    // el viejo se da de baja cuando el nuevo se confirma, asi que el nuevo difiere
+    // hasta el fin de lo que el viejo cobro: el 30/9, por su cobro del 30/8.
+    const { app, store } = fakeApp(DADO_DE_BAJA());
     const mp = fakeMp({ subs: { viejo: [VIVA] } });
 
-    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+    const r = await correr(app, { cycle: "annual" }, mp);
 
-    expect(error.code).toBe("failed-precondition");
-    expect(error.message).toContain("se sigue cobrando");
-    expect(mp.pedidos).toEqual([]);
-    expect(escrituras).toEqual([]);
-    expect(store.mp_plans["plan-nuevo"]).toBeUndefined();
+    expect(r.status).toBe("created");
+    expect(mp.pedidos[0]).toMatchObject({ frequencyMonths: 12, freeTrialDays: 13 });
+    expect(r.diferidoHastaIso).toBe(new Date(FIN).toISOString());
+    expect(store.mp_plans["plan-nuevo"]).toMatchObject({ diferidoHastaMs: FIN });
   });
 
   it("con el interruptor apagado todo es como antes: el mismo ciclo bloqueado, el otro en el acto", async () => {
@@ -1106,16 +1110,17 @@ describe("volver con dias pagos: el primer cobro se difiere", () => {
       expect(escrituras).toEqual([]);
     });
 
-    it("la pasada corta en la primera viva: no se consultan los planes que siguen", async () => {
+    it("la pasada corta en la SEGUNDA viva: no se consultan los planes que siguen", async () => {
       const mundo = DADO_DE_BAJA();
       mundo.mp_plans.nuevo = { ...HUERFANO };
+      mundo.mp_plans.tercero = { ...HUERFANO };
       const { app } = fakeApp(mundo);
-      const mp = fakeMp({ subs: { viejo: [VIVA], nuevo: [BAJA] } });
+      const mp = fakeMp({ subs: { viejo: [VIVA], nuevo: [VIVA], tercero: [VIVA] } });
 
       await expect(correr(app, { cycle: "annual" }, mp))
         .rejects.toMatchObject({ code: "failed-precondition" });
 
-      expect(mp.busquedas).toEqual(["viejo"]);
+      expect(mp.busquedas).toEqual(["viejo", "nuevo"]);
     });
 
     it("si MP falla en un plan antes de hallar uno vivo → unavailable: no se difiere ni se abre nada", async () => {
@@ -1219,5 +1224,290 @@ describe("volver con dias pagos: el primer cobro se difiere", () => {
       expect(mp.pedidos[0]).not.toHaveProperty("freeTrialDays");
       expect(r).not.toHaveProperty("diferidoHastaIso");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cambiar de plan con el viejo cobrando: el nuevo difiere, el viejo se da de baja.
+//
+// Las reglas de la decision se prueban en `mp-diferir-primer-cobro.test.ts`
+// (`decidirCambioDePlanDelAlumno`) y la baja del viejo en `mp-reconcile.test.ts`.
+// Aca se fija lo que el CALLABLE hace: que el checkout se abra con la prueba (y la
+// fecha vuelva para la landing), que lo que no se puede establecer siga bloqueado
+// con el mensaje del #1305, y que abrir el checkout no de de baja NADA.
+// ---------------------------------------------------------------------------
+
+describe("cambiar de plan con el viejo cobrando", () => {
+  /** El proximo cobro del mensual: dentro de 20 dias (7/10). */
+  const PROXIMO = AHORA + 20 * DIA_MS;
+
+  const MENSUAL_AL_DIA = (): Store => ({
+    users: {
+      [UID]: {
+        role: "athlete",
+        displayName: "Ana",
+        athleteSubscription: { status: "active" },
+      },
+    },
+    mp_plans: {
+      viejo: {
+        producto: "athlete",
+        uid: UID,
+        cycle: "monthly",
+        createdAt: ts(AHORA - 70 * DIA_MS),
+        currentPeriodEnd: ts(PROXIMO),
+      },
+    },
+  });
+
+  /** El mensual autorizado: el ultimo cobro, el 7/9, cubre hasta el 7/10. */
+  const VIVO: MpPreapproval = {
+    id: "s-vieja",
+    status: "authorized",
+    next_payment_date: new Date(PROXIMO).toISOString(),
+    auto_recurring: {
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: ATHLETE_PRICES_ARS.monthly,
+    },
+    summarized: {
+      charged_quantity: 3,
+      charged_amount: ATHLETE_PRICES_ARS.monthly,
+      last_charged_date: "2026-09-07T12:00:00.000Z",
+      last_charged_amount: ATHLETE_PRICES_ARS.monthly,
+      pending_charge_quantity: 0,
+    },
+  };
+
+  /** Un MP que anota si alguien intento dar de baja algo. */
+  function conBajas(mp: ReturnType<typeof fakeMp>) {
+    const bajas: string[] = [];
+    mp.deps.mpClient.cancelPreapproval = async (id: string) => {
+      bajas.push(id);
+      return {};
+    };
+    return { mp, bajas };
+  }
+
+  it("mensual con 20 dias pagos → el anual se abre con 20 dias de prueba, sin bloquear", async () => {
+    const { app, store } = fakeApp(MENSUAL_AL_DIA());
+    const { mp, bajas } = conBajas(fakeMp({ subs: { viejo: [VIVO] } }));
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.pedidos[0]).toMatchObject({ frequencyMonths: 12, freeTrialDays: 20 });
+    // La landing avisa la fecha antes de mandarlo a MP («¡Tenés 20 días gratis!»).
+    expect(r.diferidoHastaIso).toBe(new Date(PROXIMO).toISOString());
+    // El plan nuevo guarda E: es lo que el reconciliador lee como prueba.
+    expect(store.mp_plans["plan-nuevo"])
+      .toMatchObject({ producto: "athlete", cycle: "annual", diferidoHastaMs: PROXIMO });
+    // ⚠️ Abrir el checkout NO da de baja nada: si lo abandona, el viejo sigue.
+    expect(bajas).toEqual([]);
+    expect(store.mp_plans.viejo).not.toHaveProperty("terminal");
+    expect(store.mp_plans.viejo).not.toHaveProperty("supersededBy");
+  });
+
+  it("anual → mensual con 11 meses por delante: la prueba entra en el tope de MP", async () => {
+    const proximo = Date.parse("2027-08-17T12:00:00.000Z");
+    const mundo = MENSUAL_AL_DIA();
+    Object.assign(mundo.mp_plans.viejo as Record<string, unknown>, {
+      cycle: "annual",
+      currentPeriodEnd: ts(proximo),
+    });
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      next_payment_date: new Date(proximo).toISOString(),
+      auto_recurring: {
+        frequency: 12,
+        frequency_type: "months",
+        transaction_amount: ATHLETE_PRICES_ARS.annual,
+      },
+      summarized: {
+        charged_quantity: 1,
+        charged_amount: ATHLETE_PRICES_ARS.annual,
+        last_charged_date: "2026-08-17T12:00:00.000Z",
+        last_charged_amount: ATHLETE_PRICES_ARS.annual,
+        pending_charge_quantity: 0,
+      },
+    }] } });
+
+    const r = await correr(app, { cycle: "monthly" }, mp);
+
+    expect(mp.pedidos[0]).toMatchObject({ frequencyMonths: 1, freeTrialDays: 334 });
+    expect(r.diferidoHastaIso).toBe(new Date(proximo).toISOString());
+  });
+
+  it("el MISMO ciclo sigue bloqueado, con el mensaje del ciclo", async () => {
+    const { app, escrituras } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [VIVO] } });
+
+    const error = await correr(app, { cycle: "monthly" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toBe("ya tenes una suscripcion activa con este ciclo");
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
+  it("⚠️ sin saber hasta cuando esta pago, se BLOQUEA con el mensaje del #1305 (nunca cobra en el acto)", async () => {
+    // Sin la fecha del proximo cobro ni guardada ni en MP. Cobrar en el acto con la
+    // baja del viejo al confirmar le haria perder los dias que pago.
+    const mundo = MENSUAL_AL_DIA();
+    delete (mundo.mp_plans.viejo as Record<string, unknown>).currentPeriodEnd;
+    const { app, escrituras } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{ ...VIVO, next_payment_date: undefined }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("se sigue cobrando");
+    expect(error.message).toContain("dalo de baja primero");
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
+  it("si el viejo se renueva en menos de 3 dias, se bloquea con su propio mensaje", async () => {
+    // La baja del viejo necesita margen para confirmarse antes de la renovacion
+    // (`MIN_PAGO_PARA_CAMBIAR_MS`). Pasada la renovacion el cambio se puede hacer.
+    const cerca = AHORA + 2 * DIA_MS;
+    const mundo = MENSUAL_AL_DIA();
+    (mundo.mp_plans.viejo as Record<string, unknown>).currentPeriodEnd = ts(cerca);
+    const { app, escrituras } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      next_payment_date: new Date(cerca).toISOString(),
+      summarized: {
+        ...(VIVO.summarized as object),
+        last_charged_date: new Date(cerca - 30 * DIA_MS).toISOString(),
+      },
+    }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("se renueva en los proximos dias");
+    // Las palabras que la landing busca para elegir otro copy no aparecen.
+    expect(error.message.toLowerCase()).not.toContain("entrenador");
+    expect(error.message.toLowerCase()).not.toContain("ciclo");
+    expect(mp.pedidos).toEqual([]);
+    expect(escrituras).toEqual([]);
+  });
+
+  it("si las fuentes no coinciden, el mensaje no promete que esperar lo arregla", async () => {
+    // Proximo cobro dentro de 20 dias, pero el ultimo cobro solo cubre hasta pasado
+    // mañana: no es una renovacion cercana.
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      summarized: { ...(VIVO.summarized as object), last_charged_date: "2026-08-19T12:00:00.000Z" },
+    }] } });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("no pudimos confirmar hasta cuando esta pago");
+    expect(error.message).not.toContain("se renueva");
+    expect(error.message.toLowerCase()).not.toContain("entrenador");
+    expect(error.message.toLowerCase()).not.toContain("ciclo");
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("con un cobro rebotado (MP reintenta) se bloquea: ese periodo no esta pago", async () => {
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      summarized: { ...(VIVO.summarized as object), pending_charge_quantity: 1 },
+    }] } });
+
+    await expect(correr(app, { cycle: "annual" }, mp))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("con el interruptor apagado se bloquea como en el #1305", async () => {
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [VIVO] }, diferirHabilitado: false });
+
+    const error = await correr(app, { cycle: "annual" }, mp).catch((e) => e);
+
+    expect(error.code).toBe("failed-precondition");
+    expect(error.message).toContain("se sigue cobrando");
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("pausado con dias pagos: difiere igual que el autorizado", async () => {
+    const mundo = MENSUAL_AL_DIA();
+    ((mundo.users[UID] as Record<string, unknown>).athleteSubscription as Record<string, unknown>)
+      .status = "expired";
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{ ...VIVO, status: "paused" }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(mp.pedidos[0]).toMatchObject({ freeTrialDays: 20 });
+    expect(r.diferidoHastaIso).toBe(new Date(PROXIMO).toISOString());
+  });
+
+  it("pausado sin nada pago: el nuevo cobra al autorizar (el viejo se da de baja al confirmarse)", async () => {
+    const vencido = AHORA - 40 * DIA_MS;
+    const mundo = MENSUAL_AL_DIA();
+    ((mundo.users[UID] as Record<string, unknown>).athleteSubscription as Record<string, unknown>)
+      .status = "expired";
+    (mundo.mp_plans.viejo as Record<string, unknown>).currentPeriodEnd = ts(vencido);
+    const { app } = fakeApp(mundo);
+    const mp = fakeMp({ subs: { viejo: [{
+      ...VIVO,
+      status: "paused",
+      next_payment_date: new Date(vencido).toISOString(),
+      summarized: { ...(VIVO.summarized as object), last_charged_date: "2026-07-08T12:00:00.000Z" },
+    }] } });
+
+    const r = await correr(app, { cycle: "annual" }, mp);
+
+    expect(r.status).toBe("created");
+    expect(mp.pedidos[0]).not.toHaveProperty("freeTrialDays");
+    expect(r).not.toHaveProperty("diferidoHastaIso");
+  });
+
+  it("el doble click llega a la misma fecha y reusa el MISMO checkout", async () => {
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const mp = fakeMp({ subs: { viejo: [VIVO] } });
+
+    const a = await correr(app, { cycle: "annual" }, mp);
+    const b = await correr(app, { cycle: "annual" }, mp);
+
+    expect(b.status).toBe("reused");
+    expect(b.planId).toBe(a.planId);
+    expect(mp.pedidos).toHaveLength(1);
+    expect(b.diferidoHastaIso).toBe(new Date(PROXIMO).toISOString());
+  });
+
+  it("⚠️ autorizado el nuevo, otro toque queda bloqueado: dos vivas (o el mismo ciclo)", async () => {
+    const { app } = fakeApp(MENSUAL_AL_DIA());
+    const subs: Record<string, MpPreapproval[]> = { viejo: [VIVO] };
+    const mp = fakeMp({ subs });
+
+    await correr(app, { cycle: "annual" }, mp);
+    subs["plan-nuevo"] = [{
+      id: "s-nueva",
+      status: "authorized",
+      auto_recurring: {
+        frequency: 12,
+        frequency_type: "months",
+        free_trial: { frequency: 20, frequency_type: "days" },
+      },
+      summarized: { charged_quantity: 0, pending_charge_quantity: 0 },
+    }];
+
+    // Antes de que el reconciliador de de baja el viejo: dos vivas.
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+    // Y despues, con el viejo dado de baja: el nuevo en prueba no deja cambiar.
+    subs.viejo = [{ ...VIVO, status: "cancelled" }];
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+    expect(mp.pedidos).toHaveLength(1);
   });
 });
