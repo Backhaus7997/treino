@@ -1254,17 +1254,21 @@ const A_DE_BAJA: MpPreapproval = {
 };
 
 /**
- * La misma baja con los campos que permiten el respaldo de `pagadoHastaDe`:
- * alta + cantidad de cobros por frecuencia. Esa cuenta supone que el primer
- * cobro fue al autorizar; no usa una fecha de ultimo cobro medida en MP.
+ * La misma baja con el ultimo cobro medido por MP (`last_charged_date`) y el
+ * ciclo: es lo que fecha lo que A pago (`last_charged_date + frequency`).
  */
 const A_DE_BAJA_CON_EVIDENCIA: MpPreapproval = {
   ...A_DE_BAJA,
-  date_created: "2026-08-20T12:00:00.000Z",
   auto_recurring: {
     frequency: 1,
     frequency_type: "months",
     transaction_amount: 22000,
+  },
+  summarized: {
+    charged_quantity: 1,
+    charged_amount: 22000,
+    pending_charge_quantity: 0,
+    last_charged_date: "2026-08-20T12:00:00.000Z",
   },
 };
 
@@ -1948,6 +1952,24 @@ describe("resolverFinDePeriodo — la cascada", () => {
           charged_amount: 22000,
           last_charged_date: "2026-08-20T12:00:00.000Z",
         },
+      },
+    });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("3. con otro plan y solo el respaldo desde el alta, NO lo usa: es una cota inferior", () => {
+    // Alta 1/6, dos cobros mensuales: la estimacion da 1/8. Si hubo una pausa en
+    // el medio, el segundo cobro pudo cubrir hasta mucho despues, y escribir 1/8
+    // cortaria un periodo pago. Sin ultimo cobro medido, sigue la cascada.
+    const r = resolverFinDePeriodo({
+      ...base,
+      yaGuardada: ts(9_999),
+      planIdYaGuardado: "otro-plan",
+      mp: {
+        status: "cancelled",
+        date_created: "2026-06-01T12:00:00.000Z",
+        auto_recurring: { frequency: 1, frequency_type: "months" },
+        summarized: { charged_quantity: 2, charged_amount: 44000 },
       },
     });
     expect(r?.toMillis()).toBe(9_999);

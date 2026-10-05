@@ -348,8 +348,8 @@ import {
   aplicarPruebaDiferidaAlPeriodo,
   cobroAntesDeLaPrueba,
   cobrosExitosos,
+  evidenciaDePago,
   finPagoDelPlanVivo,
-  pagadoHastaDe,
   situacionDeLaPrueba,
 } from "./diferir-primer-cobro";
 import {
@@ -584,10 +584,13 @@ interface FinDePeriodoInput {
  * periodo entero, asi que la cascada existe para no llegar nunca ahi:
  *
  *   1. `next_payment_date`, si MP lo mando.
- *   2. Si la fecha guardada es de OTRO plan, el fin respaldado por la evidencia
- *      de cobro del plan que se reconcilia. [pagadoHastaDe] prioriza el ultimo
- *      cobro y, si falta, documenta el supuesto con el que reconstruye desde el
- *      alta, la cantidad de cobros y la frecuencia.
+ *   2. Si la fecha guardada es de OTRO plan, el fin que respalda el ULTIMO
+ *      COBRO medido del plan que se reconcilia (`last_charged_date + frequency`,
+ *      ver [evidenciaDePago]). Solo esa fuente: el respaldo desde el alta
+ *      (`alta + cobros * frequency`) es una cota INFERIOR —una pausa o una
+ *      renovacion demorada la adelantan— y escribirla como fin podria cortar en
+ *      el acto un periodo que el usuario pago. Sin ultimo cobro, sigue la
+ *      cascada de antes.
  *   3. La que ya teniamos. Cubre al PF que estuvo meses suscripto: el barrido
  *      diario la fue refrescando mientras estaba activo.
  *      Si pertenece a otro plan y no hay evidencia suficiente, se conserva como
@@ -613,8 +616,10 @@ export function resolverFinDePeriodo(
     i.planIdYaGuardado.length > 0 &&
     i.planIdYaGuardado !== i.planId;
   if (fechaEsDeOtroPlan && i.mp !== undefined) {
-    const pagadoHasta = pagadoHastaDe(i.mp);
-    if (pagadoHasta !== null) return Timestamp.fromMillis(pagadoHasta);
+    const evidencia = evidenciaDePago(i.mp);
+    if (evidencia?.fuente === "ultimo-cobro") {
+      return Timestamp.fromMillis(evidencia.hastaMs);
+    }
   }
 
   const previa = comoTimestamp(i.yaGuardada);
