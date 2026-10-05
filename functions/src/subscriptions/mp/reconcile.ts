@@ -1869,6 +1869,15 @@ const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
 const CAMPO_INDICE_MP_DIFERIDO_AT_MS = "indiceMpDiferidoAtMs";
 
 /**
+ * Cuanto puede estar en el futuro el `createdAt` de un hermano y seguir siendo
+ * «reciente». Lo escribe otra instancia, con su propio reloj: unos ms (o
+ * segundos) de desfase no pueden hacer que el checkout recien abierto —el caso
+ * real de la carrera— pierda el beneficio de la duda. Mas alla de este margen
+ * es un reloj roto, y no posterga nada.
+ */
+const DESFASE_DE_RELOJ_TOLERADO_MS = 60 * 1000;
+
+/**
  * El derecho que el plan hermano [hermanoId] le da HOY al alumno, leido de MP en
  * vivo. Solo para el hermano que no tiene [CAMPO_ULTIMO_STATUS] (ver
  * [otroPlanQueOtorga]). **Tira** si no puede decidirlo.
@@ -1939,7 +1948,7 @@ async function derechoVivoDelHermano(
     if (
       !topeVencido &&
       edadMs !== null &&
-      edadMs >= 0 &&
+      edadMs >= -DESFASE_DE_RELOJ_TOLERADO_MS &&
       edadMs < VENTANA_INDICE_MP_MS
     ) {
       if (difirioPorIndiceVacioAtMs === null) {

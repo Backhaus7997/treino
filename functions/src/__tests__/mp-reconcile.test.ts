@@ -3044,6 +3044,21 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
         },
       );
 
+      it("unos segundos de desfase de reloj no le sacan el beneficio de la duda al recien abierto", async () => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.createdAt = ts(AHORA + 5 * 1000);
+        const { app, store } = fakeApp(mundo);
+        const { deps } = conRegistro(fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }));
+
+        const r = await reconcileSubscription(app, "a1", deps);
+
+        expect(r.outcome).toBe("error-mp");
+        expect(derechoDe(store)).toBe("active");
+      });
+
       it("un `createdAt` futuro no recibe el beneficio de la duda", async () => {
         const mundo = mundoPreDeploy();
         mundo.mp_plans.a2.createdAt = ts(AHORA + 2 * 60 * 1000);
