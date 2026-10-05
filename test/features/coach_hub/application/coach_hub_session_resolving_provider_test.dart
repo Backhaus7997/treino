@@ -165,6 +165,44 @@ void main() {
       expect(container.read(coachHubSessionResolvingProvider), isFalse);
     });
 
+    // Espejo del gate de onboarding (#1331): un PF con etapa != done sale del
+    // shell hacia /completar-perfil, igual que un atleta hacia /not-allowed.
+    test(
+        'SCENARIO-018: PF con etapa pendiente → resolviendo; completo → no, '
+        'aun con una escritura pendiente en true', () async {
+      for (final incompleto in [
+        trainerRecienPromovido(email: 'pf@example.com'),
+        trainerCompleto(email: 'pf@example.com').copyWith(displayName: ' '),
+      ]) {
+        final auth = Completer<User?>()..complete(_MockUser());
+        final container = _container(
+          auth: auth,
+          profile: Stream.value(incompleto),
+        );
+        container.listen(authNotifierProvider, (_, __) {});
+        container.listen(userProfileProvider, (_, __) {});
+        await _settle();
+        expect(container.read(coachHubSessionResolvingProvider), isTrue);
+      }
+
+      final auth = Completer<User?>()..complete(_MockUser());
+      final container = ProviderContainer(overrides: [
+        authNotifierProvider.overrideWith(() => _ControlledAuth(auth)),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(UserRole.trainer)),
+        ),
+        userProfileHasPendingWritesProvider
+            .overrideWith((ref) => Stream<bool>.value(true)),
+      ]);
+      addTearDown(container.dispose);
+      container.listen(authNotifierProvider, (_, __) {});
+      container.listen(userProfileProvider, (_, __) {});
+      container.listen(userProfileHasPendingWritesProvider, (_, __) {});
+      await _settle();
+      expect(container.read(userProfileHasPendingWritesProvider).value, isTrue);
+      expect(container.read(coachHubSessionResolvingProvider), isFalse);
+    });
+
     // El caso real, de punta a punta: el flag tiene que pasar de true a false
     // UNA vez, cuando llega el perfil — no parpadear en el medio, y no
     // quedarse en true.

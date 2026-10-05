@@ -9,6 +9,7 @@ import 'package:treino/core/utils/deep_link_destination.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/application/email_gate_providers.dart';
+import 'package:treino/features/coach_hub/domain/hub_onboarding_stage.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -917,6 +918,355 @@ void main() {
           '/facturacion/planes',
         ]);
         expect(box.value, isNull);
+      });
+    });
+  });
+
+  // ── Gate del onboarding del PF promovido (#1331) ───────────────────────────
+  group('coachHubRedirect — gate del onboarding (/completar-perfil)', () {
+    const email = 'trainer@example.com';
+
+    // Un PF por etapa. Se verifica contra el predicado para que el fixture no
+    // mienta sobre la etapa que dice tener.
+    UserProfile conEtapa(HubOnboardingStage etapa) {
+      final p = switch (etapa) {
+        HubOnboardingStage.age => trainerRecienPromovido(),
+        HubOnboardingStage.identity =>
+          trainerCompleto().copyWith(displayName: '   '),
+        HubOnboardingStage.pf => UserProfile(
+            uid: 'test-uid',
+            email: email,
+            displayName: 'Mateo',
+            role: UserRole.trainer,
+            createdAt: DateTime.utc(2026, 1, 1),
+            updatedAt: DateTime.utc(2026, 1, 1),
+            bornAt: DateTime.utc(1990, 1, 1),
+          ),
+        HubOnboardingStage.done => trainerCompleto(),
+      };
+      expect(hubOnboardingStage(p), etapa, reason: 'fixture de la etapa');
+      return p;
+    }
+
+    ProviderContainer armar(
+      UserProfile? profile, {
+      Stream<bool>? pendiente,
+      Stream<bool>? interruptor,
+      bool conUsuario = true,
+    }) {
+      final user = _MockUser();
+      when(() => user.email).thenReturn(email);
+      final c = ProviderContainer(overrides: [
+        authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(conUsuario ? user : null)),
+        ),
+        userProfileProvider
+            .overrideWith((ref) => Stream<UserProfile?>.value(profile)),
+        emailGateEnabledProvider
+            .overrideWith((ref) => interruptor ?? Stream<bool>.value(false)),
+        userProfileHasPendingWritesProvider
+            .overrideWith((ref) => pendiente ?? Stream<bool>.value(false)),
+      ]);
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    // Deja el perfil, el interruptor y (si emite) el pendiente ya resueltos.
+    Future<ProviderContainer> listo(
+      UserProfile? profile, {
+      Stream<bool>? pendiente,
+      Stream<bool>? interruptor,
+      bool esperarPendiente = true,
+    }) async {
+      final c = armar(profile, pendiente: pendiente, interruptor: interruptor);
+      await c.read(userProfileProvider.future);
+      await c.read(emailGateEnabledProvider.future);
+      if (esperarPendiente) {
+        await c
+            .read(userProfileHasPendingWritesProvider.future)
+            .catchError((_) => false);
+      }
+      return c;
+    }
+
+    List<String> cadena(
+      ProviderContainer c,
+      String desde, {
+      DeepLinkDestinationBox? box,
+    }) {
+      final visitadas = [desde];
+      for (var i = 0; i < 5; i++) {
+        final siguiente = coachHubRedirect(
+          c.read,
+          visitadas.last,
+          initialDestination: box,
+        );
+        if (siguiente == null) return visitadas;
+        visitadas.add(siguiente);
+      }
+      fail('redirect sin punto fijo: $visitadas');
+    }
+
+    const incompletas = [
+      HubOnboardingStage.age,
+      HubOnboardingStage.identity,
+      HubOnboardingStage.pf,
+    ];
+
+    test(
+        'SCENARIO-007: entrada por etapa desde /login, /dashboard y una ruta '
+        'profunda', () async {
+      for (final etapa in incompletas) {
+        final c = await listo(conEtapa(etapa));
+        for (final ruta in ['/login', '/dashboard', '/alumnos/abc', '/']) {
+          expect(
+            coachHubRedirect(c.read, ruta),
+            kCoachHubOnboardingRoute,
+            reason: '$etapa desde $ruta',
+          );
+        }
+        expect(
+          coachHubRedirect(c.read, kCoachHubOnboardingRoute),
+          isNull,
+          reason: '$etapa: el gate no se redirige a sí mismo',
+        );
+      }
+    });
+
+    test(
+        'SCENARIO-008: etapa done y sin escritura pendiente en el gate → '
+        '/dashboard', () async {
+      final c = await listo(conEtapa(HubOnboardingStage.done));
+      expect(
+        coachHubRedirect(c.read, kCoachHubOnboardingRoute),
+        kCoachHubInitialLocation,
+      );
+    });
+
+    test('SCENARIO-009: cambiar de etapa dentro del gate no navega', () async {
+      final perfil = StreamController<UserProfile?>();
+      addTearDown(perfil.close);
+      final user = _MockUser();
+      when(() => user.email).thenReturn(email);
+      final c = ProviderContainer(overrides: [
+        authNotifierProvider
+            .overrideWith(() => _StubAuthNotifier(AsyncData(user))),
+        userProfileProvider.overrideWith((ref) => perfil.stream),
+        emailGateEnabledProvider.overrideWith((ref) => Stream.value(false)),
+        userProfileHasPendingWritesProvider
+            .overrideWith((ref) => Stream.value(false)),
+      ]);
+      addTearDown(c.dispose);
+      c.listen(userProfileProvider, (_, __) {});
+
+      for (final etapa in incompletas) {
+        perfil.add(conEtapa(etapa));
+        await Future<void>.delayed(Duration.zero);
+        expect(
+          coachHubRedirect(c.read, kCoachHubOnboardingRoute),
+          isNull,
+          reason: 'etapa $etapa dentro del gate',
+        );
+      }
+    });
+
+    test(
+        'SCENARIO-010: barrido etapas × pendiente × rutas llega a punto fijo '
+        'en ≤ 2 saltos', () async {
+      const rutas = [
+        '/login',
+        '/',
+        '/dashboard',
+        '/agenda',
+        '/alumnos',
+        '/alumnos/abc',
+        '/pagos',
+        '/ajustes',
+        '/facturacion/planes',
+        '/home/notifications',
+        '/not-allowed',
+        '/verificar-mail',
+        kCoachHubOnboardingRoute,
+      ];
+      final pendientes = <String, Stream<bool> Function()>{
+        'cargando': () => StreamController<bool>().stream,
+        'true': () => Stream<bool>.value(true),
+        'false': () => Stream<bool>.value(false),
+        'error': () => Stream<bool>.error(StateError('stream roto')),
+      };
+      for (final etapa in HubOnboardingStage.values) {
+        for (final p in pendientes.entries) {
+          final c = await listo(
+            conEtapa(etapa),
+            pendiente: p.value(),
+            esperarPendiente: p.key != 'cargando',
+          );
+          for (final ruta in rutas) {
+            final saltos = cadena(c, ruta).length - 1;
+            expect(
+              saltos,
+              lessThanOrEqualTo(2),
+              reason: '$etapa / pendiente ${p.key} / $ruta',
+            );
+          }
+        }
+      }
+    });
+
+    test('SCENARIO-011: el rol gana al onboarding (atleta y sin doc)',
+        () async {
+      final atleta = await listo(_athleteProfile());
+      final sinDoc = await listo(null);
+      for (final c in [atleta, sinDoc]) {
+        for (final ruta in ['/dashboard', '/login', kCoachHubOnboardingRoute]) {
+          expect(
+            coachHubRedirect(c.read, ruta),
+            '/not-allowed',
+            reason: ruta,
+          );
+        }
+        expect(coachHubRedirect(c.read, '/not-allowed'), isNull);
+      }
+    });
+
+    test(
+        'SCENARIO-012: el mail gana al onboarding, y al confirmarlo sigue el '
+        'onboarding', () async {
+      final sinConfirmar = await listo(
+        conEtapa(HubOnboardingStage.age),
+        interruptor: Stream<bool>.value(true),
+      );
+      expect(
+          coachHubRedirect(sinConfirmar.read, '/dashboard'), '/verificar-mail');
+      expect(coachHubRedirect(sinConfirmar.read, kCoachHubOnboardingRoute),
+          '/verificar-mail');
+
+      final confirmado = await listo(
+        conEtapa(HubOnboardingStage.age).copyWith(
+          emailVerification: mailConfirmadoPara(UserRole.trainer, email),
+        ),
+        interruptor: Stream<bool>.value(true),
+      );
+      expect(coachHubRedirect(confirmado.read, '/dashboard'),
+          kCoachHubOnboardingRoute);
+    });
+
+    test('SCENARIO-013: ?to= sobrevive al onboarding y se usa recién al salir',
+        () async {
+      final box = DeepLinkDestinationBox(
+        const DeepLinkDestination(DeepLinkTo.facturacion),
+      );
+      final enCurso = await listo(conEtapa(HubOnboardingStage.age));
+      expect(cadena(enCurso, kCoachHubInitialLocation, box: box),
+          [kCoachHubInitialLocation, kCoachHubOnboardingRoute]);
+      expect(cadena(enCurso, '/login', box: box),
+          ['/login', kCoachHubOnboardingRoute]);
+      for (var i = 0; i < 3; i++) {
+        expect(
+          coachHubRedirect(enCurso.read, kCoachHubOnboardingRoute,
+              initialDestination: box),
+          isNull,
+        );
+      }
+      expect(box.value?.to, DeepLinkTo.facturacion, reason: 'caja intacta');
+
+      final terminado = await listo(conEtapa(HubOnboardingStage.done));
+      expect(cadena(terminado, kCoachHubOnboardingRoute, box: box), [
+        kCoachHubOnboardingRoute,
+        kCoachHubInitialLocation,
+        '/facturacion/planes',
+      ]);
+      expect(box.value, isNull);
+    });
+
+    test('SCENARIO-014: trainer completo no ve el gate', () async {
+      final c = await listo(conEtapa(HubOnboardingStage.done));
+      for (final ruta in ['/dashboard', '/agenda', '/pagos', '/ajustes']) {
+        expect(coachHubRedirect(c.read, ruta), isNull, reason: ruta);
+      }
+      expect(coachHubRedirect(c.read, '/login'), kCoachHubInitialLocation);
+    });
+
+    test('SCENARIO-015: sin sesión → /login, nunca el gate', () async {
+      final c = armar(null, conUsuario: false);
+      await c.read(userProfileProvider.future);
+      for (final ruta in ['/dashboard', kCoachHubOnboardingRoute]) {
+        expect(coachHubRedirect(c.read, ruta), '/login', reason: ruta);
+      }
+    });
+
+    test('SCENARIO-016: perfil cargando no redirige', () async {
+      final user = _MockUser();
+      when(() => user.email).thenReturn(email);
+      final c = ProviderContainer(overrides: [
+        authNotifierProvider
+            .overrideWith(() => _StubAuthNotifier(AsyncData(user))),
+        userProfileProvider
+            .overrideWith((ref) => StreamController<UserProfile?>().stream),
+        emailGateEnabledProvider.overrideWith((ref) => Stream.value(false)),
+      ]);
+      addTearDown(c.dispose);
+      c.listen(userProfileProvider, (_, __) {});
+      for (final ruta in ['/dashboard', '/login', kCoachHubOnboardingRoute]) {
+        expect(coachHubRedirect(c.read, ruta), isNull, reason: ruta);
+      }
+    });
+
+    test('SCENARIO-017: auth cargando no redirige', () {
+      final c = ProviderContainer(overrides: [
+        authNotifierProvider.overrideWith(_LoadingAuthNotifier.new),
+      ]);
+      addTearDown(c.dispose);
+      for (final ruta in ['/dashboard', '/login', kCoachHubOnboardingRoute]) {
+        expect(coachHubRedirect(c.read, ruta), isNull, reason: ruta);
+      }
+    });
+
+    group('SCENARIO-019: la salida espera la escritura confirmada', () {
+      test('pendiente cargando → se queda', () async {
+        final c = await listo(
+          conEtapa(HubOnboardingStage.done),
+          pendiente: StreamController<bool>().stream,
+          esperarPendiente: false,
+        );
+        expect(c.read(userProfileHasPendingWritesProvider).isLoading, isTrue);
+        expect(coachHubRedirect(c.read, kCoachHubOnboardingRoute), isNull);
+      });
+
+      test('pendiente true → se queda', () async {
+        final c = await listo(
+          conEtapa(HubOnboardingStage.done),
+          pendiente: Stream<bool>.value(true),
+        );
+        expect(coachHubRedirect(c.read, kCoachHubOnboardingRoute), isNull);
+      });
+
+      test('pendiente false → sale', () async {
+        final c = await listo(
+          conEtapa(HubOnboardingStage.done),
+          pendiente: Stream<bool>.value(false),
+        );
+        expect(coachHubRedirect(c.read, kCoachHubOnboardingRoute),
+            kCoachHubInitialLocation);
+      });
+
+      test('el stream de pendientes con error falla abierto', () async {
+        final c = await listo(
+          conEtapa(HubOnboardingStage.done),
+          pendiente: Stream<bool>.error(StateError('stream roto')),
+        );
+        expect(c.read(userProfileHasPendingWritesProvider).hasError, isTrue);
+        expect(coachHubRedirect(c.read, kCoachHubOnboardingRoute),
+            kCoachHubInitialLocation);
+      });
+
+      test('un trainer completo FUERA del gate no mira el pendiente', () async {
+        final c = await listo(
+          conEtapa(HubOnboardingStage.done),
+          pendiente: Stream<bool>.value(true),
+        );
+        expect(coachHubRedirect(c.read, '/dashboard'), isNull);
+        expect(coachHubRedirect(c.read, '/agenda'), isNull);
       });
     });
   });

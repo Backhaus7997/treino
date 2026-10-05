@@ -29,6 +29,8 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach_hub/application/coach_hub_router_refresh.dart';
+import 'package:treino/features/coach_hub/presentation/onboarding/completar_perfil_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_login_screen.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
@@ -118,6 +120,7 @@ class _Hub {
     required this.tester,
     required this.auth,
     required this.perfil,
+    required this.pendiente,
     required this.router,
     required this.frames,
   });
@@ -130,6 +133,9 @@ class _Hub {
   /// Lo que emitiría el snapshot del perfil en Firestore. Mudo = perfil
   /// cargando.
   final StreamController<UserProfile?> perfil;
+
+  /// Lo que emitiría `watchHasPendingWrites`. Mudo = pendiente cargando.
+  final StreamController<bool> pendiente;
 
   final GoRouter router;
   final _Frames frames;
@@ -172,9 +178,13 @@ Future<_Hub> _montar(
   final perfil = StreamController<UserProfile?>.broadcast();
   addTearDown(auth.close);
   addTearDown(perfil.close);
+  final pendiente = StreamController<bool>.broadcast();
+  addTearDown(pendiente.close);
 
   final repo = _MockUserRepository();
   when(() => repo.watch(any())).thenAnswer((_) => perfil.stream);
+  when(() => repo.watchHasPendingWrites(any()))
+      .thenAnswer((_) => pendiente.stream);
 
   final container = ProviderContainer(overrides: [
     // Los dos bordes de IO. Todo lo demás —`AuthNotifier`,
@@ -189,8 +199,9 @@ Future<_Hub> _montar(
 
   final router = buildCoachHubRouter(
     // El refresh REAL, el mismo de `CoachHubApp`: es el que hace re-evaluar el
-    // redirect cuando la sesión o el perfil cambian.
-    refreshListenable: container.read(routerRefreshNotifierProvider),
+    // redirect cuando la sesión, el perfil o el pendiente de escrituras
+    // cambian.
+    refreshListenable: container.read(coachHubRouterRefreshProvider),
     read: container.read,
     initialUri: initialUri,
   );
@@ -214,6 +225,7 @@ Future<_Hub> _montar(
     tester: tester,
     auth: auth,
     perfil: perfil,
+    pendiente: pendiente,
     router: router,
     frames: frames,
   );
@@ -342,6 +354,45 @@ void main() {
       expect(find.byType(CoachHubSidebar), findsOneWidget);
       expect(find.byType(PricingScreen), findsOneWidget);
       expect(hub.frames.secuencia, ['escritorio']);
+    });
+  });
+
+  group('onboarding del PF promovido (1400×900)', () {
+    testWidgets(
+        'PF incompleto → /completar-perfil sin shell; al completar sale recién '
+        'con el ack y aterriza en el ?to= del mail', (tester) async {
+      final hub = await _montar(
+        tester,
+        size: const Size(1400, 900),
+        initialUri: _kLinkDelMail,
+      );
+
+      hub.auth.add(hub.usuario);
+      await hub.avanzar();
+      hub.perfil.add(trainerRecienPromovido(
+        uid: 'pf-1',
+        email: 'pf@example.com',
+      ).copyWith(onboardingSeen: allSurfacesSeen()));
+      await hub.avanzar();
+
+      expect(hub.ruta, kCoachHubOnboardingRoute);
+      expect(find.byType(CompletarPerfilScreen), findsOneWidget);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+
+      // La última escritura llega al perfil (optimista) pero el servidor no
+      // confirmó: sigue en el gate.
+      hub.pendiente.add(true);
+      hub.perfil.add(_perfil(UserRole.trainer));
+      await hub.avanzar();
+      expect(hub.ruta, kCoachHubOnboardingRoute);
+
+      // El ack (pendiente → false) re-evalúa el redirect SOLO por el ping.
+      hub.pendiente.add(false);
+      await hub.avanzar();
+      await tester.pumpAndSettle();
+
+      expect(hub.ruta, '/facturacion/planes');
+      expect(find.byType(CompletarPerfilScreen), findsNothing);
     });
   });
 }
