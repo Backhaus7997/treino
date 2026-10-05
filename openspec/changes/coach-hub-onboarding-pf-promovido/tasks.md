@@ -76,12 +76,12 @@ Cubre: REQ-CHW-ONB-012; SCENARIO-049, 050. Depende de: B1.
 Commit: `fix(profile): watchHasPendingWrites emite el ack de metadatos`
 Cubre: REQ-CHW-ONB-004 (parte repo/refresh); SCENARIO-019 (repo, refresh). Independiente de B2.
 
-- [ ] 3.1 **RED** — `test/features/profile/data/user_repository_test.dart`: `watchHasPendingWrites` llama `snapshots(includeMetadataChanges: true)` y emite `true` luego `false` ante ack sin cambio de datos; sin repetidos (`.distinct()`).
-- [ ] 3.2 **GREEN** — `lib/features/profile/data/user_repository.dart:803-808`: `includeMetadataChanges: true` + `.distinct()` (+3 líneas, único cambio del archivo).
-- [ ] 3.3 **RED** — `test/features/coach_hub/application/coach_hub_router_refresh_test.dart`: un cambio del ping de pendiente notifica a `coachHubRouterRefreshProvider`; `RouterRefreshNotifier` no se modificó.
-- [ ] 3.4 **GREEN** — `lib/features/coach_hub/application/coach_hub_router_refresh.dart`: `coachHubRouterRefreshProvider = Listenable.merge([routerRefreshNotifier, ping de pendiente])`. NO editar `router_refresh_notifier.dart`.
-- [ ] 3.5 **GATE** — ambos tests + tests existentes de `user_repository` y de `router_refresh_notifier`; analyze acotado; format.
-- [ ] 3.6 **Control negativo** (tras commit): quitar `includeMetadataChanges` ⇒ 3.1 en rojo; revertir.
+- [x] 3.1 **RED** — `test/features/profile/data/user_repository_test.dart`: `watchHasPendingWrites` llama `snapshots(includeMetadataChanges: true)` y emite `true` luego `false` ante ack sin cambio de datos; sin repetidos (`.distinct()`).
+- [x] 3.2 **GREEN** — `lib/features/profile/data/user_repository.dart:803-808`: `includeMetadataChanges: true` + `.distinct()` (+3 líneas, único cambio del archivo).
+- [x] 3.3 **RED** — `test/features/coach_hub/application/coach_hub_router_refresh_test.dart`: un cambio del ping de pendiente notifica a `coachHubRouterRefreshProvider`; `RouterRefreshNotifier` no se modificó.
+- [x] 3.4 **GREEN** — `lib/features/coach_hub/application/coach_hub_router_refresh.dart`: `coachHubRouterRefreshProvider = Listenable.merge([routerRefreshNotifier, ping de pendiente])`. NO editar `router_refresh_notifier.dart`.
+- [x] 3.5 **GATE** — ambos tests + tests existentes de `user_repository` y de `router_refresh_notifier`; analyze acotado; format.
+- [x] 3.6 **Control negativo** (tras commit): quitar `includeMetadataChanges` ⇒ 3.1 en rojo; revertir.
 
 ## Batch 4 — Extracciones compartidas: validadores PF y `terms_stamp`
 
