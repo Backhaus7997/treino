@@ -9,6 +9,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -222,6 +223,53 @@ void main() {
           find.text(const AuthFailure.unknown('x').userMessage), findsNothing);
       expect(_botonWidget(tester, 'APPLE').loading, isFalse);
     });
+
+    for (final entry in {
+      'oscuro': AppTheme.dark(),
+      'claro': AppTheme.light(),
+    }.entries) {
+      testWidgets(
+          'tema ${entry.key}: providerUnavailable muestra la dirección de '
+          'contacto seleccionable', (tester) async {
+        final notifier = _FakePopupNotifier();
+        await _pumpLoginSocial(tester, notifier, theme: entry.value);
+
+        await tester.tap(_boton('GOOGLE'));
+        await tester.pump();
+        notifier.resultado = const AsyncError<User?>(
+          AuthFailure.providerUnavailable(),
+          StackTrace.empty,
+        );
+        notifier.gate.complete();
+        await tester.pump();
+
+        expect(find.text(const AuthFailure.providerUnavailable().userMessage),
+            findsOneWidget);
+        expect(find.widgetWithText(SelectableText, kLegalContactEmail),
+            findsOneWidget);
+      });
+
+      testWidgets(
+          'tema ${entry.key}: popupBlocked NO muestra la dirección de contacto',
+          (tester) async {
+        final notifier = _FakePopupNotifier();
+        await _pumpLoginSocial(tester, notifier, theme: entry.value);
+
+        await tester.tap(_boton('APPLE'));
+        await tester.pump();
+        notifier.resultado = const AsyncError<User?>(
+          AuthFailure.popupBlocked(),
+          StackTrace.empty,
+        );
+        notifier.gate.complete();
+        await tester.pump();
+
+        expect(find.text(const AuthFailure.popupBlocked().userMessage),
+            findsOneWidget);
+        expect(find.text(kLegalContactEmail), findsNothing);
+        expect(find.byType(SelectableText), findsNothing);
+      });
+    }
 
     testWidgets('el éxito no navega desde la pantalla: sigue montada sin error',
         (tester) async {

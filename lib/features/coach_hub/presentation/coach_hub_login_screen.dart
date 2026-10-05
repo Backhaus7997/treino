@@ -8,6 +8,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../auth/domain/auth_failure.dart';
+import '../../auth/presentation/legal/legal_content.dart';
 import '../../auth/presentation/widgets/terms_notice_text.dart';
 import '../../../core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
@@ -53,6 +54,11 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   _Metodo? _enCurso;
   String? _error;
 
+  /// `true` cuando el error mostrado es `providerUnavailable`: el copy manda
+  /// a «escribinos al equipo» y el Hub no tiene otro canal que esta pantalla,
+  /// así que mostramos la dirección (REQ-CHW-AUTH-004).
+  bool _errorEsProveedorNoDisponible = false;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -93,6 +99,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
     setState(() {
       _enCurso = metodo;
       _error = null;
+      _errorEsProveedorNoDisponible = false;
     });
     await accion();
     // El notifier captura errores internamente (AsyncValue.guard) y los
@@ -106,6 +113,11 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
       final l10n = AppL10n.of(context);
       setState(() {
         _error = _humanizeError(state.error!, l10n);
+        _errorEsProveedorNoDisponible = state.error is AuthFailure &&
+            (state.error! as AuthFailure).maybeWhen(
+              providerUnavailable: () => true,
+              orElse: () => false,
+            );
         _enCurso = null;
       });
     } else {
@@ -224,6 +236,17 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(color: palette.danger, fontSize: 13),
                       ),
+                      if (_errorEsProveedorNoDisponible) ...[
+                        const SizedBox(height: AppSpacing.s8),
+                        SelectableText(
+                          kLegalContactEmail,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: palette.accentText,
+                            fontSize: AppTextSize.caption,
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 18),
                     TreinoButton(

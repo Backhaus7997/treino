@@ -70,7 +70,8 @@ void main() {
     test('providerUnavailable userMessage is hardcoded es-AR', () {
       expect(
         const AuthFailure.providerUnavailable().userMessage,
-        'Este método no está disponible en este momento. Probá más tarde.',
+        'Este método no está disponible. Entrá con email o escribinos al '
+        'equipo',
       );
     });
   });
