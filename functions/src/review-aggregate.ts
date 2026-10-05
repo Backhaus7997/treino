@@ -149,6 +149,16 @@ export async function recomputeAggregate(
     );
   } catch (err) {
     // REQ-RV-CF-006: catch all → log + no rethrow
+    // NOT_FOUND (gRPC 5) de `update()` es el desenlace ESPERADO de la carrera
+    // con el cascade de borrado de cuenta (#1333): `warn`, no `error`.
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 5 || code === "not-found") {
+      logger.warn(
+        `reviewAggregate: trainerPublicProfiles/${trainerId} disappeared before the write — skipping`,
+        { trainerId },
+      );
+      return;
+    }
     logger.error(
       `reviewAggregate: error recomputing for trainerId=${trainerId}`,
       { trainerId, err },

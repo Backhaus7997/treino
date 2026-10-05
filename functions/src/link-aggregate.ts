@@ -124,6 +124,16 @@ export async function recomputeAthleteCount(
     });
   } catch (err) {
     // Catch all → log + no rethrow (mirrors reviewAggregate).
+    // NOT_FOUND (gRPC 5) de `update()` es el desenlace ESPERADO de la carrera
+    // con el cascade de borrado de cuenta (#1333): `warn`, no `error`.
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 5 || code === "not-found") {
+      logger.warn(
+        `linkAggregate: trainerPublicProfiles/${trainerId} disappeared before the write — skipping`,
+        { trainerId },
+      );
+      return;
+    }
     logger.error(
       `linkAggregate: error recomputing for trainerId=${trainerId}`,
       { trainerId, err },

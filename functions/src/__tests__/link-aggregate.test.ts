@@ -11,6 +11,7 @@
 
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { DocumentReference, getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 
 process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
@@ -81,5 +82,38 @@ describe("recomputeAthleteCount", () => {
 
     jest.restoreAllMocks();
     expect((await db().collection("trainerPublicProfiles").doc(TRAINER).get()).exists).toBe(false);
+  });
+
+  it("the NOT_FOUND race logs at warn, not error (expected outcome of the cascade)", async () => {
+    await db().collection("trainerPublicProfiles").doc(TRAINER).set({ displayName: "PF", athleteCount: 0 });
+    const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    const realGet = DocumentReference.prototype.get;
+    jest.spyOn(DocumentReference.prototype, "get").mockImplementation(async function (this: DocumentReference) {
+      const snap = await realGet.call(this);
+      if (this.path === `trainerPublicProfiles/${TRAINER}`) await this.delete();
+      return snap;
+    });
+
+    await recomputeAthleteCount(testApp, TRAINER);
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("disappeared"),
+      expect.objectContaining({ trainerId: TRAINER }),
+    );
+  });
+
+  it("any other write failure still logs at error", async () => {
+    await db().collection("trainerPublicProfiles").doc(TRAINER).set({ displayName: "PF", athleteCount: 0 });
+    const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+    jest.spyOn(DocumentReference.prototype, "update").mockRejectedValue(
+      Object.assign(new Error("boom"), { code: 14 }),
+    );
+
+    await recomputeAthleteCount(testApp, TRAINER);
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });
