@@ -231,12 +231,25 @@
  * `resolverFinDePeriodo`, y MP omite `next_payment_date` en una baja que cobro, asi
  * que cae en la fecha guardada —la de B— y no en la que A pago de verdad.
  *
+ * Hay otro cruce que NO se arregla cambiando el ranking: un `pending` B tiene que
+ * seguir viendose mientras el checkout esta en curso, asi que pesa 2 contra la
+ * baja paga de A, que pesa 1. Lo que no puede hacer ese rechazo transitorio es
+ * marcar A `terminal`: si despues B se cae sin cobrar, A tiene que seguir en el
+ * barrido, ganar 1 contra 0 y acreditar lo que pago. Por eso una baja rechazada
+ * que cobro queda en el barrido hasta el fin de su periodo pago. Si esa fecha no
+ * se puede reconstruir (una prueba gratis sin `last_charged_date`, un ciclo que
+ * no entendemos), se marca `terminal` como antes: si despues ganara, la cascada
+ * de `resolverFinDePeriodo` podria darle la fecha guardada de OTRO plan, un
+ * periodo que nadie pago. Entre regalar un periodo sin cota y no recuperar uno
+ * que no podemos acotar, se elige lo segundo.
+ *
  * Lo que la guarda NO hace, a proposito:
  *
  *   - Frenar al plan anotado. Su propia baja, su pausa o su cobro rebotado
  *     escriben siempre — si no, nadie perderia nunca el plan.
- *   - Saltearse la marca `terminal`. Que un plan no mande no cambia que MP haya
- *     confirmado su baja.
+ *   - Saltearse para siempre la marca `terminal`. Una baja rechazada que no cobro
+ *     o cuyo periodo ya termino se marca en el acto; la que tiene pago pendiente
+ *     se conserva solo hasta que ese periodo termina, y solo si se lo puede fechar.
  *   - Decidir sin datos. Un estado escrito antes de que existiera la clave, o dos
  *     planes que no se pueden ordenar porque a uno le falta la fecha, se escriben
  *     como antes de la guarda. Frenar ahi podria dejar sin acreditar un pago para
@@ -956,6 +969,42 @@ async function marcarTerminalSiSeDioDeBaja(
     .collection(MP_PLANS_COLLECTION)
     .doc(planId)
     .set({ terminal: true }, { merge: true });
+}
+
+/**
+ * Decide si una baja que perdio la disputa entre planes ya puede salir del
+ * barrido. Una que no cobro no tiene nada que acreditar. Una que cobro queda
+ * hasta el fin que respaldan MP, el documento del plan o el ultimo cobro.
+ *
+ * Si las tres fuentes fallan, sale del barrido igual: sin un fin pago propio, si
+ * despues le ganara al vigente heredaria la fecha guardada de otro plan (ver "EL
+ * PLAN VIGENTE" en el encabezado).
+ */
+async function cerrarBajaRechazadaCuandoCorresponde(i: {
+  app: App;
+  planId: string;
+  status: SubscriptionStatus;
+  cobro: boolean;
+  mp: MpPreapproval;
+  planDoc: Record<string, unknown> | undefined;
+  nowMs: number;
+}): Promise<void> {
+  if (i.status !== "cancelled" || i.planDoc?.terminal === true) return;
+  if (!i.cobro) {
+    await marcarTerminalSiSeDioDeBaja(i.app, i.planId, i.status, i.planDoc);
+    return;
+  }
+
+  const finPagoMs = finPagoDelPlanVivo(i.mp, i.planDoc?.currentPeriodEnd);
+  if (finPagoMs !== null && finPagoMs > i.nowMs) return;
+
+  if (finPagoMs === null) {
+    logger.warn(
+      "mp/reconcile: baja paga rechazada sin fin pago reconstruible — sale del barrido",
+      { planId: i.planId },
+    );
+  }
+  await marcarTerminalSiSeDioDeBaja(i.app, i.planId, i.status, i.planDoc);
 }
 
 /**
@@ -2725,8 +2774,19 @@ export async function reconcileSubscription(
         status,
         statusVigente: actual?.status,
       });
-      // La baja de ESTE plan sigue siendo un hecho de MP, aunque no mande.
-      await marcarTerminalSiSeDioDeBaja(app, planId, status, planDoc);
+      // La baja de ESTE plan sigue siendo un hecho de MP, aunque no mande. Pero
+      // si cobro y todavia tiene periodo pago, sacarlo del barrido aca haria
+      // definitivo un rechazo que puede ser transitorio (por ejemplo, B
+      // `pending` hoy y cancelado sin cobro manana).
+      await cerrarBajaRechazadaCuandoCorresponde({
+        app,
+        planId,
+        status,
+        cobro,
+        mp,
+        planDoc,
+        nowMs: deps.nowMs,
+      });
       return {
         planId,
         outcome: "skipped-plan-no-vigente",
