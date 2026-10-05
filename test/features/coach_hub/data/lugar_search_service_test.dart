@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:treino/features/coach_hub/data/lugar_search_service.dart';
 
-const _key = 'KEY-DE-PRUEBA-123';
+const _credencialFalsa = 'credencial-falsa-de-test';
 
 http.Response _json(Object body, [int status = 200]) => http.Response(
       jsonEncode(body),
@@ -22,7 +22,7 @@ void main() {
           visto = req;
           return _json({'places': []});
         }),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       await service.buscar('Av. Siempreviva 742');
@@ -32,7 +32,7 @@ void main() {
         visto.url.toString(),
         'https://places.googleapis.com/v1/places:searchText',
       );
-      expect(visto.headers['X-Goog-Api-Key'], _key);
+      expect(visto.headers['X-Goog-Api-Key'], _credencialFalsa);
       expect(
         visto.headers['X-Goog-FieldMask'],
         'places.displayName,places.formattedAddress,places.location',
@@ -55,7 +55,7 @@ void main() {
             ],
           }),
         ),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       final r = await service.buscar('Av. Siempreviva 742');
@@ -84,7 +84,7 @@ void main() {
             ],
           }),
         ),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       final r = await service.buscar('calle');
@@ -100,7 +100,7 @@ void main() {
           llamadas++;
           return _json({'places': []});
         }),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       expect(await service.buscar('ab'), isEmpty);
@@ -145,7 +145,7 @@ void main() {
         () async {
       final service = LugarSearchService(
         httpClient: MockClient((_) async => _json({'error': 'x'}, 403)),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       Object? capturado;
@@ -157,7 +157,7 @@ void main() {
 
       expect(capturado, isA<LugarSearchError>());
       expect((capturado! as LugarSearchError).statusCode, 403);
-      expect(capturado.toString(), isNot(contains(_key)));
+      expect(capturado.toString(), isNot(contains(_credencialFalsa)));
     });
 
     test('excepción de red lanza LugarSearchError sin la key', () async {
@@ -167,7 +167,7 @@ void main() {
             'fallo de red en ${req.headers['X-Goog-Api-Key']}',
           ),
         ),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
 
       Object? capturado;
@@ -178,7 +178,7 @@ void main() {
       }
 
       expect(capturado, isA<LugarSearchError>());
-      expect(capturado.toString(), isNot(contains(_key)));
+      expect(capturado.toString(), isNot(contains(_credencialFalsa)));
     });
 
     test('el error de configuración no contiene la key', () async {
@@ -193,13 +193,13 @@ void main() {
         capturado = e;
       }
       expect(capturado.toString(), contains('PLACES_WEB_CLIENT_KEY'));
-      expect(capturado.toString(), isNot(contains(_key)));
+      expect(capturado.toString(), isNot(contains(_credencialFalsa)));
     });
 
     test('respuesta sin places devuelve lista vacía legítima', () async {
       final service = LugarSearchService(
         httpClient: MockClient((_) async => _json(<String, Object?>{})),
-        apiKey: _key,
+        apiKey: _credencialFalsa,
       );
       expect(await service.buscar('Av. Siempreviva 742'), isEmpty);
     });
