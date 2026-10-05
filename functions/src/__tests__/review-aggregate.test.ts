@@ -18,7 +18,7 @@
  */
 
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
-import { Timestamp, getFirestore } from "firebase-admin/firestore";
+import { DocumentReference, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -337,5 +337,39 @@ describe("SCENARIO-REV-002: dedupe by athleteId (relink manipulation)", () => {
     // Two distinct opinions: athlete1 (deduped) + athlete2. (4 + 2) / 2 = 3.
     expect(agg!.reviewCount).toBe(2);
     expect(agg!.averageRating).toBeCloseTo(3, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1333 / SC-PSD-22 — sin resurreccion fantasma durante el borrado del PF.
+// ---------------------------------------------------------------------------
+describe("SC-PSD-22: a profile deleted between the exists-check and the write is not resurrected", () => {
+  const trainerId = "psd-revagg-trainer";
+  const reviewId = "psd-revagg-link_psd-revagg-ath";
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await db().collection(COL_TRAINER_PROFILES).doc(trainerId).delete().catch(() => undefined);
+    await db().collection(COL_REVIEWS).doc(reviewId).delete().catch(() => undefined);
+  });
+
+  it("does not recreate trainerPublicProfiles/{uid} and does not throw", async () => {
+    await seedTrainerProfile(trainerId);
+    await db().collection(COL_REVIEWS).doc(reviewId).set(
+      buildReview("psd-revagg-link", "psd-revagg-ath", trainerId, 5, "ok"),
+    );
+
+    // Simula `deleteUserDocs` corriendo justo despues de la lectura del trigger.
+    const realGet = DocumentReference.prototype.get;
+    jest.spyOn(DocumentReference.prototype, "get").mockImplementation(async function (this: DocumentReference) {
+      const snap = await realGet.call(this);
+      if (this.path === `${COL_TRAINER_PROFILES}/${trainerId}`) await this.delete();
+      return snap;
+    });
+
+    await expect(recomputeAggregate(testApp, trainerId)).resolves.toBeUndefined();
+
+    jest.restoreAllMocks();
+    expect((await db().collection(COL_TRAINER_PROFILES).doc(trainerId).get()).exists).toBe(false);
   });
 });

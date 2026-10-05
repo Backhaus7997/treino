@@ -134,8 +134,14 @@ export async function recomputeAggregate(
       return;
     }
 
-    // 3. Merge aggregate fields — never overwrite identity fields.
-    await profileRef.set(update, { merge: true });
+    // 3. Update ONLY the aggregate fields — never overwrite identity fields.
+    //    `update()`, NOT `set(merge)` (#1333): the exists-check above is not
+    //    transactional, so a trigger that read the profile before the account
+    //    deletion cascade removed it (`deleteUserDocs`) would otherwise write
+    //    after and RE-CREATE `trainerPublicProfiles/{uid}` as a ghost doc with
+    //    just the aggregate. `update()` fails with NOT_FOUND instead, which
+    //    the catch below logs and swallows (REQ-RV-CF-006).
+    await profileRef.update(update);
 
     logger.info(
       `reviewAggregate: updated trainerPublicProfiles/${trainerId}`,
