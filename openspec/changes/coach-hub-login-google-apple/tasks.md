@@ -262,6 +262,12 @@ Cubre: REQ-CHW-AUTH-007; SCENARIO-CHW-AUTH-022, 025.
 
 ---
 
+## Fixes de review
+
+- [x] M1 — La invariante «ningún `await` antes de `signInWithPopup`» se prueba sobre la cadena real: `auth_service_test.dart` (Google y Apple) y `auth_notifier_test.dart` (Google y Apple) llaman sin await y verifican síncronamente. Control negativo: un `await` en `_signInWithPopup` pone rojos 2 tests del servicio; uno en `_socialSignIn` pone rojos 2 del notifier.
+- [x] M2 — `_contactar` de `/not-allowed` maneja `abrirUrl` que devuelve `false` o lanza: aviso inline (`coachHubNotAllowedContactFallback`, 3 ARBs) que remite a la dirección visible.
+- [x] L1 — `providerUnavailable`: «Este método no está disponible en este momento. Probá más tarde.» (el login del Hub no tiene canal de contacto).
+
 ## Para el USUARIO (no lo ejecuta apply)
 
 ### Checklist de consola (antes del deploy; todo en `treino-dev` = PRODUCCIÓN)
