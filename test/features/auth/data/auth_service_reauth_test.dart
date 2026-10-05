@@ -267,4 +267,76 @@ void main() {
       verifyNever(() => user.reauthenticateWithCredential(any()));
     });
   });
+
+  group('AuthService.reauthenticateWith*Popup (web)', () {
+    test('Google: re-autentica al usuario actual con un GoogleAuthProvider',
+        () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any()))
+          .thenAnswer((_) async => MockUserCredential());
+
+      await sut.reauthenticateWithGooglePopup();
+
+      final provider = verify(() => user.reauthenticateWithPopup(captureAny()))
+          .captured
+          .single;
+      expect(provider, isA<GoogleAuthProvider>());
+    });
+
+    test('Apple: re-autentica con el proveedor apple.com', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any()))
+          .thenAnswer((_) async => MockUserCredential());
+
+      await sut.reauthenticateWithApplePopup();
+
+      final provider = verify(() => user.reauthenticateWithPopup(captureAny()))
+          .captured
+          .single as OAuthProvider;
+      expect(provider.providerId, 'apple.com');
+    });
+
+    test('no usa GoogleSignIn (no existe en web)', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any()))
+          .thenAnswer((_) async => MockUserCredential());
+
+      await sut.reauthenticateWithGooglePopup();
+
+      verifyZeroInteractions(googleSignIn);
+    });
+
+    test('sin usuario → AuthFailure.userNotFound', () async {
+      when(() => fbAuth.currentUser).thenReturn(null);
+
+      await expectLater(
+        sut.reauthenticateWithGooglePopup(),
+        throwsA(const AuthFailure.userNotFound()),
+      );
+    });
+
+    test('cierra el popup → AuthFailure.signInCancelled', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any())).thenThrow(
+        FirebaseAuthException(code: 'popup-closed-by-user'),
+      );
+
+      await expectLater(
+        sut.reauthenticateWithGooglePopup(),
+        throwsA(const AuthFailure.signInCancelled()),
+      );
+    });
+
+    test('el navegador bloquea el popup → AuthFailure.popupBlocked', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any())).thenThrow(
+        FirebaseAuthException(code: 'popup-blocked'),
+      );
+
+      await expectLater(
+        sut.reauthenticateWithApplePopup(),
+        throwsA(const AuthFailure.popupBlocked()),
+      );
+    });
+  });
 }

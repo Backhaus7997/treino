@@ -5063,4 +5063,19 @@ class AppL10nEn extends AppL10n {
   @override
   String get eliminarCuentaSheetErrorNotAllowed =>
       'We couldn\'t delete your account from the app. Contact us and we\'ll sort it out.';
+
+  @override
+  String get eliminarCuentaWebReauthTitle => 'Confirm your identity';
+
+  @override
+  String get eliminarCuentaWebReauthPasswordBody =>
+      'For your security, enter your password to confirm it\'s you.';
+
+  @override
+  String get eliminarCuentaWebReauthCta => 'CONFIRM';
+
+  @override
+  String eliminarCuentaWebPopupHint(String provider) {
+    return 'To confirm it\'s you, a $provider window will open.';
+  }
 }

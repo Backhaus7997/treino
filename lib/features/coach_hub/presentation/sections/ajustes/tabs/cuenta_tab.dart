@@ -14,6 +14,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -608,7 +609,7 @@ class _DangerZone extends ConsumerWidget {
               TreinoButton(
                 label: 'ELIMINAR CUENTA', // i18n: Fase W3
                 variant: TreinoButtonVariant.danger,
-                onPressed: () => _confirmEliminarCuenta(context),
+                onPressed: () => showEliminarCuentaDialog(context),
               ),
             ],
           ),
@@ -769,30 +770,6 @@ class _Muted extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Confirmación honesta de ELIMINAR CUENTA (ADR-F12-01/F12-08): eliminar la
-/// cuenta se gestiona desde la app móvil (políticas de las stores) — no hay
-/// backend web para ejecutarlo, así que el dialog nunca promete una acción
-/// que no corre. `Entendido` sólo cierra el dialog, no muta nada.
-Future<void> _confirmEliminarCuenta(BuildContext context) {
-  return showTreinoDialog<void>(
-    context,
-    builder: (ctx) => TreinoDialog(
-      title: 'Eliminar cuenta', // i18n: Fase W3
-      body: const Text(
-        // i18n: Fase W3
-        'La eliminación de tu cuenta se gestiona desde la app TREINO, '
-        'según las políticas de las tiendas de aplicaciones. Próximamente '
-        'vas a poder hacerlo también desde acá.',
-      ),
-      destructive: true,
-      primaryLabel: 'Entendido', // i18n: Fase W3
-      onPrimaryTap: () => Navigator.of(ctx).maybePop(),
-      secondaryLabel: 'Cancelar', // i18n: Fase W3
-      onSecondaryTap: () => Navigator.of(ctx).maybePop(),
-    ),
-  );
 }
 
 /// Confirmación honesta de PAUSAR CUENTA: todavía no hay backend web para

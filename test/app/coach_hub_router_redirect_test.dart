@@ -10,6 +10,7 @@ import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/application/email_gate_providers.dart';
 import 'package:treino/features/coach_hub/domain/hub_onboarding_stage.dart';
+import 'package:treino/features/profile/application/account_deletion_notifier.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -251,6 +252,34 @@ void main() {
         ),
         profileOverride: userProfileProvider.overrideWith(
           (ref) => Stream<UserProfile?>.value(_athleteProfile()),
+        ),
+      );
+      addTearDown(container.dispose);
+
+      expect(await _call(container, '/dashboard'), '/not-allowed');
+    });
+
+    // La baja de cuenta borra el perfil ANTES que al usuario de Auth: sin la
+    // guarda, el PF caía a /not-allowed a mitad de la baja.
+    test('baja de cuenta en vuelo + perfil borrado → no redirige', () async {
+      final user = _MockUser();
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
+        ),
+      );
+      addTearDown(container.dispose);
+      container.read(accountDeletionInFlightProvider.notifier).state = true;
+
+      expect(await _call(container, '/dashboard'), isNull);
+    });
+
+    test('sin baja en vuelo, perfil borrado → /not-allowed (control)',
+        () async {
+      final user = _MockUser();
+      final container = _container(
+        authOverride: authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(user)),
         ),
       );
       addTearDown(container.dispose);

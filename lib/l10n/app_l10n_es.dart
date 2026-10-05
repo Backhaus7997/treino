@@ -5161,6 +5161,21 @@ class AppL10nEs extends AppL10n {
   @override
   String get eliminarCuentaSheetErrorNotAllowed =>
       'No pudimos eliminar tu cuenta desde la app. Escríbenos y lo resolvemos.';
+
+  @override
+  String get eliminarCuentaWebReauthTitle => 'Confirma tu identidad';
+
+  @override
+  String get eliminarCuentaWebReauthPasswordBody =>
+      'Por seguridad, introduce tu contraseña para confirmar que eres tú.';
+
+  @override
+  String get eliminarCuentaWebReauthCta => 'CONFIRMAR';
+
+  @override
+  String eliminarCuentaWebPopupHint(String provider) {
+    return 'Para confirmar que eres tú, se abrirá una ventana de $provider.';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10317,4 +10332,19 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get eliminarCuentaSheetErrorNotAllowed =>
       'No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.';
+
+  @override
+  String get eliminarCuentaWebReauthTitle => 'Confirmá tu identidad';
+
+  @override
+  String get eliminarCuentaWebReauthPasswordBody =>
+      'Por seguridad, ingresá tu contraseña para confirmar que sos vos.';
+
+  @override
+  String get eliminarCuentaWebReauthCta => 'CONFIRMAR';
+
+  @override
+  String eliminarCuentaWebPopupHint(String provider) {
+    return 'Para confirmar que sos vos, se va a abrir una ventana de $provider.';
+  }
 }

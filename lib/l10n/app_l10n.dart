@@ -8712,6 +8712,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.'**
   String get eliminarCuentaSheetErrorNotAllowed;
+
+  /// No description provided for @eliminarCuentaWebReauthTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmá tu identidad'**
+  String get eliminarCuentaWebReauthTitle;
+
+  /// No description provided for @eliminarCuentaWebReauthPasswordBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Por seguridad, ingresá tu contraseña para confirmar que sos vos.'**
+  String get eliminarCuentaWebReauthPasswordBody;
+
+  /// No description provided for @eliminarCuentaWebReauthCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIRMAR'**
+  String get eliminarCuentaWebReauthCta;
+
+  /// Aviso en el diálogo de eliminar cuenta del Coach Hub: la re-autenticación abre un popup del proveedor (Google o Apple).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para confirmar que sos vos, se va a abrir una ventana de {provider}.'**
+  String eliminarCuentaWebPopupHint(String provider);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

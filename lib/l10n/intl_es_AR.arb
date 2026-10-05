@@ -4672,5 +4672,17 @@
     }
   },
   "eliminarCuentaSheetErrorSubscriptionCancel": "No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.",
-  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos."
+  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.",
+  "eliminarCuentaWebReauthTitle": "Confirmá tu identidad",
+  "eliminarCuentaWebReauthPasswordBody": "Por seguridad, ingresá tu contraseña para confirmar que sos vos.",
+  "eliminarCuentaWebReauthCta": "CONFIRMAR",
+  "eliminarCuentaWebPopupHint": "Para confirmar que sos vos, se va a abrir una ventana de {provider}.",
+  "@eliminarCuentaWebPopupHint": {
+    "description": "Aviso en el diálogo de eliminar cuenta del Coach Hub: la re-autenticación abre un popup del proveedor (Google o Apple).",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  }
 }
