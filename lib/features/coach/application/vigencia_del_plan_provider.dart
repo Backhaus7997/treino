@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/domain/plan_vigencia.dart';
@@ -28,9 +27,12 @@ import 'package:treino/features/profile/application/user_providers.dart';
 /// `select`, así que no se reconstruyen hasta que cambia.
 const Duration _kTopeDeEspera = Duration(minutes: 1);
 
-/// Cuánto esperar, desde [ahora], para recalcular una vigencia que deja de
-/// valer en [cambio]: lo que falta, sin pasarse de un minuto.
-@visibleForTesting
+/// Cuánto esperar, desde [ahora], para recalcular algo que deja de valer en
+/// [cambio]: lo que falta, sin pasarse de un minuto.
+///
+/// Lo usan los providers que se reagendan solos en un borde de reloj:
+/// [vigenciaDelPlanProvider] y `limiteDeAlumnosProvider`. Los dos necesitan
+/// el mismo tope, por los mismos dos motivos de arriba.
 Duration esperaHasta(DateTime cambio, {required DateTime ahora}) {
   final falta = cambio.difference(ahora);
   return falta < _kTopeDeEspera ? falta : _kTopeDeEspera;
