@@ -121,6 +121,12 @@ export async function linkLoadReconcileHandler(
   // caso, justamente porque el caso no viene marcado como degradado. Y encima
   // su `tx.set(..., {merge: true})` resucitaria el doc como un fantasma.
   //
+  // (Desde #1333 `syncTrainerEntitlements` SI chequea la existencia, dentro de
+  // su transaccion, y devuelve `missing` sin escribir: eso cierra la ventana
+  // que queda ENTRE `syncTrainerLoad` y esta llamada, cuando el cascade de
+  // borrado de cuenta corre en el medio. Esta guarda de arriba sigue haciendo
+  // falta por el otro motivo: un error transitorio saltea el evento.)
+  //
   // La friccion la come el entrenador, nunca el alumno: sin perfil no se
   // bloquea a nadie. Un error transitorio cae en la misma rama y tambien
   // saltea la reconciliacion de ESTE evento, cediendole el caso al barrido de
@@ -194,6 +200,14 @@ export async function linkLoadReconcileHandler(
   try {
     const nowMs = Date.now();
     const r = await syncTrainerEntitlements(app, trainerId);
+    // Perfil borrado entre `syncTrainerLoad` y esta llamada (cascade de #1333):
+    // no se escribio nada, y no hay PF a quien mandarle mail.
+    if (r.missing) {
+      logger.info("linkLoadReconcile: users/{trainerId} no existe, salteo entitlements", {
+        trainerId,
+      });
+      return;
+    }
     logger.info("linkLoadReconcile: reconciled entitlements", {
       trainerId,
       limit: r.limit,

@@ -70,6 +70,7 @@ export const syncEntitlementsOnSubscription = onDocumentWritten(
     const nowMs = Date.now();
     try {
       const r = await syncTrainerEntitlements(ensureApp(), uid, nowMs);
+      if (r.missing) return; // PF borrado (#1333): nada que reconciliar ni anunciar.
       logger.info("syncEntitlementsOnSubscription: reconciliado", {
         trainerId: uid,
         limit: r.limit,
