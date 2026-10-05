@@ -9,7 +9,7 @@ import 'package:treino/features/profile_setup/domain/profile_setup_validators.da
 enum HubOnboardingStage { age, identity, pf, done }
 
 /// Decide la etapa de [profile]. Función pura: sin Riverpod, sin I/O y sin
-/// `DateTime.now()` oculto (`now` entra por parámetro).
+/// leer el reloj por su cuenta (`now` entra por parámetro).
 ///
 /// Devuelve la PRIMERA etapa que falle:
 /// 1. `age`: `bornAt` inválido o menor de 13 años. Va primero para no guardar

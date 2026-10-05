@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/trainer_location.dart';
@@ -85,7 +86,7 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
     setState(() {
       _locations.add(
         TrainerLocation(
-          id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
+          id: 'custom-${AppClock.now().millisecondsSinceEpoch}',
           type: TrainerLocationType.custom,
           customLabel: lugar.label,
           lat: lugar.lat,
