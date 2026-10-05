@@ -1688,7 +1688,7 @@
   "@coachHubNotAllowedTitle": {
     "description": "Coach Hub not-allowed screen \u2014 headline shown to a signed-in user without the trainer role."
   },
-  "coachHubNotAllowedBody": "El Coach Hub es solo para entrenadores. Descargá la app de treino desde App Store o Play Store e iniciá sesión ahí.",
+  "coachHubNotAllowedBody": "El Coach Hub es solo para entrenadores. Descargá la app de TREINO desde App Store o Play Store e iniciá sesión ahí.",
   "@coachHubNotAllowedBody": {
     "description": "Coach Hub not-allowed screen \u2014 explains the web is trainers-only and points to the mobile app. App Store and Play Store are named WITHOUT links (the app is not published yet)."
   },
@@ -1700,7 +1700,7 @@
   "@coachHubNotAllowedContactCta": {
     "description": "Coach Hub not-allowed screen \u2014 label of the button that opens a mailto: to the team."
   },
-  "coachHubNotAllowedMailSubject": "Quiero ser entrenador en treino",
+  "coachHubNotAllowedMailSubject": "Quiero ser entrenador en TREINO",
   "@coachHubNotAllowedMailSubject": {
     "description": "Coach Hub not-allowed screen \u2014 subject of the mailto: draft. Contains spaces on purpose; encoded as %20."
   },

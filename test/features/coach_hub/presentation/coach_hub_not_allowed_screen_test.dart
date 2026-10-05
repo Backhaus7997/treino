@@ -58,6 +58,8 @@ void main() {
         );
 
         expect(find.textContaining('App Store'), findsOneWidget);
+        // AGENTS.md: la marca va en mayúsculas.
+        expect(find.textContaining('app de TREINO'), findsOneWidget);
         expect(find.textContaining('Play Store'), findsOneWidget);
 
         // Los únicos tappables son contacto y cerrar sesión: dos TreinoButton.
@@ -114,6 +116,8 @@ void main() {
           tester.element(find.byType(CoachHubNotAllowedScreen)),
         ).coachHubNotAllowedMailSubject;
         expect(asunto, contains(' '), reason: 'el control necesita espacios');
+        expect(asunto, endsWith('TREINO'));
+        expect(Uri.decodeComponent(uri.query), contains('en TREINO'));
         expect(
             uri.toString(), contains('subject=${Uri.encodeComponent(asunto)}'));
         expect(uri.toString(), isNot(contains('+')));

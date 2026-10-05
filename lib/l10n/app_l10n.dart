@@ -4427,7 +4427,7 @@ abstract class AppL10n {
   /// Coach Hub not-allowed screen — explains the web is trainers-only and points to the mobile app. App Store and Play Store are named WITHOUT links (the app is not published yet).
   ///
   /// In es_AR, this message translates to:
-  /// **'El Coach Hub es solo para entrenadores. Descargá la app de treino desde App Store o Play Store e iniciá sesión ahí.'**
+  /// **'El Coach Hub es solo para entrenadores. Descargá la app de TREINO desde App Store o Play Store e iniciá sesión ahí.'**
   String get coachHubNotAllowedBody;
 
   /// Coach Hub not-allowed screen — line above the contact button for people who want to become a trainer.
@@ -4445,7 +4445,7 @@ abstract class AppL10n {
   /// Coach Hub not-allowed screen — subject of the mailto: draft. Contains spaces on purpose; encoded as %20.
   ///
   /// In es_AR, this message translates to:
-  /// **'Quiero ser entrenador en treino'**
+  /// **'Quiero ser entrenador en TREINO'**
   String get coachHubNotAllowedMailSubject;
 
   /// Coach Hub not-allowed screen — inline message when the mailto: cannot be opened; points to the visible address.

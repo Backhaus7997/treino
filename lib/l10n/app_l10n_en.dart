@@ -2407,7 +2407,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubNotAllowedBody =>
-      'The Coach Hub is only for trainers. Download the treino app from the App Store or Play Store and sign in there.';
+      'The Coach Hub is only for trainers. Download the TREINO app from the App Store or Play Store and sign in there.';
 
   @override
   String get coachHubNotAllowedContactPrompt =>
@@ -2418,7 +2418,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubNotAllowedMailSubject =>
-      'I want to be a trainer on treino';
+      'I want to be a trainer on TREINO';
 
   @override
   String get coachHubNotAllowedContactFallback =>
