@@ -88,11 +88,11 @@ Cubre: REQ-CHW-ONB-004 (parte repo/refresh); SCENARIO-019 (repo, refresh). Indep
 Commit: `refactor(coach-hub): validadores PF y estampado de términos compartidos`
 Cubre: REQ-CHW-ONB-008 (helper), 009 (validadores); SCENARIO-062, 064. Independiente de B1-B3.
 
-- [ ] 4.1 **RED** — `test/features/coach_hub/domain/perfil_pf_validators_test.dart`: bio 19/281 falla, 20/280 pasa; precio 499/1000000 falla, 500/999999 pasa (064).
-- [ ] 4.2 **GREEN** — `lib/features/coach_hub/domain/perfil_pf_validators.dart` (`validarBio`, `validarPrecio`); `identidad_card.dart` y `especialidad_precio_card.dart` los usan (sin copiar constantes). Tests existentes de las cards en verde sin tocar.
-- [ ] 4.3 **RED** — `test/features/profile_setup/application/terms_stamp_test.dart`: el helper arma los TRES campos `termsAcceptedAt`, `acceptedTermsVersion`, `acceptedPrivacyVersion` con versiones vigentes (062).
-- [ ] 4.4 **GREEN** — `lib/features/profile_setup/application/terms_stamp.dart`; `profile_setup_notifier.dart` (`:328-331,388-394`) pasa a usarlo. Los tests del notifier siguen verdes SIN relajarse.
-- [ ] 4.5 **GATE** — validators, terms_stamp, tests de las dos cards, `profile_setup_notifier_test`; analyze acotado; format.
+- [x] 4.1 **RED** — `test/features/coach_hub/domain/perfil_pf_validators_test.dart`: bio 19/281 falla, 20/280 pasa; precio 499/1000000 falla, 500/999999 pasa (064).
+- [x] 4.2 **GREEN** — `lib/features/coach_hub/domain/perfil_pf_validators.dart` (`validarBio`, `validarPrecio`); `identidad_card.dart` y `especialidad_precio_card.dart` los usan (sin copiar constantes). Tests existentes de las cards en verde sin tocar.
+- [x] 4.3 **RED** — `test/features/profile_setup/application/terms_stamp_test.dart`: el helper arma los TRES campos `termsAcceptedAt`, `acceptedTermsVersion`, `acceptedPrivacyVersion` con versiones vigentes (062).
+- [x] 4.4 **GREEN** — `lib/features/profile_setup/application/terms_stamp.dart`; `profile_setup_notifier.dart` (`:328-331,388-394`) pasa a usarlo. Los tests del notifier siguen verdes SIN relajarse.
+- [x] 4.5 **GATE** — validators, terms_stamp, tests de las dos cards, `profile_setup_notifier_test`; analyze acotado; format.
 
 ## Batch 5 — `HubOnboardingController` (escrituras)
 
