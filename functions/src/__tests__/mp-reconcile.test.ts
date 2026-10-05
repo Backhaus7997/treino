@@ -1508,23 +1508,18 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     expect(store.mp_plans.pA.terminal).toBe(true);
   });
 
-  it("si cobro pero no se conoce el fin, el reintento queda acotado a un ciclo", async () => {
+  it("si cobro pero no hay fin pago reconstruible, sale del barrido: no puede heredar el de B", async () => {
+    // `A_DE_BAJA` no trae fecha, ni ciclo en `auto_recurring`, ni ultimo cobro:
+    // ninguna fuente fecha lo que A pago. Si quedara en el barrido y le ganara
+    // a B, la cascada le daria la fecha guardada de B, que nadie pago.
     const { app, store } = fakeApp(VOLVIO("plan3"));
     await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE), B_PENDIENTE);
 
-    await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+    const r = await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
 
-    expect(store.mp_plans.pA.terminal).toBeUndefined();
-    expect(store.mp_plans.pA.reintentarBajaPagaHastaMs)
-      .toBe(AHORA + 31 * DIA_MS);
-
-    await reconcileSubscription(
-      app,
-      "pA",
-      fakeMp(A_DE_BAJA, AHORA + 31 * DIA_MS),
-      A_DE_BAJA,
-    );
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
     expect(store.mp_plans.pA.terminal).toBe(true);
+    expect(store.mp_plans.pA.reintentarBajaPagaHastaMs).toBeUndefined();
   });
 
   it("anota si cobro en cada escritura, y el primer cobro sin cambio de estado tambien se escribe", async () => {

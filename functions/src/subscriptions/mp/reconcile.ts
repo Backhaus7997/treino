@@ -237,9 +237,11 @@
  * marcar A `terminal`: si despues B se cae sin cobrar, A tiene que seguir en el
  * barrido, ganar 1 contra 0 y acreditar lo que pago. Por eso una baja rechazada
  * que cobro queda en el barrido hasta el fin de su periodo pago. Si esa fecha no
- * se puede reconstruir, se le da una ventana de UN ciclo desde que vimos el
- * problema (un ano ante ciclo ausente o raro): falla hacia no perder un pago,
- * pero queda acotada y no agrega una llamada nocturna para siempre.
+ * se puede reconstruir (una prueba gratis sin `last_charged_date`, un ciclo que
+ * no entendemos), se marca `terminal` como antes: si despues ganara, la cascada
+ * de `resolverFinDePeriodo` podria darle la fecha guardada de OTRO plan, un
+ * periodo que nadie pago. Entre regalar un periodo sin cota y no recuperar uno
+ * que no podemos acotar, se elige lo segundo.
  *
  * Lo que la guarda NO hace, a proposito:
  *
@@ -247,7 +249,7 @@
  *     escriben siempre — si no, nadie perderia nunca el plan.
  *   - Saltearse para siempre la marca `terminal`. Una baja rechazada que no cobro
  *     o cuyo periodo ya termino se marca en el acto; la que tiene pago pendiente
- *     se conserva solo hasta que ese periodo —o la ventana acotada— termina.
+ *     se conserva solo hasta que ese periodo termina, y solo si se lo puede fechar.
  *   - Decidir sin datos. Un estado escrito antes de que existiera la clave, o dos
  *     planes que no se pueden ordenar porque a uno le falta la fecha, se escriben
  *     como antes de la guarda. Frenar ahi podria dejar sin acreditar un pago para
@@ -874,16 +876,6 @@ const CAMPO_PLAN_VIGENTE = "mpPlanId";
 const CAMPO_COBRO_DEL_VIGENTE = "mpPlanCobro";
 
 /**
- * Tope persistido para una baja PAGA rechazada cuyo fin no se pudo reconstruir.
- * No concede acceso: solo evita sacarla del barrido antes de que pueda ganarle a
- * un checkout que despues se cae. Se escribe una vez para que el tope no se corra
- * una noche mas en cada barrido.
- */
-const CAMPO_REINTENTAR_BAJA_PAGA_HASTA_MS = "reintentarBajaPagaHastaMs";
-
-const DIA_MS = 24 * 60 * 60 * 1000;
-
-/**
  * Que tan vigente es un estado, para decidir entre dos planes del mismo PF.
  *
  *   3 — `active` / `grace`: las dos caras del `authorized` de MP. Hay medio de
@@ -984,11 +976,9 @@ async function marcarTerminalSiSeDioDeBaja(
  * barrido. Una que no cobro no tiene nada que acreditar. Una que cobro queda
  * hasta el fin que respaldan MP, el documento del plan o el ultimo cobro.
  *
- * Si las tres fuentes fallan, esperar sin limite convierte un payload raro en
- * una llamada diaria eterna. Se persiste entonces una ventana desde la primera
- * vez que lo vimos: 31 dias para mensual, 366 para anual o ciclo desconocido.
- * Es deliberadamente conservadora y NO extiende el entitlement; solo mantiene
- * viva la oportunidad de reconsiderar este plan si cambia el vigente.
+ * Si las tres fuentes fallan, sale del barrido igual: sin un fin pago propio, si
+ * despues le ganara al vigente heredaria la fecha guardada de otro plan (ver "EL
+ * PLAN VIGENTE" en el encabezado).
  */
 async function cerrarBajaRechazadaCuandoCorresponde(i: {
   app: App;
@@ -1006,31 +996,15 @@ async function cerrarBajaRechazadaCuandoCorresponde(i: {
   }
 
   const finPagoMs = finPagoDelPlanVivo(i.mp, i.planDoc?.currentPeriodEnd);
-  if (finPagoMs !== null) {
-    if (finPagoMs <= i.nowMs) {
-      await marcarTerminalSiSeDioDeBaja(i.app, i.planId, i.status, i.planDoc);
-    }
-    return;
-  }
+  if (finPagoMs !== null && finPagoMs > i.nowMs) return;
 
-  const topeGuardado = i.planDoc?.[CAMPO_REINTENTAR_BAJA_PAGA_HASTA_MS];
-  if (typeof topeGuardado === "number" && Number.isFinite(topeGuardado)) {
-    if (topeGuardado <= i.nowMs) {
-      await marcarTerminalSiSeDioDeBaja(i.app, i.planId, i.status, i.planDoc);
-    }
-    return;
+  if (finPagoMs === null) {
+    logger.warn(
+      "mp/reconcile: baja paga rechazada sin fin pago reconstruible — sale del barrido",
+      { planId: i.planId },
+    );
   }
-
-  const ventanaMs = i.planDoc?.cycle === "monthly" ? 31 * DIA_MS : 366 * DIA_MS;
-  const hastaMs = i.nowMs + ventanaMs;
-  await getFirestore(i.app)
-    .collection(MP_PLANS_COLLECTION)
-    .doc(i.planId)
-    .set({ [CAMPO_REINTENTAR_BAJA_PAGA_HASTA_MS]: hastaMs }, { merge: true });
-  logger.warn(
-    "mp/reconcile: baja paga rechazada sin fin conocido — queda en el barrido con tope",
-    { planId: i.planId, hasta: isoDeMs(hastaMs) },
-  );
+  await marcarTerminalSiSeDioDeBaja(i.app, i.planId, i.status, i.planDoc);
 }
 
 /**
