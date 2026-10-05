@@ -47,19 +47,29 @@ enum PlanLimitReason { planLimit, subscriptionInactive }
 ///   pulgar llega al CTA y el gesto de descarte es el nativo del sistema.
 enum PlanLimitPaywallForm { dialog, sheet }
 
-/// Estado de suscripción más reciente del perfil del PF.
+/// Estado de suscripción del perfil del PF, para explicar un rechazo
+/// `subscription-inactive` del servidor.
 ///
-/// Los rechazos `subscription-inactive` del servidor no incluyen el estado,
-/// así que los callsites leen este provider en el `catch`, no durante build.
-/// Mantener la extracción acá evita que cada pantalla interprete el perfil de
-/// una manera distinta.
+/// Los rechazos del servidor no incluyen el estado, así que los callsites leen
+/// este provider en el `catch`, no durante build. Mantener la extracción acá
+/// evita que cada pantalla interprete el perfil de una manera distinta.
+///
+/// `active` y `grace` dan `null`: contradicen el rechazo. Pasa con un status
+/// ausente o desconocido, que el servidor normaliza a `paused`
+/// (`subscription-state.ts`) y Dart a `active` (`SubscriptionStatusX.fromJson`).
+/// Pasarlo haría que el modal dijera «suspendida» con «Estado: activa» abajo;
+/// sin status dice «suspendida» sin la caja, como antes de #1314.
 final currentTrainerSubscriptionStatusProvider =
     Provider<SubscriptionStatus?>((ref) {
-  return ref.watch(
+  final status = ref.watch(
     userProfileProvider.select(
       (profile) => profile.valueOrNull?.subscription?.status,
     ),
   );
+  return switch (status) {
+    SubscriptionStatus.active || SubscriptionStatus.grace => null,
+    _ => status,
+  };
 });
 
 /// Fuerza la forma del paywall. SÓLO para tests.

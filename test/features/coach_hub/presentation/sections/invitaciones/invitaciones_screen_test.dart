@@ -452,6 +452,46 @@ void main() {
     }
 
     testWidgets(
+        'subscription-inactive con el perfil leído como active (status '
+        'ausente o desconocido) no dibuja «Estado: activa»', (tester) async {
+      debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+      addTearDown(() => debugPlanLimitPaywallForm = null);
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenThrow(
+        const LinkPromotionFailure$PlanLimitReached(
+          reason: 'subscription-inactive',
+          tier: SubscriptionTier.plan1,
+          limit: 2,
+          currentLoad: 2,
+          projectedLoad: 3,
+        ),
+      );
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
+        profiles: [_prof('a1', 'Ana García')],
+        promotionService: svc,
+        subscriptionStatus: SubscriptionStatus.active,
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(InvitacionesScreen)),
+        listen: false,
+      );
+      await container.read(userProfileProvider.future);
+
+      await tester.tap(find.byKey(const Key('accept_l1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('dialog_primary_button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsOneWidget);
+      expect(find.textContaining('Estado:'), findsNothing);
+    });
+
+    testWidgets(
         'aceptar → dialog de confirmación → svc.accept + snackbar de éxito',
         (tester) async {
       final svc = _MockPromotionService();
