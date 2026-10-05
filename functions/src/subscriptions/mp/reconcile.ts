@@ -325,6 +325,7 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
+import { enqueueMail } from "../../mail/enqueue-mail";
 import {
   SUBSCRIPTION_STATUSES,
   SubscriptionStatus,
@@ -1394,6 +1395,7 @@ function finPagoDelNuevoMs(nuevo: PlanNuevoDelAlumno): number | null {
  * app, y alguien tiene que poder explicarselo (o devolver, si ya cobraron los dos).
  */
 async function darDeBajaElNuevoDelAlumno(
+  app: App,
   uid: string,
   nuevo: PlanNuevoDelAlumno,
   conflictos: SuscripcionViejaDelAlumno[],
@@ -1442,6 +1444,22 @@ async function darDeBajaElNuevoDelAlumno(
         "da de baja el NUEVO, el viejo sigue; el alumno tiene que volver a hacer el cambio",
     { ...contexto, preapprovalId },
   );
+  try {
+    await enqueueMail(app, {
+      toUid: uid,
+      kind: "plan-change-cancelled",
+      scope: nuevo.planId,
+      params: { cobroDuplicado: yaCobraronLosDos ? "1" : "0" },
+    });
+  } catch (error: unknown) {
+    // `enqueueMail` es total, pero esta frontera no puede convertir una falla de
+    // aviso en una baja fallida: MP ya confirmo la cancelacion del plan nuevo.
+    logger.warn("mp/reconcile: no se pudo encolar el aviso del cambio de plan cancelado", {
+      uid,
+      planNuevo: nuevo.planId,
+      error,
+    });
+  }
   return { cancelados: 1, fallo: false };
 }
 
@@ -1700,7 +1718,8 @@ async function darDeBajaLosReemplazadosDelAlumno(
   const conflictos = vivas.filter((v) => v.solapa.conflicto);
   if (conflictos.length > 0) {
     if (cobrosExitosos(nuevo.mp.summarized) < 1) {
-      return darDeBajaElNuevoDelAlumno(uid, nuevo, conflictos, "viejo-pago-mas-alla", deps);
+      return darDeBajaElNuevoDelAlumno(
+        app, uid, nuevo, conflictos, "viejo-pago-mas-alla", deps);
     }
     // Los dos cobraron el solapamiento: se queda el que mas lejos tiene pago.
     const finDelNuevo = finPagoDelNuevoMs(nuevo);
@@ -1716,6 +1735,7 @@ async function darDeBajaLosReemplazadosDelAlumno(
     };
     if (finDelNuevo !== null && finDelViejo > finDelNuevo) {
       return darDeBajaElNuevoDelAlumno(
+        app,
         uid,
         nuevo,
         conflictos,

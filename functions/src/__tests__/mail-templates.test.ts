@@ -59,6 +59,7 @@ const KINDS: Record<MailKind, true> = {
   "inactive-account-notice": true,
   "service-cancel-confirm": true,
   "service-cancel-done": true,
+  "plan-change-cancelled": true,
   "withdrawal-confirm": true,
   "withdrawal-received": true,
   "withdrawal-expired": true,
@@ -130,6 +131,31 @@ describe("renderMail: escapes user-controlled values", () => {
     expect(out.html).not.toContain("<script>");
     expect(out.html).toContain("&lt;&lt;a&gt;script&gt;");
     expect(out.text).toContain("<<a>script>");
+  });
+});
+
+describe("plan-change-cancelled", () => {
+  const kind = "plan-change-cancelled" as MailKind;
+
+  it("explica que el cambio no se aplicó y que el plan actual sigue", () => {
+    const out = renderMail(kind, { cobroDuplicado: "0" });
+
+    expect(out.subject).toBe("Tu cambio de plan no se aplicó");
+    expect(out.text).toContain(
+      "Tu cambio de plan no se aplicó porque tu plan actual ya se había renovado.",
+    );
+    expect(out.text).toContain(
+      "Seguís con tu plan actual; podés volver a cambiarlo cuando quieras.",
+    );
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it("si ambos cobraron, dice honestamente que el reintegro se revisa a mano", () => {
+    const out = renderMail(kind, { cobroDuplicado: "1" });
+
+    expect(out.text).toContain("Mercado Pago ya te había cobrado el plan nuevo");
+    expect(out.text).toContain("el equipo de TREINO lo revisa y te escribe para devolvértelo");
+    expect(out.text).not.toContain("automát");
   });
 });
 
@@ -260,6 +286,7 @@ describe("destino del CTA", () => {
     ];
     const sinBoton = [
       "moderation-report-created", "service-cancel-done",
+      "plan-change-cancelled",
       "withdrawal-received", "withdrawal-team-notice",
     ];
     const aLaLanding = ["withdrawal-expired"];
