@@ -1442,6 +1442,88 @@ describe("reconcileSubscription — el evento tardio de un plan que ya no manda"
     expect(suscripcion(store)).toMatchObject({
       tier: "plan3", status: "cancelled", mpPlanId: "pB", mpPlanCobro: true,
     });
+    // Perdio contra otro plan pago, pero sus propios dias todavia no terminaron:
+    // sigue en el barrido por si el vigente cambia antes de FIN_DE_A.
+    expect(store.mp_plans.pA.terminal).toBeUndefined();
+  });
+
+  it("un `pending` no saca para siempre del barrido la baja paga de un plan viejo", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    const mp = fakeMpMultiPlan({
+      pA: A_PAGO_Y_CANCELADO,
+      pB: B_PENDIENTE,
+    });
+
+    // B se abrio primero y queda visible mientras el checkout sigue en curso.
+    expect((await reconcileSubscription(app, "pB", mp, B_PENDIENTE)).outcome)
+      .toBe("written");
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan3", status: "pending", mpPlanId: "pB", mpPlanCobro: false,
+    });
+
+    // La primera noticia de A ya es su baja, pero A cobro y conserva dias pagos.
+    const rechazada = await reconcileSubscription(
+      app, "pA", mp, A_PAGO_Y_CANCELADO);
+    expect(rechazada.outcome).toBe("skipped-plan-no-vigente");
+    expect(store.mp_plans.pA.terminal).toBeUndefined();
+
+    // B se cae sin cobrar. A tiene que seguir en el barrido y ganar ahora 1 > 0.
+    await mp.mpClient.cancelPreapproval("sub-b");
+    expect((await reconcileSubscription(app, "pB", mp)).outcome).toBe("written");
+    await reconcileAllSubscriptions(app, mp);
+
+    expect(suscripcion(store)).toMatchObject({
+      tier: "plan2", status: "cancelled", mpPlanId: "pA", mpPlanCobro: true,
+    });
+    expect((suscripcion(store).currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(FIN_DE_A);
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("si el periodo pago rechazado ya termino, la baja sigue siendo terminal", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE), B_PENDIENTE);
+    const vencida: MpPreapproval = {
+      ...A_PAGO_Y_CANCELADO,
+      next_payment_date: new Date(AHORA - 1).toISOString(),
+    };
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(vencida), vencida);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("si el plan rechazado no cobro, la baja sigue siendo terminal", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE), B_PENDIENTE);
+    const aSinCobro: MpPreapproval = {
+      ...A_PAGO_Y_CANCELADO,
+      summarized: { pending_charge_quantity: 0 },
+    };
+
+    const r = await reconcileSubscription(app, "pA", fakeMp(aSinCobro), aSinCobro);
+
+    expect(r.outcome).toBe("skipped-plan-no-vigente");
+    expect(store.mp_plans.pA.terminal).toBe(true);
+  });
+
+  it("si cobro pero no se conoce el fin, el reintento queda acotado a un ciclo", async () => {
+    const { app, store } = fakeApp(VOLVIO("plan3"));
+    await reconcileSubscription(app, "pB", fakeMp(B_PENDIENTE), B_PENDIENTE);
+
+    await reconcileSubscription(app, "pA", fakeMp(A_DE_BAJA), A_DE_BAJA);
+
+    expect(store.mp_plans.pA.terminal).toBeUndefined();
+    expect(store.mp_plans.pA.reintentarBajaPagaHastaMs)
+      .toBe(AHORA + 31 * DIA_MS);
+
+    await reconcileSubscription(
+      app,
+      "pA",
+      fakeMp(A_DE_BAJA, AHORA + 31 * DIA_MS),
+      A_DE_BAJA,
+    );
     expect(store.mp_plans.pA.terminal).toBe(true);
   });
 
