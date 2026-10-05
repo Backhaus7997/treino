@@ -141,11 +141,11 @@ Depende de: B2.
 Commit: `fix(auth): los links de TermsNoticeText usan accentText para contraste en light`
 Cubre: SCENARIO-CHW-AUTH-030 (REQ-CHW-AUTH-006, D13). Independiente.
 
-- [ ] 4.1 **RED** — `test/features/auth/presentation/widgets/terms_notice_text_test.dart`:
+- [x] 4.1 **RED** — `test/features/auth/presentation/widgets/terms_notice_text_test.dart`:
   en light los links usan `palette.accentText`; en dark el color resultante no cambia.
   Ver rojo (hoy usa `accent`).
-- [ ] 4.2 **GREEN** — `terms_notice_text.dart:68-71`: `accent` → `accentText`.
-- [ ] 4.3 **GATE** — test del widget + `coach_hub_login_screen_test.dart` y el test de login
+- [x] 4.2 **GREEN** — `terms_notice_text.dart:68-71`: `accent` → `accentText`.
+- [x] 4.3 **GATE** — test del widget + `coach_hub_login_screen_test.dart` y el test de login
   mobile que use `TermsNoticeText` (revisar los de `coach_hub_login_screen_test.dart:71-80`
   que miden contraste); analyze acotado.
 
