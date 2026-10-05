@@ -960,6 +960,7 @@
   "coachHubNotAllowedContactPrompt": "Want to become a trainer? Get in touch with the team.",
   "coachHubNotAllowedContactCta": "Contact the team",
   "coachHubNotAllowedMailSubject": "I want to be a trainer on treino",
+  "coachHubNotAllowedContactFallback": "We couldn't open your email app. Write to us at the address above.",
   "coachHubLoginPrompt": "Sign in with the same account you use on the mobile app.",
   "coachHubLoginEmailLabel": "Email",
   "coachHubLoginEmailRequired": "Enter your email",

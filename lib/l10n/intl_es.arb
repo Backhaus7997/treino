@@ -400,6 +400,7 @@
   "coachHubNotAllowedContactPrompt": "¿Quieres ser entrenador? Ponte en contacto con el equipo.",
   "coachHubNotAllowedContactCta": "Contactar al equipo",
   "coachHubNotAllowedMailSubject": "Quiero ser entrenador en treino",
+  "coachHubNotAllowedContactFallback": "No pudimos abrir tu correo. Escríbenos a la dirección de arriba.",
   "coachHubLoginPrompt": "Ingresa con la cuenta que ya usas en la app móvil.",
   "coachHubLoginEmailLabel": "Email",
   "coachHubLoginEmailRequired": "Ingresa tu email",

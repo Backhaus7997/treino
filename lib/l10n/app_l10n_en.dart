@@ -2421,6 +2421,10 @@ class AppL10nEn extends AppL10n {
       'I want to be a trainer on treino';
 
   @override
+  String get coachHubNotAllowedContactFallback =>
+      'We couldn\'t open your email app. Write to us at the address above.';
+
+  @override
   String get coachHubLoginPrompt =>
       'Sign in with the same account you use on the mobile app.';
 

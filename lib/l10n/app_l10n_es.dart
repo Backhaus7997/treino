@@ -2472,6 +2472,10 @@ class AppL10nEs extends AppL10n {
   String get coachHubNotAllowedMailSubject => 'Quiero ser entrenador en treino';
 
   @override
+  String get coachHubNotAllowedContactFallback =>
+      'No pudimos abrir tu correo. Escríbenos a la dirección de arriba.';
+
+  @override
   String get coachHubLoginPrompt =>
       'Ingresa con la cuenta que ya usas en la app móvil.';
 
@@ -7502,6 +7506,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubNotAllowedMailSubject => 'Quiero ser entrenador en treino';
+
+  @override
+  String get coachHubNotAllowedContactFallback =>
+      'No pudimos abrir tu correo. Escribinos a la dirección de arriba.';
 
   @override
   String get coachHubLoginPrompt =>

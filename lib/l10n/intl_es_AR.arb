@@ -1704,6 +1704,10 @@
   "@coachHubNotAllowedMailSubject": {
     "description": "Coach Hub not-allowed screen \u2014 subject of the mailto: draft. Contains spaces on purpose; encoded as %20."
   },
+  "coachHubNotAllowedContactFallback": "No pudimos abrir tu correo. Escribinos a la dirección de arriba.",
+  "@coachHubNotAllowedContactFallback": {
+    "description": "Coach Hub not-allowed screen \u2014 inline message when the mailto: cannot be opened; points to the visible address."
+  },
   "coachHubLoginPrompt": "Ingresá con la cuenta que ya usás en la app móvil.",
   "@coachHubLoginPrompt": {
     "description": "Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account."

@@ -120,6 +120,48 @@ void main() {
         expect(uri.toString(), contains('%20'));
       });
 
+      for (final falla in <String, Future<bool> Function(Uri)>{
+        'devuelve false': (_) async => false,
+        'lanza': (_) async => throw StateError('sin handler de mailto'),
+      }.entries) {
+        testWidgets(
+            'si abrirUrl ${falla.key} muestra el aviso de escribir a la '
+            'dirección visible, sin error sin manejar', (tester) async {
+          await _pump(tester, theme: entry.value(), abrirUrl: falla.value);
+
+          final l10n =
+              AppL10n.of(tester.element(find.byType(CoachHubNotAllowedScreen)));
+          expect(
+              find.text(l10n.coachHubNotAllowedContactFallback), findsNothing);
+
+          await tester.tap(
+            find.widgetWithText(
+                TreinoButton, l10n.coachHubNotAllowedContactCta),
+          );
+          await tester.pump();
+          await tester.pump();
+
+          expect(find.text(l10n.coachHubNotAllowedContactFallback),
+              findsOneWidget);
+          // La dirección sigue visible para copiarla.
+          expect(find.text(kLegalContactEmail), findsOneWidget);
+          expect(tester.takeException(), isNull);
+        });
+      }
+
+      testWidgets('si abrirUrl devuelve true no muestra el aviso',
+          (tester) async {
+        await _pump(tester, theme: entry.value());
+        final l10n =
+            AppL10n.of(tester.element(find.byType(CoachHubNotAllowedScreen)));
+        await tester.tap(
+          find.widgetWithText(TreinoButton, l10n.coachHubNotAllowedContactCta),
+        );
+        await tester.pump();
+        await tester.pump();
+        expect(find.text(l10n.coachHubNotAllowedContactFallback), findsNothing);
+      });
+
       // SCENARIO-CHW-AUTH-017
       testWidgets('Cerrar sesión invoca cerrarSesion, sin AuthService/Notifier',
           (tester) async {

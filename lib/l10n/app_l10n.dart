@@ -4448,6 +4448,12 @@ abstract class AppL10n {
   /// **'Quiero ser entrenador en treino'**
   String get coachHubNotAllowedMailSubject;
 
+  /// Coach Hub not-allowed screen — inline message when the mailto: cannot be opened; points to the visible address.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir tu correo. Escribinos a la dirección de arriba.'**
+  String get coachHubNotAllowedContactFallback;
+
   /// Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account.
   ///
   /// In es_AR, this message translates to:

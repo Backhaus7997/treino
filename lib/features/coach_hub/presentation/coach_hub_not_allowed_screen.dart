@@ -46,6 +46,8 @@ class _CoachHubNotAllowedScreenState
     extends ConsumerState<CoachHubNotAllowedScreen> {
   bool _signingOut = false;
   String? _error;
+  String? _contactError;
+  bool _contactando = false;
 
   Future<void> _signOut() async {
     if (_signingOut) return;
@@ -66,17 +68,32 @@ class _CoachHubNotAllowedScreenState
     }
   }
 
-  void _contactar() {
-    final asunto = AppL10n.of(context).coachHubNotAllowedMailSubject;
-    // `query:` + `encodeComponent`, NO `queryParameters`: éste codifica el
-    // espacio como `+`, que en un `mailto:` los clientes muestran literal.
-    widget.abrirUrl(
-      Uri(
-        scheme: 'mailto',
-        path: kLegalContactEmail,
-        query: 'subject=${Uri.encodeComponent(asunto)}',
-      ),
-    );
+  Future<void> _contactar() async {
+    if (_contactando) return;
+    _contactando = true;
+    final l10n = AppL10n.of(context);
+    setState(() => _contactError = null);
+    var abierto = false;
+    try {
+      // `query:` + `encodeComponent`, NO `queryParameters`: éste codifica el
+      // espacio como `+`, que en un `mailto:` los clientes muestran literal.
+      abierto = await widget.abrirUrl(
+        Uri(
+          scheme: 'mailto',
+          path: kLegalContactEmail,
+          query:
+              'subject=${Uri.encodeComponent(l10n.coachHubNotAllowedMailSubject)}',
+        ),
+      );
+    } catch (_) {
+      // Sin handler de `mailto:` la plataforma lanza o devuelve false; los dos
+      // casos se tratan igual: avisar y dejar la dirección visible.
+      abierto = false;
+    } finally {
+      _contactando = false;
+    }
+    if (abierto || !mounted) return;
+    setState(() => _contactError = l10n.coachHubNotAllowedContactFallback);
   }
 
   @override
@@ -147,6 +164,17 @@ class _CoachHubNotAllowedScreenState
                   expand: true,
                   onPressed: _contactar,
                 ),
+                if (_contactError != null) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    _contactError!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.barlow(
+                      color: palette.danger,
+                      fontSize: AppTextSize.bodyDense,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: AppSpacing.s8),
                 // Visible como texto: sin cliente de mail configurado el
                 // `mailto:` no hace nada y la dirección hay que poder copiarla.
