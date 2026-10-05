@@ -588,6 +588,9 @@ describe("SC-PSD-07: reason=trainer-account-deleted → aviso SOLO al alumno", (
     expect(calls[0].tokens).toEqual(["athlete-token-psd7"]);
     expect(calls[0].notification?.title).toBe("Tu entrenador cerró su cuenta");
     expect(calls[0].notification?.body).toContain("Tus rutinas, tu historial y el chat siguen en tu cuenta");
+    // La cancelación de turnos es otro paso de la cascada y puede fallar
+    // (`partial`); este trigger no sabe si salió. No puede afirmarla.
+    expect(calls[0].notification?.body).not.toMatch(/cancelad/i);
     expect(calls[0].data?.deepLink).toBe("/coach");
     // sin mail
     const queued = await db().collection(MAIL_QUEUE_COLLECTION).where("toUid", "==", athleteId).get();

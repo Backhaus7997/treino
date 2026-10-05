@@ -359,9 +359,11 @@ export async function notifyOnLinkChangeHandler(
           "Podés buscar otro."; // i18n: #1333
       } else {
         title = "Tu entrenador cerró su cuenta"; // i18n: #1333
+        // No afirma que los turnos se cancelaron: eso lo hace otro paso de la
+        // cascada, que puede fallar y volver como `partial` (review de #1341).
+        // Este trigger corre aparte y no sabe si salió.
         body = "El vínculo terminó. Tus rutinas, tu historial y el chat " +
-          "siguen en tu cuenta. Si tenían turnos agendados, quedaron " +
-          "cancelados."; // i18n: #1333
+          "siguen en tu cuenta."; // i18n: #1333
       }
     } else if (causaTerminacion === "rechazo") {
       // El PF rechazó una solicitud. Avisarle a ÉL de su propia acción es ruido.
