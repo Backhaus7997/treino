@@ -1,6 +1,14 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show
+        CollectionReference,
+        DocumentReference,
+        DocumentSnapshot,
+        FirebaseFirestore,
+        SnapshotMetadata,
+        Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -8,6 +16,9 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
 // ignore_for_file: avoid_dynamic_calls
+// Los dobles de watchHasPendingWrites mockean tipos selados de cloud_firestore
+// (mismo trato que trainer_link_repository_cache_fria_test.dart).
+// ignore_for_file: subtype_of_sealed_class
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -648,4 +659,80 @@ void main() {
       );
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // watchHasPendingWrites — la senal de pendiente que leen los gates
+  // ---------------------------------------------------------------------------
+  //
+  // fake_cloud_firestore NO emula la metadata (hasPendingWrites siempre false,
+  // e ignora includeMetadataChanges), asi que el ack del servidor no se puede
+  // observar con el fake. Se inyecta un doble de Firestore cuyo `snapshots`
+  // se comporta como el SDK real: SOLO entrega el ack (pending -> false sobre
+  // datos identicos) si se pidio includeMetadataChanges: true.
+  group('UserRepository.watchHasPendingWrites', () {
+    late _MockFirestore fs;
+    late _MockCollection col;
+    late _MockDocRef doc;
+    bool? requestedIncludeMetadata;
+
+    DocumentSnapshot<Map<String, Object?>> snap({required bool pending}) {
+      final meta = _MockMetadata();
+      when(() => meta.hasPendingWrites).thenReturn(pending);
+      final s = _MockSnap();
+      when(() => s.metadata).thenReturn(meta);
+      return s;
+    }
+
+    setUp(() {
+      fs = _MockFirestore();
+      col = _MockCollection();
+      doc = _MockDocRef();
+      requestedIncludeMetadata = null;
+      when(() => fs.collection('users')).thenReturn(col);
+      when(() => col.doc('uid-p')).thenReturn(doc);
+      when(() => doc.snapshots(
+            includeMetadataChanges: any(named: 'includeMetadataChanges'),
+          )).thenAnswer((inv) {
+        final include =
+            inv.namedArguments[#includeMetadataChanges] as bool? ?? false;
+        requestedIncludeMetadata = include;
+        return Stream.fromIterable([
+          // Escritura local optimista.
+          snap(pending: true),
+          // Ack del servidor sobre datos identicos: el SDK real lo entrega
+          // SOLO con includeMetadataChanges: true.
+          if (include) snap(pending: false),
+          // Un segundo evento de metadata que no cambia el valor.
+          if (include) snap(pending: false),
+        ]);
+      });
+    });
+
+    test(
+        'pide includeMetadataChanges: true y emite true, luego false, sin '
+        'repetidos', () async {
+      final repo = UserRepository(
+        firestore: fs,
+        gyms: GymRepository(firestore: FakeFirebaseFirestore()),
+      );
+
+      final values = await repo.watchHasPendingWrites('uid-p').toList();
+
+      expect(requestedIncludeMetadata, isTrue);
+      expect(values, [true, false]);
+    });
+  });
 }
+
+class _MockFirestore extends Mock implements FirebaseFirestore {}
+
+class _MockCollection extends Mock
+    implements CollectionReference<Map<String, Object?>> {}
+
+class _MockDocRef extends Mock
+    implements DocumentReference<Map<String, Object?>> {}
+
+class _MockSnap extends Mock
+    implements DocumentSnapshot<Map<String, Object?>> {}
+
+class _MockMetadata extends Mock implements SnapshotMetadata {}

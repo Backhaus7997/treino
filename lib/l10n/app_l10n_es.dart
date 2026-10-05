@@ -2455,6 +2455,105 @@ class AppL10nEs extends AppL10n {
       'No pudimos cerrar sesión. Inténtalo de nuevo.';
 
   @override
+  String get coachHubOnboardingAgeTitle => '¿CUÁNDO NACISTE?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tienes que tener 13 años o más.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'FECHA DE NACIMIENTO';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => '¿CÓMO TE LLAMAS?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'Este es el nombre con el que te verán tus alumnos.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'NOMBRE';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'APELLIDO';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Ingresa tu nombre';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Ingresa tu apellido';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get coachHubOnboardingPfBody =>
+      'Esto es lo que ven los alumnos cuando te buscan. Lo puedes cambiar cuando quieras.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'ESPECIALIDAD';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'TARIFA MENSUAL (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALIDAD';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'Doy clases online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Activa las clases online o suma un lugar de entrenamiento.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'LUGARES DE ENTRENAMIENTO';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'BUSCAR UN LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint =>
+      'Dirección o nombre del lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Buscar';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'No encontramos ese lugar. Prueba con la dirección completa.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'No pudimos buscar el lugar. Revisa tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'La búsqueda de lugares no está disponible en este momento. Si das clases online, puedes finalizar igual.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gimnasio';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finalizar';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continuar';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'No pudimos guardar tus datos. Inténtalo de nuevo.';
+
+  @override
   String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';
 
   @override
@@ -7489,6 +7588,105 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubSignOutError =>
       'No pudimos cerrar sesión. Probá de nuevo.';
+
+  @override
+  String get coachHubOnboardingAgeTitle => '¿CUÁNDO NACISTE?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'FECHA DE NACIMIENTO';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => '¿CÓMO TE LLAMÁS?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'Este es el nombre con el que te van a ver tus alumnos.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'NOMBRE';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'APELLIDO';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Ingresá tu nombre';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Ingresá tu apellido';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'TU PERFIL PROFESIONAL';
+
+  @override
+  String get coachHubOnboardingPfBody =>
+      'Esto es lo que ven los alumnos cuando te buscan. Lo podés cambiar cuando quieras.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'ESPECIALIDAD';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'TARIFA MENSUAL (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALIDAD';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'Doy clases online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Activá las clases online o sumá un lugar de entrenamiento.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'LUGARES DE ENTRENAMIENTO';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'BUSCAR UN LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint =>
+      'Dirección o nombre del lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Buscar';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'No encontramos ese lugar. Probá con la dirección completa.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'La búsqueda de lugares no está disponible en este momento. Si das clases online, podés finalizar igual.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
+
+  @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gimnasio';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finalizar';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continuar';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'No pudimos guardar tus datos. Probá de nuevo.';
 
   @override
   String get coachHubNotAllowedTitle => 'SOLO PARA ENTRENADORES';

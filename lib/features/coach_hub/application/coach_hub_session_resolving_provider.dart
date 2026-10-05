@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/coach_hub/domain/hub_onboarding_stage.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
@@ -42,6 +43,10 @@ import 'package:treino/features/profile/domain/user_role.dart';
 /// scaffold observa se reconstruye solo cuando el estado cambia, sin depender
 /// de la ruta.
 ///
+/// **El onboarding del PF promovido** (#1331) cuenta igual que el atleta: un
+/// trainer con `hubOnboardingStage != done` está saliendo hacia
+/// `/completar-perfil`, que es top-level y no dibuja el shell.
+///
 /// **Qué NO cuenta como resolviendo:** un error de auth sin valor. No es una
 /// espera sino un estado terminal (el redirect tampoco actúa), y una carga
 /// eterna sería peor que el banner de antes.
@@ -57,7 +62,16 @@ final coachHubSessionResolvingProvider = Provider<bool>((ref) {
   final profile = ref.watch(userProfileProvider);
   if (profile.isLoading) return true;
 
+  final perfil = profile.valueOrNull;
+
   // Un atleta, o un perfil ausente, va a `/not-allowed` (defensivo, igual que
   // el redirect).
-  return profile.valueOrNull?.role != UserRole.trainer;
+  if (perfil?.role != UserRole.trainer) return true;
+
+  // Un PF con el onboarding pendiente también sale del shell, hacia
+  // `/completar-perfil` (mismo predicado que el gate del redirect): sin esto el
+  // dashboard o el `MobileBanner` se dibujarían debajo de la transición. NO se
+  // mira el pendiente de escrituras: un PF completo que edita su perfil
+  // mostraría la vista de carga a cada guardado.
+  return hubOnboardingStage(perfil!) != HubOnboardingStage.done;
 });

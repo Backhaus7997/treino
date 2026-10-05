@@ -47,6 +47,7 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
 import '../helpers/mail_test_helpers.dart';
+import '../helpers/coach_hub_profiles.dart';
 import '../helpers/onboarding_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
@@ -77,15 +78,8 @@ class _StubAuthNotifier extends AuthNotifier {
   }
 }
 
-UserProfile _trainerProfile() => UserProfile(
-      onboardingSeen: allSurfacesSeen(),
-      uid: 'test-uid',
-      email: 'trainer@example.com',
-      displayName: 'Mateo',
-      role: UserRole.trainer,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-    );
+UserProfile _trainerProfile() =>
+    trainerCompleto(onboardingSeen: allSurfacesSeen());
 
 UserProfile _athleteProfile() => UserProfile(
       onboardingSeen: allSurfacesSeen(),

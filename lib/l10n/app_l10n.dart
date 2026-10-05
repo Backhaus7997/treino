@@ -4418,6 +4418,186 @@ abstract class AppL10n {
   /// **'No pudimos cerrar sesión. Probá de nuevo.'**
   String get coachHubSignOutError;
 
+  /// Coach Hub onboarding, age step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNDO NACISTE?'**
+  String get coachHubOnboardingAgeTitle;
+
+  /// Coach Hub onboarding, age step explanation (minimum age 13).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.'**
+  String get coachHubOnboardingAgeBody;
+
+  /// Coach Hub onboarding, label above the date of birth field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FECHA DE NACIMIENTO'**
+  String get coachHubOnboardingAgeLabel;
+
+  /// Coach Hub onboarding, identity step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE LLAMÁS?'**
+  String get coachHubOnboardingIdentityTitle;
+
+  /// Coach Hub onboarding, identity step explanation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este es el nombre con el que te van a ver tus alumnos.'**
+  String get coachHubOnboardingIdentityBody;
+
+  /// Coach Hub onboarding, first name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE'**
+  String get coachHubOnboardingFirstNameLabel;
+
+  /// Coach Hub onboarding, last name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APELLIDO'**
+  String get coachHubOnboardingLastNameLabel;
+
+  /// Coach Hub onboarding, inline error for an empty first name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu nombre'**
+  String get coachHubOnboardingFirstNameRequired;
+
+  /// Coach Hub onboarding, inline error for an empty last name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu apellido'**
+  String get coachHubOnboardingLastNameRequired;
+
+  /// Coach Hub onboarding, professional profile step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL PROFESIONAL'**
+  String get coachHubOnboardingPfTitle;
+
+  /// Coach Hub onboarding, professional profile step explanation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto es lo que ven los alumnos cuando te buscan. Lo podés cambiar cuando quieras.'**
+  String get coachHubOnboardingPfBody;
+
+  /// Coach Hub onboarding, label above the bio field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BIO'**
+  String get coachHubOnboardingPfBioLabel;
+
+  /// Coach Hub onboarding, label above the specialty chips.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESPECIALIDAD'**
+  String get coachHubOnboardingPfSpecialtyLabel;
+
+  /// Coach Hub onboarding, label above the monthly rate field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TARIFA MENSUAL (ARS)'**
+  String get coachHubOnboardingPfRateLabel;
+
+  /// Coach Hub onboarding, label of the modality block (online and in-person).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MODALIDAD'**
+  String get coachHubOnboardingPfModalityLabel;
+
+  /// Coach Hub onboarding, switch label for online coaching.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Doy clases online'**
+  String get coachHubOnboardingPfOnlineSwitch;
+
+  /// Coach Hub onboarding, hint shown while neither online nor a place is set.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá las clases online o sumá un lugar de entrenamiento.'**
+  String get coachHubOnboardingPfModalityRequired;
+
+  /// Coach Hub onboarding, label above the in-person places.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LUGARES DE ENTRENAMIENTO'**
+  String get coachHubOnboardingPfLocationsLabel;
+
+  /// Coach Hub onboarding, label above the place search field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUSCAR UN LUGAR'**
+  String get coachHubOnboardingPfLocationSearchLabel;
+
+  /// Coach Hub onboarding, hint of the place search field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dirección o nombre del lugar'**
+  String get coachHubOnboardingPfLocationSearchHint;
+
+  /// Coach Hub onboarding, button that runs the place search.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar'**
+  String get coachHubOnboardingPfLocationSearchButton;
+
+  /// Coach Hub onboarding, place search returned no results.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos ese lugar. Probá con la dirección completa.'**
+  String get coachHubOnboardingPfLocationEmpty;
+
+  /// Coach Hub onboarding, place search failed (network or HTTP).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.'**
+  String get coachHubOnboardingPfLocationNetworkError;
+
+  /// Coach Hub onboarding, place search is misconfigured (missing key). Must never read as 'no results'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La búsqueda de lugares no está disponible en este momento. Si das clases online, podés finalizar igual.'**
+  String get coachHubOnboardingPfLocationConfigError;
+
+  /// Coach Hub onboarding, retry the place search.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get coachHubOnboardingPfLocationRetry;
+
+  /// Coach Hub onboarding, tooltip of the remove-place button.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar lugar'**
+  String get coachHubOnboardingPfLocationRemove;
+
+  /// Coach Hub onboarding, label of a legacy gym-type location that has no custom label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio'**
+  String get coachHubOnboardingPfLocationGymFallback;
+
+  /// Coach Hub onboarding, final button of the professional profile step.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Finalizar'**
+  String get coachHubOnboardingPfFinish;
+
+  /// Coach Hub onboarding, continue button of the age and identity steps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Continuar'**
+  String get coachHubOnboardingContinue;
+
+  /// Coach Hub onboarding, inline error when saving a step fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tus datos. Probá de nuevo.'**
+  String get coachHubOnboardingSaveError;
+
   /// Coach Hub not-allowed screen — headline shown to a signed-in user without the trainer role.
   ///
   /// In es_AR, this message translates to:

@@ -7,7 +7,9 @@ import '../features/auth/application/auth_providers.dart';
 import '../features/auth/application/email_gate_providers.dart';
 import '../features/auth/domain/mail_verificado.dart';
 import '../features/auth/presentation/verify_mail_screen.dart';
+import '../features/coach_hub/domain/hub_onboarding_stage.dart';
 import '../features/coach_hub/presentation/coach_hub_login_screen.dart';
+import '../features/coach_hub/presentation/onboarding/completar_perfil_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/moderacion/routes.dart';
 import '../features/coach_hub/presentation/sections/actividad/routes.dart';
@@ -51,15 +53,20 @@ const _coachHubPublicRoutes = {'/login'};
 /// `ShellRoute`: quien todavía no confirmó el mail no ve el sidebar.
 const _verifyMailRoute = '/verificar-mail';
 
+/// Ruta del onboarding del PF promovido (ver `hubOnboardingStage`).
+const kCoachHubOnboardingRoute = '/completar-perfil';
+
 /// Lógica de redirect pura del Coach Hub — testeable como función standalone.
 ///
 /// Diferencias clave vs `authRedirect` mobile:
 /// 1. NO hay `/welcome`, `/register`, `/forgot-password`, `/splash` — el hub
-///    es solo para PFs ya registrados desde mobile (signup vive en mobile).
+///    es solo para PFs ya registrados (el signup vive en mobile).
 /// 2. **Role gating**: usuarios con `role != trainer` se redirigen a
 ///    `/not-allowed`. Athletes que entran por accidente ven una info page.
-/// 3. NO hay flow de profile-setup — si el PF llegó al hub es porque ya
-///    tiene profile completo desde mobile.
+/// 3. NO hay flow de profile-setup propio de la app móvil, pero el PF puede
+///    llegar INCOMPLETO (una cuenta web promovida a trainer): el Hub tiene su
+///    propio gate, que manda a [kCoachHubOnboardingRoute] mientras
+///    `hubOnboardingStage` no devuelva `done`.
 ///
 /// [initialDestination] es el destino fino que trajo un mail —
 /// `/abrir/profe?to=...` en Vercel redirige a `app.gettreino.com/?to=...`
@@ -164,6 +171,39 @@ String? coachHubRedirect(
     if (enElGateDelMail) {
       return gateOn && mailSinConfirmar ? null : kCoachHubInitialLocation;
     }
+
+    // Gate del onboarding del PF promovido (#1331): una cuenta web promovida a
+    // trainer llega SIN `bornAt`, sin nombre público o sin perfil profesional, y
+    // `hubOnboardingStage` dice qué le falta. Una sola ruta, `/completar-perfil`,
+    // y la pantalla dibuja el paso que corresponde al perfil vivo: por eso un
+    // cambio de etapa DENTRO del gate no navega.
+    //
+    // Va DESPUÉS del role gate y del mail, y ANTES de `/home/notifications` y de
+    // los aterrizajes, por la misma razón que el gate del mail: el `?to=` vive en
+    // la caja que el bloque de aterrizajes consume. Este gate NO la toca; la
+    // SALIDA va a `kCoachHubInitialLocation` (un aterrizaje) y la pasada
+    // siguiente usa el destino.
+    //
+    // ENTRADA y SALIDA contra el MISMO predicado. La salida exige además que la
+    // última escritura esté confirmada por el servidor: el stream emite el dato
+    // optimista antes del ack, y si el servidor rechaza, el PF volvería al paso
+    // sin la pantalla que mostraba el error. `pendiente` es cargando o `true`; un
+    // error del stream falla ABIERTO (`valueOrNull` es null) para no encerrarlo.
+    // Se lee SOLO acá: un PF completo que edita su perfil no depende de él.
+    //
+    // La comparación es de path EXACTO (`location` es la ruta matcheada, sin
+    // query): un `startsWith` capturaría cualquier subruta futura.
+    final etapa = hubOnboardingStage(profile);
+    final enElOnboarding = location == kCoachHubOnboardingRoute;
+    if (enElOnboarding) {
+      final pendingAsync = read(userProfileHasPendingWritesProvider);
+      final pendiente =
+          pendingAsync.isLoading || (pendingAsync.valueOrNull ?? false);
+      return etapa == HubOnboardingStage.done && !pendiente
+          ? kCoachHubInitialLocation
+          : null;
+    }
+    if (etapa != HubOnboardingStage.done) return kCoachHubOnboardingRoute;
 
     // El push de vinculación manda UN SOLO `deepLink` a las dos superficies, y
     // las rutas no coinciden: en la app móvil las solicitudes pendientes viven
@@ -393,6 +433,12 @@ GoRouter buildCoachHubRouter({
       GoRoute(
         path: _verifyMailRoute,
         builder: (_, __) => const _VerifyMailEnElHub(),
+      ),
+      // Onboarding del PF promovido. Top-level, fuera del shell: sin sidebar
+      // hasta que complete el perfil. El ancho acotado lo pone la pantalla.
+      GoRoute(
+        path: kCoachHubOnboardingRoute,
+        builder: (_, __) => const CompletarPerfilScreen(),
       ),
       ShellRoute(
         pageBuilder: (ctx, state, child) => NoTransitionPage(
