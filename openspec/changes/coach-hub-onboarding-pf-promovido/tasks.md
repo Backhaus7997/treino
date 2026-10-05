@@ -215,3 +215,10 @@ Primero `app.gettreino.com`, luego `coach-treino-dev.web.app`:
 | REQ-CHW-ONB-013 | 051-053 | B6, B8 |
 | REQ-CHW-ONB-014 | 054 | B11 |
 | REQ-CHW-ONB-015 | 055-060 | Task 0, usuario |
+
+## Fixes de review
+
+- [x] M1 — el onboarding conserva lo tipeado si el servidor rechaza la escritura (etapa fijada en `CompletarPerfilScreen` mientras la escritura está en curso o fallada; tests pf + identidad)
+- [x] M2 — un lugar `gym` legacy muestra «Gimnasio» en vez de una fila en blanco (`coachHubOnboardingPfLocationGymFallback`)
+- [x] L — `LugarSearchConfigError` ya no ofrece «Reintentar» (el error de red sí)
+- [x] NIT — parámetro `pideTerminos` muerto en `paso_identidad.dart`; doc comment colgado en `terms_stamp.dart`
