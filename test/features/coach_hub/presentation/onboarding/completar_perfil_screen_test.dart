@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
@@ -34,20 +36,30 @@ class _RepoFalible extends UserRepository {
 
   Object? errorEnUpdate;
 
+  /// Simula el servidor que rechaza DESPUÉS de que el cache local ya emitió el
+  /// perfil optimista: la escritura entra, queda colgada hasta que el test
+  /// completa la compuerta con un error, y recién ahí rechaza.
+  Completer<void>? compuertaDeRechazo;
+
   @override
   Future<void> update(
     String uid,
     Map<String, Object?> partial, {
     bool grantLocationConsent = false,
-  }) {
+  }) async {
     final e = errorEnUpdate;
     if (e != null) throw e;
-    return super
+    await super
         .update(uid, partial, grantLocationConsent: grantLocationConsent);
+    final compuerta = compuertaDeRechazo;
+    if (compuerta != null) await compuerta.future;
   }
 }
 
 enum _Paso { age, identity, pf }
+
+const _bioValida =
+    'Entreno personas hace diez años, con foco en fuerza y movilidad para todos los niveles.';
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -318,6 +330,92 @@ void main() {
         expect(boton.onPressed, isNotNull);
         expect(boton.loading, isFalse);
         expect(find.byType(BornAtField), findsOneWidget);
+      });
+
+      // M1: el servidor rechaza la ÚLTIMA escritura tras el perfil optimista.
+      testWidgets(
+          'pf: si el servidor rechaza tras el optimista, conserva lo tipeado '
+          'y muestra el error', (tester) async {
+        await sembrar(_Paso.pf);
+        await pump(tester, theme: entry.value());
+        final l10n = l10nDe(tester);
+        final original = await usuario();
+
+        await tester.enterText(
+            find.byKey(const Key('onboarding-pf-bio')), _bioValida);
+        await tester.enterText(
+            find.byKey(const Key('onboarding-pf-tarifa')), '28000');
+        await tester.tap(find.text('Yoga'));
+        await tester.tap(find.byKey(const Key('onboarding-pf-online')));
+        await tester.pump();
+
+        repo.compuertaDeRechazo = Completer<void>();
+        await tester.tap(find.byKey(const Key('onboarding-pf-finalizar')));
+        await tester.pump();
+        await tester.pump();
+        // El perfil optimista ya está en `done`, pero el servidor no confirmó:
+        // el formulario sigue montado, cargando.
+        expect(find.byKey(const Key('onboarding-pf-bio')), findsOneWidget);
+        expect(
+            tester
+                .widget<TreinoButton>(
+                    find.byKey(const Key('onboarding-pf-finalizar')))
+                .loading,
+            isTrue);
+
+        // Rechazo: el cache revierte el perfil y la escritura falla.
+        await firestore.collection('users').doc('u1').set(original);
+        repo.compuertaDeRechazo!.completeError(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        ));
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text(_bioValida), findsOneWidget);
+        expect(find.text('28000'), findsOneWidget);
+        expect(
+            tester
+                .widget<Switch>(find.byKey(const Key('onboarding-pf-online')))
+                .value,
+            isTrue);
+        expect(find.text(l10n.coachHubOnboardingSaveError), findsOneWidget);
+      });
+
+      testWidgets(
+          'identidad: si el servidor rechaza tras el optimista, conserva el '
+          'nombre tipeado y muestra el error', (tester) async {
+        await sembrar(_Paso.identity,
+            extra: {'termsAcceptedAt': DateTime.utc(2026)});
+        await pump(tester, theme: entry.value());
+        final l10n = l10nDe(tester);
+        final original = await usuario();
+
+        await tester.enterText(find.byType(TextFormField).at(0), 'Ana');
+        await tester.enterText(find.byType(TextFormField).at(1), 'Pérez');
+        await tester.pump();
+
+        repo.compuertaDeRechazo = Completer<void>();
+        await tester.tap(find.text(l10n.coachHubOnboardingContinue));
+        await tester.pump();
+        await tester.pump();
+        // Optimista: la etapa ya avanzó a `pf`, pero sigue el paso de identidad.
+        expect(find.text('Ana'), findsOneWidget);
+        expect(find.byKey(const Key('onboarding-pf-bio')), findsNothing);
+
+        await firestore.collection('users').doc('u1').set(original);
+        repo.compuertaDeRechazo!.completeError(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        ));
+        await tester.pump();
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.text('Ana'), findsOneWidget);
+        expect(find.text('Pérez'), findsOneWidget);
+        expect(find.text(l10n.coachHubOnboardingSaveError), findsOneWidget);
       });
 
       // SCENARIO-CHW-ONB-047 y 053

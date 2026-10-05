@@ -5,6 +5,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/application/hub_onboarding_controller.dart';
 import 'package:treino/features/coach_hub/domain/hub_onboarding_stage.dart';
 import 'package:treino/features/coach_hub/presentation/onboarding/onboarding_widgets.dart';
 import 'package:treino/features/coach_hub/presentation/onboarding/paso_edad.dart';
@@ -61,6 +62,13 @@ class _CompletarPerfilScreenState extends ConsumerState<CompletarPerfilScreen> {
   bool _cerrando = false;
   String? _errorAlCerrar;
 
+  /// Etapa que se está mostrando. Mientras hay una escritura en curso (o fallada)
+  /// queda FIJA: el perfil optimista puede saltar a otra etapa (o a `done`) antes
+  /// de que el servidor confirme, y si lo rechaza el perfil revierte. Desmontar
+  /// el paso en el medio perdería lo que el PF tipeó (el estado vive en el
+  /// `State` del paso). Se suelta cuando la escritura termina bien.
+  HubOnboardingStage? _etapaFijada;
+
   Future<void> _cerrarSesion() async {
     if (_cerrando) return;
     setState(() {
@@ -83,7 +91,13 @@ class _CompletarPerfilScreenState extends ConsumerState<CompletarPerfilScreen> {
   @override
   Widget build(BuildContext context) {
     final perfil = ref.watch(userProfileProvider).valueOrNull;
-    final etapa = perfil == null ? null : hubOnboardingStage(perfil);
+    final escritura = ref.watch(hubOnboardingControllerProvider);
+    final viva = perfil == null ? null : hubOnboardingStage(perfil);
+    final fijar = (escritura.isLoading || escritura.hasError) &&
+        _etapaFijada != null &&
+        _etapaFijada != HubOnboardingStage.done;
+    if (!fijar) _etapaFijada = viva;
+    final etapa = _etapaFijada;
     // Sin perfil todavía, o con la etapa `done` (el gate está por soltarlo):
     // la vista de carga neutra, no un formulario vacío.
     if (etapa == null || etapa == HubOnboardingStage.done) {
