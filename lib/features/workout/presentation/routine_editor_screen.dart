@@ -5779,6 +5779,40 @@ class _SetTable extends StatefulWidget {
 }
 
 class _SetTableState extends State<_SetTable> {
+  /// Una llave por set para llegar al `State` de cada fila (#910). Es la tabla
+  /// —no la fila— quien conoce el orden de las filas, así que es ella quien
+  /// resuelve "la celda que sigue" y le pide el foco a la fila que corresponda.
+  /// Reemplaza al `ObjectKey(set)`: misma identidad, pero consultable.
+  final Map<_EditableSet, GlobalKey<_SetRowState>> _filas = {};
+
+  /// Pasa el foco a la celda siguiente a ([fila], [campo]) en el orden de
+  /// lectura visible —kg → reps (o mín → máx) → kg del set de abajo—, o cierra
+  /// el teclado si era la última.
+  ///
+  /// Recorre `widget.sets` y no el modelo completo: esa lista ya es la de la
+  /// semana activa, así que lo que no se dibuja no entra al recorrido. No se
+  /// usa `nextFocus()`: el orden de lectura del framework metería el botón de
+  /// borrar de cada fila entre reps y el kg siguiente.
+  void _irALaSiguiente(int fila, _SetField campo) {
+    final sets = widget.sets;
+    final actual = fila < sets.length ? _filas[sets[fila]]?.currentState : null;
+    final orden = actual?.camposEnOrden ?? const <_SetField>[];
+    final pos = orden.indexOf(campo);
+    if (actual != null && pos >= 0 && pos + 1 < orden.length) {
+      actual.enfocar(orden[pos + 1]);
+      return;
+    }
+    for (var i = fila + 1; i < sets.length; i++) {
+      final siguiente = _filas[sets[i]]?.currentState;
+      final primero = siguiente?.camposEnOrden.firstOrNull;
+      if (siguiente != null && primero != null) {
+        siguiente.enfocar(primero);
+        return;
+      }
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
   /// Opens the measure-mode picker (Reps / Tiempo) anchored to the tapped
   /// header cell. Switches the whole exercise between rep-based and time-based
   /// sets. Rep ranges were removed from the UI — picking "Reps" normalises any
@@ -5902,6 +5936,7 @@ class _SetTableState extends State<_SetTable> {
     final sets = widget.sets;
     final palette = widget.palette;
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
+    _filas.removeWhere((set, _) => !sets.contains(set));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -5919,9 +5954,10 @@ class _SetTableState extends State<_SetTable> {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: _SetRow(
-              key: ObjectKey(sets[i]),
+              key: _filas.putIfAbsent(sets[i], GlobalKey<_SetRowState>.new),
               editableSet: sets[i],
               index: i,
+              onNext: (campo) => _irALaSiguiente(i, campo),
               allSets: sets,
               palette: palette,
               exerciseMode: slot.exerciseMode,
@@ -6066,6 +6102,7 @@ class _SetRow extends StatefulWidget {
     this.isInvalid = false,
     this.exerciseName,
     this.onFillColumn,
+    this.onNext,
   });
 
   final _EditableSet editableSet;
@@ -6091,6 +6128,9 @@ class _SetRow extends StatefulWidget {
   /// Replica el valor de una celda de esta fila en toda su columna. Null
   /// cuando no hay dónde replicar (un ejercicio de un solo set).
   final void Function(_SetField campo)? onFillColumn;
+
+  /// Pide pasar a la celda que sigue a [campo] (#910). La resuelve la tabla.
+  final void Function(_SetField campo)? onNext;
 
   @override
   State<_SetRow> createState() => _SetRowState();
@@ -6155,6 +6195,16 @@ class _SetRowState extends State<_SetRow> {
         ? const {_SetField.kg, _SetField.repsMin, _SetField.repsMax}
         : const {_SetField.kg, _SetField.reps};
   }
+
+  /// Las celdas de esta fila en orden de recorrido (#910).
+  List<_SetField> get camposEnOrden => [
+        for (final c in _SetField.values)
+          if (_camposVisibles.contains(c)) c,
+      ];
+
+  /// Le da el foco a [campo]. El teclado sigue abierto: es un cambio de foco
+  /// entre dos campos de texto, no un cierre y una apertura.
+  void enfocar(_SetField campo) => _focos[campo]?.requestFocus();
 
   /// Suelta el foco de las celdas que dejaron de existir.
   ///
@@ -6361,6 +6411,7 @@ class _SetRowState extends State<_SetRow> {
       onFillColumn: esKg && widget.onFillColumn != null
           ? () => widget.onFillColumn!(campo)
           : null,
+      onNext: widget.onNext == null ? null : () => widget.onNext!(campo),
     );
   }
 

@@ -2077,6 +2077,12 @@ class AppL10nEn extends AppL10n {
       'Replicate this value down the column';
 
   @override
+  String get routineEditorNextCellLabel => 'NEXT';
+
+  @override
+  String get routineEditorNextCellA11y => 'Go to the next cell';
+
+  @override
   String routineEditorAccessoryContext(
       String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';

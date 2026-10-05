@@ -731,6 +731,12 @@
   },
   "routineEditorFillColumnA11y": "Replicate this value down the column",
   "@routineEditorFillColumnA11y": {},
+  "routineEditorNextCellLabel": "NEXT",
+  "@routineEditorNextCellLabel": {
+    "description": "Botón de la barra del teclado: salta a la celda siguiente (#910)."
+  },
+  "routineEditorNextCellA11y": "Go to the next cell",
+  "@routineEditorNextCellA11y": {},
   "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
   "@routineEditorAccessoryContext": {
     "description": "Context line under the shortcuts: which cell they act on.",

@@ -26,6 +26,7 @@ class FocusedSetCell {
     required this.stepIncreaseLabel,
     required this.stepDecreaseLabel,
     this.onFillColumn,
+    this.onNext,
   });
 
   /// Identidad de la celda. La barra la usa para saber si el foco se movió a
@@ -62,6 +63,11 @@ class FocusedSetCell {
   /// —un ejercicio de un solo set no tiene dónde replicar—, y entonces el
   /// botón no se dibuja.
   final VoidCallback? onFillColumn;
+
+  /// Pasa el foco a la celda que sigue, o cierra el teclado si ésta era la
+  /// última (#910). Quien lo arma es la TABLA, no la celda: sólo ella sabe qué
+  /// filas hay y en qué orden. Null → el botón SIG. no se dibuja.
+  final VoidCallback? onNext;
 }
 
 /// Propaga la celda enfocada desde la fila que la tiene hasta la pantalla que
@@ -197,6 +203,10 @@ class KeyboardAccessoryBar extends StatelessWidget {
                           child: _BotonReplicar(onTap: cell.onFillColumn!),
                         ),
                       ],
+                      if (cell.onNext != null) ...[
+                        const SizedBox(width: AppSpacing.s8),
+                        Expanded(child: _BotonSiguiente(onTap: cell.onNext!)),
+                      ],
                     ],
                   ),
                   const SizedBox(height: AppSpacing.hairline),
@@ -329,6 +339,63 @@ class _BotonReplicar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "SIG. →" — salta a la celda siguiente sin cerrar el teclado (#910).
+///
+/// `GestureDetector` y no un botón de Material, por la misma razón que los
+/// steppers: un botón es enfocable y al tocarlo le sacaría el foco al campo,
+/// que es justo lo que este botón existe para NO hacer.
+class _BotonSiguiente extends StatelessWidget {
+  const _BotonSiguiente({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    // Relleno `accent` con texto ink: la misma pareja que el CTA primario.
+    final tinta = TreinoButtonTokens.foreground(context);
+
+    return Semantics(
+      button: true,
+      label: l10n.routineEditorNextCellA11y,
+      excludeSemantics: true,
+      child: GestureDetector(
+        key: const Key('accessory_next'),
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: KeyboardAccessoryBar._kAltoBoton,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppPalette.of(context).accent,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  l10n.routineEditorNextCellLabel,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: tinta,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.hairline),
+              Icon(TreinoIcon.arrowRight, size: 14, color: tinta),
             ],
           ),
         ),

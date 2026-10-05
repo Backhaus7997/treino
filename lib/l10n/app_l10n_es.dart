@@ -2129,6 +2129,12 @@ class AppL10nEs extends AppL10n {
       'Replicar este valor en toda la columna';
 
   @override
+  String get routineEditorNextCellLabel => 'SIG.';
+
+  @override
+  String get routineEditorNextCellA11y => 'Ir a la celda siguiente';
+
+  @override
   String routineEditorAccessoryContext(
       String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
@@ -7261,6 +7267,12 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get routineEditorFillColumnA11y =>
       'Replicar este valor en toda la columna';
+
+  @override
+  String get routineEditorNextCellLabel => 'SIG.';
+
+  @override
+  String get routineEditorNextCellA11y => 'Ir a la celda siguiente';
 
   @override
   String routineEditorAccessoryContext(
