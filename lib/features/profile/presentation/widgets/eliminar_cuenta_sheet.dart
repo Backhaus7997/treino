@@ -84,156 +84,167 @@ class EliminarCuentaSheet extends ConsumerWidget {
     final unlinkCount =
         (impact != null && impact.hasValue) ? impact.requireValue : 0;
 
+    // `busy` cubre también el tramo con el sheet de re-auth abierto, antes de
+    // que el notifier pase a AsyncLoading: ahí un segundo tap abría otro flujo.
+    final isBusy = ref.watch(accountDeletionBusyProvider);
     final isLoading = notifierState.isLoading;
+    final actionsLocked = isLoading || isBusy;
+    // deletionNotAllowed no se resuelve reintentando: el mensaje manda a
+    // escribirnos.
+    final canRetry = failure != const AuthFailure.deletionNotAllowed();
 
     return Stack(
       children: [
         SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Drag handle
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: palette.textMuted.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Drag handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: palette.textMuted.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  AppL10n.of(context).eliminarCuentaSheetTitle,
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.danger,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Builder(
-                  builder: (context) {
-                    final l10n = AppL10n.of(context);
-                    return RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          color: palette.textMuted,
-                        ),
-                        children: [
-                          TextSpan(text: l10n.eliminarCuentaSheetBodyPrefix),
-                          TextSpan(
-                            text: l10n.eliminarCuentaSheetBodyBold,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          TextSpan(text: l10n.eliminarCuentaSheetBodySuffix),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                // Eliminar la cuenta da de baja la suscripcion, pero NO devuelve
-                // plata: el arrepentimiento es otro derecho y no lo ejerce esto.
-                // Sin este aviso, quien borra la cuenta cree que se le reembolsa.
-                Text(
-                  AppL10n.of(context).eliminarCuentaSheetSubscriptionNote,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
-                ),
-                if (unlinkCount > 0) ...[
-                  const SizedBox(height: AppSpacing.s12),
+                  const SizedBox(height: 20),
                   Text(
-                    AppL10n.of(context)
-                        .eliminarCuentaSheetTrainerUnlinkNotice(unlinkCount),
+                    AppL10n.of(context).eliminarCuentaSheetTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      color: palette.danger,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Builder(
+                    builder: (context) {
+                      final l10n = AppL10n.of(context);
+                      return RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                            color: palette.textMuted,
+                          ),
+                          children: [
+                            TextSpan(text: l10n.eliminarCuentaSheetBodyPrefix),
+                            TextSpan(
+                              text: l10n.eliminarCuentaSheetBodyBold,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            TextSpan(text: l10n.eliminarCuentaSheetBodySuffix),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  // Eliminar la cuenta da de baja la suscripcion, pero NO devuelve
+                  // plata: el arrepentimiento es otro derecho y no lo ejerce esto.
+                  // Sin este aviso, quien borra la cuenta cree que se le reembolsa.
+                  Text(
+                    AppL10n.of(context).eliminarCuentaSheetSubscriptionNote,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w400,
                       fontSize: 13,
-                      color: palette.textPrimary,
+                      color: palette.textMuted,
                     ),
                   ),
-                ],
-                if (failure != null) ...[
-                  const SizedBox(height: AppSpacing.s12),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      _errorMessage(AppL10n.of(context), failure),
+                  if (unlinkCount > 0) ...[
+                    const SizedBox(height: AppSpacing.s12),
+                    Text(
+                      AppL10n.of(context)
+                          .eliminarCuentaSheetTrainerUnlinkNotice(unlinkCount),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.barlow(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        color: palette.danger,
+                        color: palette.textPrimary,
                       ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: isLoading
+                  ],
+                  if (failure != null) ...[
+                    const SizedBox(height: AppSpacing.s12),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _errorMessage(AppL10n.of(context), failure),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: palette.danger,
+                        ),
+                      ),
+                    ),
+                    if (canRetry)
+                      TextButton(
+                        onPressed: actionsLocked
+                            ? null
+                            : () => ref
+                                .read(accountDeletionNotifierProvider.notifier)
+                                .retry(context),
+                        child: Text(
+                          AppL10n.of(context).eliminarCuentaSheetRetryLabel,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                            color: palette.accentText,
+                          ),
+                        ),
+                      ),
+                  ],
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    // Do NOT pop the sheet here — the notifier's flow needs
+                    // a mounted listener for the loading overlay and the
+                    // error snackbar to be visible. The success path pops the
+                    // sheet via the `ref.listen` above.
+                    onPressed: actionsLocked
                         ? null
                         : () => ref
                             .read(accountDeletionNotifierProvider.notifier)
-                            .retry(context),
+                            .deleteAccount(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.danger,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: Text(
-                      AppL10n.of(context).eliminarCuentaSheetRetryLabel,
+                      AppL10n.of(context).eliminarCuentaSheetDeleteCta,
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
-                        color: palette.accentText,
+                        color: palette.bg,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed:
+                        isLoading ? null : () => Navigator.of(context).pop(),
+                    child: Text(
+                      AppL10n.of(context).eliminarCuentaSheetCancelCta,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: palette.textMuted,
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  // Do NOT pop the sheet here — the notifier's flow needs
-                  // a mounted listener for the loading overlay and the
-                  // error snackbar to be visible. The success path pops the
-                  // sheet via the `ref.listen` above.
-                  onPressed: isLoading
-                      ? null
-                      : () => ref
-                          .read(accountDeletionNotifierProvider.notifier)
-                          .deleteAccount(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.danger,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: Text(
-                    AppL10n.of(context).eliminarCuentaSheetDeleteCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: palette.bg,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed:
-                      isLoading ? null : () => Navigator.of(context).pop(),
-                  child: Text(
-                    AppL10n.of(context).eliminarCuentaSheetCancelCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),

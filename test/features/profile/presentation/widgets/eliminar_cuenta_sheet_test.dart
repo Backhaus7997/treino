@@ -51,6 +51,7 @@ class _ErrorNotifier extends AccountDeletionNotifier {
 }
 
 Widget _buildSheet({
+  bool busy = false,
   AccountDeletionNotifier? notifier,
   UserRole role = UserRole.athlete,
   AsyncValue<int> unlinkImpact = const AsyncData(0),
@@ -60,6 +61,7 @@ Widget _buildSheet({
   return ProviderScope(
     overrides: [
       accountDeletionNotifierProvider.overrideWith(() => notifier!),
+      accountDeletionBusyProvider.overrideWith((_) => busy),
       userProfileProvider.overrideWith((_) => Stream.value(_profile(role))),
       trainerUnlinkImpactProvider.overrideWithValue(unlinkImpact),
     ],
@@ -366,6 +368,71 @@ void main() {
         find.text('No pudimos eliminar tu cuenta. Probá de nuevo.'),
         findsNothing,
       );
+    });
+
+    testWidgets('permission-denied: sin Reintentar (no puede resolverse)',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildSheet(
+          notifier: _ErrorNotifier(const AuthFailure.deletionNotAllowed()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reintentar'), findsNothing);
+    });
+
+    testWidgets('busy (re-auth abierta): Reintentar y ELIMINAR deshabilitados',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildSheet(
+          busy: true,
+          notifier: _ErrorNotifier(const AuthFailure.deletionFailed()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final retry = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, 'Reintentar'),
+      );
+      final cta = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, 'ELIMINAR'),
+      );
+      expect(retry.onPressed, isNull);
+      expect(cta.onPressed, isNull);
+    });
+
+    testWidgets(
+        'pantalla chica y texto x2: sin overflow, con aviso, error y botón',
+        (tester) async {
+      tester.view.physicalSize = const Size(320, 480);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 480),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: _buildSheet(
+            role: UserRole.trainer,
+            unlinkImpact: const AsyncData(3),
+            notifier: _ErrorNotifier(const AuthFailure.deletionFailed()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('desvincular'), findsOneWidget);
+      expect(
+        find.text('No pudimos eliminar tu cuenta. Probá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(find.text('Reintentar'), findsOneWidget);
+      // Alcanzable: el contenido hace scroll.
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
     });
 
     testWidgets('error genérico: mensaje de deletionFailed', (tester) async {

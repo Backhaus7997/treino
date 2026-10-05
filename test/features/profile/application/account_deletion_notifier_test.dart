@@ -364,4 +364,70 @@ void main() {
       });
     }
   });
+
+  // Revisión: un requiresRecentLogin con la ventana de 5 min fresca hacía que
+  // Reintentar se saltara la re-auth y repitiera el mismo error en loop.
+  group('retry tras requiresRecentLogin', () {
+    test('reabre la re-auth aunque la ventana de 5 min esté fresca', () async {
+      var sheets = 0;
+      final container = buildContainer(
+        sheetResult: () async {
+          sheets++;
+          return FakeAuthCredential();
+        },
+      );
+      when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenThrow(
+        const AccountDeletionFailure$Server(
+          code: 'permission-denied',
+          message: 'requires recent-login',
+        ),
+      );
+      final notifier = container.read(accountDeletionNotifierProvider.notifier);
+      await notifier.deleteAccount();
+      expect(sheets, 1);
+
+      await notifier.retry();
+
+      expect(sheets, 2, reason: 'retry debe pasar por la re-auth');
+    });
+  });
+
+  // Revisión: el sheet de re-auth se abre ANTES de AsyncLoading, o sea que un
+  // segundo tap en ese tramo disparaba un segundo flujo.
+  group('guarda anti doble tap', () {
+    test('un segundo deleteAccount en vuelo es no-op', () async {
+      var sheets = 0;
+      final gate = Completer<AuthCredential?>();
+      final container = buildContainer(
+        sheetResult: () {
+          sheets++;
+          return gate.future;
+        },
+      );
+      final notifier = container.read(accountDeletionNotifierProvider.notifier);
+
+      final first = notifier.deleteAccount();
+      await notifier.deleteAccount();
+      await notifier.retry();
+
+      expect(sheets, 1);
+      expect(container.read(accountDeletionBusyProvider), isTrue);
+
+      gate.complete(null);
+      await first;
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
+
+    test('libera el busy aunque el flujo falle', () async {
+      when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenThrow(
+        const AccountDeletionFailure$Server(code: 'internal', message: 'x'),
+      );
+      final container =
+          buildContainer(sheetResult: () async => FakeAuthCredential());
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
+  });
 }
