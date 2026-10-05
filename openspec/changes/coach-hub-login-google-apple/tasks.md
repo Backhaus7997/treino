@@ -268,6 +268,11 @@ Cubre: REQ-CHW-AUTH-007; SCENARIO-CHW-AUTH-022, 025.
 - [x] M2 — `_contactar` de `/not-allowed` maneja `abrirUrl` que devuelve `false` o lanza: aviso inline (`coachHubNotAllowedContactFallback`, 3 ARBs) que remite a la dirección visible.
 - [x] L1 — `providerUnavailable`: «Este método no está disponible en este momento. Probá más tarde.» (el login del Hub no tiene canal de contacto).
 
+## Fixes de Codex (PR #1330)
+
+- [x] C1 — La marca va en mayúsculas (`TREINO`, AGENTS.md:265) en las claves `coachHubNotAllowedBody` y `coachHubNotAllowedMailSubject` de los 3 ARBs (+ l10n generado); el test del mailto y el del cuerpo fijan el texto nuevo. Direcciones y dominios sin tocar.
+- [x] C2 — `providerUnavailable` es accionable (REQ-CHW-AUTH-004): copy «Este método no está disponible. Entrá con email o escribinos al equipo» y el login del Hub muestra `kLegalContactEmail` como `SelectableText` solo para este error. Tests en claro/oscuro (muestra con `providerUnavailable`, no con `popupBlocked`). Supera a L1. Spec (tabla y SCENARIO-CHW-AUTH-014) y design alineados.
+
 ## Para el USUARIO (no lo ejecuta apply)
 
 ### Checklist de consola (antes del deploy; todo en `treino-dev` = PRODUCCIÓN)

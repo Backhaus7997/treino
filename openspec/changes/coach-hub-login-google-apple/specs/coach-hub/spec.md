@@ -167,7 +167,7 @@ en los ARB** (ADR-I18N-002, guardado por
 |---|---|---|---|
 | `popup-blocked` | `AuthFailure.popupBlocked()` | «Tu navegador bloqueó la ventana. Permití ventanas emergentes y probá de nuevo» | no |
 | `account-exists-with-different-credential` | `accountExistsWithDifferentCredential` (existente) | «Ya tenés una cuenta con ese email. Entrá con el método que usaste al registrarte» | no |
-| `unauthorized-domain`, `operation-not-allowed`, `invalid-credential` | `AuthFailure.providerUnavailable()` | «Este método no está disponible. Entrá con email o escribinos» | **sí, non-fatal** (`reason: 'AuthService.$camino: proveedor no disponible (${e.code})'`) |
+| `unauthorized-domain`, `operation-not-allowed`, `invalid-credential` | `AuthFailure.providerUnavailable()` | «Este método no está disponible. Entrá con email o escribinos al equipo» (el login del Hub muestra debajo la dirección `kLegalContactEmail` como texto seleccionable, solo para este error) | **sí, non-fatal** (`reason: 'AuthService.$camino: proveedor no disponible (${e.code})'`) |
 
 El nuevo copy de `account-exists-with-different-credential` MUST ser el mismo que ve
 mobile (`auth_failure.dart` es compartido); los tests de mobile que lo citen MUST
@@ -199,8 +199,10 @@ consola del navegador; se acepta, Analytics queda fuera de alcance.)
 
 - GIVEN `signInWithPopup` lanza `unauthorized-domain` (o `operation-not-allowed`)
 - WHEN se mapea
-- THEN el failure es `providerUnavailable` con «Este método no está disponible...» y
-  mención al email
+- THEN el failure es `providerUnavailable` con «Este método no está disponible. Entrá con
+  email o escribinos al equipo»
+- AND el login del Hub muestra debajo del mensaje la dirección `kLegalContactEmail` (texto
+  seleccionable); ningún otro error la muestra
 - AND se emite un reporte non-fatal con el code
 - AND el usuario NO queda autenticado
 

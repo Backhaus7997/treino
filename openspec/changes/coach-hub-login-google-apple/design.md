@@ -85,7 +85,8 @@ const factory AuthFailure.providerUnavailable() = _ProviderUnavailable;
 
 Copy (`userMessage`): `popupBlocked` «Tu navegador bloqueó la ventana. Permití ventanas
 emergentes y probá de nuevo» · `providerUnavailable` «Este método no está disponible. Entrá
-con email o escribinos» · `accountExistsWithDifferentCredential` pasa a «Ya tenés una cuenta
+con email o escribinos al equipo» (el login del Hub muestra debajo `kLegalContactEmail`
+como `SelectableText`, solo para este error) · `accountExistsWithDifferentCredential` pasa a «Ya tenés una cuenta
 con ese email. Entrá con el método que usaste al registrarte» (también lo ve mobile).
 Non-fatal: `reason: 'AuthService.$camino: proveedor no disponible (${e.code})'`.
 
