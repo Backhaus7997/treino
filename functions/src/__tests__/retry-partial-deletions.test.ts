@@ -48,6 +48,8 @@ import * as trainerData from "../cascade/trainer-data";
 import { createMpClient } from "../subscriptions/mp/client";
 import {
   MAX_RETRY_ATTEMPTS,
+  RETRY_BATCH_LIMIT,
+  RETRY_SCHEDULE_OPTIONS,
   retryPartialDeletionsHandler,
 } from "../retention/retry-partial-deletions";
 
@@ -267,5 +269,83 @@ describe("intentos y rendicion", () => {
     const r = await retryPartialDeletionsHandler(app, { limit: 1 });
 
     expect(r.scanned).toBe(1);
+  });
+});
+
+describe("carrera con un borrado que se vuelve a correr", () => {
+  it("si el audit doc cambia entre la lectura y la escritura, no pisa lo nuevo y lo saltea", async () => {
+    await partial(PF);
+    // Mientras la cascada del barrido corre, la persona vuelve a pedir el
+    // borrado: `writeStarted` hace set() y deja el doc fresco en `started`.
+    const cascade = jest.fn(async () => {
+      await db().collection("audit_log").doc(PF).set({ uid: PF, status: "started", provider: "password" });
+      return { deletedCollections: ["posts"], errors: [] };
+    });
+
+    const r = await retryPartialDeletionsHandler(app, { cascade });
+
+    expect(r).toMatchObject({ scanned: 1, succeeded: 0, stillPartial: 0, failed: 0, skipped: 1 });
+    const a = await audit(PF);
+    expect(a.status).toBe("started");
+    expect(a.retryCount).toBeUndefined();
+    expect(a.errors).toBeUndefined();
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining("retryPartialDeletions"),
+      expect.objectContaining({ uid: PF })
+    );
+  });
+});
+
+describe("opciones del schedule", () => {
+  it("le da tiempo y memoria a 20 cascadas secuenciales", () => {
+    expect(RETRY_SCHEDULE_OPTIONS.timeoutSeconds).toBe(540);
+    expect(RETRY_SCHEDULE_OPTIONS.memory).toBe("512MiB");
+    expect(RETRY_BATCH_LIMIT).toBeLessThanOrEqual(20);
+  });
+});
+
+describe("casos de borde del barrido", () => {
+  it("auth/user-not-found cuenta como exito al reintentar la baja de Auth", async () => {
+    // Sin usuario de Auth: deleteUser tira auth/user-not-found.
+    await partial(PF, { errors: ["auth: boom"] });
+
+    const r = await retryPartialDeletionsHandler(app);
+
+    expect(r).toMatchObject({ succeeded: 1, stillPartial: 0 });
+    const a = await audit(PF);
+    expect(a.status).toBe("success");
+    expect(a.errors).toEqual([]);
+  });
+
+  it("un uid que explota no frena a los siguientes", async () => {
+    await partial(PF);
+    await partial(ATH, { errors: ["athlete-data: boom"] });
+    const real = jest.requireActual("../cascade/run-data-cascade").runDataCascade;
+    const cascade = jest.fn(async (a: App, uid: string) => {
+      if (uid === PF) throw new Error("revienta");
+      return real(a, uid);
+    });
+
+    const r = await retryPartialDeletionsHandler(app, { cascade });
+
+    expect(r.scanned).toBe(2);
+    expect(r.succeeded).toBe(1);
+    expect((await audit(ATH)).status).toBe("success");
+    expect((await audit(PF)).status).toBe("partial");
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("retryPartialDeletions"),
+      expect.objectContaining({ uid: PF })
+    );
+  });
+
+  it("previous >= maxAttempts (tope inyectado) cierra como failed sin correr la cascada", async () => {
+    await partial(PF, { retryCount: 2 });
+    const cascade = jest.fn();
+
+    const r = await retryPartialDeletionsHandler(app, { maxAttempts: 2, cascade });
+
+    expect(r.failed).toBe(1);
+    expect(cascade).not.toHaveBeenCalled();
+    expect((await audit(PF)).status).toBe("failed");
   });
 });
