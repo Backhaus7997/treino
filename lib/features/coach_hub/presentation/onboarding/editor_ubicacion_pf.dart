@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/features/gyms/presentation/widgets/google_maps_attribution.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_input.dart';
@@ -338,14 +339,7 @@ class _Resultados extends StatelessWidget {
           // de Google exige la atribución textual visible. Es el nombre de marca:
           // no se traduce, por eso es una constante y no una clave ARB.
           const SizedBox(height: AppSpacing.s8),
-          Text(
-            _atribucionGoogleMaps,
-            textAlign: TextAlign.end,
-            style: GoogleFonts.barlow(
-              color: palette.textMuted,
-              fontSize: AppTextSize.bodyDense,
-            ),
-          ),
+          const GoogleMapsAttribution(),
         ],
       ),
     );
@@ -410,6 +404,3 @@ class _Candidato extends StatelessWidget {
     );
   }
 }
-
-/// Atribución textual exigida por la política de Google Places.
-const _atribucionGoogleMaps = 'Google Maps';

@@ -9,6 +9,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach/presentation/widgets/location_permission_rationale_sheet.dart';
 import '../../../gyms/application/places_providers.dart';
+import '../../../gyms/presentation/widgets/google_maps_attribution.dart';
 import '../../../profile_setup/presentation/widgets/gym_card.dart';
 
 /// Distance-ranked nearby-gyms section — the `emptyQueryContent` widget
@@ -178,6 +179,7 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
         // no "Ver más" expand step. The list already scrolls inside
         // ProfileGymScreen's SingleChildScrollView.
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final gym in deduped) ...[
               GymCard(
@@ -199,6 +201,7 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
               ),
               const SizedBox(height: 12),
             ],
+            const GoogleMapsAttribution(),
           ],
         );
       },

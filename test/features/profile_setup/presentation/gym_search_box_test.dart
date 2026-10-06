@@ -99,6 +99,8 @@ void main() {
     expect(find.byType(GymCard), findsWidgets);
     expect(find.text('QIVOX Villa Warcalde'), findsOneWidget);
     expect(find.text('Some street 123'), findsOneWidget);
+    // Política de Places: resultados fuera de un mapa de Google => atribución.
+    expect(find.text('Google Maps'), findsOneWidget);
   });
 
   testWidgets('typing under 3 characters never calls the service',
@@ -275,6 +277,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sin resultados para "zzz-no-match"'), findsOneWidget);
+    expect(find.text('Google Maps'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
