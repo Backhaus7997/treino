@@ -35,10 +35,9 @@ This spec defines 3 coordinated capabilities, all NEW (no prior specs to merge):
 
 - Pre-delete data export (deferred GDPR work)
 - Soft-delete / grace period
-- Email notifications (trainer unlink notice is push only; see follow-up #1353 for partial retry)
+- Email notifications (trainer unlink notice is push only)
 - Account restoration
 - Storage rules audit
-- Partial deletion retry automation (see follow-up #1353)
 
 ---
 
@@ -572,7 +571,7 @@ Chat UI MUST render sender name as "Usuario eliminado" (es-AR; marked `// i18n: 
 4. CF service account refactor to `firebase-adminsdk-fbsvc` (cleaner IAM model)
 5. Node 20 → 22 + firebase-functions upgrade (deprecation warnings)
 6. gymSearchQueryProvider autoDispose (arrastre from profile-screen-rewrite SDD)
-7. Partial deletion retry automation (issue #1353): re-run failed cascades without manual intervention
+7. ~~Partial deletion retry automation (issue #1353)~~ DONE: scheduled `retryPartialDeletions` (daily 06:00 ART) re-runs ONLY the data cascade (`cascade/run-data-cascade.ts`) over `audit_log where status == 'partial'` (limit 50/run); never MP, never Auth (unless the original error was `auth:`), no re-notification (terminated links / cancelled appointments are filtered, so no write, so no trigger). Tracks `retryCount`/`lastRetryAt`; success sets `status: 'success'` + `retriedAt`; the 5th failed attempt sets `status: 'failed'` and logs at error level
 8. Coach Hub web delete button for trainers (issue #1334, follow-up)
 
 ---
