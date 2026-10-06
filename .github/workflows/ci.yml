@@ -817,39 +817,43 @@ jobs:
   # Instalar `firebase-admin` acá sería medio minuto por run para nada — y
   # peor, dejaría que un test toque la red sin que se note.
   #
-  # ⚠️ NODE 20, Y ES EL ÚNICO JOB DEL REPO QUE QUEDA ACÁ. NO SE SUBE.
+  # ⚠️ NODE 22 ES EL PISO DE `scripts/`. NO SE SUBE A «latest»: se queda en el
+  # major exacto que es el piso soportado.
   #
-  # Hasta el 2026-09-15 esta línea se justificaba sola con «igual que los otros
-  # jobs de Node». Ese argumento se murió: el resto del repo se fue a Node 22
-  # porque el runtime `nodejs20` de Cloud Functions se decomisiona el
-  # 2026-10-30. Así que el motivo hay que escribirlo entero, porque ya no se
-  # deduce mirando al de al lado.
+  # Hasta el 2026-10-06 este job corría Node 20 como canario. Se movió a 22 por
+  # decisión del dueño, por tres razones que se verifican mirando afuera:
+  #   - `firebase-admin` 14.5 declara `engines.node >=22` y trae
+  #     `@google-cloud/firestore ^9.1.0` como `optionalDependency` (Firestore 9
+  #     también pide Node >=22). En Node 20 `npm ci` se saltea el opcional por
+  #     el `engines` y el SDK explota con `Cannot find module
+  #     '@google-cloud/firestore'`. Así se cayó el #1367 de dependabot.
+  #   - Node 20 salió de soporte de la comunidad el 2026-04-30 (EOL).
+  #   - Cloud Functions corre Node 22; `scripts/` ya no tiene motivo para ir
+  #     por detrás del resto del repo.
   #
+  # El piso quedó escrito también en `scripts/package.json` (`engines.node`).
+  #
+  # **La versión vieja de Node no es una molestia acá, es el CANARIO**, y eso
+  # no cambió: el job tiene que correr el piso soportado, no el último Node.
   # Este job ya se puso rojo una vez por una API que sólo existe de Node 22.15
-  # para arriba (`module.registerHooks`), y la tentación fue subir el job.
-  # Habría tapado el problema real: sin el hook, el subproceso carga el
-  # `firebase-admin` DE VERDAD y los tests de compuerta —que prueban la
-  # AUSENCIA de un marcador— quedan verdes midiendo nada. El fix fue
-  # `module.register()`, que existe desde Node 20.6, más un marcador de
-  # intercepción que los tests exigen en cada corrida:
+  # para arriba (`module.registerHooks`) cuando el piso era 20. Habría sido un
+  # error subir el job: sin el hook, el subproceso carga el `firebase-admin` DE
+  # VERDAD y los tests de compuerta —que prueban la AUSENCIA de un marcador—
+  # quedan verdes midiendo nada. El fix fue `module.register()`, más un
+  # marcador de intercepción que los tests exigen en cada corrida:
   # `esm_stub_interception.test.js` lo custodia con control negativo.
   #
-  # **La versión vieja de Node no es una molestia acá, es el CANARIO**, y el
-  # canario sólo sirve si es más viejo que todo lo demás. Subirlo a 22 no
-  # rompería nada hoy —439/439 en verde, medido en 20, 22 y 26— y ése es
-  # justamente el problema: no se notaría hasta el día que alguien vuelva a
-  # alcanzar una API nueva y la compuerta vuelva a medir nada.
+  # Ojo con lo que ESTE canario ya no cubre: `node-version: '22'` resuelve a
+  # la última 22.x, o sea >= 22.15. Una API de 22.15 ya no pone el job rojo.
+  # Eso lo sigue custodiando el control negativo de arriba, no la versión; y
+  # sigue siendo cierto que una API de Node 23+ sí aparecería acá como rojo.
   #
   # `scripts/` NO se deploya a Cloud Functions: son scripts que corren en la
-  # laptop del dev y acá. El decommission del 2026-10-30 no los toca, así que
-  # esta línea no tiene fecha de vencimiento por ese lado. Lo que sí hay que
-  # saber es que Node 20 salió de soporte de la comunidad el 2026-04-30: si
-  # `actions/setup-node` algún día deja de servirlo, el reemplazo NO es subir a
-  # 22 sin más — es bajar el piso a la versión soportada más vieja que haya, o
-  # mover el canario a un control negativo explícito que no dependa de la
-  # versión.
+  # laptop del dev y acá. Si `actions/setup-node` algún día deja de servir el
+  # 22 (EOL 2027-04-30), el reemplazo NO es subir a «latest» sin más: es mover
+  # el piso al major soportado más viejo y cambiar `engines.node` a la par.
   #
-  # Anda en 20 y en 22 también por el glob: el del `npm test` lo expande el
+  # Anda en 22 (y lo que venga) por el glob: el del `npm test` lo expande el
   # shell. El `--test "test/*.test.js"` entrecomillado que traía el #835 exigía
   # Node >= 22 —el test runner recién expande globs por su cuenta desde ahí— y
   # habría roto este job en silencio el día que se agregara; por eso el merge se
@@ -870,7 +874,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       # Este paso NO estaba, y esa ausencia es la que dejó pasar el #901.
       #
