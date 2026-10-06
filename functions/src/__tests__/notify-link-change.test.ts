@@ -21,7 +21,10 @@
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { getFirestore } from "firebase-admin/firestore";
-import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
+import {
+  notifyOnLinkChangeHandler,
+  scopeDeSolicitud,
+} from "../notifications/notify-link-change";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { trainerEntry } from "../mail/templates";
@@ -151,12 +154,42 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
 
     const snap = await db()
       .collection(MAIL_QUEUE_COLLECTION)
-      .doc(dedupeKey("link-requested", "link-test", trainerId))
+      .doc(dedupeKey("link-requested", scopeDeSolicitud(athleteId), trainerId))
       .get();
     expect(snap.exists).toBe(true);
     expect(snap.data()?.params?.ctaUrl).toBe(
       trainerEntry({ to: "solicitudes" }),
     );
+  });
+
+  // SCENARIO-TL-05 — el techo del mail de solicitud.
+  //
+  // El `scope` era el `linkId`, que es un id NUEVO por solicitud: el dedupe de
+  // `enqueueMail` no colapsaba nada y cada doc creado valía un mail. Con el
+  // gate de rol de `firestore.rules` el destinatario ya no puede ser cualquiera
+  // —tiene que ser un PF de verdad—, pero un alumno todavía podía inundar a SU
+  // entrenador, y cada mail cuesta cuota del remitente que también manda los
+  // códigos de verificación y los resets.
+  //
+  // El scope pasa a ser el par + el día (el `toUid` ya entra en `dedupeKey`,
+  // así que alcanza con el alumno), que es el idiom que ya usan
+  // trainer-limit-mail, free-limit-mail y notify-overdue-payments.
+  it("dos solicitudes del mismo alumno al mismo PF en el día encolan UN mail", async () => {
+    for (const id of ["link-flood-1", "link-flood-2", "link-flood-3"]) {
+      await notifyOnLinkChangeHandler(
+        testApp,
+        id,
+        undefined,
+        { trainerId, athleteId, status: "pending" },
+        makeMockMessaging(),
+      );
+    }
+
+    const encolados = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .where("toUid", "==", trainerId)
+      .get();
+    expect(encolados.size).toBe(1);
   });
 });
 
