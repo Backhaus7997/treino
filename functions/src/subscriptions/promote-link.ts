@@ -179,6 +179,31 @@ export async function syncTrainerLoad(
         throw new HttpsError("failed-precondition", "wrong-status");
       } else if (linkData.entitlement === "blocked") {
         throw new HttpsError("failed-precondition", "link-blocked");
+      } else if (
+        linkData.terminatedAt != null || linkData.terminationReason != null
+      ) {
+        // ── A2: un vínculo TERMINADO no se revive ─────────────────────────
+        //
+        // Defensa en profundidad del gate que `firestore.rules` le puso a
+        // `paused` (sólo desde `active`). Esta callable va por Admin SDK y SE
+        // SALTEA las reglas, así que es la otra mitad del camino: un vínculo
+        // que YA haya quedado `paused` arrastrando su terminación —revivido
+        // antes de ese gate, o escrito por un script— se resumía igual.
+        //
+        // Lo que el resume devuelve son datos de SALUD:
+        // `syncSessionShareOnTrainerLink` re-otorga `session_shares` en la
+        // transición a `active`, y eso abre `sessions`, `setLogs`,
+        // `exerciseFeedback`, las mediciones y las fotos de molestias — sobre
+        // una relación que el alumno ya cortó y sin que vuelva a consentir.
+        // De paso le saca el share al PF actual.
+        //
+        // EVIDENCIA POSITIVA, no ausencia. `acceptedAt` NO sirve de
+        // discriminador: el repo lo llama «un DEFECTO DE DATOS, no evidencia
+        // de lealtad» (select-blocked-links.ts ~192) y un vínculo real viejo
+        // puede no tenerlo, así que exigirlo rompería resumes legítimos.
+        // `terminatedAt` y `terminationReason` sólo los escribe una
+        // terminación.
+        throw new HttpsError("failed-precondition", "link-terminated");
       }
     }
 
