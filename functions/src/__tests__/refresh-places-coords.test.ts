@@ -22,6 +22,7 @@ import {
   refreshPlacesCoordsHandler,
 } from "../places/refresh-places-coords";
 import { geohash5 } from "../places/geohash";
+import { logger } from "firebase-functions";
 
 let app: App;
 const db = () => getFirestore(app);
@@ -39,7 +40,14 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-  for (const col of ["gyms", "users", "trainerPublicProfiles"]) {
+  // La alerta de «ninguna consulta ok» es ruido en los tests que no la miden.
+  jest.spyOn(logger, "error").mockImplementation(() => {});
+  for (const col of [
+    "gyms",
+    "users",
+    "trainerPublicProfiles",
+    "placesRefreshBackoff",
+  ]) {
     const snap = await db().collection(col).get();
     await Promise.all(snap.docs.map((d) => d.ref.delete()));
   }
@@ -108,7 +116,9 @@ async function seedTrainer(
     .set({
       uid,
       trainerLocations: locations,
-      trainerGeohashes: [...new Set(locations.map((l) => l.geohash))],
+      trainerGeohashes: [
+        ...new Set(locations.map((l) => l.geohash).filter((g) => g)),
+      ],
       trainerLocationsCoordsFetchedAt:
         opts.minAge == null ? null : daysAgo(opts.minAge),
       trainerLocationConsentAt: opts.consent ? daysAgo(60) : null,
@@ -120,7 +130,9 @@ async function seedTrainer(
       .set({
         uid,
         trainerLocations: locations,
-        trainerGeohashes: [...new Set(locations.map((l) => l.geohash))],
+        trainerGeohashes: [
+          ...new Set(locations.map((l) => l.geohash).filter((g) => g)),
+        ],
       });
   }
 }
@@ -373,6 +385,231 @@ describe("entrenadores", () => {
   });
 });
 
+describe("purga por EDAD (cumplimiento de los 30 días)", () => {
+  it("gym de 31d + error transitorio: se saca de la búsqueda igual", async () => {
+    await seedGym("p1", 31);
+
+    const r = await run(fetcher({ p1: { status: "transient" } }));
+
+    const g = (await db().collection("gyms").doc("p1").get()).data()!;
+    expect(g.geohash).toBeNull();
+    expect(g.coordsFetchedAt).toBeNull();
+    expect(g.name).toBe("Gym p1");
+    expect(r.gymsPurged).toBe(1);
+    const f2 = fetcher({});
+    await run(f2);
+    expect(f2).not.toHaveBeenCalled();
+  });
+
+  it("gym de 26d + error transitorio: se conserva y se salta", async () => {
+    await seedGym("p1", 26);
+    const before = (await db().collection("gyms").doc("p1").get()).data();
+
+    const r = await run(fetcher({ p1: { status: "transient" } }));
+
+    expect((await db().collection("gyms").doc("p1").get()).data()).toEqual(
+      before,
+    );
+    expect(r.gymsSkipped).toBe(1);
+    expect(r.gymsPurged).toBe(0);
+  });
+
+  it("lugar de PF de 31d + error transitorio: stale, afuera de geohashes y del espejo público", async () => {
+    await seedTrainer(
+      "t1",
+      [
+        loc("l1", "p1", 31, { geohash: "oldgh" }),
+        loc("l2", null, 0, { geohash: "gpsgh" }),
+      ],
+      { consent: true, minAge: 31 },
+    );
+
+    const r = await run(fetcher({ p1: { status: "transient" } }));
+
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    expect(u.trainerLocations.find((l: any) => l.id === "l1").stale).toBe(true);
+    expect(u.trainerGeohashes).toEqual(["gpsgh"]);
+    const p = (
+      await db().collection("trainerPublicProfiles").doc("t1").get()
+    ).data()!;
+    expect(p.trainerLocations.map((l: any) => l.id)).toEqual(["l2"]);
+    expect(r.usersPurged).toBe(1);
+  });
+
+  it("lugar de PF de 26d + error transitorio: se conserva", async () => {
+    await seedTrainer("t1", [loc("l1", "p1", 26)], {
+      consent: true,
+      minAge: 26,
+    });
+    const before = (await db().collection("users").doc("t1").get()).data();
+
+    const r = await run(fetcher({ p1: { status: "transient" } }));
+
+    expect((await db().collection("users").doc("t1").get()).data()).toEqual(
+      before,
+    );
+    expect(r.usersSkipped).toBe(1);
+    expect(r.usersPurged).toBe(0);
+  });
+
+  it("una corrida donde TODAS las consultas fallan loguea a nivel error", async () => {
+    await seedGym("p1", 26);
+    const err = logger.error as jest.Mock;
+    err.mockClear();
+
+    await run(fetcher({}, { status: "transient" }));
+
+    expect(err).toHaveBeenCalledWith(
+      expect.stringContaining("ninguna consulta"),
+      expect.anything(),
+    );
+  });
+
+  it("si al menos una consulta sale ok NO loguea la alerta", async () => {
+    await seedGym("p1", 26);
+    const err = logger.error as jest.Mock;
+    err.mockClear();
+
+    await run(fetcher({ p1: ok(-31.4, -64.2) }));
+
+    expect(err).not.toHaveBeenCalled();
+  });
+});
+
+describe("equidad y topes", () => {
+  it("los docs irresolubles no bloquean la ventana: se posterga y el límite avanza a los siguientes", async () => {
+    await seedGym("a", 26.5);
+    await seedGym("b", 26.2);
+    await seedGym("c", 25.5);
+    const f1 = fetcher({ c: ok(1, 1) });
+
+    await run(f1, { limit: 2 }); // a y b: transitorios -> postergados
+    expect(f1.mock.calls.map((c) => c[0]).sort()).toEqual(["a", "b"]);
+
+    const f2 = fetcher({ c: ok(1, 1) });
+    await run(f2, { limit: 2 });
+    expect(f2.mock.calls.map((c) => c[0])).toEqual(["c"]);
+    expect((await db().collection("gyms").doc("c").get()).data()!.lat).toBe(1);
+  });
+
+  it("el postergamiento no pasa del día 28: un gym viejo no queda oculto hasta vencer", async () => {
+    await seedGym("a", 27.5); // tope = día 28 => mañana ya es elegible
+    await run(fetcher({}));
+    const st = (
+      await db().collection("placesRefreshBackoff").doc("gym_a").get()
+    ).data()!;
+    const max = NOW.getTime() + 0.5 * 24 * 60 * 60 * 1000;
+    expect((st.nextAttemptAt as Timestamp).toMillis()).toBeLessThanOrEqual(max);
+  });
+
+  it("NOT_FOUND antes de 30d también posterga", async () => {
+    await seedGym("a", 26);
+    await run(fetcher({ a: { status: "not_found" } }));
+    const f2 = fetcher({});
+    await run(f2);
+    expect(f2).not.toHaveBeenCalled();
+  });
+
+  it("los gyms no dejan sin tiempo a los entrenadores (presupuesto por fase)", async () => {
+    await seedGym("g1", 30);
+    await seedGym("g2", 29);
+    await seedGym("g3", 28);
+    await seedTrainer("t1", [loc("l1", "pu", 26)], {
+      consent: true,
+      minAge: 26,
+    });
+    const f = jest.fn(async (id: string): Promise<PlaceLookup> => {
+      if (id.startsWith("g")) {
+        await new Promise((r) => setTimeout(r, 300));
+        return ok(1, 1);
+      }
+      return ok(-31.4, -64.2);
+    }) as Fetch;
+
+    const r = await run(f, { concurrency: 1, deadlineMs: 400 });
+
+    expect(r.deadlineHit).toBe(true);
+    expect(
+      f.mock.calls.filter((c) => c[0].startsWith("g")).length,
+    ).toBeLessThan(3);
+    expect(
+      (await db().collection("users").doc("t1").get()).data()!
+        .trainerLocations[0].lat,
+    ).toBe(-31.4);
+  });
+
+  it("tope de consultas distintas a Places por corrida", async () => {
+    await seedGym("a", 40);
+    await seedGym("b", 39);
+    await seedGym("c", 38);
+    const f = fetcher({ a: ok(1, 1), b: ok(1, 1), c: ok(1, 1) });
+
+    const r = await run(f, { maxPlaceFetches: 2 });
+
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(r.fetchCapHit).toBe(true);
+  });
+
+  it("los placeIds de un entrenador no exceden la concurrencia global", async () => {
+    const locs = ["p1", "p2", "p3", "p4", "p5", "p6"].map((p, i) =>
+      loc(`l${i}`, p, 26),
+    );
+    await seedTrainer("t1", locs, { consent: true, minAge: 26 });
+    let inFlight = 0;
+    let max = 0;
+    const f = jest.fn(async (): Promise<PlaceLookup> => {
+      inFlight++;
+      max = Math.max(max, inFlight);
+      await new Promise((r) => setTimeout(r, 20));
+      inFlight--;
+      return ok(-31.4, -64.2);
+    }) as unknown as Fetch;
+
+    await run(f, { concurrency: 2 });
+
+    expect(f).toHaveBeenCalledTimes(6);
+    expect(max).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("bordes de datos", () => {
+  it("coordsFetchedAt = 1970-01-01 (lo que pone la migración) se recoge y se refresca", async () => {
+    await seedGym("p1", null, { coordsFetchedAt: Timestamp.fromMillis(0) });
+    await seedTrainer(
+      "t1",
+      [{ ...loc("l1", "p2", 0), coordsFetchedAt: Timestamp.fromMillis(0) }],
+      { consent: true, minAge: null },
+    );
+    await db()
+      .collection("users")
+      .doc("t1")
+      .update({ trainerLocationsCoordsFetchedAt: Timestamp.fromMillis(0) });
+
+    await run(fetcher({ p1: ok(-31.4, -64.2), p2: ok(-32, -65) }));
+
+    const g = (await db().collection("gyms").doc("p1").get()).data()!;
+    expect(g.lat).toBe(-31.4);
+    expect((g.coordsFetchedAt as Timestamp).toMillis()).toBe(NOW.getTime());
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    expect(u.trainerLocations[0].lat).toBe(-32);
+  });
+
+  it("un lugar sin geohash no rompe la transacción", async () => {
+    const bad: Record<string, unknown> = loc("l1", "p1", 26);
+    delete bad.geohash;
+    await seedTrainer("t1", [bad, loc("l2", "p2", 26)], {
+      consent: true,
+      minAge: 26,
+    });
+
+    await run(fetcher({ p1: { status: "transient" }, p2: ok(-31.4, -64.2) }));
+
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    expect(u.trainerLocations.find((l: any) => l.id === "l2").lat).toBe(-31.4);
+    expect(u.trainerGeohashes).toEqual([geohash5(-31.4, -64.2)]);
+  });
+});
+
 describe("dedupe dentro de la corrida", () => {
   it("un mismo placeId en un gym y en dos entrenadores se pide UNA sola vez", async () => {
     await seedGym("p1", 26);
@@ -443,6 +680,27 @@ describe("fetchPlaceLocation (HTTP)", () => {
       },
       "transient",
     ],
+    [
+      400,
+      { error: { status: "INVALID_ARGUMENT", message: "Invalid place_id" } },
+      "not_found",
+    ],
+    [
+      400,
+      {
+        error: {
+          status: "INVALID_ARGUMENT",
+          message: "Invalid place id",
+          details: [{ reason: "API_KEY_INVALID" }],
+        },
+      },
+      "transient",
+    ],
+    [
+      400,
+      { error: { status: "INVALID_ARGUMENT", message: "Bad field mask" } },
+      "transient",
+    ],
     [429, { error: { status: "RESOURCE_EXHAUSTED" } }, "transient"],
     [500, {}, "transient"],
     [403, { error: { status: "PERMISSION_DENIED" } }, "transient"],
@@ -456,8 +714,12 @@ describe("fetchPlaceLocation (HTTP)", () => {
 
   it("200 sin location, o una excepción de red -> transient", async () => {
     expect(
-      (await fetchPlaceLocation("K", jest.fn(async () => res(200, {})))("x"))
-        .status,
+      (
+        await fetchPlaceLocation(
+          "K",
+          jest.fn(async () => res(200, {})),
+        )("x")
+      ).status,
     ).toBe("transient");
     expect(
       (

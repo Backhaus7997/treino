@@ -29,6 +29,27 @@
  * ubicación (`trainerLocationConsentAt != null`) y el doc público ya existe: es
  * la misma compuerta que aplica el cliente en user_repository.dart.
  *
+ * Cumplimiento (30 días): si un lugar tiene `coordsFetchedAt` de hace MÁS de 30
+ * días y el refresco NO dio `ok` (NOT_FOUND, 403 por key revocada, 429, caída),
+ * igual se lo saca de la búsqueda. La purga es por EDAD, no por tipo de error:
+ * si no, un fallo transitorio largo dejaría coordenadas publicadas fuera de plazo.
+ * Si hubo consultas y NINGUNA salió `ok`, se loguea a nivel error (alerta).
+ *
+ * Equidad: la cola es `orderBy asc + limit`, así que los docs que no se pueden
+ * resolver se quedarían al frente para siempre. Por eso se les anota un
+ * postergamiento en `placesRefreshBackoff/{gym|user}_{id}` (colección solo de
+ * servidor: sin reglas = denegado a clientes, y no toca los docs de usuario) y
+ * se pagina saltándolos. El postergamiento nunca pasa del día 28, así que lo
+ * cercano al vencimiento vuelve a ser elegible a tiempo. Cada fase (gyms, luego
+ * usuarios) tiene su propio presupuesto de tiempo (la mitad; lo que sobra pasa
+ * a la siguiente), hay un tope de consultas distintas a Places por corrida y
+ * una concurrencia global (los placeIds de un mismo entrenador no la exceden).
+ *
+ * Migración: un doc SIN `coordsFetchedAt` (gym) o sin
+ * `trainerLocationsCoordsFetchedAt` (usuario) es INVISIBLE para este job hasta
+ * que la migración lo rellene (con 1970-01-01 si no se sabe la edad: ese valor
+ * sí entra, cae en el borde y se refresca o se purga en la primera corrida).
+ *
  * La llamada HTTP es inyectable (`fetchLocation`) para testear sin red.
  */
 
@@ -37,6 +58,7 @@ import {
   DocumentData,
   DocumentSnapshot,
   Firestore,
+  Query,
   Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
@@ -58,6 +80,15 @@ const DEFAULT_LIMIT = 300;
 const DEFAULT_CONCURRENCY = 4;
 /** El timeout de la función es 540 s: cortamos antes para no morir a medias. */
 const DEFAULT_DEADLINE_MS = 480_000;
+/** Tope de consultas DISTINTAS a Places por corrida (costo y cuota acotados). */
+const DEFAULT_MAX_PLACE_FETCHES = 1000;
+/** Páginas máximas al buscar candidatos elegibles saltando los postergados. */
+const MAX_PAGES = 5;
+/** Un postergamiento nunca pasa de aquí: queda margen para reintentar y purgar. */
+const MAX_BACKOFF_UNTIL_DAYS = 28;
+const TRANSIENT_BACKOFF_MS = 36 * 60 * 60 * 1000;
+const NOT_FOUND_BACKOFF_MS = 3 * DAY_MS;
+const BACKOFF_COLLECTION = "placesRefreshBackoff";
 
 export type PlaceLookup =
   | { status: "ok"; lat: number; lng: number }
@@ -74,6 +105,8 @@ export interface RefreshOptions {
   concurrency?: number;
   /** Ms de reloj real tras los cuales no se arranca trabajo nuevo. */
   deadlineMs?: number;
+  /** Tope de consultas distintas a Places en la corrida. */
+  maxPlaceFetches?: number;
 }
 
 export interface RefreshResult {
@@ -82,8 +115,13 @@ export interface RefreshResult {
   gymsSkipped: number;
   usersUpdated: number;
   usersSkipped: number;
+  /** Gyms / usuarios sacados de la búsqueda por pasar de 30 días sin refrescar. */
+  gymsPurged: number;
+  usersPurged: number;
   placesFetched: number;
+  placesOk: number;
   deadlineHit: boolean;
+  fetchCapHit: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +194,25 @@ export function fetchPlaceLocation(
 // Handler
 // ---------------------------------------------------------------------------
 
+/** Semáforo con traspaso de cupo: nunca hay más de `max` tareas activas. */
+class Semaphore {
+  private active = 0;
+  private waiters: Array<() => void> = [];
+  constructor(private readonly max: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.active < this.max) this.active++;
+    else await new Promise<void>((resolve) => this.waiters.push(resolve));
+    try {
+      return await fn();
+    } finally {
+      const next = this.waiters.shift();
+      if (next) next();
+      else this.active--;
+    }
+  }
+}
+
 interface Ctx {
   db: Firestore;
   now: Date;
@@ -164,19 +221,110 @@ interface Ctx {
   fetchLocation: FetchLocation;
   cache: Map<string, Promise<PlaceLookup>>;
   result: RefreshResult;
+  maxFetches: number;
+  gate: Semaphore;
+  /** Claves de backoff que ya existían al elegir candidatos (para limpiarlas). */
+  hadBackoff: Set<string>;
 }
 
 /** Una consulta por placeId en toda la corrida (gyms y entrenadores). */
 function lookup(ctx: Ctx, placeId: string): Promise<PlaceLookup> {
   let p = ctx.cache.get(placeId);
   if (!p) {
+    if (ctx.result.placesFetched >= ctx.maxFetches) {
+      // Sobre el tope: no se consulta. Cuenta como transitorio (y la purga por
+      // edad igual aplica a lo que ya venció).
+      ctx.result.fetchCapHit = true;
+      return Promise.resolve({ status: "transient" });
+    }
     ctx.result.placesFetched++;
-    p = ctx.fetchLocation(placeId).catch(() => ({
-      status: "transient" as const,
-    }));
+    p = ctx.gate
+      .run(() => ctx.fetchLocation(placeId))
+      .catch((): PlaceLookup => ({ status: "transient" }))
+      .then((r) => {
+        if (r.status === "ok") ctx.result.placesOk++;
+        return r;
+      });
     ctx.cache.set(placeId, p);
   }
   return p;
+}
+
+function backoffKey(kind: "gym" | "user", id: string): string {
+  return `${kind}_${id}`;
+}
+
+/**
+ * Posterga el reintento de un doc que no se pudo resolver. Tope: día 28 desde
+ * `fetchedAt`, para que lo que se acerca al vencimiento siga siendo elegible.
+ * Mejor esfuerzo: un fallo acá no frena el ítem.
+ */
+async function postpone(
+  ctx: Ctx,
+  kind: "gym" | "user",
+  id: string,
+  fetchedAt: unknown,
+  backoffMs: number,
+): Promise<void> {
+  const until = Math.min(
+    ctx.now.getTime() + backoffMs,
+    asTimestamp(fetchedAt).toMillis() + MAX_BACKOFF_UNTIL_DAYS * DAY_MS,
+  );
+  if (until <= ctx.now.getTime()) return; // ya urge: sin postergar
+  try {
+    await ctx.db
+      .collection(BACKOFF_COLLECTION)
+      .doc(backoffKey(kind, id))
+      .set({ nextAttemptAt: Timestamp.fromMillis(until), kind });
+  } catch (e) {
+    logger.warn("refreshPlacesCoords: no se pudo postergar un ítem", {
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
+async function clearBackoff(ctx: Ctx, kind: "gym" | "user", id: string) {
+  const key = backoffKey(kind, id);
+  if (!ctx.hadBackoff.has(key)) return;
+  try {
+    await ctx.db.collection(BACKOFF_COLLECTION).doc(key).delete();
+  } catch {
+    // inofensivo: ya vencido, no se vuelve a mirar
+  }
+}
+
+/**
+ * Candidatos vencidos, del más viejo al más nuevo, saltando los postergados.
+ * Pagina con cursor hasta juntar `limit` elegibles (o `MAX_PAGES`).
+ */
+async function collectEligible(
+  ctx: Ctx,
+  base: Query,
+  kind: "gym" | "user",
+  limit: number,
+): Promise<DocumentSnapshot[]> {
+  const out: DocumentSnapshot[] = [];
+  let last: DocumentSnapshot | undefined;
+  for (let page = 0; page < MAX_PAGES && out.length < limit; page++) {
+    const snap = await (last ? base.startAfter(last) : base).limit(limit).get();
+    if (snap.empty) break;
+    const states = await ctx.db.getAll(
+      ...snap.docs.map((d) =>
+        ctx.db.collection(BACKOFF_COLLECTION).doc(backoffKey(kind, d.id)),
+      ),
+    );
+    snap.docs.forEach((d, i) => {
+      const next = states[i].exists ? states[i].get("nextAttemptAt") : null;
+      if (states[i].exists) ctx.hadBackoff.add(backoffKey(kind, d.id));
+      if (next instanceof Timestamp && next.toMillis() > ctx.now.getTime()) {
+        return;
+      }
+      if (out.length < limit) out.push(d);
+    });
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < limit) break;
+  }
+  return out;
 }
 
 const EPOCH = Timestamp.fromMillis(0);
@@ -221,23 +369,38 @@ async function processGym(ctx: Ctx, snap: DocumentSnapshot): Promise<void> {
         { lastUpdateTime: snap.updateTime! },
       );
       ctx.result.gymsRefreshed++;
-    } else if (r.status === "not_found") {
-      const purge = olderThanMaxCache(ctx, data.coordsFetchedAt);
-      if (purge) {
-        // Fuera de la búsqueda y de la cola; el doc y su nombre se conservan.
-        await snap.ref.update(
-          { placeStatus: "not_found", geohash: null, coordsFetchedAt: null },
-          { lastUpdateTime: snap.updateTime! },
-        );
-      } else if (data.placeStatus !== "not_found") {
+      await clearBackoff(ctx, "gym", snap.id);
+      return;
+    }
+    // No ok. Pasados 30 días no se pueden seguir sirviendo las coordenadas,
+    // sea cual sea el motivo: se sacan de la búsqueda y de la cola.
+    if (olderThanMaxCache(ctx, data.coordsFetchedAt)) {
+      await snap.ref.update(
+        {
+          ...(r.status === "not_found" ? { placeStatus: "not_found" } : {}),
+          geohash: null,
+          coordsFetchedAt: null,
+        },
+        { lastUpdateTime: snap.updateTime! },
+      );
+      ctx.result.gymsPurged++;
+      if (r.status === "not_found") ctx.result.gymsNotFound++;
+      else ctx.result.gymsSkipped++;
+      await clearBackoff(ctx, "gym", snap.id);
+      return;
+    }
+    if (r.status === "not_found") {
+      if (data.placeStatus !== "not_found") {
         await snap.ref.update(
           { placeStatus: "not_found" },
           { lastUpdateTime: snap.updateTime! },
         );
       }
       ctx.result.gymsNotFound++;
+      await postpone(ctx, "gym", snap.id, data.coordsFetchedAt, NOT_FOUND_BACKOFF_MS);
     } else {
       ctx.result.gymsSkipped++;
+      await postpone(ctx, "gym", snap.id, data.coordsFetchedAt, TRANSIENT_BACKOFF_MS);
     }
   } catch (e) {
     if (!isFailedPrecondition(e)) throw e;
@@ -282,8 +445,12 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
   );
 
   let wrote = false;
+  let purged = false;
+  let minAfter: Timestamp | null = null;
   await ctx.db.runTransaction(async (tx) => {
     wrote = false;
+    purged = false;
+    minAfter = null;
     const uSnap = await tx.get(userRef);
     const data = uSnap.data();
     if (!data) return;
@@ -308,14 +475,17 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
           coordsFetchedAt: ctx.nowTs,
         };
       }
-      if (r.status === "not_found" && olderThanMaxCache(ctx, l.coordsFetchedAt)) {
+      // No ok y pasado de 30 días: se retira, sea cual sea el motivo del fallo.
+      if (olderThanMaxCache(ctx, l.coordsFetchedAt)) {
         changed = true;
+        purged = true;
         return { ...l, stale: true };
       }
       return l;
     });
 
     const min = minCoordsFetchedAt(next);
+    minAfter = min;
     const storedMin = data.trainerLocationsCoordsFetchedAt as unknown;
     const minChanged =
       (min === null) !== (storedMin == null) ||
@@ -323,7 +493,12 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
     if (!changed && !minChanged) return;
 
     const geohashes = [
-      ...new Set(next.filter((l) => l.stale !== true).map((l) => l.geohash)),
+      ...new Set(
+        next
+          .filter((l) => l.stale !== true)
+          .map((l) => l.geohash)
+          .filter((g): g is string => typeof g === "string"),
+      ),
     ];
     tx.update(userRef, {
       trainerLocations: next,
@@ -341,8 +516,15 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
   });
 
   if (wrote) ctx.result.usersUpdated++;
-  else if ([...results.values()].some((r) => r.status === "transient")) {
+  if (purged) ctx.result.usersPurged++;
+  const unresolved = [...results.values()].some((r) => r.status !== "ok");
+  if (!wrote && [...results.values()].some((r) => r.status === "transient")) {
     ctx.result.usersSkipped++;
+  }
+  if (unresolved && (minAfter as Timestamp | null) !== null && isDue(ctx, minAfter as unknown)) {
+    await postpone(ctx, "user", uid, minAfter as unknown, TRANSIENT_BACKOFF_MS);
+  } else if (!unresolved || (minAfter as Timestamp | null) === null) {
+    await clearBackoff(ctx, "user", uid);
   }
 }
 
@@ -387,9 +569,15 @@ export async function refreshPlacesCoordsHandler(
     gymsSkipped: 0,
     usersUpdated: 0,
     usersSkipped: 0,
+    gymsPurged: 0,
+    usersPurged: 0,
     placesFetched: 0,
+    placesOk: 0,
     deadlineHit: false,
+    fetchCapHit: false,
   };
+  const limit = opts.limit ?? DEFAULT_LIMIT;
+  const concurrency = Math.max(1, opts.concurrency ?? DEFAULT_CONCURRENCY);
   const ctx: Ctx = {
     db,
     now: opts.now,
@@ -398,31 +586,50 @@ export async function refreshPlacesCoordsHandler(
     fetchLocation: opts.fetchLocation,
     cache: new Map(),
     result,
+    maxFetches: opts.maxPlaceFetches ?? DEFAULT_MAX_PLACE_FETCHES,
+    gate: new Semaphore(concurrency),
+    hadBackoff: new Set(),
   };
-  const limit = opts.limit ?? DEFAULT_LIMIT;
-  const concurrency = opts.concurrency ?? DEFAULT_CONCURRENCY;
-  const deadlineAt = Date.now() + (opts.deadlineMs ?? DEFAULT_DEADLINE_MS);
+  const startedAt = Date.now();
+  const totalMs = opts.deadlineMs ?? DEFAULT_DEADLINE_MS;
+  // Presupuesto por fase: los gyms usan hasta la mitad; lo que no usen pasa a
+  // los usuarios (que tienen hasta el final). Así los gyms no los dejan sin tiempo.
+  const gymDeadlineAt = startedAt + totalMs / 2;
+  const userDeadlineAt = startedAt + totalMs;
 
-  const gyms = await db
-    .collection("gyms")
-    .where("coordsFetchedAt", "<=", ctx.cutoff)
-    .orderBy("coordsFetchedAt", "asc")
-    .limit(limit)
-    .get();
-  await forEachLimited(gyms.docs, concurrency, deadlineAt, result, (d) =>
+  const gyms = await collectEligible(
+    ctx,
+    db
+      .collection("gyms")
+      .where("coordsFetchedAt", "<=", ctx.cutoff)
+      .orderBy("coordsFetchedAt", "asc"),
+    "gym",
+    limit,
+  );
+  await forEachLimited(gyms, concurrency, gymDeadlineAt, result, (d) =>
     processGym(ctx, d),
   );
 
-  const users = await db
-    .collection("users")
-    .where("trainerLocationsCoordsFetchedAt", "<=", ctx.cutoff)
-    .orderBy("trainerLocationsCoordsFetchedAt", "asc")
-    .limit(limit)
-    .get();
-  await forEachLimited(users.docs, concurrency, deadlineAt, result, (d) =>
+  const users = await collectEligible(
+    ctx,
+    db
+      .collection("users")
+      .where("trainerLocationsCoordsFetchedAt", "<=", ctx.cutoff)
+      .orderBy("trainerLocationsCoordsFetchedAt", "asc"),
+    "user",
+    limit,
+  );
+  await forEachLimited(users, concurrency, userDeadlineAt, result, (d) =>
     processTrainer(ctx, d.id),
   );
 
+  if (result.placesFetched > 0 && result.placesOk === 0) {
+    // Ni una consulta salió ok: key revocada, cuota o caída. Las coordenadas
+    // seguirán venciendo; esto tiene que verse en las alertas.
+    logger.error("refreshPlacesCoords: ninguna consulta a Places resultó ok", {
+      placesFetched: result.placesFetched,
+    });
+  }
   return result;
 }
 
