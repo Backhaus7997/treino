@@ -430,4 +430,104 @@ void main() {
       expect(container.read(accountDeletionBusyProvider), isFalse);
     });
   });
+
+  group('estrategia de re-auth y sign-out inyectables (Coach Hub web)', () {
+    ProviderContainer webContainer({
+      required AccountDeletionReauth reauth,
+      required Future<void> Function() signOut,
+    }) {
+      final container = ProviderContainer(
+        overrides: [
+          authServiceProvider.overrideWithValue(mockAuthService),
+          accountDeletionServiceProvider.overrideWithValue(mockDeletionService),
+          firebaseAuthProvider.overrideWithValue(mockFirebaseAuth),
+          accountDeletionReauthProvider.overrideWithValue(reauth),
+          accountDeletionSignOutProvider.overrideWithValue(signOut),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    void stubCfOk() {
+      when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenAnswer(
+        (_) async => FakeDeletionResult(
+          status: 'success',
+          deletedCollections: const ['users-auth'],
+        ),
+      );
+    }
+
+    test(
+        'con estrategia: re-auth -> CF -> sign-out inyectado, y NUNCA '
+        'AuthService.signOut (se cuelga en web)', () async {
+      final order = <String>[];
+      stubCfOk();
+      final container = webContainer(
+        reauth: (_) async {
+          order.add('reauth');
+          return true;
+        },
+        signOut: () async => order.add('signOut'),
+      );
+
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+
+      expect(order, ['reauth', 'signOut']);
+      verify(() => mockDeletionService.call(uid: 'uid-test')).called(1);
+      verifyNever(() => mockAuthService.signOut());
+      expect(container.read(accountDeletedFlagProvider), isTrue);
+    });
+
+    test('estrategia devuelve false (cancelo): no llama al CF', () async {
+      final container = webContainer(
+        reauth: (_) async => false,
+        signOut: () async {},
+      );
+
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+
+      verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
+      expect(container.read(accountDeletedFlagProvider), isFalse);
+    });
+
+    test('estrategia tira AuthFailure: queda en AsyncError, sin CF', () async {
+      final container = webContainer(
+        reauth: (_) async => throw const AuthFailure.popupBlocked(),
+        signOut: () async {},
+      );
+
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+
+      final state = container.read(accountDeletionNotifierProvider);
+      expect(state.error, const AuthFailure.popupBlocked());
+      verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
+
+    test(
+        'estrategia tira una excepcion inesperada: AsyncError sin CF y sin '
+        'dejar el flag busy', () async {
+      final container = webContainer(
+        reauth: (_) async => throw StateError('boom'),
+        signOut: () async {},
+      );
+
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+
+      final state = container.read(accountDeletionNotifierProvider);
+      expect(state.hasError, isTrue);
+      expect(state.error, isA<StateError>());
+      verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
+  });
 }

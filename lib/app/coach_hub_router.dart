@@ -38,6 +38,8 @@ import '../features/coach_hub/presentation/sections/templates/routes.dart';
 import '../features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import '../features/coach_hub/presentation/shell/content_max_width.dart';
 import '../features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
+import '../features/profile/application/account_deletion_notifier.dart'
+    show accountDeletionInFlightProvider;
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
 import 'theme/app_palette.dart';
@@ -118,6 +120,11 @@ String? coachHubRedirect(
 
   // Authenticated → role gating
   if (loggedIn) {
+    // Baja de cuenta en vuelo: el CF borra el perfil de Firestore ANTES que al
+    // usuario de Auth, y esa ventana (loggedIn + profile null) mandaba al PF a
+    // /not-allowed a mitad de la baja. Se difiere hasta que cierre la sesión.
+    if (read(accountDeletionInFlightProvider)) return null;
+
     final profileAsync = read(userProfileProvider);
     // Misma espera que `coachHubSessionResolvingProvider` (ver arriba).
     if (profileAsync.isLoading) return null;

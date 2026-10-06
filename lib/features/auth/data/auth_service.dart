@@ -540,6 +540,48 @@ class AuthService {
     );
   }
 
+  /// Re-autentica con Google por popup. **Sólo web** (Coach Hub), donde
+  /// [getGoogleCredential] no funciona. Mismo invariante que
+  /// [signInWithGooglePopup]: ningún `await` entre el tap y el popup.
+  ///
+  /// Throws [AuthFailure.signInCancelled] si cierra el popup,
+  /// [AuthFailure.popupBlocked] si el navegador lo bloquea.
+  Future<void> reauthenticateWithGooglePopup() => _reauthenticateWithPopup(
+        GoogleAuthProvider()
+          ..setCustomParameters(const {'prompt': 'select_account'}),
+        'reauthenticateWithGooglePopup',
+      );
+
+  /// Re-autentica con Apple por popup. **Sólo web** (Coach Hub).
+  Future<void> reauthenticateWithApplePopup() => _reauthenticateWithPopup(
+        OAuthProvider('apple.com')
+          ..addScope('email')
+          ..addScope('name'),
+        'reauthenticateWithApplePopup',
+      );
+
+  Future<void> _reauthenticateWithPopup(
+    AuthProvider provider,
+    String camino,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure.userNotFound();
+    try {
+      await user.reauthenticateWithPopup(provider);
+    } on FirebaseAuthException catch (e, st) {
+      throw _failureFromPopup(e, st, camino);
+    } catch (e, st) {
+      // Cualquier otra cosa del SDK web (interop JS, etc.) no puede escapar
+      // sin mensaje: sube como falla de re-auth y se reporta.
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.$camino: excepción inesperada',
+      ));
+      throw const AuthFailure.reAuthFailed();
+    }
+  }
+
   /// Triggers Apple re-authentication via Firebase's
   /// `reauthenticateWithProvider` flow. Returns a SENTINEL credential that
   /// [reauthenticate] recognizes as "already done, skip" — because the

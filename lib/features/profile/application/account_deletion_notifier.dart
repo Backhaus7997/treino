@@ -57,9 +57,24 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
   }
 
   Future<void> _deleteAccountFlow(BuildContext? context) async {
-    final credential = await _openReAuthSheet(context);
-    if (credential == null) {
-      debugPrint('[AccountDeletion] re-auth sheet returned null — aborted');
+    final bool reauthenticated;
+    try {
+      reauthenticated = await _reauthenticate(context);
+    } on AuthFailure catch (e) {
+      // La re-auth web (popup bloqueado, contraseña mal, cuenta equivocada)
+      // falla ANTES del callable: se muestra inline igual que un error del CF.
+      debugPrint('[AccountDeletion] re-auth AuthFailure: $e');
+      state = AsyncError(e, StackTrace.current);
+      return;
+    } catch (e, st) {
+      // Excepción no tipada de la estrategia de re-auth: sin esto escapa sin
+      // mensaje y el diálogo queda como si nada hubiera pasado.
+      debugPrint('[AccountDeletion] re-auth unexpected error: $e\n$st');
+      state = AsyncError(e, st);
+      return;
+    }
+    if (!reauthenticated) {
+      debugPrint('[AccountDeletion] re-auth cancelled — aborted');
       return;
     }
 
@@ -168,7 +183,7 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       // By awaiting signOut first, authStateChanges emits null before we
       // signal the navigation, so the router sees !loggedIn and routes to
       // /welcome cleanly.
-      await ref.read(authServiceProvider).signOut();
+      await ref.read(accountDeletionSignOutProvider)();
 
       // Reset any onboarding state from the deleted user so a follow-up
       // signup starts on a blank form (otherwise the previous user's draft
@@ -180,6 +195,18 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     } finally {
       ref.read(accountDeletionInFlightProvider.notifier).state = false;
     }
+  }
+
+  /// Re-autentica a la persona. `true` = confirmó su identidad, `false` =
+  /// canceló. Si hay una estrategia inyectada ([accountDeletionReauthProvider],
+  /// la web) manda ella; si no, el bottom sheet de mobile.
+  ///
+  /// SIN `await` antes de invocar la estrategia: en web el popup de
+  /// `reauthenticateWithPopup` exige que se abra dentro del gesto del usuario.
+  Future<bool> _reauthenticate(BuildContext? context) {
+    final strategy = ref.read(accountDeletionReauthProvider);
+    if (strategy != null) return strategy(context);
+    return _openReAuthSheet(context).then((c) => c != null);
   }
 
   /// Opens the ReAuthBottomSheet and returns the credential or null.
@@ -236,6 +263,25 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
     return AuthFailure.deletionFailed(cause: e);
   }
 }
+
+/// Estrategia de re-autenticación alternativa al bottom sheet de mobile.
+/// Devuelve `true` si la persona confirmó su identidad, `false` si canceló, y
+/// tira [AuthFailure] si falló.
+typedef AccountDeletionReauth = Future<bool> Function(BuildContext? context);
+
+/// `null` en mobile (usa [ReAuthBottomSheet]). El Coach Hub la sobreescribe en
+/// `main_coach_hub.dart`: `GoogleSignIn.authenticate()` no existe en web y el
+/// Hub nunca lo inicializa, así que ahí se re-autentica por popup.
+final accountDeletionReauthProvider =
+    Provider<AccountDeletionReauth?>((_) => null);
+
+/// Cierra la sesión local al terminar la baja. Mobile: `AuthService.signOut()`.
+/// El Hub lo sobreescribe con `FirebaseAuth.signOut()` directo, porque
+/// `AuthService.signOut()` espera `GoogleSignIn.initialize()` y en web se
+/// cuelga (ver `coach_hub_not_allowed_screen.dart`).
+final accountDeletionSignOutProvider = Provider<Future<void> Function()>(
+  (ref) => () => ref.read(authServiceProvider).signOut(),
+);
 
 /// Riverpod provider for [AccountDeletionNotifier].
 final accountDeletionNotifierProvider =

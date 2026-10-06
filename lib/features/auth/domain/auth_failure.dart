@@ -26,6 +26,10 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
       _AccountExistsWithDifferentCredential;
   const factory AuthFailure.popupBlocked() = _PopupBlocked;
   const factory AuthFailure.providerUnavailable() = _ProviderUnavailable;
+
+  /// La persona eligió OTRA cuenta en el popup de re-autenticación
+  /// (`user-mismatch`): hay que repetir con la cuenta con la que entró.
+  const factory AuthFailure.accountMismatch() = _AccountMismatch;
   const factory AuthFailure.unknown(String code) = _Unknown;
   const factory AuthFailure.profileCreateFailed({Object? cause}) =
       _ProfileCreateFailed;
@@ -58,6 +62,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         'account-exists-with-different-credential' =>
           const AuthFailure.accountExistsWithDifferentCredential(),
         'requires-recent-login' => const AuthFailure.requiresRecentLogin(),
+        'user-mismatch' => const AuthFailure.accountMismatch(),
         final code => AuthFailure.unknown(code),
       };
 
@@ -83,6 +88,8 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _ProviderUnavailable() =>
           'Este método no está disponible. Entrá con email o escribinos al '
               'equipo',
+        _AccountMismatch() =>
+          'Usá la misma cuenta con la que entraste para confirmar',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',

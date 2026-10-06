@@ -22,6 +22,9 @@ dart: kDataRetentionSections
 **Desde la app:** Perfil → Ajustes → Eliminar cuenta. No hace falta pedírselo a
 nadie ni esperar aprobación.
 
+**Si sos entrenador, también desde el Coach Hub:** Ajustes → Cuenta → Eliminar
+cuenta. Te pedimos que vuelvas a confirmar tu identidad antes de borrar.
+
 **Desde la web:** entrá a
 [gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta) y
 seguí las instrucciones. No hace falta tener la app instalada ni iniciar

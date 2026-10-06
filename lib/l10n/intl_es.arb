@@ -1113,5 +1113,9 @@
   "@moderationBlockedMessage": {},
   "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}",
   "eliminarCuentaSheetErrorSubscriptionCancel": "No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Inténtalo de nuevo en unos minutos.",
-  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escríbenos y lo resolvemos."
+  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escríbenos y lo resolvemos.",
+  "eliminarCuentaWebReauthTitle": "Confirma tu identidad",
+  "eliminarCuentaWebReauthPasswordBody": "Por seguridad, introduce tu contraseña para confirmar que eres tú.",
+  "eliminarCuentaWebReauthCta": "CONFIRMAR",
+  "eliminarCuentaWebPopupHint": "Para confirmar que eres tú, se abrirá una ventana de {provider}."
 }

@@ -2233,5 +2233,9 @@
   "planLimitTrainerPlanAMedidaCuerpo": "You're on the largest plan. We're preparing a custom plan for you.",
   "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{1 athlete will be unlinked. We'll let them know.} other{{count} athletes will be unlinked. We'll let them know.}}",
   "eliminarCuentaSheetErrorSubscriptionCancel": "We couldn't cancel your subscription, so your account was not deleted. Please try again in a few minutes.",
-  "eliminarCuentaSheetErrorNotAllowed": "We couldn't delete your account from the app. Contact us and we'll sort it out."
+  "eliminarCuentaSheetErrorNotAllowed": "We couldn't delete your account from the app. Contact us and we'll sort it out.",
+  "eliminarCuentaWebReauthTitle": "Confirm your identity",
+  "eliminarCuentaWebReauthPasswordBody": "For your security, enter your password to confirm it's you.",
+  "eliminarCuentaWebReauthCta": "CONFIRM",
+  "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open."
 }
