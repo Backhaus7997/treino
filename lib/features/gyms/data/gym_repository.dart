@@ -42,6 +42,12 @@ class GymRepository {
     return _fromDoc(snap);
   }
 
+  /// Stream de `gyms/{id}`: emite el gym en vivo y `null` si no existe (o si
+  /// el doc no se puede parsear). Lo usa el aviso de «nombrá tu gimnasio»
+  /// para desaparecer solo cuando alguien —vos u otro— lo nombra.
+  Stream<Gym?> watchById(String id) =>
+      _collection.doc(id).snapshots().map(_fromDoc);
+
   /// Crea o actualiza `gyms/{gym.id}` con merge:true.
   ///
   /// Usado por el read-through cache client-side de `ResolveGymPlaceService`

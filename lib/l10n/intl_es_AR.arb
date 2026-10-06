@@ -4721,6 +4721,31 @@
   "@gymNameDialogConfirm": {
     "description": "Confirm button of the gym name dialog. Cancel reuses commonCancel."
   },
+  "gymNamePromptTitle": "Tu gimnasio necesita un nombre",
+  "@gymNamePromptTitle": {
+    "description": "Título de la card de Inicio que pide nombrar el gimnasio vinculado cuando está marcado nameNeeded (migración de Places, #1338)."
+  },
+  "gymNamePromptBody": "Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.",
+  "@gymNamePromptBody": {
+    "description": "Cuerpo de la card que pide nombrar el gimnasio."
+  },
+  "gymNamePromptCta": "PONERLE NOMBRE",
+  "@gymNamePromptCta": {
+    "description": "Botón de la card que abre el diálogo para nombrar el gimnasio."
+  },
+  "gymNamePromptDismiss": "Ahora no",
+  "@gymNamePromptDismiss": {
+    "description": "Cierra la card de nombrar el gimnasio hasta la próxima sesión."
+  },
+  "gymNamePromptRaceMessage": "Alguien ya lo nombró: {name}.",
+  "@gymNamePromptRaceMessage": {
+    "description": "Snackbar cuando otro usuario nombró el gimnasio antes que vos; muestra el nombre ganador.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.",
   "@coachHubOnboardingPfLocationStaleHint": {
     "description": "Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo."
