@@ -73,17 +73,45 @@ flutter analyze
 
 ## 3. Correr la app
 
-### Gimnasios (Google Places) — sin setup
+### Gimnasios (Google Places) — necesita la key
 
 La feature de gimnasios usa Google Places con un **client key restringido** que
-va **committeado en el código** (`lib/features/gyms/application/places_providers.dart`).
-No es un secreto: un client key viaja en el binario de la app de todos modos, así
-que la protección real es la **restricción** de la key en Google Cloud Console
-(API restriction = "Places API (New)"), no esconderla. Por eso `flutter run` y los
-builds andan **sin ningún setup extra**.
+**NO va committeado**. Se pasa en build-time:
 
-> Para rotar la key sin recompilar el default, se puede pisar en build-time con
-> `--dart-define=PLACES_CLIENT_KEY=<key>`.
+```bash
+flutter run --dart-define=PLACES_CLIENT_KEY=<key>
+```
+
+Sin la key la app **anda igual**: la búsqueda de gimnasios muestra "no está
+disponible en esta versión de la app", sin botón de reintentar. Es un estado
+explícito, nunca un "no hay resultados" ni un crash. Si sólo vas a tocar otra
+parte de la app, podés correr sin el define y listo.
+
+> **La key va en el comando de build de release también.** Sin ella, la app sale
+> a producción con la búsqueda de gimnasios caída. El smoke test lo muestra: la
+> pantalla de gimnasios dice que no está disponible.
+
+Hasta octubre de 2026 la key iba committeada como `defaultValue`, y acá decía que
+eso estaba bien porque "viaja en el binario de todos modos" y porque "la
+protección real es la restricción de la key". Las dos mitades fallaban:
+
+- **"Viaja en el binario de todos modos"** es cierto, pero sacarla de un APK es
+  trabajo deliberado; de un repositorio **público** la levantan bots que escanean
+  `AIza` solos, a las horas de cada push. No es la misma amenaza.
+- **"La protección real es la restricción"**, a medias: la API restriction acota
+  **qué** API se puede llamar, no **quién**. Y una restricción por APP acá es
+  imposible: estas llamadas REST mandan sólo `X-Goog-Api-Key` y
+  `X-Goog-FieldMask`, nunca `X-Android-Package` / `X-Ios-Bundle-Identifier`.
+
+El lado web ya se hacía así (`kPlacesWebClientKey`, con
+`--dart-define=PLACES_WEB_CLIENT_KEY` desde Vercel); mobile estaba desalineado.
+
+**En Google Cloud Console la key necesita las tres:**
+
+1. **API restriction** = "Places API (New)".
+2. **Tope de cuota diario.** Con la key filtrada, es lo ÚNICO que acota el gasto
+   — del orden de USD 32 cada 1000 llamadas.
+3. **Alerta de presupuesto.**
 
 ### iOS (simulador)
 ```bash

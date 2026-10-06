@@ -214,6 +214,42 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  // La key de Places dejó de tener default committeado, así que "la app se
+  // compiló sin la key" pasó a ser un estado alcanzable. NO se parece a un
+  // error de red: reintentar no la trae, y ofrecer el botón sería prometer una
+  // salida que no existe (AGENTS.md §11.1).
+  //
+  // El `findsNothing` del botón es la mitad que importa. Sin él, el test pasaría
+  // igual mostrando el mensaje nuevo CON un «Reintentar» al lado.
+  testWidgets(
+      'sin la key: mensaje de configuración y NINGÚN botón de reintentar',
+      (tester) async {
+    when(() => mockService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            ))
+        .thenThrow(
+            const PlacesTextSearchConfigError('PLACES_CLIENT_KEY is empty'));
+
+    await tester.pumpWidget(_wrap(
+      overrides: [
+        placesTextSearchServiceProvider.overrideWithValue(mockService),
+        gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+      ],
+      selectedGymId: null,
+      onGymIdSelected: (_) {},
+    ));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'qivox');
+    await tester.pump(const Duration(milliseconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('no está disponible'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Reintentar'), findsNothing);
+  });
+
   testWidgets('shows an error state with retry when the search fails',
       (tester) async {
     when(() => mockService.search(

@@ -1162,6 +1162,7 @@
   "profileGymSaveError": "We couldn't save your gym. Please try again.",
   "gymNearbyLocationAffordance": "Turn on location to see nearby gyms",
   "gymNearbyShowMore": "Show more",
+  "gymSearchConfigError": "Gym search isn't available in this version of the app.",
   "gymNearbyLoadError": "We couldn't load nearby gyms.",
   "feedPullToRefreshA11y": "Pull to refresh",
   "logFieldInvalidNumber": "Enter a valid number",

@@ -3040,6 +3040,10 @@ class AppL10nEn extends AppL10n {
   String get gymNearbyShowMore => 'Show more';
 
   @override
+  String get gymSearchConfigError =>
+      'Gym search isn\'t available in this version of the app.';
+
+  @override
   String get gymNearbyLoadError => 'We couldn\'t load nearby gyms.';
 
   @override

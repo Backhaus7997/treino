@@ -3095,6 +3095,10 @@ class AppL10nEs extends AppL10n {
   String get gymNearbyShowMore => 'Ver más';
 
   @override
+  String get gymSearchConfigError =>
+      'La búsqueda de gimnasios no está disponible en esta versión de la app.';
+
+  @override
   String get gymNearbyLoadError => 'No pudimos cargar los gimnasios cercanos.';
 
   @override
@@ -8319,6 +8323,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get gymNearbyShowMore => 'Ver más';
+
+  @override
+  String get gymSearchConfigError =>
+      'La búsqueda de gyms no está disponible en esta versión de la app.';
 
   @override
   String get gymNearbyLoadError => 'No pudimos cargar los gyms cercanos.';
