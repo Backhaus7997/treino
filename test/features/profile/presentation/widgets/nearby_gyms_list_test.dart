@@ -169,6 +169,20 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.textContaining('No pudimos'), findsNothing);
       expect(find.byType(NearbyGymsList), findsOneWidget);
+      expect(find.text('Google Maps'), findsNothing);
+    });
+
+    testWidgets('con resultados de Places se atribuye a «Google Maps»',
+        (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: true);
+
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        nearbyGymsProvider(_bucket).overrideWith((ref) async => [_gym('a')]),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Google Maps'), findsOneWidget);
     });
 
     testWidgets(

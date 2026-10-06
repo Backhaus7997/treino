@@ -7,6 +7,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
+import '../../../gyms/presentation/widgets/google_maps_attribution.dart';
 import 'gym_card.dart';
 
 /// Single search box replacing the two-step brand→sucursal picker (retired
@@ -147,6 +148,7 @@ class _SuggestionsList extends ConsumerWidget {
           return _EmptyResults(query: query);
         }
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             for (final suggestion in suggestions) ...[
               GymCard(
@@ -157,6 +159,7 @@ class _SuggestionsList extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
             ],
+            const GoogleMapsAttribution(),
           ],
         );
       },
