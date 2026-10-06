@@ -257,7 +257,9 @@ seguimiento, archivos, facturación y planes de alimentación), los accesos que
 ellos te habían compartido, tus plantillas —incluidas las publicadas—, tus
 ejercicios propios con sus videos, las reseñas que recibiste y tu perfil
 público. Se cancelan tus turnos futuros y se borra tu disponibilidad. No hay
-recuperación.
+recuperación. Si un paso del borrado falla, la cuenta se elimina igual y algo
+de eso puede quedar guardado hasta que nos pidas completarlo (lo explica la
+política de retención, sección 2.7).
 
 **Tus vínculos terminan** y a cada alumno le llega una notificación; no les
 mandamos correo. **Los alumnos conservan** las rutinas que les asignaste y su

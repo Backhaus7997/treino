@@ -121,6 +121,16 @@ de ellos, con su historial. Si una de esas rutinas usaba un ejercicio propio
 tuyo, conserva el nombre pero deja de tener el video y la descripción. Las copias
 que un alumno haya adoptado de una plantilla tuya también siguen siendo suyas.
 
+### 2.7 Si un paso falla a mitad de camino
+
+El borrado son varios pasos. Salvo la baja de la suscripción, que va primero y
+frena todo si falla, un error transitorio en uno de ellos no detiene el resto:
+tu cuenta y tu acceso se eliminan igual, y **los datos de ese paso pueden quedar
+guardados**. Hoy no lo reintentamos solos. Cada falla queda registrada con tu
+identificador. Si querés que confirmemos que no quedó nada, o que terminemos de
+borrarlo, escribinos a treino@gettreino.com con el correo de tu cuenta: lo
+tratamos como una solicitud de supresión, con el plazo de la sección 5.
+
 ---
 
 ## 3. Qué NO se elimina, y por qué
@@ -230,6 +240,12 @@ cuatro decisiones que conviene que valide un abogado cuando llegue:
    razonable frente a los alumnos que las usaban, o si corresponde un plazo de
    gracia. Hoy el borrado es inmediato y el alumno conserva las rutinas que ya
    tenía asignadas.
+
+**Pendiente técnico:** un borrado `partial` (sección 2.7) no se reintenta solo.
+`audit_log/{uid}` guarda `status: partial` y la lista de errores, pero nada lo
+lee. Como la cascada es idempotente y ya no depende de `users/{uid}`, un barrido
+programado sobre los `partial` podría completarlos; hasta entonces, el texto
+publicado dice la verdad: se completa a pedido.
 
 **Pendiente de producto, independiente del abogado:** la pantalla de
 confirmación de borrado no le dice al usuario qué sobrevive. La sección 3 sí lo
