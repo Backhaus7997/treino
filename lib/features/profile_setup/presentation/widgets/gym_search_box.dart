@@ -140,9 +140,16 @@ class _SuggestionsList extends ConsumerWidget {
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => _ErrorRetry(
-        onRetry: () => ref.invalidate(placesTextSearchProvider(query)),
-      ),
+      // "Falta la key" NO es un error de red: reintentar no la trae, así que
+      // ofrecer el botón sería prometer una salida que no existe (AGENTS.md
+      // §11.1). Es alcanzable desde que la key dejó de tener default
+      // committeado. Mismo criterio que el Coach Hub, que separa `errorConfig`
+      // de `errorRed` en `editor_ubicacion_pf.dart`.
+      error: (error, __) => esFaltanteDeKeyDePlaces(error)
+          ? const _ConfigError()
+          : _ErrorRetry(
+              onRetry: () => ref.invalidate(placesTextSearchProvider(query)),
+            ),
       data: (suggestions) {
         if (suggestions.isEmpty) {
           return _EmptyResults(query: query);
@@ -180,6 +187,30 @@ class _EmptyResults extends StatelessWidget {
       child: Text(
         'Sin resultados para "$query"',
         style: TextStyle(color: palette.textMuted, fontSize: 13),
+      ),
+    );
+  }
+}
+
+/// La app se compiló sin `--dart-define=PLACES_CLIENT_KEY`.
+///
+/// Hermano de [_ErrorRetry] SIN el botón, y esa ausencia es lo único que
+/// importa: el usuario no puede hacer nada, y un «Reintentar» que no puede
+/// funcionar es peor que no ofrecer nada.
+class _ConfigError extends StatelessWidget {
+  const _ConfigError();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          AppL10n.of(context).gymSearchConfigError,
+          style: TextStyle(color: palette.danger, fontSize: 13),
+        ),
       ),
     );
   }

@@ -5546,6 +5546,12 @@ abstract class AppL10n {
   /// **'Ver más'**
   String get gymNearbyShowMore;
 
+  /// Places client key missing at build time (no --dart-define=PLACES_CLIENT_KEY). Config error, NOT a network failure: must never read as 'no results' and must never offer retry — retrying cannot supply the key.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La búsqueda de gyms no está disponible en esta versión de la app.'**
+  String get gymSearchConfigError;
+
   /// gym-selection-v2: nearbyGymsProvider fetch-error state. Paired with coachRetryLabel for the retry CTA.
   ///
   /// In es_AR, this message translates to:

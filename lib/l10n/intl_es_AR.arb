@@ -2484,6 +2484,10 @@
   "@gymNearbyShowMore": {
     "description": "gym-selection-v2 AD-4: reveals already-fetched nearby rows beyond the initial 8 — a pure local toggle, never a re-request."
   },
+  "gymSearchConfigError": "La búsqueda de gyms no está disponible en esta versión de la app.",
+  "@gymSearchConfigError": {
+    "description": "Places client key missing at build time (no --dart-define=PLACES_CLIENT_KEY). Config error, NOT a network failure: must never read as 'no results' and must never offer retry — retrying cannot supply the key."
+  },
   "gymNearbyLoadError": "No pudimos cargar los gyms cercanos.",
   "@gymNearbyLoadError": {
     "description": "gym-selection-v2: nearbyGymsProvider fetch-error state. Paired with coachRetryLabel for the retry CTA."

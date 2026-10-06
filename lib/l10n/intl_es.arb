@@ -627,6 +627,7 @@
   "profileGymSaveError": "No pudimos guardar el gimnasio. Inténtalo de nuevo.",
   "gymNearbyLocationAffordance": "Activa tu ubicación para ver gimnasios cercanos",
   "gymNearbyShowMore": "Ver más",
+  "gymSearchConfigError": "La búsqueda de gimnasios no está disponible en esta versión de la app.",
   "gymNearbyLoadError": "No pudimos cargar los gimnasios cercanos.",
   "feedPullToRefreshA11y": "Desliza para actualizar",
   "logFieldInvalidNumber": "Ingresa un número válido",

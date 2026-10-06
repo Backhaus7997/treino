@@ -141,31 +141,40 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
         padding: EdgeInsets.symmetric(vertical: 24),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (_, __) => Padding(
+      // La key de Places dejó de tener default committeado, así que "falta la
+      // key" es un estado alcanzable — y NO se parece a un error de red: el
+      // botón de reintentar no la trae. Ofrecerlo sería prometer una salida que
+      // no existe (AGENTS.md §11.1). Mismo criterio que el Coach Hub, que
+      // separa `errorConfig` de `errorRed` en `editor_ubicacion_pf.dart`.
+      error: (error, __) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.gymNearbyLoadError,
+              esFaltanteDeKeyDePlaces(error)
+                  ? l10n.gymSearchConfigError
+                  : l10n.gymNearbyLoadError,
               style: TextStyle(color: palette.danger, fontSize: 13),
             ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: () => ref.invalidate(nearbyGymsProvider(bucket)),
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 32),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
-                  l10n.coachRetryLabel,
-                  style: TextStyle(color: palette.accent),
+            if (!esFaltanteDeKeyDePlaces(error)) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => ref.invalidate(nearbyGymsProvider(bucket)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    l10n.coachRetryLabel,
+                    style: TextStyle(color: palette.accent),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
