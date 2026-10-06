@@ -85,7 +85,7 @@ Instalación manual y detalles en [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Cómo correr
 
-Desarrollo local **contra el emulador** (nunca contra producción):
+Desarrollo local **contra el emulador**:
 
 ```bash
 ./scripts/emulator.sh        # Firestore, Auth, Functions y UI del emulador
@@ -98,7 +98,18 @@ flutter run --flavor phone --dart-define=USE_EMULATOR=true
 
 > [!CAUTION]
 > Sin `--dart-define=USE_EMULATOR=true` **cualquier** superficie arranca contra
-> `treino-dev`, que es producción.
+> `treino-dev`, que es producción. **Y con el flag, no todo queda aislado**:
+>
+> | Servicio | App móvil | Coach Hub | Wear OS |
+> |---|---|---|---|
+> | Firestore y Auth | emulador | emulador | emulador |
+> | Functions (callables) | emulador | **producción** | **producción** |
+> | Storage | **producción** | **producción** | **producción** |
+> | Analytics y Crashlytics | **producción** | **producción** (Analytics) | — |
+>
+> Las callables del Coach Hub (checkout, bajas, moderación…) fallan contra
+> producción con un usuario del emulador de Auth, y subir archivos escribe en el
+> bucket real. Medido en los `main*.dart`: qué servicio llama a `use*Emulator`.
 
 Las otras superficies:
 
