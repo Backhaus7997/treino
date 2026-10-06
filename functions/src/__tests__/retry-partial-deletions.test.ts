@@ -186,7 +186,19 @@ describe("no toca MP ni Auth", () => {
 
     expect(r.succeeded).toBe(1);
     await expect(getAuth(app).getUser(PF)).rejects.toBeDefined();
-    expect((await audit(PF)).status).toBe("success");
+    const a = await audit(PF);
+    expect(a.status).toBe("success");
+    // El partial original no pudo anotar `users-auth`: lo anota el reintento
+    // que efectivamente dio de baja la identidad (review de #1355).
+    expect(a.deletedCollections).toContain("users-auth");
+  });
+
+  it("si el partial NO fue por Auth, no anota users-auth", async () => {
+    await partial(PF, { errors: ["routines: boom"] });
+
+    await retryPartialDeletionsHandler(app);
+
+    expect((await audit(PF)).deletedCollections ?? []).not.toContain("users-auth");
   });
 });
 

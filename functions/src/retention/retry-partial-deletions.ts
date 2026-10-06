@@ -165,8 +165,13 @@ export async function retryPartialDeletionsHandler(
 
       const cascade = await cascadeFn(app, uid);
       const errors = [...cascade.errors];
+      const deleted = [...cascade.deletedCollections];
       if (previousErrors.some((e) => e.startsWith("auth:"))) {
-        errors.push(...(await retryAuthDeletion(app, uid)));
+        const authErrors = await retryAuthDeletion(app, uid);
+        errors.push(...authErrors);
+        // El partial original no pudo anotar `users-auth`; si este reintento
+        // dio de baja la identidad, el audit tiene que decirlo.
+        if (authErrors.length === 0) deleted.push("users-auth");
       }
       const attempt = previous + 1;
       const base = {
@@ -180,7 +185,7 @@ export async function retryPartialDeletionsHandler(
           ...base,
           status: "success",
           retriedAt: FieldValue.serverTimestamp(),
-          deletedCollections: FieldValue.arrayUnion(...cascade.deletedCollections),
+          deletedCollections: FieldValue.arrayUnion(...deleted),
         });
         r.succeeded++;
         logger.info("retryPartialDeletions: borrado completado", { uid, attempt });
