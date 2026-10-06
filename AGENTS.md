@@ -372,13 +372,26 @@ worktrees en `.claude/worktrees/`. Cuatro reglas:
 Si `check` sale con error, **frená y confirmá** con el usuario antes de seguir.
 Dos ramas arreglando el mismo bug es la forma más cara de perder trabajo.
 
+Si el claim que te frena sale marcado `← VIEJO, capaz murió`, limpialo con
+`release <scope>` (abajo) en vez de esperar las 8h de `prune`.
+
 **b. Al arrancar, anotate. Al terminar o abandonar, borrate.**
 
 ```bash
 ./scripts/agent-ledger.sh claim 826 "banner de entornos en docs"
 ./scripts/agent-ledger.sh release          # sólo los claims de ESTA sesión
+./scripts/agent-ledger.sh release 826      # ese scope, para limpiar un claim muerto
 ./scripts/agent-ledger.sh release --all    # todo lo de este worktree
 ```
+
+`release <scope>` dice `liberado:` **sólo si borró una fila**, y si no borró dice
+a qué worktree apunta. Hasta el 2026-10-06 lo decía siempre, así que el camino
+más común de limpieza —un agente terminó, borró su worktree, y otro corre el
+`release` desde la raíz— contestaba que sí y dejaba el claim en pie. El día que
+se arregló había un claim de **once días** que se había comido varios `release`
+de esa forma. Alcanza a los claims de este worktree y a los de un worktree que
+ya no existe en disco; si el worktree sigue existiendo no lo toca, porque puede
+haber un agente vivo ahí.
 
 El ledger vive en `.git/agent-ledger.tsv` — el único directorio que comparten
 todos los worktrees y que nunca se commitea. No lo edites a mano. Si tu
