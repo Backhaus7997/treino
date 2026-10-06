@@ -3860,6 +3860,18 @@ abstract class AppL10n {
   /// **'Replicar este valor en toda la columna'**
   String get routineEditorFillColumnA11y;
 
+  /// Botón de la barra del teclado: salta a la celda siguiente (#910).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIG.'**
+  String get routineEditorNextCellLabel;
+
+  /// No description provided for @routineEditorNextCellA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ir a la celda siguiente'**
+  String get routineEditorNextCellA11y;
+
   /// Contexto debajo de los atajos: sobre qué celda actúan.
   ///
   /// In es_AR, this message translates to:
