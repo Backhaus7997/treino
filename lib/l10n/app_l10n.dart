@@ -4562,6 +4562,12 @@ abstract class AppL10n {
   /// **'No encontramos ese lugar. Probá con la dirección completa.'**
   String get coachHubOnboardingPfLocationEmpty;
 
+  /// Coach Hub onboarding, the picked place is already in the trainer's locations.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese lugar ya está en tu lista.'**
+  String get coachHubOnboardingPfLocationDuplicate;
+
   /// Coach Hub onboarding, place search failed (network or HTTP).
   ///
   /// In es_AR, this message translates to:
@@ -4579,6 +4585,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Reintentar'**
   String get coachHubOnboardingPfLocationRetry;
+
+  /// Coach Hub onboarding, shown after the place search found a place; asks the trainer to name it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.'**
+  String get coachHubOnboardingPfLocationFound;
+
+  /// Coach Hub onboarding, label of the field where the trainer types the name of the place.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE DEL LUGAR'**
+  String get coachHubOnboardingPfLocationLabelLabel;
+
+  /// Coach Hub onboarding, hint of the place name field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Mi estudio, Parque Sarmiento'**
+  String get coachHubOnboardingPfLocationLabelHint;
+
+  /// Coach Hub onboarding, button that adds the found place with the typed name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar lugar'**
+  String get coachHubOnboardingPfLocationAddButton;
 
   /// Coach Hub onboarding, tooltip of the remove-place button.
   ///

@@ -397,6 +397,86 @@ function verdictFor(value: unknown): ModerationVerdict | null {
   return verdict === "ok" ? null : verdict;
 }
 
+/** Un dato de cuarentena para UNA etiqueta de `trainerLocations`. */
+export interface LocationLabelFinding {
+  /** `trainerLocations[i].customLabel`, mismo shape que el guard del cliente. */
+  field: string;
+  verdict: ModerationVerdict;
+}
+
+/**
+ * Cuarentena de las etiquetas (`customLabel`) de `trainerLocations`.
+ *
+ * Las escribe el PF y quedan en `trainerPublicProfiles`, legible por cualquier
+ * autenticado. Viven dentro de un array de maps: Firestore no actualiza un
+ * elemento por indice, asi que se redacta en memoria y se reescribe el array
+ * ENTERO, con la precondicion [updateTime]. Un finding por etiqueta; `review`
+ * se registra pero no se redacta. Elementos que no son objetos se saltean sin
+ * apagar el resto.
+ */
+export async function quarantineTrainerLocationLabels(input: {
+  db: Firestore;
+  path: string;
+  locations: unknown;
+  authorUid?: string;
+  updateTime?: FirebaseFirestore.Timestamp;
+}): Promise<LocationLabelFinding[]> {
+  const { db, path, locations, authorUid, updateTime } = input;
+  if (!Array.isArray(locations)) return [];
+
+  const findings: LocationLabelFinding[] = [];
+  let changed = false;
+  const nuevas = locations.map((loc, i) => {
+    if (loc === null || typeof loc !== "object") return loc;
+    const verdict = verdictFor((loc as { customLabel?: unknown }).customLabel);
+    if (!verdict) return loc;
+    findings.push({ field: `trainerLocations[${i}].customLabel`, verdict });
+    if (verdict !== "block") return loc;
+    changed = true;
+    return { ...(loc as object), customLabel: REDACTADO };
+  });
+  if (findings.length === 0) return [];
+
+  for (const f of findings) {
+    await escribirRegistroVersionado(
+      db,
+      `${path.replace(/\//g, "__")}__${f.field.replace(/[[\].]/g, "_")}`,
+      updateTime,
+      {
+        path,
+        field: f.field,
+        kind: "profile",
+        verdict: f.verdict,
+        authorUid: authorUid ?? null,
+        redacted: f.verdict === "block",
+        at: new Date(),
+      },
+    );
+  }
+  if (!changed) return findings;
+
+  try {
+    await db
+      .doc(path)
+      .update(
+        { trainerLocations: nuevas },
+        updateTime ? { lastUpdateTime: updateTime } : {},
+      );
+  } catch (err) {
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      logger.info("quarantine: el perfil cambio, lo revisa su propio evento", {
+        path,
+      });
+      return findings;
+    }
+    throw err;
+  }
+  logger.warn("etiqueta de ubicacion vetada redactada por el servidor", {
+    path,
+  });
+  return findings;
+}
+
 /**
  * Cuarentena de rutinas.
  *
@@ -650,6 +730,18 @@ export const quarantineTrainerProfileName = onDocumentWritten(
       kind: "profile",
       authorUid: event.params.uid,
       updateTime: fresh.updateTime,
+    });
+
+    // Etiquetas de ubicaciones: el `update()` de la bio de arriba también
+    // escribió este documento, así que se relee otra vez (misma razón).
+    const fresh2 = await db.doc(after.ref.path).get();
+    if (!fresh2.exists) return;
+    await quarantineTrainerLocationLabels({
+      db,
+      path: after.ref.path,
+      locations: fresh2.get("trainerLocations"),
+      authorUid: event.params.uid,
+      updateTime: fresh2.updateTime,
     });
   },
 );

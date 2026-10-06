@@ -2480,6 +2480,10 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t find that place. Try the full address.';
 
   @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'That place is already in your list.';
+
+  @override
   String get coachHubOnboardingPfLocationNetworkError =>
       'We couldn\'t search for the place. Check your connection and try again.';
 
@@ -2489,6 +2493,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachHubOnboardingPfLocationRetry => 'Retry';
+
+  @override
+  String get coachHubOnboardingPfLocationFound =>
+      'We found the place. Name it the way your clients will see it.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'PLACE NAME';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'E.g. My studio, Sarmiento Park';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Add place';
 
   @override
   String get coachHubOnboardingPfLocationRemove => 'Remove place';

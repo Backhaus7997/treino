@@ -23,9 +23,14 @@ enum _Estado { inicial, cargando, resultados, vacio, errorConfig, errorRed }
 /// Buscador de un lugar de entrenamiento POR DIRECCIÓN (design D9/D10).
 ///
 /// La web no usa la geolocalización del dispositivo: el PF escribe, busca (con
-/// el botón o con Enter) y ELIGE un resultado. Solo un resultado elegido llega a
-/// [onElegir]: un texto libre sin coordenadas no es una ubicación y no se puede
-/// guardar.
+/// el botón o con Enter), ELIGE uno de los resultados y le pone un NOMBRE.
+/// Solo un lugar elegido y nombrado llega a [onElegir]: un texto libre sin
+/// coordenadas no es una ubicación y no se puede guardar.
+///
+/// Políticas de Places: el nombre y la dirección de Google se MUESTRAN en la
+/// lista (con la atribución «Google Maps»), pero NO se guardan ni se prefillan.
+/// El nombre lo escribe SIEMPRE el PF y es lo único que se persiste como
+/// etiqueta.
 ///
 /// La búsqueda es explícita (botón/Enter, desde [LugarSearchService.minCaracteres]
 /// caracteres), no por tecla: cada request de Text Search se factura, y así no
@@ -33,8 +38,9 @@ enum _Estado { inicial, cargando, resultados, vacio, errorConfig, errorRed }
 class EditorUbicacionPf extends ConsumerStatefulWidget {
   const EditorUbicacionPf({super.key, required this.onElegir});
 
-  /// Se llama con el resultado que el PF eligió. El editor se limpia después.
-  final ValueChanged<LugarCandidato> onElegir;
+  /// Se llama con el lugar encontrado y el nombre que el PF le puso (ya
+  /// recortado, nunca vacío). El editor se limpia después.
+  final void Function(LugarCandidato lugar, String etiqueta) onElegir;
 
   @override
   ConsumerState<EditorUbicacionPf> createState() => _EditorUbicacionPfState();
@@ -42,9 +48,14 @@ class EditorUbicacionPf extends ConsumerStatefulWidget {
 
 class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   final _consulta = TextEditingController();
+  final _etiqueta = TextEditingController();
   _Estado _estado = _Estado.inicial;
   List<LugarCandidato> _resultados = const [];
+  LugarCandidato? _elegido;
   int _busquedaActual = 0;
+
+  bool get _puedeAgregar =>
+      _elegido != null && _etiqueta.text.trim().isNotEmpty;
 
   bool get _puedeBuscar =>
       _consulta.text.trim().length >= LugarSearchService.minCaracteres &&
@@ -54,17 +65,43 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   void initState() {
     super.initState();
     // Habilita/deshabilita «Buscar» según el largo del texto.
-    _consulta.addListener(_alCambiarTexto);
+    _consulta.addListener(_alCambiarConsulta);
+    _etiqueta.addListener(_alCambiarTexto);
   }
 
   void _alCambiarTexto() {
     if (mounted) setState(() {});
   }
 
+  String _consultaBuscada = '';
+
+  /// Cambiar la dirección invalida lo que se buscó con la anterior: los
+  /// resultados y el lugar elegido son de OTRA consulta (agregarlos guardaría
+  /// coordenadas que el PF ya no está mirando), y la respuesta de una búsqueda
+  /// en vuelo queda descartada por el token.
+  void _alCambiarConsulta() {
+    if (!mounted) return;
+    final texto = _consulta.text.trim();
+    if (texto != _consultaBuscada) {
+      _consultaBuscada = texto;
+      final hayEstado = _estado != _Estado.inicial;
+      if (hayEstado || _elegido != null) {
+        _busquedaActual++;
+        _etiqueta.clear();
+        _estado = _Estado.inicial;
+        _resultados = const [];
+        _elegido = null;
+      }
+    }
+    setState(() {});
+  }
+
   @override
   void dispose() {
-    _consulta.removeListener(_alCambiarTexto);
+    _consulta.removeListener(_alCambiarConsulta);
+    _etiqueta.removeListener(_alCambiarTexto);
     _consulta.dispose();
+    _etiqueta.dispose();
     super.dispose();
   }
 
@@ -72,7 +109,12 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     final texto = _consulta.text.trim();
     if (texto.length < LugarSearchService.minCaracteres) return;
     final esta = ++_busquedaActual;
-    setState(() => _estado = _Estado.cargando);
+    _consultaBuscada = texto;
+    _etiqueta.clear();
+    setState(() {
+      _estado = _Estado.cargando;
+      _elegido = null;
+    });
 
     _Estado siguiente;
     var encontrados = const <LugarCandidato>[];
@@ -94,13 +136,25 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   }
 
   void _elegir(LugarCandidato lugar) {
+    // Volver a tocar el mismo resultado no borra lo que el PF ya tipeó.
+    if (_elegido?.placeId != lugar.placeId) _etiqueta.clear();
+    setState(() => _elegido = lugar);
+  }
+
+  void _agregar() {
+    final lugar = _elegido;
+    if (lugar == null || !_puedeAgregar) return;
+    final etiqueta = _etiqueta.text.trim();
     _busquedaActual++;
+    _consultaBuscada = '';
     _consulta.clear();
+    _etiqueta.clear();
     setState(() {
       _estado = _Estado.inicial;
       _resultados = const [];
+      _elegido = null;
     });
-    widget.onElegir(lugar);
+    widget.onElegir(lugar, etiqueta);
   }
 
   @override
@@ -139,7 +193,10 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
           _Estado.inicial || _Estado.cargando => const SizedBox.shrink(),
           _Estado.resultados => _Resultados(
               resultados: _resultados,
+              elegido: _elegido,
               onElegir: _elegir,
+              etiqueta: _etiqueta,
+              onAgregar: _puedeAgregar ? _agregar : null,
             ),
           _Estado.vacio => _Aviso(
               mensaje: l10n.coachHubOnboardingPfLocationEmpty,
@@ -206,14 +263,26 @@ class _Aviso extends StatelessWidget {
   }
 }
 
+/// Los candidatos de Places (nombre y dirección solo para mostrar) y, una vez
+/// elegido uno, el campo donde el PF escribe el nombre que se guarda.
 class _Resultados extends StatelessWidget {
-  const _Resultados({required this.resultados, required this.onElegir});
+  const _Resultados({
+    required this.resultados,
+    required this.elegido,
+    required this.onElegir,
+    required this.etiqueta,
+    required this.onAgregar,
+  });
 
   final List<LugarCandidato> resultados;
+  final LugarCandidato? elegido;
   final ValueChanged<LugarCandidato> onElegir;
+  final TextEditingController etiqueta;
+  final VoidCallback? onAgregar;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return Padding(
       key: const Key('onboarding-pf-lugar-resultados'),
@@ -223,44 +292,46 @@ class _Resultados extends StatelessWidget {
         children: [
           for (var i = 0; i < resultados.length; i++) ...[
             if (i > 0) const SizedBox(height: AppSpacing.s8),
-            Material(
-              color: palette.bgCard,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                side: BorderSide(color: palette.border),
+            _Candidato(
+              key: Key('onboarding-pf-lugar-resultado-$i'),
+              lugar: resultados[i],
+              seleccionado: identical(resultados[i], elegido),
+              onTap: () => onElegir(resultados[i]),
+            ),
+          ],
+          if (elegido != null) ...[
+            const SizedBox(height: AppSpacing.s12),
+            Text(
+              l10n.coachHubOnboardingPfLocationFound,
+              style: GoogleFonts.barlow(
+                color: palette.textPrimary,
+                fontSize: AppTextSize.body,
+                fontWeight: FontWeight.w600,
               ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: Key('onboarding-pf-lugar-resultado-$i'),
-                onTap: () => onElegir(resultados[i]),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resultados[i].label,
-                        style: GoogleFonts.barlow(
-                          color: palette.textPrimary,
-                          fontSize: AppTextSize.body,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (resultados[i].direccion.isNotEmpty &&
-                          resultados[i].direccion != resultados[i].label) ...[
-                        const SizedBox(height: AppSpacing.hairline),
-                        Text(
-                          resultados[i].direccion,
-                          style: GoogleFonts.barlow(
-                            color: palette.textMuted,
-                            fontSize: AppTextSize.bodyDense,
-                          ),
-                        ),
-                      ],
-                    ],
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: AuthInput(
+                    key: const Key('onboarding-pf-lugar-etiqueta'),
+                    controller: etiqueta,
+                    label: l10n.coachHubOnboardingPfLocationLabelLabel,
+                    hint: l10n.coachHubOnboardingPfLocationLabelHint,
+                    leadingIcon: TreinoIcon.mapPin,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => onAgregar?.call(),
                   ),
                 ),
-              ),
+                const SizedBox(width: AppSpacing.s12),
+                TreinoButton(
+                  key: const Key('onboarding-pf-lugar-agregar'),
+                  label: l10n.coachHubOnboardingPfLocationAddButton,
+                  variant: TreinoButtonVariant.secondary,
+                  onPressed: onAgregar,
+                ),
+              ],
             ),
           ],
           // Política de Places: el contenido de Places mostrado fuera de un mapa
@@ -276,6 +347,65 @@ class _Resultados extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Candidato extends StatelessWidget {
+  const _Candidato({
+    super.key,
+    required this.lugar,
+    required this.seleccionado,
+    required this.onTap,
+  });
+
+  final LugarCandidato lugar;
+  final bool seleccionado;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final direccion = lugar.formattedAddress;
+    return Material(
+      color: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        side: BorderSide(
+          color: seleccionado ? palette.accent : palette.border,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (lugar.displayName.isNotEmpty)
+                Text(
+                  lugar.displayName,
+                  style: GoogleFonts.barlow(
+                    color: palette.textPrimary,
+                    fontSize: AppTextSize.body,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (direccion.isNotEmpty && direccion != lugar.displayName) ...[
+                const SizedBox(height: AppSpacing.hairline),
+                Text(
+                  direccion,
+                  style: GoogleFonts.barlow(
+                    color: palette.textMuted,
+                    fontSize: AppTextSize.bodyDense,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

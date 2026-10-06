@@ -336,6 +336,23 @@ class UserRepository {
     }
   }
 
+  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId`; `null` si no hay.
+  /// Acepta los maps de `TrainerLocation.toJson()` (Timestamp) y DateTime.
+  static Timestamp? _masViejoCoordsFetchedAt(Object? locations) {
+    if (locations is! List) return null;
+    DateTime? min;
+    for (final l in locations) {
+      if (l is! Map || l['placeId'] == null) continue;
+      final raw = l['coordsFetchedAt'];
+      final t = raw is Timestamp
+          ? raw.toDate().toUtc()
+          : (raw is DateTime ? raw.toUtc() : null);
+      if (t == null) continue;
+      if (min == null || t.isBefore(min)) min = t;
+    }
+    return min == null ? null : Timestamp.fromDate(min);
+  }
+
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
@@ -679,10 +696,35 @@ class UserRepository {
           campo: 'trainerBio');
     }
 
+    // Las etiquetas de `trainerLocations` (`customLabel`) las escribe el PF y se
+    // espejan a trainerPublicProfiles, que lee cualquier autenticado: mismo
+    // riesgo y mismo guard que la bio. Se valida cada una, en el cuello de
+    // botella, para cubrir todos los escritores (mobile y Hub).
+    final lugares = efectivo['trainerLocations'];
+    if (lugares is List) {
+      for (var i = 0; i < lugares.length; i++) {
+        final lugar = lugares[i];
+        final etiqueta = lugar is Map ? lugar['customLabel'] : null;
+        if (etiqueta is String) {
+          ModerationGuard.ensure(etiqueta,
+              campo: 'trainerLocations[$i].customLabel');
+        }
+      }
+    }
+
     _assertTrainerLocationStateIsValid(efectivo);
     final sanitized = Map<String, Object?>.fromEntries(
       efectivo.entries.where((e) => !_immutableFields.contains(e.key)),
     )..['updatedAt'] = now;
+    // Más viejo `coordsFetchedAt` de los lugares con `placeId`: el job de
+    // refresco consulta este campo (Firestore no filtra dentro de un array de
+    // maps). Se deriva ACÁ, en el cuello de botella, para que cualquier
+    // escritor de `trainerLocations` lo deje consistente. Solo `users/`: no
+    // está en `_trainerPublicFields`, así que no se espeja.
+    if (efectivo.containsKey('trainerLocations')) {
+      sanitized['trainerLocationsCoordsFetchedAt'] =
+          _masViejoCoordsFetchedAt(efectivo['trainerLocations']);
+    }
 
     final publicSubset = await _publicSubsetFromPartial(efectivo, uid: uid);
     final hasLocationConsent =

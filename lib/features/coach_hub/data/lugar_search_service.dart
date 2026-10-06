@@ -1,24 +1,43 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:treino/core/utils/app_clock.dart';
 
 /// Un lugar devuelto por la búsqueda por dirección del PF.
 ///
+/// Políticas de Places: se persisten SOLO [placeId] y coordenadas.
+/// [displayName] y [formattedAddress] son de SOLO MOSTRAR (para que el PF
+/// distinga los candidatos, con la atribución «Google Maps» visible): nunca se
+/// guardan; la etiqueta que se persiste la escribe el PF.
 /// [lat]/[lng] son EXACTOS (sin redondear): paridad con mobile, que guarda
 /// la coordenada tal cual y deriva el `geohash5` de ella.
 class LugarCandidato {
   const LugarCandidato({
-    required this.label,
-    required this.direccion,
+    required this.placeId,
     required this.lat,
     required this.lng,
+    required this.fetchedAt,
+    this.displayName = '',
+    this.formattedAddress = '',
   });
 
-  /// `displayName.text`, o la dirección si Places no manda nombre.
-  final String label;
-  final String direccion;
+  final String placeId;
   final double lat;
   final double lng;
+
+  /// Cuándo llegó la respuesta de Places con estas coordenadas (UTC). Es lo
+  /// que se persiste como `coordsFetchedAt`: el límite de 30 días de caché se
+  /// cuenta desde que Google las devolvió, no desde que el PF apretó Agregar.
+  final DateTime fetchedAt;
+
+  /// Solo para mostrar en la lista. NO persistir.
+  final String displayName;
+
+  /// Solo para mostrar en la lista. NO persistir.
+  final String formattedAddress;
+
+  @override
+  String toString() => 'LugarCandidato($placeId, $lat, $lng)';
 }
 
 /// El servicio está mal configurado (key vacía): error de armado, no de red.
@@ -60,8 +79,13 @@ class LugarSearchService {
   static final Uri _endpoint =
       Uri.parse('https://places.googleapis.com/v1/places:searchText');
 
+  /// Las políticas de Places prohíben GUARDAR nombre y dirección, no
+  /// MOSTRARLOS (con la atribución «Google Maps», que el editor ya muestra).
+  /// Por eso se piden `displayName` y `formattedAddress`: son display-only,
+  /// para que el PF elija entre varios candidatos. Lo único persistible es
+  /// `id` (indefinido) y `location` (hasta 30 días, ver `coordsFetchedAt`).
   static const String fieldMask =
-      'places.displayName,places.formattedAddress,places.location';
+      'places.id,places.location,places.displayName,places.formattedAddress';
 
   /// Largo mínimo (tras `trim`) para gastar un request de Text Search.
   static const int minCaracteres = 3;
@@ -112,6 +136,7 @@ class LugarSearchService {
     }
     if (decoded is! Map || decoded['places'] is! List) return const [];
 
+    final fetchedAt = AppClock.now().toUtc();
     final out = <LugarCandidato>[];
     for (final entry in decoded['places'] as List) {
       if (entry is! Map) continue;
@@ -121,22 +146,22 @@ class LugarSearchService {
       final lng = loc['longitude'];
       if (lat is! num || lng is! num) continue;
 
-      final direccion = entry['formattedAddress'];
-      final dir = direccion is String ? direccion : '';
-      final nombre = _texto(entry['displayName']);
-      final label = (nombre != null && nombre.trim().isNotEmpty) ? nombre : dir;
-      if (label.isEmpty) continue;
+      final id = entry['id'];
+      if (id is! String || id.isEmpty) continue;
 
+      final nombre = entry['displayName'];
+      final direccion = entry['formattedAddress'];
       out.add(LugarCandidato(
-        label: label,
-        direccion: dir,
+        placeId: id,
         lat: lat.toDouble(),
         lng: lng.toDouble(),
+        fetchedAt: fetchedAt,
+        displayName: nombre is Map && nombre['text'] is String
+            ? nombre['text'] as String
+            : '',
+        formattedAddress: direccion is String ? direccion : '',
       ));
     }
     return out;
   }
-
-  String? _texto(Object? field) =>
-      field is Map && field['text'] is String ? field['text'] as String : null;
 }

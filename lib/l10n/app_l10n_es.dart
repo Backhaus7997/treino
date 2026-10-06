@@ -2533,6 +2533,10 @@ class AppL10nEs extends AppL10n {
       'No encontramos ese lugar. Prueba con la dirección completa.';
 
   @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'Ese lugar ya está en tu lista.';
+
+  @override
   String get coachHubOnboardingPfLocationNetworkError =>
       'No pudimos buscar el lugar. Revisa tu conexión e inténtalo de nuevo.';
 
@@ -2542,6 +2546,20 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationFound =>
+      'Encontramos el lugar. Ponle el nombre con el que lo verán tus alumnos.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'NOMBRE DEL LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'Ej: Mi estudio, Parque Sarmiento';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Agregar lugar';
 
   @override
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
@@ -7708,6 +7726,10 @@ class AppL10nEsAr extends AppL10nEs {
       'No encontramos ese lugar. Probá con la dirección completa.';
 
   @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'Ese lugar ya está en tu lista.';
+
+  @override
   String get coachHubOnboardingPfLocationNetworkError =>
       'No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.';
 
@@ -7717,6 +7739,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationFound =>
+      'Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'NOMBRE DEL LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'Ej: Mi estudio, Parque Sarmiento';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Agregar lugar';
 
   @override
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
