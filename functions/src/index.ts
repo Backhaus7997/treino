@@ -235,15 +235,12 @@ export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
 // Completa los borrados de cuenta que terminaron `partial` (#1353): 06:00 ART,
 // hasta 5 intentos, despues `failed` + log de error. Ver el modulo.
 export { retryPartialDeletions } from "./retention/retry-partial-deletions";
-// SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
-// GCP project treino-dev sits under org code-assurance.com, whose
-// Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
-// Cloud Function. Gym place resolution moved client-side
-// (ResolveGymPlaceService,
-// lib/features/gyms/data/resolve_gym_place_service.dart). Restore this
-// export + redeploy if the org later allows public functions — see
-// functions/src/places-search.ts header comment.
-// export { resolveGymPlace } from "./places-search";
+// La resolución de lugares de gimnasio vive en el cliente
+// (ResolveGymPlaceService, lib/features/gyms/data/resolve_gym_place_service.dart).
+// La Cloud Function `resolveGymPlace` (functions/src/places-search.ts) se
+// ELIMINÓ: no se podía deployar (Domain-Restricted-Sharing de la org) y
+// persistía el nombre y la dirección de Google, que la política de Places
+// (#1338) no permite guardar. No la restaures.
 
 // Companion de Apple Watch (change watch-standalone-client, fase F1): entrega
 // al reloj una credencial PROPIA y renovable. Necesaria porque
@@ -411,6 +408,7 @@ export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
 export {
   quarantineChatMessage,
   quarantineDisplayNameOnWrite,
+  quarantineGym,
   quarantinePost,
   quarantinePublicProfileName,
   quarantineReview,

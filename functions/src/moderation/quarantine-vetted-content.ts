@@ -180,7 +180,7 @@ export interface QuarantineInput {
 /**
  * Handler puro. El wrapper `onDocumentWritten` de abajo es fino a proposito —
  * es el patron que este repo ya usa (`add-alias.ts:7`,
- * `mint-watch-credential.ts:46`, `places-search.ts:17`).
+ * `mint-watch-credential.ts:46`).
  */
 export async function quarantineIfVetted(
   input: QuarantineInput,
@@ -742,6 +742,88 @@ export const quarantineTrainerProfileName = onDocumentWritten(
       locations: fresh2.get("trainerLocations"),
       authorUid: event.params.uid,
       updateTime: fresh2.updateTime,
+    });
+  },
+);
+
+/**
+ * Nombre neutro con el que un gym vuelve a `nameNeeded` cuando el que le
+ * puso un usuario esta vetado. No es el del usuario ni el de Google; el
+ * proximo que vincule el gym lo reemplaza.
+ */
+export const GYM_NOMBRE_PENDIENTE = "Gimnasio";
+
+/**
+ * Cuarentena de `gyms/{id}.name` (politica de Places, #1338).
+ *
+ * El nombre lo tipea el primer usuario que vincula el gimnasio y el catalogo
+ * lo lee cualquier autenticado. Un nombre vetado NO se vacia (se renderiza en
+ * posts y rankings): el gym vuelve a `nameNeeded: true` con
+ * [GYM_NOMBRE_PENDIENTE], y el proximo usuario vinculado lo nombra.
+ *
+ * Sin bucle: el reemplazo no esta vetado y ademas deja `nameNeeded: true`,
+ * que esta funcion saltea (ese nombre no es de un usuario).
+ */
+export async function quarantineGymName(input: {
+  db: Firestore;
+  path: string;
+  name: unknown;
+  nameNeeded: unknown;
+  updateTime?: FirebaseFirestore.Timestamp;
+}): Promise<ModerationVerdict> {
+  const { db, path, name, nameNeeded, updateTime } = input;
+  if (nameNeeded === true) return "ok";
+  const verdict = verdictFor(name);
+  if (!verdict) return "ok";
+
+  await escribirRegistroVersionado(db, path.replace(/\//g, "__"), updateTime, {
+    path,
+    field: "name",
+    kind: "gym",
+    verdict,
+    authorUid: null,
+    // El TEXTO no se guarda; quien modere abre el documento original.
+    redacted: verdict === "block",
+    at: new Date(),
+  });
+  if (verdict !== "block") return verdict;
+
+  try {
+    await db
+      .doc(path)
+      .update(
+        { name: GYM_NOMBRE_PENDIENTE, nameNeeded: true },
+        updateTime ? { lastUpdateTime: updateTime } : {},
+      );
+  } catch (err) {
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      logger.info("quarantine: el gym cambio, lo revisa su propio evento", {
+        path,
+      });
+      await marcarRedaccionAbandonada(
+        db,
+        path.replace(/\//g, "__"),
+        updateTime,
+      );
+      return verdict;
+    }
+    throw err;
+  }
+  logger.warn("nombre de gym vetado revertido por el servidor", { path });
+  return verdict;
+}
+
+export const quarantineGym = onDocumentWritten(
+  { document: "gyms/{gymId}", region: REGION },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    await quarantineGymName({
+      db: getFirestore(),
+      path: after.ref.path,
+      name: after.get("name"),
+      nameNeeded: after.get("nameNeeded"),
+      updateTime: after.updateTime,
     });
   },
 );

@@ -8,7 +8,7 @@
  *
  * `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Un módulo de
  * producción que importe `firebase-admin/firestore` NO queda mockeado por eso,
- * y hoy ya pasa: `send-fcm.ts`, `add-alias.ts`, `places-search.ts`,
+ * y hoy ya pasa: `send-fcm.ts`, `add-alias.ts`,
  * `mail/enqueue-mail.ts` y `mail/send-queued-mail.ts` importan `FieldValue` del
  * subpath mientras sus tests mockean sólo el specifier pelado.
  *
