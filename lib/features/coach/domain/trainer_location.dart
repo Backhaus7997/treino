@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/data/timestamp_converter.dart';
 
 part 'trainer_location.freezed.dart';
@@ -56,4 +58,25 @@ class TrainerLocation with _$TrainerLocation {
 
   factory TrainerLocation.fromJson(Map<String, Object?> json) =>
       _$TrainerLocationFromJson(json);
+}
+
+/// Lugar de PF tipo `gym` a partir de un gym del catálogo.
+///
+/// Copia las coordenadas del gym. Si el gym viene de Google Places su id ES el
+/// `place_id`: se copia también `placeId` y `coordsFetchedAt` (la edad real de
+/// esas coordenadas) para que el job de refresco (#1338) las mantenga dentro de
+/// los 30 días de Google. Sin `coordsFetchedAt` en el gym queda null y la
+/// migración lo cubre. Un gym seed / self-service no tiene `place_id`.
+TrainerLocation trainerLocationFromGym(Gym gym) {
+  final fromPlaces = gym.source == GymSource.googlePlaces;
+  return TrainerLocation(
+    id: 'gym-${gym.id}',
+    type: TrainerLocationType.gym,
+    gymId: gym.id,
+    lat: gym.lat,
+    lng: gym.lng,
+    geohash: gym.geohash,
+    placeId: fromPlaces ? gym.id : null,
+    coordsFetchedAt: fromPlaces ? gym.coordsFetchedAt : null,
+  );
 }

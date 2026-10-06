@@ -136,14 +136,7 @@ class _ProfileEditTrainerScreenState
     );
     if (picked == null) return;
     setState(() {
-      _locations.add(TrainerLocation(
-        id: 'gym-${picked.id}',
-        type: TrainerLocationType.gym,
-        gymId: picked.id,
-        lat: picked.lat,
-        lng: picked.lng,
-        geohash: picked.geohash,
-      ));
+      _locations.add(trainerLocationFromGym(picked));
       _error = null;
     });
   }
