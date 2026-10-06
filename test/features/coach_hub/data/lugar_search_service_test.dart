@@ -35,9 +35,10 @@ void main() {
       expect(visto.headers['X-Goog-Api-Key'], _credencialFalsa);
       expect(
         visto.headers['X-Goog-FieldMask'],
-        // Política de Places: solo place_id y coordenadas. Nunca nombre ni
-        // dirección: no se pueden persistir.
-        'places.id,places.location',
+        // Nombre y dirección se piden para MOSTRARLOS en la lista de
+        // candidatos; no se persisten (ver el comentario de fieldMask).
+        'places.id,places.location,places.displayName,'
+        'places.formattedAddress',
       );
       final body = jsonDecode(visto.body) as Map<String, dynamic>;
       expect(body['textQuery'], 'Av. Siempreviva 742');
@@ -67,7 +68,7 @@ void main() {
       expect(r.single.lng, -58.381592);
     });
 
-    test('ignora texto de Google aunque llegue: el candidato no lo conserva',
+    test('el candidato carga nombre y dirección solo para mostrarlos',
         () async {
       final service = LugarSearchService(
         httpClient: MockClient(
@@ -79,6 +80,10 @@ void main() {
                 'formattedAddress': 'Av. Siempreviva 742, Springfield',
                 'location': {'latitude': 1.5, 'longitude': 2.5},
               },
+              {
+                'id': 'ChIJsin-texto',
+                'location': {'latitude': 3.5, 'longitude': 4.5},
+              },
             ],
           }),
         ),
@@ -87,8 +92,11 @@ void main() {
 
       final r = await service.buscar('calle');
 
-      expect(r.single.toString(), isNot(contains('Simpson')));
-      expect(r.single.toString(), isNot(contains('Siempreviva')));
+      expect(r.first.displayName, 'Casa Simpson');
+      expect(r.first.formattedAddress, 'Av. Siempreviva 742, Springfield');
+      // Sin texto de Google el candidato sigue siendo válido.
+      expect(r.last.displayName, isEmpty);
+      expect(r.last.formattedAddress, isEmpty);
     });
 
     test('sin id o sin location se omite (no se puede refrescar ni guardar)',

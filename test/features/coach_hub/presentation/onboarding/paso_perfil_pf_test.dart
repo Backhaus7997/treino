@@ -49,9 +49,12 @@ class _RepoContador extends UserRepository {
 
 const _bioValida = 'Entreno fuerza y movilidad hace diez años.';
 
-/// Lo único que Places devuelve con el fieldMask de la política: id + location.
+/// Lo que Places devuelve con el fieldMask: id + location + nombre y dirección
+/// (estos dos SOLO para mostrar en la lista; nunca se persisten).
 Map<String, Object?> _lugar(String id, double lat, double lng) => {
       'id': id,
+      'displayName': {'text': 'NOMBRE-DE-GOOGLE-$id'},
+      'formattedAddress': 'DIRECCION-DE-GOOGLE-$id',
       'location': {'latitude': lat, 'longitude': lng},
     };
 
@@ -68,6 +71,7 @@ const _busquedaKey = Key('onboarding-pf-lugar-busqueda');
 const _buscarKey = Key('onboarding-pf-lugar-buscar');
 const _reintentarKey = Key('onboarding-pf-lugar-reintentar');
 const _resultadosKey = Key('onboarding-pf-lugar-resultados');
+Key _resultadoKey(int i) => Key('onboarding-pf-lugar-resultado-$i');
 const _etiquetaKey = Key('onboarding-pf-lugar-etiqueta');
 const _agregarKey = Key('onboarding-pf-lugar-agregar');
 const _finalizarKey = Key('onboarding-pf-finalizar');
@@ -181,15 +185,18 @@ void main() {
     }
   }
 
-  /// Busca, y le pone al lugar encontrado la etiqueta que escribe el PF
-  /// (Google no aporta ningún texto).
+  /// Busca, elige el resultado [indice] de la lista y le pone la etiqueta que
+  /// escribe el PF (el texto de Google se muestra pero no se prefilla).
   Future<void> buscarYElegir(
     WidgetTester tester, {
     String etiqueta = 'Casa Simpson',
+    int indice = 0,
   }) async {
     await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
     await tester.tap(find.byKey(_buscarKey));
     await asentar(tester);
+    await tester.tap(find.byKey(_resultadoKey(indice)));
+    await tester.pump();
     await escribir(tester, _etiquetaKey, etiqueta);
     await tester.tap(find.byKey(_agregarKey));
     await tester.pump();
@@ -386,6 +393,47 @@ void main() {
         expect(lp['coordsFetchedAt'], isA<Timestamp>());
       });
 
+      testWidgets(
+          'la lista muestra nombre y dirección de Google y elegir el 2º guarda '
+          'el placeId del 2º, sin texto de Google', (tester) async {
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        await llenarBasicos(tester);
+        await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+
+        // Solo para mostrar: el PF distingue los candidatos.
+        expect(find.text('NOMBRE-DE-GOOGLE-ChIJcasa'), findsOneWidget);
+        expect(find.text('DIRECCION-DE-GOOGLE-ChIJotro'), findsOneWidget);
+        expect(find.byKey(_resultadoKey(1)), findsOneWidget);
+
+        await tester.tap(find.byKey(_resultadoKey(1)));
+        await tester.pump();
+        await escribir(tester, _etiquetaKey, 'Mi estudio');
+        await tester.tap(find.byKey(_agregarKey));
+        await tester.pump();
+        await tester.tap(find.byKey(_finalizarKey));
+        await asentar(tester);
+        await tester.tap(
+            find.text(l10nDe(tester).profileEditTrainerConsentConfirmAccept));
+        await asentar(tester);
+
+        final d = await usuario();
+        final l = (d['trainerLocations'] as List).single as Map;
+        expect(l['placeId'], 'ChIJotro');
+        expect(l['lat'], -34.6);
+        expect(l['lng'], -58.4);
+        expect(l['customLabel'], 'Mi estudio');
+        expect(d.toString(), isNot(contains('DE-GOOGLE')));
+        final publico = (await firestore
+                .collection('trainerPublicProfiles')
+                .doc('u1')
+                .get())
+            .data()!;
+        expect(publico.toString(), isNot(contains('DE-GOOGLE')));
+      });
+
       testWidgets('sin etiqueta no se puede agregar el lugar (sin prefill)',
           (tester) async {
         await sembrar();
@@ -394,6 +442,9 @@ void main() {
         await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
         await tester.tap(find.byKey(_buscarKey));
         await asentar(tester);
+        expect(find.byKey(_etiquetaKey), findsNothing);
+        await tester.tap(find.byKey(_resultadoKey(0)));
+        await tester.pump();
 
         final campo = tester.widget<TextField>(
           find.descendant(
@@ -469,7 +520,7 @@ void main() {
         await asentar(tester);
 
         expect(requests, 1);
-        expect(find.byKey(_etiquetaKey), findsOneWidget);
+        expect(find.byKey(_resultadoKey(0)), findsOneWidget);
       });
 
       // Política de Places: el contenido de Places fuera de un mapa de Google
@@ -598,7 +649,7 @@ void main() {
         falla = false;
         await tester.tap(find.byKey(_reintentarKey));
         await asentar(tester);
-        expect(find.byKey(_etiquetaKey), findsOneWidget);
+        expect(find.byKey(_resultadoKey(0)), findsOneWidget);
         expect(find.text(l10n.coachHubOnboardingPfLocationNetworkError),
             findsNothing);
       });

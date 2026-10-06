@@ -4,8 +4,10 @@ import 'package:http/http.dart' as http;
 
 /// Un lugar devuelto por la búsqueda por dirección del PF.
 ///
-/// Políticas de Places: solo [placeId] y coordenadas. Nombre y dirección de
-/// Google NO se piden ni se guardan (la etiqueta la escribe el PF).
+/// Políticas de Places: se persisten SOLO [placeId] y coordenadas.
+/// [displayName] y [formattedAddress] son de SOLO MOSTRAR (para que el PF
+/// distinga los candidatos, con la atribución «Google Maps» visible): nunca se
+/// guardan; la etiqueta que se persiste la escribe el PF.
 /// [lat]/[lng] son EXACTOS (sin redondear): paridad con mobile, que guarda
 /// la coordenada tal cual y deriva el `geohash5` de ella.
 class LugarCandidato {
@@ -13,11 +15,19 @@ class LugarCandidato {
     required this.placeId,
     required this.lat,
     required this.lng,
+    this.displayName = '',
+    this.formattedAddress = '',
   });
 
   final String placeId;
   final double lat;
   final double lng;
+
+  /// Solo para mostrar en la lista. NO persistir.
+  final String displayName;
+
+  /// Solo para mostrar en la lista. NO persistir.
+  final String formattedAddress;
 
   @override
   String toString() => 'LugarCandidato($placeId, $lat, $lng)';
@@ -62,9 +72,13 @@ class LugarSearchService {
   static final Uri _endpoint =
       Uri.parse('https://places.googleapis.com/v1/places:searchText');
 
-  /// Solo `id` y `location`: lo único que las políticas de Places dejan
-  /// persistir (place_id indefinido, coordenadas hasta 30 días).
-  static const String fieldMask = 'places.id,places.location';
+  /// Las políticas de Places prohíben GUARDAR nombre y dirección, no
+  /// MOSTRARLOS (con la atribución «Google Maps», que el editor ya muestra).
+  /// Por eso se piden `displayName` y `formattedAddress`: son display-only,
+  /// para que el PF elija entre varios candidatos. Lo único persistible es
+  /// `id` (indefinido) y `location` (hasta 30 días, ver `coordsFetchedAt`).
+  static const String fieldMask =
+      'places.id,places.location,places.displayName,places.formattedAddress';
 
   /// Largo mínimo (tras `trim`) para gastar un request de Text Search.
   static const int minCaracteres = 3;
@@ -127,10 +141,16 @@ class LugarSearchService {
       final id = entry['id'];
       if (id is! String || id.isEmpty) continue;
 
+      final nombre = entry['displayName'];
+      final direccion = entry['formattedAddress'];
       out.add(LugarCandidato(
         placeId: id,
         lat: lat.toDouble(),
         lng: lng.toDouble(),
+        displayName: nombre is Map && nombre['text'] is String
+            ? nombre['text'] as String
+            : '',
+        formattedAddress: direccion is String ? direccion : '',
       ));
     }
     return out;
