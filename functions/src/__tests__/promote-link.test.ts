@@ -150,6 +150,70 @@ describe("syncTrainerLoad — precondition ladder", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
+
+  // Defensa en profundidad del gate de rol que `firestore.rules` le puso al
+  // `create` de `trainer_links`. Esta callable va por Admin SDK y SE SALTEA las
+  // reglas, así que es la otra mitad del camino: un vínculo trucho que ya
+  // estuviera en la base —creado antes del fix— se promovía igual.
+  //
+  // El ataque que cierra: dos cuentas de ATLETA se nombran entrenador una a la
+  // otra y se aceptan. Con el vínculo activo, `hasActiveTrainerLink` apaga
+  // `athletePaywallEnforced` y las dos quedan exentas del tope.
+  it("permission-denied — el 'trainer' del vínculo tiene rol de atleta", async () => {
+    install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { role: "athlete", subscription: plan1Active } },
+    });
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+      }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  // El ANCLA de la asimetría, y por qué el chequeo de arriba mira el valor y no
+  // la ausencia: NINGÚN fixture de este archivo siembra `role` —ni los de más
+  // abajo, ni los de promote-link.emulator.test.ts—, porque `syncTrainerLoad`
+  // nunca lo necesitó. Un chequeo fail-CLOSED los pondría todos en rojo, y en
+  // producción le rompería el aceptar a cualquier PF legacy cuyo doc no tenga
+  // el campo.
+  //
+  // No debilita el gate: el ataque usa cuentas del signup PÚBLICO, que escribe
+  // `role: 'athlete'` explícito (firestore.rules ~296). Un rol ausente es un
+  // doc viejo, no un atacante.
+  it("rol ausente NO frena la promoción (PF legacy sin el campo)", async () => {
+    const state = install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { subscription: plan1Active } },
+    });
+    const result = await syncTrainerLoad(app, {
+      promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+    });
+    expect(result.promoted).toBe(true);
+    expect(state.trainer_links.L1.status).toBe("active");
+  });
+
+  // El gate de rol va SÓLO en el camino de promoción. `linkLoadReconcile`
+  // entra acá con `promotion: null` para recomputar
+  // `users/{trainerId}.weightedLoad`, que es denormalizado y PARA MOSTRAR: el
+  // gate nunca le cree y siempre recalcula en vivo (REQ-PAYWALL-GATE-006).
+  //
+  // Bloquear ese camino no autoriza nada y sí rompe algo: el trigger tiene un
+  // catch-and-log, así que el número que ve un entrenador quedaría viejo en
+  // silencio. Sin este test, mover el chequeo una llave más afuera pasa la
+  // review sin que nada se ponga rojo.
+  it("reconcile (promotion:null) recomputa aunque el rol no sea trainer", async () => {
+    const state = install({
+      trainer_links: { L1: link({ status: "active" }) },
+      users: { "trainer-1": { role: "athlete", subscription: plan1Active } },
+    });
+    const result = await syncTrainerLoad(app, {
+      trainerId: "trainer-1",
+      promotion: null,
+    });
+    expect(result.promoted).toBe(false);
+    expect(state.users["trainer-1"].weightedLoad).toBe(1.0);
+  });
 });
 
 describe("syncTrainerLoad — gate boundary (strict <=)", () => {

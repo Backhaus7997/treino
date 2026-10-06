@@ -23,7 +23,10 @@ import { sendQueuedMail, sendQueuedMailHandler } from "../mail/send-queued-mail"
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
 import { ATHLETE_PROSPECT_PREF_KEY } from "../subscriptions/athlete-prospect-mail";
 import { MailSendError, MailSender, OutboundMail } from "../mail/resend-client";
-import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
+import {
+  notifyOnLinkChangeHandler,
+  scopeDeSolicitud,
+} from "../notifications/notify-link-change";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -244,7 +247,10 @@ describe("producers: prefKey is set only for recipients who have a screen", () =
   // toggle has to be honoured rather than bypassed as transactional.
   it("link-requested carries prefKey nueva_solicitud", async () => {
     const linkId = "link-prefkey-1";
-    const id = dedupeKey("link-requested", linkId, trainerId);
+    // El scope de este mail es el par + el día, NO el `linkId`: el id del
+    // vínculo es nuevo en cada solicitud, así que como scope no deduplicaba
+    // nada. Ver `scopeDeSolicitud`.
+    const id = dedupeKey("link-requested", scopeDeSolicitud(athleteId), trainerId);
 
     await notifyOnLinkChangeHandler(
       testApp,
