@@ -23,9 +23,14 @@ enum _Estado { inicial, cargando, resultados, vacio, errorConfig, errorRed }
 /// Buscador de un lugar de entrenamiento POR DIRECCIÓN (design D9/D10).
 ///
 /// La web no usa la geolocalización del dispositivo: el PF escribe, busca (con
-/// el botón o con Enter) y ELIGE un resultado. Solo un resultado elegido llega a
-/// [onElegir]: un texto libre sin coordenadas no es una ubicación y no se puede
-/// guardar.
+/// el botón o con Enter) y, si Places encuentra el lugar, le pone un NOMBRE.
+/// Solo un lugar encontrado y nombrado llega a [onElegir]: un texto libre sin
+/// coordenadas no es una ubicación y no se puede guardar.
+///
+/// Políticas de Places: la búsqueda pide solo `id` y `location`, así que no hay
+/// texto de Google que mostrar ni guardar. El nombre lo escribe SIEMPRE el PF
+/// (sin prefill) y es lo único que se persiste como etiqueta. Se usa el primer
+/// resultado (el mejor match de Google).
 ///
 /// La búsqueda es explícita (botón/Enter, desde [LugarSearchService.minCaracteres]
 /// caracteres), no por tecla: cada request de Text Search se factura, y así no
@@ -33,8 +38,9 @@ enum _Estado { inicial, cargando, resultados, vacio, errorConfig, errorRed }
 class EditorUbicacionPf extends ConsumerStatefulWidget {
   const EditorUbicacionPf({super.key, required this.onElegir});
 
-  /// Se llama con el resultado que el PF eligió. El editor se limpia después.
-  final ValueChanged<LugarCandidato> onElegir;
+  /// Se llama con el lugar encontrado y el nombre que el PF le puso (ya
+  /// recortado, nunca vacío). El editor se limpia después.
+  final void Function(LugarCandidato lugar, String etiqueta) onElegir;
 
   @override
   ConsumerState<EditorUbicacionPf> createState() => _EditorUbicacionPfState();
@@ -42,9 +48,12 @@ class EditorUbicacionPf extends ConsumerStatefulWidget {
 
 class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   final _consulta = TextEditingController();
+  final _etiqueta = TextEditingController();
   _Estado _estado = _Estado.inicial;
   List<LugarCandidato> _resultados = const [];
   int _busquedaActual = 0;
+
+  bool get _puedeAgregar => _etiqueta.text.trim().isNotEmpty;
 
   bool get _puedeBuscar =>
       _consulta.text.trim().length >= LugarSearchService.minCaracteres &&
@@ -55,6 +64,7 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     super.initState();
     // Habilita/deshabilita «Buscar» según el largo del texto.
     _consulta.addListener(_alCambiarTexto);
+    _etiqueta.addListener(_alCambiarTexto);
   }
 
   void _alCambiarTexto() {
@@ -64,7 +74,9 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   @override
   void dispose() {
     _consulta.removeListener(_alCambiarTexto);
+    _etiqueta.removeListener(_alCambiarTexto);
     _consulta.dispose();
+    _etiqueta.dispose();
     super.dispose();
   }
 
@@ -72,6 +84,7 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     final texto = _consulta.text.trim();
     if (texto.length < LugarSearchService.minCaracteres) return;
     final esta = ++_busquedaActual;
+    _etiqueta.clear();
     setState(() => _estado = _Estado.cargando);
 
     _Estado siguiente;
@@ -93,14 +106,18 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     });
   }
 
-  void _elegir(LugarCandidato lugar) {
+  void _agregar() {
+    if (_resultados.isEmpty || !_puedeAgregar) return;
+    final lugar = _resultados.first;
+    final etiqueta = _etiqueta.text.trim();
     _busquedaActual++;
     _consulta.clear();
+    _etiqueta.clear();
     setState(() {
       _estado = _Estado.inicial;
       _resultados = const [];
     });
-    widget.onElegir(lugar);
+    widget.onElegir(lugar, etiqueta);
   }
 
   @override
@@ -137,9 +154,9 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
         ),
         switch (_estado) {
           _Estado.inicial || _Estado.cargando => const SizedBox.shrink(),
-          _Estado.resultados => _Resultados(
-              resultados: _resultados,
-              onElegir: _elegir,
+          _Estado.resultados => _LugarEncontrado(
+              etiqueta: _etiqueta,
+              onAgregar: _puedeAgregar ? _agregar : null,
             ),
           _Estado.vacio => _Aviso(
               mensaje: l10n.coachHubOnboardingPfLocationEmpty,
@@ -206,14 +223,16 @@ class _Aviso extends StatelessWidget {
   }
 }
 
-class _Resultados extends StatelessWidget {
-  const _Resultados({required this.resultados, required this.onElegir});
+/// El lugar que Places encontró, sin texto de Google: solo pide el nombre.
+class _LugarEncontrado extends StatelessWidget {
+  const _LugarEncontrado({required this.etiqueta, required this.onAgregar});
 
-  final List<LugarCandidato> resultados;
-  final ValueChanged<LugarCandidato> onElegir;
+  final TextEditingController etiqueta;
+  final VoidCallback? onAgregar;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
     final palette = AppPalette.of(context);
     return Padding(
       key: const Key('onboarding-pf-lugar-resultados'),
@@ -221,48 +240,38 @@ class _Resultados extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < resultados.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.s8),
-            Material(
-              color: palette.bgCard,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                side: BorderSide(color: palette.border),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: Key('onboarding-pf-lugar-resultado-$i'),
-                onTap: () => onElegir(resultados[i]),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.s12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resultados[i].label,
-                        style: GoogleFonts.barlow(
-                          color: palette.textPrimary,
-                          fontSize: AppTextSize.body,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (resultados[i].direccion.isNotEmpty &&
-                          resultados[i].direccion != resultados[i].label) ...[
-                        const SizedBox(height: AppSpacing.hairline),
-                        Text(
-                          resultados[i].direccion,
-                          style: GoogleFonts.barlow(
-                            color: palette.textMuted,
-                            fontSize: AppTextSize.bodyDense,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+          Text(
+            l10n.coachHubOnboardingPfLocationFound,
+            style: GoogleFonts.barlow(
+              color: palette.textPrimary,
+              fontSize: AppTextSize.body,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: AuthInput(
+                  key: const Key('onboarding-pf-lugar-etiqueta'),
+                  controller: etiqueta,
+                  label: l10n.coachHubOnboardingPfLocationLabelLabel,
+                  hint: l10n.coachHubOnboardingPfLocationLabelHint,
+                  leadingIcon: TreinoIcon.mapPin,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => onAgregar?.call(),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.s12),
+              TreinoButton(
+                key: const Key('onboarding-pf-lugar-agregar'),
+                label: l10n.coachHubOnboardingPfLocationAddButton,
+                variant: TreinoButtonVariant.secondary,
+                onPressed: onAgregar,
+              ),
+            ],
+          ),
           // Política de Places: el contenido de Places mostrado fuera de un mapa
           // de Google exige la atribución textual visible. Es el nombre de marca:
           // no se traduce, por eso es una constante y no una clave ARB.

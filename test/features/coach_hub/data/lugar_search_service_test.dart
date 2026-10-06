@@ -35,21 +35,22 @@ void main() {
       expect(visto.headers['X-Goog-Api-Key'], _credencialFalsa);
       expect(
         visto.headers['X-Goog-FieldMask'],
-        'places.displayName,places.formattedAddress,places.location',
+        // Política de Places: solo place_id y coordenadas. Nunca nombre ni
+        // dirección: no se pueden persistir.
+        'places.id,places.location',
       );
       final body = jsonDecode(visto.body) as Map<String, dynamic>;
       expect(body['textQuery'], 'Av. Siempreviva 742');
       expect(body['languageCode'], 'es');
     });
 
-    test('mapea location.latitude/longitude a lat/lng exactos', () async {
+    test('mapea id y location.latitude/longitude exactos', () async {
       final service = LugarSearchService(
         httpClient: MockClient(
           (_) async => _json({
             'places': [
               {
-                'displayName': {'text': 'Casa Simpson', 'languageCode': 'es'},
-                'formattedAddress': 'Av. Siempreviva 742, Springfield',
+                'id': 'ChIJabc123',
                 'location': {'latitude': -34.603722, 'longitude': -58.381592},
               },
             ],
@@ -61,25 +62,48 @@ void main() {
       final r = await service.buscar('Av. Siempreviva 742');
 
       expect(r, hasLength(1));
-      expect(r.single.label, 'Casa Simpson');
-      expect(r.single.direccion, 'Av. Siempreviva 742, Springfield');
+      expect(r.single.placeId, 'ChIJabc123');
       expect(r.single.lat, -34.603722);
       expect(r.single.lng, -58.381592);
     });
 
-    test('sin displayName usa la dirección como label; sin location se omite',
+    test('ignora texto de Google aunque llegue: el candidato no lo conserva',
         () async {
       final service = LugarSearchService(
         httpClient: MockClient(
           (_) async => _json({
             'places': [
               {
-                'formattedAddress': 'Calle 1',
+                'id': 'ChIJabc123',
+                'displayName': {'text': 'Casa Simpson'},
+                'formattedAddress': 'Av. Siempreviva 742, Springfield',
                 'location': {'latitude': 1.5, 'longitude': 2.5},
               },
+            ],
+          }),
+        ),
+        apiKey: _credencialFalsa,
+      );
+
+      final r = await service.buscar('calle');
+
+      expect(r.single.toString(), isNot(contains('Simpson')));
+      expect(r.single.toString(), isNot(contains('Siempreviva')));
+    });
+
+    test('sin id o sin location se omite (no se puede refrescar ni guardar)',
+        () async {
+      final service = LugarSearchService(
+        httpClient: MockClient(
+          (_) async => _json({
+            'places': [
               {
-                'displayName': {'text': 'Sin coordenadas'},
-                'formattedAddress': 'Calle 2',
+                'location': {'latitude': 1.5, 'longitude': 2.5},
+              },
+              {'id': 'sin-coordenadas'},
+              {
+                'id': 'ok',
+                'location': {'latitude': 3.5, 'longitude': 4.5},
               },
             ],
           }),
@@ -90,7 +114,7 @@ void main() {
       final r = await service.buscar('calle');
 
       expect(r, hasLength(1));
-      expect(r.single.label, 'Calle 1');
+      expect(r.single.placeId, 'ok');
     });
 
     test('busca solo desde 3 caracteres: sin red y sin error', () async {

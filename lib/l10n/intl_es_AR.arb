@@ -1790,6 +1790,22 @@
   "@coachHubOnboardingPfLocationRetry": {
     "description": "Coach Hub onboarding, retry the place search."
   },
+  "coachHubOnboardingPfLocationFound": "Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.",
+  "@coachHubOnboardingPfLocationFound": {
+    "description": "Coach Hub onboarding, shown after the place search found a place; asks the trainer to name it."
+  },
+  "coachHubOnboardingPfLocationLabelLabel": "NOMBRE DEL LUGAR",
+  "@coachHubOnboardingPfLocationLabelLabel": {
+    "description": "Coach Hub onboarding, label of the field where the trainer types the name of the place."
+  },
+  "coachHubOnboardingPfLocationLabelHint": "Ej: Mi estudio, Parque Sarmiento",
+  "@coachHubOnboardingPfLocationLabelHint": {
+    "description": "Coach Hub onboarding, hint of the place name field."
+  },
+  "coachHubOnboardingPfLocationAddButton": "Agregar lugar",
+  "@coachHubOnboardingPfLocationAddButton": {
+    "description": "Coach Hub onboarding, button that adds the found place with the typed name."
+  },
   "coachHubOnboardingPfLocationRemove": "Quitar lugar",
   "@coachHubOnboardingPfLocationRemove": {
     "description": "Coach Hub onboarding, tooltip of the remove-place button."

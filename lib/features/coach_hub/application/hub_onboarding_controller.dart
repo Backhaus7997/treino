@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../coach/domain/trainer_location.dart';
@@ -121,10 +122,27 @@ class HubOnboardingController extends AsyncNotifier<void> {
                 'trainerLocations': d.locations.map((l) => l.toJson()).toList(),
                 'trainerGeohashes':
                     d.locations.map((l) => l.geohash).toSet().toList(),
+                // Más viejo `coordsFetchedAt` de los lugares con `placeId`:
+                // el job de refresco consulta este campo (Firestore no puede
+                // filtrar dentro de un array de maps). Solo `users/`, no se
+                // espeja al perfil público. `null` si no hay lugares de Places.
+                'trainerLocationsCoordsFetchedAt': _masViejoCoordsFetchedAt(
+                  d.locations,
+                ),
               },
               grantLocationConsent: otorgaConsentimientoUbicacion,
             );
       });
+
+  static Timestamp? _masViejoCoordsFetchedAt(List<TrainerLocation> locs) {
+    DateTime? min;
+    for (final l in locs) {
+      final t = l.coordsFetchedAt;
+      if (l.placeId == null || t == null) continue;
+      if (min == null || t.isBefore(min)) min = t;
+    }
+    return min == null ? null : Timestamp.fromDate(min);
+  }
 
   String _uid() {
     final uid = ref.read(userProfileProvider).valueOrNull?.uid;

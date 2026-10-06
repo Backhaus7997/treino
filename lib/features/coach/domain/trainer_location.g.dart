@@ -16,6 +16,10 @@ _$TrainerLocationImpl _$$TrainerLocationImplFromJson(
       lat: (json['lat'] as num).toDouble(),
       lng: (json['lng'] as num).toDouble(),
       geohash: json['geohash'] as String,
+      placeId: json['placeId'] as String?,
+      coordsFetchedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['coordsFetchedAt'], const TimestampConverter().fromJson),
+      stale: json['stale'] as bool?,
     );
 
 Map<String, dynamic> _$$TrainerLocationImplToJson(
@@ -28,9 +32,25 @@ Map<String, dynamic> _$$TrainerLocationImplToJson(
       'lat': instance.lat,
       'lng': instance.lng,
       'geohash': instance.geohash,
+      'placeId': instance.placeId,
+      'coordsFetchedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.coordsFetchedAt, const TimestampConverter().toJson),
+      'stale': instance.stale,
     };
 
 const _$TrainerLocationTypeEnumMap = {
   TrainerLocationType.gym: 'gym',
   TrainerLocationType.custom: 'custom',
 };
+
+Value? _$JsonConverterFromJson<Json, Value>(
+  Object? json,
+  Value? Function(Json json) fromJson,
+) =>
+    json == null ? null : fromJson(json as Json);
+
+Json? _$JsonConverterToJson<Json, Value>(
+  Value? value,
+  Json? Function(Value value) toJson,
+) =>
+    value == null ? null : toJson(value);

@@ -76,22 +76,29 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
       _specialty != null &&
       _tieneModalidad;
 
-  /// Mismo armado que `profile_edit_trainer_screen.dart`: ubicación propia
-  /// (`custom`), coordenadas EXACTAS de Places y `geohash5` derivado de ellas.
-  void _agregarLugar(LugarCandidato lugar) {
+  /// Ubicación propia (`custom`) con coordenadas EXACTAS de Places y `geohash5`
+  /// derivado de ellas. Políticas de Places: se guarda `placeId` y la fecha de
+  /// las coordenadas (`coordsFetchedAt`, para refrescarlas antes de los 30
+  /// días); la etiqueta es lo que escribió el PF, nunca texto de Google.
+  void _agregarLugar(LugarCandidato lugar, String etiqueta) {
     final repetido = _locations.any(
-      (l) => l.lat == lugar.lat && l.lng == lugar.lng,
+      (l) =>
+          l.placeId == lugar.placeId ||
+          (l.lat == lugar.lat && l.lng == lugar.lng),
     );
     if (repetido) return;
+    final ahora = AppClock.now();
     setState(() {
       _locations.add(
         TrainerLocation(
-          id: 'custom-${AppClock.now().millisecondsSinceEpoch}',
+          id: 'custom-${ahora.millisecondsSinceEpoch}',
           type: TrainerLocationType.custom,
-          customLabel: lugar.label,
+          customLabel: etiqueta,
           lat: lugar.lat,
           lng: lugar.lng,
           geohash: geohash5(lugar.lat, lugar.lng),
+          placeId: lugar.placeId,
+          coordsFetchedAt: ahora.toUtc(),
         ),
       );
     });

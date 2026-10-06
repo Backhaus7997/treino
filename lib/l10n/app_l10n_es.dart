@@ -2544,6 +2544,20 @@ class AppL10nEs extends AppL10n {
   String get coachHubOnboardingPfLocationRetry => 'Reintentar';
 
   @override
+  String get coachHubOnboardingPfLocationFound =>
+      'Encontramos el lugar. Ponle el nombre con el que lo verán tus alumnos.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'NOMBRE DEL LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'Ej: Mi estudio, Parque Sarmiento';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Agregar lugar';
+
+  @override
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';
 
   @override
@@ -7717,6 +7731,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachHubOnboardingPfLocationRetry => 'Reintentar';
+
+  @override
+  String get coachHubOnboardingPfLocationFound =>
+      'Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'NOMBRE DEL LUGAR';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'Ej: Mi estudio, Parque Sarmiento';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Agregar lugar';
 
   @override
   String get coachHubOnboardingPfLocationRemove => 'Quitar lugar';

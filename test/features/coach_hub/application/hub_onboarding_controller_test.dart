@@ -354,6 +354,50 @@ void main() {
       expect(p['trainerGeohashes'], [geohash5(-34.603722, -58.381592)]);
     });
 
+    test(
+        'trainerLocationsCoordsFetchedAt es el MÁS VIEJO de los lugares con '
+        'placeId; null si no hay ninguno (y no va al perfil público)',
+        () async {
+      await sembrar(extra: {'displayName': 'Ana Pérez'});
+      final c = await contenedor();
+      final viejo = DateTime.utc(2026, 9, 1);
+      final nuevo = DateTime.utc(2026, 10, 1);
+      TrainerLocation de(String id, double lat, String? placeId, DateTime? t) =>
+          TrainerLocation(
+            id: id,
+            type: TrainerLocationType.custom,
+            customLabel: id,
+            lat: lat,
+            lng: -58.4,
+            geohash: geohash5(lat, -58.4),
+            placeId: placeId,
+            coordsFetchedAt: t,
+          );
+
+      await ctl(c).guardarPerfilPf(
+        draft(online: false, locs: [
+          de('a', -34.1, 'P1', nuevo),
+          de('b', -34.2, 'P2', viejo),
+          // GPS del móvil: sin placeId, no se refresca ni cuenta.
+          de('c', -34.3, null, DateTime.utc(2020, 1, 1)),
+        ]),
+        otorgaConsentimientoUbicacion: true,
+      );
+
+      final d = await users();
+      expect(
+          (d['trainerLocationsCoordsFetchedAt'] as Timestamp).toDate().toUtc(),
+          viejo);
+      final p = await publico('trainerPublicProfiles');
+      expect(p!.containsKey('trainerLocationsCoordsFetchedAt'), isFalse);
+
+      await ctl(c).guardarPerfilPf(
+        draft(online: true, locs: [de('c', -34.3, null, null)]),
+        otorgaConsentimientoUbicacion: false,
+      );
+      expect((await users())['trainerLocationsCoordsFetchedAt'], isNull);
+    });
+
     test('SCENARIO-042: consentimiento previo no se pisa', () async {
       await sembrar(extra: {
         'displayName': 'Ana Pérez',

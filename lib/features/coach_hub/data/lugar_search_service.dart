@@ -4,21 +4,23 @@ import 'package:http/http.dart' as http;
 
 /// Un lugar devuelto por la búsqueda por dirección del PF.
 ///
+/// Políticas de Places: solo [placeId] y coordenadas. Nombre y dirección de
+/// Google NO se piden ni se guardan (la etiqueta la escribe el PF).
 /// [lat]/[lng] son EXACTOS (sin redondear): paridad con mobile, que guarda
 /// la coordenada tal cual y deriva el `geohash5` de ella.
 class LugarCandidato {
   const LugarCandidato({
-    required this.label,
-    required this.direccion,
+    required this.placeId,
     required this.lat,
     required this.lng,
   });
 
-  /// `displayName.text`, o la dirección si Places no manda nombre.
-  final String label;
-  final String direccion;
+  final String placeId;
   final double lat;
   final double lng;
+
+  @override
+  String toString() => 'LugarCandidato($placeId, $lat, $lng)';
 }
 
 /// El servicio está mal configurado (key vacía): error de armado, no de red.
@@ -60,8 +62,9 @@ class LugarSearchService {
   static final Uri _endpoint =
       Uri.parse('https://places.googleapis.com/v1/places:searchText');
 
-  static const String fieldMask =
-      'places.displayName,places.formattedAddress,places.location';
+  /// Solo `id` y `location`: lo único que las políticas de Places dejan
+  /// persistir (place_id indefinido, coordenadas hasta 30 días).
+  static const String fieldMask = 'places.id,places.location';
 
   /// Largo mínimo (tras `trim`) para gastar un request de Text Search.
   static const int minCaracteres = 3;
@@ -121,22 +124,15 @@ class LugarSearchService {
       final lng = loc['longitude'];
       if (lat is! num || lng is! num) continue;
 
-      final direccion = entry['formattedAddress'];
-      final dir = direccion is String ? direccion : '';
-      final nombre = _texto(entry['displayName']);
-      final label = (nombre != null && nombre.trim().isNotEmpty) ? nombre : dir;
-      if (label.isEmpty) continue;
+      final id = entry['id'];
+      if (id is! String || id.isEmpty) continue;
 
       out.add(LugarCandidato(
-        label: label,
-        direccion: dir,
+        placeId: id,
         lat: lat.toDouble(),
         lng: lng.toDouble(),
       ));
     }
     return out;
   }
-
-  String? _texto(Object? field) =>
-      field is Map && field['text'] is String ? field['text'] as String : null;
 }
