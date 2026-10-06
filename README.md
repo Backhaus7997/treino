@@ -75,6 +75,8 @@ docs/ · openspec/            # documentación y specs (SDD)
 
 ## Setup
 
+Requisitos: **Node 22**, **firebase-tools 15+** (`npm i -g firebase-tools`) y **Java 21** para los emuladores (`scripts/emulator.sh` busca un JDK 21 si el del `PATH` no sirve). Detalle en la cabecera de `scripts/emulator.sh`.
+
 ```bash
 git clone https://github.com/Backhaus7997/treino.git
 cd treino
@@ -101,18 +103,12 @@ flutter run --flavor phone --dart-define=USE_EMULATOR=true
 
 > [!CAUTION]
 > Sin `--dart-define=USE_EMULATOR=true` **cualquier** superficie arranca contra
-> `treino-dev`, que es producción. **Y con el flag, no todo queda aislado**:
->
-> | Servicio | App móvil | Coach Hub | Wear OS |
-> |---|---|---|---|
-> | Firestore y Auth | emulador | emulador | emulador |
-> | Functions (callables) | emulador | **producción** | **producción** |
-> | Storage | **producción** | **producción** | **producción** |
-> | Analytics y Crashlytics | **producción** | **producción** (Analytics) | — |
->
-> Las callables del Coach Hub (checkout, bajas, moderación…) fallan contra
-> producción con un usuario del emulador de Auth, y subir archivos escribe en el
-> bucket real. Medido en los `main*.dart`: qué servicio llama a `use*Emulator`.
+> `treino-dev`, que es producción. **Y el flag no aísla todo**: redirige
+> Firestore y Auth en las tres superficies, y Functions **solo en la app
+> móvil**. Cualquier otro servicio de Firebase que use una superficie —Storage,
+> Messaging, App Check, Analytics, Crashlytics, y las callables del Coach
+> Hub— sigue hablando con `treino-dev`. Para saber qué redirige cada una,
+> buscá `use*Emulator` en su `lib/main*.dart`.
 
 Las otras superficies:
 
