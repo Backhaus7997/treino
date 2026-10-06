@@ -116,6 +116,45 @@ updates:
         # Lo único que se pide es que no viaje de polizón.
         update-types: [minor, patch]
 
+    # ── La excepción: setup-swift v3 NO EXISTE todavía como estable ──────────
+    #
+    # El párrafo de arriba dice que los majors de actions se revisan en cinco
+    # minutos. Éste no, y no por nuestro código: **la v3 de `setup-swift` es una
+    # BETA**. El único release v3 publicado es `v3.0.0-beta.1` (2025-11-30) y no
+    # hay estable detrás.
+    #
+    # Y viene con un bug que rompe exactamente nuestros dos jobs de Swift:
+    #
+    #     swift-actions/setup-swift#798 — «gpg: Can't check signature: No
+    #     public key» — ABIERTO desde 2025-12-02.
+    #
+    # Es el fallo textual del PR #927: `The process '/usr/bin/gpg' failed with
+    # exit code 2`, en `Conformance (Swift)` y en `Watch capabilities y
+    # permisos`. Los dos corren en `ubuntu-latest`, que no trae Swift, así que
+    # la action no se puede simplemente sacar.
+    #
+    # Antes del #927 ya había pasado lo mismo dentro del #885 —el que motivó el
+    # `update-types` de acá arriba—, así que van DOS PRs quemados en el mismo
+    # upstream roto. Sin este ignore vuelve cada lunes.
+    #
+    # ── CUÁNDO SACAR ESTO ────────────────────────────────────────────────────
+    #
+    # Cuando `swift-actions/setup-swift` publique una v3 ESTABLE (no beta) y el
+    # #798 esté cerrado. Chequeo de 30 segundos:
+    #
+    #     gh api repos/swift-actions/setup-swift/releases --jq '.[0].tag_name'
+    #     gh api repos/swift-actions/setup-swift/issues/798 --jq .state
+    #
+    # Mientras tanto seguimos en el tag flotante `@v2`. OJO con un detalle que
+    # se verificó el 2026-09-17 y que no es obvio: **`@v2` NO apunta a la última
+    # v2.4.0** — el tag flotante quedó en `7591e4f0` y v2.4.0 es `7ca6abe6`. No
+    # se toca porque el CI está verde con lo que hay, pero si algún día hace
+    # falta algo de 2.4.0, se pinea la versión exacta y no se espera que `@v2`
+    # la traiga sola.
+    ignore:
+      - dependency-name: 'swift-actions/setup-swift'
+        update-types: ['version-update:semver-major']
+
   # ---------------------------------------------------------------------------
   # pub.dev — las 61 dependencias de pubspec.yaml.
   #
