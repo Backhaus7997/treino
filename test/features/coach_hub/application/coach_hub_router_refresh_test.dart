@@ -68,31 +68,27 @@ void main() {
       expect(calls, 1);
     });
 
-    test('el notifier de mobile NO escucha el pendiente (queda intacto)',
+    test(
+        'el Hub y mobile comparten el MISMO notifier (un solo refresh por ack)',
         () async {
-      final pending = StreamController<bool>.broadcast();
       final container = ProviderContainer(
         overrides: [
           authStateChangesProvider.overrideWith(_silentAuth),
           userProfileProvider.overrideWith(_silentProfile),
           emailGateEnabledProvider.overrideWith(_silentGate),
           userProfileHasPendingWritesProvider
-              .overrideWith((_) => pending.stream),
+              .overrideWith((_) => const Stream<bool>.empty()),
         ],
       );
       addTearDown(container.dispose);
-      addTearDown(pending.close);
 
-      final mobile = container.read(routerRefreshNotifierProvider);
-      var calls = 0;
-      mobile.addListener(() => calls++);
-      // Mantener vivo el provider de pendiente.
-      container.listen(userProfileHasPendingWritesProvider, (_, __) {});
-
-      pending.add(true);
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-
-      expect(calls, 0);
+      expect(
+        identical(
+          container.read(coachHubRouterRefreshProvider),
+          container.read(routerRefreshNotifierProvider),
+        ),
+        isTrue,
+      );
     });
   });
 }
