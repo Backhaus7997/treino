@@ -1811,6 +1811,31 @@ export function renderMail(
     );
   }
 
+  // ── Cambio de plan del alumno cancelado para evitar cobro doble ─────────
+  //
+  // Sin boton: el plan actual sigue funcionando y la persona puede volver a
+  // cambiarlo cuando quiera. Si ambos planes ya cobraron, no se promete un
+  // reintegro automatico: el caso queda para revision manual del equipo.
+  case "plan-change-cancelled": {
+    const cobroDuplicado = String(params.cobroDuplicado ?? "") === "1";
+    return build(
+      "Tu cambio de plan no se aplicó",
+      "Tu cambio de plan no se aplicó",
+      [
+        [
+          "Tu cambio de plan no se aplicó porque tu plan actual ya se había renovado.",
+        ],
+        ["Seguís con tu plan actual; podés volver a cambiarlo cuando quieras."],
+        ...(cobroDuplicado
+          ? [[
+            "Mercado Pago ya te había cobrado el plan nuevo: el equipo de " +
+              "TREINO lo revisa y te escribe para devolvértelo.",
+          ] as Line]
+          : []),
+      ],
+    );
+  }
+
   // ── Botón de Arrepentimiento ────────────────────────────────────────────
   //
   // NO ES LA BAJA, y los textos lo tienen que dejar clarísimo: la baja conserva

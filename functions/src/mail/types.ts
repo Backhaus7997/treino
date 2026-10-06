@@ -230,6 +230,10 @@ export type MailKind =
   // acaba de iniciar (Disp. 954/2025 art. 4 y 5), no algo que se pueda apagar.
   | "service-cancel-confirm"
   | "service-cancel-done"
+  // El cambio de plan del alumno se cancelo para evitar un cobro doble porque
+  // el plan anterior ya se habia renovado. Sin preferencias: es el resultado
+  // operativo de una accion que la persona acaba de hacer, no publicidad.
+  | "plan-change-cancelled"
   // ── Botón de Arrepentimiento (Ley 24.240 art. 34, Disp. 954/2025) ───────
   //
   // Los produce `subscriptions/mp/arrepentimiento-por-mail.ts`. NO es la baja:
