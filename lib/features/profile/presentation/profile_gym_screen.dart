@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -12,6 +13,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/application/places_providers.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
+import '../../gyms/presentation/gym_name_dialog.dart';
 import '../../profile_setup/presentation/widgets/gym_search_box.dart';
 import '../application/user_providers.dart';
 import 'widgets/nearby_gyms_list.dart';
@@ -63,9 +65,22 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         await ref
             .read(selectGymActionProvider.notifier)
             .select(uid: uid, placeId: gymId);
-        final actionState = ref.read(selectGymActionProvider);
+        var actionState = ref.read(selectGymActionProvider);
         if (actionState.hasError) {
           throw actionState.error!;
+        }
+        if (actionState.valueOrNull?.needsName ?? false) {
+          // Gym nuevo (o sin nombre de usuario): lo nombra quien lo vincula.
+          if (!mounted) return;
+          final typed = await showGymNameDialog(context);
+          if (typed == null) return;
+          await ref
+              .read(selectGymActionProvider.notifier)
+              .select(uid: uid, placeId: gymId, name: typed);
+          actionState = ref.read(selectGymActionProvider);
+          if (actionState.hasError) {
+            throw actionState.error!;
+          }
         }
       } else {
         await ref.read(userRepositoryProvider).update(uid, {'gymId': gymId});
@@ -81,12 +96,14 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         );
         context.pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppL10n.of(context).profileGymSaveError,
+              e is ModerationBlockedException
+                  ? AppL10n.of(context).moderationBlockedMessage
+                  : AppL10n.of(context).profileGymSaveError,
               style: GoogleFonts.barlow(fontSize: 14),
             ),
           ),

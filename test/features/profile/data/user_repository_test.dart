@@ -449,6 +449,24 @@ void main() {
     });
 
     test(
+        'a gym flagged nameNeeded never leaks its Google-derived name into '
+        'userPublicProfiles.gymName', () async {
+      await seedGymDoc(firestore, 'ChIJ_flagged', name: 'Nombre de Google');
+      await firestore
+          .collection('gyms')
+          .doc('ChIJ_flagged')
+          .update({'nameNeeded': true});
+      await seedDoc('u-gym-2');
+
+      await repo.update('u-gym-2', {'gymId': 'ChIJ_flagged'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-2').get();
+      expect(pubSnap.data()!['gymId'], equals('ChIJ_flagged'));
+      expect(pubSnap.data()!['gymName'], isNull);
+    });
+
+    test(
         'SCENARIO-525: update with gymId=kNoGymId writes gymName:null with no '
         'gym resolution attempted', () async {
       await seedDoc('u-gym-2');

@@ -193,10 +193,10 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'QIVOX Villa Warcalde',
-            address: 'Some street 123',
             source: 'google-places',
           ));
 
@@ -221,7 +221,71 @@ void main() {
       verify(() => mockResolveService.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
+            name: null,
           )).called(1);
+      verify(() => mockUserRepo.update(_uid, {'gymId': 'ChIJ_1'})).called(1);
+    });
+
+    testWidgets(
+        'gym nuevo: pide el nombre, lo manda al resolver y recién ahí vincula',
+        (tester) async {
+      when(() => mockPlacesService.search(
+            textQuery: any(named: 'textQuery'),
+            biasLatitude: any(named: 'biasLatitude'),
+            biasLongitude: any(named: 'biasLongitude'),
+          )).thenAnswer((_) async => const [
+            GymSuggestion(
+              placeId: 'ChIJ_1',
+              primaryText: 'QIVOX Villa Warcalde',
+              secondaryText: 'Some street 123',
+            ),
+          ]);
+      when(() => mockResolveService.call(
+            placeId: 'ChIJ_1',
+            sessionToken: null,
+            name: null,
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: '',
+            source: 'google-places',
+            needsName: true,
+          ));
+      when(() => mockResolveService.call(
+            placeId: 'ChIJ_1',
+            sessionToken: null,
+            name: 'Mi gimnasio',
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: 'Mi gimnasio',
+            source: 'google-places',
+          ));
+
+      await tester.pumpWidget(_buildScreen(
+        profile: _profile(gymId: null),
+        userRepo: mockUserRepo,
+        placesService: mockPlacesService,
+        resolveService: mockResolveService,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'qivox');
+      await tester.pump(const Duration(milliseconds: 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('QIVOX Villa Warcalde'));
+      await tester.pump();
+      await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
+      // Con el diálogo abierto el botón sigue mostrando su spinner
+      // (`_saving`): pumpAndSettle no termina nunca, se avanza a mano.
+      await tester.pump(const Duration(milliseconds: 500));
+
+      verifyNever(() => mockUserRepo.update(any(), any()));
+      await tester.enterText(
+          find.byKey(const Key('gym-name-field')), 'Mi gimnasio');
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('gym-name-confirm')));
+      await tester.pumpAndSettle();
+
       verify(() => mockUserRepo.update(_uid, {'gymId': 'ChIJ_1'})).called(1);
     });
 
@@ -283,6 +347,7 @@ void main() {
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           ));
     });
 
@@ -498,10 +563,10 @@ void main() {
         when(() => mockResolveService.call(
               placeId: any(named: 'placeId'),
               sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name'),
             )).thenAnswer((_) async => const ResolveGymPlaceResult(
               gymId: 'nearby-1',
               name: 'Nearby Gym',
-              address: 'Nearby address',
               source: 'google-places',
             ));
         when(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
@@ -560,6 +625,7 @@ void main() {
         verifyNever(() => mockResolveService.call(
               placeId: any(named: 'placeId'),
               sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name'),
             ));
         verifyNever(() => mockUserRepo.update(any(), any()));
 
@@ -595,6 +661,7 @@ void main() {
         verify(() => mockResolveService.call(
               placeId: 'nearby-1',
               sessionToken: null,
+              name: null,
             )).called(1);
         verify(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
             .called(1);

@@ -41,16 +41,13 @@ import 'package:treino/l10n/app_l10n.dart';
 /// window.
 const _testDebounce = Duration(milliseconds: 1);
 
-/// Fake notifier: mirrors [ProfileSetupNotifier.updateGymId] without touching
-/// Firebase Auth / Firestore — this widget only exercises step-2 selection.
+/// Notifier sin Firebase: el paso sólo ejercita la selección del gym, así que
+/// se usa `updateGymId` real (incluida la limpieza del nombre pendiente) sobre
+/// un estado inicial sin auth ni Firestore.
 class _FakeProfileSetupNotifier extends ProfileSetupNotifier {
   @override
   ProfileSetupState build() =>
       const ProfileSetupState(draft: ProfileSetupDraft(), currentStep: 1);
-
-  @override
-  void updateGymId(String? value) =>
-      state = state.copyWith(draft: state.draft.copyWith(gymId: value));
 }
 
 class MockPlacesTextSearchService extends Mock
@@ -192,10 +189,10 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'QIVOX Villa Warcalde',
-            address: 'Some street 123',
             source: 'google-places',
           ));
 
@@ -212,6 +209,7 @@ void main() {
       verify(() => mockResolveService.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
+            name: null,
           )).called(1);
       // Antes acá había un `verify(update).called(1)`, y estaba verde con el
       // bug adentro: el mock aceptaba una escritura que las reglas denegaban
@@ -225,6 +223,201 @@ void main() {
         container.read(profileSetupNotifierProvider).draft.gymId,
         'ChIJ_1',
       );
+    });
+
+    group('gym nuevo o sin nombre: se lo pide al usuario', () {
+      void stubSuggestion() {
+        when(() => mockPlacesService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            )).thenAnswer((_) async => const [
+              GymSuggestion(
+                placeId: 'ChIJ_1',
+                primaryText: 'QIVOX Villa Warcalde',
+                secondaryText: 'Some street 123',
+              ),
+            ]);
+        when(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_1',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+            ));
+      }
+
+      Future<void> pickSuggestion(WidgetTester tester) async {
+        await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'qivox');
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('QIVOX Villa Warcalde'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets(
+          'el nombre tipeado queda en el draft y NO se escribe todavía: el '
+          'gym compartido se crea en el submit', (tester) async {
+        stubSuggestion();
+
+        await pickSuggestion(tester);
+
+        final dialogField = find.byKey(const Key('gym-name-field'));
+        expect(dialogField, findsOneWidget);
+        await tester.enterText(dialogField, 'Mi gimnasio');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        // Ninguna llamada con nombre: crear el doc acá dejaba el nombre de
+        // alguien que después elegía otro gym o abandonaba el alta.
+        verifyNever(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name', that: isNotNull),
+              beforeNaming: any(named: 'beforeNaming'),
+            ));
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, 'ChIJ_1');
+        expect(state.pendingGymName, 'Mi gimnasio');
+      });
+
+      testWidgets(
+          'nombrar el gym A y elegir después el B: el nombre de A se descarta '
+          'y A no se toca', (tester) async {
+        when(() => mockPlacesService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            )).thenAnswer((_) async => const [
+              GymSuggestion(placeId: 'ChIJ_A', primaryText: 'Gym A'),
+              GymSuggestion(placeId: 'ChIJ_B', primaryText: 'Gym B'),
+            ]);
+        when(() => mockResolveService.call(
+              placeId: 'ChIJ_A',
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_A',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+            ));
+        when(() => mockResolveService.call(
+              placeId: 'ChIJ_B',
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_B',
+              name: 'Gym B',
+              source: 'google-places',
+            ));
+
+        await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'gym');
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Gym A'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+            find.byKey(const Key('gym-name-field')), 'Nombre para A');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Gym B'));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, 'ChIJ_B');
+        expect(state.pendingGymName, isNull);
+        verifyNever(() => mockResolveService.call(
+              placeId: 'ChIJ_A',
+              sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name', that: isNotNull),
+              beforeNaming: any(named: 'beforeNaming'),
+            ));
+      });
+
+      testWidgets('elegir «sin gym» después de nombrar descarta el nombre',
+          (tester) async {
+        stubSuggestion();
+
+        await pickSuggestion(tester);
+        await tester.enterText(
+            find.byKey(const Key('gym-name-field')), 'Mi gimnasio');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('OTRO GYM / SIN GYM'));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, kNoGymId);
+        expect(state.pendingGymName, isNull);
+      });
+
+      testWidgets(
+          'gym existente sin nombre: no se pide nombre (en el alta aún no hay '
+          'users/{uid}.gymId y la regla no deja nombrarlo); queda en el draft',
+          (tester) async {
+        stubSuggestion();
+        when(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_1',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+              existsUnnamed: true,
+            ));
+
+        await pickSuggestion(tester);
+
+        expect(find.byKey(const Key('gym-name-field')), findsNothing);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        expect(
+          container.read(profileSetupNotifierProvider).draft.gymId,
+          'ChIJ_1',
+        );
+      });
+
+      testWidgets('cancelar el diálogo no vincula el gym', (tester) async {
+        stubSuggestion();
+
+        await pickSuggestion(tester);
+        await tester.tap(find.byKey(const Key('gym-name-cancel')));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        expect(
+          container.read(profileSetupNotifierProvider).draft.gymId,
+          isNot('ChIJ_1'),
+        );
+      });
     });
 
     testWidgets(
@@ -244,6 +437,7 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenThrow(const ResolveGymPlaceFailure$Server(
         'Places API request failed. Please try again.',
         statusCode: 503,
@@ -323,6 +517,7 @@ void main() {
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           ));
     });
 

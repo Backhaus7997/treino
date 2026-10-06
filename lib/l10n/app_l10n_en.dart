@@ -5096,4 +5096,16 @@ class AppL10nEn extends AppL10n {
   String eliminarCuentaWebPopupHint(String provider) {
     return 'To confirm it\'s you, a $provider window will open.';
   }
+
+  @override
+  String get gymNameDialogTitle => 'Name your gym';
+
+  @override
+  String get gymNameDialogBody => 'Type the name you want other people to see.';
+
+  @override
+  String get gymNameDialogHint => 'Gym name';
+
+  @override
+  String get gymNameDialogConfirm => 'SAVE';
 }

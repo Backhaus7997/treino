@@ -176,13 +176,18 @@ class UserRepository {
   /// Resolves the composed brand-branch display name for [gymId].
   ///
   /// - `null` or [kNoGymId] → `null`, no lookup attempted.
+  /// - Gym flagged `nameNeeded` → `null` (its stored name isn't user-typed).
   /// - Unknown/unresolvable id → `null`, logged, never throws — a stale or
   ///   deleted gym doc must not abort the whole `update()` batch.
   Future<String?> _resolveGymName(String? gymId) async {
     if (gymId == null || gymId == kNoGymId) return null;
     try {
       final gym = await _gyms.getById(gymId);
-      return gym?.name;
+      // Un gym marcado `nameNeeded` guarda un nombre que vino de Google: no
+      // se copia al perfil público (política de Places, #1338). El nombre
+      // vuelve a copiarse cuando alguien lo nombra.
+      if (gym == null || gym.nameNeeded) return null;
+      return gym.name;
     } catch (e, st) {
       developer.log(
         'UserRepository: failed to resolve gymName for gymId=$gymId',

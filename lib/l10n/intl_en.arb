@@ -2242,5 +2242,9 @@
   "eliminarCuentaWebReauthTitle": "Confirm your identity",
   "eliminarCuentaWebReauthPasswordBody": "For your security, enter your password to confirm it's you.",
   "eliminarCuentaWebReauthCta": "CONFIRM",
-  "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open."
+  "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open.",
+  "gymNameDialogTitle": "Name your gym",
+  "gymNameDialogBody": "Type the name you want other people to see.",
+  "gymNameDialogHint": "Gym name",
+  "gymNameDialogConfirm": "SAVE"
 }

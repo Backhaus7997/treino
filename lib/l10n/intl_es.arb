@@ -1122,5 +1122,9 @@
   "eliminarCuentaWebReauthTitle": "Confirma tu identidad",
   "eliminarCuentaWebReauthPasswordBody": "Por seguridad, introduce tu contraseña para confirmar que eres tú.",
   "eliminarCuentaWebReauthCta": "CONFIRMAR",
-  "eliminarCuentaWebPopupHint": "Para confirmar que eres tú, se abrirá una ventana de {provider}."
+  "eliminarCuentaWebPopupHint": "Para confirmar que eres tú, se abrirá una ventana de {provider}.",
+  "gymNameDialogTitle": "Ponle nombre a tu gimnasio",
+  "gymNameDialogBody": "Escribe el nombre con el que quieres que lo vean los demás.",
+  "gymNameDialogHint": "Nombre del gimnasio",
+  "gymNameDialogConfirm": "GUARDAR"
 }

@@ -4704,5 +4704,21 @@
         "type": "String"
       }
     }
+  },
+  "gymNameDialogTitle": "Ponele nombre a tu gimnasio",
+  "@gymNameDialogTitle": {
+    "description": "Title of the dialog asking the user to name the gym they just picked (the name is typed by the first user, never taken from Google)."
+  },
+  "gymNameDialogBody": "Escribí el nombre con el que querés que lo vean los demás.",
+  "@gymNameDialogBody": {
+    "description": "Body of the gym name dialog."
+  },
+  "gymNameDialogHint": "Nombre del gimnasio",
+  "@gymNameDialogHint": {
+    "description": "Hint of the gym name text field."
+  },
+  "gymNameDialogConfirm": "GUARDAR",
+  "@gymNameDialogConfirm": {
+    "description": "Confirm button of the gym name dialog. Cancel reuses commonCancel."
   }
 }

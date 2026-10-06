@@ -1713,7 +1713,7 @@ export async function moderationStatsHandler(
 
 // ---------------------------------------------------------------------------
 // Wrappers finos — el patron que este repo ya usa (`add-alias.ts:7`,
-// `mint-watch-credential.ts:46`, `places-search.ts:17`).
+// `mint-watch-credential.ts:46`).
 // ---------------------------------------------------------------------------
 
 export const listPendingReports = onCall({ region: REGION }, async (req) => {
