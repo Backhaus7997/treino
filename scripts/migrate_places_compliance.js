@@ -76,6 +76,9 @@ const EPOCH = Timestamp.fromMillis(0);
 const MAX_BATCH_WRITES = 400;
 const PAGE_SIZE = 200;
 const FAILED_PRECONDITION = 9;
+const NOT_FOUND = 5;
+/** Un doc que cambió (9) o se borró (5) entre la lectura y la escritura es un conflicto, no un error. */
+const esConflicto = (err) => Boolean(err) && (err.code === FAILED_PRECONDITION || err.code === NOT_FOUND);
 
 // ── Args ────────────────────────────────────────────────────────────────────
 
@@ -158,15 +161,20 @@ function planTrainer(data, googleGymIds) {
     if (l.type === 'custom' && l.placeId == null) customSinPlaceId++;
     if (l.type === 'gym' && typeof l.gymId === 'string' && googleGymIds.has(l.gymId)) {
       const next = { ...l };
+      let tocado = false;
       if (next.placeId == null) {
         next.placeId = l.gymId;
-        changed = true;
+        tocado = true;
       }
-      if (!(next.coordsFetchedAt instanceof Timestamp)) {
+      // Sólo cuando la clave NO existe y el lugar no está `stale`. Un `null`
+      // explícito lo deja el job de refresco en los lugares purgados por
+      // NOT_FOUND: resetearlo a 1970 los reencolaría y rompería la idempotencia.
+      if (next.coordsFetchedAt === undefined && next.stale !== true) {
         next.coordsFetchedAt = EPOCH;
-        changed = true;
+        tocado = true;
       }
-      return changed ? next : l;
+      if (tocado) changed = true;
+      return tocado ? next : l;
     }
     return l;
   });
@@ -181,11 +189,15 @@ function planTrainer(data, googleGymIds) {
  * batches de <= 400 operaciones. Si un batch falla por precondición (un doc
  * cambió desde que se leyó), se reintenta grupo por grupo y los que siguen
  * fallando se cuentan como conflictos.
- * @returns {Promise<{escritos: number, conflictos: number}>}
+ * `antesDeCommit(fase)` (sólo tests): se invoca una vez por llamada, entre la lectura y la
+ * primera escritura, para simular un cambio concurrente.
+ * @returns {Promise<{escritos: number, conflictos: number, fallidos: object[][]}>}
  */
-async function commitGrupos(db, grupos) {
+async function commitGrupos(db, grupos, antesDeCommit, fase) {
   let escritos = 0;
   let conflictos = 0;
+  const fallidos = [];
+  if (antesDeCommit) await antesDeCommit(fase);
 
   const aplicar = (batch, grupo) => {
     for (const w of grupo) {
@@ -212,7 +224,7 @@ async function commitGrupos(db, grupos) {
       await batch.commit();
       escritos += lote.length;
     } catch (err) {
-      if (err && err.code !== FAILED_PRECONDITION) throw err;
+      if (!esConflicto(err)) throw err;
       for (const g of lote) {
         try {
           const batch = db.batch();
@@ -220,13 +232,14 @@ async function commitGrupos(db, grupos) {
           await batch.commit();
           escritos++;
         } catch (e2) {
-          if (e2 && e2.code !== FAILED_PRECONDITION) throw e2;
+          if (!esConflicto(e2)) throw e2;
           conflictos++;
+          fallidos.push(g);
         }
       }
     }
   }
-  return { escritos, conflictos };
+  return { escritos, conflictos, fallidos };
 }
 
 // ── Fases ───────────────────────────────────────────────────────────────────
@@ -270,9 +283,13 @@ async function migrarGyms(db, opts, out, resultado) {
   }
 
   if (opts.apply && grupos.length) {
-    const c = await commitGrupos(db, grupos);
+    const c = await commitGrupos(db, grupos, opts.antesDeCommit, 'gyms');
     r.conflictos = c.conflictos;
     r.cambiados -= c.conflictos;
+    // Un gym que no se escribió conserva su nombre de Google: sus perfiles no se limpian.
+    const fallidos = new Set(c.fallidos.map((g) => g[0].ref.id));
+    resultado.gymsLegacyIds = resultado.gymsLegacyIds.filter((id) => !fallidos.has(id));
+    r.legacy -= c.fallidos.filter((g) => g[0].data.nameNeeded === true).length;
   }
   return googleIds;
 }
@@ -286,6 +303,10 @@ async function perfilesDeGymsLegados(db, opts, out, resultado) {
       if (doc.get('gymName') == null) continue;
       r.afectados++;
       if (opts.clearProfileNames) {
+        if (opts.limit !== null && grupos.length >= opts.limit) {
+          r.omitidosPorLimit++;
+          continue;
+        }
         out.log(
           `  ${opts.apply ? '' : '[DRY-RUN] WOULD '}userPublicProfiles/${doc.id}: gymName -> null`,
         );
@@ -294,7 +315,7 @@ async function perfilesDeGymsLegados(db, opts, out, resultado) {
     }
   }
   if (opts.apply && grupos.length) {
-    const c = await commitGrupos(db, grupos);
+    const c = await commitGrupos(db, grupos, opts.antesDeCommit, 'perfiles');
     r.escritos = c.escritos;
   }
 }
@@ -303,7 +324,11 @@ async function migrarEntrenadores(db, googleIds, opts, out, resultado) {
   const r = resultado.trainers;
   let cursor = null;
   for (;;) {
-    let q = db.collection('users').where('role', '==', 'trainer').orderBy('__name__').limit(PAGE_SIZE);
+    // Sin filtro de rol: un PF degradado a atleta conserva sus `trainerLocations`.
+    // `!= null` excluye los docs sin el campo; el orden por el mismo campo
+    // (y luego __name__) lo cubre el índice automático de un solo campo.
+    let q = db.collection('users').where('trainerLocations', '!=', null)
+      .orderBy('trainerLocations').orderBy('__name__').limit(PAGE_SIZE);
     if (cursor) q = q.startAfter(cursor);
     const page = await q.get();
     if (page.empty) break;
@@ -337,17 +362,23 @@ async function migrarEntrenadores(db, googleIds, opts, out, resultado) {
         const pubRef = db.collection('trainerPublicProfiles').doc(doc.id);
         const pub = await pubRef.get();
         if (pub.exists) {
-          grupo.push({ ref: pubRef, data: { trainerLocations: publicables(plan.locations) } });
-          r.espejados++;
+          grupo.push({
+            ref: pubRef,
+            data: { trainerLocations: publicables(plan.locations) },
+            precondition: { lastUpdateTime: pub.updateTime },
+          });
+          grupo.espejo = true;
         }
       }
       grupos.push(grupo);
     }
 
     if (opts.apply && grupos.length) {
-      const c = await commitGrupos(db, grupos);
+      const c = await commitGrupos(db, grupos, opts.antesDeCommit, 'entrenadores');
       r.conflictos += c.conflictos;
       r.cambiados -= c.conflictos;
+      const espejoFallido = c.fallidos.filter((g) => g.espejo).length;
+      r.espejados += grupos.filter((g) => g.espejo).length - espejoFallido;
     }
     if (page.size < PAGE_SIZE) break;
     cursor = page.docs[page.docs.length - 1];
@@ -367,7 +398,7 @@ async function run(db, opts, out = console) {
       total: 0, google: 0, noGoogle: 0, cambiados: 0, legacy: 0,
       conAddress: 0, omitidosPorLimit: 0, conflictos: 0,
     },
-    profiles: { afectados: 0, escritos: 0 },
+    profiles: { afectados: 0, escritos: 0, omitidosPorLimit: 0 },
     trainers: {
       total: 0, cambiados: 0, espejados: 0, customSinPlaceId: 0,
       omitidosPorLimit: 0, conflictos: 0,

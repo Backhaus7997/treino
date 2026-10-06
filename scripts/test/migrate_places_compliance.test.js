@@ -378,3 +378,134 @@ skipSinEmulador('emulador — --limit acota los gyms cambiados', async () => {
   const r = await run(db(), { apply: true, limit: 1 }, silencio());
   assert.strictEqual(r.gyms.cambiados, 1);
 });
+
+// ── Hallazgos de la revisión del PR #1362 ───────────────────────────────────
+
+test('planTrainer — coordsFetchedAt null explícito en un lugar stale se respeta (no se resetea a 1970)', () => {
+  const stale = {
+    id: 'a', type: 'gym', gymId: 'ChIJgym1', placeId: 'ChIJgym1',
+    stale: true, lat: null, lng: null, coordsFetchedAt: null,
+  };
+  const p = planTrainer({ trainerLocations: [stale] }, GOOGLE_IDS);
+  assert.strictEqual(p.changed, false);
+  assert.strictEqual(p.locations[0].coordsFetchedAt, null);
+});
+
+test('planTrainer — null explícito se respeta aunque no esté stale; ausente + stale tampoco se completa', () => {
+  const a = planTrainer(
+    { trainerLocations: [{ id: 'a', type: 'gym', gymId: 'ChIJgym1', placeId: 'ChIJgym1', coordsFetchedAt: null }] },
+    GOOGLE_IDS,
+  );
+  assert.strictEqual(a.changed, false);
+  const b = planTrainer(
+    { trainerLocations: [{ id: 'a', type: 'gym', gymId: 'ChIJgym1', placeId: 'ChIJgym1', stale: true }] },
+    GOOGLE_IDS,
+  );
+  assert.strictEqual(b.changed, false);
+});
+
+skipSinEmulador('emulador — lugar stale con coordsFetchedAt null: intacto y segundo apply = 0 cambios', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await db().doc('gyms/ChIJgym1').set({ source: 'google-places', name: 'X', lat: 1, lng: 1, geohash: 'k', coordsFetchedAt: Timestamp.now(), placeStatus: 'ok' });
+  const loc = { id: 'l1', type: 'gym', gymId: 'ChIJgym1', placeId: 'ChIJgym1', stale: true, lat: null, lng: null, coordsFetchedAt: null };
+  await db().doc('users/t1').set({ role: 'trainer', trainerLocations: [loc], trainerLocationConsentAt: null });
+  const antes = await snapshotTodo();
+  const r = await run(db(), { apply: true, limit: null }, silencio());
+  assert.strictEqual(r.trainers.cambiados, 0);
+  assert.deepStrictEqual(await snapshotTodo(), antes);
+  const r2 = await run(db(), { apply: true, limit: null }, silencio());
+  assert.strictEqual(r2.trainers.cambiados, 0);
+});
+
+skipSinEmulador('emulador — gym borrado entre lectura y escritura (NOT_FOUND) cuenta como conflicto y no aborta', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  const r = await run(
+    db(),
+    { apply: true, limit: null, antesDeCommit: async () => { await db().doc('gyms/ChIJgym1').delete(); } },
+    silencio(),
+  );
+  assert.strictEqual(r.gyms.conflictos, 1);
+  assert.strictEqual(r.gyms.cambiados, 0);
+});
+
+skipSinEmulador('emulador — espejo público modificado entre lectura y commit: se saltea y cuenta como conflicto', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  const r = await run(
+    db(),
+    {
+      apply: true,
+      limit: null,
+      antesDeCommit: async (fase) => {
+        if (fase === 'entrenadores') await db().doc('trainerPublicProfiles/t1').update({ marca: 'concurrente' });
+      },
+    },
+    silencio(),
+  );
+  assert.strictEqual(r.trainers.conflictos, 1);
+  assert.strictEqual(r.trainers.espejados, 0);
+  const pub = (await db().doc('trainerPublicProfiles/t1').get()).data();
+  assert.strictEqual(pub.marca, 'concurrente');
+  assert.strictEqual(pub.trainerLocations[0].placeId, undefined);
+  // El grupo es atómico: users/t1 tampoco se tocó; re-correr lo resuelve.
+  const t1 = (await db().doc('users/t1').get()).data();
+  assert.strictEqual(t1.trainerLocations[0].placeId, undefined);
+});
+
+skipSinEmulador('emulador — --clear-profile-names no limpia perfiles de gyms que terminaron en conflicto', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  const r = await run(
+    db(),
+    {
+      apply: true,
+      limit: null,
+      clearProfileNames: true,
+      antesDeCommit: async () => { await db().doc('gyms/ChIJgym1').update({ marca: 'concurrente' }); },
+    },
+    silencio(),
+  );
+  assert.strictEqual(r.gyms.conflictos, 1);
+  assert.strictEqual((await db().doc('gyms/ChIJgym1').get()).data().name, 'Megatlon Belgrano');
+  assert.strictEqual((await db().doc('userPublicProfiles/u1').get()).data().gymName, 'Megatlon Belgrano');
+});
+
+skipSinEmulador('emulador — --limit también acota la limpieza de perfiles', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  await db().doc('userPublicProfiles/u3').set({ gymId: 'ChIJgym1', gymName: 'Megatlon Belgrano' });
+  await db().doc('userPublicProfiles/u4').set({ gymId: 'ChIJgym1', gymName: 'Megatlon Belgrano' });
+  const r = await run(db(), { apply: true, limit: 2, clearProfileNames: true }, silencio());
+  assert.strictEqual(r.profiles.escritos, 2);
+  assert.strictEqual(r.profiles.omitidosPorLimit, 1);
+});
+
+skipSinEmulador('emulador — --limit acota PF y espejos', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  const r = await run(db(), { apply: true, limit: 1 }, silencio());
+  assert.strictEqual(r.trainers.cambiados, 1);
+  assert.ok(r.trainers.espejados <= 1);
+  assert.strictEqual(r.trainers.omitidosPorLimit, 1);
+});
+
+skipSinEmulador('emulador — usuarios con trainerLocations se migran sin importar el rol', async () => {
+  const { run } = require('../migrate_places_compliance');
+  await limpiar();
+  await sembrar();
+  await db().doc('users/a1').set({
+    role: 'athlete',
+    trainerLocations: [{ id: 'l1', type: 'gym', gymId: 'ChIJgym1', lat: 1, lng: 2, geohash: 'g' }],
+  });
+  await db().doc('users/a2').set({ role: 'athlete' });
+  await run(db(), { apply: true, limit: null }, silencio());
+  const a1 = (await db().doc('users/a1').get()).data();
+  assert.strictEqual(a1.trainerLocations[0].placeId, 'ChIJgym1');
+});
