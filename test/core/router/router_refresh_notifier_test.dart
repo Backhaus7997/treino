@@ -26,6 +26,11 @@ Stream<UserProfile?> _silentProfile(Ref ref) =>
 /// vez de 2).
 Stream<bool> _silentGate(Ref ref) => Completer<bool>().future.asStream();
 
+/// Y el pendiente de escrituras: es el cuarto provider que escucha el notifier y
+/// se reconstruye con auth (loading → data), así que sin silenciarlo suma
+/// notificaciones de más al conteo exacto de los tests de auth.
+Stream<bool> _silentPending(Ref ref) => Completer<bool>().future.asStream();
+
 void main() {
   group('RouterRefreshNotifier (via routerRefreshNotifierProvider)', () {
     test('notifyListeners fires once per auth stream emission', () async {
@@ -37,6 +42,7 @@ void main() {
           authStateChangesProvider.overrideWith((_) => controller.stream),
           userProfileProvider.overrideWith(_silentProfile),
           emailGateEnabledProvider.overrideWith(_silentGate),
+          userProfileHasPendingWritesProvider.overrideWith(_silentPending),
         ],
       );
       addTearDown(container.dispose);
@@ -67,6 +73,7 @@ void main() {
               .overrideWith((_) => Stream<User?>.value(MockUser())),
           userProfileProvider.overrideWith((_) => profileController.stream),
           emailGateEnabledProvider.overrideWith(_silentGate),
+          userProfileHasPendingWritesProvider.overrideWith(_silentPending),
         ],
       );
       addTearDown(container.dispose);
@@ -125,6 +132,44 @@ void main() {
     });
 
     test(
+        'notifyListeners fires when the pending-writes signal changes '
+        '(server ack: true -> false, sin emisión nueva del perfil) (#1335)',
+        () async {
+      final pending = StreamController<bool>.broadcast();
+
+      final container = ProviderContainer(
+        overrides: [
+          authStateChangesProvider
+              .overrideWith((_) => Stream<User?>.value(MockUser())),
+          userProfileProvider.overrideWith(_silentProfile),
+          emailGateEnabledProvider.overrideWith(_silentGate),
+          userProfileHasPendingWritesProvider
+              .overrideWith((_) => pending.stream),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(pending.close);
+
+      final notifier = container.read(routerRefreshNotifierProvider);
+
+      int callCount = 0;
+      notifier.addListener(() => callCount++);
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final baseline = callCount;
+
+      pending.add(true);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, baseline + 1);
+
+      // El ack del servidor solo cambia metadata: el perfil NO re-emite, y esta
+      // es la única señal que le avisa al router que puede soltar /birth-date.
+      pending.add(false);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(callCount, baseline + 2);
+    });
+
+    test(
         'after container dispose, additional emissions do NOT call notifyListeners',
         () async {
       final controller = StreamController<User?>.broadcast();
@@ -134,6 +179,7 @@ void main() {
           authStateChangesProvider.overrideWith((_) => controller.stream),
           userProfileProvider.overrideWith(_silentProfile),
           emailGateEnabledProvider.overrideWith(_silentGate),
+          userProfileHasPendingWritesProvider.overrideWith(_silentPending),
         ],
       );
 
