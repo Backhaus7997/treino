@@ -200,6 +200,52 @@ export async function syncTrainerLoad(
       throw new HttpsError("not-found", "Trainer profile not found.");
     }
 
+    // ── El 'trainer' del vínculo tiene que ser un PF ────────────────────────
+    //
+    // Defensa en profundidad del gate que `firestore.rules` le puso al `create`
+    // de `trainer_links` (~1368). Esta callable va por Admin SDK y SE SALTEA
+    // las reglas, así que es la OTRA mitad del camino de escritura: sin esto,
+    // un vínculo trucho que ya estuviera en la base —creado antes de ese gate—
+    // se promovía igual, y con el vínculo activo `hasActiveTrainerLink` apaga
+    // `athletePaywallEnforced` para el alumno. O sea: dos cuentas de atleta que
+    // se nombran entrenador una a la otra y se aceptan quedaban las dos exentas
+    // del tope.
+    //
+    // GRATIS: `trainerSnap` ya está leído arriba para la suscripción. No agrega
+    // ni una lectura ni cambia el punto de serialización de la transacción.
+    //
+    // MIRA EL VALOR, NO LA AUSENCIA — y la asimetría con la regla (que sí falla
+    // cerrado) es deliberada. Ningún fixture de `promote-link.test.ts` ni de
+    // `promote-link.emulator.test.ts` siembra `role`, porque esta función nunca
+    // lo necesitó; y en producción un PF legacy sin el campo existe de verdad
+    // (ver el default de `paywallEnforcedFor` en las rules, que falla abierto
+    // por el mismo motivo). Fail-closed acá le rompería el aceptar a esa gente
+    // para tapar un residuo que el gate del create ya no deja crecer.
+    //
+    // No lo debilita: el ataque usa cuentas del signup PÚBLICO, y ese camino
+    // escribe `role: 'athlete'` explícito (firestore.rules ~296) con el campo
+    // pineado inmutable en el update. Un rol ausente es un doc viejo, no un
+    // atacante. Las dos ramas están fijadas por tests.
+    //
+    // SÓLO EN EL CAMINO DE PROMOCIÓN, y el `promotion &&` no es cosmético.
+    // `linkLoadReconcile` llama a esta función con `promotion: null` para
+    // recomputar `users/{trainerId}.weightedLoad`, que es DENORMALIZADO Y PARA
+    // MOSTRAR: el gate nunca le cree y siempre recalcula en vivo desde
+    // `trainer_links` (REQ-PAYWALL-GATE-006). Bloquear ese camino no compra
+    // seguridad —no autoriza nada— y sí cuesta: el trigger tiene un
+    // catch-and-log, así que el número que ve un entrenador se quedaría viejo
+    // en silencio si su doc tuviera el rol raro. Autorizar es trabajo del
+    // camino que ESCRIBE el `status`; mantener un contador de display, no.
+    if (promotion) {
+      const trainerRole = trainerSnap.data()?.role as string | undefined;
+      if (trainerRole !== undefined && trainerRole !== "trainer") {
+        throw new HttpsError(
+          "permission-denied",
+          "The link's trainer is not a trainer.",
+        );
+      }
+    }
+
     // `degraded` se IGNORA aca a proposito — ver la POLITICA en
     // subscription-state.ts: la degradacion de datos frena TRABAJO NUEVO
     // (friccion sobre el entrenador) pero NUNCA revoca relaciones existentes

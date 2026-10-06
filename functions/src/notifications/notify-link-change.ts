@@ -40,7 +40,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { resolveAthleteName, resolveTrainerName } from "../mail/format";
+import { artDateKey, resolveAthleteName, resolveTrainerName } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import {
@@ -102,6 +102,37 @@ const kDeepLinkNotificaciones = "/home/notifications";
  * @param afterStatus  - Resolved status branch.
  * @param beforeStatus - Previous status, to tell accept apart from resume.
  */
+/**
+ * Por qué se deduplica una solicitud: el par y el día, NO el vínculo.
+ *
+ * El `scope` de `enqueueMail` es "por lo que este mail se deduplica", y acá era
+ * el `linkId` — un id autogenerado, nuevo en cada solicitud
+ * (`TrainerLinkRepository.request()` hace `_links.doc()`). O sea que el dedupe
+ * no colapsaba NADA: un doc creado valía un mail, sin techo.
+ *
+ * El gate de rol del `create` (firestore.rules ~1368) ya cerró lo peor —el
+ * destinatario tiene que ser un PF de verdad, antes era cualquier uid—, pero un
+ * alumno todavía podía inundar a SU entrenador. Y el costo no es sólo molestia:
+ * es cuota del mismo remitente por el que salen los códigos de verificación y
+ * los resets de contraseña.
+ *
+ * El `toUid` ya entra en `dedupeKey`, así que el scope sólo necesita al alumno
+ * y la fecha: queda UN mail por (alumno, PF, día). El idiom del `artDateKey`
+ * como sufijo de scope es el que ya usan `trainer-limit-mail`,
+ * `free-limit-mail`, `athlete-prospect-mail` y `notify-overdue-payments`.
+ *
+ * NO topea el PUSH, que sale por `sendFcm` y no pasa por este dedupe. Es ruido
+ * in-app, sin costo externo ni reputación de dominio en juego; acotarlo pide
+ * estado del servidor y es su propio cambio.
+ *
+ * Exportada porque el test tiene que armar la MISMA clave: con la fórmula
+ * duplicada del otro lado, un cambio de formato acá dejaría el test en verde
+ * mirando un doc que ya nadie escribe.
+ */
+export function scopeDeSolicitud(athleteId: string, nowMs?: number): string {
+  return `${athleteId}_${artDateKey(nowMs ?? Date.now())}`;
+}
+
 async function enqueueLinkMail(
   app: App,
   linkId: string,
@@ -117,7 +148,7 @@ async function enqueueLinkMail(
     await enqueueMail(app, {
       toUid: trainerId,
       kind: "link-requested",
-      scope: linkId,
+      scope: scopeDeSolicitud(athleteId),
       // El destinatario es el PF, asi que el CTA va al Coach Hub. El default
       // (la landing) es para los mails que reciben ATLETAS.
       //

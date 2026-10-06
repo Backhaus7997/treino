@@ -105,6 +105,25 @@ async function seedLink(
   });
 }
 
+/**
+ * Seed `users/{uid}` with a real trainer role.
+ *
+ * El `create` de `trainer_links` exige que el `trainerId` sea un PF de verdad
+ * (`tieneRolDePF`, firestore.rules ~208): el campo peligroso de ese create es
+ * la CONTRAPARTE, porque el que escribe es el atleta. Sin este doc, todo create
+ * de este archivo se deniega por el rol.
+ *
+ * Importa para los `assertFails` tanto como para los `assertSucceeds`: un
+ * `assertFails` que pasa por el motivo equivocado —denegado por rol en vez de
+ * por el pin de `acceptedAt` que dice custodiar— no avisa nunca. Es la misma
+ * lección que SCENARIO-CC-05 en scripts/rules_test/coach-collections-role.test.js.
+ */
+async function seedTrainer(uid: string): Promise<void> {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection("users").doc(uid).set({ uid, role: "trainer" });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 1. Entitlement field-pin — the headline paywall security assertion.
 // ---------------------------------------------------------------------------
@@ -654,6 +673,12 @@ describe("trainer_links rules — existing flows unaffected by the acceptedAt pi
 describe("trainer_links rules — acceptedAt on create (slice 5)", () => {
   const trainerId = "trainer-create-pin";
   const athleteId = "athlete-create-pin";
+
+  // Es el ÚNICO describe del archivo con creates de cliente, y todos nombran a
+  // este `trainerId`. Sin el doc de usuario, el gate de rol del create los
+  // deniega a todos — incluidos los `assertFails`, que pasarían por un motivo
+  // que no es el que vinieron a probar. Ver `seedTrainer`.
+  beforeEach(() => seedTrainer(trainerId));
 
   it("denies the athlete forging an ancient acceptedAt on their own new link", async () => {
     const athlete = testEnv.authenticatedContext(athleteId);

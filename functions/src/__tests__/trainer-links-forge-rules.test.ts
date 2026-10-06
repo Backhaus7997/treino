@@ -4,7 +4,12 @@
  *
  * The exploit chain (all client-side, no trainer involvement):
  *   1. athlete creates trainer_links/{id} {athleteId: me, trainerId: victim,
- *      status: 'pending'}  — create rule allows it (no consent check).
+ *      status: 'pending'}  — el create ya NO admite cualquier `victim`: exige
+ *      que ese uid sea un PF de verdad (`tieneRolDePF`, firestore.rules ~208).
+ *      Cuando se escribió este archivo acá decía «create rule allows it (no
+ *      consent check)», y era cierto: la víctima podía ser cualquier cuenta.
+ *      La cadena sigue existiendo contra un PF REAL —que es el escenario que
+ *      el paso 2 cierra—, así que los fixtures siembran `role: 'trainer'`.
  *   2. athlete updates status pending -> active  — the update rule used to let
  *      EITHER member change status with no transition/actor validation.
  *   3. athlete creates reviews/{id} — gated on the link being
@@ -94,6 +99,30 @@ const LINK = `${TRAINER}_${ATHLETE}`;
 function ctxDb(uid: string) {
   return testEnv.authenticatedContext(uid).firestore();
 }
+
+/**
+ * `TRAINER` tiene que EXISTIR como PF para que el create del vínculo pase.
+ *
+ * El `create` de `trainer_links` exige `tieneRolDePF(trainerId)`
+ * (firestore.rules ~208): el campo peligroso de ese create es la CONTRAPARTE,
+ * porque el que escribe es el atleta.
+ *
+ * Y es coherente con lo que este archivo prueba. El header describe la cadena
+ * del forge y dice del paso 1: «create rule allows it (no consent check)». Eso
+ * dejó de ser cierto — ese paso ahora exige que el destinatario sea un PF de
+ * verdad. La cadena sigue existiendo para un PF REAL, que es el escenario que
+ * QA-SEC-002 cierra en el paso 2, así que sembrar el rol mantiene el archivo
+ * probando lo suyo en vez de aprobar por un deny que llega antes.
+ */
+beforeEach(async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection("users")
+      .doc(TRAINER)
+      .set({ uid: TRAINER, role: "trainer" });
+  });
+});
 
 describe("trainer_links update — QA-SEC-002 self-promotion", () => {
   it("DENIES the athlete promoting pending -> active (the forge)", async () => {

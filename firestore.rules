@@ -184,6 +184,32 @@ service cloud.firestore {
       return u != null && u.data.get('athletePaywallEnforced', false) == true;
     }
 
+    // ¿`uid` es un PF DE VERDAD?
+    //
+    // El rol es el único hecho NO auto-declarable del sistema: el signup
+    // público fuerza 'athlete' (~línea 296), el update lo pinea inmutable
+    // (QA-SEC-001, ~línea 416) y sólo el Admin SDK acuña un trainer. Por eso
+    // es lo que se pregunta cuando una escritura nombra a una CONTRAPARTE que
+    // dice ser entrenador — el mismo criterio que la rama `inquiry` de
+    // `chatCreateOk` (~2485) y que el gate de rol de rules-hardening Slice C.
+    //
+    // FALLA CERRADO, al revés que `paywallEnforcedFor` de arriba, y la
+    // asimetría es deliberada: allá "no sé" tiene que favorecer al usuario (no
+    // cobrarle), acá "no sé" es "no me consta que sea PF". Un doc inexistente
+    // o sin `role` deniega. Un PF sin `role` no puede existir: el rol se
+    // estampa en la creación y es inmutable.
+    //
+    // El `u != null` no es decorativo: contra el emulador 1.21+ y en
+    // producción, `get()` de un doc que no está devuelve null, y
+    // desreferenciarlo tiraría un ERROR DE EVALUACIÓN —que rebota la escritura
+    // con un mensaje que no dice nada— en vez de un deny limpio. Mismo motivo
+    // por el que `chatCreateOk` se quedó con su `exists()` redundante: que la
+    // condición se LEA, y no dependa de que algo reviente.
+    function tieneRolDePF(uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid));
+      return u != null && u.data.get('role', '') == 'trainer';
+    }
+
     // Edad mínima de cuenta — ver `ProfileSetupValidators.kMinAgeYears` y
     // `docs/legal/terminos-y-condiciones.md`.
     //
@@ -1365,13 +1391,40 @@ service cloud.firestore {
       // ni siquiera entra al sort), pero la rama `resume` del MISMO tx.update
       // ya preserva `acceptedAt`, así que alcanza con una transición futura
       // que promueva sin pisarlo para que la antigüedad forjada gane.
+      // `tieneRolDePF(trainerId)` va ÚLTIMO, y el orden es parte del diseño:
+      // es la única cláusula que paga una lectura facturada, y las reglas
+      // cortan por izquierda — un payload que ya falla por cualquiera de las
+      // guardas de arriba no la paga. Mismo criterio que el `get()` del
+      // paywall en `routines/create` (~940).
+      //
+      // POR QUÉ EL GATE, y por qué mira al OTRO: este create lo hace el
+      // ATLETA (convención producto), así que el campo auto-declarado y
+      // peligroso no es quien escribe sino el `trainerId`. Sin esta cláusula
+      // cualquier cuenta podía nombrar a CUALQUIER uid como su entrenador, y
+      // eso compraba dos cosas:
+      //
+      //   1. El trigger `notifyOnLinkChange` le encola `link-requested` a ese
+      //      uid — o sea, mail del remitente verificado del producto hacia
+      //      alguien que nunca fue PF, con texto que elige el que escribe.
+      //   2. `athletePaywallEnforced` se apaga con un vínculo activo
+      //      (`hasActiveTrainerLink`), así que dos cuentas de atleta que se
+      //      aceptaran mutuamente quedaban las dos exentas del tope.
+      //
+      // ALCANCE: rol, NO rol + perfil publicado. La rama `inquiry` de
+      // `chatCreateOk` suma `exists(trainerPublicProfiles/{otro})` como señal
+      // de consentimiento; acá NO se replica porque rompería el flujo de
+      // INVITACIÓN (`invite_dialog.dart` ~65), donde el atleta crea el vínculo
+      // desde el link del PF y ese PF no necesariamente publicó su perfil de
+      // discovery. Espeja la decisión AD-1 de Slice C ("ROLE-CHECK ONLY").
+      // Fijado por SCENARIO-TL-03 en scripts/rules_test/trainer-links-role.test.js.
       allow create: if request.auth != null
                     && request.auth.uid == request.resource.data.athleteId
                     && request.auth.uid != request.resource.data.trainerId
                     && request.resource.data.status == 'pending'
                     && request.resource.data.trainerId is string
                     && request.resource.data.trainerId.size() > 0
-                    && request.resource.data.get('acceptedAt', null) == null;
+                    && request.resource.data.get('acceptedAt', null) == null
+                    && tieneRolDePF(request.resource.data.trainerId);
 
       // Update: members del vínculo pueden actualizar (decline / cancel /
       // terminate / pause). Fields `trainerId`, `athleteId`, `requestedAt`,
