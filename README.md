@@ -17,7 +17,7 @@ Un solo código Flutter genera varias superficies, más un backend de Cloud Func
 
 | Superficie | Para quién | Entrypoint | Dónde corre |
 |---|---|---|---|
-| **App móvil** | Alumnos y PF | `lib/main.dart` | iOS y Android (`com.treino.app`) |
+| **App móvil** | Alumnos y PF | `lib/main.dart` | iOS (`com.backhaus.treino`) y Android (`com.treino.app`) |
 | **Coach Hub** | PF | `lib/main_coach_hub.dart` | Flutter Web en Vercel → [app.gettreino.com](https://app.gettreino.com/) |
 | **Wear OS** | Alumnos | `lib/main_wear.dart` | Android, flavor `wear` |
 | **Apple Watch** | Alumnos | `ios/TreinoWatch Watch App/` | watchOS, Swift nativo (Firestore por REST) |
@@ -89,17 +89,29 @@ Desarrollo local **contra el emulador** (nunca contra producción):
 
 ```bash
 ./scripts/emulator.sh        # Firestore, Auth, Functions y UI del emulador
+
+# iOS
 flutter run --dart-define=USE_EMULATOR=true
+# Android: el flavor es obligatorio (hay dos, `phone` y `wear`)
+flutter run --flavor phone --dart-define=USE_EMULATOR=true
 ```
+
+> [!CAUTION]
+> Sin `--dart-define=USE_EMULATOR=true` **cualquier** superficie arranca contra
+> `treino-dev`, que es producción.
 
 Las otras superficies:
 
 ```bash
 flutter run -d chrome -t lib/main_coach_hub.dart --dart-define=USE_EMULATOR=true
-flutter run -d <reloj> --flavor wear -t lib/main_wear.dart
+
+flutter run -d <reloj> --flavor wear -t lib/main_wear.dart \
+  --dart-define=USE_EMULATOR=true \
+  --dart-define=EMULATOR_HOST=10.0.2.2 \
+  --dart-define=APPCHECK_DEBUG=true
 ```
 
-El reloj contra el emulador necesita además `EMULATOR_HOST` y `APPCHECK_DEBUG`: ver la cabecera de `lib/main_wear.dart`. Para cargar datos de prueba: `scripts/seed_emulator_full.js` ([README del seed](./scripts/seed_emulator_full_README.md)).
+El detalle del reloj (host del emulador, App Check de debug) está en la cabecera de `lib/main_wear.dart`. Para cargar datos de prueba: `scripts/seed_emulator_full.js` ([README del seed](./scripts/seed_emulator_full_README.md)).
 
 ## Calidad
 
@@ -111,7 +123,7 @@ dart format .                # lo verifica el CI
 flutter test <tests afectados>
 ```
 
-La suite completa es grande: ~900 archivos de tests de Flutter, ~170 de Functions (jest; los que tocan Firestore de verdad necesitan el emulador), tests de reglas y de scripts. Corré lo que toca tu cambio; el CI corre todo.
+La suite completa es grande: ~900 archivos de tests de Flutter, ~170 de Functions (jest; los que tocan Firestore de verdad necesitan el emulador), tests de reglas y de scripts. Corré lo que toca tu cambio; el CI corre esas suites completas. Los 5 flujos end-to-end de `integration_test/` (registro, login, chat, rutinas, entrenamiento) **no** corren en el CI: se corren a mano en un dispositivo.
 
 El CI (`.github/workflows/`) corre:
 
