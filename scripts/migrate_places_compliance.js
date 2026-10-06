@@ -325,18 +325,21 @@ async function migrarEntrenadores(db, googleIds, opts, out, resultado) {
   let cursor = null;
   for (;;) {
     // Sin filtro de rol: un PF degradado a atleta conserva sus `trainerLocations`.
-    // `!= null` excluye los docs sin el campo; el orden por el mismo campo
-    // (y luego __name__) lo cubre el índice automático de un solo campo.
-    let q = db.collection('users').where('trainerLocations', '!=', null)
-      .orderBy('trainerLocations').orderBy('__name__').limit(PAGE_SIZE);
+    // Se pagina por id de documento y se filtra en memoria. NO usar
+    // `where('trainerLocations', '!=', null).orderBy('trainerLocations')`:
+    // `trainerLocations` es un array, Firestore no le crea índice ascendente
+    // automático, y el emulador no valida índices — pasaría los tests y
+    // fallaría en producción.
+    let q = db.collection('users').orderBy('__name__').limit(PAGE_SIZE);
     if (cursor) q = q.startAfter(cursor);
     const page = await q.get();
     if (page.empty) break;
 
     const grupos = [];
     for (const doc of page.docs) {
-      r.total++;
       const data = doc.data();
+      if (!Array.isArray(data.trainerLocations) || data.trainerLocations.length === 0) continue;
+      r.total++;
       const plan = planTrainer(data, googleIds);
       r.customSinPlaceId += plan.customSinPlaceId;
       if (!plan.changed) continue;
