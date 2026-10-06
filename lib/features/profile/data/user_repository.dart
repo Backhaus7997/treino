@@ -696,6 +696,22 @@ class UserRepository {
           campo: 'trainerBio');
     }
 
+    // Las etiquetas de `trainerLocations` (`customLabel`) las escribe el PF y se
+    // espejan a trainerPublicProfiles, que lee cualquier autenticado: mismo
+    // riesgo y mismo guard que la bio. Se valida cada una, en el cuello de
+    // botella, para cubrir todos los escritores (mobile y Hub).
+    final lugares = efectivo['trainerLocations'];
+    if (lugares is List) {
+      for (var i = 0; i < lugares.length; i++) {
+        final lugar = lugares[i];
+        final etiqueta = lugar is Map ? lugar['customLabel'] : null;
+        if (etiqueta is String) {
+          ModerationGuard.ensure(etiqueta,
+              campo: 'trainerLocations[$i].customLabel');
+        }
+      }
+    }
+
     _assertTrainerLocationStateIsValid(efectivo);
     final sanitized = Map<String, Object?>.fromEntries(
       efectivo.entries.where((e) => !_immutableFields.contains(e.key)),

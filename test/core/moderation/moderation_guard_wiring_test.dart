@@ -216,6 +216,52 @@ void main() {
     });
   });
 
+  group('etiquetas de ubicaciones (trainerLocations)', () {
+    Map<String, Object?> lugar(String id, String? etiqueta) => {
+          'id': id,
+          'type': 'custom',
+          'customLabel': etiqueta,
+          'lat': -34.6,
+          'lng': -58.4,
+        };
+
+    test('update rechaza una etiqueta vetada y no escribe en ningun documento',
+        () async {
+      final repo = UserRepository(firestore: firestore);
+      await firestore.collection('users').doc('t1').set({'uid': 't1'});
+      await firestore
+          .collection('trainerPublicProfiles')
+          .doc('t1')
+          .set({'uid': 't1'});
+
+      await expectLater(
+        repo.update('t1', {
+          'trainerLocations': [lugar('a', 'Mi estudio'), lugar('b', _vetado)],
+        }),
+        throwsA(isA<ModerationBlockedException>().having(
+            (e) => e.campo, 'campo', 'trainerLocations[1].customLabel')),
+      );
+
+      final privado = await firestore.collection('users').doc('t1').get();
+      final publico =
+          await firestore.collection('trainerPublicProfiles').doc('t1').get();
+      expect(privado.data()!.containsKey('trainerLocations'), isFalse);
+      expect(publico.data()!.containsKey('trainerLocations'), isFalse);
+    });
+
+    test('etiquetas limpias, nulas o ausentes pasan', () async {
+      final repo = UserRepository(firestore: firestore);
+      await firestore.collection('users').doc('t1').set({'uid': 't1'});
+
+      await repo.update('t1', {
+        'trainerLocations': [lugar('a', 'Mi estudio'), lugar('b', null)],
+      });
+
+      final privado = await firestore.collection('users').doc('t1').get();
+      expect((privado.data()!['trainerLocations'] as List), hasLength(2));
+    });
+  });
+
   group('rutinas', () {
     // Los CINCO campos de texto libre de una rutina: `name`, `split`,
     // `summary` a nivel documento, y `days[].name` / `days[].slots[].notes`
