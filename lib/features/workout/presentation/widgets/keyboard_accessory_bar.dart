@@ -391,7 +391,7 @@ class _BotonSiguiente extends StatelessWidget {
                 child: Text(
                   l10n.routineEditorNextCellLabel,
                   style: GoogleFonts.barlowCondensed(
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                     fontWeight: FontWeight.w700,
                     color: tinta,
                   ),
