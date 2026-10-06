@@ -247,6 +247,30 @@ elimina su cuenta, **se borra todo lo asociado a él, incluidas tus notas, tu
 seguimiento y los archivos que hayas subido sobre esa persona**. No hay
 recuperación.
 
+### 7.3 Si eliminás tu cuenta de entrenador
+
+Podés hacerlo desde la aplicación. Antes de borrar nada damos de baja tu
+suscripción; si no podemos, la cuenta no se elimina y podés reintentar.
+
+Al eliminarla, **se borra lo que llevabas sobre tus alumnos** (notas,
+seguimiento, archivos, facturación y planes de alimentación), los accesos que
+ellos te habían compartido, tus plantillas —incluidas las publicadas—, tus
+ejercicios propios con sus videos, las reseñas que recibiste y tu perfil
+público. Se cancelan tus turnos futuros y se borra tu disponibilidad. No hay
+recuperación. Si un paso del borrado falla, la cuenta se elimina igual y algo
+de eso puede quedar guardado hasta que nos pidas completarlo (lo explica la
+política de retención, sección 2.7).
+
+**Tus vínculos terminan** y a cada alumno le llega una notificación; no les
+mandamos correo. **Los alumnos conservan** las rutinas que les asignaste y su
+historial, y el chat queda en su cuenta con tu nombre reemplazado por «Usuario
+eliminado». Si una rutina usaba un ejercicio propio tuyo, conserva el nombre
+pero pierde el video y la descripción.
+
+**Los pagos registrados no se borran:** se conservan como respaldo contable y
+fiscal, y dejan de resolver a tu nombre. El detalle está en la política de
+retención.
+
 ---
 
 ## 8. Tu suscripción
@@ -358,6 +382,8 @@ Tus alumnos pueden calificarte y dejar comentarios públicos.
   escribas desde cuentas propias o de allegados.
 - Si un alumno elimina su cuenta, **su puntuación se conserva** en tu promedio,
   ya des-identificada. Está explicado en la política de retención.
+- Si eliminás tu cuenta vos, las reseñas que recibiste **se borran** con ella
+  (sección 7.3).
 
 ---
 
@@ -385,7 +411,8 @@ descargo.
 Si te damos de baja, tus alumnos conservan sus datos y su historial.
 
 Podés dejar de usar TREINO cuando quieras, y eliminar tu cuenta desde la
-aplicación. Avisale a tus alumnos con antelación razonable: la relación con
+aplicación (qué pasa con tus datos y con los de tus alumnos, en la sección 7.3).
+Avisale a tus alumnos con antelación razonable: la relación con
 ellos es tuya, no nuestra.
 
 ---

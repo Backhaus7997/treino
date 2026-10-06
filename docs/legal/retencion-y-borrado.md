@@ -12,7 +12,7 @@ dart: kDataRetentionSections
 > Documento de respaldo de la [Política de Privacidad](./politica-de-privacidad.md),
 > secciones 8 y 10. Escrito contra el comportamiento real de
 > `functions/src/delete-account.ts` y `functions/src/cascade/`, verificado el
-> **2026-08-31**. Sirve además como URL de referencia para el requisito de
+> **2026-10-05**. Sirve además como URL de referencia para el requisito de
 > eliminación de cuenta de Google Play.
 
 ---
@@ -90,20 +90,62 @@ publicaciones (`posts`) y tus turnos (`appointments`).
 En Cloud Storage: avatar, subidas temporales, videos de ejercicios propios,
 fotos de publicaciones, fotos de molestias y multimedia del chat.
 
+### 2.6 Si sos entrenador
+
+Podés eliminar tu cuenta de entrenador igual que cualquier otra, desde la app.
+Además de todo lo anterior, se hace esto:
+
+**Tus alumnos.** Terminamos todos tus vínculos, incluidas las solicitudes
+pendientes. A cada alumno le llega una notificación avisándole que el vínculo
+terminó. No les mandamos correo.
+
+**Tus turnos.** Se cancelan los turnos futuros que estaban pendientes o
+confirmados, y se borra tu disponibilidad horaria. La notificación al alumno es
+la del vínculo; no recibe una por cada turno.
+
+**Lo que escribiste sobre tus alumnos.** Se elimina todo lo que llevabas sobre
+ellos: notas privadas, registro de seguimiento, archivos (y el objeto en
+Storage), configuración de facturación y planes de alimentación. También los
+accesos que los alumnos te habían compartido (sus perfiles y sus sesiones).
+
+**Tu contenido profesional.** Se eliminan tus plantillas de rutina —las
+privadas y las que habías publicado—, las reseñas que recibiste, tus ejercicios
+propios y los videos que subiste a ellos, y tu perfil público de entrenador.
+
+**Tu suscripción.** Antes de borrar nada damos de baja tu suscripción de
+Mercado Pago. Si no podemos hacerlo, la cuenta **no se elimina** y podés
+reintentar: no te dejamos pagando sin cuenta.
+
+**Lo que se queda con tus alumnos.** Las rutinas que les asignaste siguen siendo
+de ellos, con su historial. Si una de esas rutinas usaba un ejercicio propio
+tuyo, conserva el nombre pero deja de tener el video y la descripción. Las copias
+que un alumno haya adoptado de una plantilla tuya también siguen siendo suyas.
+
+### 2.7 Si un paso falla a mitad de camino
+
+El borrado son varios pasos. Salvo la baja de la suscripción, que va primero y
+frena todo si falla, un error transitorio en uno de ellos no detiene el resto:
+tu cuenta y tu acceso se eliminan igual, y **los datos de ese paso pueden quedar
+guardados**. Hoy no lo reintentamos solos. Cada falla queda registrada con tu
+identificador. Si querés que confirmemos que no quedó nada, o que terminemos de
+borrarlo, escribinos a treino@gettreino.com con el correo de tu cuenta: lo
+tratamos como una solicitud de supresión, con el plazo de la sección 5.
+
 ---
 
 ## 3. Qué NO se elimina, y por qué
 
-Esto es lo que hay que leer con atención. Tres cosas sobreviven, por razones
+Esto es lo que hay que leer con atención. Estas cosas sobreviven, por razones
 distintas.
 
 | Dato | Qué queda | Por qué |
 |---|---|---|
 | **Pagos** (`payments`) | El registro, con tu `uid` a secas | Respaldo contable y fiscal del entrenador. **No contiene tu nombre**: al borrarse `userPublicProfiles/{uid}` el identificador deja de resolver a una persona |
-| **Reseñas** (`reviews`) | La puntuación numérica | Sostiene el promedio del entrenador. Borrarla alteraría retroactivamente la reputación de un tercero |
-| **Chat** (`chats/messages`) | El hilo, para el otro participante | La conversación también le pertenece a la otra persona |
+| **Reseñas** que escribiste como alumno (`reviews`) | La puntuación numérica | Sostiene el promedio del entrenador. Borrarla alteraría retroactivamente la reputación de un tercero |
+| **Chat** (`chats/messages`) | El hilo, para el otro participante. Si eliminás tu cuenta de entrenador, el hilo queda para el alumno, que ve «Usuario eliminado» | La conversación también le pertenece a la otra persona |
+| **Rutinas que un entrenador asignó a un alumno** | Quedan con el alumno | Son parte del historial de entrenamiento del alumno. Si eliminás tu cuenta de entrenador, no se borran |
 
-En los tres casos, la des-identificación opera por la vía de que **ninguno de
+En los tres primeros casos, la des-identificación opera por la vía de que **ninguno de
 esos documentos guarda tu nombre desnormalizado** — sólo el `uid`, que tras el
 borrado ya no resuelve contra ningún perfil.
 
@@ -148,7 +190,9 @@ entrar una vez para que el plazo vuelva a empezar.
 
 **Quedan fuera de esta baja automática** las cuentas de entrenador, las que
 tengan una suscripción vigente y las que mantengan un vínculo activo con un
-entrenador. Dar de baja a un entrenador afecta a terceros: los vínculos con sus
+entrenador. (Esto es sólo la baja automática: un entrenador que elimina su cuenta él mismo
+la elimina como se explica en la sección 2.6.) Dar de baja a un entrenador
+afecta a terceros: los vínculos con sus
 alumnos, las reseñas que recibió y los chats que mantuvo con ellos. Y una cuenta
 que está pagando, o que está entrenando con un profesional, no está abandonada
 aunque no la abras. Esas cuentas se revisan a mano si la inactividad se
@@ -183,7 +227,7 @@ párrafo le anunciaba al usuario que no se le avisa algo — decírselo así es 
 avisarle igual, pero por escrito.
 
 El esquema de la sección 3 es razonable y está pensado. Lo que sigue son las
-tres decisiones que conviene que valide un abogado cuando llegue:
+cuatro decisiones que conviene que valide un abogado cuando llegue:
 
 1. Si la retención del **texto de las reseñas** (no sólo el número) es
    sostenible frente a un pedido de supresión del art. 16 de la Ley 25.326.
@@ -191,6 +235,17 @@ tres decisiones que conviene que valide un abogado cuando llegue:
    momento del borrado, en vez de sólo estar escrito en el documento.
 3. Cuál es el **plazo fiscal concreto** de conservación de `payments` según la
    normativa aplicable, y si corresponde purgarlos al vencerlo.
+4. Si borrar **sin aviso previo** las reseñas recibidas y las plantillas
+   publicadas de un entrenador que elimina su cuenta (sección 2.6) es
+   razonable frente a los alumnos que las usaban, o si corresponde un plazo de
+   gracia. Hoy el borrado es inmediato y el alumno conserva las rutinas que ya
+   tenía asignadas.
+
+**Pendiente técnico:** un borrado `partial` (sección 2.7) no se reintenta solo.
+`audit_log/{uid}` guarda `status: partial` y la lista de errores, pero nada lo
+lee. Como la cascada es idempotente y ya no depende de `users/{uid}`, un barrido
+programado sobre los `partial` podría completarlos; hasta entonces, el texto
+publicado dice la verdad: se completa a pedido.
 
 **Pendiente de producto, independiente del abogado:** la pantalla de
 confirmación de borrado no le dice al usuario qué sobrevive. La sección 3 sí lo
