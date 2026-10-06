@@ -340,7 +340,12 @@ class _ProfileEditTrainerScreenState
           ? null
           : int.parse(_experienceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
-      'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
+      // Un lugar `stale` ya no se publica: no entra a la búsqueda.
+      'trainerGeohashes': _locations
+          .where((l) => l.stale != true)
+          .map((l) => l.geohash)
+          .toSet()
+          .toList(),
       'trainerOffersOnline': _offersOnline,
       // Sólo si el PF lo tocó ACÁ. El switch se edita también desde el Coach
       // Hub, que persiste al instante: si el form quedó abierto, mandarlo

@@ -119,8 +119,12 @@ class HubOnboardingController extends AsyncNotifier<void> {
                 'trainerMonthlyRate': d.monthlyRate,
                 'trainerOffersOnline': d.offersOnline,
                 'trainerLocations': d.locations.map((l) => l.toJson()).toList(),
-                'trainerGeohashes':
-                    d.locations.map((l) => l.geohash).toSet().toList(),
+                // Un lugar `stale` ya no se publica: no entra a la búsqueda.
+                'trainerGeohashes': d.locations
+                    .where((l) => l.stale != true)
+                    .map((l) => l.geohash)
+                    .toSet()
+                    .toList(),
               },
               grantLocationConsent: otorgaConsentimientoUbicacion,
             );

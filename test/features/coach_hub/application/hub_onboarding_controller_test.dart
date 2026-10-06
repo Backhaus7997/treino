@@ -398,6 +398,40 @@ void main() {
       expect((await users())['trainerLocationsCoordsFetchedAt'], isNull);
     });
 
+    test(
+        'un lugar stale no entra a trainerGeohashes ni al mínimo de '
+        'trainerLocationsCoordsFetchedAt (el job ya no lo refresca)', () async {
+      await sembrar(extra: {'displayName': 'Ana Pérez'});
+      final c = await contenedor();
+      final vigente = DateTime.utc(2026, 10, 1);
+      TrainerLocation de(String id, double lat, DateTime t, {bool? stale}) =>
+          TrainerLocation(
+            id: id,
+            type: TrainerLocationType.custom,
+            customLabel: id,
+            lat: lat,
+            lng: -58.4,
+            geohash: geohash5(lat, -58.4),
+            placeId: 'P$id',
+            coordsFetchedAt: t,
+            stale: stale,
+          );
+
+      await ctl(c).guardarPerfilPf(
+        draft(online: false, locs: [
+          de('a', -34.1, vigente),
+          de('b', -34.2, DateTime.utc(2026, 8, 1), stale: true),
+        ]),
+        otorgaConsentimientoUbicacion: true,
+      );
+
+      final d = await users();
+      expect(d['trainerGeohashes'], [geohash5(-34.1, -58.4)]);
+      expect(
+          (d['trainerLocationsCoordsFetchedAt'] as Timestamp).toDate().toUtc(),
+          vigente);
+    });
+
     test('SCENARIO-042: consentimiento previo no se pisa', () async {
       await sembrar(extra: {
         'displayName': 'Ana Pérez',

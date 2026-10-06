@@ -707,6 +707,48 @@ void main() {
       });
 
       testWidgets(
+          'un lugar marcado stale por el servidor pide volver a elegirlo; uno vigente no',
+          (tester) async {
+        await sembrar(extra: {
+          'trainerLocations': [
+            {
+              'id': 'viejo',
+              'type': 'custom',
+              'customLabel': 'Mi estudio',
+              'lat': -34.6,
+              'lng': -58.4,
+              'geohash': '69y7p',
+              'placeId': 'p1',
+              'stale': true,
+            },
+            {
+              'id': 'vigente',
+              'type': 'custom',
+              'customLabel': 'Otro lugar',
+              'lat': -34.7,
+              'lng': -58.5,
+              'geohash': '69y7q',
+              'placeId': 'p2',
+            },
+          ],
+        });
+        await pump(tester, theme: entry.value());
+
+        final hint = l10nDe(tester).coachHubOnboardingPfLocationStaleHint;
+        expect(hint, isNotEmpty);
+        expect(find.text(hint), findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(
+                  find.byKey(const Key('onboarding-pf-lugar-stale-0')))
+              .data,
+          hint,
+        );
+        expect(
+            find.byKey(const Key('onboarding-pf-lugar-stale-1')), findsNothing);
+      });
+
+      testWidgets(
           'volver a tocar el MISMO resultado conserva la etiqueta tipeada; '
           'elegir OTRO la limpia', (tester) async {
         await sembrar();

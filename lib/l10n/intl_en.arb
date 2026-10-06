@@ -2246,5 +2246,6 @@
   "gymNameDialogTitle": "Name your gym",
   "gymNameDialogBody": "Type the name you want other people to see.",
   "gymNameDialogHint": "Gym name",
-  "gymNameDialogConfirm": "SAVE"
+  "gymNameDialogConfirm": "SAVE",
+  "coachHubOnboardingPfLocationStaleHint": "This place is no longer available. Pick this place again so people can find you."
 }

@@ -341,13 +341,14 @@ class UserRepository {
     }
   }
 
-  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId`; `null` si no hay.
+  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId` vigentes (no
+  /// `stale`: el job ya no los refresca); `null` si no hay.
   /// Acepta los maps de `TrainerLocation.toJson()` (Timestamp) y DateTime.
   static Timestamp? _masViejoCoordsFetchedAt(Object? locations) {
     if (locations is! List) return null;
     DateTime? min;
     for (final l in locations) {
-      if (l is! Map || l['placeId'] == null) continue;
+      if (l is! Map || l['placeId'] == null || l['stale'] == true) continue;
       final raw = l['coordsFetchedAt'];
       final t = raw is Timestamp
           ? raw.toDate().toUtc()

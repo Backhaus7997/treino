@@ -5108,4 +5108,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get gymNameDialogConfirm => 'SAVE';
+
+  @override
+  String get coachHubOnboardingPfLocationStaleHint =>
+      'This place is no longer available. Pick this place again so people can find you.';
 }

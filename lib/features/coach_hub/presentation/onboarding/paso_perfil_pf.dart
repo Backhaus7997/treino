@@ -252,6 +252,7 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
             lugar: _locations[i],
             tooltip: l10n.coachHubOnboardingPfLocationRemove,
             etiquetaGym: l10n.coachHubOnboardingPfLocationGymFallback,
+            avisoStale: l10n.coachHubOnboardingPfLocationStaleHint,
             onQuitar: () => setState(() => _locations.removeAt(i)),
           ),
         if (_locations.isNotEmpty) const SizedBox(height: AppSpacing.s8),
@@ -333,6 +334,7 @@ class _FilaLugar extends StatelessWidget {
     required this.lugar,
     required this.tooltip,
     required this.etiquetaGym,
+    required this.avisoStale,
     required this.onQuitar,
   });
 
@@ -343,6 +345,10 @@ class _FilaLugar extends StatelessWidget {
   /// Rótulo de un lugar legacy `type == gym`: no lleva `customLabel` (apunta a
   /// `gyms/{gymId}`) y no se resuelve el nombre del gym para no sumar lecturas.
   final String etiquetaGym;
+
+  /// Texto cuando el servidor marcó el lugar `stale` (no pudo refrescar sus
+  /// coordenadas y ya no se publica): hay que volver a elegirlo.
+  final String avisoStale;
   final VoidCallback onQuitar;
 
   @override
@@ -365,13 +371,27 @@ class _FilaLugar extends StatelessWidget {
             Icon(TreinoIcon.mapPin, color: palette.textMuted),
             const SizedBox(width: AppSpacing.s12),
             Expanded(
-              child: Text(
-                lugar.customLabel ?? etiquetaGym,
-                style: GoogleFonts.barlow(
-                  color: palette.textPrimary,
-                  fontSize: AppTextSize.body,
-                  fontWeight: FontWeight.w600,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    lugar.customLabel ?? etiquetaGym,
+                    style: GoogleFonts.barlow(
+                      color: palette.textPrimary,
+                      fontSize: AppTextSize.body,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (lugar.stale == true)
+                    Text(
+                      avisoStale,
+                      key: Key('onboarding-pf-lugar-stale-$indice'),
+                      style: GoogleFonts.barlow(
+                        color: palette.textMuted,
+                        fontSize: AppTextSize.caption,
+                      ),
+                    ),
+                ],
               ),
             ),
             TreinoIconButton(
