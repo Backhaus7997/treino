@@ -76,6 +76,11 @@ const como = (uid, id) =>
   testEnv.authenticatedContext(uid).firestore().collection('routines').doc(id);
 
 test('el PF crea la plantilla con los campos que arrastra del plan', async () => {
+  // El CREATE también tiene gate de rol ahora (A3), no sólo el path 5 de
+  // publicar: la rama del PF validaba `source`/`visibility`/`assignedTo` y nada
+  // más, así que cualquier cuenta podía escribir un doc diciendo que lo asignó
+  // un entrenador. Sin este seed, el create se deniega por el rol.
+  await sembrarPF();
   await assertSucceeds(
     como(PF, 'tpl-1').set(plantillaDesdeUnPlanCargado()),
   );

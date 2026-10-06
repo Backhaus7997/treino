@@ -98,6 +98,17 @@ const seed = (docId, data) =>
     ctx.firestore().collection('routines').doc(docId).set(data),
   );
 
+/**
+ * El CREATE del PF tiene gate de rol (A3): la rama del entrenador validaba
+ * `source`/`visibility`/`assignedTo` y nada más, así que cualquier cuenta podía
+ * escribir un doc diciendo que lo asignó un PF. Sin este doc, el create se
+ * deniega por el rol y el test pasaría a mirar otra cosa.
+ */
+const sembrarPF = (uid) =>
+  testEnv.withSecurityRulesDisabled((ctx) =>
+    ctx.firestore().collection('users').doc(uid).set({ uid, role: 'trainer' }),
+  );
+
 // ── El atleta: convive con el campo, no lo cambia ──────────────────────────
 
 test('el atleta puede CREAR una rutina que lleva goals', async () => {
@@ -144,6 +155,7 @@ test('el atleta NO puede cambiar goals', async () => {
 // ── El PF: lo declara y lo edita ───────────────────────────────────────────
 
 test('el PF puede CREAR una plantilla con goals', async () => {
+  await sembrarPF('trainer-a');
   const trainer = testEnv.authenticatedContext('trainer-a');
   await assertSucceeds(
     trainer
