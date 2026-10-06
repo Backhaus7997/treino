@@ -38,7 +38,7 @@ UserProfile _trainer({
       trainerSpecialty: specialty,
       trainerMonthlyRate: rate,
       trainerLocations: locations,
-      trainerGeohashes: locations.map((l) => l.geohash).toList(),
+      trainerGeohashes: locations.map((l) => l.geohash).whereType<String>().toList(),
       trainerOffersOnline: offersOnline,
     );
 

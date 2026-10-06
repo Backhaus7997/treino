@@ -13,9 +13,9 @@ _$TrainerLocationImpl _$$TrainerLocationImplFromJson(
       type: $enumDecode(_$TrainerLocationTypeEnumMap, json['type']),
       gymId: json['gymId'] as String?,
       customLabel: json['customLabel'] as String?,
-      lat: (json['lat'] as num).toDouble(),
-      lng: (json['lng'] as num).toDouble(),
-      geohash: json['geohash'] as String,
+      lat: (json['lat'] as num?)?.toDouble(),
+      lng: (json['lng'] as num?)?.toDouble(),
+      geohash: json['geohash'] as String?,
       placeId: json['placeId'] as String?,
       coordsFetchedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['coordsFetchedAt'], const TimestampConverter().fromJson),

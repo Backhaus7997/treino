@@ -91,4 +91,95 @@ void main() {
     expect(pub, isNotNull);
     expect(pub!.containsKey('trainerLocationsCoordsFetchedAt'), isFalse);
   });
+
+  group('lugares stale (purga de 30 días de Places)', () {
+    TrainerLocation vencido(String id, {String? placeId, DateTime? t}) =>
+        TrainerLocation(
+          id: id,
+          type: TrainerLocationType.custom,
+          customLabel: id,
+          placeId: placeId,
+          coordsFetchedAt: t,
+          stale: true,
+        );
+
+    test(
+        'un stale que conserva su fecha (fallo transitorio) cuenta para el '
+        'mínimo: el job lo sigue reintentando', () async {
+      final viejo = DateTime.utc(2026, 8, 1);
+      await repo.update('u1', {
+        'trainerOffersOnline': true,
+        'trainerLocations': [
+          lugar('a', placeId: 'P1', t: DateTime.utc(2026, 9, 20)).toJson(),
+          vencido('b', placeId: 'P2', t: viejo).toJson(),
+        ],
+      });
+      expect(
+        ((await users())['trainerLocationsCoordsFetchedAt']! as Timestamp)
+            .toDate()
+            .toUtc(),
+        viejo,
+      );
+    });
+
+    test('un stale SIN fecha (NOT_FOUND) no cuenta: sale de la cola', () async {
+      await repo.update('u1', {
+        'trainerOffersOnline': true,
+        'trainerLocations': [vencido('b', placeId: 'P2').toJson()],
+      });
+      expect((await users())['trainerLocationsCoordsFetchedAt'], isNull);
+    });
+
+    Future<Map<String, Object?>> espejo() async =>
+        (await firestore.collection('trainerPublicProfiles').doc('u1').get())
+            .data()!;
+
+    test('el espejo público NO recibe un lugar stale ni uno sin coordenadas',
+        () async {
+      await repo.update(
+        'u1',
+        {
+          'trainerOffersOnline': true,
+          'trainerLocations': [
+            lugar('vigente', placeId: 'P1', t: DateTime.utc(2026, 9, 20))
+                .toJson(),
+            vencido('vencido', placeId: 'P2', t: DateTime.utc(2026, 8, 1))
+                .toJson(),
+            // stale por error del cliente pero con coordenadas viejas
+            lugar('con-coords-stale', placeId: 'P3')
+                .copyWith(stale: true)
+                .toJson(),
+          ],
+        },
+        grantLocationConsent: true,
+      );
+
+      final pub = await espejo();
+      final ids = (pub['trainerLocations']! as List)
+          .map((l) => (l as Map)['id'])
+          .toList();
+      expect(ids, ['vigente']);
+      // El dato del usuario (users/) sí conserva todo, para el reintento.
+      final u = await users();
+      expect((u['trainerLocations']! as List), hasLength(3));
+    });
+
+    test('otorgar consentimiento re-espeja SOLO los lugares con coordenadas',
+        () async {
+      await firestore.collection('users').doc('u1').set({
+        'trainerLocations': [
+          lugar('vigente').toJson(),
+          vencido('vencido', placeId: 'P2').toJson(),
+        ],
+        'trainerGeohashes': ['GEOHASH'],
+      });
+
+      await repo.grantTrainerLocationConsent('u1');
+
+      final ids = ((await espejo())['trainerLocations']! as List)
+          .map((l) => (l as Map)['id'])
+          .toList();
+      expect(ids, ['vigente']);
+    });
+  });
 }

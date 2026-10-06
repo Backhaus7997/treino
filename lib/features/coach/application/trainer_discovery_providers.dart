@@ -343,8 +343,13 @@ final trainerDiscoveryProvider =
 /// Sino, si `trainerLatitude/Longitude/Geohash` legacy están seteados →
 /// devuelve un `TrainerLocation` sintético de tipo `custom`.
 /// Sino → lista vacía.
+///
+/// Solo devuelve lugares con coordenadas vigentes (`isPublishable`): uno
+/// `stale` o sin lat/lng nunca entra a mapa, distancia ni etiqueta.
 List<TrainerLocation> effectiveLocationsOf(TrainerPublicProfile t) {
-  if (t.trainerLocations.isNotEmpty) return t.trainerLocations;
+  if (t.trainerLocations.isNotEmpty) {
+    return t.trainerLocations.where((l) => l.isPublishable).toList();
+  }
   if (t.trainerLatitude != null &&
       t.trainerLongitude != null &&
       t.trainerGeohash != null) {
@@ -369,7 +374,7 @@ double? nearestDistanceKm(TrainerPublicProfile t, Position pos) {
   if (locations.isEmpty) return null;
   double? best;
   for (final loc in locations) {
-    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat!, loc.lng!);
     if (best == null || km < best) best = km;
   }
   return best;
@@ -383,7 +388,7 @@ TrainerLocation? nearestLocationOf(TrainerPublicProfile t, Position pos) {
   TrainerLocation? best;
   double? bestKm;
   for (final loc in locations) {
-    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat!, loc.lng!);
     if (bestKm == null || km < bestKm) {
       bestKm = km;
       best = loc;

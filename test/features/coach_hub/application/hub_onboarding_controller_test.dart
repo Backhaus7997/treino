@@ -399,8 +399,9 @@ void main() {
     });
 
     test(
-        'un lugar stale no entra a trainerGeohashes ni al mínimo de '
-        'trainerLocationsCoordsFetchedAt (el job ya no lo refresca)', () async {
+        'un lugar stale no entra a trainerGeohashes, pero si conserva su fecha '
+        '(fallo transitorio) sigue en el mínimo de '
+        'trainerLocationsCoordsFetchedAt: el job lo reintenta', () async {
       await sembrar(extra: {'displayName': 'Ana Pérez'});
       final c = await contenedor();
       final vigente = DateTime.utc(2026, 10, 1);
@@ -429,7 +430,45 @@ void main() {
       expect(d['trainerGeohashes'], [geohash5(-34.1, -58.4)]);
       expect(
           (d['trainerLocationsCoordsFetchedAt'] as Timestamp).toDate().toUtc(),
-          vigente);
+          DateTime.utc(2026, 8, 1));
+    });
+
+    test(
+        'un lugar stale sin coordenadas no entra a trainerGeohashes ni al '
+        'espejo, y no rompe el guardado', () async {
+      await sembrar(extra: {'displayName': 'Ana Pérez'});
+      final c = await contenedor();
+      const vencido = TrainerLocation(
+        id: 'b',
+        type: TrainerLocationType.custom,
+        customLabel: 'b',
+        placeId: 'Pb',
+        stale: true,
+      );
+      final vigente = TrainerLocation(
+        id: 'a',
+        type: TrainerLocationType.custom,
+        customLabel: 'a',
+        lat: -34.1,
+        lng: -58.4,
+        geohash: geohash5(-34.1, -58.4),
+      );
+
+      await ctl(c).guardarPerfilPf(
+        draft(online: false, locs: [vigente, vencido]),
+        otorgaConsentimientoUbicacion: true,
+      );
+
+      final d = await users();
+      expect(d['trainerGeohashes'], [geohash5(-34.1, -58.4)]);
+      expect((d['trainerLocations'] as List), hasLength(2));
+      final espejo =
+          (await firestore.collection('trainerPublicProfiles').doc('u1').get())
+              .data()!;
+      expect(
+        (espejo['trainerLocations'] as List).map((l) => (l as Map)['id']),
+        ['a'],
+      );
     });
 
     test('SCENARIO-042: consentimiento previo no se pisa', () async {

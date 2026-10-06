@@ -268,7 +268,10 @@ class UserRepository {
     // the repo, not an assumption about the caller.
     if (hasLocationConsent) {
       if (partial.containsKey('trainerLocations')) {
-        result['trainerLocations'] = partial['trainerLocations'];
+        // Un lugar `stale` o sin coordenadas no se publica: el espejo lo lee
+        // cualquier autenticado y el servidor ya le borró las coordenadas.
+        result['trainerLocations'] =
+            _publishableLocations(partial['trainerLocations']);
       }
       if (partial.containsKey('trainerGeohashes')) {
         result['trainerGeohashes'] = partial['trainerGeohashes'];
@@ -341,14 +344,32 @@ class UserRepository {
     }
   }
 
-  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId` vigentes (no
-  /// `stale`: el job ya no los refresca); `null` si no hay.
+  /// Los lugares que sí se espejan a `trainerPublicProfiles`: sin `stale` y con
+  /// `lat`/`lng`. Es la misma regla que `TrainerLocation.isPublishable`, sobre
+  /// los maps de `toJson()`; así el cliente no puede republicar coordenadas de
+  /// un lugar que el servidor purgó (30 días de Places).
+  static List<Object?> _publishableLocations(Object? locations) {
+    if (locations is! List) return const [];
+    return [
+      for (final l in locations)
+        if (l is Map &&
+            l['stale'] != true &&
+            l['lat'] != null &&
+            l['lng'] != null)
+          l,
+    ];
+  }
+
+  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId` que el job aún
+  /// debe mirar; `null` si no hay. Un lugar `stale` cuenta SOLO si conserva su
+  /// fecha (purgado por un fallo transitorio: el job lo reintenta); sin fecha es
+  /// NOT_FOUND y no se reintenta. Debe coincidir con `isRetryable` del job.
   /// Acepta los maps de `TrainerLocation.toJson()` (Timestamp) y DateTime.
   static Timestamp? _masViejoCoordsFetchedAt(Object? locations) {
     if (locations is! List) return null;
     DateTime? min;
     for (final l in locations) {
-      if (l is! Map || l['placeId'] == null || l['stale'] == true) continue;
+      if (l is! Map || l['placeId'] == null) continue;
       final raw = l['coordsFetchedAt'];
       final t = raw is Timestamp
           ? raw.toDate().toUtc()
@@ -801,7 +822,7 @@ class UserRepository {
       _trainerPublicProfiles.doc(uid),
       {
         'uid': uid,
-        'trainerLocations': stored?['trainerLocations'] ?? const <Object?>[],
+        'trainerLocations': _publishableLocations(stored?['trainerLocations']),
         'trainerGeohashes': stored?['trainerGeohashes'] ?? const <Object?>[],
       },
       SetOptions(merge: true),

@@ -749,6 +749,71 @@ void main() {
       });
 
       testWidgets(
+          'un lugar stale SIN coordenadas (el servidor las borró) se dibuja y '
+          'pide volver a elegirlo, sin romper la pantalla', (tester) async {
+        await sembrar(extra: {
+          'trainerLocations': [
+            {
+              'id': 'viejo',
+              'type': 'custom',
+              'customLabel': 'Mi estudio',
+              'lat': null,
+              'lng': null,
+              'geohash': null,
+              'placeId': 'ChIJcasa',
+              'stale': true,
+            },
+          ],
+        });
+        await pump(tester, theme: entry.value());
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('Mi estudio'), findsOneWidget);
+        expect(
+          find.byKey(const Key('onboarding-pf-lugar-stale-0')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets(
+          'volver a elegir el MISMO lugar que quedó stale lo reemplaza: no es '
+          'un duplicado y el aviso desaparece', (tester) async {
+        await sembrar(extra: {
+          'trainerLocations': [
+            {
+              'id': 'viejo',
+              'type': 'custom',
+              'customLabel': 'Mi estudio',
+              'lat': null,
+              'lng': null,
+              'geohash': null,
+              'placeId': 'ChIJcasa',
+              'stale': true,
+            },
+          ],
+        });
+        await pump(tester, theme: entry.value());
+        await llenarBasicos(tester);
+
+        await buscarYElegir(tester, etiqueta: 'Estudio renovado');
+
+        expect(
+          find.text(l10nDe(tester).coachHubOnboardingPfLocationDuplicate),
+          findsNothing,
+        );
+        expect(find.text('Mi estudio'), findsNothing);
+        expect(find.text('Estudio renovado'), findsOneWidget);
+        expect(
+          find.byKey(const Key('onboarding-pf-lugar-stale-0')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('onboarding-pf-lugar-quitar-1')),
+          findsNothing,
+        );
+      });
+
+      testWidgets(
           'volver a tocar el MISMO resultado conserva la etiqueta tipeada; '
           'elegir OTRO la limpia', (tester) async {
         await sembrar();

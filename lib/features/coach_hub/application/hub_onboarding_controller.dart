@@ -121,8 +121,9 @@ class HubOnboardingController extends AsyncNotifier<void> {
                 'trainerLocations': d.locations.map((l) => l.toJson()).toList(),
                 // Un lugar `stale` ya no se publica: no entra a la búsqueda.
                 'trainerGeohashes': d.locations
-                    .where((l) => l.stale != true)
+                    .where((l) => l.isPublishable)
                     .map((l) => l.geohash)
+                    .whereType<String>()
                     .toSet()
                     .toList(),
               },

@@ -30,9 +30,13 @@ extension TrainerLocationTypeX on TrainerLocationType {
 /// es null. Cuando `type == custom`, `gymId` es null y `customLabel` lleva
 /// el nombre que le puso el PF (ej: 'Mi estudio en casa', 'Parque Sarmiento').
 ///
-/// `lat`, `lng` y `geohash` SIEMPRE están seteados — tanto para gyms (copia
-/// de la ubicación del gym al snapshotear) como para custom (lo que el PF
-/// marca en el mapa). El `geohash` se calcula client-side con `geohash5`.
+/// `lat`, `lng` y `geohash` están seteados — tanto para gyms (copia de la
+/// ubicación del gym al snapshotear) como para custom (lo que el PF marca en el
+/// mapa). El `geohash` se calcula client-side con `geohash5`. Son `null` SOLO en
+/// un lugar `stale`: Google permite cachear las coordenadas 30 días, y cuando el
+/// servidor no pudo refrescarlas se las BORRA (no se guarda ninguna coordenada
+/// de relleno que pudiera dibujarse en un mapa). Todo consumidor que necesite
+/// coordenadas filtra con [TrainerLocationPublishable.isPublishable].
 ///
 /// Políticas de Google Places: de un lugar elegido en Places se guarda SOLO
 /// `placeId` (referencia permanente) y las coordenadas con su fecha
@@ -48,9 +52,9 @@ class TrainerLocation with _$TrainerLocation {
     required TrainerLocationType type,
     String? gymId,
     String? customLabel,
-    required double lat,
-    required double lng,
-    required String geohash,
+    double? lat,
+    double? lng,
+    String? geohash,
     String? placeId,
     @TimestampConverter() DateTime? coordsFetchedAt,
     bool? stale,
@@ -58,6 +62,14 @@ class TrainerLocation with _$TrainerLocation {
 
   factory TrainerLocation.fromJson(Map<String, Object?> json) =>
       _$TrainerLocationFromJson(json);
+}
+
+extension TrainerLocationPublishable on TrainerLocation {
+  /// `true` si el lugar tiene coordenadas vigentes: no está `stale` y conserva
+  /// `lat`/`lng`. Es la compuerta para mapa, distancia, búsqueda y espejo
+  /// público; un lugar que no la pasa solo se muestra para pedir que se lo
+  /// vuelva a elegir.
+  bool get isPublishable => stale != true && lat != null && lng != null;
 }
 
 /// Lugar de PF tipo `gym` a partir de un gym del catálogo.

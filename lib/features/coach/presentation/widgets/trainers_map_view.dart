@@ -140,7 +140,7 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
                 context,
                 t,
                 palette,
-                LatLng(loc.lat, loc.lng),
+                LatLng(loc.lat!, loc.lng!),
                 loc.type,
               ),
         ];

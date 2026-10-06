@@ -335,8 +335,9 @@ class _ProfileEditTrainerScreenState
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       // Un lugar `stale` ya no se publica: no entra a la búsqueda.
       'trainerGeohashes': _locations
-          .where((l) => l.stale != true)
+          .where((l) => l.isPublishable)
           .map((l) => l.geohash)
+          .whereType<String>()
           .toSet()
           .toList(),
       'trainerOffersOnline': _offersOnline,
@@ -943,8 +944,11 @@ class _CustomLocationsSection extends StatelessWidget {
                         palette: palette,
                         icon: TreinoIcon.mapPin,
                         title: loc.customLabel ?? 'Lugar propio',
-                        subtitle:
-                            '${loc.lat.toStringAsFixed(4)}, ${loc.lng.toStringAsFixed(4)}',
+                        // Un lugar vencido no tiene coordenadas (el servidor las
+                        // borró a los 30 días): se pide volver a elegirlo.
+                        subtitle: loc.isPublishable
+                            ? '${loc.lat!.toStringAsFixed(4)}, ${loc.lng!.toStringAsFixed(4)}'
+                            : 'Lugar vencido: volvé a elegirlo',
                         onRemove: () => onRemove(loc),
                       ),
                     ))

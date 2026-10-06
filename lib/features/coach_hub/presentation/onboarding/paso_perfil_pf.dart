@@ -81,10 +81,14 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
   /// las coordenadas (`coordsFetchedAt`, para refrescarlas antes de los 30
   /// días); la etiqueta es lo que escribió el PF, nunca texto de Google.
   void _agregarLugar(LugarCandidato lugar, String etiqueta) {
+    // Un lugar `stale` (el servidor le borró las coordenadas) NO cuenta como
+    // repetido: volver a elegirlo es justo lo que se le pide al PF, y reemplaza
+    // al vencido en vez de duplicarlo.
     final repetido = _locations.any(
       (l) =>
-          l.placeId == lugar.placeId ||
-          (l.lat == lugar.lat && l.lng == lugar.lng),
+          l.stale != true &&
+          (l.placeId == lugar.placeId ||
+              (l.lat == lugar.lat && l.lng == lugar.lng)),
     );
     if (repetido) {
       ScaffoldMessenger.of(context)
@@ -99,6 +103,9 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
     }
     final ahora = AppClock.now();
     setState(() {
+      _locations.removeWhere(
+        (l) => l.stale == true && l.placeId == lugar.placeId,
+      );
       _locations.add(
         TrainerLocation(
           id: 'custom-${ahora.millisecondsSinceEpoch}',
