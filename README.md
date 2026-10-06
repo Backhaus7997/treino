@@ -78,8 +78,11 @@ docs/ · openspec/            # documentación y specs (SDD)
 ```bash
 git clone https://github.com/Backhaus7997/treino.git
 cd treino
-./scripts/bootstrap.sh       # Flutter, herramientas y dependencias
+./scripts/bootstrap.sh       # Flutter, herramientas y dependencias de Dart
+npm --prefix functions ci    # dependencias de Functions (Node 22): sin esto el emulador no arranca
 ```
+
+Cada worktree nuevo necesita su propio `npm --prefix functions ci`: `node_modules` no se comparte.
 
 Instalación manual y detalles en [CONTRIBUTING.md](./CONTRIBUTING.md).
 
