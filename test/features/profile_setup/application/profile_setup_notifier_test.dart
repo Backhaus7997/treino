@@ -10,6 +10,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart'
     show authStateChangesProvider, firebaseAuthProvider;
 import 'package:treino/features/auth/presentation/legal/legal_content.dart';
+import 'package:treino/features/gyms/application/places_providers.dart'
+    show resolveGymPlaceServiceProvider;
+import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userProfileProvider, userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -21,6 +24,9 @@ import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
 class _MockUser extends Mock implements User {}
+
+class _MockResolveGymPlaceService extends Mock
+    implements ResolveGymPlaceService {}
 
 class _FakeAvatarUploadService implements AvatarUploadService {
   _FakeAvatarUploadService({this.error});
@@ -89,8 +95,10 @@ void main() {
   ProviderContainer makeContainer({
     AvatarUploadService? avatarService,
     Stream<UserProfile?> Function()? perfilObservado,
+    List<Override> extraOverrides = const [],
   }) {
     return ProviderContainer(overrides: [
+      ...extraOverrides,
       firestoreProvider.overrideWithValue(firestore),
       userRepositoryProvider.overrideWithValue(
         UserRepository(firestore: firestore),
@@ -722,6 +730,147 @@ void main() {
       final estado = container.read(profileSetupNotifierProvider);
       expect(estado.termsAccepted, isTrue);
       expect(estado.draft.bornAt, equals(_adultBornAt));
+    });
+  });
+
+  // Places (#1338): el nombre del gym lo escribe quien lo vincula, pero el
+  // alta recién se confirma en submit(). Crear/nombrar el doc compartido al
+  // tocar el gym dejaba el nombre de alguien que después elegía otro gym.
+  group('gym nuevo nombrado en el alta: se crea en el submit', () {
+    late _MockResolveGymPlaceService resolver;
+    late List<String> log;
+
+    setUpAll(() {
+      registerFallbackValue(() async {});
+    });
+
+    setUp(() {
+      resolver = _MockResolveGymPlaceService();
+      log = [];
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenAnswer((inv) async {
+        final placeId = inv.namedArguments[#placeId] as String;
+        final name = inv.namedArguments[#name] as String?;
+        log.add('resolve:$placeId:$name');
+        // Simula la creación del doc compartido, para que el dual-write de
+        // gymName del update (que lo lee) lo encuentre.
+        await firestore.collection('gyms').doc(placeId).set({
+          'id': placeId,
+          'name': name,
+          'lat': -31.4,
+          'lng': -64.2,
+          'geohash': '6e7sx',
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+          'source': 'google-places',
+        });
+        return ResolveGymPlaceResult(
+          gymId: placeId,
+          name: name ?? '',
+          source: 'google-places',
+        );
+      });
+    });
+
+    Future<ProviderContainer> arrancar() async {
+      await seedUserDoc('u1');
+      final container = makeContainer(
+        extraOverrides: [
+          resolveGymPlaceServiceProvider.overrideWithValue(resolver)
+        ],
+      );
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+      container.read(profileSetupNotifierProvider.notifier)
+        ..updateUsername('Carlos')
+        ..updateBornAt(_adultBornAt);
+      return container;
+    }
+
+    test(
+        'submit crea el gym con el nombre pendiente ANTES de vincular al usuario',
+        () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      // Tocar el gym y nombrarlo no escribe nada.
+      verifyNever(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          ));
+
+      await notifier.submit();
+
+      expect(log, ['resolve:ChIJ_A:Mi gimnasio']);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_A');
+      // El dual-write leyó el gym recién creado: el resolve fue antes del update.
+      final pub =
+          await firestore.collection('userPublicProfiles').doc('u1').get();
+      expect(pub.data()!['gymName'], 'Mi gimnasio');
+    });
+
+    test('nombrar A y elegir B: submit no toca A', () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Nombre para A');
+      notifier.updateGymId('ChIJ_B');
+
+      await notifier.submit();
+
+      expect(log, isEmpty);
+      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
+      expect(a.exists, isFalse);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_B');
+    });
+
+    test('abandonar el alta no escribe ningún gym', () async {
+      final container = await arrancar();
+      container
+          .read(profileSetupNotifierProvider.notifier)
+          .updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      container.dispose();
+
+      expect(log, isEmpty);
+      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
+      expect(a.exists, isFalse);
+    });
+
+    test('sin nombre pendiente (gym ya nombrado) submit no llama al resolver',
+        () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A');
+
+      await notifier.submit();
+
+      expect(log, isEmpty);
+    });
+
+    test('si crear el gym falla, el usuario no queda vinculado', () async {
+      final container = await arrancar();
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenThrow(const ResolveGymPlaceFailure$Unknown());
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      await expectLater(
+          notifier.submit(), throwsA(isA<ResolveGymPlaceFailure>()));
+
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], isNull);
     });
   });
 }

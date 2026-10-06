@@ -41,16 +41,13 @@ import 'package:treino/l10n/app_l10n.dart';
 /// window.
 const _testDebounce = Duration(milliseconds: 1);
 
-/// Fake notifier: mirrors [ProfileSetupNotifier.updateGymId] without touching
-/// Firebase Auth / Firestore — this widget only exercises step-2 selection.
+/// Notifier sin Firebase: el paso sólo ejercita la selección del gym, así que
+/// se usa `updateGymId` real (incluida la limpieza del nombre pendiente) sobre
+/// un estado inicial sin auth ni Firestore.
 class _FakeProfileSetupNotifier extends ProfileSetupNotifier {
   @override
   ProfileSetupState build() =>
       const ProfileSetupState(draft: ProfileSetupDraft(), currentStep: 1);
-
-  @override
-  void updateGymId(String? value) =>
-      state = state.copyWith(draft: state.draft.copyWith(gymId: value));
 }
 
 class MockPlacesTextSearchService extends Mock
@@ -264,18 +261,9 @@ void main() {
       }
 
       testWidgets(
-          'el nombre tipeado se manda al resolver y el gym queda en el draft',
-          (tester) async {
+          'el nombre tipeado queda en el draft y NO se escribe todavía: el '
+          'gym compartido se crea en el submit', (tester) async {
         stubSuggestion();
-        when(() => mockResolveService.call(
-              placeId: 'ChIJ_1',
-              sessionToken: null,
-              name: 'Mi gimnasio',
-            )).thenAnswer((_) async => const ResolveGymPlaceResult(
-              gymId: 'ChIJ_1',
-              name: 'Mi gimnasio',
-              source: 'google-places',
-            ));
 
         await pickSuggestion(tester);
 
@@ -286,18 +274,104 @@ void main() {
         await tester.tap(find.byKey(const Key('gym-name-confirm')));
         await tester.pumpAndSettle();
 
-        verify(() => mockResolveService.call(
-              placeId: 'ChIJ_1',
-              sessionToken: null,
-              name: 'Mi gimnasio',
-            )).called(1);
+        // Ninguna llamada con nombre: crear el doc acá dejaba el nombre de
+        // alguien que después elegía otro gym o abandonaba el alta.
+        verifyNever(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name', that: isNotNull),
+              beforeNaming: any(named: 'beforeNaming'),
+            ));
         final container = ProviderScope.containerOf(
           tester.element(find.byType(Step3Gym)),
         );
-        expect(
-          container.read(profileSetupNotifierProvider).draft.gymId,
-          'ChIJ_1',
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, 'ChIJ_1');
+        expect(state.pendingGymName, 'Mi gimnasio');
+      });
+
+      testWidgets(
+          'nombrar el gym A y elegir después el B: el nombre de A se descarta '
+          'y A no se toca', (tester) async {
+        when(() => mockPlacesService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            )).thenAnswer((_) async => const [
+              GymSuggestion(placeId: 'ChIJ_A', primaryText: 'Gym A'),
+              GymSuggestion(placeId: 'ChIJ_B', primaryText: 'Gym B'),
+            ]);
+        when(() => mockResolveService.call(
+              placeId: 'ChIJ_A',
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_A',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+            ));
+        when(() => mockResolveService.call(
+              placeId: 'ChIJ_B',
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_B',
+              name: 'Gym B',
+              source: 'google-places',
+            ));
+
+        await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'gym');
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Gym A'));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+            find.byKey(const Key('gym-name-field')), 'Nombre para A');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Gym B'));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
         );
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, 'ChIJ_B');
+        expect(state.pendingGymName, isNull);
+        verifyNever(() => mockResolveService.call(
+              placeId: 'ChIJ_A',
+              sessionToken: any(named: 'sessionToken'),
+              name: any(named: 'name', that: isNotNull),
+              beforeNaming: any(named: 'beforeNaming'),
+            ));
+      });
+
+      testWidgets('elegir «sin gym» después de nombrar descarta el nombre',
+          (tester) async {
+        stubSuggestion();
+
+        await pickSuggestion(tester);
+        await tester.enterText(
+            find.byKey(const Key('gym-name-field')), 'Mi gimnasio');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('OTRO GYM / SIN GYM'));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        final state = container.read(profileSetupNotifierProvider);
+        expect(state.draft.gymId, kNoGymId);
+        expect(state.pendingGymName, isNull);
       });
 
       testWidgets(

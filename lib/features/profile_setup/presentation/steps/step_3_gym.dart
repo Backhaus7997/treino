@@ -20,12 +20,15 @@ import '../widgets/gym_search_box.dart';
 /// `gymBrandsProvider`, `branchesForBrandProvider`) per spec gym-catalog
 /// "Athlete gym selection is a single debounced search".
 ///
-/// Tocar un gimnasio lo RESUELVE en el acto (`ResolveGymPlaceService`: lee o
-/// crea `gyms/{placeId}`) y lo deja en el draft. El `gymId` del usuario lo
-/// persiste `ProfileSetupNotifier.submit()`, que lo manda en su parcial y
-/// hace el dual-write de `gymName` leyendo justamente ese `gyms/{placeId}`.
-/// Por eso el resolve no se difiere al submit: sin el doc del gimnasio,
-/// `gymName` queda vacío.
+/// Tocar un gimnasio lo RESUELVE en el acto (`ResolveGymPlaceService`: LEE
+/// `gyms/{placeId}`) y lo deja en el draft. El `gymId` del usuario lo persiste
+/// `ProfileSetupNotifier.submit()`, que lo manda en su parcial y hace el
+/// dual-write de `gymName` leyendo ese `gyms/{placeId}`.
+///
+/// Un gym NUEVO se nombra acá, pero el nombre queda en el draft
+/// (`pendingGymName`) y el doc compartido se CREA en el submit, antes del
+/// update de `users/{uid}`: crearlo al elegir dejaba el nombre de alguien que
+/// después elegía otro gimnasio o abandonaba el alta (#1338).
 ///
 /// Este paso NO escribe `users/{uid}`, y no es un detalle. Hasta sep-2026
 /// escribía `{'gymId': ...}` ahí (vía `selectGymActionProvider`), apoyado en
@@ -81,7 +84,12 @@ class Step3Gym extends ConsumerWidget {
         if (!context.mounted) return;
         final typed = await showGymNameDialog(context);
         if (typed == null) return;
-        result = await resolver.call(placeId: gymId, name: typed);
+        // El nombre se valida acá (feedback inmediato) pero se ESCRIBE en el
+        // submit: el gym compartido no puede quedar con el nombre de alguien
+        // que después elige otro o abandona el alta (#1338).
+        ModerationGuard.ensure(typed, campo: 'gym.name');
+        notifier.updateGymId(gymId, pendingName: typed.trim());
+        return;
       }
       notifier.updateGymId(result.gymId);
     } on ModerationBlockedException {
