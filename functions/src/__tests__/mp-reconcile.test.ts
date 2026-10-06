@@ -116,6 +116,7 @@ function fakeApp(
       escrituras.push({ col, id, data, merge: o?.merge === true });
     },
     create: async (data: Record<string, unknown>) => {
+      opts.alEscribir?.(col, id, data);
       if (store[col]?.[id] !== undefined) {
         throw Object.assign(new Error("already exists"), { code: 6 });
       }
@@ -5731,6 +5732,41 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       await reconcileSubscription(app, "nuevo", despues);
       expect(despues.bajas).toEqual(["s-nuevo"]);
       expect(store.mp_plans.viejo.terminal).toBeUndefined();
+    });
+
+    it("si la cola de mails falla, el aviso queda pendiente y el barrido lo entrega una sola vez", async () => {
+      let colaCaida = true;
+      const { app, store } = fakeApp(mundoTarde("monthly"), {
+        alEscribir: (col) => {
+          if (col === "mail_queue" && colaCaida) {
+            throw Object.assign(new Error("unavailable"), { code: 14 });
+          }
+        },
+      });
+      const mp = fakeMpMultiPlan({ viejo: viejoRenovado(1), nuevo: NUEVO_TARDE });
+
+      const r = await reconcileSubscription(app, "nuevo", mp);
+
+      // La baja del nuevo vale igual: MP la confirmo.
+      expect(mp.bajas).toEqual(["s-nuevo"]);
+      expect(r.bajaFallida).toBeUndefined();
+      expect(mails(store, "plan-change-cancelled")).toHaveLength(0);
+      expect(store.mp_plans.nuevo.avisoCambioCanceladoPendiente).toEqual({
+        uid: "u1", cobroDuplicado: "0",
+      });
+
+      // El plan nuevo puede quedar `terminal`: el barrido lo reintenta igual.
+      store.mp_plans.nuevo.terminal = true;
+      colaCaida = false;
+      await reconcileAllSubscriptions(app, mp);
+      expect(mails(store, "plan-change-cancelled")).toEqual([
+        expect.objectContaining({ toUid: "u1", params: { cobroDuplicado: "0" } }),
+      ]);
+      expect(store.mp_plans.nuevo.avisoCambioCanceladoPendiente).toBeNull();
+
+      // Ya entregado: otro barrido no lo vuelve a encolar.
+      await reconcileAllSubscriptions(app, mp);
+      expect(mails(store, "plan-change-cancelled")).toHaveLength(1);
     });
 
     it("si la suscripcion nueva viene sin id, no encola el aviso", async () => {

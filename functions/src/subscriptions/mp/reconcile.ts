@@ -325,7 +325,8 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
-import { enqueueMail } from "../../mail/enqueue-mail";
+import { dedupeKey, enqueueMail } from "../../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION } from "../../mail/types";
 import {
   SUBSCRIPTION_STATUSES,
   SubscriptionStatus,
@@ -1444,23 +1445,116 @@ async function darDeBajaElNuevoDelAlumno(
         "da de baja el NUEVO, el viejo sigue; el alumno tiene que volver a hacer el cambio",
     { ...contexto, preapprovalId },
   );
-  try {
-    await enqueueMail(app, {
-      toUid: uid,
-      kind: "plan-change-cancelled",
-      scope: nuevo.planId,
-      params: { cobroDuplicado: yaCobraronLosDos ? "1" : "0" },
-    });
-  } catch (error: unknown) {
-    // `enqueueMail` es total, pero esta frontera no puede convertir una falla de
-    // aviso en una baja fallida: MP ya confirmo la cancelacion del plan nuevo.
-    logger.warn("mp/reconcile: no se pudo encolar el aviso del cambio de plan cancelado", {
-      uid,
-      planNuevo: nuevo.planId,
-      error,
-    });
-  }
+  await avisarCambioDePlanCancelado(app, nuevo.planId, {
+    uid,
+    cobroDuplicado: yaCobraronLosDos ? "1" : "0",
+  });
   return { cancelados: 1, fallo: false };
+}
+
+/**
+ * El aviso de [darDeBajaElNuevoDelAlumno] que todavia no se confirmo en la cola de
+ * mails, guardado en el plan NUEVO. Lo reintenta el barrido (ver
+ * [reintentarAvisoPendiente]).
+ */
+const CAMPO_AVISO_CAMBIO_CANCELADO = "avisoCambioCanceladoPendiente";
+
+interface AvisoCambioCancelado {
+  uid: string;
+  cobroDuplicado: "0" | "1";
+}
+
+function avisoPendienteDe(datos: Record<string, unknown> | undefined): AvisoCambioCancelado | null {
+  const v = datos?.[CAMPO_AVISO_CAMBIO_CANCELADO] as Partial<AvisoCambioCancelado> | null | undefined;
+  if (v === null || typeof v !== "object") return null;
+  if (typeof v.uid !== "string" || v.uid === "") return null;
+  if (v.cobroDuplicado !== "0" && v.cobroDuplicado !== "1") return null;
+  return { uid: v.uid, cobroDuplicado: v.cobroDuplicado };
+}
+
+/**
+ * Le avisa al alumno que su cambio de plan se cancelo, con entrega AL MENOS UNA vez.
+ * Total: nunca tira.
+ *
+ * ── Por que no alcanza con llamar a `enqueueMail` ──
+ *
+ * `enqueueMail` es total: si la escritura en la cola falla, logea y devuelve `null`,
+ * lo mismo que cuando el mail ya estaba encolado. Y despues de la baja no hay segunda
+ * oportunidad: la proxima reconciliacion del plan nuevo lo ve `cancelled` y no vuelve
+ * a pasar por [darDeBajaElNuevoDelAlumno]. Un aviso perdido ahi se pierde para
+ * siempre, tambien el del alumno al que se le cobro dos veces.
+ *
+ * Por eso: (1) PRIMERO se deja la intencion en el plan nuevo; (2) se encola; (3) se
+ * confirma leyendo el documento de la cola —su id es determinístico ([dedupeKey])—
+ * y recien ahi se borra la intencion. Si algo falla en el medio, la intencion queda
+ * y el barrido la reintenta, aunque el plan ya sea `terminal`. El dedupe de la cola
+ * garantiza que el alumno no reciba dos mails. Si falla el paso (1), no queda nada
+ * que reintentar: se logea ERROR para que alguien le avise a mano.
+ */
+async function avisarCambioDePlanCancelado(
+  app: App,
+  planNuevo: string,
+  aviso: AvisoCambioCancelado,
+): Promise<void> {
+  const planRef = getFirestore(app).collection(MP_PLANS_COLLECTION).doc(planNuevo);
+  try {
+    await planRef.set({ [CAMPO_AVISO_CAMBIO_CANCELADO]: aviso }, { merge: true });
+  } catch (error: unknown) {
+    logger.error(
+      "mp/reconcile: no se pudo guardar el aviso del cambio de plan cancelado — el " +
+        "alumno NO se va a enterar, hay que avisarle a mano",
+      { planNuevo, uid: aviso.uid, error },
+    );
+  }
+  await entregarAvisoPendiente(app, planNuevo, aviso);
+}
+
+/** Encola el aviso y, si la cola lo confirma, borra la intencion. Total. */
+async function entregarAvisoPendiente(
+  app: App,
+  planNuevo: string,
+  aviso: AvisoCambioCancelado,
+): Promise<void> {
+  try {
+    const db = getFirestore(app);
+    await enqueueMail(app, {
+      toUid: aviso.uid,
+      kind: "plan-change-cancelled",
+      scope: planNuevo,
+      params: { cobroDuplicado: aviso.cobroDuplicado },
+    });
+    const encolado = await db
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey("plan-change-cancelled", planNuevo, aviso.uid))
+      .get();
+    if (!encolado.exists) {
+      logger.warn("mp/reconcile: el aviso del cambio de plan cancelado no quedo en la " +
+        "cola — lo reintenta el barrido", { planNuevo, uid: aviso.uid });
+      return;
+    }
+    await db
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planNuevo)
+      .set({ [CAMPO_AVISO_CAMBIO_CANCELADO]: null }, { merge: true });
+  } catch (error: unknown) {
+    // MP ya confirmo la baja: una falla del aviso no puede volverse una baja fallida.
+    logger.warn("mp/reconcile: no se pudo confirmar el aviso del cambio de plan cancelado " +
+      "— lo reintenta el barrido", { planNuevo, uid: aviso.uid, error });
+  }
+}
+
+/**
+ * El barrido reintenta el aviso que quedo pendiente en [datos], si hay uno. Va ANTES
+ * del filtro de `terminal`: el plan nuevo dado de baja sin cobrar se vuelve terminal
+ * enseguida, y es justo el que tiene que avisar. Total.
+ */
+async function reintentarAvisoPendiente(
+  app: App,
+  planId: string,
+  datos: Record<string, unknown> | undefined,
+): Promise<void> {
+  const aviso = avisoPendienteDe(datos);
+  if (aviso !== null) await entregarAvisoPendiente(app, planId, aviso);
 }
 
 /**
@@ -3209,6 +3303,7 @@ export async function reconcileAllSubscriptions(
 
   for (const doc of snap.docs) {
     const datos = doc.data();
+    await reintentarAvisoPendiente(app, doc.id, datos);
     if (datos?.terminal === true) continue;
     r.total += 1;
 
