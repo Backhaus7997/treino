@@ -10,7 +10,8 @@
 //   3. Errors never crash — surfaced as ResolveGymPlaceFailure.
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show FirebaseException, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -21,6 +22,29 @@ import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
 
 class MockHttpClient extends Mock implements http.Client {}
+
+/// Simula la carrera: otro usuario nombró el gym entre nuestro `getById` y
+/// nuestro `setName`, así que la regla deniega el segundo escritor.
+class _RacingGymRepository extends GymRepository {
+  _RacingGymRepository(this._db, {this.winnerName}) : super(firestore: _db);
+
+  final FakeFirebaseFirestore _db;
+  final String? winnerName;
+
+  @override
+  Future<void> setName(String gymId, String name) async {
+    if (winnerName != null) {
+      await _db
+          .collection('gyms')
+          .doc(gymId)
+          .update({'name': winnerName, 'nameNeeded': false});
+    }
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+  }
+}
 
 void main() {
   setUpAll(() {
@@ -155,6 +179,91 @@ void main() {
           (await firestore.collection('gyms').doc('ChIJ_place_9').get())
               .data()!;
       expect(data['name'], 'Marcador');
+    });
+  });
+
+  group('ResolveGymPlaceService.call — naming a nameNeeded gym', () {
+    Future<void> seedNeedingName() =>
+        firestore.collection('gyms').doc('ChIJ_place_9').set({
+          'name': 'Marcador',
+          'nameNeeded': true,
+          'lat': -34.5,
+          'lng': -58.4,
+          'geohash': '6d6m7',
+          'source': 'google-places',
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+        });
+
+    test('existing gym without a user name reports existsUnnamed', () async {
+      await seedNeedingName();
+
+      final result = await sut.call(placeId: 'ChIJ_place_9');
+
+      expect(result.needsName, isTrue);
+      expect(result.existsUnnamed, isTrue);
+    });
+
+    test('a brand-new gym asking for a name is NOT existsUnnamed', () async {
+      final result = await sut.call(placeId: 'ChIJ_place_new');
+
+      expect(result.needsName, isTrue);
+      expect(result.existsUnnamed, isFalse);
+    });
+
+    test('beforeNaming runs BEFORE the name is written (rules need the link)',
+        () async {
+      await seedNeedingName();
+      String? nameSeenByCallback;
+
+      await sut.call(
+        placeId: 'ChIJ_place_9',
+        name: 'Mi gimnasio',
+        beforeNaming: () async {
+          nameSeenByCallback =
+              (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+                  .data()!['name'] as String;
+        },
+      );
+
+      expect(nameSeenByCallback, 'Marcador');
+      final data =
+          (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+              .data()!;
+      expect(data['name'], 'Mi gimnasio');
+    });
+
+    test(
+        'permission-denied on setName because someone named it first: '
+        'returns the winner\'s name', () async {
+      await seedNeedingName();
+      final racing =
+          _RacingGymRepository(firestore, winnerName: 'Gym del otro');
+      final svc = ResolveGymPlaceService(
+        gymRepository: racing,
+        httpClient: mockClient,
+        clientApiKey: 'test-client-key',
+      );
+
+      final result = await svc.call(placeId: 'ChIJ_place_9', name: 'Mi gym');
+
+      expect(result.needsName, isFalse);
+      expect(result.name, 'Gym del otro');
+    });
+
+    test('permission-denied on setName with the gym still unnamed rethrows',
+        () async {
+      await seedNeedingName();
+      final denying = _RacingGymRepository(firestore);
+      final svc = ResolveGymPlaceService(
+        gymRepository: denying,
+        httpClient: mockClient,
+        clientApiKey: 'test-client-key',
+      );
+
+      await expectLater(
+        () => svc.call(placeId: 'ChIJ_place_9', name: 'Mi gym'),
+        throwsA(isA<FirebaseException>()),
+      );
     });
   });
 

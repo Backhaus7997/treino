@@ -18,6 +18,7 @@ class ResolveGymPlaceResult {
     required this.name,
     required this.source,
     this.needsName = false,
+    this.existsUnnamed = false,
   });
 
   /// Google Place ID, reused as `gyms/{gymId}` doc id.
@@ -35,6 +36,11 @@ class ResolveGymPlaceResult {
   /// quien llama tiene que pedirle el nombre al usuario y volver a llamar
   /// con `name`. En ese caso NO se escribió nada.
   final bool needsName;
+
+  /// `true` cuando [needsName] y el doc `gyms/{gymId}` YA existe (migrado,
+  /// marcado `nameNeeded`). Nombrarlo exige que el usuario esté vinculado a
+  /// ese gym (regla de Firestore), cosa que todavía no pasa durante el alta.
+  final bool existsUnnamed;
 }
 
 /// Client-side failure resolving a gym place. Sealed so callers can
@@ -129,12 +135,17 @@ class ResolveGymPlaceService {
   /// session that produced [placeId] (spec: "the same token in the one
   /// Place Details request triggered by the eventual selection").
   ///
+  /// [beforeNaming] se ejecuta justo ANTES de escribir el nombre de un gym
+  /// `nameNeeded`: la regla de Firestore sólo deja nombrarlo a quien ya tiene
+  /// `users/{uid}.gymId` apuntando a ese gym, así que quien llama vincula acá.
+  ///
   /// Throws [ResolveGymPlaceFailure] on error and
   /// `ModerationBlockedException` when [name] is blocked — never crashes.
   Future<ResolveGymPlaceResult> call({
     required String placeId,
     String? name,
     String? sessionToken,
+    Future<void> Function()? beforeNaming,
   }) async {
     if (placeId.isEmpty) {
       throw const ResolveGymPlaceFailure$Config('placeId is required.');
@@ -155,9 +166,23 @@ class ResolveGymPlaceService {
             name: '',
             source: cached.source.toWire(),
             needsName: true,
+            existsUnnamed: true,
           );
         }
-        await _gymRepository.setName(cached.id, typed);
+        try {
+          await beforeNaming?.call();
+          await _gymRepository.setName(cached.id, typed);
+        } catch (_) {
+          // Carrera: otro usuario lo nombró entre nuestro getById y el
+          // update (la regla niega al segundo). Gana el nombre del primero.
+          final winner = await _gymRepository.getById(placeId);
+          if (winner == null || winner.nameNeeded) rethrow;
+          return ResolveGymPlaceResult(
+            gymId: winner.id,
+            name: winner.name,
+            source: winner.source.toWire(),
+          );
+        }
         return ResolveGymPlaceResult(
           gymId: cached.id,
           name: typed,

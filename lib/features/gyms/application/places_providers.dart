@@ -37,11 +37,11 @@ final httpClientProvider = Provider<http.Client>((ref) => http.Client());
 /// Provider for [ResolveGymPlaceService] — CLIENT-SIDE (Plan B pivot).
 ///
 /// The original design called a `resolveGymPlace` Cloud Function (Admin SDK
-/// + server-side key in Secret Manager, `functions/src/places-search.ts`).
+/// + server-side key in Secret Manager).
 /// That CF CANNOT be deployed: GCP project `treino-dev` sits under org
 /// `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks
-/// public (`allUsers`) invoker on Cloud Functions. The CF is SHELVED
-/// (kept, not exported from `functions/src/index.ts`) — resolution now
+/// public (`allUsers`) invoker on Cloud Functions. The CF was
+/// DELETED (it also persisted Google's name/address, #1338) — resolution now
 /// happens directly from the client via [ResolveGymPlaceService], reusing
 /// [gymRepositoryProvider] for the read-through cache/upsert and the same
 /// bundle-restricted [_placesClientKey] Text Search already uses.
@@ -147,11 +147,24 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final result = await ref.read(resolveGymPlaceServiceProvider).call(
-            placeId: placeId,
-            sessionToken: null,
-            name: name,
-          );
+      final service = ref.read(resolveGymPlaceServiceProvider);
+      final userRepo = ref.read(userRepositoryProvider);
+      // Al nombrar un gym `nameNeeded`, la regla de Firestore exige que el
+      // usuario YA esté vinculado a él: el servicio llama este hook justo
+      // antes de escribir el nombre. Sin nombre tipeado no hay nada que
+      // nombrar, así que no se pasa.
+      final result = name == null
+          ? await service.call(
+              placeId: placeId,
+              sessionToken: null,
+              name: null,
+            )
+          : await service.call(
+              placeId: placeId,
+              sessionToken: null,
+              name: name,
+              beforeNaming: () => userRepo.update(uid, {'gymId': placeId}),
+            );
       if (result.needsName) return result;
       await ref
           .read(userRepositoryProvider)

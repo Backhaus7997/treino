@@ -300,6 +300,35 @@ void main() {
         );
       });
 
+      testWidgets(
+          'gym existente sin nombre: no se pide nombre (en el alta aún no hay '
+          'users/{uid}.gymId y la regla no deja nombrarlo); queda en el draft',
+          (tester) async {
+        stubSuggestion();
+        when(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_1',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+              existsUnnamed: true,
+            ));
+
+        await pickSuggestion(tester);
+
+        expect(find.byKey(const Key('gym-name-field')), findsNothing);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        expect(
+          container.read(profileSetupNotifierProvider).draft.gymId,
+          'ChIJ_1',
+        );
+      });
+
       testWidgets('cancelar el diálogo no vincula el gym', (tester) async {
         stubSuggestion();
 

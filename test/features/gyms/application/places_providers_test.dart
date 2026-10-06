@@ -135,11 +135,47 @@ void main() {
       verifyNever(() => mockUserRepo.update(any(), any()));
     });
 
+    test(
+        'a typed name comes with a beforeNaming hook that links the user to '
+        'the gym FIRST (the rules only let a linked user name it)', () async {
+      final order = <String>[];
+      when(() => mockResolve.call(
+            placeId: 'ChIJ_1',
+            sessionToken: null,
+            name: 'Mi gym',
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenAnswer((inv) async {
+        final hook =
+            inv.namedArguments[#beforeNaming] as Future<void> Function()?;
+        expect(hook, isNotNull);
+        order.add('resolver-start');
+        await hook!();
+        order.add('resolver-wrote-name');
+        return const ResolveGymPlaceResult(
+          gymId: 'ChIJ_1',
+          name: 'Mi gym',
+          source: 'google-places',
+        );
+      });
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((inv) async {
+        order.add('link');
+      });
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+      await container
+          .read(selectGymActionProvider.notifier)
+          .select(uid: 'uid-1', placeId: 'ChIJ_1', name: 'Mi gym');
+
+      expect(order.take(3), ['resolver-start', 'link', 'resolver-wrote-name']);
+    });
+
     test('forwards the typed name and then links the gym', () async {
       when(() => mockResolve.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
             name: 'Mi gym',
+            beforeNaming: any(named: 'beforeNaming'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'Mi gym',

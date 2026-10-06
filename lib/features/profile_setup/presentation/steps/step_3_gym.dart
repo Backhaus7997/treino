@@ -72,8 +72,12 @@ class Step3Gym extends ConsumerWidget {
 
     try {
       var result = await resolver.call(placeId: gymId, name: null);
-      if (result.needsName) {
-        // Gym nuevo (o sin nombre de usuario): lo nombra quien lo vincula.
+      if (result.needsName && !result.existsUnnamed) {
+        // Gym nuevo: lo nombra quien lo crea. Un gym que ya existe sin
+        // nombre de usuario NO se nombra acá: la regla de Firestore sólo deja
+        // a quien ya está vinculado (`users/{uid}.gymId`), y en el alta ese
+        // doc todavía no existe. Queda en el draft y lo nombra su primer
+        // usuario vinculado desde el perfil.
         if (!context.mounted) return;
         final typed = await showGymNameDialog(context);
         if (typed == null) return;

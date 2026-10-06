@@ -254,6 +254,7 @@ void main() {
             placeId: 'ChIJ_1',
             sessionToken: null,
             name: 'Mi gimnasio',
+            beforeNaming: any(named: 'beforeNaming'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'Mi gimnasio',
