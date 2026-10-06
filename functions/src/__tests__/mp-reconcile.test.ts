@@ -5908,6 +5908,28 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       expect(despues.bajas).toEqual(["s-nuevo"]);
     });
 
+    it("una `last_charged_date` que solo trae la relectura, con los mismos cobros, NO es un cobro nuevo", async () => {
+      // La busqueda omitio el campo opcional; la lectura por id lo trae, con la fecha
+      // del cobro que ya estaba. Leerlo como cobro frenaria la baja para siempre.
+      const { app } = fakeApp(MUNDO());
+      const sinFecha: MpPreapproval = {
+        ...VIEJO_VIVO,
+        summarized: { charged_quantity: 3, charged_amount: 3500, pending_charge_quantity: 0 },
+      };
+      const mp = fakeMpMultiPlan(
+        { viejo: sinFecha, nuevo: NUEVO_EN_PRUEBA },
+        { alReLeer: { "s-viejo": VIEJO_VIVO } },
+      );
+
+      await reconcileSubscription(app, "nuevo", mp);
+
+      expect(mp.bajas).toEqual(["s-viejo"]);
+      expect(errorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("COBRO DOBLE"),
+        expect.anything(),
+      );
+    });
+
     it("⚠️ el nuevo cobra ENTRE la lectura y su baja: no se cancela, se re-decide", async () => {
       // Se lee sin cobrar (se daria de baja el nuevo, que no movio plata). Antes del
       // PUT ya cobro: el aviso diria "no se cobro nada" y el que cubre mas puede ser el
@@ -5958,6 +5980,24 @@ describe("reconcileSubscription — el alumno cambia de plan: la baja del viejo"
       expect(sano.bajas).toEqual(["s-viejo"]);
       expect(fallos(store)).toBe(0);
     });
+  });
+
+  it("un contador que ya paso el umbral (una carrera perdio un incremento) sigue avisando", async () => {
+    // Dos invocaciones solapadas pueden escribir el mismo numero: con `=== 3` un
+    // 3 salteado no avisaba nunca mas.
+    const mundo = MUNDO();
+    mundo.mp_plans.viejo.bajaBusquedaFallosSeguidos = 3;
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "nuevo", fakeMpMultiPlan({
+      viejo: new MpApiError("429", 429), nuevo: NUEVO_EN_PRUEBA,
+    }));
+
+    expect(store.mp_plans.viejo.bajaBusquedaFallosSeguidos).toBe(4);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("BLOQUEADAS"),
+      expect.objectContaining({ fallos: 4 }),
+    );
   });
 
   it("autorizado fuera de ventana SIN que el viejo se renueve: se da de baja el viejo (decision)", async () => {

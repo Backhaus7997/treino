@@ -1411,9 +1411,13 @@ async function cobroDesdeLaLectura(
     return false;
   }
   if (cobrosExitosos(fresca?.summarized) > cobrosExitosos(sub.summarized)) return true;
+  // Las fechas solo se comparan si estan las DOS: `last_charged_date` es opcional,
+  // y que aparezca en la lectura por id y no en la busqueda no es un cobro nuevo.
+  // Leerlo como cobro dejaria la baja frenada para siempre con un falso «COBRO
+  // DOBLE». Sin las dos fechas decide la cantidad de cobros, de arriba.
   const antes = ultimoCobroMs(sub);
   const ahora = ultimoCobroMs(fresca ?? {});
-  return ahora !== null && (antes === null || ahora > antes);
+  return ahora !== null && antes !== null && ahora > antes;
 }
 
 /**
@@ -1708,7 +1712,13 @@ function puedeTenerUnaSuscripcion(datos: Record<string, unknown>, nowMs: number)
  * 429 suelto es normal; lo que importa es que sea siempre el mismo plan.
  */
 const CAMPO_FALLOS_DE_BUSQUEDA = "bajaBusquedaFallosSeguidos";
-/** A cuantos fallos seguidos se avisa con un ERROR (una sola vez, al llegar). */
+/**
+ * Desde cuantos fallos seguidos se avisa con un ERROR, en cada intento mientras siga.
+ *
+ * `>=` y no `===`: el contador no es atomico —un webhook y el barrido sobre el mismo
+ * plan pueden escribir el mismo numero— y con `===` un incremento perdido podia saltear
+ * el aviso para siempre. Asi solo lo demora un intento.
+ */
 const FALLOS_DE_BUSQUEDA_PARA_ALERTAR = 3;
 
 function fallosPrevios(datos: Record<string, unknown>): number {
@@ -1736,7 +1746,7 @@ async function contarFalloDeBusqueda(
     });
     return;
   }
-  if (fallos === FALLOS_DE_BUSQUEDA_PARA_ALERTAR) {
+  if (fallos >= FALLOS_DE_BUSQUEDA_PARA_ALERTAR) {
     logger.error(
       "mp/reconcile: las bajas del cambio de plan del alumno estan BLOQUEADAS — la " +
         `busqueda del plan viejo fallo ${fallos} veces seguidas; mientras siga rota ` +
