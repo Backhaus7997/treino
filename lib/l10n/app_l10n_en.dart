@@ -5110,6 +5110,24 @@ class AppL10nEn extends AppL10n {
   String get gymNameDialogConfirm => 'SAVE';
 
   @override
+  String get gymNamePromptTitle => 'Your gym needs a name';
+
+  @override
+  String get gymNamePromptBody =>
+      'Help us out: what is it called? Everyone who trains there will see it.';
+
+  @override
+  String get gymNamePromptCta => 'NAME IT';
+
+  @override
+  String get gymNamePromptDismiss => 'Not now';
+
+  @override
+  String gymNamePromptRaceMessage(String name) {
+    return 'Someone already named it: $name.';
+  }
+
+  @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'This place is no longer available. Pick this place again so people can find you.';
 }

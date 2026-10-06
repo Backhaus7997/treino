@@ -5209,6 +5209,24 @@ class AppL10nEs extends AppL10n {
   String get gymNameDialogConfirm => 'GUARDAR';
 
   @override
+  String get gymNamePromptTitle => 'Tu gimnasio necesita un nombre';
+
+  @override
+  String get gymNamePromptBody =>
+      'Ayúdanos: ¿cómo se llama? Lo verán todos los que entrenan ahí.';
+
+  @override
+  String get gymNamePromptCta => 'PONERLE NOMBRE';
+
+  @override
+  String get gymNamePromptDismiss => 'Ahora no';
+
+  @override
+  String gymNamePromptRaceMessage(String name) {
+    return 'Alguien ya lo nombró: $name.';
+  }
+
+  @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.';
 }
@@ -10413,6 +10431,24 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get gymNameDialogConfirm => 'GUARDAR';
+
+  @override
+  String get gymNamePromptTitle => 'Tu gimnasio necesita un nombre';
+
+  @override
+  String get gymNamePromptBody =>
+      'Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.';
+
+  @override
+  String get gymNamePromptCta => 'PONERLE NOMBRE';
+
+  @override
+  String get gymNamePromptDismiss => 'Ahora no';
+
+  @override
+  String gymNamePromptRaceMessage(String name) {
+    return 'Alguien ya lo nombró: $name.';
+  }
 
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
