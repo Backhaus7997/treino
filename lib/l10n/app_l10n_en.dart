@@ -5044,4 +5044,23 @@ class AppL10nEn extends AppL10n {
   @override
   String get planLimitTrainerPlanAMedidaCuerpo =>
       'You\'re on the largest plan. We\'re preparing a custom plan for you.';
+
+  @override
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count athletes will be unlinked. We\'ll let them know.',
+      one: '1 athlete will be unlinked. We\'ll let them know.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get eliminarCuentaSheetErrorSubscriptionCancel =>
+      'We couldn\'t cancel your subscription, so your account was not deleted. Please try again in a few minutes.';
+
+  @override
+  String get eliminarCuentaSheetErrorNotAllowed =>
+      'We couldn\'t delete your account from the app. Contact us and we\'ll sort it out.';
 }

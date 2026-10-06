@@ -35,6 +35,8 @@ mixin _$AuthFailure {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -56,6 +58,8 @@ mixin _$AuthFailure {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -77,6 +81,8 @@ mixin _$AuthFailure {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -100,6 +106,9 @@ mixin _$AuthFailure {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -122,6 +131,9 @@ mixin _$AuthFailure {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) =>
       throw _privateConstructorUsedError;
   @optionalTypeArgs
@@ -144,6 +156,8 @@ mixin _$AuthFailure {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) =>
       throw _privateConstructorUsedError;
@@ -228,6 +242,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return invalidEmail();
   }
@@ -252,6 +268,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return invalidEmail?.call();
   }
@@ -276,6 +294,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -305,6 +325,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return invalidEmail(this);
   }
@@ -330,6 +353,9 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return invalidEmail?.call(this);
   }
@@ -355,6 +381,8 @@ class _$InvalidEmailImpl extends _InvalidEmail {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (invalidEmail != null) {
@@ -427,6 +455,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return userDisabled();
   }
@@ -451,6 +481,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return userDisabled?.call();
   }
@@ -475,6 +507,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -504,6 +538,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return userDisabled(this);
   }
@@ -529,6 +566,9 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return userDisabled?.call(this);
   }
@@ -554,6 +594,8 @@ class _$UserDisabledImpl extends _UserDisabled {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (userDisabled != null) {
@@ -626,6 +668,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return userNotFound();
   }
@@ -650,6 +694,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return userNotFound?.call();
   }
@@ -674,6 +720,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -703,6 +751,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return userNotFound(this);
   }
@@ -728,6 +779,9 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return userNotFound?.call(this);
   }
@@ -753,6 +807,8 @@ class _$UserNotFoundImpl extends _UserNotFound {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (userNotFound != null) {
@@ -825,6 +881,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return wrongPassword();
   }
@@ -849,6 +907,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return wrongPassword?.call();
   }
@@ -873,6 +933,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -902,6 +964,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return wrongPassword(this);
   }
@@ -927,6 +992,9 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return wrongPassword?.call(this);
   }
@@ -952,6 +1020,8 @@ class _$WrongPasswordImpl extends _WrongPassword {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (wrongPassword != null) {
@@ -1024,6 +1094,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return emailAlreadyInUse();
   }
@@ -1048,6 +1120,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return emailAlreadyInUse?.call();
   }
@@ -1072,6 +1146,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -1101,6 +1177,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return emailAlreadyInUse(this);
   }
@@ -1126,6 +1205,9 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return emailAlreadyInUse?.call(this);
   }
@@ -1151,6 +1233,8 @@ class _$EmailAlreadyInUseImpl extends _EmailAlreadyInUse {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (emailAlreadyInUse != null) {
@@ -1223,6 +1307,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return weakPassword();
   }
@@ -1247,6 +1333,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return weakPassword?.call();
   }
@@ -1271,6 +1359,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1300,6 +1390,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return weakPassword(this);
   }
@@ -1325,6 +1418,9 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return weakPassword?.call(this);
   }
@@ -1350,6 +1446,8 @@ class _$WeakPasswordImpl extends _WeakPassword {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (weakPassword != null) {
@@ -1422,6 +1520,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return tooManyRequests();
   }
@@ -1446,6 +1546,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return tooManyRequests?.call();
   }
@@ -1470,6 +1572,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1499,6 +1603,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return tooManyRequests(this);
   }
@@ -1524,6 +1631,9 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return tooManyRequests?.call(this);
   }
@@ -1549,6 +1659,8 @@ class _$TooManyRequestsImpl extends _TooManyRequests {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (tooManyRequests != null) {
@@ -1621,6 +1733,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return networkError();
   }
@@ -1645,6 +1759,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return networkError?.call();
   }
@@ -1669,6 +1785,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1698,6 +1816,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return networkError(this);
   }
@@ -1723,6 +1844,9 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return networkError?.call(this);
   }
@@ -1748,6 +1872,8 @@ class _$NetworkErrorImpl extends _NetworkError {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (networkError != null) {
@@ -1820,6 +1946,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return signInCancelled();
   }
@@ -1844,6 +1972,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return signInCancelled?.call();
   }
@@ -1868,6 +1998,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (signInCancelled != null) {
@@ -1897,6 +2029,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return signInCancelled(this);
   }
@@ -1922,6 +2057,9 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return signInCancelled?.call(this);
   }
@@ -1947,6 +2085,8 @@ class _$SignInCancelledImpl extends _SignInCancelled {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (signInCancelled != null) {
@@ -2024,6 +2164,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return accountExistsWithDifferentCredential();
   }
@@ -2048,6 +2190,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return accountExistsWithDifferentCredential?.call();
   }
@@ -2072,6 +2216,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (accountExistsWithDifferentCredential != null) {
@@ -2101,6 +2247,9 @@ class _$AccountExistsWithDifferentCredentialImpl
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return accountExistsWithDifferentCredential(this);
   }
@@ -2126,6 +2275,9 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return accountExistsWithDifferentCredential?.call(this);
   }
@@ -2151,6 +2303,8 @@ class _$AccountExistsWithDifferentCredentialImpl
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (accountExistsWithDifferentCredential != null) {
@@ -2224,6 +2378,8 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return popupBlocked();
   }
@@ -2248,6 +2404,8 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return popupBlocked?.call();
   }
@@ -2272,6 +2430,8 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (popupBlocked != null) {
@@ -2301,6 +2461,9 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return popupBlocked(this);
   }
@@ -2326,6 +2489,9 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return popupBlocked?.call(this);
   }
@@ -2351,6 +2517,8 @@ class _$PopupBlockedImpl extends _PopupBlocked {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (popupBlocked != null) {
@@ -2424,6 +2592,8 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return providerUnavailable();
   }
@@ -2448,6 +2618,8 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return providerUnavailable?.call();
   }
@@ -2472,6 +2644,8 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (providerUnavailable != null) {
@@ -2501,6 +2675,9 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return providerUnavailable(this);
   }
@@ -2526,6 +2703,9 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return providerUnavailable?.call(this);
   }
@@ -2551,6 +2731,8 @@ class _$ProviderUnavailableImpl extends _ProviderUnavailable {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (providerUnavailable != null) {
@@ -2650,6 +2832,8 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return unknown(code);
   }
@@ -2674,6 +2858,8 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return unknown?.call(code);
   }
@@ -2698,6 +2884,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -2727,6 +2915,9 @@ class _$UnknownImpl extends _Unknown {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return unknown(this);
   }
@@ -2752,6 +2943,9 @@ class _$UnknownImpl extends _Unknown {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return unknown?.call(this);
   }
@@ -2777,6 +2971,8 @@ class _$UnknownImpl extends _Unknown {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (unknown != null) {
@@ -2883,6 +3079,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return profileCreateFailed(cause);
   }
@@ -2907,6 +3105,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return profileCreateFailed?.call(cause);
   }
@@ -2931,6 +3131,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (profileCreateFailed != null) {
@@ -2960,6 +3162,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return profileCreateFailed(this);
   }
@@ -2985,6 +3190,9 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return profileCreateFailed?.call(this);
   }
@@ -3010,6 +3218,8 @@ class _$ProfileCreateFailedImpl extends _ProfileCreateFailed {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (profileCreateFailed != null) {
@@ -3092,6 +3302,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return requiresRecentLogin();
   }
@@ -3116,6 +3328,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return requiresRecentLogin?.call();
   }
@@ -3140,6 +3354,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (requiresRecentLogin != null) {
@@ -3169,6 +3385,9 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return requiresRecentLogin(this);
   }
@@ -3194,6 +3413,9 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return requiresRecentLogin?.call(this);
   }
@@ -3219,6 +3441,8 @@ class _$RequiresRecentLoginImpl extends _RequiresRecentLogin {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (requiresRecentLogin != null) {
@@ -3319,6 +3543,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return reAuthFailed(provider);
   }
@@ -3343,6 +3569,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return reAuthFailed?.call(provider);
   }
@@ -3367,6 +3595,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (reAuthFailed != null) {
@@ -3396,6 +3626,9 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return reAuthFailed(this);
   }
@@ -3421,6 +3654,9 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return reAuthFailed?.call(this);
   }
@@ -3446,6 +3682,8 @@ class _$ReAuthFailedImpl extends _ReAuthFailed {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (reAuthFailed != null) {
@@ -3552,6 +3790,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     required TResult Function() requiresRecentLogin,
     required TResult Function(String? provider) reAuthFailed,
     required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
   }) {
     return deletionFailed(cause);
   }
@@ -3576,6 +3816,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult? Function()? requiresRecentLogin,
     TResult? Function(String? provider)? reAuthFailed,
     TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
   }) {
     return deletionFailed?.call(cause);
   }
@@ -3600,6 +3842,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult Function()? requiresRecentLogin,
     TResult Function(String? provider)? reAuthFailed,
     TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (deletionFailed != null) {
@@ -3629,6 +3873,9 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
     required TResult Function(_ReAuthFailed value) reAuthFailed,
     required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
   }) {
     return deletionFailed(this);
   }
@@ -3654,6 +3901,9 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult? Function(_ReAuthFailed value)? reAuthFailed,
     TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
   }) {
     return deletionFailed?.call(this);
   }
@@ -3679,6 +3929,8 @@ class _$DeletionFailedImpl extends _DeletionFailed {
     TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
     TResult Function(_ReAuthFailed value)? reAuthFailed,
     TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
     required TResult orElse(),
   }) {
     if (deletionFailed != null) {
@@ -3699,4 +3951,433 @@ abstract class _DeletionFailed extends AuthFailure {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$DeletionFailedImplCopyWith<_$DeletionFailedImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class _$$DeletionNotAllowedImplCopyWith<$Res> {
+  factory _$$DeletionNotAllowedImplCopyWith(_$DeletionNotAllowedImpl value,
+          $Res Function(_$DeletionNotAllowedImpl) then) =
+      __$$DeletionNotAllowedImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$DeletionNotAllowedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$DeletionNotAllowedImpl>
+    implements _$$DeletionNotAllowedImplCopyWith<$Res> {
+  __$$DeletionNotAllowedImplCopyWithImpl(_$DeletionNotAllowedImpl _value,
+      $Res Function(_$DeletionNotAllowedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$DeletionNotAllowedImpl extends _DeletionNotAllowed {
+  const _$DeletionNotAllowedImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.deletionNotAllowed()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType && other is _$DeletionNotAllowedImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
+  }) {
+    return deletionNotAllowed();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
+  }) {
+    return deletionNotAllowed?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
+    required TResult orElse(),
+  }) {
+    if (deletionNotAllowed != null) {
+      return deletionNotAllowed();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
+  }) {
+    return deletionNotAllowed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
+  }) {
+    return deletionNotAllowed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
+    required TResult orElse(),
+  }) {
+    if (deletionNotAllowed != null) {
+      return deletionNotAllowed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _DeletionNotAllowed extends AuthFailure {
+  const factory _DeletionNotAllowed() = _$DeletionNotAllowedImpl;
+  const _DeletionNotAllowed._() : super._();
+}
+
+/// @nodoc
+abstract class _$$SubscriptionCancelFailedImplCopyWith<$Res> {
+  factory _$$SubscriptionCancelFailedImplCopyWith(
+          _$SubscriptionCancelFailedImpl value,
+          $Res Function(_$SubscriptionCancelFailedImpl) then) =
+      __$$SubscriptionCancelFailedImplCopyWithImpl<$Res>;
+}
+
+/// @nodoc
+class __$$SubscriptionCancelFailedImplCopyWithImpl<$Res>
+    extends _$AuthFailureCopyWithImpl<$Res, _$SubscriptionCancelFailedImpl>
+    implements _$$SubscriptionCancelFailedImplCopyWith<$Res> {
+  __$$SubscriptionCancelFailedImplCopyWithImpl(
+      _$SubscriptionCancelFailedImpl _value,
+      $Res Function(_$SubscriptionCancelFailedImpl) _then)
+      : super(_value, _then);
+
+  /// Create a copy of AuthFailure
+  /// with the given fields replaced by the non-null parameter values.
+}
+
+/// @nodoc
+
+class _$SubscriptionCancelFailedImpl extends _SubscriptionCancelFailed {
+  const _$SubscriptionCancelFailedImpl() : super._();
+
+  @override
+  String toString() {
+    return 'AuthFailure.subscriptionCancelFailed()';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SubscriptionCancelFailedImpl);
+  }
+
+  @override
+  int get hashCode => runtimeType.hashCode;
+
+  @override
+  @optionalTypeArgs
+  TResult when<TResult extends Object?>({
+    required TResult Function() invalidEmail,
+    required TResult Function() userDisabled,
+    required TResult Function() userNotFound,
+    required TResult Function() wrongPassword,
+    required TResult Function() emailAlreadyInUse,
+    required TResult Function() weakPassword,
+    required TResult Function() tooManyRequests,
+    required TResult Function() networkError,
+    required TResult Function() signInCancelled,
+    required TResult Function() accountExistsWithDifferentCredential,
+    required TResult Function() popupBlocked,
+    required TResult Function() providerUnavailable,
+    required TResult Function(String code) unknown,
+    required TResult Function(Object? cause) profileCreateFailed,
+    required TResult Function() requiresRecentLogin,
+    required TResult Function(String? provider) reAuthFailed,
+    required TResult Function(Object? cause) deletionFailed,
+    required TResult Function() deletionNotAllowed,
+    required TResult Function() subscriptionCancelFailed,
+  }) {
+    return subscriptionCancelFailed();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? whenOrNull<TResult extends Object?>({
+    TResult? Function()? invalidEmail,
+    TResult? Function()? userDisabled,
+    TResult? Function()? userNotFound,
+    TResult? Function()? wrongPassword,
+    TResult? Function()? emailAlreadyInUse,
+    TResult? Function()? weakPassword,
+    TResult? Function()? tooManyRequests,
+    TResult? Function()? networkError,
+    TResult? Function()? signInCancelled,
+    TResult? Function()? accountExistsWithDifferentCredential,
+    TResult? Function()? popupBlocked,
+    TResult? Function()? providerUnavailable,
+    TResult? Function(String code)? unknown,
+    TResult? Function(Object? cause)? profileCreateFailed,
+    TResult? Function()? requiresRecentLogin,
+    TResult? Function(String? provider)? reAuthFailed,
+    TResult? Function(Object? cause)? deletionFailed,
+    TResult? Function()? deletionNotAllowed,
+    TResult? Function()? subscriptionCancelFailed,
+  }) {
+    return subscriptionCancelFailed?.call();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeWhen<TResult extends Object?>({
+    TResult Function()? invalidEmail,
+    TResult Function()? userDisabled,
+    TResult Function()? userNotFound,
+    TResult Function()? wrongPassword,
+    TResult Function()? emailAlreadyInUse,
+    TResult Function()? weakPassword,
+    TResult Function()? tooManyRequests,
+    TResult Function()? networkError,
+    TResult Function()? signInCancelled,
+    TResult Function()? accountExistsWithDifferentCredential,
+    TResult Function()? popupBlocked,
+    TResult Function()? providerUnavailable,
+    TResult Function(String code)? unknown,
+    TResult Function(Object? cause)? profileCreateFailed,
+    TResult Function()? requiresRecentLogin,
+    TResult Function(String? provider)? reAuthFailed,
+    TResult Function(Object? cause)? deletionFailed,
+    TResult Function()? deletionNotAllowed,
+    TResult Function()? subscriptionCancelFailed,
+    required TResult orElse(),
+  }) {
+    if (subscriptionCancelFailed != null) {
+      return subscriptionCancelFailed();
+    }
+    return orElse();
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult map<TResult extends Object?>({
+    required TResult Function(_InvalidEmail value) invalidEmail,
+    required TResult Function(_UserDisabled value) userDisabled,
+    required TResult Function(_UserNotFound value) userNotFound,
+    required TResult Function(_WrongPassword value) wrongPassword,
+    required TResult Function(_EmailAlreadyInUse value) emailAlreadyInUse,
+    required TResult Function(_WeakPassword value) weakPassword,
+    required TResult Function(_TooManyRequests value) tooManyRequests,
+    required TResult Function(_NetworkError value) networkError,
+    required TResult Function(_SignInCancelled value) signInCancelled,
+    required TResult Function(_AccountExistsWithDifferentCredential value)
+        accountExistsWithDifferentCredential,
+    required TResult Function(_PopupBlocked value) popupBlocked,
+    required TResult Function(_ProviderUnavailable value) providerUnavailable,
+    required TResult Function(_Unknown value) unknown,
+    required TResult Function(_ProfileCreateFailed value) profileCreateFailed,
+    required TResult Function(_RequiresRecentLogin value) requiresRecentLogin,
+    required TResult Function(_ReAuthFailed value) reAuthFailed,
+    required TResult Function(_DeletionFailed value) deletionFailed,
+    required TResult Function(_DeletionNotAllowed value) deletionNotAllowed,
+    required TResult Function(_SubscriptionCancelFailed value)
+        subscriptionCancelFailed,
+  }) {
+    return subscriptionCancelFailed(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult? mapOrNull<TResult extends Object?>({
+    TResult? Function(_InvalidEmail value)? invalidEmail,
+    TResult? Function(_UserDisabled value)? userDisabled,
+    TResult? Function(_UserNotFound value)? userNotFound,
+    TResult? Function(_WrongPassword value)? wrongPassword,
+    TResult? Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult? Function(_WeakPassword value)? weakPassword,
+    TResult? Function(_TooManyRequests value)? tooManyRequests,
+    TResult? Function(_NetworkError value)? networkError,
+    TResult? Function(_SignInCancelled value)? signInCancelled,
+    TResult? Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult? Function(_PopupBlocked value)? popupBlocked,
+    TResult? Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult? Function(_Unknown value)? unknown,
+    TResult? Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult? Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult? Function(_ReAuthFailed value)? reAuthFailed,
+    TResult? Function(_DeletionFailed value)? deletionFailed,
+    TResult? Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult? Function(_SubscriptionCancelFailed value)?
+        subscriptionCancelFailed,
+  }) {
+    return subscriptionCancelFailed?.call(this);
+  }
+
+  @override
+  @optionalTypeArgs
+  TResult maybeMap<TResult extends Object?>({
+    TResult Function(_InvalidEmail value)? invalidEmail,
+    TResult Function(_UserDisabled value)? userDisabled,
+    TResult Function(_UserNotFound value)? userNotFound,
+    TResult Function(_WrongPassword value)? wrongPassword,
+    TResult Function(_EmailAlreadyInUse value)? emailAlreadyInUse,
+    TResult Function(_WeakPassword value)? weakPassword,
+    TResult Function(_TooManyRequests value)? tooManyRequests,
+    TResult Function(_NetworkError value)? networkError,
+    TResult Function(_SignInCancelled value)? signInCancelled,
+    TResult Function(_AccountExistsWithDifferentCredential value)?
+        accountExistsWithDifferentCredential,
+    TResult Function(_PopupBlocked value)? popupBlocked,
+    TResult Function(_ProviderUnavailable value)? providerUnavailable,
+    TResult Function(_Unknown value)? unknown,
+    TResult Function(_ProfileCreateFailed value)? profileCreateFailed,
+    TResult Function(_RequiresRecentLogin value)? requiresRecentLogin,
+    TResult Function(_ReAuthFailed value)? reAuthFailed,
+    TResult Function(_DeletionFailed value)? deletionFailed,
+    TResult Function(_DeletionNotAllowed value)? deletionNotAllowed,
+    TResult Function(_SubscriptionCancelFailed value)? subscriptionCancelFailed,
+    required TResult orElse(),
+  }) {
+    if (subscriptionCancelFailed != null) {
+      return subscriptionCancelFailed(this);
+    }
+    return orElse();
+  }
+}
+
+abstract class _SubscriptionCancelFailed extends AuthFailure {
+  const factory _SubscriptionCancelFailed() = _$SubscriptionCancelFailedImpl;
+  const _SubscriptionCancelFailed._() : super._();
 }

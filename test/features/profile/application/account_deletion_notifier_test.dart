@@ -13,6 +13,7 @@
 
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -256,5 +257,177 @@ void main() {
 
     expect(container.read(accountDeletionInFlightProvider), isFalse,
         reason: 'flag must be reset after the cascade completes');
+  });
+
+  // SC-PSD-27..30: el mapeo de errores corre en deleteAccount Y en retry, y
+  // contra lo que el servicio REALMENTE tira (AccountDeletionFailure$Server),
+  // no contra una FirebaseFunctionsException que nunca llega hasta acá.
+  group('mapeo de errores del callable (SC-PSD-27..30)', () {
+    final casos = <String, (Object, Matcher)>{
+      'permission-denied (servidor viejo rechaza al PF)': (
+        const AccountDeletionFailure$Server(
+          code: 'permission-denied',
+          message: 'trainers cannot self-delete',
+        ),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.deletionNotAllowed().userMessage,
+        ),
+      ),
+      'permission-denied con recent-login': (
+        const AccountDeletionFailure$Server(
+          code: 'permission-denied',
+          message: 'requires recent-login',
+        ),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.requiresRecentLogin().userMessage,
+        ),
+      ),
+      'unavailable (no se pudo cancelar la suscripción)': (
+        const AccountDeletionFailure$Server(
+          code: 'unavailable',
+          message: 'No pudimos cancelar tu suscripción',
+        ),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.subscriptionCancelFailed().userMessage,
+        ),
+      ),
+      'unavailable como FirebaseFunctionsException cruda': (
+        FirebaseFunctionsException(code: 'unavailable', message: 'x'),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.subscriptionCancelFailed().userMessage,
+        ),
+      ),
+      'otro código': (
+        const AccountDeletionFailure$Server(
+          code: 'internal',
+          message: 'boom',
+        ),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.deletionFailed().userMessage,
+        ),
+      ),
+      'error desconocido': (
+        const AccountDeletionFailure$Unknown(),
+        isA<AuthFailure>().having(
+          (f) => f.userMessage,
+          'userMessage',
+          const AuthFailure.deletionFailed().userMessage,
+        ),
+      ),
+    };
+
+    for (final entry in casos.entries) {
+      test('deleteAccount: ${entry.key}', () async {
+        when(() => mockDeletionService.call(uid: any(named: 'uid')))
+            .thenThrow(entry.value.$1);
+        final container =
+            buildContainer(sheetResult: () async => FakeAuthCredential());
+
+        await container
+            .read(accountDeletionNotifierProvider.notifier)
+            .deleteAccount();
+
+        final state = container.read(accountDeletionNotifierProvider);
+        expect(state, isA<AsyncError<void>>());
+        expect(state.error, entry.value.$2);
+        expect(container.read(accountDeletionInFlightProvider), isFalse);
+      });
+
+      test('retry: ${entry.key}', () async {
+        // Primer intento fresco para abrir la ventana de 5 min y que el retry
+        // NO reabra el sheet de re-auth.
+        when(() => mockDeletionService.call(uid: any(named: 'uid')))
+            .thenAnswer((_) async => FakeDeletionResult(status: 'partial'));
+        final container =
+            buildContainer(sheetResult: () async => FakeAuthCredential());
+        await container
+            .read(accountDeletionNotifierProvider.notifier)
+            .deleteAccount();
+
+        when(() => mockDeletionService.call(uid: any(named: 'uid')))
+            .thenThrow(entry.value.$1);
+        await container.read(accountDeletionNotifierProvider.notifier).retry();
+
+        final state = container.read(accountDeletionNotifierProvider);
+        expect(state, isA<AsyncError<void>>());
+        expect(state.error, entry.value.$2);
+      });
+    }
+  });
+
+  // Revisión: un requiresRecentLogin con la ventana de 5 min fresca hacía que
+  // Reintentar se saltara la re-auth y repitiera el mismo error en loop.
+  group('retry tras requiresRecentLogin', () {
+    test('reabre la re-auth aunque la ventana de 5 min esté fresca', () async {
+      var sheets = 0;
+      final container = buildContainer(
+        sheetResult: () async {
+          sheets++;
+          return FakeAuthCredential();
+        },
+      );
+      when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenThrow(
+        const AccountDeletionFailure$Server(
+          code: 'permission-denied',
+          message: 'requires recent-login',
+        ),
+      );
+      final notifier = container.read(accountDeletionNotifierProvider.notifier);
+      await notifier.deleteAccount();
+      expect(sheets, 1);
+
+      await notifier.retry();
+
+      expect(sheets, 2, reason: 'retry debe pasar por la re-auth');
+    });
+  });
+
+  // Revisión: el sheet de re-auth se abre ANTES de AsyncLoading, o sea que un
+  // segundo tap en ese tramo disparaba un segundo flujo.
+  group('guarda anti doble tap', () {
+    test('un segundo deleteAccount en vuelo es no-op', () async {
+      var sheets = 0;
+      final gate = Completer<AuthCredential?>();
+      final container = buildContainer(
+        sheetResult: () {
+          sheets++;
+          return gate.future;
+        },
+      );
+      final notifier = container.read(accountDeletionNotifierProvider.notifier);
+
+      final first = notifier.deleteAccount();
+      await notifier.deleteAccount();
+      await notifier.retry();
+
+      expect(sheets, 1);
+      expect(container.read(accountDeletionBusyProvider), isTrue);
+
+      gate.complete(null);
+      await first;
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
+
+    test('libera el busy aunque el flujo falle', () async {
+      when(() => mockDeletionService.call(uid: any(named: 'uid'))).thenThrow(
+        const AccountDeletionFailure$Server(code: 'internal', message: 'x'),
+      );
+      final container =
+          buildContainer(sheetResult: () async => FakeAuthCredential());
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
   });
 }

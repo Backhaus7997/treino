@@ -4661,5 +4661,16 @@
   "planLimitTrainerPlanAMedidaCuerpo": "Estás en el plan más grande. Estamos preparando un plan a tu medida.",
   "@planLimitTrainerPlanAMedidaCuerpo": {
     "description": "Cuerpo de la caja 'plan a medida' de los avisos de EJERCICIOS PROPIOS y PLANTILLAS, forma MÓVIL. Inalcanzable con las tablas de hoy: para llegar acá el tier efectivo tendría que ser Plan 3, y Plan 3 no tiene un tope finito que resolveNoticeTier pueda matchear. Queda como red por si la tabla cambia."
-  }
+  },
+  "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}",
+  "@eliminarCuentaSheetTrainerUnlinkNotice": {
+    "description": "Aviso en la hoja de eliminar cuenta del entrenador: cuántos alumnos quedan desvinculados.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eliminarCuentaSheetErrorSubscriptionCancel": "No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.",
+  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos."
 }
