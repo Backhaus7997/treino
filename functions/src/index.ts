@@ -65,6 +65,7 @@ export { notifyOnReview } from "./notifications/notify-review";
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
 export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
+export { propagateGymNameToProfiles } from "./gyms/propagate-gym-name";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // generateDuePayments (auto-created mensual/semanal pending Payment docs) was
