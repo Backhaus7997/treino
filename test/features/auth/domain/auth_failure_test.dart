@@ -228,6 +228,7 @@ void main() {
         const AuthFailure.profileCreateFailed(),
         const AuthFailure.popupBlocked(),
         const AuthFailure.providerUnavailable(),
+        const AuthFailure.accountMismatch(),
       ];
       for (final f in failures) {
         expect(f.userMessage, isNotEmpty, reason: '$f.userMessage was empty');
@@ -263,6 +264,15 @@ void main() {
         FirebaseAuthException(code: 'requires-recent-login'),
       );
       expect(failure, const AuthFailure.requiresRecentLogin());
+    });
+
+    test('fromFirebase maps user-mismatch to accountMismatch con copy claro',
+        () {
+      final failure = AuthFailure.fromFirebase(
+        FirebaseAuthException(code: 'user-mismatch'),
+      );
+      expect(failure, const AuthFailure.accountMismatch());
+      expect(failure.userMessage, contains('misma cuenta'));
     });
   });
 }

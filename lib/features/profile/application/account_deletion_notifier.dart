@@ -66,6 +66,12 @@ class AccountDeletionNotifier extends AsyncNotifier<void> {
       debugPrint('[AccountDeletion] re-auth AuthFailure: $e');
       state = AsyncError(e, StackTrace.current);
       return;
+    } catch (e, st) {
+      // Excepción no tipada de la estrategia de re-auth: sin esto escapa sin
+      // mensaje y el diálogo queda como si nada hubiera pasado.
+      debugPrint('[AccountDeletion] re-auth unexpected error: $e\n$st');
+      state = AsyncError(e, st);
+      return;
     }
     if (!reauthenticated) {
       debugPrint('[AccountDeletion] re-auth cancelled — aborted');

@@ -255,6 +255,15 @@ class _PasswordReauthDialogState extends ConsumerState<_PasswordReauthDialog> {
           _loading = false;
         });
       }
+    } catch (_) {
+      // Sin esto `_loading` queda en true y el diálogo es inescapable
+      // (barrera no descartable + CANCELAR deshabilitado mientras carga).
+      if (mounted) {
+        setState(() {
+          _error = const AuthFailure.reAuthFailed().userMessage;
+          _loading = false;
+        });
+      }
     }
   }
 

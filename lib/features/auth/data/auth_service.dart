@@ -570,6 +570,15 @@ class AuthService {
       await user.reauthenticateWithPopup(provider);
     } on FirebaseAuthException catch (e, st) {
       throw _failureFromPopup(e, st, camino);
+    } catch (e, st) {
+      // Cualquier otra cosa del SDK web (interop JS, etc.) no puede escapar
+      // sin mensaje: sube como falla de re-auth y se reporta.
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.$camino: excepción inesperada',
+      ));
+      throw const AuthFailure.reAuthFailed();
     }
   }
 

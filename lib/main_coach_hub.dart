@@ -14,6 +14,15 @@ import 'features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_di
     show coachHubAccountDeletionOverrides;
 import 'firebase_options.dart';
 
+/// Overrides del `ProviderScope` raíz del Hub. Vive aparte de `main()` para
+/// poder probar que el cableado de producción (baja de cuenta incluida) existe.
+List<Override> coachHubProviderOverrides(SharedPreferences prefs) => [
+      // Synchronous by contract — see sharedPreferencesOverride (#543).
+      sharedPreferencesOverride(prefs),
+      // Baja de cuenta por popup / contraseña y sign-out directo (web).
+      ...coachHubAccountDeletionOverrides,
+    ];
+
 /// Entry point del TREINO Coach Hub (Flutter Web target).
 ///
 /// Es paralelo a `lib/main.dart` (mobile app). Mismo backend Firebase,
@@ -75,12 +84,7 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        // Synchronous by contract — see sharedPreferencesOverride (#543).
-        sharedPreferencesOverride(prefs),
-        // Baja de cuenta por popup / contraseña y sign-out directo (web).
-        ...coachHubAccountDeletionOverrides,
-      ],
+      overrides: coachHubProviderOverrides(prefs),
       child: const CoachHubApp(),
     ),
   );

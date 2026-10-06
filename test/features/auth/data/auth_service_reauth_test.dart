@@ -327,6 +327,31 @@ void main() {
       );
     });
 
+    test('eligió otra cuenta en el popup → AuthFailure.accountMismatch',
+        () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any())).thenThrow(
+        FirebaseAuthException(code: 'user-mismatch'),
+      );
+
+      await expectLater(
+        sut.reauthenticateWithGooglePopup(),
+        throwsA(const AuthFailure.accountMismatch()),
+      );
+    });
+
+    test('excepción inesperada del SDK → AuthFailure.reAuthFailed (no escapa)',
+        () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => user.reauthenticateWithPopup(any()))
+          .thenThrow(StateError('js interop'));
+
+      await expectLater(
+        sut.reauthenticateWithGooglePopup(),
+        throwsA(isA<AuthFailure>()),
+      );
+    });
+
     test('el navegador bloquea el popup → AuthFailure.popupBlocked', () async {
       when(() => fbAuth.currentUser).thenReturn(user);
       when(() => user.reauthenticateWithPopup(any())).thenThrow(

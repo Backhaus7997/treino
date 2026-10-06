@@ -392,6 +392,28 @@ void main() {
         expect(find.byType(TreinoDialog), findsOneWidget);
       });
 
+      testWidgets(
+          'excepción inesperada: sale el mensaje de respaldo y el diálogo '
+          'no queda trabado cargando', (tester) async {
+        when(() => auth.getPasswordCredential(password: any(named: 'password')))
+            .thenAnswer((_) async => _FakeCredential());
+        when(() => auth.reauthenticate(any())).thenThrow(StateError('boom'));
+        await tester.pumpWidget(host((_) {}));
+        await tester.tap(find.text('go'));
+        await tester.pumpAndSettle();
+
+        await tester.enterText(find.byType(TextField), 'secreta123');
+        await tester.tap(find.byKey(const Key('dialog_primary_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.text(const AuthFailure.reAuthFailed().userMessage),
+            findsOneWidget);
+        // CANCELAR habilitado = ya no está en `_loading`: se puede salir.
+        await tester.tap(find.byKey(const Key('dialog_secondary_button')));
+        await tester.pumpAndSettle();
+        expect(find.byType(TreinoDialog), findsNothing);
+      });
+
       testWidgets('CANCELAR devuelve false sin re-autenticar', (tester) async {
         late Future<bool> result;
         await tester.pumpWidget(host((f) => result = f));

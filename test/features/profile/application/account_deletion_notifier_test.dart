@@ -510,5 +510,24 @@ void main() {
       verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
       expect(container.read(accountDeletionBusyProvider), isFalse);
     });
+
+    test(
+        'estrategia tira una excepcion inesperada: AsyncError sin CF y sin '
+        'dejar el flag busy', () async {
+      final container = webContainer(
+        reauth: (_) async => throw StateError('boom'),
+        signOut: () async {},
+      );
+
+      await container
+          .read(accountDeletionNotifierProvider.notifier)
+          .deleteAccount();
+
+      final state = container.read(accountDeletionNotifierProvider);
+      expect(state.hasError, isTrue);
+      expect(state.error, isA<StateError>());
+      verifyNever(() => mockDeletionService.call(uid: any(named: 'uid')));
+      expect(container.read(accountDeletionBusyProvider), isFalse);
+    });
   });
 }
