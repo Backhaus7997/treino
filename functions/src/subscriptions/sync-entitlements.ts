@@ -124,6 +124,13 @@ function describeShape(raw: unknown): { acceptedAtType: string; acceptedAtKeys?:
 
 export interface SyncEntitlementsResult {
   trainerId: string;
+  /**
+   * `users/{trainerId}` no existe (el PF borro la cuenta y el cascade ya paso
+   * por `deleteUserDocs`). No se escribio NADA: los demas campos vienen vacios
+   * y NO describen estado real. Los llamadores tienen que saltear mails y logs
+   * de reconciliacion.
+   */
+  missing?: true;
   /** `null` = sin limite (plan3). */
   limit: number | null;
   /**
@@ -159,7 +166,8 @@ export interface SyncEntitlementsResult {
  * Idempotente EN `trainer_links`: si el estado ya es correcto los diffs salen
  * vacios y no se escribe un solo vinculo, asi el barrido diario no ensucia el
  * historial de los alumnos. El `tx.set` de `users/{trainerId}` NO es
- * condicional: corre siempre, con los mismos valores si nada cambio. Es una
+ * condicional: corre siempre, con los mismos valores si nada cambio (salvo si
+ * el documento no existe: ahi no se escribe nada, ver `missing`). Es una
  * escritura por corrida sobre UN documento, y `linkLoadReconcile` la dispara
  * en cada escritura de `trainer_links`; no genera loop porque la guarda
  * `subscriptionChanged` compara solo el mapa `subscription`, que este barrido
@@ -180,6 +188,27 @@ export async function syncTrainerEntitlements(
       tx.get(db.collection("users").doc(trainerId)),
       tx.get(db.collection("trainer_links").where("trainerId", "==", trainerId)),
     ]);
+
+    // El perfil no existe: el PF borro la cuenta (cascade de #1333) y este
+    // llamador es un trigger tardio (`linkLoadReconcile` dispara una vez por
+    // cada vinculo que el cascade termino). Sin esta guarda, `toSubscriptionState`
+    // lee `undefined` (= PF free, `degraded: false`), se bloquean alumnos con
+    // limite 2, y el `tx.set(..., {merge: true})` de abajo RESUCITA el doc como
+    // un fantasma sin role ni nada. La guarda va DENTRO de la transaccion: un
+    // `exists` afuera dejaria la misma ventana entre el chequeo y la escritura.
+    if (!trainerSnap.exists) {
+      return {
+        trainerId,
+        missing: true as const,
+        limit: null,
+        blocked: [],
+        unblocked: [],
+        weightedLoad: 0,
+        blockedAthleteIds: [],
+        subscription: null,
+        degraded: false,
+      };
+    }
 
     const { state: sub, degraded } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, clock);

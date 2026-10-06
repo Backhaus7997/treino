@@ -37,6 +37,11 @@
  *   - after missing (delete event) → skip.
  *   - reason === 'account-deleted' → skip (the account-deletion cascade owns
  *     that flow; don't interfere).
+ *   - reason === 'trainer-account-deleted' → skip (#1333). The trainer deleted
+ *     their account; the plans they assigned STAY with the athlete and stay
+ *     usable (owner decision). Archiving them would hide them from the athlete,
+ *     whose list filters by status. Reads are allowed by `assignedTo ==
+ *     auth.uid` with no link check.
  *   - before.status === after.status (no-op write) → skip.
  *   - after.status !== 'terminated' → skip.
  */
@@ -45,6 +50,7 @@ import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "./cascade/trainer-data";
 
 const BATCH_SIZE = 500;
 
@@ -135,6 +141,14 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
   // Guard: account-deletion cascade owns its own cleanup — don't interfere.
   if (reason === "account-deleted") {
     logger.info("cleanupAssignedPlans: skipping cascade reason=account-deleted");
+    return { count: 0 };
+  }
+
+  // Guard: the TRAINER deleted their account — the assigned plans stay (#1333).
+  if (reason === TRAINER_ACCOUNT_DELETED_REASON) {
+    logger.info(
+      `cleanupAssignedPlans: skipping reason=${TRAINER_ACCOUNT_DELETED_REASON}`,
+    );
     return { count: 0 };
   }
 

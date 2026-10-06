@@ -244,6 +244,29 @@ test('clasificar — account-deleted CON acceptedAt → conserva la historia', (
   );
 });
 
+// #1333 — el PF borra su cuenta: `cascade/trainer-data.ts` termina SUS vinculos
+// con `reason: 'trainer-account-deleted'`. Misma regla que la cuenta del atleta.
+test('clasificar — trainer-account-deleted sin acceptedAt → borra', () => {
+  assert.strictEqual(
+    clasificar({ acceptedAt: null, reason: 'trainer-account-deleted' }),
+    'borra',
+  );
+});
+
+test('clasificar — trainer-account-deleted CON acceptedAt → conserva', () => {
+  assert.strictEqual(
+    clasificar({ acceptedAt: { _seconds: 1 }, reason: 'trainer-account-deleted' }),
+    'conserva',
+  );
+});
+
+test('clasificar — trainer-account-deleted en terminationReason no habilita nada', () => {
+  assert.strictEqual(
+    clasificar({ acceptedAt: null, terminationReason: 'trainer-account-deleted' }),
+    'ambiguo',
+  );
+});
+
 test('clasificar — `reason` no se confunde con `terminationReason`', () => {
   assert.strictEqual(clasificar({ acceptedAt: null, reason: 'otra-cosa' }), 'ambiguo');
   assert.strictEqual(

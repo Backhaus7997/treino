@@ -109,8 +109,14 @@ export async function recomputeAthleteCount(
       return;
     }
 
-    // 3. Merge the aggregate field — never overwrite identity fields.
-    await profileRef.set({ athleteCount }, { merge: true });
+    // 3. Update ONLY the aggregate field — never overwrite identity fields.
+    //    `update()`, NOT `set(merge)` (#1333): the exists-check above is not
+    //    transactional, so a trigger that read the profile before the account
+    //    deletion cascade removed it (`deleteUserDocs`) would otherwise write
+    //    after and RE-CREATE `trainerPublicProfiles/{uid}` as a ghost doc with
+    //    just `athleteCount`. `update()` fails with NOT_FOUND instead, which
+    //    the catch below logs and swallows.
+    await profileRef.update({ athleteCount });
 
     logger.info(`linkAggregate: updated trainerPublicProfiles/${trainerId}`, {
       trainerId,
@@ -118,6 +124,16 @@ export async function recomputeAthleteCount(
     });
   } catch (err) {
     // Catch all → log + no rethrow (mirrors reviewAggregate).
+    // NOT_FOUND (gRPC 5) de `update()` es el desenlace ESPERADO de la carrera
+    // con el cascade de borrado de cuenta (#1333): `warn`, no `error`.
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 5 || code === "not-found") {
+      logger.warn(
+        `linkAggregate: trainerPublicProfiles/${trainerId} disappeared before the write — skipping`,
+        { trainerId },
+      );
+      return;
+    }
     logger.error(
       `linkAggregate: error recomputing for trainerId=${trainerId}`,
       { trainerId, err },

@@ -10,7 +10,7 @@
  *   SCENARIO-551 — CF returns structured success response (REQ-ACCDEL-CF-014)
  *
  * SCENARIOS added (PR#2 — T21):
- *   SCENARIO-535 — Trainer role rejected (REQ-ACCDEL-CF-003)
+ *   SCENARIO-535 — Trainer role rejected (REQ-ACCDEL-CF-003) — INVERTED by #1333
  *   SCENARIO-547 (final) — Audit log includes cascadeResults (REQ-ACCDEL-CF-011)
  *   SCENARIO-548 — Audit log status partial when a cascade step errors (REQ-ACCDEL-CF-011)
  *   SCENARIO-550 — Idempotent re-run completes cleanly (REQ-ACCDEL-CF-013)
@@ -270,27 +270,34 @@ describe("SCENARIO-533: core logic callable by authenticated athlete", () => {
   });
 });
 
-describe("SCENARIO-535: trainer role rejected", () => {
+// #1333: SCENARIO-535 used to REQUIRE the rejection of a trainer. The owner
+// reversed it (Apple 5.1.1(v) needs in-app deletion for every account type):
+// a trainer now deletes the account like anyone else. The trainer cascade
+// itself is covered in delete-account-trainer.test.ts.
+describe("SCENARIO-535 (inverted, #1333): trainer role is NOT rejected", () => {
   const uid = "smoke-trainer-535";
 
   beforeEach(() => createTestUser(uid, "trainer"));
   afterEach(() => cleanupUser(uid));
 
-  it("SCENARIO-535: throws permission-denied for trainer role", async () => {
-    await expect(runDeleteAccount(smokeApp, uid, "password")).rejects.toMatchObject({
-      code: "permission-denied",
-    });
+  it("SC-PSD-01: resolves with success instead of permission-denied", async () => {
+    const result = (await runDeleteAccount(
+      smokeApp,
+      uid,
+      "password"
+    )) as DeleteAccountResponse;
+    expect(result.status).toBe("success");
+    expect(result.errors).toEqual([]);
   });
 
-  it("SCENARIO-535: no data is modified when trainer is rejected", async () => {
-    await runDeleteAccount(smokeApp, uid, "password").catch(() => undefined);
+  it("SC-PSD-01: the trainer's user doc and Auth user are gone", async () => {
+    await runDeleteAccount(smokeApp, uid, "password");
 
-    // Trainer's user doc should still exist
-    const snap = await getFirestore(smokeApp)
-      .collection("users")
-      .doc(uid)
-      .get();
-    expect(snap.exists).toBe(true);
+    const snap = await getFirestore(smokeApp).collection("users").doc(uid).get();
+    expect(snap.exists).toBe(false);
+    await expect(getAuth(smokeApp).getUser(uid)).rejects.toMatchObject({
+      code: "auth/user-not-found",
+    });
   });
 });
 

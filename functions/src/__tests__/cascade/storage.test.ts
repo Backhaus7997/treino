@@ -32,7 +32,11 @@ afterAll(async () => {
 });
 
 // Import the module under test — will fail until implementation exists
-import { deleteAvatar, deleteAthleteStorage } from "../../cascade/storage";
+import {
+  deleteAvatar,
+  deleteAthleteStorage,
+  deleteTrainerStorage,
+} from "../../cascade/storage";
 
 async function uploadFakeAvatar(uid: string): Promise<void> {
   const bucket = getStorage(testApp).bucket();
@@ -280,3 +284,71 @@ describe("#628: deleteAthleteStorage removes the athlete's session feedback phot
 });
 
 const db = () => getFirestore(testApp);
+
+// #1333 / SC-PSD-16: the PF's side of athleteFiles/{trainerId}_{athleteId}/…
+describe("SC-PSD-16: deleteTrainerStorage", () => {
+  const pf = "psd-st-pf";
+  const names = [
+    `athleteFiles/${pf}_ath1/a.pdf`,
+    `athleteFiles/${pf}_ath2/deep/b.pdf`,
+    `athleteFiles/${pf}x_ath1/not-mine.pdf`, // uid that merely shares the prefix
+    `athleteFiles/psd-st-other_${pf}/athlete-side.pdf`, // pf as the ATHLETE half
+    `customExerciseVideos/${pf}/v.mp4`,
+  ];
+
+  beforeEach(async () => {
+    const bucket = getStorage(testApp).bucket();
+    await Promise.all(names.map((n) => bucket.file(n).save(Buffer.from("x"))));
+  });
+  afterEach(async () => {
+    const bucket = getStorage(testApp).bucket();
+    await Promise.all(names.map((n) => bucket.file(n).delete().catch(() => undefined)));
+  });
+
+  const exists = async (n: string) =>
+    (await getStorage(testApp).bucket().file(n).exists())[0];
+
+  it("deletes only athleteFiles/{uid}_* objects", async () => {
+    await deleteTrainerStorage(testApp, pf);
+    expect(await exists(names[0])).toBe(false);
+    expect(await exists(names[1])).toBe(false);
+    expect(await exists(names[2])).toBe(true);
+    expect(await exists(names[3])).toBe(true);
+    // customExerciseVideos is owned by deleteAthleteStorage (V3), not this step.
+    expect(await exists(names[4])).toBe(true);
+  });
+
+  it("is a no-op for a uid with no files", async () => {
+    await expect(deleteTrainerStorage(testApp, "psd-st-nobody")).resolves.toBeUndefined();
+  });
+
+  it("bounds the number of concurrent deletes", async () => {
+    const bucket = getStorage(testApp).bucket();
+    const many = Array.from({ length: 45 }, (_, i) => `athleteFiles/${pf}_bulk/f${i}.txt`);
+    await Promise.all(many.map((n) => bucket.file(n).save(Buffer.from("x"))));
+
+    const proto = Object.getPrototypeOf(bucket.file("probe")) as { delete: (...a: unknown[]) => Promise<unknown> };
+    const realDelete = proto.delete;
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const spy = jest.spyOn(proto, "delete").mockImplementation(async function (this: unknown, ...args: unknown[]) {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        return await realDelete.apply(this, args);
+      } finally {
+        inFlight--;
+      }
+    });
+
+    try {
+      await deleteTrainerStorage(testApp, pf);
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(maxInFlight).toBeGreaterThan(0);
+    expect(maxInFlight).toBeLessThanOrEqual(20);
+    expect(await exists(many[44])).toBe(false);
+  });
+});

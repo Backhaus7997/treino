@@ -18,6 +18,7 @@ import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
 import { trainerEntry } from "../mail/templates";
@@ -356,6 +357,79 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
     await expect(
       notifyOnAppointmentHandler(testApp, APPT_ID, undefined, afterData, mock),
     ).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1333 — el PF borra su cuenta: reason === 'trainer-account-deleted' → skip.
+// El alumno se entera por UN push del vinculo (notify-link-change), no por N
+// pushes de turnos (una serie recurrente los multiplicaria).
+// ---------------------------------------------------------------------------
+describe("SC-PSD-12: reason=trainer-account-deleted → sendFcm NOT called", () => {
+  const trainerId = "trainer-appt-psd12";
+  const athleteId = "athlete-appt-psd12";
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-psd12"]);
+    await seedUser(athleteId, ["athlete-token-psd12"]);
+  });
+
+  afterEach(() => cleanup(trainerId, athleteId));
+
+  it("no manda push cuando la cascada del PF cancela el turno", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        reason: TRAINER_ACCOUNT_DELETED_REASON,
+        cancelledBy: trainerId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("una cancelacion normal del PF SIGUE avisando al alumno (el guard no la traga)", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        cancelledBy: trainerId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it("se mira la ESCRITURA: un cambio posterior sobre un turno ya marcado vuelve a avisar", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed", reason: TRAINER_ACCOUNT_DELETED_REASON },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        reason: TRAINER_ACCOUNT_DELETED_REASON,
+        cancelledBy: athleteId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
   });
 });
 

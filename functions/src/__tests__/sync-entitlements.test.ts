@@ -72,6 +72,27 @@ const lnk = (o: Record<string, unknown>) => ({
 beforeEach(() => jest.clearAllMocks());
 
 describe("syncTrainerEntitlements", () => {
+  it("si users/{trainerId} no existe NO lo recrea y no toca los vinculos (#1333)", async () => {
+    // El cascade de borrado del PF termina vinculos (N triggers async) y luego
+    // borra users/{uid}: un linkLoadReconcile tardio no puede resucitarlo.
+    const state = install({
+      users: {},
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        L2: lnk({ athleteId: "a2", acceptedAt: ts(200) }),
+        L3: lnk({ athleteId: "a3", acceptedAt: ts(900) }),
+      },
+    });
+
+    const r = await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1).toBeUndefined();
+    expect(r.missing).toBe(true);
+    expect(r.blocked).toEqual([]);
+    expect(r.unblocked).toEqual([]);
+    expect(state.trainer_links.L3.entitlement).toBe("entitled");
+  });
+
   it("sin suscripcion (Free 2) bloquea el excedente y deja los 2 mas antiguos", async () => {
     const state = install({
       users: { t1: {} },

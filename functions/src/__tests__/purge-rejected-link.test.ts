@@ -111,6 +111,30 @@ describe("clasificarTerminacion", () => {
     ).toBe("vinculo-real");
   });
 
+  // #1333 — el PF borra su cuenta. `cascade/trainer-data.ts` termina SUS
+  // vinculos con `reason: 'trainer-account-deleted'`. Una solicitud que nunca
+  // fue aceptada y cuyo destinatario ya no existe es basura, igual que arriba.
+  it("trainer-account-deleted sin acceptedAt → cuenta-borrada", () => {
+    expect(
+      clasificarTerminacion({ acceptedAt: null, reason: "trainer-account-deleted" }),
+    ).toBe("cuenta-borrada");
+  });
+
+  it("trainer-account-deleted CON acceptedAt → vinculo-real: se conserva", () => {
+    expect(
+      clasificarTerminacion({
+        acceptedAt: { seconds: 1 },
+        reason: "trainer-account-deleted",
+      }),
+    ).toBe("vinculo-real");
+  });
+
+  it("trainer-account-deleted en terminationReason NO habilita nada", () => {
+    expect(
+      clasificarTerminacion({ acceptedAt: null, terminationReason: "trainer-account-deleted" }),
+    ).toBe("vinculo-real");
+  });
+
   it("`reason` no se confunde con `terminationReason`", () => {
     // Son campos DISTINTOS: la cascada escribe `reason`, el cliente escribe
     // `terminationReason`. Un `reason` cualquiera no habilita nada.

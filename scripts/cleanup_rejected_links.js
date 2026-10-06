@@ -118,6 +118,18 @@ const { FieldPath, getFirestore } = require('firebase-admin/firestore');
 /** Las dos únicas razones que se escriben sobre un `pending`. */
 const RAZONES_DE_NO_VINCULO = new Set(['declined', 'cancelled-by-athlete']);
 
+/**
+ * Motivos de `reason` (NO `terminationReason`) con los que las cascadas de
+ * borrado de cuenta terminan un vinculo. TIENE QUE COINCIDIR con
+ * `cascade/trainer-links.ts` ('account-deleted', el atleta) y con `TRAINER_ACCOUNT_DELETED_REASON` de `functions/src/cascade/trainer-data.ts`
+ * (#1333). Este script es JS plano y no puede importar el TS: es una copia, y
+ * `clasificarTerminacion` (functions/src/purge-rejected-link.ts) decide lo mismo.
+ */
+const RAZONES_DE_CUENTA_BORRADA = new Set([
+  'account-deleted',
+  'trainer-account-deleted',
+]);
+
 /** Límite duro de `WriteBatch` en Firestore. */
 const BATCH_SIZE = 500;
 
@@ -218,7 +230,7 @@ function clasificar(data) {
   // `functions/src/cascade/trainer-links.ts` cuando el atleta borra su cuenta.
   // Son campos DISTINTOS y confundirlos dejó el agujero: estos docs caían en
   // AMBIGUO y no los juntaba nadie. Hubo uno real en producción.
-  if (data.reason === 'account-deleted') return 'borra';
+  if (RAZONES_DE_CUENTA_BORRADA.has(data.reason)) return 'borra';
 
   return RAZONES_DE_NO_VINCULO.has(data.terminationReason) ? 'borra' : 'ambiguo';
 }

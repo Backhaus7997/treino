@@ -24,6 +24,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import {
   archiveAssignedPlansForPair,
   cleanupAssignedPlansOnUnlinkHandler,
@@ -178,6 +179,33 @@ describe("cleanupAssignedPlansOnUnlinkHandler guards", () => {
     );
     expect(count).toBe(0);
     expect(await exists(ASSIGNED_TA)).toBe(true);
+  });
+
+  // #1333 / SC-PSD-11 — el PF borra su cuenta. Las rutinas asignadas SE QUEDAN
+  // con el alumno y siguen usables: archivarlas las esconde (`listAssignedTo`
+  // filtra por estado), que es justo lo que el dueño NO quiere.
+  it("SC-PSD-11: skips when reason is trainer-account-deleted (plans stay usable)", async () => {
+    const { count } = await cleanupAssignedPlansOnUnlinkHandler(
+      testApp,
+      link("active"),
+      link("terminated", { reason: TRAINER_ACCOUNT_DELETED_REASON }),
+    );
+    expect(count).toBe(0);
+    expect(await exists(ASSIGNED_TA)).toBe(true);
+    expect(await statusOf(ASSIGNED_TA)).not.toBe("archived");
+  });
+
+  it("SC-PSD-11: any OTHER reason still archives (the guard is not a blanket skip)", async () => {
+    for (const reason of ["declined", "cancelled-by-athlete", "algo-que-no-existe"]) {
+      await seedRoutines();
+      const { count } = await cleanupAssignedPlansOnUnlinkHandler(
+        testApp,
+        link("active"),
+        link("terminated", { reason }),
+      );
+      expect(count).toBe(1);
+      expect(await statusOf(ASSIGNED_TA)).toBe("archived");
+    }
   });
 
   it("skips a no-op write (status unchanged)", async () => {

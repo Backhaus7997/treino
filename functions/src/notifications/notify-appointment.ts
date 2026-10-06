@@ -8,8 +8,9 @@
  *   - ADR-PN-006.
  *   - Guards: after missing → skip; el write ESCRIBIÓ `reason` =
  *     'athlete-account-deleted', o sea es el cascade de baja de cuenta (ver
- *     `isAthleteAccountDeletedWrite`) → skip; before?.status === after.status →
- *     skip (no-op write).
+ *     `isAthleteAccountDeletedWrite`) → skip; idem para
+ *     'trainer-account-deleted' (#1333, `isTrainerAccountDeletedWrite`);
+ *     before?.status === after.status → skip (no-op write).
  *   - Branches:
  *       create + requested → notify trainer, deepLink "/coach?tab=agenda"
  *       requested → confirmed → notify athlete, deepLink "/coach?tab=agenda"
@@ -25,6 +26,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { ATHLETE_ACCOUNT_DELETED_REASON } from "../cascade/appointments";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import { enqueueMail } from "../mail/enqueue-mail";
 import {
   formatDateAR,
@@ -82,6 +84,29 @@ function isAthleteAccountDeletedWrite(
   return (
     after.reason === ATHLETE_ACCOUNT_DELETED_REASON &&
     before?.reason !== ATHLETE_ACCOUNT_DELETED_REASON
+  );
+}
+
+/**
+ * ¿Este write es la cascada cancelando el turno de un PF que borró su cuenta?
+ * (#1333)
+ *
+ * Misma señal y mismo razonamiento que arriba: `reason` es la única clave que el
+ * cliente no puede escribir (pineada en `firestore.rules`), y se mira la
+ * ESCRITURA (`before`) y no el estado final.
+ *
+ * Se silencia porque el alumno ya recibe UN aviso por el vínculo
+ * (`notify-link-change`, que dice que los turnos quedaron cancelados). Sin este
+ * guard una serie recurrente le mandaría N pushes, y el copy del turno
+ * resolvería el nombre de un PF que ya no existe.
+ */
+function isTrainerAccountDeletedWrite(
+  before: ApptData | undefined,
+  after: ApptData,
+): boolean {
+  return (
+    after.reason === TRAINER_ACCOUNT_DELETED_REASON &&
+    before?.reason !== TRAINER_ACCOUNT_DELETED_REASON
   );
 }
 
@@ -203,6 +228,15 @@ export async function notifyOnAppointmentHandler(
   if (isAthleteAccountDeletedWrite(before, after)) {
     logger.info(
       `notifyOnAppointment: skipping cascade reason=${ATHLETE_ACCOUNT_DELETED_REASON}`,
+    );
+    return;
+  }
+
+  // Guard: cascade delete — trainer account deleted (#1333). The athlete is
+  // told once, through the link push.
+  if (isTrainerAccountDeletedWrite(before, after)) {
+    logger.info(
+      `notifyOnAppointment: skipping cascade reason=${TRAINER_ACCOUNT_DELETED_REASON}`,
     );
     return;
   }
