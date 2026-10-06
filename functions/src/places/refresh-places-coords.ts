@@ -15,11 +15,17 @@
  *    índices automáticos de un solo campo: no hace falta ningún índice nuevo.
  *
  * Qué NO hace:
- *  - No borra datos del usuario. Un lugar que Google ya no reconoce
- *    (NOT_FOUND) se marca; pasados 30 días SOLO se lo saca de la búsqueda
- *    (gym: `geohash:null`; lugar de PF: `stale:true` y afuera de
- *    `trainerGeohashes` y del espejo público) y la app le pide al PF que lo
- *    vuelva a elegir.
+ *  - No borra datos del usuario (nombre, etiqueta, `placeId`). Un lugar que
+ *    Google ya no reconoce (NOT_FOUND) se marca; pasados 30 días se le BORRAN
+ *    las coordenadas (`lat`, `lng`, `geohash` quedan en `null`: no se puede
+ *    seguir cacheándolas) y sale de la búsqueda (gym: sin geohash; lugar de PF:
+ *    `stale:true` y afuera de `trainerGeohashes` y del espejo público). La app
+ *    le pide al PF que lo vuelva a elegir.
+ *  - Lo purgado por un fallo TRANSITORIO (key revocada, cuota, caída) sigue en
+ *    la cola: gym con `coordsFetchedAt = 1970`, lugar de PF `stale` con su
+ *    `coordsFetchedAt` viejo. Cuando Places vuelve a responder `ok` se
+ *    restauran coordenadas, geohash y (con consentimiento) el espejo público.
+ *    Lo purgado por NOT_FOUND sale de la cola (`coordsFetchedAt: null`).
  *  - No reintenta en línea: 429/5xx/red => se salta y queda para mañana (hay 5
  *    días de colchón entre los 25 y los 30).
  *  - No pisa ediciones concurrentes: gyms con precondición `lastUpdateTime`,
@@ -266,10 +272,15 @@ async function postpone(
   fetchedAt: unknown,
   backoffMs: number,
 ): Promise<void> {
-  const until = Math.min(
-    ctx.now.getTime() + backoffMs,
-    asTimestamp(fetchedAt).toMillis() + MAX_BACKOFF_UNTIL_DAYS * DAY_MS,
-  );
+  // Pasados los 30 días el ítem ya está purgado y solo espera una recuperación:
+  // no hay vencimiento que cuidar, así que el postergamiento no lleva tope (si
+  // lo llevara, los purgados quedarían al frente de la cola para siempre).
+  const until = olderThanMaxCache(ctx, fetchedAt)
+    ? ctx.now.getTime() + backoffMs
+    : Math.min(
+      ctx.now.getTime() + backoffMs,
+      asTimestamp(fetchedAt).toMillis() + MAX_BACKOFF_UNTIL_DAYS * DAY_MS,
+    );
   if (until <= ctx.now.getTime()) return; // ya urge: sin postergar
   try {
     await ctx.db
@@ -372,21 +383,35 @@ async function processGym(ctx: Ctx, snap: DocumentSnapshot): Promise<void> {
       await clearBackoff(ctx, "gym", snap.id);
       return;
     }
-    // No ok. Pasados 30 días no se pueden seguir sirviendo las coordenadas,
-    // sea cual sea el motivo: se sacan de la búsqueda y de la cola.
+    // No ok. Pasados 30 días no se pueden seguir cacheando las coordenadas,
+    // sea cual sea el motivo: se BORRAN (no solo se esconden) y el gym sale de
+    // la búsqueda.
     if (olderThanMaxCache(ctx, data.coordsFetchedAt)) {
-      await snap.ref.update(
-        {
-          ...(r.status === "not_found" ? { placeStatus: "not_found" } : {}),
-          geohash: null,
-          coordsFetchedAt: null,
-        },
-        { lastUpdateTime: snap.updateTime! },
-      );
-      ctx.result.gymsPurged++;
-      if (r.status === "not_found") ctx.result.gymsNotFound++;
-      else ctx.result.gymsSkipped++;
-      await clearBackoff(ctx, "gym", snap.id);
+      const notFound = r.status === "not_found";
+      const yaPurgado = data.lat == null && data.lng == null;
+      if (notFound || !yaPurgado) {
+        await snap.ref.update(
+          {
+            ...(notFound ? { placeStatus: "not_found" } : {}),
+            lat: null,
+            lng: null,
+            geohash: null,
+            // not_found sale de la cola. Un fallo transitorio la conserva
+            // (1970 también es lo que usa la migración): cuando Places vuelva,
+            // el próximo `ok` restaura las coordenadas.
+            coordsFetchedAt: notFound ? null : EPOCH,
+          },
+          { lastUpdateTime: snap.updateTime! },
+        );
+        if (!yaPurgado) ctx.result.gymsPurged++;
+      }
+      if (notFound) {
+        ctx.result.gymsNotFound++;
+        await clearBackoff(ctx, "gym", snap.id);
+      } else {
+        ctx.result.gymsSkipped++;
+        await postpone(ctx, "gym", snap.id, EPOCH, TRANSIENT_BACKOFF_MS);
+      }
       return;
     }
     if (r.status === "not_found") {
@@ -411,10 +436,20 @@ async function processGym(ctx: Ctx, snap: DocumentSnapshot): Promise<void> {
 
 type Loc = Record<string, unknown>;
 
+/**
+ * ¿El job debe (re)consultar este lugar? Tiene `placeId` y, si está `stale`,
+ * conserva un `coordsFetchedAt` (purga por fallo transitorio: reintentable).
+ * Un stale sin fecha es NOT_FOUND o dato viejo: no se consulta.
+ */
+function isRetryable(l: Loc): boolean {
+  if (typeof l.placeId !== "string" || l.placeId === "") return false;
+  return l.stale !== true || l.coordsFetchedAt instanceof Timestamp;
+}
+
 function minCoordsFetchedAt(locs: Loc[]): Timestamp | null {
   let min: Timestamp | null = null;
   for (const l of locs) {
-    if (!l.placeId || l.stale === true) continue;
+    if (!isRetryable(l)) continue;
     const t = asTimestamp(l.coordsFetchedAt);
     if (min === null || t.toMillis() < min.toMillis()) min = t;
   }
@@ -430,12 +465,7 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
   const dueIds = [
     ...new Set(
       firstLocs
-        .filter(
-          (l) =>
-            typeof l.placeId === "string" &&
-            l.stale !== true &&
-            isDue(ctx, l.coordsFetchedAt),
-        )
+        .filter((l) => isRetryable(l) && isDue(ctx, l.coordsFetchedAt))
         .map((l) => l.placeId as string),
     ),
   ];
@@ -460,12 +490,13 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
 
     let changed = false;
     const next = locs.map((l): Loc => {
-      if (typeof l.placeId !== "string" || l.stale === true) return l;
+      if (!isRetryable(l)) return l;
       // Re-chequeo contra el doc fresco: el PF pudo volver a elegir el lugar.
       if (!isDue(ctx, l.coordsFetchedAt)) return l;
-      const r = results.get(l.placeId);
+      const r = results.get(l.placeId as string);
       if (!r) return l;
       if (r.status === "ok") {
+        // También restaura un lugar purgado por un fallo transitorio.
         changed = true;
         return {
           ...l,
@@ -473,13 +504,31 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
           lng: r.lng,
           geohash: geohash5(r.lat, r.lng),
           coordsFetchedAt: ctx.nowTs,
+          stale: null,
         };
       }
+      if (l.stale === true) {
+        // Ya purgado. Si Google ahora dice NOT_FOUND se deja de reintentar;
+        // si sigue fallando, no hay nada que escribir.
+        if (r.status !== "not_found") return l;
+        changed = true;
+        return { ...l, coordsFetchedAt: null };
+      }
       // No ok y pasado de 30 días: se retira, sea cual sea el motivo del fallo.
+      // Se borran las coordenadas (no se pueden cachear más) y se marca `stale`.
       if (olderThanMaxCache(ctx, l.coordsFetchedAt)) {
         changed = true;
         purged = true;
-        return { ...l, stale: true };
+        return {
+          ...l,
+          lat: null,
+          lng: null,
+          geohash: null,
+          stale: true,
+          // not_found sale de la cola; un fallo transitorio conserva la fecha
+          // vieja para que el usuario siga siendo candidato.
+          coordsFetchedAt: r.status === "not_found" ? null : l.coordsFetchedAt,
+        };
       }
       return l;
     });
@@ -508,7 +557,9 @@ async function processTrainer(ctx: Ctx, uid: string): Promise<void> {
     if (pSnap?.exists) {
       // Lo vencido no se publica: el espejo público lleva solo lugares vigentes.
       tx.update(pubRef, {
-        trainerLocations: next.filter((l) => l.stale !== true),
+        trainerLocations: next.filter(
+          (l) => l.stale !== true && l.lat != null && l.lng != null,
+        ),
         trainerGeohashes: geohashes,
       });
     }

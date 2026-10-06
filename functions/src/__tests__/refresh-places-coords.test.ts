@@ -179,18 +179,24 @@ describe("gyms", () => {
     expect(g.lat).toBe(-34.6);
   });
 
-  it("NOT_FOUND pasados 30d: quita el geohash de la búsqueda y no vuelve a ser candidato", async () => {
+  it("NOT_FOUND pasados 30d: borra lat/lng/geohash (no se cachean coords vencidas) y no vuelve a ser candidato", async () => {
     await seedGym("p1", 31);
     await run(fetcher({ p1: { status: "not_found" } }));
 
     const g = (await db().collection("gyms").doc("p1").get()).data()!;
     expect(g.placeStatus).toBe("not_found");
+    expect(g.lat).toBeNull();
+    expect(g.lng).toBeNull();
     expect(g.geohash).toBeNull();
     expect(g.coordsFetchedAt).toBeNull();
     expect(g.name).toBe("Gym p1"); // nunca se borra el dato
 
-    const f2 = fetcher({});
-    await run(f2);
+    // Ni días después: not_found sale de la cola para siempre.
+    const f2 = fetcher({ p1: ok(-31.4, -64.2) });
+    await refreshPlacesCoordsHandler(app, {
+      now: new Date(NOW.getTime() + 5 * 24 * 60 * 60 * 1000),
+      fetchLocation: f2,
+    });
     expect(f2).not.toHaveBeenCalled();
   });
 
@@ -328,6 +334,11 @@ describe("entrenadores", () => {
     const u = (await db().collection("users").doc("t1").get()).data()!;
     const l1 = u.trainerLocations.find((l: any) => l.id === "l1");
     expect(l1.stale).toBe(true);
+    expect(l1.lat).toBeNull();
+    expect(l1.lng).toBeNull();
+    expect(l1.geohash).toBeNull();
+    expect(l1.placeId).toBe("p1");
+    expect(l1.coordsFetchedAt).toBeNull(); // not_found: no se reintenta
     expect(l1.customLabel).toBe("Label l1");
     expect(u.trainerGeohashes).toEqual(["gpsgh"]);
     expect(u.trainerLocationsCoordsFetchedAt).toBeNull();
@@ -368,11 +379,23 @@ describe("entrenadores", () => {
     expect(r.usersSkipped).toBe(1);
   });
 
-  it("un lugar ya stale no se vuelve a consultar y no deja al usuario pegado en la cola", async () => {
-    await seedTrainer("t1", [loc("l1", "p1", 40, { stale: true })], {
-      consent: true,
-      minAge: 40,
-    });
+  it("un lugar stale por NOT_FOUND (sin coordsFetchedAt) no se vuelve a consultar y no deja al usuario pegado en la cola", async () => {
+    await seedTrainer(
+      "t1",
+      [
+        loc("l1", "p1", 40, {
+          stale: true,
+          lat: null,
+          lng: null,
+          geohash: null,
+          coordsFetchedAt: null,
+        }),
+      ],
+      {
+        consent: true,
+        minAge: 40,
+      },
+    );
     const f = fetcher({});
 
     await run(f);
@@ -386,19 +409,61 @@ describe("entrenadores", () => {
 });
 
 describe("purga por EDAD (cumplimiento de los 30 días)", () => {
-  it("gym de 31d + error transitorio: se saca de la búsqueda igual", async () => {
+  it("gym de 31d + error transitorio: borra lat/lng/geohash pero SIGUE en la cola", async () => {
     await seedGym("p1", 31);
 
     const r = await run(fetcher({ p1: { status: "transient" } }));
 
     const g = (await db().collection("gyms").doc("p1").get()).data()!;
+    expect(g.lat).toBeNull();
+    expect(g.lng).toBeNull();
     expect(g.geohash).toBeNull();
-    expect(g.coordsFetchedAt).toBeNull();
+    expect(g.placeStatus).toBe("ok"); // no es not_found
+    expect((g.coordsFetchedAt as Timestamp).toMillis()).toBe(0);
     expect(g.name).toBe("Gym p1");
     expect(r.gymsPurged).toBe(1);
-    const f2 = fetcher({});
-    await run(f2);
-    expect(f2).not.toHaveBeenCalled();
+  });
+
+  it("gym purgado por un fallo transitorio: cuando la key vuelve a andar se restauran lat/lng/geohash/coordsFetchedAt", async () => {
+    await seedGym("p1", 31);
+    await run(fetcher({ p1: { status: "transient" } }));
+
+    const later = new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const r = await refreshPlacesCoordsHandler(app, {
+      now: later,
+      fetchLocation: fetcher({ p1: ok(-31.4, -64.2) }),
+    });
+
+    const g = (await db().collection("gyms").doc("p1").get()).data()!;
+    expect(g.lat).toBe(-31.4);
+    expect(g.lng).toBe(-64.2);
+    expect(g.geohash).toBe(geohash5(-31.4, -64.2));
+    expect(g.placeStatus).toBe("ok");
+    expect((g.coordsFetchedAt as Timestamp).toMillis()).toBe(later.getTime());
+    expect(r.gymsRefreshed).toBe(1);
+  });
+
+  it("gym ya purgado + otro fallo transitorio: no se vuelve a escribir ni a contar, y se posterga para no frenar la cola", async () => {
+    await seedGym("p1", 31);
+    await run(fetcher({ p1: { status: "transient" } }));
+    const before = (await db().collection("gyms").doc("p1").get()).data();
+
+    const later = new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const r = await refreshPlacesCoordsHandler(app, {
+      now: later,
+      fetchLocation: fetcher({ p1: { status: "transient" } }),
+    });
+
+    expect((await db().collection("gyms").doc("p1").get()).data()).toEqual(
+      before,
+    );
+    expect(r.gymsPurged).toBe(0);
+    const b = (
+      await db().collection("placesRefreshBackoff").doc("gym_p1").get()
+    ).data()!;
+    expect((b.nextAttemptAt as Timestamp).toMillis()).toBeGreaterThan(
+      later.getTime(),
+    );
   });
 
   it("gym de 26d + error transitorio: se conserva y se salta", async () => {
@@ -414,7 +479,7 @@ describe("purga por EDAD (cumplimiento de los 30 días)", () => {
     expect(r.gymsPurged).toBe(0);
   });
 
-  it("lugar de PF de 31d + error transitorio: stale, afuera de geohashes y del espejo público", async () => {
+  it("lugar de PF de 31d + error transitorio: stale sin coords, afuera de geohashes y del espejo público, pero reintentable", async () => {
     await seedTrainer(
       "t1",
       [
@@ -427,13 +492,103 @@ describe("purga por EDAD (cumplimiento de los 30 días)", () => {
     const r = await run(fetcher({ p1: { status: "transient" } }));
 
     const u = (await db().collection("users").doc("t1").get()).data()!;
-    expect(u.trainerLocations.find((l: any) => l.id === "l1").stale).toBe(true);
+    const l1 = u.trainerLocations.find((l: any) => l.id === "l1");
+    expect(l1.stale).toBe(true);
+    expect(l1.lat).toBeNull();
+    expect(l1.lng).toBeNull();
+    expect(l1.geohash).toBeNull();
+    expect(l1.placeId).toBe("p1");
+    // Se conserva la fecha vieja: el usuario sigue en la cola de reintento.
+    expect((l1.coordsFetchedAt as Timestamp).toMillis()).toBe(
+      daysAgo(31).toMillis(),
+    );
+    expect(
+      (u.trainerLocationsCoordsFetchedAt as Timestamp).toMillis(),
+    ).toBe(daysAgo(31).toMillis());
     expect(u.trainerGeohashes).toEqual(["gpsgh"]);
     const p = (
       await db().collection("trainerPublicProfiles").doc("t1").get()
     ).data()!;
     expect(p.trainerLocations.map((l: any) => l.id)).toEqual(["l2"]);
     expect(r.usersPurged).toBe(1);
+  });
+
+  it("lugar de PF stale por fallo transitorio: cuando Places vuelve, se limpia stale y se restauran coords, geohash y espejo público", async () => {
+    await seedTrainer(
+      "t1",
+      [loc("l1", "p1", 31), loc("l2", null, 0, { geohash: "gpsgh" })],
+      { consent: true, minAge: 31 },
+    );
+    await run(fetcher({ p1: { status: "transient" } }));
+
+    const later = new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000);
+    const r = await refreshPlacesCoordsHandler(app, {
+      now: later,
+      fetchLocation: fetcher({ p1: ok(-31.4, -64.2) }),
+    });
+
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    const l1 = u.trainerLocations.find((l: any) => l.id === "l1");
+    expect(l1.stale).toBeNull();
+    expect(l1.lat).toBe(-31.4);
+    expect(l1.lng).toBe(-64.2);
+    expect(l1.geohash).toBe(geohash5(-31.4, -64.2));
+    expect((l1.coordsFetchedAt as Timestamp).toMillis()).toBe(later.getTime());
+    expect(new Set(u.trainerGeohashes)).toEqual(
+      new Set(["gpsgh", geohash5(-31.4, -64.2)]),
+    );
+    expect(
+      (u.trainerLocationsCoordsFetchedAt as Timestamp).toMillis(),
+    ).toBe(later.getTime());
+    const p = (
+      await db().collection("trainerPublicProfiles").doc("t1").get()
+    ).data()!;
+    expect(p.trainerLocations.map((l: any) => l.id).sort()).toEqual([
+      "l1",
+      "l2",
+    ]);
+    expect(r.usersUpdated).toBe(1);
+  });
+
+  it("restaurar un lugar stale SIN consentimiento no lo espeja al perfil público", async () => {
+    await seedTrainer("t1", [loc("l1", "p1", 31)], {
+      consent: false,
+      minAge: 31,
+    });
+    await run(fetcher({ p1: { status: "transient" } }));
+    const pubBefore = (
+      await db().collection("trainerPublicProfiles").doc("t1").get()
+    ).data();
+
+    const later = new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000);
+    await refreshPlacesCoordsHandler(app, {
+      now: later,
+      fetchLocation: fetcher({ p1: ok(-31.4, -64.2) }),
+    });
+
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    expect(u.trainerLocations[0].lat).toBe(-31.4);
+    expect(
+      (await db().collection("trainerPublicProfiles").doc("t1").get()).data(),
+    ).toEqual(pubBefore);
+  });
+
+  it("lugar stale por fallo transitorio que ahora da NOT_FOUND: deja de reintentarse", async () => {
+    await seedTrainer("t1", [loc("l1", "p1", 31)], {
+      consent: true,
+      minAge: 31,
+    });
+    await run(fetcher({ p1: { status: "transient" } }));
+
+    const later = new Date(NOW.getTime() + 2 * 24 * 60 * 60 * 1000);
+    await refreshPlacesCoordsHandler(app, {
+      now: later,
+      fetchLocation: fetcher({ p1: { status: "not_found" } }),
+    });
+    const u = (await db().collection("users").doc("t1").get()).data()!;
+    expect(u.trainerLocations[0].stale).toBe(true);
+    expect(u.trainerLocations[0].coordsFetchedAt).toBeNull();
+    expect(u.trainerLocationsCoordsFetchedAt).toBeNull();
   });
 
   it("lugar de PF de 26d + error transitorio: se conserva", async () => {
