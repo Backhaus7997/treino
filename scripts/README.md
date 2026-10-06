@@ -666,11 +666,12 @@ El stub (`test/fixtures/stub_firebase_admin.js`) tapa los **dos** caminos de
 carga, porque los scripts de `migrations/` son `.mjs` y su `import` no pasa por
 `Module._load`: `Module._load` para CJS y `module.register()` —con los hooks de
 `test/fixtures/esm_stub_hooks.mjs`— para ESM. `register()` y no
-`registerHooks()` a propósito: la segunda existe recién en Node 22.15 y el job
-corre **Node 20**, donde el subproceso pasaba a cargar el `firebase-admin` de
-verdad. Ese modo es peor que un rojo, porque los tests que prueban la
+`registerHooks()` a propósito: la segunda existe recién en Node 22.15, y el piso
+de `scripts/` es **Node 22** (`engines.node`, `firebase-admin` 14.5 lo exige): en
+una 22.x anterior a la 22.15 el subproceso pasaba a cargar el `firebase-admin`
+de verdad. Ese modo es peor que un rojo, porque los tests que prueban la
 **ausencia** de un marcador quedan verdes midiendo nada. Por eso la intercepción
 ahora se **anuncia** (`STUB_ESM_INTERCEPTED`), los tests la exigen en cada
 corrida y `test/esm_stub_interception.test.js` la custodia con control negativo.
-Si tocás el stub, corré la suite en Node 20 —no sólo en el tuyo—:
-`npx -y node@20 --test test/*.test.js` desde `scripts/`.
+Si tocás el stub, corré la suite en Node 22 —no sólo en el tuyo—:
+`npx -y node@22 --test test/*.test.js` desde `scripts/`.

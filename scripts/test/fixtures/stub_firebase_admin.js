@@ -362,8 +362,8 @@ globalThis.__STUB_FIREBASE_ADMIN__ = adminStub;
 // Si este Node no puede interceptar el import ESM, el preload MUERE acá, y el
 // error dice por qué. NO se sigue de largo con la mitad CJS puesta.
 //
-// Es la lección del rojo de CI. `registerHooks` (Node 22.15+) no existe en el
-// Node 20 del job, así que el preload tiraba `TypeError` y se llevaba puesto
+// Es la lección del rojo de CI. `registerHooks` (Node 22.15+) no existía en el
+// Node 20 que corría el job (hoy el piso es 22), así que el preload tiraba `TypeError` y se llevaba puesto
 // cada subproceso — eso fue ruidoso y por eso se vio. Lo que NO se habría visto
 // es el modo de al lado: que la intercepción de CJS ande y la de ESM no. Ahí
 // los tests de compuerta —que prueban la AUSENCIA de `STUB_FIRESTORE_REACHED`—
@@ -384,7 +384,7 @@ if (typeof register !== 'function') {
 
 // Node 26 marca `register()` como deprecada en favor de `registerHooks()`, y
 // avisa por stderr. Se queda `register()` igual: es la ÚNICA de las dos que
-// existe en Node 20, que es la versión de CI, y un solo camino para todas las
+// existe en Node 20 —el piso anterior de CI— y un solo camino para todas las
 // versiones vale más que ahorrarse un warning. El día que el piso de Node del
 // repo suba a >= 22.15 en todos lados, esto pasa a `registerHooks(hooks)` con
 // los MISMOS hooks de `esm_stub_hooks.mjs` — y `STUB_ESM_INTERCEPTED` va a ser

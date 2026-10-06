@@ -9,7 +9,8 @@
  *
  * La primera versión de esta intercepción usaba `module.registerHooks()`, que
  * es síncrono y en el mismo hilo. Anda — en Node 22.15+. **El job
- * `scripts-test` de CI corre Node 20**, donde `registerHooks` no existe, y ahí
+ * `scripts-test` de CI corría Node 20** (hoy corre 22, el piso de `scripts/`),
+ * donde `registerHooks` no existe, y ahí
  * el preload moría con `TypeError: registerHooks is not a function`.
  *
  * Lo grave no era el rojo. Era que sin el hook el subproceso carga el
