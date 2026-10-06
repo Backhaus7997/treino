@@ -313,6 +313,76 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
     expect(state.trainer_links.L1.acceptedAt).toEqual(originalAcceptedAt);
   });
 
+  // A2 — defensa en profundidad del gate que `firestore.rules` le puso a
+  // `paused` (sólo desde `active`). Esta callable va por Admin SDK y SE SALTEA
+  // las reglas, así que un vínculo que YA quedó en ese estado —revivido antes
+  // del fix, o escrito por un script— se resumía igual.
+  //
+  // Y lo que el resume devuelve son datos de SALUD del alumno:
+  // `syncSessionShareOnTrainerLink` re-otorga `session_shares` en la transición
+  // a `active`, sobre una relación que el alumno ya había cortado.
+  //
+  // El discriminador es la EVIDENCIA POSITIVA de que se terminó, no la ausencia
+  // de algo: `acceptedAt` NO sirve para esto —el repo lo llama «un DEFECTO DE
+  // DATOS, no evidencia de lealtad» en select-blocked-links.ts ~192, o sea que
+  // un vínculo real viejo puede no tenerlo— y exigirlo rompería resumes
+  // legítimos. `terminatedAt` y `terminationReason`, en cambio, sólo aparecen
+  // cuando alguien terminó el vínculo.
+  it("A2: DENIEGA resumir un vínculo que arrastra terminatedAt", async () => {
+    install({
+      trainer_links: {
+        L1: link({
+          status: "paused",
+          acceptedAt: Timestamp.fromMillis(1_600_000_000_000),
+          terminatedAt: Timestamp.fromMillis(1_650_000_000_000),
+        }),
+      },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "paused" },
+      }),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("A2: DENIEGA resumir un vínculo que arrastra terminationReason", async () => {
+    install({
+      trainer_links: {
+        L1: link({
+          status: "paused",
+          acceptedAt: Timestamp.fromMillis(1_600_000_000_000),
+          terminationReason: "athlete-terminated",
+        }),
+      },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "paused" },
+      }),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  // El ancla de que esto NO toca el accept: una solicitud `pending` no arrastra
+  // nada, y aceptar tiene que seguir andando. El ancla del resume legítimo vive
+  // arriba, en "resume clears pausedAt and does NOT restamp acceptedAt".
+  it("A2: aceptar un pending limpio sigue andando", async () => {
+    const state = install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    const result = await syncTrainerLoad(app, {
+      promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+    });
+
+    expect(result.promoted).toBe(true);
+    expect(state.trainer_links.L1.status).toBe("active");
+  });
+
   it("reconciliation (promotion:null) touches no link fields", async () => {
     const state = install({
       trainer_links: { ...seedActiveLinks(2), L1: link({ status: "paused" }) },
