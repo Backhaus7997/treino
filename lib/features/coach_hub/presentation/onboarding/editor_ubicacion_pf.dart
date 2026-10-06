@@ -65,7 +65,7 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   void initState() {
     super.initState();
     // Habilita/deshabilita «Buscar» según el largo del texto.
-    _consulta.addListener(_alCambiarTexto);
+    _consulta.addListener(_alCambiarConsulta);
     _etiqueta.addListener(_alCambiarTexto);
   }
 
@@ -73,9 +73,32 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     if (mounted) setState(() {});
   }
 
+  String _consultaBuscada = '';
+
+  /// Cambiar la dirección invalida lo que se buscó con la anterior: los
+  /// resultados y el lugar elegido son de OTRA consulta (agregarlos guardaría
+  /// coordenadas que el PF ya no está mirando), y la respuesta de una búsqueda
+  /// en vuelo queda descartada por el token.
+  void _alCambiarConsulta() {
+    if (!mounted) return;
+    final texto = _consulta.text.trim();
+    if (texto != _consultaBuscada) {
+      _consultaBuscada = texto;
+      final hayEstado = _estado != _Estado.inicial;
+      if (hayEstado || _elegido != null) {
+        _busquedaActual++;
+        _etiqueta.clear();
+        _estado = _Estado.inicial;
+        _resultados = const [];
+        _elegido = null;
+      }
+    }
+    setState(() {});
+  }
+
   @override
   void dispose() {
-    _consulta.removeListener(_alCambiarTexto);
+    _consulta.removeListener(_alCambiarConsulta);
     _etiqueta.removeListener(_alCambiarTexto);
     _consulta.dispose();
     _etiqueta.dispose();
@@ -86,6 +109,7 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     final texto = _consulta.text.trim();
     if (texto.length < LugarSearchService.minCaracteres) return;
     final esta = ++_busquedaActual;
+    _consultaBuscada = texto;
     _etiqueta.clear();
     setState(() {
       _estado = _Estado.cargando;
@@ -122,6 +146,7 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
     if (lugar == null || !_puedeAgregar) return;
     final etiqueta = _etiqueta.text.trim();
     _busquedaActual++;
+    _consultaBuscada = '';
     _consulta.clear();
     _etiqueta.clear();
     setState(() {

@@ -108,7 +108,7 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
           lng: lugar.lng,
           geohash: geohash5(lugar.lat, lugar.lng),
           placeId: lugar.placeId,
-          coordsFetchedAt: ahora.toUtc(),
+          coordsFetchedAt: lugar.fetchedAt,
         ),
       );
     });

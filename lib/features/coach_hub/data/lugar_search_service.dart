@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:treino/core/utils/app_clock.dart';
 
 /// Un lugar devuelto por la búsqueda por dirección del PF.
 ///
@@ -15,6 +16,7 @@ class LugarCandidato {
     required this.placeId,
     required this.lat,
     required this.lng,
+    required this.fetchedAt,
     this.displayName = '',
     this.formattedAddress = '',
   });
@@ -22,6 +24,11 @@ class LugarCandidato {
   final String placeId;
   final double lat;
   final double lng;
+
+  /// Cuándo llegó la respuesta de Places con estas coordenadas (UTC). Es lo
+  /// que se persiste como `coordsFetchedAt`: el límite de 30 días de caché se
+  /// cuenta desde que Google las devolvió, no desde que el PF apretó Agregar.
+  final DateTime fetchedAt;
 
   /// Solo para mostrar en la lista. NO persistir.
   final String displayName;
@@ -129,6 +136,7 @@ class LugarSearchService {
     }
     if (decoded is! Map || decoded['places'] is! List) return const [];
 
+    final fetchedAt = AppClock.now().toUtc();
     final out = <LugarCandidato>[];
     for (final entry in decoded['places'] as List) {
       if (entry is! Map) continue;
@@ -147,6 +155,7 @@ class LugarSearchService {
         placeId: id,
         lat: lat.toDouble(),
         lng: lng.toDouble(),
+        fetchedAt: fetchedAt,
         displayName: nombre is Map && nombre['text'] is String
             ? nombre['text'] as String
             : '',

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
@@ -853,6 +854,105 @@ void main() {
       });
     }
   }
+
+  testWidgets(
+      'editar la dirección tras buscar descarta resultados y lugar elegido '
+      '(no se agrega con las coordenadas de la consulta anterior)',
+      (tester) async {
+    await sembrar();
+    await pump(tester, theme: AppTheme.light());
+    await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+    await tester.tap(find.byKey(_buscarKey));
+    await asentar(tester);
+    await tester.tap(find.byKey(_resultadoKey(0)));
+    await tester.pump();
+    await escribir(tester, _etiquetaKey, 'Casa Simpson');
+    expect(find.byKey(_agregarKey), findsOneWidget);
+
+    await escribir(tester, _busquedaKey, 'Otra calle 123');
+
+    expect(find.byKey(_resultadosKey), findsNothing);
+    expect(find.byKey(_etiquetaKey), findsNothing);
+    expect(find.byKey(_agregarKey), findsNothing);
+  });
+
+  testWidgets(
+      'editar la dirección con una búsqueda en vuelo ignora su respuesta',
+      (tester) async {
+    final completer = Completer<http.Response>();
+    places = (_) => completer.future;
+    await sembrar();
+    await pump(tester, theme: AppTheme.light());
+    await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+    await tester.tap(find.byKey(_buscarKey));
+    await tester.pump();
+
+    await escribir(tester, _busquedaKey, 'Otra calle 123');
+    completer.complete(_json({
+      'places': [_lugar('ChIJviejo', -1, -2)],
+    }));
+    await asentar(tester);
+
+    expect(find.byKey(_resultadosKey), findsNothing);
+    expect(find.byKey(_resultadoKey(0)), findsNothing);
+    // Y la búsqueda nueva se puede disparar (no quedó en «cargando»).
+    expect(
+      tester.widget<TreinoButton>(find.byKey(_buscarKey)).onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets(
+      'coordsFetchedAt es la hora en que llegó la respuesta de Places, no la '
+      'de apretar Agregar', (tester) async {
+    addTearDown(AppClock.unfreeze);
+    final llegada = DateTime(2026, 5, 1, 10);
+    AppClock.freeze(llegada);
+    await sembrar();
+    await pump(tester, theme: AppTheme.light());
+    await llenarBasicos(tester);
+    await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+    await tester.tap(find.byKey(_buscarKey));
+    await asentar(tester);
+    await tester.tap(find.byKey(_resultadoKey(0)));
+    await tester.pump();
+    await escribir(tester, _etiquetaKey, 'Casa Simpson');
+
+    // El PF se toma tres días para apretar Agregar.
+    AppClock.freeze(llegada.add(const Duration(days: 3)));
+    await tester.tap(find.byKey(_agregarKey));
+    await tester.pump();
+    await tester.tap(find.byKey(_finalizarKey));
+    await asentar(tester);
+    await tester
+        .tap(find.text(l10nDe(tester).profileEditTrainerConsentConfirmAccept));
+    await asentar(tester);
+
+    final l = ((await usuario())['trainerLocations'] as List).single as Map;
+    expect(
+        (l['coordsFetchedAt'] as Timestamp).toDate().isAtSameMomentAs(llegada),
+        isTrue);
+  });
+
+  testWidgets(
+      'una etiqueta vetada no se guarda y muestra el error de moderación',
+      (tester) async {
+    await sembrar();
+    await pump(tester, theme: AppTheme.light());
+    await llenarBasicos(tester);
+    await buscarYElegir(tester, etiqueta: 'sos un hijo de puta');
+    await tester.tap(find.byKey(_finalizarKey));
+    await asentar(tester);
+    final aceptar =
+        find.text(l10nDe(tester).profileEditTrainerConsentConfirmAccept);
+    if (aceptar.evaluate().isNotEmpty) {
+      await tester.tap(aceptar);
+      await asentar(tester);
+    }
+
+    expect(find.text(l10nDe(tester).moderationBlockedMessage), findsOneWidget);
+    expect((await usuario()).containsKey('trainerLocations'), isFalse);
+  });
 
   testWidgets('desmontar con una búsqueda en vuelo no lanza al terminar',
       (tester) async {
