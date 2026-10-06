@@ -201,7 +201,9 @@ void main() {
     expect(data['name'], 'Iron Box');
     expect(data['nameNeeded'], false);
     // Re-escribe el gymId para que `users/{uid}.gymName` se resuelva.
-    verify(() => userRepo.update('u1', {'gymId': 'g1'})).called(greaterThan(0));
+    final writes = verify(() => userRepo.update('u1', captureAny())).captured;
+    expect(writes, isNotEmpty);
+    expect(writes.last, {'gymId': 'g1'});
     expect(title, findsNothing);
   });
 
@@ -219,6 +221,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Normas de Comunidad'), findsOneWidget);
+    expect(find.textContaining('No pudimos guardar el gimnasio'), findsNothing);
+    verifyNever(() => userRepo.update(any(), any()));
     final data = (await firestore.collection('gyms').doc('g1').get()).data()!;
     expect(data['nameNeeded'], true);
     expect(title, findsOneWidget);
@@ -263,10 +267,87 @@ void main() {
         find.textContaining('No pudimos guardar el gimnasio'), findsOneWidget);
   });
 
-  // Silencia el aviso de import sin uso si el provider de dismiss cambia.
-  test('el provider de descarte arranca en false', () {
+  test('el descarte es por uid: A descartó, B sigue viendo el aviso', () {
     final c = ProviderContainer();
     addTearDown(c.dispose);
-    expect(c.read(gymNamePromptDismissedProvider), isFalse);
+    expect(c.read(gymNamePromptDismissedProvider('A')), isFalse);
+    c.read(gymNamePromptDismissedProvider('A').notifier).state = true;
+    expect(c.read(gymNamePromptDismissedProvider('A')), isTrue);
+    expect(c.read(gymNamePromptDismissedProvider('B')), isFalse);
+  });
+
+  testWidgets('A descarta, cambia la cuenta a B: B ve el aviso',
+      (tester) async {
+    await seed(nameNeeded: true);
+    final uid = StateProvider<String?>((ref) => 'u1');
+    final container = ProviderContainer(overrides: [
+      userProfileProvider
+          .overrideWith((ref) => Stream.value(_profile(gymId: 'g1'))),
+      currentUidProvider.overrideWith((ref) => ref.watch(uid)),
+      gymRepositoryProvider
+          .overrideWithValue(GymRepository(firestore: firestore)),
+    ]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: const Scaffold(body: GymNamePromptCard()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.tap(find.text('Ahora no'));
+    await tester.pump();
+    expect(title, findsNothing);
+
+    container.read(uid.notifier).state = 'u2';
+    await tester.pump();
+    await tester.pump();
+    expect(title, findsOneWidget);
+  });
+
+  testWidgets('a 320dp con textScaler 2.0 no desborda y ambas acciones se ven',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await seed(nameNeeded: true);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_profile(gymId: 'g1'))),
+          currentUidProvider.overrideWithValue('u1'),
+          gymRepositoryProvider
+              .overrideWithValue(GymRepository(firestore: firestore)),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(2.0)),
+            child: child!,
+          ),
+          home: const Scaffold(
+              body: SingleChildScrollView(
+            child: GymNamePromptCard(),
+          )),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const Key('gym_name_prompt_dismiss')), findsOneWidget);
+    expect(find.byKey(const Key('gym_name_prompt_cta')), findsOneWidget);
   });
 }

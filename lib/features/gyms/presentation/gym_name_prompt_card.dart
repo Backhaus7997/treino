@@ -11,6 +11,7 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/gym_name_prompt_providers.dart';
 import '../application/places_providers.dart';
+import '../data/resolve_gym_place_service.dart' show ResolveGymPlaceResult;
 import '../domain/gym.dart';
 import 'gym_name_dialog.dart';
 
@@ -48,15 +49,25 @@ class GymNamePromptCard extends ConsumerWidget {
     final notifier = container.read(selectGymActionProvider.notifier);
 
     final ok = await notifier.select(uid: uid, placeId: gym.id, name: typed);
-    final state = container.read(selectGymActionProvider);
+    // El scope puede haberse desmontado durante el await (logout): no hay
+    // nada que mostrar ni a quién.
+    final ResolveGymPlaceResult? resolved;
+    final Object? error;
+    try {
+      final state = container.read(selectGymActionProvider);
+      resolved = state.valueOrNull;
+      error = state.hasError ? (state.error ?? 'error') : null;
+    } catch (_) {
+      return;
+    }
 
     String? message;
-    if (state.hasError) {
-      message = state.error is ModerationBlockedException
+    if (error != null) {
+      message = error is ModerationBlockedException
           ? l10n.moderationBlockedMessage
           : l10n.profileGymSaveError;
     } else if (ok) {
-      final winner = state.valueOrNull?.name;
+      final winner = resolved?.name;
       // Carrera perdida: el servicio devuelve el nombre del que llegó
       // primero. Si coincide con lo tipeado, fue un alta normal.
       if (winner != null && winner.isNotEmpty && winner != typed.trim()) {
@@ -70,7 +81,8 @@ class GymNamePromptCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (ref.watch(gymNamePromptDismissedProvider)) {
+    final uid = ref.watch(currentUidProvider);
+    if (uid == null || ref.watch(gymNamePromptDismissedProvider(uid))) {
       return const SizedBox.shrink();
     }
     final gym = ref.watch(gymNamePromptGymProvider).valueOrNull;
@@ -92,48 +104,53 @@ class GymNamePromptCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(TreinoIcon.gym, size: 20, color: palette.accent),
-                const SizedBox(width: AppSpacing.s12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.gymNamePromptTitle,
-                        style: GoogleFonts.barlow(
-                          fontSize: AppTextSize.body,
-                          fontWeight: FontWeight.w700,
-                          color: palette.textPrimary,
+            Semantics(
+              liveRegion: true,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(TreinoIcon.gym, size: 20, color: palette.accent),
+                  const SizedBox(width: AppSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.gymNamePromptTitle,
+                          style: GoogleFonts.barlow(
+                            fontSize: AppTextSize.body,
+                            fontWeight: FontWeight.w700,
+                            color: palette.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.hairline),
-                      Text(
-                        l10n.gymNamePromptBody,
-                        style: GoogleFonts.barlow(
-                          fontSize: AppTextSize.bodyDense,
-                          color: palette.textMuted,
+                        const SizedBox(height: AppSpacing.hairline),
+                        Text(
+                          l10n.gymNamePromptBody,
+                          style: GoogleFonts.barlow(
+                            fontSize: AppTextSize.bodyDense,
+                            color: palette.textMuted,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: AppSpacing.s12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
               children: [
                 TextButton(
                   key: const Key('gym_name_prompt_dismiss'),
                   onPressed: () => ref
-                      .read(gymNamePromptDismissedProvider.notifier)
+                      .read(gymNamePromptDismissedProvider(uid).notifier)
                       .state = true,
                   child: Text(l10n.gymNamePromptDismiss),
                 ),
-                const SizedBox(width: AppSpacing.s8),
                 ElevatedButton(
                   key: const Key('gym_name_prompt_cta'),
                   onPressed: () => _name(context, ref, gym),

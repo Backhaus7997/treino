@@ -11,11 +11,13 @@ final gymStreamByIdProvider =
   return ref.watch(gymRepositoryProvider).watchById(id);
 });
 
-/// El atleta/entrenador descartó la card «nombrá tu gimnasio» en esta sesión.
-/// Vive lo que vive el `ProviderScope`: no se persiste a propósito, así que
-/// vuelve a aparecer en la próxima apertura de la app si el gym sigue sin
-/// nombre.
-final gymNamePromptDismissedProvider = StateProvider<bool>((ref) => false);
+/// El atleta/entrenador [uid] descartó la card «nombrá tu gimnasio» en esta
+/// sesión. Vive lo que vive el `ProviderScope`: no se persiste a propósito,
+/// así que vuelve a aparecer en la próxima apertura de la app si el gym sigue
+/// sin nombre. Va por uid: si otra cuenta inicia sesión en el mismo proceso,
+/// el descarte de la anterior no la afecta.
+final gymNamePromptDismissedProvider =
+    StateProvider.family<bool, String>((ref, uid) => false);
 
 /// El gym vinculado del usuario (`users/{uid}.gymId`) SOLO si está marcado
 /// `nameNeeded`; `AsyncData(null)` si no hay gym, es el sentinel `no-gym`,
