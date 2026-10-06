@@ -384,9 +384,6 @@ const validGooglePlacesGym = (id) => ({
   lng: -58.4615,
   geohash: '6d6m7',
   source: 'google-places',
-  brandId: null,
-  brandName: null,
-  branchName: null,
   createdAt: new Date(),
   // Places policy (#1338): coords carry the server time they were fetched at.
   coordsFetchedAt: firebaseCompat.firestore.FieldValue.serverTimestamp(),
@@ -452,7 +449,16 @@ test('GYM-PLACES-05: same-shape update on an existing google-places doc is allow
       .firestore()
       .collection('gyms')
       .doc('ChIJ_place_5')
-      .set(validGooglePlacesGym('ChIJ_place_5'), { merge: true }),
+      .set(
+        {
+          id: 'ChIJ_place_5',
+          name: 'SportClub Belgrano',
+          lat: -34.5598,
+          lng: -58.4615,
+          source: 'google-places',
+        },
+        { merge: true },
+      ),
   );
 });
 
@@ -606,9 +612,19 @@ test('GYM-PLACES-15: create cannot self-flag nameNeeded', async () => {
   );
 });
 
-/** Seeds a migrated gym that still needs a user-typed name. */
-async function seedGymNeedingName(id) {
+/**
+ * Seeds a migrated gym that still needs a user-typed name, plus the users doc
+ * of `linkedUid` pointing at it (only a user linked to the gym may name it).
+ */
+async function seedGymNeedingName(id, linkedUid = 'athlete-b') {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    if (linkedUid) {
+      await ctx.firestore().collection('users').doc(linkedUid).set({
+        uid: linkedUid,
+        role: 'athlete',
+        gymId: id,
+      });
+    }
     await ctx.firestore().collection('gyms').doc(id).set({
       id,
       name: 'Marcador',
@@ -622,7 +638,7 @@ async function seedGymNeedingName(id) {
   });
 }
 
-test('GYM-PLACES-16: any authenticated user can name a gym flagged nameNeeded', async () => {
+test('GYM-PLACES-16: a user linked to the gym can name it when flagged nameNeeded', async () => {
   await seedGymNeedingName('ChIJ_place_16');
   const athleteB = testEnv.authenticatedContext('athlete-b');
   await assertSucceeds(
@@ -687,6 +703,125 @@ test('GYM-PLACES-19: a gym already named cannot be renamed through the nameNeede
       .collection('gyms')
       .doc('ChIJ_place_19')
       .update({ name: 'VANDALIZED', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-20: clearing nameNeeded WITHOUT changing the name is denied (no laundering the legacy name)', async () => {
+  await seedGymNeedingName('ChIJ_place_20');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_20')
+      .update({ nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-21: re-sending the same legacy name while clearing the flag is denied', async () => {
+  await seedGymNeedingName('ChIJ_place_21');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_21')
+      .update({ name: 'Marcador', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-22: a whitespace-only name is denied', async () => {
+  await seedGymNeedingName('ChIJ_place_22');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_22')
+      .update({ name: '   ', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-23: a user NOT linked to the gym cannot name it', async () => {
+  await seedGymNeedingName('ChIJ_place_23', null);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc('athlete-c').set({
+      uid: 'athlete-c',
+      role: 'athlete',
+      gymId: 'otro-gym',
+    });
+  });
+  // no users doc at all
+  await assertFails(
+    testEnv
+      .authenticatedContext('athlete-z')
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_23')
+      .update({ name: 'Mi gimnasio', nameNeeded: false }),
+  );
+  // linked to a different gym
+  await assertFails(
+    testEnv
+      .authenticatedContext('athlete-c')
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_23')
+      .update({ name: 'Mi gimnasio', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-24: create is denied with an extra key (e.g. Google formattedAddress)', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_24')
+      .set({
+        ...validGooglePlacesGym('ChIJ_place_24'),
+        formattedAddress: 'Av. Cabildo 1234',
+      }),
+  );
+});
+
+test('GYM-PLACES-25: create is denied without a geohash string', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  const { geohash, ...sinGeohash } = validGooglePlacesGym('ChIJ_place_25');
+  await assertFails(
+    athleteA.firestore().collection('gyms').doc('ChIJ_place_25').set(sinGeohash),
+  );
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_25')
+      .set({ ...validGooglePlacesGym('ChIJ_place_25'), geohash: 123 }),
+  );
+});
+
+test('GYM-PLACES-26: a client cannot change coordsFetchedAt or placeStatus (only the refresh job does)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_26')
+      .set({ ...validGooglePlacesGym('ChIJ_place_26'), coordsFetchedAt: new Date(0) });
+  });
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_26')
+      .update({ coordsFetchedAt: firebaseCompat.firestore.FieldValue.serverTimestamp() }),
+  );
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_26')
+      .update({ placeStatus: 'not_found' }),
   );
 });
 

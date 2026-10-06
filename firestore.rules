@@ -2057,8 +2057,9 @@ service cloud.firestore {
     // a `resolveGymPlace` Cloud Function (Admin SDK, bypasses rules). That CF
     // CANNOT be deployed — GCP project `treino-dev` sits under org
     // `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks a
-    // publicly-invokable (`allUsers`) Cloud Function. The CF is SHELVED
-    // (kept in functions/src/places-search.ts, not exported from index.ts).
+    // publicly-invokable (`allUsers`) Cloud Function. The CF was
+    // DELETED (it persisted Google's name/address, which the Places policy,
+    // #1338, forbids).
     // Resolution now happens CLIENT-SIDE (ResolveGymPlaceService,
     // lib/features/gyms/data/resolve_gym_place_service.dart), so an
     // authenticated athlete's client now writes `gyms/{placeId}` directly —
@@ -2092,7 +2093,14 @@ service cloud.firestore {
       allow create: if request.auth != null
                     && request.resource.data.source == 'google-places'
                     && request.resource.data.id == gymId
-                    && request.resource.data.keys().hasAll(['id', 'name', 'lat', 'lng', 'source', 'coordsFetchedAt'])
+                    && request.resource.data.keys().hasAll(['id', 'name', 'lat', 'lng', 'geohash', 'source', 'coordsFetchedAt'])
+                    // Lista CERRADA = exactamente lo que escribe
+                    // GymRepository.createFromPlace. Con `hasAll` un cliente
+                    // modificado podía agregar `formattedAddress` o cualquier
+                    // otro texto de Google y quedaba en un catálogo legible
+                    // por todos.
+                    && request.resource.data.keys().hasOnly(['id', 'name', 'lat', 'lng', 'geohash', 'source', 'createdAt', 'coordsFetchedAt', 'placeStatus'])
+                    && request.resource.data.geohash is string
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
@@ -2134,7 +2142,9 @@ service cloud.firestore {
       // Places policy (#1338): a gym the migration flagged `nameNeeded` (its
       // stored name came from Google) can be named ONCE by any authenticated
       // user — the next one who links it. Only `name` + the flag move; coords
-      // stay pinned and `address` can't come back through a merge.
+      // stay pinned and `address` can't come back through a merge. Y
+      // `coordsFetchedAt`/`placeStatus` los mueve SOLO el job de refresco
+      // (Admin SDK): un cliente no puede rejuvenecer coords vencidas.
       allow update: if request.auth != null
                     && resource.data.source == 'google-places'
                     && request.resource.data.source == resource.data.source
@@ -2142,12 +2152,20 @@ service cloud.firestore {
                     && ((request.resource.data.name == resource.data.name
                           && request.resource.data.lat == resource.data.lat
                           && request.resource.data.lng == resource.data.lng
-                          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['address', 'nameNeeded']))
+                          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['address', 'nameNeeded', 'coordsFetchedAt', 'placeStatus']))
                         || (resource.data.get('nameNeeded', false) == true
+                          // Sólo quien YA está vinculado al gym lo nombra: un
+                          // tercero sin relación con ese gimnasio no puede
+                          // ponerle nombre al catálogo de todos.
+                          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == gymId
                           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'nameNeeded'])
                           && request.resource.data.nameNeeded == false
                           && request.resource.data.name is string
-                          && request.resource.data.name.size() > 0
+                          // El nombre TIENE que cambiar: limpiar la marca
+                          // reenviando el nombre legado de Google lo
+                          // blanquearía como si lo hubiera escrito un usuario.
+                          && request.resource.data.name != resource.data.name
+                          && request.resource.data.name.trim().size() > 0
                           && request.resource.data.name.size() <= 100));
 
       allow delete: if false;
