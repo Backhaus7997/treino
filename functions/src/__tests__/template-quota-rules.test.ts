@@ -188,7 +188,17 @@ describe("crear una trainer-template — CREATE branch 1", () => {
     );
   });
 
-  it("un alumno crea su forjado como hasta hoy — la cuota no se le aplica", async () => {
+  // A3 — este test afirmaba `assertSucceeds`: el forjado de un alumno pasaba, y
+  // el nombre decía "como hasta hoy". Era cierto y era el agujero: la rama del
+  // PF en el CREATE validaba `source`/`visibility`/`assignedTo` y nada más, así
+  // que cualquier cuenta escribía un doc diciendo que lo hizo un entrenador.
+  //
+  // Ahora se deniega, y conviene ser preciso sobre POR QUÉ: no lo frena la
+  // cuota —que efectivamente no se le aplica a un alumno, y eso no cambió— sino
+  // el gate de rol del create. Los dos campos de cuota se dejan sembrados a
+  // propósito, con valores que la harían fallar, para que el deny no se pueda
+  // confundir con un rechazo por tope.
+  it("un alumno NO puede crear un forjado: lo frena el rol, no la cuota", async () => {
     const uid = "alumno-forjado";
     await seedUser(uid, {
       role: "athlete",
@@ -196,7 +206,7 @@ describe("crear una trainer-template — CREATE branch 1", () => {
       templateUsage: { count: 999 },
     });
 
-    await assertSucceeds(
+    await assertFails(
       asUser(uid).collection(COL_ROUTINES).add(templateDoc(uid)),
     );
   });
@@ -222,10 +232,34 @@ describe("crear una trainer-template — CREATE branch 1", () => {
     );
   });
 
-  it("sin doc de perfil, la cuota no se aplica (falla abierta, como paywallEnforcedFor)", async () => {
-    const uid = "pf-sin-doc-de-perfil";
+  // Lo que este test mide es que la CUOTA falla abierta cuando no hay datos de
+  // cuota — no que el create entero sea gratis sin doc de usuario.
+  //
+  // Antes esas dos cosas eran la misma, porque sin doc de perfil no había nada
+  // que mirar. Con el gate de rol de A3 se separan, y la asimetría es
+  // deliberada: la cuota falla ABIERTA (ante la duda, no le cobres a un PF real
+  // por un dato que falta) y el rol falla CERRADO (ante la duda, no me consta
+  // que sea PF). Es la política que el propio repo escribe en `promote-link.ts`:
+  // la degradación de datos frena TRABAJO NUEVO, y crear una plantilla lo es.
+  //
+  // Así que el fixture siembra el rol y NADA de cuota, que es lo que el test
+  // quiere observar. Sin eso miraría el deny del rol creyendo que mira el de la
+  // cuota — un verde por el motivo equivocado.
+  it("con rol pero sin datos de cuota, la cuota falla ABIERTA", async () => {
+    const uid = "pf-sin-datos-de-cuota";
+    await seedUser(uid, { role: "trainer" });
 
     await assertSucceeds(
+      asUser(uid).collection(COL_ROUTINES).add(templateDoc(uid)),
+    );
+  });
+
+  // Y la contracara, que antes no se podía escribir: sin doc de usuario no hay
+  // rol que mostrar, y el create se deniega. Fija el fail-closed del gate.
+  it("sin doc de usuario, el create se deniega (el rol falla CERRADO)", async () => {
+    const uid = "pf-sin-doc-de-perfil";
+
+    await assertFails(
       asUser(uid).collection(COL_ROUTINES).add(templateDoc(uid)),
     );
   });

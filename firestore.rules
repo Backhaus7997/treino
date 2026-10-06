@@ -712,6 +712,30 @@ service cloud.firestore {
                 'copiedFrom'];
       }
 
+      // Los campos que un doc del PF —asignado o plantilla— puede traer AL
+      // CREARSE. Hermano de `userCreatedRoutineFields()`, y existe por el mismo
+      // motivo: que el `create` no admita claves que después nadie puede editar.
+      //
+      // ⚠️ NO es la lista de los `hasOnly` de UPDATE 3 y 4, y la diferencia es
+      // una sola clave que importa: `copiedFrom`. Esta lista describe lo que el
+      // CLIENTE ESCRIBE, y `createAssigned` manda `routine.toJson()` entero
+      // (menos `id`, más `createdAt`); el `toJson` generado emite `copiedFrom`
+      // SIEMPRE, con null cuando la rutina no se copió de ninguna. Sin la clave
+      // acá, este `hasOnly` rechazaría el create de TODO plan asignado — el
+      // modo de falla exacto que el COUPLING WARNING de abajo advierte, y que
+      // `routine.dart` ~100 ya documenta para la lista del atleta.
+      //
+      // `ratingAvg`/`ratingsCount` NO van: son CF-write-only y el create las
+      // rechaza explícitamente unas líneas más abajo. Listarlas acá sería
+      // contradecir esa guarda.
+      function trainerRoutineFields() {
+        return ['name', 'split', 'level', 'days',
+                'source', 'assignedBy', 'assignedTo', 'visibility',
+                'status', 'createdBy', 'createdAt',
+                'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
+                'summary', 'goals', 'copiedFrom'];
+      }
+
       // ¿Es `routineId` una plantilla del CATÁLOGO del sistema?
       //
       // Falla ABIERTO en los dos bordes, igual que `rutinaEsPaga` más abajo:
@@ -933,7 +957,48 @@ service cloud.firestore {
                         // `recountTemplates`.
                         && (request.resource.data.get('status', 'active') == 'archived'
                             || templateQuotaOk(request.auth.uid)))
-                    );
+                    )
+                    // ── FORMA (A3) ────────────────────────────────────────────
+                    //
+                    // Esta rama validaba TRES cosas (source, visibility, y que
+                    // `assignedTo` fuera un string no vacío) mientras la rama
+                    // del ATLETA de este mismo create —branch 2, abajo— valida
+                    // tipos, `hasOnly` y el tope. La asimetría no era una
+                    // decisión: era el agujero.
+                    //
+                    // Sin tipos, un doc al que le falta `days` o que trae
+                    // `level` mal tipado hace que `Routine.fromJson` TIRE en el
+                    // cliente del alumno, y ese parseo no tiene try/catch por
+                    // documento: se cae su lista de Rutinas entera. Y no puede
+                    // sacarlo — el delete es sólo del `assignedBy` (~1300).
+                    && request.resource.data.createdAt is timestamp
+                    && request.resource.data.keys().hasOnly(trainerRoutineFields())
+                    // ── ROL (A3) ──────────────────────────────────────────────
+                    //
+                    // Va ÚLTIMO: es la única cláusula que paga una lectura
+                    // facturada y las reglas cortan por izquierda, así que un
+                    // payload que ya falla por forma no la paga. Mismo criterio
+                    // que el `get()` del paywall en branch 2.
+                    //
+                    // Acá el que tiene que ser PF es QUIEN ESCRIBE (al revés que
+                    // en `trainer_links`, donde el create lo hace el atleta y el
+                    // campo peligroso es la contraparte).
+                    //
+                    // Qué cierra, además del contenido falso: el TOPE DEL PLAN
+                    // GRATIS. `withinFreeRoutineShape` vive sólo en la rama del
+                    // atleta, así que un alumno free que se autoasignaba un plan
+                    // —`assignedBy` == `assignedTo` == su uid— entrenaba 7 días
+                    // y 12 semanas, y la sesión lo dejaba pasar porque sólo mira
+                    // `isPremium` de la rutina (~2880).
+                    //
+                    // ALCANCE: rol, NO rol + vínculo — la misma decisión AD-1 de
+                    // rules-hardening Slice C ("ROLE-CHECK ONLY"), que dejó como
+                    // residuo ACEPTADO el caso "un PF real escribe sobre un
+                    // alumno que no es suyo": es atribuible, porque su uid queda
+                    // en `assignedBy`. Y sigue sin poder hacerse mejor:
+                    // `trainer_links` tiene ids autogenerados, así que una regla
+                    // no puede preguntar si existe el vínculo entre los dos.
+                    && tieneRolDePF(request.auth.uid);
 
       // CREATE branch 2 (NEW): athlete self-authored — 6 conditions, all must pass.
       // REQ-USR-004, REQ-USR-009, REQ-USR-012, REQ-USR-014, ADR-USR-03, ADR-USR-06.
