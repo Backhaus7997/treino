@@ -1843,15 +1843,39 @@ function derechoGuardado(
  *
  * El indice de busqueda de MP tarda en reflejar una alta: medido en ~93 s (ver
  * [conLaConocidaPrimero]). 15 minutos es un margen de diez veces ese numero, y
- * el costo esta del lado barato: pasarse de largo solo demora el corte de un
- * plan vencido hasta el proximo barrido o webhook, mientras que quedarse corto
- * lo corta por error —un `expired` seguido, segundos despues, del `active` que
+ * el costo esta del lado barato: pasarse de largo solo demora el corte una vez,
+ * mientras que quedarse corto lo corta por error —un `expired` seguido,
+ * segundos despues, del `active` que
  * restaura el webhook del hermano, con los dos triggers de `users/{uid}` sin
  * orden—. El caso real es `reconcile-my-checkout`: el mensual vencido y el
  * alumno todavia `active` hasta las 03:00 compra el anual, y el callable
  * reconcilia los dos planes sin la suscripcion a mano.
+ *
+ * La ventana NO se renueva con cada checkout. El plan que se estaba por cortar
+ * persiste [CAMPO_INDICE_MP_DIFERIDO_AT_MS] la primera vez que recibe este
+ * beneficio de la duda, y el beneficio dura como mucho otra ventana contada
+ * desde ESA marca: los reintentos de esos minutos (un webhook, el mismo
+ * callable) siguen protegidos contra el indice atrasado, y pasado ese tope
+ * cualquier lista vacia cuenta como vacia aunque aparezca otro hermano recien
+ * creado. Sin el tope, abrir un checkout dentro de estos 15 minutos antes de
+ * cada barrido sostendria un plan vencido noche tras noche.
  */
 const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
+
+/**
+ * Cuando se postergo por primera vez el corte de un plan por el indice tardio
+ * de MP (ms). No se pisa: es el ancla del tope de [VENTANA_INDICE_MP_MS].
+ */
+const CAMPO_INDICE_MP_DIFERIDO_AT_MS = "indiceMpDiferidoAtMs";
+
+/**
+ * Cuanto puede estar en el futuro el `createdAt` de un hermano y seguir siendo
+ * «reciente». Lo escribe otra instancia, con su propio reloj: unos ms (o
+ * segundos) de desfase no pueden hacer que el checkout recien abierto —el caso
+ * real de la carrera— pierda el beneficio de la duda. Mas alla de este margen
+ * es un reloj roto, y no posterga nada.
+ */
+const DESFASE_DE_RELOJ_TOLERADO_MS = 60 * 1000;
 
 /**
  * El derecho que el plan hermano [hermanoId] le da HOY al alumno, leido de MP en
@@ -1883,7 +1907,7 @@ const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
  *
  * No otorgan, sin tirar: una lista vacia de un plan que ya tiene mas de
  * [VENTANA_INDICE_MP_MS] (un checkout que nunca se pago; no hay estado que
- * guardar, y la pregunta se repite si el cruce vuelve a darse) y las
+ * guardar) y las
  * suscripciones de otro uid (un dato raro: se logea como error y no se las
  * regalamos a este alumno). Un plan sin `createdAt` legible tampoco recibe el
  * beneficio de la duda: la lista vacia cuenta como «no hay nada».
@@ -1892,8 +1916,10 @@ const VENTANA_INDICE_MP_MS = 15 * 60 * 1000;
  * respuesta venga rota (`estricto`: una lista vacia de una respuesta sin
  * `results` no puede afirmar que no hay nada cobrando); un estado ininteligible
  * —cortar por algo que no entendimos es lo que la politica de
- * `subscription-state.ts` prohibe—; y una lista vacia de un plan RECIEN abierto,
- * que puede ser el retraso del indice.
+ * `subscription-state.ts` prohibe—; y, durante una sola ventana por plan que se
+ * estaba por cortar, una lista vacia de un hermano RECIEN abierto, que puede ser
+ * el retraso del indice. Un `createdAt` futuro no es reciente: un reloj roto no puede
+ * postergar el corte.
  *
  * Guarda lo que aprendio en el plan hermano, igual que lo haria el escritor
  * (el estado y la fecha), para que el barrido y el proximo cruce no vuelvan a
@@ -1904,6 +1930,9 @@ async function derechoVivoDelHermano(
   uid: string,
   hermanoId: string,
   datos: Record<string, unknown>,
+  planQueSeReconciliaId: string,
+  /** [CAMPO_INDICE_MP_DIFERIDO_AT_MS] del plan que se reconcilia, o `null`. */
+  difirioPorIndiceVacioAtMs: number | null,
   deps: ReconcileDeps,
 ): Promise<AthleteStatus> {
   const subs = await deps.mpClient.searchPreapprovalsByPlan(hermanoId, {
@@ -1912,10 +1941,26 @@ async function derechoVivoDelHermano(
 
   if (subs.length === 0) {
     const creadoMs = comoTimestamp(datos.createdAt)?.toMillis() ?? null;
-    if (creadoMs !== null && deps.nowMs - creadoMs < VENTANA_INDICE_MP_MS) {
+    const edadMs = creadoMs === null ? null : deps.nowMs - creadoMs;
+    const topeVencido =
+      difirioPorIndiceVacioAtMs !== null &&
+      deps.nowMs - difirioPorIndiceVacioAtMs >= VENTANA_INDICE_MP_MS;
+    if (
+      !topeVencido &&
+      edadMs !== null &&
+      edadMs >= -DESFASE_DE_RELOJ_TOLERADO_MS &&
+      edadMs < VENTANA_INDICE_MP_MS
+    ) {
+      if (difirioPorIndiceVacioAtMs === null) {
+        await getFirestore(app)
+          .collection(MP_PLANS_COLLECTION)
+          .doc(planQueSeReconciliaId)
+          .set({ [CAMPO_INDICE_MP_DIFERIDO_AT_MS]: deps.nowMs }, { merge: true });
+      }
       throw new Error(
         `mp/reconcile: el plan hermano ${hermanoId} es reciente y MP no lo ` +
-          "devuelve todavia — puede ser el retraso del indice, no se decide",
+          "devuelve todavia — puede ser el retraso del indice; se posterga " +
+          "este corte, como mucho una ventana",
       );
     }
     return "expired";
@@ -2075,9 +2120,15 @@ async function otroPlanQueOtorga(
     .get();
 
   const sinEstado: { id: string; datos: Record<string, unknown> }[] = [];
+  let difirioPorIndiceVacioAtMs: number | null = null;
   for (const doc of planes.docs) {
-    if (doc.id === planId) continue;
     const datos = doc.data();
+    if (doc.id === planId) {
+      const marca = datos?.[CAMPO_INDICE_MP_DIFERIDO_AT_MS];
+      difirioPorIndiceVacioAtMs =
+        typeof marca === "number" && Number.isFinite(marca) ? marca : null;
+      continue;
+    }
     if (datos?.producto !== "athlete") continue;
     if (!puedeSeguirCobrando(datos)) continue;
     const reemplazadoPor = datos?.[CAMPO_REEMPLAZO];
@@ -2096,7 +2147,15 @@ async function otroPlanQueOtorga(
   // De a uno y cortando en el primero que otorga: uno o dos planes por alumno, y
   // cada llamada de mas es una oportunidad de error que frena el corte.
   for (const { id, datos } of sinEstado) {
-    const derecho = await derechoVivoDelHermano(app, uid, id, datos, deps);
+    const derecho = await derechoVivoDelHermano(
+      app,
+      uid,
+      id,
+      datos,
+      planId,
+      difirioPorIndiceVacioAtMs,
+      deps,
+    );
     if (athleteStatusOtorga(derecho)) return id;
   }
   return null;
@@ -2324,16 +2383,17 @@ async function escribirSuscripcionDeAlumno(i: {
     athleteStatusOtorga(statusPrevio as AthleteStatus);
   //
   // Si hay que preguntarle a MP por el otro plan y no contesta, este reconcile no
-  // escribe NADA mas: ni el corte, ni la fecha, ni `terminal`. Un corte sin saber
-  // si otro plan paga es el mismo corte equivocado que la guarda existe para
-  // evitar, y `terminal` sacaria a este plan del barrido que lo reintenta. Sale
+  // escribe el corte, la fecha ni `terminal`. La unica excepcion es la marca que
+  // acota a una ventana la postergacion por una lista vacia reciente. Un corte sin
+  // saber si otro plan paga es el mismo corte equivocado que la guarda existe
+  // para evitar, y `terminal` sacaria a este plan del barrido que lo reintenta. Sale
   // `error-mp`, y cada llamador lo trata a su manera: el barrido lo cuenta y
   // reintenta esta noche; `reconcile-my-checkout` lo muestra como no disponible;
   // `arrepentimiento-por-mail` tira para que se reintente el tramite; y el webhook
   // NO lo trata como fallo —marca el evento visto por 10 minutos, logea y contesta
   // 200, asi que MP no reintenta—: ahi la recuperacion es el barrido de las 03:00,
-  // y este plan sigue en el. Solo queda escrito el `ultimoStatus` de arriba, que es
-  // un hecho de este plan.
+  // y este plan sigue en el. Queda escrito el `ultimoStatus` de arriba, que es un
+  // hecho de este plan, y en aquel caso puntual la marca de postergacion.
   let otorgaOtro: string | null = null;
   if (revocaria) {
     try {
@@ -2358,6 +2418,22 @@ async function escribirSuscripcionDeAlumno(i: {
       "mp/reconcile: el plan ya no otorga, pero otro plan del alumno si — no se corta",
       { planId, uid, producto: "athlete", status, athleteStatus, otorgaOtro },
     );
+  }
+
+  // ── Fin del episodio: la marca de [CAMPO_INDICE_MP_DIFERIDO_AT_MS] se limpia ──
+  //
+  // La marca acota UN corte, no la vida del plan. Llegar aca —sin la excepcion
+  // de arriba, que es la postergacion misma— es que ese corte se resolvio, sea
+  // como sea: el plan volvio a otorgar (`revocaria` en falso), un hermano otorga,
+  // o se corto. Un corte independiente de meses despues tiene que recibir su
+  // propia ventana; con la marca vieja, a un hermano pago que el indice de MP
+  // todavia no muestra se lo leeria como ausente y se le cortaria el acceso al
+  // alumno. Un solo punto para los tres desenlaces: limpiar en cada uno por
+  // separado ya dejo afuera el de un plan `paused` cuyo corte lo resolvio un
+  // hermano. Se escribe `null` y no se borra: la lectura trata cualquier cosa
+  // que no sea un numero como «sin marca».
+  if (typeof planDoc?.[CAMPO_INDICE_MP_DIFERIDO_AT_MS] === "number") {
+    await planRef.set({ [CAMPO_INDICE_MP_DIFERIDO_AT_MS]: null }, { merge: true });
   }
 
   const sinCambios = statusPrevio === athleteStatus;
