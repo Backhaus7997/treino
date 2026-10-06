@@ -1462,6 +1462,35 @@ service cloud.firestore {
                     // status in ['active','paused']). Pausar BAJA el peso, así
                     // que no necesita gate.
                     //
+                    // …Y SÓLO DESDE `active`. La cláusula pedía únicamente que
+                    // quien escribe fuera el trainer, sin mirar el estado de
+                    // ORIGEN, y eso alcanzaba para REVIVIR UN VÍNCULO MUERTO:
+                    // el ex-PF tomaba uno que el alumno había terminado, le
+                    // escribía `paused`, y después llamaba a
+                    // `resumeTrainerLink` —que sólo compara contra 'paused'—
+                    // para devolverlo a `active`.
+                    //
+                    // Lo que eso le devuelve no es cosmético:
+                    // `syncSessionShareOnTrainerLink` re-otorga
+                    // `session_shares/{athleteId}` en toda transición real
+                    // hacia `active`, y ese grant abre `sessions`, `setLogs`,
+                    // `exerciseFeedback`, las mediciones y las fotos de
+                    // molestias — datos de SALUD, sobre una relación que el
+                    // alumno ya cortó y sin que vuelva a consentir. De paso le
+                    // SACA el share al PF actual (last-writer-wins). El alumno
+                    // sólo ve un push de "reanudada" y su única defensa es
+                    // volver a terminar, que el ex-PF deshace de nuevo.
+                    //
+                    // No cierra ningún camino legítimo: es lo que el párrafo de
+                    // abajo YA afirmaba ("nunca revive el viejo") y lo que el
+                    // cliente YA garantiza —`TrainerLinkRepository.pause()`
+                    // tira StateError si el status no es `active`—. La regla se
+                    // pone al día con su propia intención.
+                    //
+                    // Cierra de paso `pending` → `paused`, que habilitaba
+                    // reseñas con cuentas títere sin pasar nunca por
+                    // `acceptTrainerLink`, o sea sin pagar el gate del peso.
+                    //
                     // `terminated` lo puede escribir cualquier member
                     // (decline / cancel / terminate). También baja el peso.
                     //
@@ -1474,6 +1503,7 @@ service cloud.firestore {
                     && (request.resource.data.status == resource.data.status
                         || request.resource.data.status == 'terminated'
                         || (request.resource.data.status == 'paused'
+                            && resource.data.status == 'active'
                             && request.auth.uid == resource.data.trainerId))
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId

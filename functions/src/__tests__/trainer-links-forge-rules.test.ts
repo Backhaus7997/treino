@@ -76,6 +76,8 @@ interface LinkFixture {
   acceptedAt?: number | null;
   pausedAt?: number | null;
   sharedWithTrainer?: boolean;
+  /** La razón con la que se terminó. Un `terminated` real la lleva. */
+  terminationReason?: string | null;
 }
 
 async function seedLink(linkId: string, fixture: LinkFixture): Promise<void> {
@@ -216,6 +218,99 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
     });
     const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
     await assertSucceeds(ref.update({ sharedWithTrainer: true }));
+  });
+});
+
+// ── `paused` sólo desde `active`: no se revive un vínculo muerto ─────────────
+//
+// La cláusula de `paused` pedía UNA sola cosa —que quien escribe sea el
+// trainer— y no miraba el estado de ORIGEN. Con eso, un ex-PF podía tomar un
+// vínculo que el alumno había TERMINADO, escribirle `paused`, y después llamar
+// a `resumeTrainerLink`: la callable sólo compara contra `'paused'`, así que lo
+// devolvía a `active`.
+//
+// Lo que eso le devuelve al ex-PF no es cosmético. `syncSessionShareOnTrainerLink`
+// re-otorga `session_shares/{athleteId}` en toda transición real hacia `active`,
+// y ese grant abre `sessions`, `setLogs`, `exerciseFeedback`, las mediciones y
+// las fotos de molestias del alumno — datos de SALUD, sobre una relación que el
+// alumno ya había cortado y sin que vuelva a consentir. De paso le SACA el share
+// al PF actual, que es last-writer-wins sobre `session_shares`.
+//
+// El alumno sólo recibe un push de "vinculación reanudada" y su única defensa es
+// volver a terminar, que el ex-PF puede deshacer otra vez. Sin tope.
+//
+// La regla ahora exige `resource.data.status == 'active'`, que es exactamente lo
+// que su propio comentario ya afirmaba ("un re-request legítimo crea un doc
+// nuevo, nunca revive el viejo") y lo que el cliente YA garantiza:
+// `TrainerLinkRepository.pause()` (~140) tira StateError si el status no es
+// `active`. O sea que esto no cierra ningún camino que un cliente legítimo use
+// — se pone al día con la intención escrita.
+//
+// El ancla del camino bueno vive arriba, en "allows the trainer to pause
+// (active -> paused) but NOT to resume".
+describe("trainer_links — `paused` sólo desde `active` (A2)", () => {
+  it("DENIEGA que el PF pause un vínculo TERMINADO (el paso 1 de revivirlo)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "terminated",
+      requestedAt: 1,
+      acceptedAt: 2,
+      terminationReason: "athlete-terminated",
+    });
+
+    const ref = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
+    await assertFails(ref.update({ status: "paused", pausedAt: 4 }));
+  });
+
+  // Variante del mismo agujero, y cierra de paso el camino de reseñas con
+  // cuentas títere: `reviews` gatea en `status in ['active','paused']`, así que
+  // un `pending` empujado a `paused` habilitaba la reseña sin que el vínculo
+  // hubiera pasado NUNCA por `acceptTrainerLink` — o sea, sin pagar el gate del
+  // peso ponderado.
+  it("DENIEGA que el PF pause una solicitud PENDING (saltearía el accept)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    const ref = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
+    await assertFails(ref.update({ status: "paused", pausedAt: 4 }));
+  });
+
+  // Control: el que ya estaba pausado puede seguir escribiendo otras cosas sin
+  // tocar el status. La rama `status == resource.data.status` de la regla sigue
+  // viva, y si se rompiera, un `paused` quedaría congelado para siempre.
+  it("PERMITE un update que NO toca el status sobre un vínculo pausado", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "paused",
+      requestedAt: 1,
+      acceptedAt: 2,
+      pausedAt: 3,
+      sharedWithTrainer: false,
+    });
+
+    const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
+    await assertSucceeds(ref.update({ sharedWithTrainer: true }));
+  });
+
+  // Y terminar un pausado sigue andando: es la salida del alumno.
+  it("PERMITE terminar un vínculo pausado (la salida del alumno)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "paused",
+      requestedAt: 1,
+      acceptedAt: 2,
+      pausedAt: 3,
+    });
+
+    const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
+    await assertSucceeds(ref.update({ status: "terminated" }));
   });
 });
 
