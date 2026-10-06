@@ -4562,6 +4562,12 @@ abstract class AppL10n {
   /// **'No encontramos ese lugar. Probá con la dirección completa.'**
   String get coachHubOnboardingPfLocationEmpty;
 
+  /// Coach Hub onboarding, the picked place is already in the trainer's locations.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese lugar ya está en tu lista.'**
+  String get coachHubOnboardingPfLocationDuplicate;
+
   /// Coach Hub onboarding, place search failed (network or HTTP).
   ///
   /// In es_AR, this message translates to:

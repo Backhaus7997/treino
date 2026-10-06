@@ -112,7 +112,8 @@ class _EditorUbicacionPfState extends ConsumerState<EditorUbicacionPf> {
   }
 
   void _elegir(LugarCandidato lugar) {
-    _etiqueta.clear();
+    // Volver a tocar el mismo resultado no borra lo que el PF ya tipeó.
+    if (_elegido?.placeId != lugar.placeId) _etiqueta.clear();
     setState(() => _elegido = lugar);
   }
 

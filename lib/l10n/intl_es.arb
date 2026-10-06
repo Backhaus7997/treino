@@ -423,6 +423,7 @@
   "coachHubOnboardingPfLocationSearchHint": "Dirección o nombre del lugar",
   "coachHubOnboardingPfLocationSearchButton": "Buscar",
   "coachHubOnboardingPfLocationEmpty": "No encontramos ese lugar. Prueba con la dirección completa.",
+  "coachHubOnboardingPfLocationDuplicate": "Ese lugar ya está en tu lista.",
   "coachHubOnboardingPfLocationNetworkError": "No pudimos buscar el lugar. Revisa tu conexión e inténtalo de nuevo.",
   "coachHubOnboardingPfLocationConfigError": "La búsqueda de lugares no está disponible en este momento. Si das clases online, puedes finalizar igual.",
   "coachHubOnboardingPfLocationRetry": "Reintentar",

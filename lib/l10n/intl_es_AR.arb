@@ -1778,6 +1778,10 @@
   "@coachHubOnboardingPfLocationEmpty": {
     "description": "Coach Hub onboarding, place search returned no results."
   },
+  "coachHubOnboardingPfLocationDuplicate": "Ese lugar ya está en tu lista.",
+  "@coachHubOnboardingPfLocationDuplicate": {
+    "description": "Coach Hub onboarding, the picked place is already in the trainer's locations."
+  },
   "coachHubOnboardingPfLocationNetworkError": "No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.",
   "@coachHubOnboardingPfLocationNetworkError": {
     "description": "Coach Hub onboarding, place search failed (network or HTTP)."

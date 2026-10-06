@@ -705,6 +705,60 @@ void main() {
         expect(l10n.coachHubOnboardingPfLocationGymFallback, isNotEmpty);
       });
 
+      testWidgets(
+          'volver a tocar el MISMO resultado conserva la etiqueta tipeada; '
+          'elegir OTRO la limpia', (tester) async {
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        await llenarBasicos(tester, online: true);
+        await escribir(tester, _busquedaKey, 'Av. Siempreviva 742');
+        await tester.tap(find.byKey(_buscarKey));
+        await asentar(tester);
+        await tester.tap(find.byKey(_resultadoKey(0)));
+        await tester.pump();
+        await escribir(tester, _etiquetaKey, 'Mi estudio');
+
+        await tester.tap(find.byKey(_resultadoKey(0)));
+        await tester.pump();
+        expect(
+          tester
+              .widget<TextField>(find.descendant(
+                of: find.byKey(_etiquetaKey),
+                matching: find.byType(TextField),
+              ))
+              .controller!
+              .text,
+          'Mi estudio',
+        );
+
+        await tester.tap(find.byKey(_resultadoKey(1)));
+        await tester.pump();
+        expect(
+          tester
+              .widget<TextField>(find.descendant(
+                of: find.byKey(_etiquetaKey),
+                matching: find.byType(TextField),
+              ))
+              .controller!
+              .text,
+          isEmpty,
+        );
+      });
+
+      testWidgets('agregar un lugar repetido avisa y no lo duplica',
+          (tester) async {
+        await sembrar();
+        await pump(tester, theme: entry.value());
+        await llenarBasicos(tester, online: true);
+        await buscarYElegir(tester);
+        await buscarYElegir(tester, etiqueta: 'Otra vez');
+
+        expect(find.text(l10nDe(tester).coachHubOnboardingPfLocationDuplicate),
+            findsOneWidget);
+        expect(find.text('Casa Simpson'), findsOneWidget);
+        expect(find.text('Otra vez'), findsNothing);
+      });
+
       testWidgets('quitar un lugar lo saca de la lista y de la escritura',
           (tester) async {
         await sembrar();
@@ -771,7 +825,6 @@ void main() {
           'trainerOffersOnline',
           'trainerLocations',
           'trainerGeohashes',
-          'trainerLocationsCoordsFetchedAt',
         });
         expect(claves.contains('role'), isFalse);
       });

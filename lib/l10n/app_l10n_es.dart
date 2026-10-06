@@ -2533,6 +2533,10 @@ class AppL10nEs extends AppL10n {
       'No encontramos ese lugar. Prueba con la dirección completa.';
 
   @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'Ese lugar ya está en tu lista.';
+
+  @override
   String get coachHubOnboardingPfLocationNetworkError =>
       'No pudimos buscar el lugar. Revisa tu conexión e inténtalo de nuevo.';
 
@@ -7720,6 +7724,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubOnboardingPfLocationEmpty =>
       'No encontramos ese lugar. Probá con la dirección completa.';
+
+  @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'Ese lugar ya está en tu lista.';
 
   @override
   String get coachHubOnboardingPfLocationNetworkError =>

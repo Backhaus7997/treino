@@ -2480,6 +2480,10 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t find that place. Try the full address.';
 
   @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'That place is already in your list.';
+
+  @override
   String get coachHubOnboardingPfLocationNetworkError =>
       'We couldn\'t search for the place. Check your connection and try again.';
 

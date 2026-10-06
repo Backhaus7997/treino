@@ -1,4 +1,3 @@
-// ignore: unused_import — Timestamp is used by the generated trainer_location.g.dart part
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:treino/features/profile/data/timestamp_converter.dart';

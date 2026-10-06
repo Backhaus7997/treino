@@ -86,7 +86,17 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
           l.placeId == lugar.placeId ||
           (l.lat == lugar.lat && l.lng == lugar.lng),
     );
-    if (repetido) return;
+    if (repetido) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content:
+                Text(AppL10n.of(context).coachHubOnboardingPfLocationDuplicate),
+          ),
+        );
+      return;
+    }
     final ahora = AppClock.now();
     setState(() {
       _locations.add(
