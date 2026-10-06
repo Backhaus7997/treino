@@ -8,6 +8,10 @@
  * Apple 5.1.1(v)). There is NO role guard: the trainer steps (T1-T5, from
  * `cascade/trainer-data.ts`) run on EVERY call and are no-ops for an athlete.
  *
+ * Steps 4-9 (the Firestore/Storage data cascade) live in
+ * `cascade/run-data-cascade.ts`, shared with the retry of `partial` deletions
+ * (`retention/retry-partial-deletions.ts`, #1353).
+ *
  * Cascade order (REQ-ACCDEL-CF-012: Auth MUST be last):
  *   1. Validate + anti-spoof (callable wrapper)
  *  2b. Cancel live Mercado Pago subscriptions — FAIL-CLOSED: if MP cannot be
@@ -37,24 +41,7 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
-import { sweepFollows } from "./cascade/friendships";
-import { deletePosts } from "./cascade/posts";
-import { terminateTrainerLinks } from "./cascade/trainer-links";
-import { cancelFutureAppointments } from "./cascade/appointments";
-import {
-  deleteAvatar,
-  deleteAthleteStorage,
-  deleteTrainerStorage,
-} from "./cascade/storage";
-import {
-  cancelFutureAppointmentsAsTrainer,
-  deleteTrainerOwnedData,
-  deleteTrainerTemplates,
-  terminateLinksAsTrainer,
-} from "./cascade/trainer-data";
-import { deleteAthleteOwnedData } from "./cascade/athlete-data";
-import { deleteAthleteRoutines } from "./cascade/routines";
-import { deleteUserDocs } from "./cascade/users";
+import { runDataCascade } from "./cascade/run-data-cascade";
 import {
   CancelarAlEliminarDeps,
   cancelarSuscripcionesAntesDeEliminar,
@@ -127,133 +114,14 @@ export async function runDeleteAccount(
   // ── Audit log: started ─────────────────────────────────────────────────
   await writeStarted(app, uid, provider);
 
-  const errors: string[] = [];
+  // ── Pasos de datos (Firestore + Storage), en `cascade/run-data-cascade.ts` ─
+  // Los comparte el reintento de los `partial` (#1353). Cada uno va en su
+  // try/catch: uno que falla no frena a los demas.
+  const cascade = await runDataCascade(app, uid);
+  const errors: string[] = [...cascade.errors];
   const deletedCollections: string[] = [];
   if (suscripcionesCanceladas > 0) deletedCollections.push("mp-subscriptions");
-
-  // ── Step 4: Sweep follows ──────────────────────────────────────────────
-  try {
-    await sweepFollows(app, uid);
-    deletedCollections.push("follows");
-  } catch (err: unknown) {
-    errors.push(`follows: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 5: Delete posts ────────────────────────────────────────────────
-  try {
-    await deletePosts(app, uid);
-    deletedCollections.push("posts");
-  } catch (err: unknown) {
-    errors.push(`posts: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 6: Terminate trainer links ───────────────────────────────────
-  try {
-    await terminateTrainerLinks(app, uid);
-    deletedCollections.push("trainer_links");
-  } catch (err: unknown) {
-    errors.push(`trainer_links: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── T1: Terminate the links where this uid is the TRAINER (#1333) ──────
-  // Reason `trainer-account-deleted`: notify-link-change tells each athlete.
-  try {
-    await terminateLinksAsTrainer(app, uid);
-    deletedCollections.push("trainer-links");
-  } catch (err: unknown) {
-    errors.push(`trainer-links: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 7: Cancel future appointments ────────────────────────────────
-  try {
-    await cancelFutureAppointments(app, uid);
-    deletedCollections.push("appointments");
-  } catch (err: unknown) {
-    errors.push(`appointments: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── T2: Cancel the trainer's future appointments + availability ────────
-  try {
-    await cancelFutureAppointmentsAsTrainer(app, uid);
-    deletedCollections.push("trainer-appointments");
-  } catch (err: unknown) {
-    errors.push(`trainer-appointments: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8: Delete storage avatar ─────────────────────────────────────
-  // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013).
-  try {
-    await deleteAvatar(app, uid);
-    deletedCollections.push("storage");
-  } catch (err: unknown) {
-    errors.push(`storage: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8b: Delete the athlete's other Storage objects (QA-CMP-002) ───
-  // chatMedia / customExerciseVideos / temp uploads / athleteFiles.
-  try {
-    await deleteAthleteStorage(app, uid);
-    deletedCollections.push("storage-athlete");
-  } catch (err: unknown) {
-    errors.push(`storage-athlete: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── T3: Delete the files the trainer authored for athletes ─────────────
-  try {
-    await deleteTrainerStorage(app, uid);
-    deletedCollections.push("trainer-storage");
-  } catch (err: unknown) {
-    errors.push(`trainer-storage: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8c: Delete athlete-owned Firestore data (QA-CMP-003) ──────────
-  // measurements, performance_tests, profile_shares, session_shares,
-  // athlete_billing, athlete_notes, follow_up_entries, nutrition_plans.
-  try {
-    await deleteAthleteOwnedData(app, uid);
-    deletedCollections.push("athlete-data");
-  } catch (err: unknown) {
-    errors.push(`athlete-data: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── T4: Delete the data the trainer wrote/was granted about athletes ───
-  // payments are RETAINED (fiscal). See cascade/trainer-data.ts.
-  try {
-    await deleteTrainerOwnedData(app, uid);
-    deletedCollections.push("trainer-data");
-  } catch (err: unknown) {
-    errors.push(`trainer-data: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8d: Delete the athlete's routines (QA-CMP-004) ────────────────
-  // `routines where assignedTo == uid` (the plans their trainer built for
-  // them) + `routines where createdBy == uid` (their own). recursiveDelete,
-  // so the `ratings` subcollection goes with the parent. The disposition and
-  // the reason `assignedBy` is NOT swept live in cascade/routines.ts.
-  try {
-    await deleteAthleteRoutines(app, uid);
-    deletedCollections.push("routines");
-  } catch (err: unknown) {
-    errors.push(`routines: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── T5: Delete the trainer's templates (published too) ─────────────────
-  // Plans assigned to athletes stay with them. See cascade/trainer-data.ts.
-  try {
-    await deleteTrainerTemplates(app, uid);
-    deletedCollections.push("trainer-templates");
-  } catch (err: unknown) {
-    errors.push(`trainer-templates: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 9: Delete user docs ───────────────────────────────────────────
-  try {
-    await deleteUserDocs(app, uid);
-    deletedCollections.push("users");
-    deletedCollections.push("userPublicProfiles");
-  } catch (err: unknown) {
-    errors.push(`users: ${(err as Error).message ?? String(err)}`);
-  }
+  deletedCollections.push(...cascade.deletedCollections);
 
   // ── Step 10-11: Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────
   // MUST be last — so a retry after a mid-cascade failure still finds the account.
