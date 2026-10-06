@@ -192,10 +192,10 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'QIVOX Villa Warcalde',
-            address: 'Some street 123',
             source: 'google-places',
           ));
 
@@ -212,6 +212,7 @@ void main() {
       verify(() => mockResolveService.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
+            name: null,
           )).called(1);
       // Antes acá había un `verify(update).called(1)`, y estaba verde con el
       // bug adentro: el mock aceptaba una escritura que las reglas denegaban
@@ -225,6 +226,95 @@ void main() {
         container.read(profileSetupNotifierProvider).draft.gymId,
         'ChIJ_1',
       );
+    });
+
+    group('gym nuevo o sin nombre: se lo pide al usuario', () {
+      void stubSuggestion() {
+        when(() => mockPlacesService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            )).thenAnswer((_) async => const [
+              GymSuggestion(
+                placeId: 'ChIJ_1',
+                primaryText: 'QIVOX Villa Warcalde',
+                secondaryText: 'Some street 123',
+              ),
+            ]);
+        when(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+              name: null,
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_1',
+              name: '',
+              source: 'google-places',
+              needsName: true,
+            ));
+      }
+
+      Future<void> pickSuggestion(WidgetTester tester) async {
+        await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'qivox');
+        await tester.pump(const Duration(milliseconds: 5));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('QIVOX Villa Warcalde'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets(
+          'el nombre tipeado se manda al resolver y el gym queda en el draft',
+          (tester) async {
+        stubSuggestion();
+        when(() => mockResolveService.call(
+              placeId: 'ChIJ_1',
+              sessionToken: null,
+              name: 'Mi gimnasio',
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'ChIJ_1',
+              name: 'Mi gimnasio',
+              source: 'google-places',
+            ));
+
+        await pickSuggestion(tester);
+
+        final dialogField = find.byKey(const Key('gym-name-field'));
+        expect(dialogField, findsOneWidget);
+        await tester.enterText(dialogField, 'Mi gimnasio');
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('gym-name-confirm')));
+        await tester.pumpAndSettle();
+
+        verify(() => mockResolveService.call(
+              placeId: 'ChIJ_1',
+              sessionToken: null,
+              name: 'Mi gimnasio',
+            )).called(1);
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        expect(
+          container.read(profileSetupNotifierProvider).draft.gymId,
+          'ChIJ_1',
+        );
+      });
+
+      testWidgets('cancelar el diálogo no vincula el gym', (tester) async {
+        stubSuggestion();
+
+        await pickSuggestion(tester);
+        await tester.tap(find.byKey(const Key('gym-name-cancel')));
+        await tester.pumpAndSettle();
+
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(Step3Gym)),
+        );
+        expect(
+          container.read(profileSetupNotifierProvider).draft.gymId,
+          isNot('ChIJ_1'),
+        );
+      });
     });
 
     testWidgets(
@@ -244,6 +334,7 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenThrow(const ResolveGymPlaceFailure$Server(
         'Places API request failed. Please try again.',
         statusCode: 503,
@@ -323,6 +414,7 @@ void main() {
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           ));
     });
 

@@ -55,10 +55,10 @@ void main() {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'SportClub Belgrano',
-            address: 'Cabildo 1789',
             source: 'google-places',
           ));
       when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
@@ -73,6 +73,7 @@ void main() {
       verify(() => mockResolve.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
+            name: null,
           )).called(1);
       verify(() => mockUserRepo.update('uid-1', {'gymId': 'ChIJ_1'})).called(1);
 
@@ -90,10 +91,10 @@ void main() {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'SportClub Belgrano',
-            address: 'Cabildo 1789',
             source: 'google-places',
           ));
       when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
@@ -108,10 +109,60 @@ void main() {
       expect(ok, isTrue);
     });
 
+    test(
+        'needsName: does NOT link the gym (no users update) and exposes '
+        'needsName so the UI can ask for the name', () async {
+      when(() => mockResolve.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: '',
+            source: 'google-places',
+            needsName: true,
+          ));
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(selectGymActionProvider.notifier)
+          .select(uid: 'uid-1', placeId: 'ChIJ_1');
+
+      expect(ok, isFalse);
+      expect(container.read(selectGymActionProvider).value?.needsName, isTrue);
+      verifyNever(() => mockUserRepo.update(any(), any()));
+    });
+
+    test('forwards the typed name and then links the gym', () async {
+      when(() => mockResolve.call(
+            placeId: 'ChIJ_1',
+            sessionToken: null,
+            name: 'Mi gym',
+          )).thenAnswer((_) async => const ResolveGymPlaceResult(
+            gymId: 'ChIJ_1',
+            name: 'Mi gym',
+            source: 'google-places',
+          ));
+      when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
+
+      final container = buildContainer();
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(selectGymActionProvider.notifier)
+          .select(uid: 'uid-1', placeId: 'ChIJ_1', name: 'Mi gym');
+
+      expect(ok, isTrue);
+      verify(() => mockUserRepo.update('uid-1', {'gymId': 'ChIJ_1'})).called(1);
+    });
+
     test('select devuelve false cuando la resolución falla', () async {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenThrow(Exception('places down'));
 
       final container = buildContainer();
@@ -132,10 +183,10 @@ void main() {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'ChIJ_1',
             name: 'SportClub Belgrano',
-            address: 'Cabildo 1789',
             source: 'google-places',
           ));
       when(() => mockUserRepo.update(any(), any())).thenAnswer((_) async {});
@@ -152,6 +203,7 @@ void main() {
       verify(() => mockResolve.call(
             placeId: 'ChIJ_1',
             sessionToken: null,
+            name: null,
           )).called(1);
     });
 
@@ -159,12 +211,12 @@ void main() {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async {
         await Future<void>.delayed(const Duration(milliseconds: 5));
         return const ResolveGymPlaceResult(
           gymId: 'ChIJ_1',
           name: 'SportClub Belgrano',
-          address: null,
           source: 'google-places',
         );
       });
@@ -186,6 +238,7 @@ void main() {
       when(() => mockResolve.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenThrow(const ResolveGymPlaceFailure$Server(
         'bad placeId',
         statusCode: 500,

@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/moderation/moderation_guard.dart';
 import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
+import '../../../gyms/presentation/gym_name_dialog.dart';
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
 import '../widgets/gym_search_box.dart';
@@ -69,8 +71,21 @@ class Step3Gym extends ConsumerWidget {
     final l10n = AppL10n.of(context);
 
     try {
-      final result = await resolver.call(placeId: gymId);
+      var result = await resolver.call(placeId: gymId, name: null);
+      if (result.needsName) {
+        // Gym nuevo (o sin nombre de usuario): lo nombra quien lo vincula.
+        if (!context.mounted) return;
+        final typed = await showGymNameDialog(context);
+        if (typed == null) return;
+        result = await resolver.call(placeId: gymId, name: typed);
+      }
       notifier.updateGymId(result.gymId);
+    } on ModerationBlockedException {
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.moderationBlockedMessage)),
+        );
+      }
     } catch (e, st) {
       // Antes esto no avisaba a nadie: ni al usuario, que tocaba el gimnasio
       // y no pasaba nada, ni a Crashlytics. Por eso el bug de `bornAtOk` se

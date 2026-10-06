@@ -2092,10 +2092,19 @@ service cloud.firestore {
       allow create: if request.auth != null
                     && request.resource.data.source == 'google-places'
                     && request.resource.data.id == gymId
-                    && request.resource.data.keys().hasAll(['id', 'name', 'lat', 'lng', 'source'])
+                    && request.resource.data.keys().hasAll(['id', 'name', 'lat', 'lng', 'source', 'coordsFetchedAt'])
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
+                    // Places policy (#1338): `name` is typed by the first user
+                    // who links the gym; Google's text is never stored. No
+                    // `address`, and `nameNeeded` is only ever set by the
+                    // migration (Admin SDK), never by a client.
+                    && !('address' in request.resource.data)
+                    && !('nameNeeded' in request.resource.data)
+                    // Coords carry the server time they were fetched at —
+                    // the refresh job re-fetches them before the 30-day cap.
+                    && request.resource.data.coordsFetchedAt == request.time
                     // QA-SEC-003: geographic range guard — a resolved place must
                     // land on Earth. Blocks garbage coordinates polluting the
                     // world-readable catalog / distance math.
@@ -2121,13 +2130,25 @@ service cloud.firestore {
       // while denying every value change. Mirrors the field-pin idiom used by
       // userPublicProfiles ranking metrics and trainerPublicProfiles
       // averageRating/reviewCount above.
+      //
+      // Places policy (#1338): a gym the migration flagged `nameNeeded` (its
+      // stored name came from Google) can be named ONCE by any authenticated
+      // user — the next one who links it. Only `name` + the flag move; coords
+      // stay pinned and `address` can't come back through a merge.
       allow update: if request.auth != null
                     && resource.data.source == 'google-places'
                     && request.resource.data.source == resource.data.source
                     && request.resource.data.id == gymId
-                    && request.resource.data.name == resource.data.name
-                    && request.resource.data.lat == resource.data.lat
-                    && request.resource.data.lng == resource.data.lng;
+                    && ((request.resource.data.name == resource.data.name
+                          && request.resource.data.lat == resource.data.lat
+                          && request.resource.data.lng == resource.data.lng
+                          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['address', 'nameNeeded']))
+                        || (resource.data.get('nameNeeded', false) == true
+                          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'nameNeeded'])
+                          && request.resource.data.nameNeeded == false
+                          && request.resource.data.name is string
+                          && request.resource.data.name.size() > 0
+                          && request.resource.data.name.size() <= 100));
 
       allow delete: if false;
     }

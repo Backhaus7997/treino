@@ -50,6 +50,20 @@ mixin _$Gym {
   String? get city => throw _privateConstructorUsedError;
   String? get province => throw _privateConstructorUsedError;
 
+  /// Cuándo se pidió a Places la lat/lng (política de Places: se pueden
+  /// cachear hasta 30 días; un job las refresca). Lo escribe el servidor
+  /// de Firestore (`request.time`), no el reloj del dispositivo.
+  @TimestampConverter()
+  DateTime? get coordsFetchedAt => throw _privateConstructorUsedError;
+
+  /// Estado del lugar en Places (`ok` | `not_found`). `null` en docs viejos.
+  String? get placeStatus => throw _privateConstructorUsedError;
+
+  /// `true` cuando el `name` guardado no lo escribió un usuario (vino de
+  /// Google, lo marca la migración). El próximo usuario que vincule este
+  /// gym tiene que nombrarlo.
+  bool get nameNeeded => throw _privateConstructorUsedError;
+
   /// Serializes this Gym to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -78,7 +92,10 @@ abstract class $GymCopyWith<$Res> {
       String? brandName,
       String? branchName,
       String? city,
-      String? province});
+      String? province,
+      @TimestampConverter() DateTime? coordsFetchedAt,
+      String? placeStatus,
+      bool nameNeeded});
 }
 
 /// @nodoc
@@ -109,6 +126,9 @@ class _$GymCopyWithImpl<$Res, $Val extends Gym> implements $GymCopyWith<$Res> {
     Object? branchName = freezed,
     Object? city = freezed,
     Object? province = freezed,
+    Object? coordsFetchedAt = freezed,
+    Object? placeStatus = freezed,
+    Object? nameNeeded = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -167,6 +187,18 @@ class _$GymCopyWithImpl<$Res, $Val extends Gym> implements $GymCopyWith<$Res> {
           ? _value.province
           : province // ignore: cast_nullable_to_non_nullable
               as String?,
+      coordsFetchedAt: freezed == coordsFetchedAt
+          ? _value.coordsFetchedAt
+          : coordsFetchedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      placeStatus: freezed == placeStatus
+          ? _value.placeStatus
+          : placeStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      nameNeeded: null == nameNeeded
+          ? _value.nameNeeded
+          : nameNeeded // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -191,7 +223,10 @@ abstract class _$$GymImplCopyWith<$Res> implements $GymCopyWith<$Res> {
       String? brandName,
       String? branchName,
       String? city,
-      String? province});
+      String? province,
+      @TimestampConverter() DateTime? coordsFetchedAt,
+      String? placeStatus,
+      bool nameNeeded});
 }
 
 /// @nodoc
@@ -219,6 +254,9 @@ class __$$GymImplCopyWithImpl<$Res> extends _$GymCopyWithImpl<$Res, _$GymImpl>
     Object? branchName = freezed,
     Object? city = freezed,
     Object? province = freezed,
+    Object? coordsFetchedAt = freezed,
+    Object? placeStatus = freezed,
+    Object? nameNeeded = null,
   }) {
     return _then(_$GymImpl(
       id: null == id
@@ -277,6 +315,18 @@ class __$$GymImplCopyWithImpl<$Res> extends _$GymCopyWithImpl<$Res, _$GymImpl>
           ? _value.province
           : province // ignore: cast_nullable_to_non_nullable
               as String?,
+      coordsFetchedAt: freezed == coordsFetchedAt
+          ? _value.coordsFetchedAt
+          : coordsFetchedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      placeStatus: freezed == placeStatus
+          ? _value.placeStatus
+          : placeStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      nameNeeded: null == nameNeeded
+          ? _value.nameNeeded
+          : nameNeeded // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -298,7 +348,10 @@ class _$GymImpl implements _Gym {
       this.brandName,
       this.branchName,
       this.city,
-      this.province});
+      this.province,
+      @TimestampConverter() this.coordsFetchedAt,
+      this.placeStatus,
+      this.nameNeeded = false});
 
   factory _$GymImpl.fromJson(Map<String, dynamic> json) =>
       _$$GymImplFromJson(json);
@@ -347,9 +400,27 @@ class _$GymImpl implements _Gym {
   @override
   final String? province;
 
+  /// Cuándo se pidió a Places la lat/lng (política de Places: se pueden
+  /// cachear hasta 30 días; un job las refresca). Lo escribe el servidor
+  /// de Firestore (`request.time`), no el reloj del dispositivo.
+  @override
+  @TimestampConverter()
+  final DateTime? coordsFetchedAt;
+
+  /// Estado del lugar en Places (`ok` | `not_found`). `null` en docs viejos.
+  @override
+  final String? placeStatus;
+
+  /// `true` cuando el `name` guardado no lo escribió un usuario (vino de
+  /// Google, lo marca la migración). El próximo usuario que vincule este
+  /// gym tiene que nombrarlo.
+  @override
+  @JsonKey()
+  final bool nameNeeded;
+
   @override
   String toString() {
-    return 'Gym(id: $id, name: $name, address: $address, lat: $lat, lng: $lng, geohash: $geohash, source: $source, createdBy: $createdBy, createdAt: $createdAt, brandId: $brandId, brandName: $brandName, branchName: $branchName, city: $city, province: $province)';
+    return 'Gym(id: $id, name: $name, address: $address, lat: $lat, lng: $lng, geohash: $geohash, source: $source, createdBy: $createdBy, createdAt: $createdAt, brandId: $brandId, brandName: $brandName, branchName: $branchName, city: $city, province: $province, coordsFetchedAt: $coordsFetchedAt, placeStatus: $placeStatus, nameNeeded: $nameNeeded)';
   }
 
   @override
@@ -375,7 +446,13 @@ class _$GymImpl implements _Gym {
                 other.branchName == branchName) &&
             (identical(other.city, city) || other.city == city) &&
             (identical(other.province, province) ||
-                other.province == province));
+                other.province == province) &&
+            (identical(other.coordsFetchedAt, coordsFetchedAt) ||
+                other.coordsFetchedAt == coordsFetchedAt) &&
+            (identical(other.placeStatus, placeStatus) ||
+                other.placeStatus == placeStatus) &&
+            (identical(other.nameNeeded, nameNeeded) ||
+                other.nameNeeded == nameNeeded));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -395,7 +472,10 @@ class _$GymImpl implements _Gym {
       brandName,
       branchName,
       city,
-      province);
+      province,
+      coordsFetchedAt,
+      placeStatus,
+      nameNeeded);
 
   /// Create a copy of Gym
   /// with the given fields replaced by the non-null parameter values.
@@ -428,7 +508,10 @@ abstract class _Gym implements Gym {
       final String? brandName,
       final String? branchName,
       final String? city,
-      final String? province}) = _$GymImpl;
+      final String? province,
+      @TimestampConverter() final DateTime? coordsFetchedAt,
+      final String? placeStatus,
+      final bool nameNeeded}) = _$GymImpl;
 
   factory _Gym.fromJson(Map<String, dynamic> json) = _$GymImpl.fromJson;
 
@@ -475,6 +558,23 @@ abstract class _Gym implements Gym {
   String? get city;
   @override
   String? get province;
+
+  /// Cuándo se pidió a Places la lat/lng (política de Places: se pueden
+  /// cachear hasta 30 días; un job las refresca). Lo escribe el servidor
+  /// de Firestore (`request.time`), no el reloj del dispositivo.
+  @override
+  @TimestampConverter()
+  DateTime? get coordsFetchedAt;
+
+  /// Estado del lugar en Places (`ok` | `not_found`). `null` en docs viejos.
+  @override
+  String? get placeStatus;
+
+  /// `true` cuando el `name` guardado no lo escribió un usuario (vino de
+  /// Google, lo marca la migración). El próximo usuario que vincule este
+  /// gym tiene que nombrarlo.
+  @override
+  bool get nameNeeded;
 
   /// Create a copy of Gym
   /// with the given fields replaced by the non-null parameter values.

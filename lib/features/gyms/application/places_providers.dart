@@ -134,9 +134,15 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   /// "Cannot use ref after the widget was disposed" si la pantalla se
   /// desmontó mientras la operación estaba en vuelo. El estado se sigue
   /// publicando igual para quien quiera mostrar loading/error.
+  ///
+  /// Si el gym es nuevo (o está marcado `nameNeeded`) y no llegó [name], NO
+  /// se vincula nada: devuelve `false` y el estado trae `needsName: true`
+  /// para que la pantalla pida el nombre y vuelva a llamar con [name]
+  /// (el nombre lo escribe el usuario, nunca Google).
   Future<bool> select({
     required String uid,
     required String placeId,
+    String? name,
     bool useSessionToken = false,
   }) async {
     state = const AsyncLoading();
@@ -144,13 +150,15 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
       final result = await ref.read(resolveGymPlaceServiceProvider).call(
             placeId: placeId,
             sessionToken: null,
+            name: name,
           );
+      if (result.needsName) return result;
       await ref
           .read(userRepositoryProvider)
           .update(uid, {'gymId': result.gymId});
       return result;
     });
-    return !state.hasError;
+    return !state.hasError && state.valueOrNull?.needsName != true;
   }
 }
 

@@ -22,6 +22,10 @@ _$GymImpl _$$GymImplFromJson(Map<String, dynamic> json) => _$GymImpl(
       branchName: json['branchName'] as String?,
       city: json['city'] as String?,
       province: json['province'] as String?,
+      coordsFetchedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['coordsFetchedAt'], const TimestampConverter().fromJson),
+      placeStatus: json['placeStatus'] as String?,
+      nameNeeded: json['nameNeeded'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$GymImplToJson(_$GymImpl instance) => <String, dynamic>{
@@ -39,6 +43,10 @@ Map<String, dynamic> _$$GymImplToJson(_$GymImpl instance) => <String, dynamic>{
       'branchName': instance.branchName,
       'city': instance.city,
       'province': instance.province,
+      'coordsFetchedAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.coordsFetchedAt, const TimestampConverter().toJson),
+      'placeStatus': instance.placeStatus,
+      'nameNeeded': instance.nameNeeded,
     };
 
 const _$GymSourceEnumMap = {
@@ -46,3 +54,15 @@ const _$GymSourceEnumMap = {
   GymSource.selfService: 'self-service',
   GymSource.googlePlaces: 'google-places',
 };
+
+Value? _$JsonConverterFromJson<Json, Value>(
+  Object? json,
+  Value? Function(Json json) fromJson,
+) =>
+    json == null ? null : fromJson(json as Json);
+
+Json? _$JsonConverterToJson<Json, Value>(
+  Value? value,
+  Json? Function(Value value) toJson,
+) =>
+    value == null ? null : toJson(value);

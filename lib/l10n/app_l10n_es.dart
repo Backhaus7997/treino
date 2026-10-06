@@ -5194,6 +5194,19 @@ class AppL10nEs extends AppL10n {
   String eliminarCuentaWebPopupHint(String provider) {
     return 'Para confirmar que eres tú, se abrirá una ventana de $provider.';
   }
+
+  @override
+  String get gymNameDialogTitle => 'Ponle nombre a tu gimnasio';
+
+  @override
+  String get gymNameDialogBody =>
+      'Escribe el nombre con el que quieres que lo vean los demás.';
+
+  @override
+  String get gymNameDialogHint => 'Nombre del gimnasio';
+
+  @override
+  String get gymNameDialogConfirm => 'GUARDAR';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10383,4 +10396,17 @@ class AppL10nEsAr extends AppL10nEs {
   String eliminarCuentaWebPopupHint(String provider) {
     return 'Para confirmar que sos vos, se va a abrir una ventana de $provider.';
   }
+
+  @override
+  String get gymNameDialogTitle => 'Ponele nombre a tu gimnasio';
+
+  @override
+  String get gymNameDialogBody =>
+      'Escribí el nombre con el que querés que lo vean los demás.';
+
+  @override
+  String get gymNameDialogHint => 'Nombre del gimnasio';
+
+  @override
+  String get gymNameDialogConfirm => 'GUARDAR';
 }

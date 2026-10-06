@@ -12,6 +12,8 @@ const { initializeTestEnvironment, assertFails, assertSucceeds } =
   require('@firebase/rules-unit-testing');
 const { readFileSync } = require('fs');
 const path = require('path');
+const firebaseCompat = require('firebase/compat/app');
+require('firebase/compat/firestore');
 
 const PROJECT_ID = 'treino-test-rules';
 const RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
@@ -378,7 +380,6 @@ test('SCENARIO-274: non-owner cannot write another user check-in', async () => {
 const validGooglePlacesGym = (id) => ({
   id,
   name: 'SportClub Belgrano',
-  address: 'Cabildo 1789, CABA',
   lat: -34.5598,
   lng: -58.4615,
   geohash: '6d6m7',
@@ -387,6 +388,9 @@ const validGooglePlacesGym = (id) => ({
   brandName: null,
   branchName: null,
   createdAt: new Date(),
+  // Places policy (#1338): coords carry the server time they were fetched at.
+  coordsFetchedAt: firebaseCompat.firestore.FieldValue.serverTimestamp(),
+  placeStatus: 'ok',
 });
 
 test('GYM-PLACES-01: any authenticated user (not just trainers) can create a google-places gym doc', async () => {
@@ -534,6 +538,155 @@ test('GYM-PLACES-10: create is denied when lng is outside geographic range', asy
       .collection('gyms')
       .doc('ChIJ_place_10')
       .set({ ...validGooglePlacesGym('ChIJ_place_10'), lng: -200 }),
+  );
+});
+
+test('GYM-PLACES-11: create is denied when the payload stores Google\'s address (Places policy)', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_11')
+      .set({
+        ...validGooglePlacesGym('ChIJ_place_11'),
+        address: 'Cabildo 1789, CABA',
+      }),
+  );
+});
+
+test('GYM-PLACES-12: create is denied without coordsFetchedAt', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  const { coordsFetchedAt, ...sinFecha } = validGooglePlacesGym('ChIJ_place_12');
+  await assertFails(
+    athleteA.firestore().collection('gyms').doc('ChIJ_place_12').set(sinFecha),
+  );
+});
+
+test('GYM-PLACES-13: create is denied when coordsFetchedAt is a client clock, not request.time', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_13')
+      .set({
+        ...validGooglePlacesGym('ChIJ_place_13'),
+        coordsFetchedAt: new Date('2020-01-01'),
+      }),
+  );
+});
+
+test('GYM-PLACES-14: create is denied with an empty or over-long name', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_14')
+      .set({ ...validGooglePlacesGym('ChIJ_place_14'), name: '' }),
+  );
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_14')
+      .set({ ...validGooglePlacesGym('ChIJ_place_14'), name: 'x'.repeat(101) }),
+  );
+});
+
+test('GYM-PLACES-15: create cannot self-flag nameNeeded', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_15')
+      .set({ ...validGooglePlacesGym('ChIJ_place_15'), nameNeeded: true }),
+  );
+});
+
+/** Seeds a migrated gym that still needs a user-typed name. */
+async function seedGymNeedingName(id) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('gyms').doc(id).set({
+      id,
+      name: 'Marcador',
+      nameNeeded: true,
+      lat: -34.5598,
+      lng: -58.4615,
+      geohash: '6d6m7',
+      source: 'google-places',
+      createdAt: new Date(),
+    });
+  });
+}
+
+test('GYM-PLACES-16: any authenticated user can name a gym flagged nameNeeded', async () => {
+  await seedGymNeedingName('ChIJ_place_16');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertSucceeds(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_16')
+      .update({ name: 'Mi gimnasio', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-17: naming a flagged gym cannot touch coords or other fields', async () => {
+  await seedGymNeedingName('ChIJ_place_17');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_17')
+      .update({ name: 'Mi gimnasio', nameNeeded: false, lat: 0 }),
+  );
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_17')
+      .update({ name: 'Mi gimnasio', nameNeeded: false, address: 'Calle 1' }),
+  );
+});
+
+test('GYM-PLACES-18: naming must clear the flag and keep a valid name', async () => {
+  await seedGymNeedingName('ChIJ_place_18');
+  const athleteB = testEnv.authenticatedContext('athlete-b');
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_18')
+      .update({ name: 'Mi gimnasio' }),
+  );
+  await assertFails(
+    athleteB
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_18')
+      .update({ name: '', nameNeeded: false }),
+  );
+});
+
+test('GYM-PLACES-19: a gym already named cannot be renamed through the nameNeeded branch', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_19')
+      .set({ ...validGooglePlacesGym('ChIJ_place_19'), coordsFetchedAt: new Date() });
+  });
+  const attacker = testEnv.authenticatedContext('attacker');
+  await assertFails(
+    attacker
+      .firestore()
+      .collection('gyms')
+      .doc('ChIJ_place_19')
+      .update({ name: 'VANDALIZED', nameNeeded: false }),
   );
 });
 

@@ -51,6 +51,19 @@ class Gym with _$Gym {
     /// Opcionales — decode seguro cuando están ausentes en docs viejos.
     String? city,
     String? province,
+
+    /// Cuándo se pidió a Places la lat/lng (política de Places: se pueden
+    /// cachear hasta 30 días; un job las refresca). Lo escribe el servidor
+    /// de Firestore (`request.time`), no el reloj del dispositivo.
+    @TimestampConverter() DateTime? coordsFetchedAt,
+
+    /// Estado del lugar en Places (`ok` | `not_found`). `null` en docs viejos.
+    String? placeStatus,
+
+    /// `true` cuando el `name` guardado no lo escribió un usuario (vino de
+    /// Google, lo marca la migración). El próximo usuario que vincule este
+    /// gym tiene que nombrarlo.
+    @Default(false) bool nameNeeded,
   }) = _Gym;
 
   factory Gym.fromJson(Map<String, Object?> json) => _$GymFromJson(json);
