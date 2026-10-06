@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 50 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 51 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -193,13 +193,24 @@ test('los 50 scripts que inicializan Firebase pasan por la frontera', () => {
   // `--allow-prod` porque asi lo pide el plan y porque decide una migración de
   // producto real.
   //
+  // El 51 es `audit_forged_trainer_links.js`: busca vínculos cuyo `trainerId`
+  // no tenga rol de entrenador — el residuo de que el `create` de
+  // `trainer_links` no validaba ese rol (firestore.rules ~1368, cerrado en el
+  // mismo PR). Entra por `lib/admin`, imprime el banner de producción ANTES de
+  // inicializar y el proyecto resuelto después, y es DRY-RUN POR DEFECTO:
+  // borra sólo con `--apply`, y `--apply --dry-run` NO borra. Va con la misma
+  // cautela que `cleanup_rejected_links.js` porque borra de la misma colección,
+  // y además deja intacto el grupo AMBIGUO —sin doc de usuario o sin `role`—
+  // en vez de tratarlo como forjado: un PF legacy sin el campo existe, y
+  // borrarle el vínculo le corta el servicio a él y a su alumno.
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    50,
+    51,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),
