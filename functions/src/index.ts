@@ -232,6 +232,9 @@ export {
 // ese numero antes es mandar ese numero de mails de golpe. Ver
 // RETENTION_SWEEP_DRY_RUN en el modulo.
 export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
+// Completa los borrados de cuenta que terminaron `partial` (#1353): 06:00 ART,
+// hasta 5 intentos, despues `failed` + log de error. Ver el modulo.
+export { retryPartialDeletions } from "./retention/retry-partial-deletions";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
