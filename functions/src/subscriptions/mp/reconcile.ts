@@ -2331,24 +2331,8 @@ async function escribirSuscripcionDeAlumno(i: {
   // Se guarda el `status` AJUSTADO por la prueba diferida, no el de MP crudo: el
   // hermano proyecta el derecho desde lo guardado ([derechoGuardado]), y tiene
   // que ver lo mismo que este escritor dejaria. Ver el orden en el encabezado.
-  //
-  // En la misma escritura se limpia [CAMPO_INDICE_MP_DIFERIDO_AT_MS] cuando este
-  // plan vuelve a otorgar: la marca acota UN corte, y un corte independiente de
-  // meses despues (pausa → activo → vencido) merece su propia ventana. Sin esto,
-  // la marca vieja le negaria el beneficio de la duda a un hermano pago que el
-  // indice de MP todavia no muestra. Se escribe `null` y no se borra: la lectura
-  // ya trata cualquier cosa que no sea un numero como «sin marca».
-  const limpiarMarcaDelIndice =
-    typeof planDoc?.[CAMPO_INDICE_MP_DIFERIDO_AT_MS] === "number" &&
-    athleteStatusOtorga(athleteStatus);
-  if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status || limpiarMarcaDelIndice) {
-    await planRef.set(
-      {
-        [CAMPO_ULTIMO_STATUS]: status,
-        ...(limpiarMarcaDelIndice ? { [CAMPO_INDICE_MP_DIFERIDO_AT_MS]: null } : {}),
-      },
-      { merge: true },
-    );
+  if (planDoc?.[CAMPO_ULTIMO_STATUS] !== status) {
+    await planRef.set({ [CAMPO_ULTIMO_STATUS]: status }, { merge: true });
   }
 
   // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un derecho vigente ──
@@ -2434,6 +2418,22 @@ async function escribirSuscripcionDeAlumno(i: {
       "mp/reconcile: el plan ya no otorga, pero otro plan del alumno si — no se corta",
       { planId, uid, producto: "athlete", status, athleteStatus, otorgaOtro },
     );
+  }
+
+  // ── Fin del episodio: la marca de [CAMPO_INDICE_MP_DIFERIDO_AT_MS] se limpia ──
+  //
+  // La marca acota UN corte, no la vida del plan. Llegar aca —sin la excepcion
+  // de arriba, que es la postergacion misma— es que ese corte se resolvio, sea
+  // como sea: el plan volvio a otorgar (`revocaria` en falso), un hermano otorga,
+  // o se corto. Un corte independiente de meses despues tiene que recibir su
+  // propia ventana; con la marca vieja, a un hermano pago que el indice de MP
+  // todavia no muestra se lo leeria como ausente y se le cortaria el acceso al
+  // alumno. Un solo punto para los tres desenlaces: limpiar en cada uno por
+  // separado ya dejo afuera el de un plan `paused` cuyo corte lo resolvio un
+  // hermano. Se escribe `null` y no se borra: la lectura trata cualquier cosa
+  // que no sea un numero como «sin marca».
+  if (typeof planDoc?.[CAMPO_INDICE_MP_DIFERIDO_AT_MS] === "number") {
+    await planRef.set({ [CAMPO_INDICE_MP_DIFERIDO_AT_MS]: null }, { merge: true });
   }
 
   const sinCambios = statusPrevio === athleteStatus;

@@ -3074,6 +3074,28 @@ describe("reconcileSubscription — el alumno con dos planes", () => {
         expect(derechoDe(store)).toBe("expired");
       });
 
+      it("la marca se limpia tambien cuando el corte lo resuelve un hermano que otorga", async () => {
+        const mundo = mundoPreDeploy();
+        mundo.mp_plans.a2.createdAt = ts(AHORA - 2 * 60 * 1000);
+        const { app, store } = fakeApp(mundo);
+
+        // Se posterga: el hermano recien abierto todavia no esta en el indice.
+        expect((await reconcileSubscription(app, "a1", fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: null,
+        }))).outcome).toBe("error-mp");
+        expect(store.mp_plans.a1.indiceMpDiferidoAtMs).toBe(AHORA);
+
+        // El indice lo muestra y otorga: a1 sigue sin otorgar (no vuelve nunca),
+        // pero el episodio termino y la marca no puede quedar para el proximo.
+        const r = await reconcileSubscription(app, "a1", fakeMpMultiPlan({
+          a1: MENSUAL_DADO_DE_BAJA,
+          a2: ANUAL_AUTORIZADO,
+        }, {}, AHORA + 60 * 1000));
+        expect(r.outcome).toBe("skipped-otro-plan-otorga");
+        expect(store.mp_plans.a1.indiceMpDiferidoAtMs).toBeNull();
+      });
+
       it("la marca se limpia cuando el plan vuelve a otorgar: un corte de meses despues tiene su propia ventana", async () => {
         const mundo = mundoPreDeploy();
         mundo.mp_plans.a2.createdAt = ts(AHORA - 2 * 60 * 1000);
