@@ -242,6 +242,9 @@ export { retryPartialDeletions } from "./retention/retry-partial-deletions";
 // ELIMINÓ: no se podía deployar (Domain-Restricted-Sharing de la org) y
 // persistía el nombre y la dirección de Google, que la política de Places
 // (#1338) no permite guardar. No la restaures.
+// Refresco diario de coordenadas de Google Places (#1338). Necesita el secret
+// PLACES_API_KEY ANTES del deploy: defineSecret resuelve todos los secretos.
+export { refreshPlacesCoords } from "./places/refresh-places-coords";
 
 // Companion de Apple Watch (change watch-standalone-client, fase F1): entrega
 // al reloj una credencial PROPIA y renovable. Necesaria porque

@@ -5207,6 +5207,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get gymNameDialogConfirm => 'GUARDAR';
+
+  @override
+  String get coachHubOnboardingPfLocationStaleHint =>
+      'Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10409,4 +10413,8 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get gymNameDialogConfirm => 'GUARDAR';
+
+  @override
+  String get coachHubOnboardingPfLocationStaleHint =>
+      'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.';
 }

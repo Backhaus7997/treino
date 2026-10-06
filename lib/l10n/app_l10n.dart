@@ -8790,6 +8790,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'GUARDAR'**
   String get gymNameDialogConfirm;
+
+  /// Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.'**
+  String get coachHubOnboardingPfLocationStaleHint;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

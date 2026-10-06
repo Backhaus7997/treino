@@ -54,5 +54,56 @@ void main() {
       });
       expect(l.stale, isTrue);
     });
+
+    test('un lugar stale sin coordenadas (purga de 30 días) parsea sin romper',
+        () {
+      final l = TrainerLocation.fromJson({
+        'id': 'custom-1',
+        'type': 'custom',
+        'customLabel': 'Mi estudio',
+        'lat': null,
+        'lng': null,
+        'geohash': null,
+        'placeId': 'ChIJabc',
+        'stale': true,
+      });
+
+      expect(l.lat, isNull);
+      expect(l.lng, isNull);
+      expect(l.geohash, isNull);
+      expect(l.stale, isTrue);
+      expect(l.placeId, 'ChIJabc');
+      expect(l.isPublishable, isFalse);
+    });
+
+    test('también parsea si los campos de coordenadas faltan del doc', () {
+      final l = TrainerLocation.fromJson({
+        'id': 'custom-1',
+        'type': 'custom',
+        'placeId': 'ChIJabc',
+        'stale': true,
+      });
+      expect(l.lat, isNull);
+      expect(l.isPublishable, isFalse);
+    });
+
+    test('isPublishable: solo con coordenadas y sin stale', () {
+      TrainerLocation de({double? lat, double? lng, bool? stale}) =>
+          TrainerLocation(
+            id: 'x',
+            type: TrainerLocationType.custom,
+            lat: lat,
+            lng: lng,
+            geohash: lat == null ? null : 'abcde',
+            stale: stale,
+          );
+
+      expect(de(lat: 1, lng: 2).isPublishable, isTrue);
+      expect(de(lat: 1, lng: 2, stale: false).isPublishable, isTrue);
+      expect(de(lat: 1, lng: 2, stale: true).isPublishable, isFalse);
+      expect(de(lat: 1).isPublishable, isFalse);
+      expect(de(lng: 2).isPublishable, isFalse);
+      expect(de().isPublishable, isFalse);
+    });
   });
 }

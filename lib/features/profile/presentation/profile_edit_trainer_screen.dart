@@ -136,14 +136,7 @@ class _ProfileEditTrainerScreenState
     );
     if (picked == null) return;
     setState(() {
-      _locations.add(TrainerLocation(
-        id: 'gym-${picked.id}',
-        type: TrainerLocationType.gym,
-        gymId: picked.id,
-        lat: picked.lat,
-        lng: picked.lng,
-        geohash: picked.geohash,
-      ));
+      _locations.add(trainerLocationFromGym(picked));
       _error = null;
     });
   }
@@ -340,7 +333,13 @@ class _ProfileEditTrainerScreenState
           ? null
           : int.parse(_experienceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
-      'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
+      // Un lugar `stale` ya no se publica: no entra a la búsqueda.
+      'trainerGeohashes': _locations
+          .where((l) => l.isPublishable)
+          .map((l) => l.geohash)
+          .whereType<String>()
+          .toSet()
+          .toList(),
       'trainerOffersOnline': _offersOnline,
       // Sólo si el PF lo tocó ACÁ. El switch se edita también desde el Coach
       // Hub, que persiste al instante: si el form quedó abierto, mandarlo
@@ -945,8 +944,11 @@ class _CustomLocationsSection extends StatelessWidget {
                         palette: palette,
                         icon: TreinoIcon.mapPin,
                         title: loc.customLabel ?? 'Lugar propio',
-                        subtitle:
-                            '${loc.lat.toStringAsFixed(4)}, ${loc.lng.toStringAsFixed(4)}',
+                        // Un lugar vencido no tiene coordenadas (el servidor las
+                        // borró a los 30 días): se pide volver a elegirlo.
+                        subtitle: loc.isPublishable
+                            ? '${loc.lat!.toStringAsFixed(4)}, ${loc.lng!.toStringAsFixed(4)}'
+                            : 'Lugar vencido: volvé a elegirlo',
                         onRemove: () => onRemove(loc),
                       ),
                     ))

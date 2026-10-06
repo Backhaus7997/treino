@@ -4720,5 +4720,9 @@
   "gymNameDialogConfirm": "GUARDAR",
   "@gymNameDialogConfirm": {
     "description": "Confirm button of the gym name dialog. Cancel reuses commonCancel."
+  },
+  "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.",
+  "@coachHubOnboardingPfLocationStaleHint": {
+    "description": "Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo."
   }
 }
