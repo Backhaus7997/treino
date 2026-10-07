@@ -43,7 +43,7 @@ void main() {
       await tester.pumpWidget(_app());
       await _open(tester);
 
-      expect(find.text('Permitir ubicación'), findsOneWidget);
+      expect(find.text('Tu ubicación'), findsOneWidget);
       expect(find.textContaining('entrenadores cerca tuyo'), findsOneWidget);
     });
 
@@ -116,7 +116,7 @@ void main() {
       await _open(tester);
 
       await tester.drag(
-        find.text('Permitir ubicación'),
+        find.text('Tu ubicación'),
         const Offset(0, 600),
       );
       await tester.pumpAndSettle();

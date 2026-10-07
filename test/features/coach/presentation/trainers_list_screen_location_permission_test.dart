@@ -86,36 +86,56 @@ void main() {
     });
 
     testWidgets(
-        'denegado de forma permanente: no hay mensaje previo, hay '
-        'aviso con Ajustes, y NO se pide al SO', (tester) async {
+        'denegado de forma permanente: al abrir NO se muestra nada ni se '
+        'pide al SO; la pantalla queda usable sin ubicación', (tester) async {
       final gateway =
           FakeLocationPermissionGateway(LocationPermission.deniedForever);
       final notifier = await _pump(tester, gateway);
 
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text('ABRIR AJUSTES'), findsNothing);
       expect(find.text('CONTINUAR'), findsNothing);
+      expect(notifier.requestPermissionCalls, 0);
+      expect(notifier.isPermissionDenied, isTrue);
+      expect(gateway.openSettingsCalls, 0);
+      expect(find.textContaining('ENCONTRÁ TU COACH'), findsOneWidget);
+      expect(find.text('ONLINE'), findsOneWidget);
+    });
+
+    testWidgets(
+        'servicios de ubicación apagados: al abrir tampoco se muestra '
+        'nada', (tester) async {
+      final notifier = await _pump(
+        tester,
+        FakeLocationPermissionGateway(
+          LocationPermission.denied,
+          serviceEnabled: false,
+        ),
+      );
+
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(notifier.requestPermissionCalls, 0);
+      expect(notifier.isPermissionDenied, isTrue);
+    });
+
+    testWidgets(
+        'denegado de forma permanente: tocar el chip Distancia (acción del '
+        'usuario) sí muestra el aviso con Ajustes', (tester) async {
+      final gateway =
+          FakeLocationPermissionGateway(LocationPermission.deniedForever);
+      final notifier = await _pump(tester, gateway);
+
+      await tester.tap(find.text('Distancia'));
+      await tester.pumpAndSettle();
+
       expect(find.text('ABRIR AJUSTES'), findsOneWidget);
+      expect(find.text('CONTINUAR'), findsNothing);
 
       await tester.tap(find.text('ABRIR AJUSTES'));
       await tester.pumpAndSettle();
 
       expect(gateway.openSettingsCalls, 1);
       expect(notifier.requestPermissionCalls, 0);
-    });
-
-    testWidgets(
-        'denegado de forma permanente + «Seguir sin ubicación»: la '
-        'pantalla sigue usable en modo sin ubicación', (tester) async {
-      final gateway =
-          FakeLocationPermissionGateway(LocationPermission.deniedForever);
-      final notifier = await _pump(tester, gateway);
-
-      await tester.tap(find.text('Seguir sin ubicación'));
-      await tester.pumpAndSettle();
-
-      expect(notifier.requestPermissionCalls, 0);
-      expect(notifier.isPermissionDenied, isTrue);
-      expect(find.textContaining('ENCONTRÁ TU COACH'), findsOneWidget);
-      expect(find.text('ONLINE'), findsOneWidget);
     });
   });
 }

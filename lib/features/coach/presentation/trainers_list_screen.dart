@@ -65,12 +65,16 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
     _rationaleShown = true;
-    // Guideline 5.1.1(iv): el único camino que no termina en el pedido del SO
-    // es el del permiso ya denegado de forma permanente (el SO no puede
-    // preguntar de nuevo), y ahí se muestra el aviso con Ajustes.
+    // Guideline 5.1.1(iv): el primer pedido va con el CONTINUAR previo, en
+    // contexto (se abrió «Encontrá tu coach»). Si el SO ya no puede preguntar
+    // (denegado de forma permanente, servicios apagados) NO se muestra el
+    // aviso de Ajustes al abrir: eso sería insistir en cada apertura. Se sigue
+    // sin ubicación, y el aviso queda para una acción del usuario (chip
+    // «Distancia»).
     final proceed = await presentLocationPermissionFlow(
       context,
       ref.read(locationPermissionGatewayProvider),
+      interactive: false,
     );
     if (!mounted) return;
     if (proceed) {

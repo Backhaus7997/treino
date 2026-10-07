@@ -17,6 +17,10 @@ import 'location_permission_rationale_sheet.dart';
 ///
 /// Decide qué mostrar según el estado REAL del permiso (Guideline 5.1.1(iv)):
 ///
+///  - **Servicios de ubicación apagados** → no hay posición posible ni diálogo
+///    del SO que mostrar: aviso que lleva a Ajustes; `false`. Se evalúa
+///    primero, porque con los servicios apagados un CONTINUAR no produciría
+///    nada visible.
 ///  - **Ya otorgado** → nada que mostrar; `true` (sólo adquiere la posición).
 ///  - **Aún no pedido** → mensaje previo con UN solo botón CONTINUAR, que
 ///    siempre lleva al pedido del SO; `true`.
@@ -26,12 +30,40 @@ import 'location_permission_rationale_sheet.dart';
 ///    salida para seguir sin ubicación; `false`. Apple lo admite
 ///    explícitamente para una función que no anda sin el permiso.
 ///
-/// Un error del plugin al consultar el estado se trata como «aún no pedido»:
-/// el pedido al SO es la fuente de verdad y no se pierde por eso.
+/// [interactive] distingue QUIÉN pidió el flujo. `true` (por defecto): lo
+/// disparó una acción del usuario (chip «Distancia», «Activar ubicación»,
+/// gimnasios cercanos) y el aviso de Ajustes es la respuesta esperada. `false`:
+/// se abrió una pantalla y el flujo corre solo; ahí el aviso de Ajustes sería
+/// un cartel insistente en cada apertura, así que se sigue en silencio
+/// (`false`) y sólo el primer pedido —el CONTINUAR previo al diálogo del SO—
+/// se muestra, porque es un pedido en contexto.
+///
+/// Un error del plugin al consultar el estado se trata como «aún no pedido»
+/// (y servicios encendidos): el pedido al SO es la fuente de verdad y no se
+/// pierde por eso.
 Future<bool> presentLocationPermissionFlow(
   BuildContext context,
-  LocationPermissionGateway gateway,
-) async {
+  LocationPermissionGateway gateway, {
+  bool interactive = true,
+}) async {
+  var servicesOn = true;
+  try {
+    servicesOn = await gateway.isServiceEnabled();
+  } catch (_) {
+    servicesOn = true;
+  }
+  if (!context.mounted) return false;
+  if (!servicesOn) {
+    if (interactive) {
+      await showLocationSettingsNoticeSheet(
+        context,
+        servicesOff: true,
+        onOpenSettings: gateway.openLocationSettings,
+      );
+    }
+    return false;
+  }
+
   LocationPermission status;
   try {
     status = await gateway.check();
@@ -45,10 +77,12 @@ Future<bool> presentLocationPermissionFlow(
     case LocationPermission.whileInUse:
       return true;
     case LocationPermission.deniedForever:
-      await showLocationSettingsNoticeSheet(
-        context,
-        onOpenSettings: gateway.openSettings,
-      );
+      if (interactive) {
+        await showLocationSettingsNoticeSheet(
+          context,
+          onOpenSettings: gateway.openSettings,
+        );
+      }
       return false;
     case LocationPermission.denied:
     case LocationPermission.unableToDetermine:
@@ -57,29 +91,37 @@ Future<bool> presentLocationPermissionFlow(
   }
 }
 
-/// Aviso informativo para el permiso denegado de forma permanente.
+/// Aviso informativo para el permiso denegado de forma permanente o los
+/// Servicios de ubicación apagados ([servicesOff]).
 ///
 /// NO es un mensaje previo a un diálogo del SO (ese diálogo ya no existe):
-/// explica que la función necesita el permiso y lleva a Ajustes. Se puede
-/// cerrar —«Seguir sin ubicación»— porque no hay ningún pedido que saltear.
+/// explica qué hay que encender y lleva a Ajustes. Se puede cerrar
+/// —«Seguir sin ubicación»— porque no hay ningún pedido que saltear.
 Future<void> showLocationSettingsNoticeSheet(
   BuildContext context, {
   required Future<void> Function() onOpenSettings,
+  bool servicesOff = false,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (ctx) =>
-        _LocationSettingsNoticeSheet(onOpenSettings: onOpenSettings),
+    builder: (ctx) => _LocationSettingsNoticeSheet(
+      onOpenSettings: onOpenSettings,
+      servicesOff: servicesOff,
+    ),
   );
 }
 
 class _LocationSettingsNoticeSheet extends StatelessWidget {
-  const _LocationSettingsNoticeSheet({required this.onOpenSettings});
+  const _LocationSettingsNoticeSheet({
+    required this.onOpenSettings,
+    required this.servicesOff,
+  });
 
   final Future<void> Function() onOpenSettings;
+  final bool servicesOff;
 
   @override
   Widget build(BuildContext context) {
@@ -101,7 +143,9 @@ class _LocationSettingsNoticeSheet extends StatelessWidget {
             Icon(TreinoIcon.mapPin, size: 48, color: palette.accent),
             const SizedBox(height: AppSpacing.s14),
             Text(
-              l10n.coachLocationSettingsNoticeTitle,
+              servicesOff
+                  ? l10n.coachLocationServicesOffTitle
+                  : l10n.coachLocationSettingsNoticeTitle,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: AppTextSize.titleLarge,
@@ -110,7 +154,9 @@ class _LocationSettingsNoticeSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s12),
             Text(
-              l10n.coachLocationSettingsNoticeBody,
+              servicesOff
+                  ? l10n.coachLocationServicesOffBody
+                  : l10n.coachLocationSettingsNoticeBody,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
                 fontSize: AppTextSize.body,
@@ -124,7 +170,13 @@ class _LocationSettingsNoticeSheet extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () async {
                   final navigator = Navigator.of(context);
-                  await onOpenSettings();
+                  try {
+                    await onOpenSettings();
+                  } catch (_) {
+                    // Si el SO no pudo abrir Ajustes, el aviso se cierra
+                    // igual: no queda un error sin manejar ni un sheet
+                    // atascado.
+                  }
                   navigator.pop();
                 },
                 style: ElevatedButton.styleFrom(

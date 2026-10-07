@@ -14,6 +14,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../coach/application/location_permission_gateway.dart';
+import '../../coach/presentation/widgets/location_permission_flow.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
 import '../../gyms/application/gym_providers.dart';
@@ -1258,14 +1260,15 @@ class _CustomLocationDraft {
   final double lng;
 }
 
-class _CustomLocationSheet extends StatefulWidget {
+class _CustomLocationSheet extends ConsumerStatefulWidget {
   const _CustomLocationSheet();
 
   @override
-  State<_CustomLocationSheet> createState() => _CustomLocationSheetState();
+  ConsumerState<_CustomLocationSheet> createState() =>
+      _CustomLocationSheetState();
 }
 
-class _CustomLocationSheetState extends State<_CustomLocationSheet> {
+class _CustomLocationSheetState extends ConsumerState<_CustomLocationSheet> {
   final _labelController = TextEditingController();
   double? _lat;
   double? _lng;
@@ -1280,33 +1283,43 @@ class _CustomLocationSheetState extends State<_CustomLocationSheet> {
 
   Future<void> _detect() async {
     if (_detecting) return;
-    setState(() {
-      _detecting = true;
-      _error = null;
-    });
+    final l10n = AppL10n.of(context);
+    final gateway = ref.read(locationPermissionGatewayProvider);
+    setState(() => _error = null);
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      // Mismo flujo que el resto de la app (Guideline 5.1.1(iv)): CONTINUAR
+      // previo al diálogo del SO, o aviso con Ajustes si el SO ya no puede
+      // preguntar / los Servicios de ubicación están apagados. El spinner
+      // arranca DESPUÉS: mientras el usuario lee el mensaje no se está
+      // detectando nada.
+      final proceed = await presentLocationPermissionFlow(context, gateway);
+      if (!mounted || !proceed) return;
+      setState(() => _detecting = true);
+      var permission = await gateway.check();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
+        permission = await gateway.request();
       }
+      if (!mounted) return;
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         setState(() {
-          _error = 'Necesitamos permiso de ubicación.';
+          _error = l10n.profileLocationPermissionNeeded;
           _detecting = false;
         });
         return;
       }
-      final pos = await Geolocator.getCurrentPosition(
-          locationSettings: kTrainerLocationSettings);
+      final pos = await gateway.currentPosition(kTrainerLocationSettings);
+      if (!mounted) return;
       setState(() {
         _lat = pos.latitude;
         _lng = pos.longitude;
         _detecting = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
-        _error = 'No pudimos detectar tu ubicación.';
+        _error = l10n.profileLocationDetectFailed;
         _detecting = false;
       });
     }

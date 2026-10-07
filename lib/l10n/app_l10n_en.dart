@@ -348,7 +348,7 @@ class AppL10nEn extends AppL10n {
   String get coachCtaProximamente => '';
 
   @override
-  String get coachLocationSheetTitle => 'Allow location';
+  String get coachLocationSheetTitle => 'Your location';
 
   @override
   String get coachLocationSheetBody =>
@@ -370,6 +370,20 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachLocationSettingsNoticeContinueWithout =>
       'Continue without location';
+
+  @override
+  String get coachLocationServicesOffTitle => 'Location Services are off';
+
+  @override
+  String get coachLocationServicesOffBody =>
+      'Turn on Location Services in Settings to see trainers near you. You can also continue without it and browse Online trainers.';
+
+  @override
+  String get profileLocationPermissionNeeded => 'We need location permission.';
+
+  @override
+  String get profileLocationDetectFailed =>
+      'We couldn\'t detect your location.';
 
   @override
   String get coachMiPlanTitle => '';

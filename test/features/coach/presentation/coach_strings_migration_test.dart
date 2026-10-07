@@ -133,7 +133,7 @@ void main() {
     // ── LocationPermissionRationaleSheet ───────────────────────────────────
     testWidgets('coachLocationSheetTitle verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.coachLocationSheetTitle, 'Permitir ubicación');
+      expect(l10n.coachLocationSheetTitle, 'Tu ubicación');
     });
     testWidgets('coachLocationSheetBody verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);

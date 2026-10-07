@@ -354,7 +354,7 @@ class AppL10nEs extends AppL10n {
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
-  String get coachLocationSheetTitle => 'Permitir ubicación';
+  String get coachLocationSheetTitle => 'Tu ubicación';
 
   @override
   String get coachLocationSheetBody =>
@@ -376,6 +376,21 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachLocationSettingsNoticeContinueWithout =>
       'Seguir sin ubicación';
+
+  @override
+  String get coachLocationServicesOffTitle =>
+      'Servicios de ubicación desactivados';
+
+  @override
+  String get coachLocationServicesOffBody =>
+      'Activa los Servicios de ubicación en Ajustes para ver entrenadores cerca de ti. Si prefieres, sigue sin ubicación y explora entrenadores Online.';
+
+  @override
+  String get profileLocationPermissionNeeded =>
+      'Necesitamos permiso de ubicación.';
+
+  @override
+  String get profileLocationDetectFailed => 'No pudimos detectar tu ubicación.';
 
   @override
   String get coachMiPlanTitle => 'MI PLAN';
@@ -5596,7 +5611,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
-  String get coachLocationSheetTitle => 'Permitir ubicación';
+  String get coachLocationSheetTitle => 'Tu ubicación';
 
   @override
   String get coachLocationSheetBody =>
@@ -5618,6 +5633,21 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachLocationSettingsNoticeContinueWithout =>
       'Seguir sin ubicación';
+
+  @override
+  String get coachLocationServicesOffTitle =>
+      'Servicios de ubicación desactivados';
+
+  @override
+  String get coachLocationServicesOffBody =>
+      'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.';
+
+  @override
+  String get profileLocationPermissionNeeded =>
+      'Necesitamos permiso de ubicación.';
+
+  @override
+  String get profileLocationDetectFailed => 'No pudimos detectar tu ubicación.';
 
   @override
   String get coachMiPlanTitle => 'MI PLAN';

@@ -719,7 +719,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationSheetTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Permitir ubicación'**
+  /// **'Tu ubicación'**
   String get coachLocationSheetTitle;
 
   /// No description provided for @coachLocationSheetBody.
@@ -757,6 +757,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Seguir sin ubicación'**
   String get coachLocationSettingsNoticeContinueWithout;
+
+  /// No description provided for @coachLocationServicesOffTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Servicios de ubicación desactivados'**
+  String get coachLocationServicesOffTitle;
+
+  /// No description provided for @coachLocationServicesOffBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
+  String get coachLocationServicesOffBody;
+
+  /// No description provided for @profileLocationPermissionNeeded.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos permiso de ubicación.'**
+  String get profileLocationPermissionNeeded;
+
+  /// No description provided for @profileLocationDetectFailed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos detectar tu ubicación.'**
+  String get profileLocationDetectFailed;
 
   /// No description provided for @coachMiPlanTitle.
   ///

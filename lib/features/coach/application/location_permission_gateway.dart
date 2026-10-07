@@ -18,8 +18,27 @@ abstract class LocationPermissionGateway {
   /// vuelve a preguntar, sólo se cambia desde Ajustes.
   Future<LocationPermission> check();
 
+  /// Si los Servicios de ubicación del dispositivo están encendidos.
+  ///
+  /// Con ellos apagados no hay posición aunque el permiso esté otorgado, y el
+  /// SO no vuelve a preguntar por el permiso: sólo se enciende desde Ajustes.
+  Future<bool> isServiceEnabled();
+
+  /// Pide el permiso al SO (dispara el diálogo del sistema si hace falta).
+  ///
+  /// Sólo para quien no tiene un notifier propio de ubicación (p. ej. el
+  /// botón «Detectar» del editor del PF).
+  Future<LocationPermission> request();
+
+  /// Adquiere la posición actual con la precisión que pide el caller.
+  Future<Position> currentPosition(LocationSettings settings);
+
   /// Abre los Ajustes de la app.
   Future<void> openSettings();
+
+  /// Abre los Ajustes de los Servicios de ubicación del dispositivo (en iOS,
+  /// la app de Ajustes; el SO no permite saltar directo al interruptor).
+  Future<void> openLocationSettings();
 }
 
 class GeolocatorLocationPermissionGateway implements LocationPermissionGateway {
@@ -29,7 +48,20 @@ class GeolocatorLocationPermissionGateway implements LocationPermissionGateway {
   Future<LocationPermission> check() => Geolocator.checkPermission();
 
   @override
+  Future<bool> isServiceEnabled() => Geolocator.isLocationServiceEnabled();
+
+  @override
+  Future<LocationPermission> request() => Geolocator.requestPermission();
+
+  @override
+  Future<Position> currentPosition(LocationSettings settings) =>
+      Geolocator.getCurrentPosition(locationSettings: settings);
+
+  @override
   Future<void> openSettings() => Geolocator.openAppSettings();
+
+  @override
+  Future<void> openLocationSettings() => Geolocator.openLocationSettings();
 }
 
 final locationPermissionGatewayProvider = Provider<LocationPermissionGateway>(
