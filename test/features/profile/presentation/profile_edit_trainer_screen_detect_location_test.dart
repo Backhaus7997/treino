@@ -157,6 +157,29 @@ void main() {
       expect(find.text('-34.6037, -58.3816'), findsOneWidget);
     });
 
+    testWidgets(
+        'Android: request → deniedForever muestra el aviso del Detectar '
+        '(no el de entrenadores)', (tester) async {
+      final gateway = FakeLocationPermissionGateway(
+        LocationPermission.denied,
+        requestResult: LocationPermission.deniedForever,
+      );
+      await _openDetectSheet(tester, gateway);
+
+      await tester.tap(find.text('Detectar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('para detectar tu ubicación'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('entrenadores'), findsNothing);
+      expect(find.text('ABRIR AJUSTES'), findsOneWidget);
+      expect(gateway.requestCalls, 1);
+    });
+
     testWidgets('el SO deniega el pedido: mensaje de permiso, sin posición',
         (tester) async {
       final gateway = FakeLocationPermissionGateway(

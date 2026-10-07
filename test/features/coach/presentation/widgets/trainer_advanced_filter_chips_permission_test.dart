@@ -54,7 +54,10 @@ void main() {
         'al pedido del SO', (tester) async {
       final notifier = await _pump(
         tester,
-        FakeLocationPermissionGateway(LocationPermission.denied),
+        FakeLocationPermissionGateway(
+          LocationPermission.denied,
+          requestResult: LocationPermission.whileInUse,
+        ),
       );
 
       await tester.tap(find.text('Distancia'));
@@ -84,6 +87,45 @@ void main() {
 
       expect(gateway.openSettingsCalls, 1);
       expect(notifier.requestPermissionCalls, 0);
+    });
+
+    testWidgets(
+        'Android: check dice denied pero el SO ya no pregunta (request → '
+        'deniedForever): aviso de Ajustes de inmediato', (tester) async {
+      final gateway = FakeLocationPermissionGateway(
+        LocationPermission.denied,
+        requestResult: LocationPermission.deniedForever,
+      );
+      final notifier = await _pump(tester, gateway);
+
+      await tester.tap(find.text('Distancia'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ABRIR AJUSTES'), findsOneWidget);
+      await tester.tap(find.text('ABRIR AJUSTES'));
+      await tester.pumpAndSettle();
+      expect(gateway.openSettingsCalls, 1);
+      expect(notifier.requestPermissionCalls, 0,
+          reason: 'el notifier no vuelve a pedir lo que el flujo ya pidió');
+    });
+
+    testWidgets('el usuario rechaza el diálogo: queda «sin ubicación»',
+        (tester) async {
+      final notifier = await _pump(
+        tester,
+        FakeLocationPermissionGateway(LocationPermission.denied),
+      );
+
+      await tester.tap(find.text('Distancia'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(notifier.requestPermissionCalls, 0);
+      expect(notifier.isPermissionDenied, isTrue);
+      expect(find.text('ABRIR AJUSTES'), findsNothing);
     });
   });
 }

@@ -7,44 +7,49 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/location_permission_gateway.dart';
+import 'location_flow_types.dart';
 import 'location_permission_rationale_sheet.dart';
+
+export 'location_flow_types.dart';
 
 /// Punto único de entrada al pedido de ubicación «con contexto».
 ///
-/// Devuelve `true` si el caller debe llamar ahora a `requestPermission()` del
-/// notifier (que dispara el diálogo del SO si hace falta y adquiere la
-/// posición), y `false` si no hay nada que pedir.
+/// Decide qué mostrar según el estado REAL del permiso (Guideline 5.1.1(iv)) y,
+/// cuando hace falta, PIDE EL PERMISO AL SO él mismo (tras el CONTINUAR), para
+/// ver el resultado:
 ///
-/// Decide qué mostrar según el estado REAL del permiso (Guideline 5.1.1(iv)):
-///
-///  - **Servicios de ubicación apagados** → no hay posición posible ni diálogo
-///    del SO que mostrar: aviso que lleva a Ajustes; `false`. Se evalúa
-///    primero, porque con los servicios apagados un CONTINUAR no produciría
-///    nada visible.
-///  - **Ya otorgado** → nada que mostrar; `true` (sólo adquiere la posición).
-///  - **Aún no pedido** → mensaje previo con UN solo botón CONTINUAR, que
-///    siempre lleva al pedido del SO; `true`.
-///  - **Denegado de forma permanente / restringido** → el SO ya no puede
-///    preguntar, así que un mensaje previo prometería un diálogo que no va a
-///    aparecer. Se muestra un aviso informativo con acceso a Ajustes y una
-///    salida para seguir sin ubicación; `false`. Apple lo admite
-///    explícitamente para una función que no anda sin el permiso.
+///  - **Servicios de ubicación apagados** → aviso que lleva a Ajustes;
+///    `blocked`. Se evalúa primero.
+///  - **Ya otorgado** → `granted`.
+///  - **Aún no pedido** (`denied`/`unableToDetermine`) → mensaje previo con
+///    UN solo botón CONTINUAR y, enseguida, el pedido al SO:
+///    * otorgado → `granted`;
+///    * `deniedForever` → el SO ya no puede preguntar: aviso de Ajustes (si
+///      es [interactive]) y `blocked`;
+///    * rechazado → `denied`.
+///    En Android `checkPermission()` devuelve `denied` también tras «no volver
+///    a preguntar»; sólo `requestPermission()` devuelve `deniedForever`. Por
+///    eso el resultado del pedido se mira acá y no se descarta.
+///  - **Denegado de forma permanente / restringido** (iOS lo informa ya en
+///    `check`) → aviso informativo con acceso a Ajustes y salida para seguir
+///    sin ubicación; `blocked`. Apple lo admite para una función que no anda
+///    sin el permiso.
 ///
 /// [interactive] distingue QUIÉN pidió el flujo. `true` (por defecto): lo
-/// disparó una acción del usuario (chip «Distancia», «Activar ubicación»,
-/// gimnasios cercanos) y el aviso de Ajustes es la respuesta esperada. `false`:
-/// se abrió una pantalla y el flujo corre solo; ahí el aviso de Ajustes sería
-/// un cartel insistente en cada apertura, así que se sigue en silencio
-/// (`false`) y sólo el primer pedido —el CONTINUAR previo al diálogo del SO—
+/// disparó una acción del usuario y el aviso de Ajustes es la respuesta
+/// esperada. `false`: se abrió una pantalla y el flujo corre solo; ahí el
+/// aviso sería un cartel insistente en cada apertura, así que se sigue en
+/// silencio y sólo el primer pedido —el CONTINUAR previo al diálogo del SO—
 /// se muestra, porque es un pedido en contexto.
 ///
 /// Un error del plugin al consultar el estado se trata como «aún no pedido»
-/// (y servicios encendidos): el pedido al SO es la fuente de verdad y no se
-/// pierde por eso.
-Future<bool> presentLocationPermissionFlow(
+/// (y servicios encendidos). Si el PEDIDO lanza, se devuelve `granted` para
+/// que el notifier del caller reintente y maneje el error a su manera.
+Future<LocationFlowOutcome> presentLocationPermissionFlow(
   BuildContext context,
   LocationPermissionGateway gateway, {
   bool interactive = true,
+  LocationPurpose purpose = LocationPurpose.trainers,
 }) async {
   var servicesOn = true;
   try {
@@ -52,16 +57,17 @@ Future<bool> presentLocationPermissionFlow(
   } catch (_) {
     servicesOn = true;
   }
-  if (!context.mounted) return false;
+  if (!context.mounted) return LocationFlowOutcome.blocked;
   if (!servicesOn) {
     if (interactive) {
       await showLocationSettingsNoticeSheet(
         context,
         servicesOff: true,
+        purpose: purpose,
         onOpenSettings: gateway.openLocationSettings,
       );
     }
-    return false;
+    return LocationFlowOutcome.blocked;
   }
 
   LocationPermission status;
@@ -70,24 +76,49 @@ Future<bool> presentLocationPermissionFlow(
   } catch (_) {
     status = LocationPermission.denied;
   }
-  if (!context.mounted) return false;
+  if (!context.mounted) return LocationFlowOutcome.blocked;
 
   switch (status) {
     case LocationPermission.always:
     case LocationPermission.whileInUse:
-      return true;
+      return LocationFlowOutcome.granted;
     case LocationPermission.deniedForever:
       if (interactive) {
         await showLocationSettingsNoticeSheet(
           context,
+          purpose: purpose,
           onOpenSettings: gateway.openSettings,
         );
       }
-      return false;
+      return LocationFlowOutcome.blocked;
     case LocationPermission.denied:
     case LocationPermission.unableToDetermine:
-      await showLocationPermissionRationaleSheet(context);
-      return context.mounted;
+      await showLocationPermissionRationaleSheet(context, purpose: purpose);
+      if (!context.mounted) return LocationFlowOutcome.blocked;
+      LocationPermission result;
+      try {
+        result = await gateway.request();
+      } catch (_) {
+        return LocationFlowOutcome.granted;
+      }
+      if (!context.mounted) return LocationFlowOutcome.blocked;
+      switch (result) {
+        case LocationPermission.always:
+        case LocationPermission.whileInUse:
+          return LocationFlowOutcome.granted;
+        case LocationPermission.deniedForever:
+          if (interactive) {
+            await showLocationSettingsNoticeSheet(
+              context,
+              purpose: purpose,
+              onOpenSettings: gateway.openSettings,
+            );
+          }
+          return LocationFlowOutcome.blocked;
+        case LocationPermission.denied:
+        case LocationPermission.unableToDetermine:
+          return LocationFlowOutcome.denied;
+      }
   }
 }
 
@@ -101,6 +132,7 @@ Future<void> showLocationSettingsNoticeSheet(
   BuildContext context, {
   required Future<void> Function() onOpenSettings,
   bool servicesOff = false,
+  LocationPurpose purpose = LocationPurpose.trainers,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -110,6 +142,7 @@ Future<void> showLocationSettingsNoticeSheet(
     builder: (ctx) => _LocationSettingsNoticeSheet(
       onOpenSettings: onOpenSettings,
       servicesOff: servicesOff,
+      purpose: purpose,
     ),
   );
 }
@@ -118,10 +151,26 @@ class _LocationSettingsNoticeSheet extends StatelessWidget {
   const _LocationSettingsNoticeSheet({
     required this.onOpenSettings,
     required this.servicesOff,
+    required this.purpose,
   });
 
   final Future<void> Function() onOpenSettings;
   final bool servicesOff;
+  final LocationPurpose purpose;
+
+  String _body(AppL10n l10n) => switch ((servicesOff, purpose)) {
+        (true, LocationPurpose.trainers) => l10n.coachLocationServicesOffBody,
+        (true, LocationPurpose.nearbyGyms) =>
+          l10n.coachLocationServicesOffBodyGyms,
+        (true, LocationPurpose.trainerDetect) =>
+          l10n.coachLocationServicesOffBodyDetect,
+        (false, LocationPurpose.trainers) =>
+          l10n.coachLocationSettingsNoticeBody,
+        (false, LocationPurpose.nearbyGyms) =>
+          l10n.coachLocationSettingsNoticeBodyGyms,
+        (false, LocationPurpose.trainerDetect) =>
+          l10n.coachLocationSettingsNoticeBodyDetect,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -154,9 +203,7 @@ class _LocationSettingsNoticeSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s12),
             Text(
-              servicesOff
-                  ? l10n.coachLocationServicesOffBody
-                  : l10n.coachLocationSettingsNoticeBody,
+              _body(l10n),
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
                 fontSize: AppTextSize.body,

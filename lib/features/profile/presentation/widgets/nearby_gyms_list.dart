@@ -89,11 +89,14 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
   }
 
   Future<void> _onActivateLocationTap() async {
-    final proceed = await presentLocationPermissionFlow(
+    final outcome = await presentLocationPermissionFlow(
       context,
       ref.read(locationPermissionGatewayProvider),
+      purpose: LocationPurpose.nearbyGyms,
     );
-    if (!mounted || !proceed) return;
+    // `denied`/`blocked`: el notifier ya quedó en «sin ubicación» por el
+    // chequeo silencioso al abrir; no hay nada que pedir de nuevo.
+    if (!mounted || !outcome.proceed) return;
     await ref.read(nearbyLocationProvider.notifier).requestPermission();
   }
 

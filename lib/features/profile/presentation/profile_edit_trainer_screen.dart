@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -1292,23 +1291,20 @@ class _CustomLocationSheetState extends ConsumerState<_CustomLocationSheet> {
       // preguntar / los Servicios de ubicación están apagados. El spinner
       // arranca DESPUÉS: mientras el usuario lee el mensaje no se está
       // detectando nada.
-      final proceed = await presentLocationPermissionFlow(context, gateway);
-      if (!mounted || !proceed) return;
-      setState(() => _detecting = true);
-      var permission = await gateway.check();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.unableToDetermine) {
-        permission = await gateway.request();
-      }
+      final outcome = await presentLocationPermissionFlow(
+        context,
+        gateway,
+        purpose: LocationPurpose.trainerDetect,
+      );
       if (!mounted) return;
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() {
-          _error = l10n.profileLocationPermissionNeeded;
-          _detecting = false;
-        });
+      if (outcome == LocationFlowOutcome.denied) {
+        setState(() => _error = l10n.profileLocationPermissionNeeded);
         return;
       }
+      if (!outcome.proceed) return;
+      setState(() => _detecting = true);
+      // El flujo ya consultó y, si hacía falta, PIDIÓ el permiso: `granted`
+      // significa otorgado, no hay que volver a pedir.
       final pos = await gateway.currentPosition(kTrainerLocationSettings);
       if (!mounted) return;
       setState(() {

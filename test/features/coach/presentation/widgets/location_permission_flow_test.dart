@@ -12,12 +12,14 @@ class _Harness {
   _Harness(this.gateway);
 
   final FakeLocationPermissionGateway gateway;
-  bool? proceed;
+  LocationFlowOutcome? outcome;
+  bool? get proceed => outcome?.proceed;
 
   Future<void> pump(
     WidgetTester tester, {
     Locale locale = const Locale('es', 'AR'),
     bool interactive = true,
+    LocationPurpose purpose = LocationPurpose.trainers,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -30,10 +32,11 @@ class _Harness {
             body: Center(
               child: ElevatedButton(
                 onPressed: () async {
-                  proceed = await presentLocationPermissionFlow(
+                  outcome = await presentLocationPermissionFlow(
                     context,
                     gateway,
                     interactive: interactive,
+                    purpose: purpose,
                   );
                 },
                 child: const Text('GO'),
@@ -54,7 +57,10 @@ void main() {
         'permiso aún no pedido: muestra el sheet y CONTINUAR devuelve '
         'true para que el caller pida el permiso al SO', (tester) async {
       final h = _Harness(
-        FakeLocationPermissionGateway(LocationPermission.denied),
+        FakeLocationPermissionGateway(
+          LocationPermission.denied,
+          requestResult: LocationPermission.whileInUse,
+        ),
       );
       await h.pump(tester);
 
@@ -103,7 +109,7 @@ void main() {
       await h.pump(tester);
 
       expect(find.text('CONTINUAR'), findsNothing);
-      expect(find.text('Tu ubicación'), findsNothing);
+      expect(find.text('TU UBICACIÓN'), findsNothing);
       expect(
         find.textContaining(
           'Activá la ubicación en Ajustes para ver entrenadores cerca tuyo',
@@ -302,7 +308,10 @@ void main() {
           'ni la barrera, ni arrastrar, ni «atrás»; sólo CONTINUAR cierra',
           (tester) async {
         final h = _Harness(
-          FakeLocationPermissionGateway(LocationPermission.denied),
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.whileInUse,
+          ),
         );
         await h.pump(tester);
         expect(find.text('CONTINUAR'), findsOneWidget);
@@ -329,6 +338,202 @@ void main() {
         expect(find.byType(BottomSheet), findsNothing);
         expect(h.proceed, isTrue,
             reason: 'el caller recibe true y pide al SO de inmediato');
+      });
+    });
+
+    group('Android: check() dice denied aunque el SO ya no pregunta', () {
+      // En Android `checkPermission()` mapea todo lo no otorgado a `denied`;
+      // sólo `requestPermission()` devuelve `deniedForever`.
+      testWidgets(
+          'interactivo: CONTINUAR → request devuelve deniedForever → aviso de '
+          'Ajustes de inmediato', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.deniedForever,
+          ),
+        );
+        await h.pump(tester);
+        await tester.tap(find.text('CONTINUAR'));
+        await tester.pumpAndSettle();
+
+        expect(h.gateway.requestCalls, 1);
+        expect(find.text('ABRIR AJUSTES'), findsOneWidget);
+        expect(h.outcome, isNull, reason: 'el aviso sigue abierto');
+
+        await tester.tap(find.text('ABRIR AJUSTES'));
+        await tester.pumpAndSettle();
+        expect(h.gateway.openSettingsCalls, 1);
+        expect(h.outcome, LocationFlowOutcome.blocked);
+      });
+
+      testWidgets('no interactivo: sigue en silencio, sin aviso',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.deniedForever,
+          ),
+        );
+        await h.pump(tester, interactive: false);
+        await tester.tap(find.text('CONTINUAR'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('ABRIR AJUSTES'), findsNothing);
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(h.outcome, LocationFlowOutcome.blocked);
+      });
+
+      testWidgets('request otorga: el caller puede seguir', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.whileInUse,
+          ),
+        );
+        await h.pump(tester);
+        await tester.tap(find.text('CONTINUAR'));
+        await tester.pumpAndSettle();
+
+        expect(h.outcome, LocationFlowOutcome.granted);
+        expect(find.text('ABRIR AJUSTES'), findsNothing);
+      });
+
+      testWidgets('el usuario rechaza el diálogo del SO: denied, sin aviso',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.denied),
+        );
+        await h.pump(tester);
+        await tester.tap(find.text('CONTINUAR'));
+        await tester.pumpAndSettle();
+
+        expect(h.outcome, LocationFlowOutcome.denied);
+        expect(find.text('ABRIR AJUSTES'), findsNothing);
+      });
+    });
+
+    group('textos por propósito', () {
+      testWidgets('gimnasios: aviso habla de gimnasios y de buscar por nombre',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.deniedForever),
+        );
+        await h.pump(tester, purpose: LocationPurpose.nearbyGyms);
+
+        expect(
+          find.text(
+            'Activá la ubicación en Ajustes para ver gimnasios cerca tuyo. '
+            'Mientras tanto podés buscarlo por nombre.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('entrenadores'), findsNothing);
+        expect(find.textContaining('Online'), findsNothing);
+      });
+
+      testWidgets('gimnasios: el mensaje previo habla de gimnasios',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.denied),
+        );
+        await h.pump(tester, purpose: LocationPurpose.nearbyGyms);
+
+        expect(find.textContaining('gimnasios cerca tuyo'), findsOneWidget);
+        expect(find.textContaining('entrenadores'), findsNothing);
+      });
+
+      testWidgets('gimnasios, servicios apagados', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            serviceEnabled: false,
+          ),
+        );
+        await h.pump(tester, purpose: LocationPurpose.nearbyGyms);
+
+        expect(find.textContaining('ver gimnasios cerca tuyo'), findsOneWidget);
+        expect(find.textContaining('Online'), findsNothing);
+      });
+
+      testWidgets('detectar (PF): aviso habla de detectar la ubicación',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.deniedForever),
+        );
+        await h.pump(tester, purpose: LocationPurpose.trainerDetect);
+
+        expect(
+          find.text(
+            'Activá la ubicación en Ajustes para detectar tu ubicación. '
+            'También podés elegir un gimnasio de la lista.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Online'), findsNothing);
+      });
+
+      testWidgets('detectar (PF): mensaje previo y servicios apagados',
+          (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.denied),
+        );
+        await h.pump(tester, purpose: LocationPurpose.trainerDetect);
+        expect(find.textContaining('detectar'), findsOneWidget);
+        expect(find.textContaining('entrenadores'), findsNothing);
+      });
+
+      testWidgets('en inglés, por propósito', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.deniedForever),
+        );
+        await h.pump(
+          tester,
+          locale: const Locale('en'),
+          purpose: LocationPurpose.nearbyGyms,
+        );
+        expect(find.textContaining('gyms near you'), findsOneWidget);
+        expect(find.textContaining('trainers'), findsNothing);
+      });
+    });
+
+    group('títulos en MAYÚSCULAS (AGENTS.md §2: headings UPPERCASE)', () {
+      testWidgets('mensaje previo', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.denied),
+        );
+        await h.pump(tester);
+        expect(find.text('TU UBICACIÓN'), findsOneWidget);
+        expect(find.text('Tu ubicación'), findsNothing);
+      });
+
+      testWidgets('aviso de permiso y de servicios apagados', (tester) async {
+        final a = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.deniedForever),
+        );
+        await a.pump(tester);
+        expect(find.text('UBICACIÓN DESACTIVADA'), findsOneWidget);
+        expect(find.text('Ubicación desactivada'), findsNothing);
+      });
+
+      testWidgets('servicios apagados', (tester) async {
+        final b = _Harness(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            serviceEnabled: false,
+          ),
+        );
+        await b.pump(tester);
+        expect(
+            find.text('SERVICIOS DE UBICACIÓN DESACTIVADOS'), findsOneWidget);
+      });
+
+      testWidgets('en inglés', (tester) async {
+        final h = _Harness(
+          FakeLocationPermissionGateway(LocationPermission.deniedForever),
+        );
+        await h.pump(tester, locale: const Locale('en'));
+        expect(find.text('LOCATION IS OFF'), findsOneWidget);
       });
     });
 

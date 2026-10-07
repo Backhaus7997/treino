@@ -348,7 +348,7 @@ class AppL10nEn extends AppL10n {
   String get coachCtaProximamente => '';
 
   @override
-  String get coachLocationSheetTitle => 'Your location';
+  String get coachLocationSheetTitle => 'YOUR LOCATION';
 
   @override
   String get coachLocationSheetBody =>
@@ -358,7 +358,7 @@ class AppL10nEn extends AppL10n {
   String get coachLocationSheetContinue => 'CONTINUE';
 
   @override
-  String get coachLocationSettingsNoticeTitle => 'Location is off';
+  String get coachLocationSettingsNoticeTitle => 'LOCATION IS OFF';
 
   @override
   String get coachLocationSettingsNoticeBody =>
@@ -372,11 +372,35 @@ class AppL10nEn extends AppL10n {
       'Continue without location';
 
   @override
-  String get coachLocationServicesOffTitle => 'Location Services are off';
+  String get coachLocationServicesOffTitle => 'LOCATION SERVICES ARE OFF';
 
   @override
   String get coachLocationServicesOffBody =>
       'Turn on Location Services in Settings to see trainers near you. You can also continue without it and browse Online trainers.';
+
+  @override
+  String get coachLocationSheetBodyGyms =>
+      'TREINO uses your location to show you gyms near you. Your location is not visible to other users.';
+
+  @override
+  String get coachLocationSheetBodyDetect =>
+      'TREINO uses your location once to detect where you train.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyGyms =>
+      'Turn on location in Settings to see gyms near you. Meanwhile you can search for yours by name.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyDetect =>
+      'Turn on location in Settings to detect your location. You can also pick a gym from the list.';
+
+  @override
+  String get coachLocationServicesOffBodyGyms =>
+      'Turn on Location Services in Settings to see gyms near you. Meanwhile you can search for yours by name.';
+
+  @override
+  String get coachLocationServicesOffBodyDetect =>
+      'Turn on Location Services in Settings to detect your location. You can also pick a gym from the list.';
 
   @override
   String get profileLocationPermissionNeeded => 'We need location permission.';

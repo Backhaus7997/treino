@@ -56,7 +56,10 @@ void main() {
         'pide el permiso al SO', (tester) async {
       final notifier = await _pump(
         tester,
-        FakeLocationPermissionGateway(LocationPermission.denied),
+        FakeLocationPermissionGateway(
+          LocationPermission.denied,
+          requestResult: LocationPermission.whileInUse,
+        ),
       );
 
       expect(find.text('CONTINUAR'), findsOneWidget);

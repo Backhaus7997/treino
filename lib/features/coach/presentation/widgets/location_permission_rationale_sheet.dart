@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
+import 'location_flow_types.dart';
 
 /// Muestra el mensaje previo al permiso de ubicación del sistema operativo.
 ///
@@ -25,7 +26,10 @@ import '../../../../l10n/app_l10n.dart';
 ///    mensaje NO se muestra: lo decide `presentLocationPermissionFlow`.
 ///
 /// REQ-COACH-DISC-UI-011.
-Future<void> showLocationPermissionRationaleSheet(BuildContext context) {
+Future<void> showLocationPermissionRationaleSheet(
+  BuildContext context, {
+  LocationPurpose purpose = LocationPurpose.trainers,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
@@ -33,9 +37,9 @@ Future<void> showLocationPermissionRationaleSheet(BuildContext context) {
     isScrollControlled: true,
     isDismissible: false,
     enableDrag: false,
-    builder: (ctx) => const PopScope(
+    builder: (ctx) => PopScope(
       canPop: false,
-      child: _LocationRationaleSheet(),
+      child: _LocationRationaleSheet(purpose: purpose),
     ),
   );
 }
@@ -50,7 +54,9 @@ class LocationPermissionRationaleSheet {
 }
 
 class _LocationRationaleSheet extends StatelessWidget {
-  const _LocationRationaleSheet();
+  const _LocationRationaleSheet({required this.purpose});
+
+  final LocationPurpose purpose;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +92,12 @@ class _LocationRationaleSheet extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.s12),
             Text(
-              l10n.coachLocationSheetBody,
+              switch (purpose) {
+                LocationPurpose.trainers => l10n.coachLocationSheetBody,
+                LocationPurpose.nearbyGyms => l10n.coachLocationSheetBodyGyms,
+                LocationPurpose.trainerDetect =>
+                  l10n.coachLocationSheetBodyDetect,
+              },
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
                 fontSize: AppTextSize.body,
