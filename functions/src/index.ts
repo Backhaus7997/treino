@@ -272,15 +272,24 @@ export { createPreapproval } from "./subscriptions/mp/create-preapproval";
 // Dos diferencias con el del PF, las dos deliberadas:
 //   - El gate es `role === "athlete"`, y ademas rechaza al alumno VINCULADO: su
 //     PF ya paga por ese cupo y cobrarle seria cobrar dos veces lo mismo.
-//   - `getAthletePricing` NO exige auth. Es la unica lectura publica del repo,
-//     porque la pagina de precios tiene que decir cuanto sale antes de que
-//     alguien se loguee.
+//   - `getAthletePricing` NO exige auth. Es una de las DOS lecturas publicas
+//     del repo (la otra es `getTrainerPricing`, mas abajo), porque la pagina de
+//     precios tiene que decir cuanto sale antes de que alguien se loguee.
 //
 // Usa el mismo secreto MP_ACCESS_TOKEN.
 export {
   createAthletePreapproval,
   getAthletePricing,
 } from "./subscriptions/mp/create-athlete-preapproval";
+
+// La otra lectura publica: precio y topes de los planes del ENTRENADOR, para la
+// pagina de entrenadores de la landing. Mismo contrato que `getAthletePricing`
+// (sin auth, sin App Check, sin body) y mismo motivo: un precio escrito a mano
+// en otro repo se desincroniza de `TIER_PRICES_ARS` y terminamos mostrando uno
+// y cobrando otro. Es seguro dejarlo publico porque devuelve constantes de
+// `tier-config.ts` que se van a publicar igual: no lee Firestore, no hay PII ni
+// secretos, no escribe nada. Ver `subscriptions/trainer-pricing.ts`.
+export { getTrainerPricing } from "./subscriptions/trainer-pricing";
 
 // El alta de un alumno desde la WEB. La landing no toca Firestore y no deberia:
 // crear una cuenta en TREINO es un dual-write atomico a `users/{uid}` y a

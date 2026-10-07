@@ -373,6 +373,18 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "costo de un abuso es una invocacion de Cloud Functions, que es lo mismo " +
       "que cuesta cargar la pagina que lo llama.",
   },
+  "subscriptions/trainer-pricing:getTrainerPricing": {
+    permanence: "decided",
+    reason:
+      "No se atesta a proposito, y no es deuda: es la segunda lectura publica " +
+      "del repo, gemela de getAthletePricing. La pagina de entrenadores de la " +
+      "landing tiene que poder decir cuanto sale ANTES de que nadie se loguee, " +
+      "y la landing no tiene App Check. " +
+      "No hay nada que proteger: devuelve constantes de tier-config.ts (precios " +
+      "y topes) que se van a publicar igual, no lee Firestore, no escribe nada, " +
+      "no contiene PII ni secretos y no acepta body. El costo de un abuso es " +
+      "una invocacion de Cloud Functions.",
+  },
   "subscriptions/mp/reconcile-my-checkout:reconcileMyCheckout": {
     // `decided` y no `debt`, a diferencia de createPreapproval, y la diferencia
     // es real: aquel ABRE un cobro, este solo pregunta por el estado de uno que
@@ -482,6 +494,7 @@ const EXPECTED_DEPLOYED = [
   "deleteAccount",
   "ensureAthleteProfile",
   "getAthletePricing",
+  "getTrainerPricing",
   "listPendingReports",
   "markReportViewed",
   "mintWatchCredential",
@@ -679,6 +692,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/create-athlete-preapproval",
       symbol: "getAthletePricing",
       as: "getAthletePricing",
+      attested: false,
+    },
+    {
+      module: "subscriptions/trainer-pricing",
+      symbol: "getTrainerPricing",
+      as: "getTrainerPricing",
       attested: false,
     },
     {
