@@ -401,6 +401,60 @@ form is submitted. On save the user lands on `/home` as a discoverable trainer.
 
 ---
 
+## 🚨 functions/scripts/delete-accounts.ts — borrar cuentas de prueba por email
+
+Borra cuentas puntuales pasando por **la misma cascada que el botón "Eliminar
+cuenta"** de la app (`runDeleteAccount`, `functions/src/delete-account.ts`): no
+la reimplementa. Incluye la baja de Mercado Pago **fail-closed**, el
+`audit_log/{uid}` y el borrado de Auth **al final**. Vive en `functions/scripts/`
+(no se compila a `lib/`, no sale de `index.ts`, **no se despliega**).
+
+**Auth y Storage no tienen backup.** Lo que borra `--apply` ahí no vuelve.
+
+- **Dry-run por default.** Sin `--apply` imprime, por cuenta: uid, email,
+  providers, createdAt, lastSignIn, si existe `users/{uid}` y su `role`.
+- **`--project` es obligatorio** contra un proyecto real y tiene que coincidir
+  con la identidad de la credencial (`$TREINO_SA_KEY`). Imprime el cartel de
+  producción.
+- **Se niega, sin flag para saltearlo**, a borrar cuentas operativas:
+  `treino@gettreino.com`, `treinosupport@gettreino.com`, `treinopf@gmail.com`,
+  `testplaystore*@gmail.com`, `martin.backhaus@code-assurance.com`, cualquier
+  `*+*@gmail.com` y `*@privaterelay.appleid.com`.
+- **Se niega a borrar entrenadores** (`role == 'trainer'`) salvo `--allow-trainers`
+  (su cascada avisa a los alumnos vinculados).
+- Secuencial. Una excepción se reporta y sigue con la próxima. **Sale con código 1**
+  si alguna cuenta pedida no quedó borrada del todo (excepción, `partial`,
+  rechazada o email no encontrado). Un `partial` lo reintenta `retryPartialDeletions`.
+- Si la cuenta tiene suscripción de Mercado Pago hace falta
+  `MP_ACCESS_TOKEN` en el entorno; sin él la cascada tira y la cuenta queda intacta.
+
+Desde `functions/` (`--project` es obligatorio y se escribe explícito):
+
+```sh
+cd functions
+
+# 1. Dry-run contra PRODUCCIÓN (no escribe nada):
+TREINO_SA_KEY="$HOME/.config/treino/sa-key.json" \
+  npx --yes ts-node scripts/delete-accounts.ts --project treino-dev \
+  --emails=uno@example.com,dos@example.com      # o --file=emails.txt (uno por línea)
+
+# 2. El mismo comando + --apply: BORRA DE VERDAD en producción.
+TREINO_SA_KEY="$HOME/.config/treino/sa-key.json" \
+  npx --yes ts-node scripts/delete-accounts.ts --project treino-dev \
+  --emails=uno@example.com,dos@example.com --apply
+```
+
+Contra el emulador (sin credencial; Firestore, Auth **y** Storage tienen que estar
+desviados, o aborta):
+
+```sh
+firebase emulators:exec --only firestore,auth,storage --project demo-del \
+  "cd functions && npx --yes ts-node scripts/delete-accounts.ts --emails=uno@example.com"
+```
+
+Tests (emulador): `firebase emulators:exec --only firestore,auth,storage --project demo-del
+"npm --prefix functions test -- --runInBand delete-accounts-cli"`.
+
 ## seed_emulator_full.js (Emulator seed)
 
 EMULATOR-ONLY full-stack seed for manual testing. Refuses to run without

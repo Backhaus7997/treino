@@ -34,12 +34,11 @@
  *    Sale con codigo != 0 si alguna cuenta pedida no quedo borrada del todo.
  *  - Un resultado `partial` lo reintenta `retryPartialDeletions` (retention/).
  *
- * ## Uso (desde la raiz del repo)
+ * ## Uso (desde functions/)
  *
  *   # dry-run (default):
  *   TREINO_SA_KEY="$HOME/.config/treino/sa-key.json" \
- *     npx --prefix functions ts-node --project functions/tsconfig.json \
- *     functions/scripts/delete-accounts.ts --project treino-dev \
+ *     npx --yes ts-node scripts/delete-accounts.ts --project treino-dev \
  *     --emails=a@example.com,b@example.com
  *
  *   # borrar de verdad: el mismo comando + --apply
@@ -329,7 +328,10 @@ export async function main(argv: string[], env: NodeJS.ProcessEnv = process.env)
 
   let contexto;
   try {
-    contexto = resolverContexto({ env, projectIdEmulador: "demo-delete-accounts" });
+    contexto = resolverContexto({
+      env,
+      projectIdEmulador: env.GCLOUD_PROJECT || "demo-delete-accounts",
+    });
   } catch (err) {
     if (!(err instanceof ErrorDeCredencial)) throw err;
     console.error((err as Error).message);
