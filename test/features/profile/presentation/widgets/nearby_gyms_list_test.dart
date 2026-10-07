@@ -128,7 +128,10 @@ void main() {
       await tester.pumpWidget(_wrap(overrides: [
         nearbyLocationProvider.overrideWith((ref) => fake),
         locationPermissionGatewayProvider.overrideWithValue(
-          FakeLocationPermissionGateway(LocationPermission.denied),
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.whileInUse,
+          ),
         ),
       ]));
       await tester.pumpAndSettle();
@@ -164,6 +167,31 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(gateway.openSettingsCalls, 1);
+      expect(fake.requestPermissionCallCount, 0);
+    });
+
+    testWidgets(
+        'Android: request → deniedForever muestra el aviso DE GIMNASIOS '
+        '(no el de entrenadores) y no re-pide', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: false);
+      final gateway = FakeLocationPermissionGateway(
+        LocationPermission.denied,
+        requestResult: LocationPermission.deniedForever,
+      );
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        locationPermissionGatewayProvider.overrideWithValue(gateway),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Activar ubicación para ver gyms cercanos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ver gimnasios cerca tuyo'), findsOneWidget);
+      expect(find.textContaining('entrenadores'), findsNothing);
+      expect(find.textContaining('Online'), findsNothing);
       expect(fake.requestPermissionCallCount, 0);
     });
   });

@@ -238,12 +238,20 @@ Future<void> activateLocationFromFilter(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final proceed = await presentLocationPermissionFlow(
+  final outcome = await presentLocationPermissionFlow(
     context,
     ref.read(locationPermissionGatewayProvider),
   );
-  if (!proceed || !context.mounted) return;
-  await ref.read(athleteLocationProvider.notifier).requestPermission();
+  if (!context.mounted) return;
+  final notifier = ref.read(athleteLocationProvider.notifier);
+  switch (outcome) {
+    case LocationFlowOutcome.granted:
+      await notifier.requestPermission();
+    case LocationFlowOutcome.denied:
+      notifier.continueWithoutLocation();
+    case LocationFlowOutcome.blocked:
+      break;
+  }
 }
 
 Future<T?> _showFilterSheet<T>({

@@ -71,13 +71,13 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
     // aviso de Ajustes al abrir: eso sería insistir en cada apertura. Se sigue
     // sin ubicación, y el aviso queda para una acción del usuario (chip
     // «Distancia»).
-    final proceed = await presentLocationPermissionFlow(
+    final outcome = await presentLocationPermissionFlow(
       context,
       ref.read(locationPermissionGatewayProvider),
       interactive: false,
     );
     if (!mounted) return;
-    if (proceed) {
+    if (outcome.proceed) {
       await notifier.requestPermission();
     } else {
       notifier.continueWithoutLocation();

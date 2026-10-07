@@ -719,7 +719,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationSheetTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Tu ubicación'**
+  /// **'TU UBICACIÓN'**
   String get coachLocationSheetTitle;
 
   /// No description provided for @coachLocationSheetBody.
@@ -737,7 +737,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationSettingsNoticeTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ubicación desactivada'**
+  /// **'UBICACIÓN DESACTIVADA'**
   String get coachLocationSettingsNoticeTitle;
 
   /// No description provided for @coachLocationSettingsNoticeBody.
@@ -761,7 +761,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationServicesOffTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Servicios de ubicación desactivados'**
+  /// **'SERVICIOS DE UBICACIÓN DESACTIVADOS'**
   String get coachLocationServicesOffTitle;
 
   /// No description provided for @coachLocationServicesOffBody.
@@ -769,6 +769,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
   String get coachLocationServicesOffBody;
+
+  /// No description provided for @coachLocationSheetBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO usa tu ubicación para mostrarte gimnasios cerca tuyo. Tu ubicación no es visible para otros usuarios.'**
+  String get coachLocationSheetBodyGyms;
+
+  /// No description provided for @coachLocationSheetBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO usa tu ubicación una sola vez para detectar el lugar donde entrenás.'**
+  String get coachLocationSheetBodyDetect;
+
+  /// No description provided for @coachLocationSettingsNoticeBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.'**
+  String get coachLocationSettingsNoticeBodyGyms;
+
+  /// No description provided for @coachLocationSettingsNoticeBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.'**
+  String get coachLocationSettingsNoticeBodyDetect;
+
+  /// No description provided for @coachLocationServicesOffBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.'**
+  String get coachLocationServicesOffBodyGyms;
+
+  /// No description provided for @coachLocationServicesOffBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.'**
+  String get coachLocationServicesOffBodyDetect;
 
   /// No description provided for @profileLocationPermissionNeeded.
   ///

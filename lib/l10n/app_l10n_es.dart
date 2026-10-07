@@ -354,7 +354,7 @@ class AppL10nEs extends AppL10n {
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
-  String get coachLocationSheetTitle => 'Tu ubicación';
+  String get coachLocationSheetTitle => 'TU UBICACIÓN';
 
   @override
   String get coachLocationSheetBody =>
@@ -364,7 +364,7 @@ class AppL10nEs extends AppL10n {
   String get coachLocationSheetContinue => 'CONTINUAR';
 
   @override
-  String get coachLocationSettingsNoticeTitle => 'Ubicación desactivada';
+  String get coachLocationSettingsNoticeTitle => 'UBICACIÓN DESACTIVADA';
 
   @override
   String get coachLocationSettingsNoticeBody =>
@@ -379,11 +379,35 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachLocationServicesOffTitle =>
-      'Servicios de ubicación desactivados';
+      'SERVICIOS DE UBICACIÓN DESACTIVADOS';
 
   @override
   String get coachLocationServicesOffBody =>
       'Activa los Servicios de ubicación en Ajustes para ver entrenadores cerca de ti. Si prefieres, sigue sin ubicación y explora entrenadores Online.';
+
+  @override
+  String get coachLocationSheetBodyGyms =>
+      'TREINO usa tu ubicación para mostrarte gimnasios cerca de ti. Tu ubicación no es visible para otros usuarios.';
+
+  @override
+  String get coachLocationSheetBodyDetect =>
+      'TREINO usa tu ubicación una sola vez para detectar el lugar donde entrenas.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyGyms =>
+      'Activa la ubicación en Ajustes para ver gimnasios cerca de ti. Mientras tanto puedes buscarlo por nombre.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyDetect =>
+      'Activa la ubicación en Ajustes para detectar tu ubicación. También puedes elegir un gimnasio de la lista.';
+
+  @override
+  String get coachLocationServicesOffBodyGyms =>
+      'Activa los Servicios de ubicación en Ajustes para ver gimnasios cerca de ti. Mientras tanto puedes buscarlo por nombre.';
+
+  @override
+  String get coachLocationServicesOffBodyDetect =>
+      'Activa los Servicios de ubicación en Ajustes para detectar tu ubicación. También puedes elegir un gimnasio de la lista.';
 
   @override
   String get profileLocationPermissionNeeded =>
@@ -5611,7 +5635,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
-  String get coachLocationSheetTitle => 'Tu ubicación';
+  String get coachLocationSheetTitle => 'TU UBICACIÓN';
 
   @override
   String get coachLocationSheetBody =>
@@ -5621,7 +5645,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachLocationSheetContinue => 'CONTINUAR';
 
   @override
-  String get coachLocationSettingsNoticeTitle => 'Ubicación desactivada';
+  String get coachLocationSettingsNoticeTitle => 'UBICACIÓN DESACTIVADA';
 
   @override
   String get coachLocationSettingsNoticeBody =>
@@ -5636,11 +5660,35 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachLocationServicesOffTitle =>
-      'Servicios de ubicación desactivados';
+      'SERVICIOS DE UBICACIÓN DESACTIVADOS';
 
   @override
   String get coachLocationServicesOffBody =>
       'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.';
+
+  @override
+  String get coachLocationSheetBodyGyms =>
+      'TREINO usa tu ubicación para mostrarte gimnasios cerca tuyo. Tu ubicación no es visible para otros usuarios.';
+
+  @override
+  String get coachLocationSheetBodyDetect =>
+      'TREINO usa tu ubicación una sola vez para detectar el lugar donde entrenás.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyGyms =>
+      'Activá la ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyDetect =>
+      'Activá la ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.';
+
+  @override
+  String get coachLocationServicesOffBodyGyms =>
+      'Activá los Servicios de ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.';
+
+  @override
+  String get coachLocationServicesOffBodyDetect =>
+      'Activá los Servicios de ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.';
 
   @override
   String get profileLocationPermissionNeeded =>
