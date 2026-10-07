@@ -112,19 +112,29 @@ function normalizar(emails: string[]): string[] {
 }
 
 /**
- * Acepta `--flag=valor` y `--flag valor`. Flag desconocida => tira (en vez de
- * ignorarla): `--force-operational` NO existe y no debe pasar por typo.
+ * Acepta `--flag=valor` y `--flag valor` para los flags con valor. Los
+ * booleanos (`--apply`, `--allow-trainers`, `--dry-run`) aceptan SOLO la forma
+ * desnuda: `--apply=false` tira en vez de leerse como `--apply` (borrado
+ * irreversible cuando se pidio lo contrario). Flag desconocida => tira (en vez
+ * de ignorarla): `--force-operational` o el typo `--aply` no deben pasar.
  */
 export function parseArgs(argv: string[]): Opciones {
   const o: Opciones = { emails: [], file: null, project: null, apply: false, allowTrainers: false };
   const conValor = new Set(["--emails", "--file", "--project"]);
+  const BOOLEANOS = new Set(["--apply", "--dry-run", "--allow-trainers"]);
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const [nombre, inline] = arg.split(/=(.*)/s, 2);
-    if (nombre === "--apply") o.apply = true;
-    else if (nombre === "--dry-run") o.apply = false;
-    else if (nombre === "--allow-trainers") o.allowTrainers = true;
-    else if (conValor.has(nombre)) {
+    if (BOOLEANOS.has(nombre)) {
+      if (inline !== undefined) {
+        throw new Error(
+          `${nombre} no acepta valor (recibi "${arg}"). Usalo desnudo: ${nombre}.`,
+        );
+      }
+      if (nombre === "--apply") o.apply = true;
+      else if (nombre === "--dry-run") o.apply = false;
+      else o.allowTrainers = true;
+    } else if (conValor.has(nombre)) {
       const valor = inline ?? argv[++i];
       if (valor === undefined || valor.startsWith("--")) {
         throw new Error(`${nombre} necesita un valor.`);
@@ -204,6 +214,8 @@ export interface Resultado {
   email: string;
   uid?: string;
   estado: Estado;
+  /** Mensaje del error cuando `estado == "error"`. */
+  detalle?: string;
 }
 
 export type Runner = (
@@ -234,72 +246,79 @@ export async function ejecutar(
   const vistos = new Set<string>();
 
   for (const email of emails) {
-    let user: UserRecord;
     try {
-      user = await getAuth(app).getUserByEmail(email);
-    } catch (err) {
-      if ((err as { code?: string }).code === "auth/user-not-found") {
-        log(`- NO ENCONTRADO ${email}: no hay usuario de Auth con ese email.`);
-        resultados.push({ email, estado: "no-encontrada" });
-      } else {
-        log(`- ERROR ${email}: no pude consultar Auth: ${(err as Error).message}`);
-        resultados.push({ email, estado: "error" });
+      let user: UserRecord;
+      try {
+        user = await getAuth(app).getUserByEmail(email);
+      } catch (err) {
+        if ((err as { code?: string }).code === "auth/user-not-found") {
+          log(`- NO ENCONTRADO ${email}: no hay usuario de Auth con ese email.`);
+          resultados.push({ email, estado: "no-encontrada" });
+        } else {
+          log(`- ERROR ${email}: no pude consultar Auth: ${(err as Error).message}`);
+          resultados.push({ email, estado: "error", detalle: (err as Error).message });
+        }
+        continue;
       }
-      continue;
-    }
-    if (vistos.has(user.uid)) continue;
-    vistos.add(user.uid);
+      if (vistos.has(user.uid)) continue;
+      vistos.add(user.uid);
 
-    const snap = await getFirestore(app).collection("users").doc(user.uid).get();
-    const rol = snap.exists ? String(snap.data()?.role ?? "(sin role)") : "(sin doc users)";
-    log(
-      [
-        `- ${email}`,
-        `    uid:        ${user.uid}`,
-        `    providers:  ${user.providerData.map((p) => p.providerId).join(", ") || "(ninguno)"}`,
-        `    createdAt:  ${fecha(user.metadata.creationTime)}`,
-        `    lastSignIn: ${fecha(user.metadata.lastSignInTime)}`,
-        `    users doc:  ${snap.exists ? "existe" : "NO existe"}   role: ${rol}`,
-      ].join("\n"),
-    );
-
-    if (esCuentaOperativa(email)) {
-      log("    RECHAZADA: es una cuenta operativa del dueno. Este CLI no la borra.");
-      resultados.push({ email, uid: user.uid, estado: "rechazada" });
-      continue;
-    }
-    if (rol === "trainer" && !opciones.allowTrainers) {
+      const snap = await getFirestore(app).collection("users").doc(user.uid).get();
+      const rol = snap.exists ? String(snap.data()?.role ?? "(sin role)") : "(sin doc users)";
       log(
-        "    RECHAZADA: es un entrenador; su cascada notifica a los alumnos vinculados. " +
-          "Si es lo que queres, repetilo con --allow-trainers.",
+        [
+          `- ${email}`,
+          `    uid:        ${user.uid}`,
+          `    providers:  ${user.providerData.map((p) => p.providerId).join(", ") || "(ninguno)"}`,
+          `    createdAt:  ${fecha(user.metadata.creationTime)}`,
+          `    lastSignIn: ${fecha(user.metadata.lastSignInTime)}`,
+          `    users doc:  ${snap.exists ? "existe" : "NO existe"}   role: ${rol}`,
+        ].join("\n"),
       );
-      resultados.push({ email, uid: user.uid, estado: "rechazada" });
-      continue;
-    }
-    if (!opciones.apply) {
-      log("    dry-run: se borraria con --apply.");
-      resultados.push({ email, uid: user.uid, estado: "dry-run" });
-      continue;
-    }
 
-    try {
-      const r = await runner(app, user.uid, PROVIDER_ADMIN);
-      if (r.status === "success") {
-        log(`    SUCCESS: borrada (${r.deletedCollections.join(", ")}).`);
-        resultados.push({ email, uid: user.uid, estado: "success" });
-      } else {
+      if (esCuentaOperativa(email)) {
+        log("    RECHAZADA: es una cuenta operativa del dueno. Este CLI no la borra.");
+        resultados.push({ email, uid: user.uid, estado: "rechazada" });
+        continue;
+      }
+      if (rol === "trainer" && !opciones.allowTrainers) {
         log(
-          `    PARTIAL: quedaron errores: ${r.errors.join(" | ")}\n` +
-            "    La Auth/datos que falten los reintenta retryPartialDeletions (audit_log/{uid}).",
+          "    RECHAZADA: es un entrenador; su cascada notifica a los alumnos vinculados. " +
+            "Si es lo que queres, repetilo con --allow-trainers.",
         );
-        resultados.push({ email, uid: user.uid, estado: "partial" });
+        resultados.push({ email, uid: user.uid, estado: "rechazada" });
+        continue;
+      }
+      if (!opciones.apply) {
+        log("    dry-run: se borraria con --apply.");
+        resultados.push({ email, uid: user.uid, estado: "dry-run" });
+        continue;
+      }
+
+      try {
+        const r = await runner(app, user.uid, PROVIDER_ADMIN);
+        if (r.status === "success") {
+          log(`    SUCCESS: borrada (${r.deletedCollections.join(", ")}).`);
+          resultados.push({ email, uid: user.uid, estado: "success" });
+        } else {
+          log(
+            `    PARTIAL: quedaron errores: ${r.errors.join(" | ")}\n` +
+              "    La Auth/datos que falten los reintenta retryPartialDeletions (audit_log/{uid}).",
+          );
+          resultados.push({ email, uid: user.uid, estado: "partial" });
+        }
+      } catch (err) {
+        log(
+          `    FALLO ${user.uid}: la cascada tiro una excepcion: ${(err as Error).message}\n` +
+            "    La cuenta puede haber quedado intacta (MP fail-closed) o a medias: revisa audit_log/{uid}.",
+        );
+        resultados.push({ email, uid: user.uid, estado: "fallo" });
       }
     } catch (err) {
-      log(
-        `    FALLO ${user.uid}: la cascada tiro una excepcion: ${(err as Error).message}\n` +
-          "    La cuenta puede haber quedado intacta (MP fail-closed) o a medias: revisa audit_log/{uid}.",
-      );
-      resultados.push({ email, uid: user.uid, estado: "fallo" });
+      // Auth ok pero Firestore (u otra cosa) tiro: esta cuenta falla, las demas siguen.
+      const msg = (err as Error).message;
+      log(`- ERROR ${email}: no pude procesar la cuenta: ${msg}`);
+      resultados.push({ email, estado: "error", detalle: msg });
     }
   }
 
@@ -309,6 +328,13 @@ export async function ejecutar(
       `${cuenta("rechazada")} rechazadas, ${cuenta("no-encontrada") + cuenta("error")} sin resolver, ` +
       `${cuenta("dry-run")} solo dry-run.`,
   );
+  const conError = resultados.filter((r) => r.estado === "error");
+  if (conError.length > 0) {
+    log(
+      "Con ERROR (no se pudieron procesar): " +
+        conError.map((r) => `${r.email} (${r.detalle ?? "sin detalle"})`).join("; "),
+    );
+  }
   if (!opciones.apply) log("Nada se escribio. Para borrar: repeti el comando con --apply.");
 
   const todasBorradas = resultados.length > 0 && resultados.every((r) => r.estado === "success");

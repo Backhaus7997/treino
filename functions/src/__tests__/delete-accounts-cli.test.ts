@@ -22,12 +22,13 @@ import * as os from "os";
 import * as path from "path";
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { DocumentReference, getFirestore } from "firebase-admin/firestore";
 
 import {
   ejecutar,
   esCuentaOperativa,
   leerEmails,
+  main,
   parseArgs,
   validarDestino,
 } from "../../scripts/delete-accounts";
@@ -113,14 +114,49 @@ describe("parseArgs / leerEmails", () => {
   });
 
   it("lee un archivo de una direccion por linea, sin vacias ni duplicadas", () => {
-    const f = path.join(os.tmpdir(), `del-emails-${process.pid}.txt`);
+    // Directorio privado (0700) y unico: nada de nombre fijo en os.tmpdir().
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "delete-accounts-"));
+    const f = path.join(dir, "emails.txt");
     fs.writeFileSync(f, "A@b.com\n\n  c@d.com  \na@b.com\n");
     try {
       expect(leerEmails({ emails: [], file: f })).toEqual(["a@b.com", "c@d.com"]);
     } finally {
-      fs.unlinkSync(f);
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // Un flag booleano acepta SOLO la forma desnuda: `--apply=false` NO puede
+  // leerse como "apply" (borrado irreversible en vez de dry-run).
+  it.each([
+    "--apply=false",
+    "--apply=true",
+    "--apply=",
+    "--allow-trainers=false",
+    "--allow-trainers=true",
+    "--dry-run=false",
+  ])("%s aborta: los flags booleanos no aceptan valor", (flag) => {
+    expect(() => parseArgs(["--emails=a@b.com", flag])).toThrow(/no acepta valor/i);
+  });
+
+  it.each(["--aply", "--allow-trainer", "--apply-all", "apply"])(
+    "el typo %s aborta como flag desconocida",
+    (flag) => {
+      expect(() => parseArgs(["--emails=a@b.com", flag])).toThrow(/desconocida/i);
+    },
+  );
+
+  it.each(["--apply=false", "--apply=true", "--allow-trainers=false", "--aply"])(
+    "main(%s) sale con 2 antes de resolver credenciales o tocar nada",
+    async (flag) => {
+      const err = jest.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        expect(await main(["--emails=a@b.com", flag], {})).toBe(2);
+        expect(err).toHaveBeenCalledTimes(1);
+      } finally {
+        err.mockRestore();
+      }
+    },
+  );
 });
 
 describe("validarDestino (guard de proyecto)", () => {
@@ -266,6 +302,59 @@ describe("ejecutar (contra el emulador)", () => {
       expect(await hayAuth("cli-ok")).toBe(false);
     } finally {
       await limpiar("cli-boom", "cli-ok");
+    }
+  });
+
+  it("fallo de Firestore al leer users/{uid}: se reporta, sigue con el resto y el exit es 1", async () => {
+    await sembrar("cli-fsboom", "cli-fsboom@example.com");
+    await sembrar("cli-fsok", "cli-fsok@example.com");
+    const get = DocumentReference.prototype.get;
+    const spy = jest.spyOn(DocumentReference.prototype, "get").mockImplementation(function (
+      this: DocumentReference,
+    ) {
+      if (this.path === "users/cli-fsboom") return Promise.reject(new Error("firestore caido"));
+      return get.call(this);
+    } as typeof get);
+    try {
+      const o = salida();
+      const r = await ejecutar(
+        { ...base, emails: ["cli-fsboom@example.com", "cli-fsok@example.com"], apply: true },
+        app,
+        o.log,
+      );
+      spy.mockRestore();
+      expect(r.exitCode).toBe(1);
+      expect(r.resultados.map((x) => x.estado)).toEqual(["error", "success"]);
+      expect(o.texto()).toMatch(/ERROR.*cli-fsboom@example\.com.*firestore caido/s);
+      // El resumen final lista la cuenta fallida.
+      expect(o.lineas[o.lineas.length - 1]).toMatch(/cli-fsboom@example\.com.*firestore caido/s);
+      expect(await hayAuth("cli-fsboom")).toBe(true);
+      expect(await hayAuth("cli-fsok")).toBe(false);
+    } finally {
+      spy.mockRestore();
+      await limpiar("cli-fsboom", "cli-fsok");
+    }
+  });
+
+  it("fallo de Firestore en dry-run: se reporta claro, no borra y no corta la corrida", async () => {
+    await sembrar("cli-dryboom", "cli-dryboom@example.com");
+    const get = DocumentReference.prototype.get;
+    const spy = jest.spyOn(DocumentReference.prototype, "get").mockImplementation(function (
+      this: DocumentReference,
+    ) {
+      if (this.path === "users/cli-dryboom") return Promise.reject(new Error("firestore caido"));
+      return get.call(this);
+    } as typeof get);
+    try {
+      const o = salida();
+      const r = await ejecutar({ ...base, emails: ["cli-dryboom@example.com"], apply: false }, app, o.log);
+      spy.mockRestore();
+      expect(r.resultados[0].estado).toBe("error");
+      expect(o.texto()).toMatch(/ERROR.*cli-dryboom@example\.com.*firestore caido/s);
+      expect(await hayAuth("cli-dryboom")).toBe(true);
+    } finally {
+      spy.mockRestore();
+      await limpiar("cli-dryboom");
     }
   });
 
