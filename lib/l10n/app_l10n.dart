@@ -719,7 +719,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationSheetTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Permitir ubicación'**
+  /// **'Tu ubicación'**
   String get coachLocationSheetTitle;
 
   /// No description provided for @coachLocationSheetBody.
@@ -728,17 +728,59 @@ abstract class AppL10n {
   /// **'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.'**
   String get coachLocationSheetBody;
 
-  /// No description provided for @coachLocationSheetAccept.
+  /// No description provided for @coachLocationSheetContinue.
   ///
   /// In es_AR, this message translates to:
-  /// **'ACEPTAR'**
-  String get coachLocationSheetAccept;
+  /// **'CONTINUAR'**
+  String get coachLocationSheetContinue;
 
-  /// No description provided for @coachLocationSheetDeny.
+  /// No description provided for @coachLocationSettingsNoticeTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ahora no'**
-  String get coachLocationSheetDeny;
+  /// **'Ubicación desactivada'**
+  String get coachLocationSettingsNoticeTitle;
+
+  /// No description provided for @coachLocationSettingsNoticeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
+  String get coachLocationSettingsNoticeBody;
+
+  /// No description provided for @coachLocationSettingsNoticeOpenSettings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ABRIR AJUSTES'**
+  String get coachLocationSettingsNoticeOpenSettings;
+
+  /// No description provided for @coachLocationSettingsNoticeContinueWithout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir sin ubicación'**
+  String get coachLocationSettingsNoticeContinueWithout;
+
+  /// No description provided for @coachLocationServicesOffTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Servicios de ubicación desactivados'**
+  String get coachLocationServicesOffTitle;
+
+  /// No description provided for @coachLocationServicesOffBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
+  String get coachLocationServicesOffBody;
+
+  /// No description provided for @profileLocationPermissionNeeded.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos permiso de ubicación.'**
+  String get profileLocationPermissionNeeded;
+
+  /// No description provided for @profileLocationDetectFailed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos detectar tu ubicación.'**
+  String get profileLocationDetectFailed;
 
   /// No description provided for @coachMiPlanTitle.
   ///

@@ -7,7 +7,8 @@ import '../../../../core/utils/geohash.dart';
 import '../../../../core/utils/haversine.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
-import '../../../coach/presentation/widgets/location_permission_rationale_sheet.dart';
+import '../../../coach/application/location_permission_gateway.dart';
+import '../../../coach/presentation/widgets/location_permission_flow.dart';
 import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/presentation/widgets/google_maps_attribution.dart';
 import '../../../profile_setup/presentation/widgets/gym_card.dart';
@@ -88,8 +89,11 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
   }
 
   Future<void> _onActivateLocationTap() async {
-    final accepted = await showLocationPermissionRationaleSheet(context);
-    if (!mounted || !accepted) return;
+    final proceed = await presentLocationPermissionFlow(
+      context,
+      ref.read(locationPermissionGatewayProvider),
+    );
+    if (!mounted || !proceed) return;
     await ref.read(nearbyLocationProvider.notifier).requestPermission();
   }
 

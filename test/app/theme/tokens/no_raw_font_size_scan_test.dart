@@ -67,7 +67,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 250;
+    const allowlistCeiling = 249;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const rawFontSizeDebtCeiling = 1695;
@@ -112,7 +112,6 @@ void main() {
       'features/coach/presentation/widgets/equipment_filter_sheet.dart',
       'features/coach/presentation/widgets/exercise_picker_sheet.dart',
       'features/coach/presentation/widgets/invite_dialog.dart',
-      'features/coach/presentation/widgets/location_permission_rationale_sheet.dart',
       'features/coach/presentation/widgets/muscle_filter_sheet.dart',
       'features/coach/presentation/widgets/new_session_sheet.dart',
       'features/coach/presentation/widgets/session_detail_sheet.dart',

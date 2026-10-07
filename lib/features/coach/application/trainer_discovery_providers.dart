@@ -105,9 +105,17 @@ class AthleteLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
   bool get isInitial =>
       state is AsyncData && state.value == null && !_isPermissionDenied;
 
+  /// El usuario sigue sin ubicación (el permiso está denegado de forma
+  /// permanente y eligió no pasar por Ajustes). Mismo estado que un permiso
+  /// rechazado: la pantalla queda usable, sin filtros de distancia.
+  void continueWithoutLocation() {
+    _isPermissionDenied = true;
+    state = const AsyncData(null);
+  }
+
   /// Requests OS permission then acquires position.
   ///
-  /// Call this AFTER the rationale sheet was accepted by the user.
+  /// Call this AFTER `presentLocationPermissionFlow` returned `true`.
   Future<void> requestPermission() async {
     state = const AsyncLoading();
     _isPermissionDenied = false;
