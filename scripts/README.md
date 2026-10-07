@@ -425,6 +425,8 @@ la reimplementa. Incluye la baja de Mercado Pago **fail-closed**, el
 - Secuencial. Una excepción se reporta y sigue con la próxima. **Sale con código 1**
   si alguna cuenta pedida no quedó borrada del todo (excepción, `partial`,
   rechazada o email no encontrado). Un `partial` lo reintenta `retryPartialDeletions`.
+  El dry-run también sale con 1 si alguna cuenta no se borraría (email no
+  encontrado, rechazada o error de lectura): un preflight fallido no pasa por éxito.
 - Si la cuenta tiene suscripción de Mercado Pago hace falta
   `MP_ACCESS_TOKEN` en el entorno; sin él la cascada tira y la cuenta queda intacta.
 

@@ -337,8 +337,12 @@ export async function ejecutar(
   }
   if (!opciones.apply) log("Nada se escribio. Para borrar: repeti el comando con --apply.");
 
-  const todasBorradas = resultados.length > 0 && resultados.every((r) => r.estado === "success");
-  return { exitCode: opciones.apply && !todasBorradas ? 1 : 0, resultados };
+  // Con --apply: 0 sólo si TODAS quedaron borradas. En dry-run: 0 sólo si
+  // todas se borrarían; un mail inexistente, una rechazada o un error de
+  // lectura es un preflight fallido y no puede pasar por éxito (review #1378).
+  const ok = opciones.apply ? "success" : "dry-run";
+  const todasOk = resultados.length > 0 && resultados.every((r) => r.estado === ok);
+  return { exitCode: todasOk ? 0 : 1, resultados };
 }
 
 // ── Entrypoint ───────────────────────────────────────────────────────────

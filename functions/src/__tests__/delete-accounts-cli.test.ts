@@ -227,6 +227,25 @@ describe("ejecutar (contra el emulador)", () => {
     }
   });
 
+  it("DRY-RUN con una cuenta sin resolver: exit 1 (el preflight falló), aunque las demás estén bien", async () => {
+    await sembrar("cli-dry-ok", "cli-dry-ok@example.com");
+    await sembrar("cli-dry-op", "treinopf@gmail.com");
+    try {
+      const casos: string[][] = [
+        ["cli-dry-ok@example.com", "no-existe-dry@example.com"],
+        ["cli-dry-ok@example.com", "treinopf@gmail.com"],
+      ];
+      for (const emails of casos) {
+        const r = await ejecutar({ ...base, emails, apply: false }, app, salida().log);
+        expect(r.exitCode).toBe(1);
+      }
+      expect(await hayAuth("cli-dry-ok")).toBe(true);
+      expect(await hayAuth("cli-dry-op")).toBe(true);
+    } finally {
+      await limpiar("cli-dry-ok", "cli-dry-op");
+    }
+  });
+
   it("email inexistente: se reporta y, con --apply, el exit es distinto de 0", async () => {
     const o = salida();
     const r = await ejecutar({ ...base, emails: ["no-existe@example.com"], apply: true }, app, o.log);
