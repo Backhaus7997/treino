@@ -22,7 +22,7 @@ export interface WeightedLink {
   entitlement?: "entitled" | "blocked";
 }
 
-const STATUS_WEIGHT: Record<WeightedLink["status"], number> = {
+export const STATUS_WEIGHT: Record<WeightedLink["status"], number> = {
   active: 1.0,
   paused: 0.5,
   pending: 0.0, // a pending request isn't following yet
