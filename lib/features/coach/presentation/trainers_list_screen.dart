@@ -11,12 +11,13 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/treino_segmented_pill.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
+import '../application/location_permission_gateway.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../onboarding/application/onboarding_providers.dart';
-import 'widgets/location_permission_rationale_sheet.dart';
+import 'widgets/location_permission_flow.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_compact_filter_row.dart';
 import 'widgets/trainer_list_tile.dart';
@@ -64,12 +65,18 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
     _rationaleShown = true;
-    final accepted = await LocationPermissionRationaleSheet.show(context);
+    // Guideline 5.1.1(iv): el único camino que no termina en el pedido del SO
+    // es el del permiso ya denegado de forma permanente (el SO no puede
+    // preguntar de nuevo), y ahí se muestra el aviso con Ajustes.
+    final proceed = await presentLocationPermissionFlow(
+      context,
+      ref.read(locationPermissionGatewayProvider),
+    );
     if (!mounted) return;
-    if (accepted == true) {
+    if (proceed) {
       await notifier.requestPermission();
     } else {
-      notifier.setDeniedForTest();
+      notifier.continueWithoutLocation();
     }
   }
 

@@ -143,13 +143,9 @@ void main() {
         'Tu ubicación no es visible para otros usuarios.',
       );
     });
-    testWidgets('coachLocationSheetAccept verbatim', (tester) async {
+    testWidgets('coachLocationSheetContinue verbatim', (tester) async {
       final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.coachLocationSheetAccept, 'ACEPTAR');
-    });
-    testWidgets('coachLocationSheetDeny verbatim', (tester) async {
-      final l10n = await _pumpAndGetL10n(tester);
-      expect(l10n.coachLocationSheetDeny, 'Ahora no');
+      expect(l10n.coachLocationSheetContinue, 'CONTINUAR');
     });
 
     // ── Coach Plans (MiPlan) ───────────────────────────────────────────────

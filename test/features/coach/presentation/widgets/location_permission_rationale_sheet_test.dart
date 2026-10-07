@@ -4,19 +4,26 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/widgets/location_permission_rationale_sheet.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-Widget _wrapWithScaffold({required Future<bool> Function()? onShow}) {
+/// Guideline 5.1.1(iv) de Apple (build 1.0 (54)): el mensaje previo al
+/// permiso del SO tiene UN solo botón, redactado «Continuar», y el usuario
+/// SIEMPRE pasa al pedido del sistema. Nada de «Aceptar» ni «Ahora no», y
+/// ninguna salida alternativa (arrastrar, tocar afuera, volver).
+Widget _app(
+    {Locale locale = const Locale('es', 'AR'),
+    Future<void> Function()? onDone}) {
   return MaterialApp(
     theme: AppTheme.dark(),
     localizationsDelegates: AppL10n.localizationsDelegates,
     supportedLocales: AppL10n.supportedLocales,
-    locale: const Locale('es', 'AR'),
+    locale: locale,
     home: Builder(
       builder: (context) => Scaffold(
         body: Center(
           child: ElevatedButton(
-            onPressed: onShow != null
-                ? () => onShow()
-                : () => showLocationPermissionRationaleSheet(context),
+            onPressed: () async {
+              await showLocationPermissionRationaleSheet(context);
+              await onDone?.call();
+            },
             child: const Text('OPEN'),
           ),
         ),
@@ -25,103 +32,111 @@ Widget _wrapWithScaffold({required Future<bool> Function()? onShow}) {
   );
 }
 
-void main() {
-  group('LocationPermissionRationaleSheet — T32/T33', () {
-    testWidgets('shows title "Permitir ubicación"', (tester) async {
-      await tester.pumpWidget(_wrapWithScaffold(onShow: null));
+Future<void> _open(WidgetTester tester) async {
+  await tester.tap(find.text('OPEN'));
+  await tester.pumpAndSettle();
+}
 
-      await tester.tap(find.text('OPEN'));
-      await tester.pumpAndSettle();
+void main() {
+  group('LocationPermissionRationaleSheet — Guideline 5.1.1(iv)', () {
+    testWidgets('muestra título y cuerpo', (tester) async {
+      await tester.pumpWidget(_app());
+      await _open(tester);
 
       expect(find.text('Permitir ubicación'), findsOneWidget);
+      expect(find.textContaining('entrenadores cerca tuyo'), findsOneWidget);
     });
 
-    testWidgets('shows body text about location use', (tester) async {
-      await tester.pumpWidget(_wrapWithScaffold(onShow: null));
+    testWidgets('tiene UN solo botón y dice CONTINUAR', (tester) async {
+      await tester.pumpWidget(_app());
+      await _open(tester);
 
-      await tester.tap(find.text('OPEN'));
-      await tester.pumpAndSettle();
-
+      final sheet = find.byType(BottomSheet);
       expect(
-        find.textContaining('entrenadores cerca tuyo'),
+        find.descendant(
+            of: sheet, matching: find.bySubtype<ButtonStyleButton>()),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('CONTINUAR')),
         findsOneWidget,
       );
     });
 
-    testWidgets('shows "ACEPTAR" button', (tester) async {
-      await tester.pumpWidget(_wrapWithScaffold(onShow: null));
+    testWidgets('no ofrece «Ahora no» ni «ACEPTAR»', (tester) async {
+      await tester.pumpWidget(_app());
+      await _open(tester);
 
-      await tester.tap(find.text('OPEN'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('ACEPTAR'), findsOneWidget);
+      expect(find.text('Ahora no'), findsNothing);
+      expect(find.text('ACEPTAR'), findsNothing);
     });
 
-    testWidgets('shows "Ahora no" button', (tester) async {
-      await tester.pumpWidget(_wrapWithScaffold(onShow: null));
+    testWidgets('en inglés el botón dice CONTINUE', (tester) async {
+      await tester.pumpWidget(_app(locale: const Locale('en')));
+      await _open(tester);
 
-      await tester.tap(find.text('OPEN'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Ahora no'), findsOneWidget);
+      expect(find.text('CONTINUE'), findsOneWidget);
+      expect(find.text('Not now'), findsNothing);
     });
 
-    testWidgets('tapping "ACEPTAR" returns true', (tester) async {
-      bool? result;
+    testWidgets('tocar CONTINUAR cierra el sheet y devuelve el control',
+        (tester) async {
+      var returned = false;
+      await tester.pumpWidget(_app(onDone: () async {
+        returned = true;
+      }));
+      await _open(tester);
 
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.dark(),
-        localizationsDelegates: AppL10n.localizationsDelegates,
-        supportedLocales: AppL10n.supportedLocales,
-        locale: const Locale('es', 'AR'),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: ElevatedButton(
-              onPressed: () async {
-                result = await showLocationPermissionRationaleSheet(context);
-              },
-              child: const Text('OPEN'),
-            ),
-          ),
-        ),
-      ));
-
-      await tester.tap(find.text('OPEN'));
+      await tester.tap(find.text('CONTINUAR'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('ACEPTAR'));
-      await tester.pumpAndSettle();
-
-      expect(result, isTrue);
+      expect(returned, isTrue);
+      expect(find.byType(BottomSheet), findsNothing);
     });
 
-    testWidgets('tapping "Ahora no" returns false', (tester) async {
-      bool? result;
+    testWidgets('tocar la barrera NO lo cierra', (tester) async {
+      var returned = false;
+      await tester.pumpWidget(_app(onDone: () async {
+        returned = true;
+      }));
+      await _open(tester);
 
-      await tester.pumpWidget(MaterialApp(
-        theme: AppTheme.dark(),
-        localizationsDelegates: AppL10n.localizationsDelegates,
-        supportedLocales: AppL10n.supportedLocales,
-        locale: const Locale('es', 'AR'),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: ElevatedButton(
-              onPressed: () async {
-                result = await showLocationPermissionRationaleSheet(context);
-              },
-              child: const Text('OPEN'),
-            ),
-          ),
-        ),
-      ));
-
-      await tester.tap(find.text('OPEN'));
+      await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Ahora no'));
+      expect(returned, isFalse);
+      expect(find.text('CONTINUAR'), findsOneWidget);
+    });
+
+    testWidgets('arrastrarlo hacia abajo NO lo cierra', (tester) async {
+      var returned = false;
+      await tester.pumpWidget(_app(onDone: () async {
+        returned = true;
+      }));
+      await _open(tester);
+
+      await tester.drag(
+        find.text('Permitir ubicación'),
+        const Offset(0, 600),
+      );
       await tester.pumpAndSettle();
 
-      expect(result, isFalse);
+      expect(returned, isFalse);
+      expect(find.text('CONTINUAR'), findsOneWidget);
+    });
+
+    testWidgets('el botón «atrás» del sistema NO lo cierra', (tester) async {
+      var returned = false;
+      await tester.pumpWidget(_app(onDone: () async {
+        returned = true;
+      }));
+      await _open(tester);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(returned, isFalse);
+      expect(find.text('CONTINUAR'), findsOneWidget);
     });
   });
 }

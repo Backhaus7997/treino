@@ -358,13 +358,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachLocationSheetBody =>
-      'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.';
+      'TREINO usa tu ubicación para mostrarte entrenadores cerca de ti. Tu ubicación no es visible para otros usuarios.';
 
   @override
-  String get coachLocationSheetAccept => 'ACEPTAR';
+  String get coachLocationSheetContinue => 'CONTINUAR';
 
   @override
-  String get coachLocationSheetDeny => 'Ahora no';
+  String get coachLocationSettingsNoticeTitle => 'Ubicación desactivada';
+
+  @override
+  String get coachLocationSettingsNoticeBody =>
+      'Activa la ubicación en Ajustes para ver entrenadores cerca de ti. Si prefieres, sigue sin ubicación y explora entrenadores Online.';
+
+  @override
+  String get coachLocationSettingsNoticeOpenSettings => 'ABRIR AJUSTES';
+
+  @override
+  String get coachLocationSettingsNoticeContinueWithout =>
+      'Seguir sin ubicación';
 
   @override
   String get coachMiPlanTitle => 'MI PLAN';
@@ -5592,10 +5603,21 @@ class AppL10nEsAr extends AppL10nEs {
       'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.';
 
   @override
-  String get coachLocationSheetAccept => 'ACEPTAR';
+  String get coachLocationSheetContinue => 'CONTINUAR';
 
   @override
-  String get coachLocationSheetDeny => 'Ahora no';
+  String get coachLocationSettingsNoticeTitle => 'Ubicación desactivada';
+
+  @override
+  String get coachLocationSettingsNoticeBody =>
+      'Activá la ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.';
+
+  @override
+  String get coachLocationSettingsNoticeOpenSettings => 'ABRIR AJUSTES';
+
+  @override
+  String get coachLocationSettingsNoticeContinueWithout =>
+      'Seguir sin ubicación';
 
   @override
   String get coachMiPlanTitle => 'MI PLAN';

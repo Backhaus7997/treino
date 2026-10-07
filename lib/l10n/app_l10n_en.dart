@@ -348,16 +348,28 @@ class AppL10nEn extends AppL10n {
   String get coachCtaProximamente => '';
 
   @override
-  String get coachLocationSheetTitle => '';
+  String get coachLocationSheetTitle => 'Allow location';
 
   @override
-  String get coachLocationSheetBody => '';
+  String get coachLocationSheetBody =>
+      'TREINO uses your location to show you trainers near you. Your location is not visible to other users.';
 
   @override
-  String get coachLocationSheetAccept => '';
+  String get coachLocationSheetContinue => 'CONTINUE';
 
   @override
-  String get coachLocationSheetDeny => '';
+  String get coachLocationSettingsNoticeTitle => 'Location is off';
+
+  @override
+  String get coachLocationSettingsNoticeBody =>
+      'Turn on location in Settings to see trainers near you. You can also continue without it and browse Online trainers.';
+
+  @override
+  String get coachLocationSettingsNoticeOpenSettings => 'OPEN SETTINGS';
+
+  @override
+  String get coachLocationSettingsNoticeContinueWithout =>
+      'Continue without location';
 
   @override
   String get coachMiPlanTitle => '';

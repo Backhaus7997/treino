@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../application/location_permission_gateway.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/discovery_filters.dart';
 import '../../domain/trainer_specialty.dart';
+import 'location_permission_flow.dart';
 import 'trainer_specialty_chips.dart' show SpecialtyLabels;
 
 /// Row de chips para filtros avanzados (distance + price) — Fase 2b.
@@ -61,7 +62,7 @@ class TrainerAdvancedFilterChips extends ConsumerWidget {
               if (hasLocation) {
                 showDistanceFilterSheet(context, ref, distance);
               } else {
-                showLocationRequiredFilterSheet(context, ref);
+                activateLocationFromFilter(context, ref);
               }
             },
           ),
@@ -225,146 +226,24 @@ Future<void> showSpecialtyFilterSheet(
   );
 }
 
-/// Modal explicativo cuando el athlete denegó (o no otorgó) location y
-/// tocó el chip de distancia. Le explica por qué y le ofrece reintentar
-/// el permission flow.
-Future<void> showLocationRequiredFilterSheet(
+/// Tap en el chip «Distancia» sin ubicación: pasa por el flujo único de
+/// permiso (`presentLocationPermissionFlow`).
+///
+/// Antes abría un sheet propio («ACTIVÁ TU UBICACIÓN», «Ahora no» / «Activar»)
+/// antes del pedido del SO, y para `deniedForever` saltaba directo a Ajustes
+/// sin explicar nada. Apple rechazó ese patrón (Guideline 5.1.1(iv)): ahora hay
+/// un mensaje con un solo CONTINUAR que lleva al pedido del SO, o —si el SO ya
+/// no puede preguntar— un aviso con acceso a Ajustes.
+Future<void> activateLocationFromFilter(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final palette = AppPalette.of(context);
-  await showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: palette.bgCard,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-    ),
-    builder: (sheetContext) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'ACTIVÁ TU UBICACIÓN',
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                letterSpacing: 1.4,
-                color: palette.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Para filtrar entrenadores por distancia necesitamos saber dónde estás. La ubicación se usa solo en tu dispositivo, no la subimos a ningún servidor.',
-              style: GoogleFonts.barlow(
-                fontSize: 14,
-                color: palette.textMuted,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(sheetContext).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: palette.border),
-                      foregroundColor: palette.textPrimary,
-                      minimumSize: const Size.fromHeight(44),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'Ahora no',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => _handleActivatePressed(sheetContext, ref),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      minimumSize: const Size.fromHeight(44),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: Text(
-                      'Activar',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ),
+  final proceed = await presentLocationPermissionFlow(
+    context,
+    ref.read(locationPermissionGatewayProvider),
   );
-}
-
-/// Handler del botón "Activar" del modal de location-required.
-///
-/// Branch según current permission state — necesario para evitar el crash
-/// del geolocator cuando se llama `requestPermission()` sobre estado
-/// `deniedForever` (la app se cierra en algunos Android). Solución:
-/// chequear primero, y si está deniedForever, abrir app settings directo
-/// (el user puede otorgar manualmente desde ahí).
-Future<void> _handleActivatePressed(
-  BuildContext sheetContext,
-  WidgetRef ref,
-) async {
-  Navigator.of(sheetContext).pop();
-  try {
-    final current = await Geolocator.checkPermission();
-    if (current == LocationPermission.deniedForever) {
-      // Sistema ya no nos deja pedir de nuevo — abrir app settings.
-      // NO llamamos `requestPermission()` después porque genera doble
-      // recarga (app background → foreground → otra request). El user
-      // vuelve, toca "Distancia" de nuevo, y ahí refresca via el flow
-      // normal (este mismo handler con checkPermission ya devolviendo
-      // `denied` o `whileInUse`).
-      await Geolocator.openAppSettings();
-    } else if (current == LocationPermission.whileInUse ||
-        current == LocationPermission.always) {
-      // Ya estaba otorgado (caso típico cuando el user volvió de app
-      // settings después de activar manualmente). Solo refrescamos
-      // posición — no re-disparamos diálogo del sistema.
-      await ref.read(athleteLocationProvider.notifier).requestPermission();
-    } else {
-      // Estado `denied` (preguntado y rechazado pero no permanente) o
-      // `unableToDetermine` — pedir permission normalmente. Sistema
-      // muestra diálogo y el user puede aceptar.
-      await ref.read(athleteLocationProvider.notifier).requestPermission();
-    }
-  } catch (_) {
-    // Errores del plugin se tragan silenciosamente — el provider state
-    // ya refleja el estado real y la UI se actualiza acorde.
-  }
+  if (!proceed || !context.mounted) return;
+  await ref.read(athleteLocationProvider.notifier).requestPermission();
 }
 
 Future<T?> _showFilterSheet<T>({
