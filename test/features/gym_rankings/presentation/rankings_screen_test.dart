@@ -35,8 +35,10 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
+import 'package:treino/features/gym_rankings/domain/lift_rank.dart';
 import 'package:treino/features/gym_rankings/domain/ranking_dimension.dart';
 import 'package:treino/features/gym_rankings/presentation/rankings_screen.dart';
+import 'package:treino/features/gym_rankings/presentation/widgets/lift_rank_badge.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/application/ranking_optin_controller_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -72,6 +74,9 @@ UserPublicProfile _rankedProfile({
   num? bestSquatKg,
   num? bestBenchKg,
   num? bestDeadliftKg,
+  int? squatRank,
+  int? benchRank,
+  int? deadliftRank,
 }) =>
     UserPublicProfile(
       uid: uid,
@@ -85,6 +90,9 @@ UserPublicProfile _rankedProfile({
       bestSquatKg: bestSquatKg,
       bestBenchKg: bestBenchKg,
       bestDeadliftKg: bestDeadliftKg,
+      squatRank: squatRank,
+      benchRank: benchRank,
+      deadliftRank: deadliftRank,
     );
 
 /// [textScaler] y [barraFlotante] simulan la letra de accesibilidad y el shell:
@@ -366,6 +374,182 @@ void main() {
       expect(node.label, contains('Ver el perfil de Lu'));
       expect(node.flagsCollection.isButton, isTrue);
       semantics.dispose();
+    });
+
+    group('rangos de levantamiento', () {
+      testWidgets('la fila de un levantamiento muestra la insignia de su rango',
+          (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            squat: [
+              _rankedProfile(
+                uid: 'u2',
+                displayName: 'Lu',
+                bestSquatKg: 200,
+                squatRank: 8,
+              ),
+              _rankedProfile(
+                uid: 'u3',
+                displayName: 'Mati',
+                bestSquatKg: 120,
+                squatRank: 3,
+              ),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        LiftRank rankOf(String uid) => tester
+            .widget<LiftRankBadge>(find.byKey(Key('rankings_badge_$uid')))
+            .rank;
+        expect(rankOf('u2'), LiftRank.olympian);
+        expect(rankOf('u3'), LiftRank.gold);
+      });
+
+      testWidgets(
+          'sin rango o con rango 0 no se dibuja nada, pero el hueco se reserva '
+          'y los nombres quedan alineados', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            squat: [
+              _rankedProfile(
+                uid: 'u2',
+                displayName: 'Lu',
+                bestSquatKg: 200,
+                squatRank: 8,
+              ),
+              _rankedProfile(
+                uid: 'u3',
+                displayName: 'Mati',
+                bestSquatKg: 20,
+                squatRank: 0,
+              ),
+              _rankedProfile(
+                uid: 'u4',
+                displayName: 'Nico',
+                bestSquatKg: 15,
+              ),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_badge_u2')), findsOneWidget);
+        expect(find.byKey(const Key('rankings_badge_u3')), findsNothing);
+        expect(find.byKey(const Key('rankings_badge_u4')), findsNothing);
+
+        final x = tester.getTopLeft(find.text('Lu')).dx;
+        expect(tester.getTopLeft(find.text('Mati')).dx, x);
+        expect(tester.getTopLeft(find.text('Nico')).dx, x);
+      });
+
+      testWidgets('rachas y volumen no tienen insignia, ni hueco para ella',
+          (tester) async {
+        // Aunque el perfil traiga rangos escritos, esos tableros no los usan.
+        final conRangos = _rankedProfile(
+          uid: 'u2',
+          displayName: 'Lu',
+          racha: 12,
+          lifetimeVolumeKg: 5000,
+          bestSquatKg: 200,
+          squatRank: 8,
+        );
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            streak: [conRangos],
+            volume: [conRangos],
+          ),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_row_u2')), findsNWidgets(2));
+        expect(find.byKey(const Key('rankings_badge_u2')), findsNothing);
+        // La única insignia de la pantalla es la de la franja "Tu rango", que
+        // vive en la sección de levantamientos y no en una fila.
+        expect(find.byType(LiftRankBadge), findsOneWidget);
+        expect(
+          find.byKey(const Key('rankings_my_rank_badge')),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('la etiqueta de la fila dice el rango, la insignia no',
+          (tester) async {
+        final semantics = tester.ensureSemantics();
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(
+            bench: [
+              _rankedProfile(
+                uid: 'u2',
+                displayName: 'Lu',
+                bestBenchKg: 90,
+                benchRank: 3,
+              ),
+            ],
+          ),
+        ));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('rankings_lift_tab_bench')));
+        await tester.pumpAndSettle();
+
+        final node =
+            tester.getSemantics(find.byKey(const Key('rankings_row_u2')));
+        expect(node.label, contains('Ver el perfil de Lu, rango Oro'));
+        semantics.dispose();
+      });
+
+      testWidgets('cada pestaña lee el rango de SU levantamiento',
+          (tester) async {
+        final lu = _rankedProfile(
+          uid: 'u2',
+          displayName: 'Lu',
+          bestSquatKg: 200,
+          squatRank: 8,
+          bestBenchKg: 40,
+          benchRank: 1,
+        );
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(squat: [lu], bench: [lu]),
+        ));
+        await tester.pumpAndSettle();
+
+        LiftRank rankOf() => tester
+            .widget<LiftRankBadge>(find.byKey(const Key('rankings_badge_u2')))
+            .rank;
+        expect(rankOf(), LiftRank.olympian);
+
+        await tester.tap(find.byKey(const Key('rankings_lift_tab_bench')));
+        await tester.pumpAndSettle();
+        expect(rankOf(), LiftRank.bronze);
+      });
+
+      testWidgets('la franja "Tu rango" acompaña a la pestaña activa',
+          (tester) async {
+        await tester.pumpWidget(_buildScreen(overrides: baseOverrides()));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_my_rank_strip')), findsOneWidget);
+        expect(find.text('TU RANGO · SENTADILLA'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('rankings_lift_tab_bench')));
+        await tester.pumpAndSettle();
+        expect(find.text('TU RANGO · BANCA'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('rankings_lift_tab_deadlift')));
+        await tester.pumpAndSettle();
+        expect(find.text('TU RANGO · PESO MUERTO'), findsOneWidget);
+      });
+
+      testWidgets(
+          'sin opt-in no hay franja: el atleta ni siquiera está en el '
+          'tablero', (tester) async {
+        await tester.pumpWidget(_buildScreen(
+          overrides: baseOverrides(rankingOptIn: false),
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('rankings_my_rank_strip')), findsNothing);
+      });
     });
 
     testWidgets('empty state renders when the gym has zero opted-in athletes',
