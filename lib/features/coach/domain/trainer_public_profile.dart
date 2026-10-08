@@ -60,6 +60,15 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     // (pin en firestore.rules). Null ⇒ nunca computado → la UI muestra "—".
     int? trainerExperienceYears,
     int? athleteCount,
+
+    /// Oculta al PF del directorio que ve el alumno ("Encontrá tu coach":
+    /// mapa, lista y online). Lo setea SOLO el admin con
+    /// `scripts/set_trainer_discovery_visibility.js` (cuentas internas, de QA
+    /// o de los revisores de las tiendas). Default `false`: un perfil sin el
+    /// campo es visible. MUST NOT aparecer en
+    /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
+    /// Solo filtra los listados; el acceso por uid sigue andando.
+    @Default(false) bool hiddenFromDiscovery,
   }) = _TrainerPublicProfile;
 
   factory TrainerPublicProfile.fromJson(Map<String, Object?> json) =>

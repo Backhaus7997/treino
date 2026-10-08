@@ -61,6 +61,15 @@ mixin _$TrainerPublicProfile {
   int? get trainerExperienceYears => throw _privateConstructorUsedError;
   int? get athleteCount => throw _privateConstructorUsedError;
 
+  /// Oculta al PF del directorio que ve el alumno ("Encontrá tu coach":
+  /// mapa, lista y online). Lo setea SOLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js` (cuentas internas, de QA
+  /// o de los revisores de las tiendas). Default `false`: un perfil sin el
+  /// campo es visible. MUST NOT aparecer en
+  /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
+  /// Solo filtra los listados; el acceso por uid sigue andando.
+  bool get hiddenFromDiscovery => throw _privateConstructorUsedError;
+
   /// Serializes this TrainerPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -97,7 +106,8 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
-      int? athleteCount});
+      int? athleteCount,
+      bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -135,6 +145,7 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
     Object? athleteCount = freezed,
+    Object? hiddenFromDiscovery = null,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -213,6 +224,10 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.athleteCount
           : athleteCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      hiddenFromDiscovery: null == hiddenFromDiscovery
+          ? _value.hiddenFromDiscovery
+          : hiddenFromDiscovery // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -245,7 +260,8 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
-      int? athleteCount});
+      int? athleteCount,
+      bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -280,6 +296,7 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
     Object? athleteCount = freezed,
+    Object? hiddenFromDiscovery = null,
   }) {
     return _then(_$TrainerPublicProfileImpl(
       uid: null == uid
@@ -358,6 +375,10 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.athleteCount
           : athleteCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      hiddenFromDiscovery: null == hiddenFromDiscovery
+          ? _value.hiddenFromDiscovery
+          : hiddenFromDiscovery // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -385,7 +406,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.averageRating,
       this.reviewCount = 0,
       this.trainerExperienceYears,
-      this.athleteCount})
+      this.athleteCount,
+      this.hiddenFromDiscovery = false})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -471,9 +493,20 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   final int? athleteCount;
 
+  /// Oculta al PF del directorio que ve el alumno ("Encontrá tu coach":
+  /// mapa, lista y online). Lo setea SOLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js` (cuentas internas, de QA
+  /// o de los revisores de las tiendas). Default `false`: un perfil sin el
+  /// campo es visible. MUST NOT aparecer en
+  /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
+  /// Solo filtra los listados; el acceso por uid sigue andando.
+  @override
+  @JsonKey()
+  final bool hiddenFromDiscovery;
+
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount, hiddenFromDiscovery: $hiddenFromDiscovery)';
   }
 
   @override
@@ -517,7 +550,9 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
             (identical(other.trainerExperienceYears, trainerExperienceYears) ||
                 other.trainerExperienceYears == trainerExperienceYears) &&
             (identical(other.athleteCount, athleteCount) ||
-                other.athleteCount == athleteCount));
+                other.athleteCount == athleteCount) &&
+            (identical(other.hiddenFromDiscovery, hiddenFromDiscovery) ||
+                other.hiddenFromDiscovery == hiddenFromDiscovery));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -542,7 +577,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
         averageRating,
         reviewCount,
         trainerExperienceYears,
-        athleteCount
+        athleteCount,
+        hiddenFromDiscovery
       ]);
 
   /// Create a copy of TrainerPublicProfile
@@ -584,7 +620,8 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final double? averageRating,
       final int reviewCount,
       final int? trainerExperienceYears,
-      final int? athleteCount}) = _$TrainerPublicProfileImpl;
+      final int? athleteCount,
+      final bool hiddenFromDiscovery}) = _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -646,6 +683,16 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   int? get trainerExperienceYears;
   @override
   int? get athleteCount;
+
+  /// Oculta al PF del directorio que ve el alumno ("Encontrá tu coach":
+  /// mapa, lista y online). Lo setea SOLO el admin con
+  /// `scripts/set_trainer_discovery_visibility.js` (cuentas internas, de QA
+  /// o de los revisores de las tiendas). Default `false`: un perfil sin el
+  /// campo es visible. MUST NOT aparecer en
+  /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
+  /// Solo filtra los listados; el acceso por uid sigue andando.
+  @override
+  bool get hiddenFromDiscovery;
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.

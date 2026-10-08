@@ -34,6 +34,7 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
       athleteCount: (json['athleteCount'] as num?)?.toInt(),
+      hiddenFromDiscovery: json['hiddenFromDiscovery'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
@@ -59,4 +60,5 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
       'reviewCount': instance.reviewCount,
       'trainerExperienceYears': instance.trainerExperienceYears,
       'athleteCount': instance.athleteCount,
+      'hiddenFromDiscovery': instance.hiddenFromDiscovery,
     };
