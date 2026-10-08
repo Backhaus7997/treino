@@ -15,11 +15,30 @@
  * Sin bucle: escribe en `userPublicProfiles`, que este trigger no escucha, y
  * antes de escribir compara con lo que ya hay (la segunda pasada no toca nada).
  */
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import { checkText } from "../moderation/vetted_terms_filter";
+
+/**
+ * El app de firebase-admin, inicializado si hace falta.
+ *
+ * `getFirestore()` SIN argumento busca el app por defecto y tira «The default
+ * Firebase app does not exist» si nadie lo inicializo. `index.ts` no llama a
+ * `initializeApp()`: cada modulo se lo asegura solo (mismo patron que
+ * `sync-shared-profile.ts` y el resto del repo). Este modulo no lo hacia, y en
+ * produccion fallaba en CADA invocacion desde el primer deploy. Los tests no
+ * lo veian porque inicializaban el app por defecto ellos mismos.
+ */
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
 
 const REGION = "southamerica-east1";
 
@@ -101,6 +120,9 @@ export const propagateGymNameToProfiles = onDocumentWritten(
     // Sólo importa si cambio el nombre que se muestra: el refresh de coords y
     // el resto de las escrituras del gym no tocan a los perfiles.
     if (effectiveName(before) === effectiveName(after)) return;
-    await propagateGymName({ db: getFirestore(), gymId: event.params.gymId });
+    await propagateGymName({
+      db: getFirestore(ensureApp()),
+      gymId: event.params.gymId,
+    });
   },
 );
