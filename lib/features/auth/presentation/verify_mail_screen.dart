@@ -9,6 +9,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../l10n/app_l10n.dart';
 import '../application/auth_providers.dart';
 import '../data/mail_verification_service.dart';
 import 'widgets/auth_input.dart';
@@ -70,6 +71,9 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
   bool _enviando = false;
   bool _verificando = false;
   bool _verificado = false;
+
+  /// Está corriendo el borrado de «Me equivoqué de mail». Bloquea todo lo demás.
+  bool _borrando = false;
 
   /// El último pedido contestó «limitado»: la espera es de minutos u horas y se
   /// cuenta con [_reenviarEn], pero se muestra en minutos u horas (ver [build]).
@@ -282,13 +286,67 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
     }
   }
 
+  /// «Me equivoqué de mail»: borra la cuenta recién creada (con el callable
+  /// real, vía `cancelOnboarding`) para que el nombre elegido quede libre y la
+  /// persona pueda registrarse de nuevo con el mail correcto.
+  ///
+  /// No navega: al cerrarse la sesión el router la saca solo, igual que con
+  /// «Cerrar sesión». Navegar a mano acá correría una carrera con el redirect.
+  Future<void> _equivocoDeMail() async {
+    if (_borrando) return;
+    final l10n = AppL10n.of(context);
+    final palette = AppPalette.of(context);
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(l10n.verifyMailWrongEmailDialogTitle),
+        content: Text(l10n.verifyMailWrongEmailDialogBody),
+        actions: [
+          TextButton(
+            key: const Key('verify_mail_wrong_email_back'),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(l10n.verifyMailWrongEmailDialogBack),
+          ),
+          TextButton(
+            key: const Key('verify_mail_wrong_email_confirm'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              l10n.verifyMailWrongEmailDialogConfirm,
+              style: TextStyle(color: palette.highlight),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted || _borrando) return;
+    setState(() => _borrando = true);
+    try {
+      await ref.read(authNotifierProvider.notifier).cancelOnboarding();
+      // Éxito: la sesión ya no existe y el router redirige. Se deja el estado
+      // en «borrando» para que nada se pueda tocar mientras la pantalla sale.
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _borrando = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.verifyMailWrongEmailError),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final signingOut = ref.watch(authNotifierProvider).isLoading;
-    final puedeConfirmar =
-        _codigo.text.trim().length == 6 && !_verificando && !_verificado;
-    final puedeReenviar = _reenviarEn == 0 && !_enviando && !_verificado;
+    final signingOut = ref.watch(authNotifierProvider).isLoading || _borrando;
+    final puedeConfirmar = _codigo.text.trim().length == 6 &&
+        !_verificando &&
+        !_verificado &&
+        !_borrando;
+    final puedeReenviar =
+        _reenviarEn == 0 && !_enviando && !_verificado && !_borrando;
     final enEsperaPorTope = _limitado && _reenviarEn > 0;
     // Desde 90 min en horas (hacia arriba): «en 1440 min» no se lee.
     final cuanto = _reenviarEn >= _segundosParaHoras
@@ -393,6 +451,22 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
                     ),
                     icon: const Icon(TreinoIcon.signOut, size: 18),
                     label: const Text('Cerrar sesión'), // i18n
+                  ),
+                ),
+                Center(
+                  child: TextButton(
+                    key: const Key('verify_mail_wrong_email'),
+                    onPressed: signingOut ? null : _equivocoDeMail,
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.textMuted,
+                    ),
+                    child: _borrando
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(AppL10n.of(context).verifyMailWrongEmailAction),
                   ),
                 ),
               ],

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -5,11 +7,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/mail_verification_service.dart';
 import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+/// Doble del notifier de auth: anota `cancelOnboarding` y puede fallar.
+class _AuthFalso extends AuthNotifier {
+  int cancelaciones = 0;
+  Object? falla;
+  Completer<void>? espera;
+
+  @override
+  Future<User?> build() async => null;
+
+  @override
+  Future<void> cancelOnboarding() async {
+    cancelaciones++;
+    await espera?.future;
+    if (falla != null) throw falla!;
+  }
+}
 
 class _MockAuth extends Mock implements FirebaseAuth {}
 
@@ -85,6 +105,7 @@ Future<void> _montar(
   _Servicio servicio, {
   _Navegacion? navegacion,
   _Reloj? reloj,
+  _AuthFalso? authFalso,
 }) async {
   final auth = _MockAuth();
   final user = _MockUser();
@@ -96,6 +117,7 @@ Future<void> _montar(
     overrides: [
       firebaseAuthProvider.overrideWithValue(auth),
       mailVerificationServiceProvider.overrideWithValue(servicio),
+      if (authFalso != null) authNotifierProvider.overrideWith(() => authFalso),
     ],
   );
   addTearDown(container.dispose);
@@ -480,5 +502,137 @@ void main() {
 
     expect(find.byKey(const Key('verify_mail_sign_out')), findsOneWidget);
     await _desmontar(tester);
+  });
+
+  group('«Me equivoqué de mail»', () {
+    Future<void> abrirDialogo(WidgetTester tester) async {
+      await tester
+          .ensureVisible(find.byKey(const Key('verify_mail_wrong_email')));
+      await tester.tap(find.byKey(const Key('verify_mail_wrong_email')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('el botón está a la vista y no borra nada por sí solo',
+        (tester) async {
+      final auth = _AuthFalso();
+      await _montar(tester, _Servicio(), authFalso: auth);
+
+      expect(find.byKey(const Key('verify_mail_wrong_email')), findsOneWidget);
+      expect(find.text('Me equivoqué de mail'), findsOneWidget);
+      expect(find.byKey(const Key('verify_mail_wrong_email_confirm')),
+          findsNothing);
+      expect(auth.cancelaciones, 0);
+      await _desmontar(tester);
+    });
+
+    testWidgets('al tocarlo pide confirmación explicando que se borra',
+        (tester) async {
+      final auth = _AuthFalso();
+      await _montar(tester, _Servicio(), authFalso: auth);
+
+      await abrirDialogo(tester);
+
+      expect(find.byKey(const Key('verify_mail_wrong_email_confirm')),
+          findsOneWidget);
+      expect(find.textContaining('borrar esta cuenta'), findsOneWidget);
+      expect(find.textContaining('mismo nombre'), findsOneWidget);
+      expect(auth.cancelaciones, 0);
+      await _desmontar(tester);
+    });
+
+    testWidgets('«Volver» en el diálogo no llama a nada', (tester) async {
+      final auth = _AuthFalso();
+      await _montar(tester, _Servicio(), authFalso: auth);
+
+      await abrirDialogo(tester);
+      await tester.tap(find.byKey(const Key('verify_mail_wrong_email_back')));
+      await tester.pumpAndSettle();
+
+      expect(auth.cancelaciones, 0);
+      expect(find.byKey(const Key('verify_mail_wrong_email_confirm')),
+          findsNothing);
+      await _desmontar(tester);
+    });
+
+    testWidgets('confirmar llama a cancelOnboarding UNA vez y no navega',
+        (tester) async {
+      final auth = _AuthFalso();
+      final navegacion = _Navegacion();
+      await _montar(tester, _Servicio(),
+          authFalso: auth, navegacion: navegacion);
+
+      await abrirDialogo(tester);
+      final antes = navegacion.cambios;
+      await tester
+          .tap(find.byKey(const Key('verify_mail_wrong_email_confirm')));
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(auth.cancelaciones, 1);
+      // Solo se cerró el diálogo (1 pop): la salida la decide el router.
+      expect(navegacion.cambios, antes + 1);
+      await _desmontar(tester);
+    });
+
+    testWidgets('mientras borra, bloquea los demás botones', (tester) async {
+      final auth = _AuthFalso()..espera = Completer<void>();
+      await _montar(tester, _Servicio(), authFalso: auth);
+
+      await abrirDialogo(tester);
+      await tester
+          .tap(find.byKey(const Key('verify_mail_wrong_email_confirm')));
+      await tester.pump();
+      await tester.pump();
+
+      expect(auth.cancelaciones, 1);
+      expect(
+        tester
+            .widget<TextButton>(
+                find.byKey(const Key('verify_mail_wrong_email')))
+            .onPressed,
+        isNull,
+      );
+      expect(_reenviar(tester).onPressed, isNull);
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+                find.byKey(const Key('verify_mail_sign_out')))
+            .onPressed,
+        isNull,
+      );
+
+      auth.espera!.complete();
+      await tester.pump();
+      await _desmontar(tester);
+    });
+
+    testWidgets('si falla: avisa y los botones vuelven a andar',
+        (tester) async {
+      final auth = _AuthFalso()..falla = Exception('boom');
+      await _montar(tester, _Servicio(), authFalso: auth);
+
+      await abrirDialogo(tester);
+      await tester
+          .tap(find.byKey(const Key('verify_mail_wrong_email_confirm')));
+      await tester.pumpAndSettle();
+
+      expect(auth.cancelaciones, 1);
+      expect(find.text('No pudimos borrar la cuenta. Probá de nuevo.'),
+          findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(
+                find.byKey(const Key('verify_mail_wrong_email')))
+            .onPressed,
+        isNotNull,
+      );
+
+      // Se puede reintentar.
+      await abrirDialogo(tester);
+      await tester
+          .tap(find.byKey(const Key('verify_mail_wrong_email_confirm')));
+      await tester.pumpAndSettle();
+      expect(auth.cancelaciones, 2);
+      await _desmontar(tester);
+    });
   });
 }
