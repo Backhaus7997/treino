@@ -320,6 +320,72 @@ void main() {
       verify(() => user.delete()).called(1);
     });
 
+    // La carrera de producción (oct-2026): el `createIfAbsent` de
+    // `perfilAseguradoProvider` crea el doc primero y el `getOrCreate` del
+    // registro rebota contra el pin de `createdAt`. El rollback borraba una
+    // cuenta CON doc y la persona veía «Hubo un problema creando tu perfil».
+    group('rollback del alta: sólo sin doc', () {
+      void registroFalla() {
+        when(
+          () => fbAuth.createUserWithEmailAndPassword(
+            email: any(named: 'email'),
+            password: any(named: 'password'),
+          ),
+        ).thenAnswer((_) async => cred);
+        when(() => user.delete()).thenAnswer((_) async {});
+        when(
+          () => mockRepo.getOrCreate(
+            uid: any(named: 'uid'),
+            email: any(named: 'email'),
+            termsAcceptedAt: any(named: 'termsAcceptedAt'),
+            acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+            acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
+          ),
+        ).thenThrow(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        ));
+      }
+
+      test('falla con el doc ya creado → NO borra la cuenta y el alta sigue',
+          () async {
+        registroFalla();
+        when(() => mockRepo.get('uid-test'))
+            .thenAnswer((_) async => _fakeProfile);
+
+        final result =
+            await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+        expect(result, same(user));
+        verifyNever(() => user.delete());
+        expect(reportados.single, contains('signUpWithEmail'));
+      });
+
+      test('falla sin doc → borra la cuenta y tira profileCreateFailed',
+          () async {
+        registroFalla();
+        when(() => mockRepo.get('uid-test')).thenAnswer((_) async => null);
+
+        await expectLater(
+          () => sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234'),
+          throwsA(isA<AuthFailure>()),
+        );
+        verify(() => user.delete()).called(1);
+      });
+
+      test('falla y no se puede confirmar si hay doc → borra, como antes',
+          () async {
+        registroFalla();
+        when(() => mockRepo.get('uid-test')).thenThrow(Exception('offline'));
+
+        await expectLater(
+          () => sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234'),
+          throwsA(isA<AuthFailure>()),
+        );
+        verify(() => user.delete()).called(1);
+      });
+    });
+
     // T30: SCENARIO-022 — rollback: getOrCreate throws AND user.delete throws
     test(
         'SCENARIO-022: getOrCreate throws AND user.delete throws → profileCreateFailed still thrown',
