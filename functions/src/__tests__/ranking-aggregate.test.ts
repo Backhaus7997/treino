@@ -21,7 +21,12 @@
  */
 
 import { App, deleteApp, initializeApp } from "firebase-admin/app";
-import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  DocumentReference,
+  Timestamp,
+  getFirestore,
+} from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
@@ -62,6 +67,14 @@ async function seedProfile(
   data: Record<string, unknown>,
 ): Promise<void> {
   await db().collection(COL_PROFILES).doc(uid).set({ uid, ...data });
+}
+
+/** Doc PRIVADO del atleta: de acá sale el peso corporal y el sexo de los rangos. */
+async function seedUser(
+  uid: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  await db().collection(COL_USERS).doc(uid).set({ uid, role: "athlete", ...data });
 }
 
 async function seedSession(
@@ -357,5 +370,172 @@ describe("recomputeMetrics: no-session opt-in", () => {
     expect(profile?.bestSquatKg ?? null).toBeNull();
     expect(profile?.bestBenchKg ?? null).toBeNull();
     expect(profile?.bestDeadliftKg ?? null).toBeNull();
+    expect(profile?.squatRank ?? null).toBeNull();
+    expect(profile?.benchRank ?? null).toBeNull();
+    expect(profile?.deadliftRank ?? null).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// lift ranks — squatRank / benchRank / deadliftRank. Derivan de best*Kg + el
+// peso corporal y el sexo del doc PRIVADO; el doc público sólo guarda el entero.
+// ---------------------------------------------------------------------------
+describe("recomputeMetrics: lift ranks", () => {
+  const uid = "athlete-ra-ranks";
+
+  afterEach(() => cleanup(uid));
+
+  it("escribe los tres rangos a partir de best*Kg y del peso corporal del doc privado", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedUser(uid, { bodyWeightKg: 80, gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 900,
+      setLogs: [
+        { exerciseId: "squat-barra", weightKg: 210 },
+        { exerciseId: "bench-press-barra", weightKg: 90 },
+        { exerciseId: "deadlift-barra", weightKg: 120 },
+      ],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    const profile = await getProfile(uid);
+    // Hombre de 80 kg: sentadilla 210 ≥ 206,7 (Olímpico), banca 90 entre 86,5
+    // y 99,9 (Platino), peso muerto 120 entre 117,2 y 138,5 (Oro).
+    expect(profile?.squatRank).toBe(8);
+    expect(profile?.benchRank).toBe(4);
+    expect(profile?.deadliftRank).toBe(3);
+  });
+
+  it("usa la escala femenina cuando el doc privado dice female", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedUser(uid, { bodyWeightKg: 55, gender: "female" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 300,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 65 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    // Mujer de 55 kg: 65 kg de banca está entre 60 (Campeón) y 68,5 (Titán).
+    expect((await getProfile(uid))?.benchRank).toBe(6);
+  });
+
+  it("deja el rango en null sin peso corporal, pero conserva best*Kg", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedUser(uid, { gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 500,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 100 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    const profile = await getProfile(uid);
+    expect(profile?.bestBenchKg).toBe(100);
+    expect(profile?.benchRank).toBeNull();
+    expect(profile?.squatRank).toBeNull();
+    expect(profile?.deadliftRank).toBeNull();
+  });
+
+  it("si falla la lectura del doc privado, escribe igual las métricas y deja los rangos en null", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedUser(uid, { bodyWeightKg: 80, gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 500,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 100 }],
+    });
+
+    // Se rompe SÓLO la lectura de `users/{uid}`: el resto de las lecturas del
+    // recompute (perfil público, sesiones, setLogs) pasan por el original.
+    const original = DocumentReference.prototype.get;
+    const spy = jest
+      .spyOn(DocumentReference.prototype, "get")
+      .mockImplementation(function (this: DocumentReference) {
+        if (this.path === `users/${uid}`) {
+          return Promise.reject(new Error("lectura privada caída"));
+        }
+        return original.call(this);
+      });
+    try {
+      await recomputeMetrics(testApp, uid);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const profile = await getProfile(uid);
+    expect(profile?.bestBenchKg).toBe(100);
+    expect(profile?.lifetimeVolumeKg).toBe(500);
+    expect(profile?.benchRank).toBeNull();
+  });
+
+  it("deja el rango en null si no existe el doc privado", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 500,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 100 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    expect((await getProfile(uid))?.benchRank).toBeNull();
+  });
+
+  it("no rankea un peso inverosímil (> 500 kg), aunque best*Kg lo conserve", async () => {
+    await seedProfile(uid, { rankingOptIn: true });
+    await seedUser(uid, { bodyWeightKg: 80, gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 500,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 600 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    const profile = await getProfile(uid);
+    expect(profile?.bestBenchKg).toBe(600);
+    expect(profile?.benchRank).toBeNull();
+  });
+
+  it("pisa un rango falsificado con el derivado de las sesiones reales", async () => {
+    await seedProfile(uid, { rankingOptIn: true, benchRank: 8 });
+    await seedUser(uid, { bodyWeightKg: 80, gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 300,
+      setLogs: [{ exerciseId: "bench-press-barra", weightKg: 50 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    // 50 kg a 80 kg de peso corporal: pasa Bronce (40) y no llega a Plata (59,9).
+    expect((await getProfile(uid))?.benchRank).toBe(1);
+  });
+
+  it("un atleta sin opt-in termina con los tres rangos en null, aunque tenga sesiones y peso", async () => {
+    await seedProfile(uid, {
+      rankingOptIn: false,
+      squatRank: 5,
+      benchRank: 4,
+      deadliftRank: 3,
+    });
+    await seedUser(uid, { bodyWeightKg: 80, gender: "male" });
+    await seedSession(uid, "s1", {
+      startedAt: new Date("2026-01-10T08:00:00Z"),
+      totalVolumeKg: 900,
+      setLogs: [{ exerciseId: "squat-barra", weightKg: 210 }],
+    });
+
+    await recomputeMetrics(testApp, uid);
+
+    const profile = await getProfile(uid);
+    expect(profile?.squatRank ?? null).toBeNull();
+    expect(profile?.benchRank ?? null).toBeNull();
+    expect(profile?.deadliftRank ?? null).toBeNull();
   });
 });

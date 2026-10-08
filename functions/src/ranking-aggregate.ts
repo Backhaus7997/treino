@@ -39,6 +39,14 @@
  *       output), catch-log-never-rethrow, no-op + warn when the profile doc
  *       is absent (mirrors `review-aggregate.ts`'s REQ-RV-CF-006 shape).
  *
+ * Rangos de levantamiento: el mismo recompute escribe también `squatRank`,
+ * `benchRank` y `deadliftRank` (enteros 0..8, o `null`), derivados de los
+ * `best*Kg` que acaba de calcular más el peso corporal y el sexo del atleta,
+ * que viven en `users/{uid}` (privado). El doc público sólo recibe el entero,
+ * nunca el peso. La fórmula y los umbrales están en `ranking-ranks.ts`. Un
+ * cambio de peso o de sexo no dispara este trigger: el rango se actualiza con
+ * la próxima sesión terminada o al reactivar el opt-in.
+ *
  * Runs in southamerica-east1 (matches reviewAggregate — ADR-RV-003).
  *
  * `sdd/rankings-integrity` Phase 1 (PR#1).
@@ -48,6 +56,7 @@ import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
+import { liftRankFor } from "./ranking-ranks";
 
 /**
  * Initialize the default Admin SDK app lazily so the module can be imported
@@ -111,6 +120,9 @@ type RankingMetrics = {
   bestSquatKg: number | null;
   bestBenchKg: number | null;
   bestDeadliftKg: number | null;
+  squatRank: number | null;
+  benchRank: number | null;
+  deadliftRank: number | null;
 };
 
 const OPTED_OUT_METRICS: RankingMetrics = {
@@ -118,10 +130,14 @@ const OPTED_OUT_METRICS: RankingMetrics = {
   bestSquatKg: null,
   bestBenchKg: null,
   bestDeadliftKg: null,
+  squatRank: null,
+  benchRank: null,
+  deadliftRank: null,
 };
 
 /**
- * Recomputes the 4 ranking-metric fields for `uid` and persists them to
+ * Recomputes the 4 ranking-metric fields — plus the 3 derived lift ranks
+ * (`squatRank`, `benchRank`, `deadliftRank`) — for `uid` and persists them to
  * `userPublicProfiles/{uid}`.
  *
  * Exported separately to enable direct unit/integration testing without
@@ -196,11 +212,39 @@ export async function recomputeMetrics(
       }
     }
 
+    const bestSquatKg = familyMaxWeight("squat", allLogs);
+    const bestBenchKg = familyMaxWeight("bench", allLogs);
+    const bestDeadliftKg = familyMaxWeight("deadlift", allLogs);
+
+    // Peso corporal y sexo viven en el doc PRIVADO del atleta. Sólo el rango
+    // resultante (un entero 0..8) llega al doc público. Un doc ausente o sin
+    // esos campos no es un error: simplemente no hay rango (`null`).
+    //
+    // Es un dato AUXILIAR: sólo alimenta la insignia. Si la lectura falla, las
+    // métricas de siempre se escriben igual y los rangos quedan en `null`, en
+    // vez de perder el recompute entero (cae al catch de abajo y no escribe
+    // nada) por algo que no es el ranking.
+    let bodyWeightKg: unknown;
+    let gender: unknown;
+    try {
+      const privateData = (await db.collection("users").doc(uid).get()).data();
+      bodyWeightKg = privateData?.bodyWeightKg;
+      gender = privateData?.gender;
+    } catch (err) {
+      logger.warn(
+        `rankingAggregate: no se pudo leer el doc privado de ${uid} — sin rangos`,
+        { uid, err },
+      );
+    }
+
     const update: RankingMetrics = {
       lifetimeVolumeKg,
-      bestSquatKg: familyMaxWeight("squat", allLogs),
-      bestBenchKg: familyMaxWeight("bench", allLogs),
-      bestDeadliftKg: familyMaxWeight("deadlift", allLogs),
+      bestSquatKg,
+      bestBenchKg,
+      bestDeadliftKg,
+      squatRank: liftRankFor("squat", bestSquatKg, bodyWeightKg, gender),
+      benchRank: liftRankFor("bench", bestBenchKg, bodyWeightKg, gender),
+      deadliftRank: liftRankFor("deadlift", bestDeadliftKg, bodyWeightKg, gender),
     };
 
     // 4. Merge aggregate fields — never overwrite identity fields.
