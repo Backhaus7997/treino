@@ -5,6 +5,7 @@ import '../../../core/moderation/moderation_guard.dart';
 import '../domain/post.dart';
 import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 class PostRepository {
   PostRepository({required FirebaseFirestore firestore})
@@ -32,7 +33,9 @@ class PostRepository {
     // Read gymId from the user doc for denormalization (ADR: authorGymId)
     final userSnap =
         await _firestore.collection('users').doc(input.authorUid).get();
-    final gymId = userSnap.data()?['gymId'] as String?;
+    final rawGymId = userSnap.data()?['gymId'] as String?;
+    // "SIN GYM" no es un gym: un post no se denormaliza con el sentinel.
+    final gymId = hasRealGym(rawGymId) ? rawGymId : null;
 
     // If input already has an explicit authorGymId (e.g., from tests), keep it;
     // otherwise use the value from the user doc.

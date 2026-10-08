@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
@@ -52,6 +53,24 @@ void main() {
 
       final result = await container.read(myGymFeedProvider.future);
       expect(result, isNull);
+    });
+
+    test('gymId kNoGymId ("SIN GYM") es el estado sin gym, no una query',
+        () async {
+      final container = ProviderContainer(
+        overrides: [
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_makeProfile(gymId: kNoGymId)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      expect(
+        await container.read(myGymFeedPaginationKeyProvider.future),
+        isNull,
+      );
+      expect(await container.read(myGymFeedProvider.future), isNull);
     });
 
     // SCENARIO-191: profile with gymId non-null returns delegated list

@@ -26,6 +26,7 @@ import '../application/session_muscle_distribution.dart';
 import '../application/session_providers.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 /// Composer del post de entreno: el atleta edita el texto (precargado con el
 /// default de siempre), adjunta UNA foto opcional y ve el detalle que va a
@@ -187,7 +188,7 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
     final isSharing = ref.watch(postWorkoutNotifierProvider).isLoading;
     final hasGym = ref.watch(
       userProfileProvider.select(
-        (profileAsync) => profileAsync.valueOrNull?.gymId != null,
+        (profileAsync) => hasRealGym(profileAsync.valueOrNull?.gymId),
       ),
     );
 

@@ -343,7 +343,7 @@ void main() {
       await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
 
-      verify(() => mockUserRepo.update(_uid, {'gymId': kNoGymId})).called(1);
+      verify(() => mockUserRepo.update(_uid, {'gymId': null})).called(1);
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
