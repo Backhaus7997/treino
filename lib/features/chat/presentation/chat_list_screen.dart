@@ -30,50 +30,71 @@ class ChatListScreen extends ConsumerWidget {
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
     final currentUid = ref.watch(currentUidProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    // Si se llegó por un deep link (`go` desde una notificación o un push), el
+    // inbox es la única página del stack: no hay nada que popear, ni con la
+    // flecha ni con el back del sistema (en Android cerraría la app). Ahí
+    // volvemos al feed. `maybeOf` para no exigir un GoRouter en los tests que
+    // montan la pantalla suelta.
+    final router = GoRouter.maybeOf(context);
+    final canPop = router?.canPop() ?? Navigator.of(context).canPop();
+    void goBack() {
+      if (router != null && !canPop) {
+        router.go('/feed');
+      } else {
+        Navigator.of(context).maybePop();
+      }
+    }
+
+    return PopScope(
+      canPop: canPop || router == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) goBack();
+      },
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(
-          l10n.chatListTitle,
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+            onPressed: goBack,
+          ),
+          title: Text(
+            l10n.chatListTitle,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            ),
           ),
         ),
-      ),
-      body: TreinoStateSwitcher(
-        childKey: ValueKey(
-          chatsAsync.when(
-            data: (_) => 'data',
-            loading: () => 'loading',
-            error: (_, __) => 'error',
+        body: TreinoStateSwitcher(
+          childKey: ValueKey(
+            chatsAsync.when(
+              data: (_) => 'data',
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+            ),
           ),
-        ),
-        child: chatsAsync.when(
-          loading: () =>
-              Center(child: CircularProgressIndicator(color: palette.accent)),
-          error: (_, __) => _ErrorState(
-            onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+          child: chatsAsync.when(
+            loading: () =>
+                Center(child: CircularProgressIndicator(color: palette.accent)),
+            error: (_, __) => _ErrorState(
+              onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+            ),
+            data: (chats) {
+              if (chats.isEmpty) return const _EmptyState();
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: chats.length,
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: palette.border, indent: 76),
+                itemBuilder: (_, i) =>
+                    _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
+              );
+            },
           ),
-          data: (chats) {
-            if (chats.isEmpty) return const _EmptyState();
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: chats.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: palette.border, indent: 76),
-              itemBuilder: (_, i) =>
-                  _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
-            );
-          },
         ),
       ),
     );
