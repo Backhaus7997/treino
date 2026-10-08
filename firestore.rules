@@ -1646,7 +1646,10 @@ service cloud.firestore {
         return followAccepted(request.auth.uid, authorUid);
       }
       function postSameGym(authorGymId) {
+        // 'no-gym' es el sentinel del cliente (kNoGymId), no un gym real: nunca
+        // debe matchear aunque el usuario tenga ese mismo valor guardado.
         return authorGymId != null
+            && authorGymId != 'no-gym'
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
       }
 
@@ -4345,8 +4348,21 @@ service cloud.firestore {
     // Per-athlete billing config set by the trainer (Pagos P1).
     // Doc id is deterministic: `${trainerId}_${athleteId}`.
     match /athlete_billing/{docId} {
+      // Si el doc NO existe, `resource == null` y `resource.data` revienta con
+      // PERMISSION_DENIED en vez de devolver un snapshot vacío (el PF veía
+      // "No pudimos cargar la config de cobro" en vez de "Sin configurar").
+      // El disyunto del doc inexistente está ACOTADO a las dos partes que el
+      // docId `${trainerId}_${athleteId}` encodea (mismo idiom que
+      // `athlete_notes`, QA-SEC-010): cualquier otro uid ve lo mismo exista o
+      // no el doc, así que no hay oráculo de existencia. Vale sólo para get:
+      // en una query `list` Firestore evalúa cada doc real, donde
+      // `resource != null`. uid de Firebase Auth sin guión bajo
+      // (docs/security.md §1.7).
       allow read: if request.auth != null
-                  && (request.auth.uid == resource.data.trainerId
+                  && ((resource == null
+                       && (docId.split('_')[0] == request.auth.uid
+                           || docId.split('_')[1] == request.auth.uid))
+                      || request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges
@@ -4554,8 +4570,15 @@ service cloud.firestore {
     // preserva trainerId y athleteId. `meals` es un list — no validamos la
     // estructura en rules (validación se hace client-side).
     match /nutrition_plans/{docId} {
+      // Doc inexistente: `resource == null` → snapshot vacío (estado vacío del
+      // alumno) en vez de PERMISSION_DENIED. Acotado a las dos partes del
+      // docId, igual que `athlete_notes` / `athlete_billing` (sin oráculo de
+      // existencia para terceros). Es sólo para get; `list` no se amplía.
       allow read, list: if request.auth != null
-                  && (request.auth.uid == resource.data.trainerId
+                  && ((resource == null
+                       && (docId.split('_')[0] == request.auth.uid
+                           || docId.split('_')[1] == request.auth.uid))
+                      || request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid

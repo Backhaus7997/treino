@@ -524,6 +524,27 @@ describe("nutrition_plans — one plan per PF↔athlete pair, trainer-only", () 
       );
     });
 
+    // Plan que todavía no existe: el alumno debe ver el estado vacío, no un
+    // permission-denied con reintento inútil.
+    it("lets the athlete and the trainer read a plan that does NOT exist yet", async () => {
+      const MISSING_ID = `${TRAINER}_athlete-sin-plan`;
+      await assertSucceeds(
+        ctxDb(TRAINER).collection(COL_NUTRITION).doc(MISSING_ID).get(),
+      );
+      await assertSucceeds(
+        ctxDb("athlete-sin-plan").collection(COL_NUTRITION).doc(MISSING_ID).get(),
+      );
+    });
+
+    it("DENIES another trainer reading a plan that does NOT exist", async () => {
+      await assertFails(
+        ctxDb(OTHER_TRAINER)
+          .collection(COL_NUTRITION)
+          .doc(`${TRAINER}_athlete-sin-plan`)
+          .get(),
+      );
+    });
+
     it("DENIES another trainer fishing plans by athleteId", async () => {
       await assertFails(
         ctxDb(OTHER_TRAINER)
