@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Query;
+import 'package:flutter/foundation.dart' show listEquals;
 
 import '../domain/follow.dart';
 import '../domain/follow_status.dart';
@@ -101,6 +102,37 @@ class FollowRepository {
             (s) =>
                 s.docs.map((d) => d.data()['followeeUid']! as String).toList(),
           );
+
+  /// Igual que [watchFollowingOf], pero SOLO con lo que el servidor ya
+  /// confirmó.
+  ///
+  /// Un `.snapshots()` común emite primero el snapshot optimista local, con la
+  /// arista nueva incluida, ANTES de que el commit llegue al servidor. Quien
+  /// usa ese conjunto para armar una query que las rules autorizan con
+  /// `exists/get` sobre la arista (`postFollowerAccepted`) manda `authorUid
+  /// whereIn [...]` con un autor que el servidor todavía no ve como seguido, y
+  /// Firestore deniega la QUERY ENTERA, no la fila de más. Es el error "No
+  /// pudimos cargar tu feed" que aparecía justo después de seguir a alguien.
+  ///
+  /// `includeMetadataChanges: true` es imprescindible: sin él, cuando el
+  /// servidor confirma (hasPendingWrites pasa a false con los mismos datos) no
+  /// hay emisión y la arista nueva no llegaría nunca. Los snapshots con
+  /// escrituras pendientes se descartan, y las emisiones repetidas (cambios de
+  /// metadata sin cambio de datos) se deduplican para no rearmar la key del
+  /// feed de balde.
+  ///
+  /// Contrapartida: esta vista llega con la latencia del commit (y sin red, no
+  /// llega hasta que haya). Para el feed es lo correcto; para pintar el estado
+  /// de un botón, no — ahí está [watchFollowingOf] / `watchEdge`.
+  Stream<List<String>> watchConfirmedFollowingOf(String uid) {
+    return _followingQuery(uid)
+        .snapshots(includeMetadataChanges: true)
+        .where((s) => !s.metadata.hasPendingWrites)
+        .map(
+          (s) => s.docs.map((d) => d.data()['followeeUid']! as String).toList(),
+        )
+        .distinct(listEquals);
+  }
 
   /// UIDs que siguen a [uid] con la relación ya aceptada.
   ///
