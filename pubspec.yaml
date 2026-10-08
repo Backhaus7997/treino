@@ -167,6 +167,9 @@ flutter:
     - assets/exercises/
     - assets/body/
     - assets/onboarding/
+    # Insignias de rango de levantamiento (Rankings). Las genera
+    # `tool/build_lift_rank_badges.dart`; no se editan a mano.
+    - assets/ranking_ranks/
     # Tipografías bundleadas. Van bajo `assets:` y NO bajo `fonts:` a
     # propósito: google_fonts las resuelve buscando en el AssetManifest un
     # archivo llamado `{Familia}-{Variante}.ttf`. Declaradas bajo `fonts:`

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120" width="120" height="120">
+  <!-- Generado por tool/build_lift_rank_badges.dart. No editar a mano: dart run tool/build_lift_rank_badges.dart -->
+  <g fill="#4A0C0C" stroke="#2A0505" stroke-width=".8" stroke-linejoin="round">
+    <polygon points="0,-54 6,-42 -6,-42"/>
+    <polygon points="46.76,-27 39.37,-15.8 33.37,-26.2"/>
+    <polygon points="46.76,27 33.37,26.2 39.37,15.8"/>
+    <polygon points="0,54 -6,42 6,42"/>
+    <polygon points="-46.76,27 -39.37,15.8 -33.37,26.2"/>
+    <polygon points="-46.76,-27 -33.37,-26.2 -39.37,-15.8"/>
+  </g>
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" transform="translate(0,2)" fill="#000" opacity=".2"/>
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" fill="#8A1A1A" stroke="#3B0707" stroke-width="1.4" stroke-linejoin="round"/>
+  <polygon points="0,-41 35.5,-20.5 35.5,20.5 0,41 -35.5,20.5 -35.5,-20.5" fill="none" stroke="#FFA79C" stroke-width=".7" opacity=".5"/>
+  <polygon points="0,-36 31.2,-18 31.2,18 0,36 -31.2,18 -31.2,-18" fill="#D8433B"/>
+  <path d="M-31.2 -18L0 -36L31.2 -18V0H-31.2z" fill="#fff" opacity=".1"/>
+  <path d="M-31.2 0H31.2V18L0 36L-31.2 18z" fill="#000" opacity=".08"/>
+  <polyline points="-31.2,18 -31.2,-18 0,-36 31.2,-18" fill="none" stroke="#FFA79C" stroke-width="1.6" stroke-linejoin="round" opacity=".7"/>
+  <polyline points="31.2,-18 31.2,18 0,36 -31.2,18" fill="none" stroke="#3B0707" stroke-width="1.6" stroke-linejoin="round" opacity=".35"/>
+  <polygon points="0,-33 28.6,-16.5 28.6,16.5 0,33 -28.6,16.5 -28.6,-16.5" fill="none" stroke="#FFA79C" stroke-width="1" opacity=".8"/>
+  <g fill="#FFA79C" stroke="#3B0707" stroke-width=".6">
+    <circle cx="0" cy="-40.5" r="1.8"/>
+    <circle cx="35" cy="-20.25" r="1.8"/>
+    <circle cx="35" cy="20.25" r="1.8"/>
+    <circle cx="0" cy="40.5" r="1.8"/>
+    <circle cx="-35" cy="20.25" r="1.8"/>
+    <circle cx="-35" cy="-20.25" r="1.8"/>
+  </g>
+  <rect x="-27.5" y="-3" width="55" height="6" rx="1" fill="#FFA79C" stroke="#3B0707" stroke-width=".7"/>
+  <path d="M6.15 -20h2.49v40h-2.49z M8.94 -18.3h2.49v36.6h-2.49z M11.74 -16.6h2.49v33.2h-2.49z M14.53 -14.9h2.49v29.8h-2.49z M17.32 -13.2h2.49v26.4h-2.49z M20.11 -11.5h2.49v23h-2.49z M22.91 -9.8h2.49v19.6h-2.49z M-8.64 -20h2.49v40h-2.49z M-11.44 -18.3h2.49v36.6h-2.49z M-14.23 -16.6h2.49v33.2h-2.49z M-17.02 -14.9h2.49v29.8h-2.49z M-19.81 -13.2h2.49v26.4h-2.49z M-22.61 -11.5h2.49v23h-2.49z M-25.4 -9.8h2.49v19.6h-2.49z" fill="#3B0707" stroke="#FFA79C" stroke-width=".7" stroke-linejoin="round"/>
+  <path d="M25.7 -4h1.8v8h-1.8z M-27.5 -4h1.8v8h-1.8z" fill="#FFA79C" stroke="#3B0707" stroke-width=".6"/>
+  <path d="M-3 -1.8v3.6 M0 -1.8v3.6 M3 -1.8v3.6" stroke="#3B0707" stroke-width=".6" opacity=".55"/>
+</svg>
