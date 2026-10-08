@@ -20,7 +20,8 @@ import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
-import 'widgets/treino_logo.dart';
+import 'widgets/trainer_inquiry_card.dart';
+import '../../../core/widgets/treino_logo.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -313,6 +314,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 20),
+                        // Trainer inquiry card
+                        const TrainerInquiryCard(),
                         const SizedBox(height: 20),
                       ],
                     ),

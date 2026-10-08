@@ -21,6 +21,7 @@ import 'package:treino/features/profile_setup/application/profile_setup_provider
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
 import '../../../helpers/onboarding_test_helpers.dart';
+import 'package:treino/features/profile_setup/domain/profile_setup_validators.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks & fakes
@@ -346,6 +347,74 @@ void main() {
       await tester.pumpWidget(_buildScreen(profile: _profile()));
       await tester.pumpAndSettle();
       expect(find.text('DD/MM/AAAA'), findsOneWidget);
+    });
+
+    // Hallazgo de Codex en el PR #1162. El campo de fecha NO es un
+    // TextFormField, así que no colgaba del _formKey y se escapaba entero del
+    // validate(): una fecha de menor de 16 viajaba a Firestore, las rules la
+    // denegaban, y la pantalla decía "No pudimos guardar… Probá de nuevo" sobre
+    // algo que reintentar nunca iba a arreglar.
+    testWidgets(
+        'una fecha por debajo del piso bloquea el guardado y NO escribe',
+        (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(
+            bornAt: DateTime.utc(
+              DateTime.now().year - (ProfileSetupValidators.kMinAgeYears - 3),
+              1,
+              1,
+            ),
+          ),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.text(
+              'Tenés que tener ${ProfileSetupValidators.kMinAgeYears} años para usar TREINO'),
+          findsOneWidget);
+      verifyNever(() => repo.update(any(), any()));
+    });
+
+    // Control: sin esto, un guard que bloquea SIEMPRE también pasaría el test
+    // de arriba.
+    testWidgets('una fecha válida no bloquea nada', (tester) async {
+      final repo = MockUserRepository();
+      when(() => repo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _profile(bornAt: DateTime.utc(1990, 5, 20)),
+          userRepository: repo,
+          authenticated: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+          find.text(
+              'Tenés que tener ${ProfileSetupValidators.kMinAgeYears} años para usar TREINO'),
+          findsNothing);
+
+      await tester
+          .ensureVisible(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('edit_personal_save_button')));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.update(any(), any())).called(1);
     });
 
     testWidgets('an invalid phone blocks the save and shows an error',

@@ -109,16 +109,24 @@
  * dos.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 import { enqueueMail } from "../mail/enqueue-mail";
 import { artDateKey } from "../mail/format";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerWebCheckout } from "../mail/templates";
 import { MailParams } from "../mail/types";
+import { ATHLETE_PROSPECT_PREF_KEY } from "./athlete-prospect-mail";
 import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { MappedSubscription } from "./subscription-state";
 
-/** Los dos unicos kinds que produce el paywall. */
+/**
+ * Los kinds que produce el paywall POR TRANSICION DE SUSCRIPCION.
+ *
+ * Hay un tercero que NO esta en esta union y no es un olvido: `limit-reached`
+ * (ver `ProspectMailKind`, al final de este archivo) se lo manda a alguien que
+ * NO TIENE `subscription`, asi que no hay transicion de la cual colgarse y su
+ * disparador vive en otro trigger. Son familias distintas con el mismo canal.
+ */
 export type SubscriptionMailKind =
   | "subscription-grace"
   | "subscription-downgraded";
@@ -343,12 +351,18 @@ export function decideExpiryMail(
  *                       cuenta, no que cambio en este evento.
  */
 export async function enqueueSubscriptionMail(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
   plan: SubscriptionMailPlan,
   blockedCount: number,
 ): Promise<string | null> {
-  const params: MailParams = { ...plan.params, ctaUrl: APP_ENTRY_TRAINER };
+  // Las dos ramas de esta funcion (grace y downgraded) son sobre plata, y las
+  // dos se resuelven en la MISMA pantalla: el Coach Hub web, no la app — ver
+  // `trainerWebCheckout`.
+  const params: MailParams = {
+    ...plan.params,
+    ctaUrl: trainerWebCheckout(),
+  };
   if (plan.kind === "subscription-downgraded") {
     params.blockedCount = blockedCount;
   }
@@ -358,5 +372,154 @@ export async function enqueueSubscriptionMail(
     kind: plan.kind,
     scope: plan.scope,
     params,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EL TERCER MAIL: el PF que NUNCA pago y choco el cupo del plan Free
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Comparte canal con los dos de arriba y NO comparte casi nada mas. Vive aca
+// igual —y no en un archivo nuevo— porque las trampas son las mismas y estan
+// explicadas una sola vez en el encabezado: el disparo por estado, la valvula
+// de degradacion, y el scope de dedupe.
+//
+// ── POR QUE EXISTE ────────────────────────────────────────────────────────
+//
+// Porque el cartel in-app ya no se puede poner. El 2026-09-15 (PR #1141) la
+// app movil dejo de nombrar donde se paga, bajo la Guideline 3.1.3(f) de
+// Apple. Lo que Apple SI permite, textual, es «send communications outside of
+// the app to their user base about purchasing methods other than in-app
+// purchase». O sea que este mail es **el unico canal legal** que le queda al PF
+// que entro por el telefono. Si se saca, ese funnel no tiene por donde salir.
+//
+// ── POR QUE NO LO CUBREN LOS OTROS DOS ────────────────────────────────────
+//
+// Los dos disparan por TRANSICION de `subscription`, y el que nunca pago no
+// transiciona nada: su documento no tiene el mapa. `toSubscriptionState` lo
+// devuelve como `{state: null, degraded: false}` — esa es, exacta, la firma del
+// prospecto, y es lo que este modulo mira.
+//
+// ── EL DISPARADOR ES EL DELTA, NO EL ESTADO ───────────────────────────────
+//
+// Esta es LA trampa de este archivo, y la de mas arriba la documenta para el
+// otro caso: hoy todo PF sin `subscription` resuelve a `FREE_LIMIT = 2`, asi
+// que «tiene alumnos bloqueados» es un ESTADO que, el dia que empiece a ser
+// comun, describe a media base. Un disparador por estado les manda un mail a
+// todos de una.
+//
+// Por eso mira `blockedNow` —los que se estacionaron EN ESA CORRIDA, el diff
+// que devuelve `syncTrainerEntitlements`— y no `blockedAthleteIds`, que es el
+// estado resultante. Medido el 2026-09-16 contra `treino-dev`: `blocked > 0`
+// NUNCA ocurrio en produccion, y las siete ultimas corridas del barrido diario
+// dan `scanned: 5, changed: 0`. O sea que no hay backlog que pueda salir de
+// golpe: el primer mail se dispara cuando un PF real sume un alumno de mas.
+//
+// ── EL SCOPE DE DEDUPE, Y POR QUE ES DISTINTO ─────────────────────────────
+//
+// Los de arriba se deduplican por `currentPeriodEnd`, el ciclo de facturacion.
+// El prospecto NO TIENE ciclo: nunca pago. Hay que elegir otra cosa, y las
+// candidatas se descartan solas:
+//
+//   - Solo el trainerId → UN mail en la vida. El PF que choca el tope, lo
+//     ignora, y seis meses despues vuelve a intentar crecer no recibe nada.
+//     Es el mismo defecto que el encabezado de arriba ya nombra.
+//   - Sumar la cantidad de bloqueados → un mail por cada alumno que sobra. Una
+//     importacion de 10 alumnos llega como ~10 eventos de Eventarc (uno por
+//     documento), y si se interpolan con distintos conteos son varios mails por
+//     un solo acto.
+//
+// Queda `artDateKey`: a lo sumo UNO por dia ART. Colapsa la importacion masiva
+// en uno, colapsa los re-disparos de un evento at-least-once, y no quema el
+// unico tiro. Tiene precedente exacto en `payment-overdue`, que lo usa por ser
+// un recordatorio recurrente legitimo — que es justo lo que este es.
+//
+// El costo aceptado, dicho para que nadie lo descubra solo: un re-disparo que
+// cruza la medianoche ART manda dos. Para `grace` eso seria grave —dos avisos
+// de plata— y por eso alla NO se usa. Aca el peor caso es un empujon repetido.
+
+/** El unico kind de esta familia. Ver el encabezado del bloque. */
+export type ProspectMailKind = "limit-reached";
+
+/** Un mail de prospecto decidido pero todavia no encolado. */
+export interface ProspectMailPlan {
+  kind: ProspectMailKind;
+  scope: string;
+  params: MailParams;
+}
+
+/**
+ * Decide si a este PF le toca el mail de tope alcanzado.
+ *
+ * Pura: sin Firestore y sin reloj propio, igual que `decideSubscriptionMail`,
+ * para que los bordes se testeen con un `nowMs` fijo.
+ *
+ * @param sub        - Estado de suscripcion ya mapeado. `null` = sin mapa.
+ * @param degraded   - El mapa existe pero no se pudo leer.
+ * @param limit      - Limite efectivo con el que se reconcilio.
+ * @param blockedNow - Los estacionados EN ESTA CORRIDA (`r.blocked`), NO el
+ *                     estado acumulado. Ver el encabezado: es la diferencia
+ *                     entre avisarle a uno y avisarle a toda la base.
+ */
+export function decideProspectMail(
+  sub: SubscriptionState | null,
+  degraded: boolean,
+  limit: number | null,
+  blockedNow: readonly string[],
+  nowMs: number,
+): ProspectMailPlan | null {
+  // Mismo criterio que el resto del archivo: sobre un documento que sabemos que
+  // leimos mal no le escribimos a nadie sobre plata.
+  if (degraded) return null;
+
+  // Tiene o tuvo suscripcion ⇒ no es prospecto, es cliente. Le hablan los otros
+  // dos mails, y con otras palabras («regularizá», que aca seria falso).
+  if (sub !== null) return null;
+
+  // EL DELTA. Sin esto el mail es por estado y le llega a todos. Ver arriba.
+  if (blockedNow.length === 0) return null;
+
+  return {
+    kind: "limit-reached",
+    scope: `prospecto_${limitParam(limit)}_${artDateKey(nowMs)}`,
+    params: { limit: limitParam(limit) },
+  };
+}
+
+/**
+ * Encola el mail de tope alcanzado.
+ *
+ * `blockedCount` viaja igual que en el downgrade: es el ESTADO resultante
+ * (`blockedAthleteIds.length`), no el delta de esta corrida. El mail describe
+ * como quedo la cuenta, no que cambio en este evento — un PF con 2 ya afuera
+ * que suma un tercero tiene que leer «3», no «1».
+ *
+ * El CTA dice VER LOS PLANES y va al Coach Hub web — ver `trainerWebCheckout`.
+ *
+ * Sin `prefKey`, como sus dos hermanos: el aviso de que N alumnos quedaron en
+ * solo lectura es operativo y le llega siempre al PF. PERO lleva un bloque de
+ * venta adentro («hay planes más grandes» + VER LOS PLANES), y ese bloque SÍ se
+ * puede apagar: por eso marca `bloqueComercial`. Al enviar, `sendQueuedMail` lee
+ * `novedades_plan`; con la preferencia apagada manda el mail sin el bloque y sin
+ * pie, y con ella prendida o ausente manda el mail completo con el pie de baja
+ * (Decreto 1558/01, Anexo I, art. 27, párr. 3). Ver §6.3 de
+ * `openspec/changes/baja-de-correos-promocionales/design.md`.
+ */
+export async function enqueueProspectMail(
+  app: App,
+  trainerId: string,
+  plan: ProspectMailPlan,
+  blockedCount: number,
+): Promise<string | null> {
+  return enqueueMail(app, {
+    toUid: trainerId,
+    kind: plan.kind,
+    scope: plan.scope,
+    params: {
+      ...plan.params,
+      blockedCount,
+      ctaUrl: trainerWebCheckout(),
+    },
+    bloqueComercial: ATHLETE_PROSPECT_PREF_KEY,
   });
 }

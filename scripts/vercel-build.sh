@@ -41,8 +41,14 @@ echo "▸ Resolviendo dependencias"
 flutter pub get
 
 echo "▸ Compilando el Coach Hub"
+# `PLACES_WEB_CLIENT_KEY` es la key de Places (New) de la búsqueda de ubicación
+# del onboarding (`lugar_search_providers.dart`, leída con `String.fromEnvironment`
+# en tiempo de compilación). El valor viene de una variable de entorno de Vercel;
+# si está vacía, la búsqueda de ubicación muestra un error de configuración (la
+# modalidad online sigue funcionando). Nunca se imprime.
 flutter build web \
   --release \
-  --target lib/main_coach_hub.dart
+  --target lib/main_coach_hub.dart \
+  --dart-define=PLACES_WEB_CLIENT_KEY="${PLACES_WEB_CLIENT_KEY:-}"
 
 echo "▸ Listo — artefacto en build/web"

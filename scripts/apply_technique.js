@@ -11,13 +11,14 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const path = require('path');
 const WRITE = process.argv.includes('--write');
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 const { technique } = require(path.join(__dirname, '..', 'docs', 'exercise_technique.json'));
 

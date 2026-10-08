@@ -18,18 +18,23 @@
  * file adds nothing but wiring — deliberately.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
-import { syncTrainerLoad } from "./promote-link";
+import { SyncTrainerLoadResult, syncTrainerLoad } from "./promote-link";
+import {
+  esTopeDeAlumnos,
+  incrementoDeAlumnos,
+  registrarTopeDeAlumnos,
+} from "./trainer-limit-mail";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -46,9 +51,19 @@ export interface AcceptTrainerLinkResult {
  * `resource-exhausted` payload (`reason`/`tier`/`limit`/loads) is the contract
  * the Flutter client parses to decide which paywall branch to show, so
  * re-wrapping it here would erase `details` and silently break that branch.
+ *
+ * Cuando ese `resource-exhausted` es el tope de alumnos (`esTopeDeAlumnos`),
+ * anota `trainerLimitHitKind: "students"` (+ el incremento rechazado, de
+ * `incrementoDeAlumnos` sobre los `details` del mismo error, + el `linkId` de
+ * ESTE intento — ver `trainer-limit-mail.ts`, `registrarTopeDeAlumnos`) ACÁ,
+ * en el `catch` — nunca dentro de
+ * `syncTrainerLoad`, cuyo throw ocurre DENTRO de su propia transacción y
+ * revertiría cualquier escritura hecha ahí. La anotación es BEST-EFFORT: un
+ * fallo se loguea y el error original se relanza igual, para que el cliente
+ * siga viendo el paywall aunque el mail no salga.
  */
 export async function runAcceptTrainerLink(
-  app: admin.app.App,
+  app: App,
   callerUid: string,
   linkId: string,
 ): Promise<AcceptTrainerLinkResult> {
@@ -56,9 +71,30 @@ export async function runAcceptTrainerLink(
     throw new HttpsError("invalid-argument", "linkId is required.");
   }
 
-  const result = await syncTrainerLoad(app, {
-    promotion: { linkId, callerUid, expectedFromStatus: "pending" },
-  });
+  let result: SyncTrainerLoadResult;
+  try {
+    result = await syncTrainerLoad(app, {
+      promotion: { linkId, callerUid, expectedFromStatus: "pending" },
+    });
+  } catch (err) {
+    if (esTopeDeAlumnos(err)) {
+      try {
+        await registrarTopeDeAlumnos(
+          app,
+          callerUid,
+          Date.now(),
+          incrementoDeAlumnos(err),
+          linkId,
+        );
+      } catch (anotarErr) {
+        logger.error("acceptTrainerLink: no se pudo anotar el tope de alumnos", {
+          trainerId: callerUid,
+          err: anotarErr,
+        });
+      }
+    }
+    throw err;
+  }
 
   // Adoption metric (M.4): counted against `link-promoted-observed` from the
   // reconciliation trigger. `observed - cf` is exactly the legacy client-side
@@ -103,6 +139,6 @@ export const acceptTrainerLink = functions.onCall(
       throw new HttpsError("invalid-argument", "linkId is required.");
     }
 
-    return runAcceptTrainerLink(getApp(), request.auth.uid, linkId);
+    return runAcceptTrainerLink(ensureApp(), request.auth.uid, linkId);
   },
 );

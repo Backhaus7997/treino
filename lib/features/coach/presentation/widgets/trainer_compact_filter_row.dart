@@ -8,7 +8,7 @@ import 'trainer_advanced_filter_chips.dart'
     show
         TrainerFilterChip,
         showDistanceFilterSheet,
-        showLocationRequiredFilterSheet,
+        activateLocationFromFilter,
         showPriceFilterSheet,
         showSpecialtyFilterSheet;
 import 'trainer_specialty_chips.dart' show SpecialtyLabels;
@@ -65,7 +65,7 @@ class TrainerCompactFilterRow extends ConsumerWidget {
                 if (hasLocation) {
                   showDistanceFilterSheet(context, ref, distance);
                 } else {
-                  showLocationRequiredFilterSheet(context, ref);
+                  activateLocationFromFilter(context, ref);
                 }
               },
             ),

@@ -1,4 +1,4 @@
-/// Tests for pickAthleteForPago — remediación CRITICAL-1 (verify ronda 1,
+/// Tests for pickAthlete — remediación CRITICAL-1 (verify ronda 1,
 /// Fase 9 Pagos). El picker resuelve el roster REAL del trainer
 /// (`trainerLinksStreamProvider`) para elegir el `athleteId` al que se le
 /// registra un pago desde el CTA trainer-wide "+ Registrar pago".
@@ -14,7 +14,7 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/athlete_picker_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/athlete_picker_dialog.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -35,7 +35,7 @@ TrainerLink _link({
       requestedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// Widget de prueba: dispara [pickAthleteForPago] y expone el resultado como
+/// Widget de prueba: dispara [pickAthlete] y expone el resultado como
 /// texto (`result:<athleteId>` o `result:null`) para poder assertear sin
 /// depender del valor de retorno de `tester.tap` (que no propaga futures).
 class _Trigger extends StatefulWidget {
@@ -58,7 +58,7 @@ class _TriggerState extends State<_Trigger> {
           TextButton(
             key: const Key('trigger'),
             onPressed: () async {
-              final picked = await pickAthleteForPago(context, ref);
+              final picked = await pickAthlete(context, ref);
               setState(() {
                 _result = picked;
                 _resolved = true;
@@ -100,7 +100,7 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
 
-  group('pickAthleteForPago (REQ-PAGW-ACTION-003)', () {
+  group('pickAthlete (REQ-PAGW-ACTION-003)', () {
     testWidgets(
         'SCENARIO 1 — lista solo alumnos active/paused, excluye pending y '
         'terminated', (tester) async {

@@ -276,7 +276,8 @@ void main() {
       await container.read(createPostNotifierProvider(null).future);
 
       notifier.setText('Buena sesión!');
-      final result = await notifier.submit();
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(result, isTrue);
       verify(() => mockRepo.create(any())).called(1);
@@ -290,7 +291,7 @@ void main() {
       await container.read(createPostNotifierProvider(null).future);
 
       notifier.setText('Buena sesión!');
-      await notifier.submit();
+      await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       final state =
           container.read(createPostNotifierProvider(null)).valueOrNull;
@@ -326,7 +327,8 @@ void main() {
 
       notifier.setText('Buena sesión!');
       notifier.setPrivacy(PostPrivacy.gym);
-      final result = await notifier.submit();
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(result, isFalse);
       verifyNever(() => mockRepo.create(any()));
@@ -362,7 +364,8 @@ void main() {
       await container.read(createPostNotifierProvider(null).future);
 
       notifier.setText('Buena sesión!');
-      final result = await notifier.submit();
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(result, isFalse);
       expect(
@@ -423,7 +426,7 @@ void main() {
 
       // Start submit — it will set isSubmitting=true then block on auth.future
       // ignore: unawaited_futures
-      notifier.submit();
+      notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       // One microtask tick lets submit() run synchronously up to its first await
       await Future<void>.microtask(() {});
@@ -480,7 +483,8 @@ void main() {
 
       notifier.setText('Edited text');
       notifier.setPrivacy(PostPrivacy.public);
-      final result = await notifier.submit();
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(result, isTrue);
       final captured = verify(() => mockActions.updatePost(captureAny()))
@@ -511,7 +515,8 @@ void main() {
       await container.read(createPostNotifierProvider(existingPost).future);
 
       notifier.setText('Edited text');
-      final result = await notifier.submit();
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(result, isFalse);
       final state =
@@ -607,7 +612,8 @@ void main() {
 
       notifier.setText('Buena sesión!');
       notifier.setRoutineTag(tag);
-      final ok = await notifier.submit();
+      final ok =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(ok, isTrue);
       final captured =
@@ -639,7 +645,8 @@ void main() {
       await container.read(createPostNotifierProvider(existingPost).future);
 
       notifier.setRoutineTag(tag);
-      final ok = await notifier.submit();
+      final ok =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
 
       expect(ok, isTrue);
       final captured = verify(() => mockActions.updatePost(captureAny()))
@@ -668,7 +675,9 @@ void main() {
       await container.read(provider.future);
       container.read(provider.notifier).setText('Buena sesión!');
 
-      final submit = container.read(provider.notifier).submit();
+      final submit = container
+          .read(provider.notifier)
+          .submit(moderationMessage: 'bloqueado por moderación');
       await Future<void>.delayed(Duration.zero);
 
       // El usuario toca back con el create todavía en vuelo. Este family es

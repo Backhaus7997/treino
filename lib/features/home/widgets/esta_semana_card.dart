@@ -215,13 +215,28 @@ class _Loaded extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
-              // Flexible, not a bare child: a 3-digit streak plus a long
-              // translated label would otherwise overflow the row.
-              const Flexible(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 14),
-                  child: _InsightsCta(),
+              // `Expanded` + `Align`, NOT `Spacer()` + `Flexible()`.
+              //
+              // Los dos son flex 1, así que el `Row` les repartía el sobrante
+              // MITAD Y MITAD: el CTA se quedaba con la mitad del hueco
+              // libre aunque necesitara menos, y su `TextOverflow.ellipsis`
+              // se comía la flecha. En 6.9" (440 pt) la mitad todavía
+              // alcanzaba y no se veía; en 6.5" (428 pt) el botón pasó a
+              // decir «VER INSIGHTS  …». Medido en el simulador con la
+              // captura de tienda 01-inicio.
+              //
+              // Con `Expanded` el CTA recibe TODO el sobrante y `Align` lo
+              // pega a la derecha, así que toma su ancho intrínseco y sólo
+              // se achica cuando de verdad no entra — que es lo que el
+              // comentario anterior quería decir (una racha de 3 dígitos más
+              // una etiqueta traducida larga no deben desbordar la fila).
+              const Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 14),
+                    child: _InsightsCta(),
+                  ),
                 ),
               ),
             ],
@@ -346,16 +361,30 @@ class _InsightsCtaState extends State<_InsightsCta> {
                     ]
                   : const [],
             ),
-            alignment: Alignment.center,
-            child: Text(
-              l10n.homeEstaSemanaInsightsCta,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 0.8,
-                color: TreinoButtonTokens.foreground(context),
+            // `Center(widthFactor: 1)` y NO `alignment: Alignment.center` en
+            // el Container.
+            //
+            // Un `Container` con `alignment` se ESTIRA a llenar las
+            // constraints acotadas que reciba — está en su dartdoc. Con el
+            // `Flexible` de antes recibía la mitad del sobrante de la fila y
+            // llenaba esa mitad; el pill nunca midió su contenido, y por eso
+            // la flecha se caía apenas la mitad dejaba de alcanzar.
+            //
+            // `Center` con `widthFactor: 1` centra vertical dentro de los 44
+            // de alto (heightFactor null → llena) pero deja el ancho pegado
+            // al del texto, así que el Container vuelve a medir su contenido.
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                l10n.homeEstaSemanaInsightsCta,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  letterSpacing: 0.8,
+                  color: TreinoButtonTokens.foreground(context),
+                ),
               ),
             ),
           ),

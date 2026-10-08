@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
 
+import '../../../core/moderation/moderation_guard.dart';
 import '../domain/post.dart';
 import '../domain/post_page.dart';
 import '../domain/post_privacy.dart';
@@ -23,6 +24,11 @@ class PostRepository {
   /// Creates a post doc. Reads `users/{uid}.gymId` once to denormalize
   /// `authorGymId`. Returns the persisted post with its assigned id.
   Future<Post> create(Post input) async {
+    // Guideline 1.2 de App Review: el contenido con terminos vetados no llega
+    // a postearse. Va antes de la lectura del user doc para no gastar un round
+    // trip en algo que se va a rechazar igual.
+    ModerationGuard.ensure(input.text, campo: 'text');
+
     // Read gymId from the user doc for denormalization (ADR: authorGymId)
     final userSnap =
         await _firestore.collection('users').doc(input.authorUid).get();
@@ -60,6 +66,11 @@ class PostRepository {
   /// immutable on edit — this writes an explicit partial map (not
   /// `post.toJson()`) so those fields are never clobbered.
   Future<Post> update(Post post) async {
+    // Editar un post cambia su texto, asi que el filtro va aca tambien. Sin
+    // esto se publica algo limpio y se lo edita para meter lo vetado, que es
+    // la evasion mas barata que existe.
+    ModerationGuard.ensure(post.text, campo: 'text');
+
     await _posts.doc(post.id).update({
       'text': post.text,
       'privacy': post.privacy.toJson(),

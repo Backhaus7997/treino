@@ -16,6 +16,26 @@ final userRepositoryProvider = Provider<UserRepository>(
   (ref) => UserRepository(firestore: ref.watch(firestoreProvider)),
 );
 
+/// `true` mientras el perfil tenga escrituras locales sin confirmar.
+///
+/// Lo consume SOLO el gate de edad del router, para no dejar salir a nadie con
+/// una fecha que el servidor todavia puede rechazar. Ver
+/// `UserRepository.watchHasPendingWrites`.
+///
+/// Arranca en `false` cuando no hay sesion: sin usuario no hay escritura
+/// pendiente que esperar, y un `true` por defecto dejaria el gate trabado.
+final userProfileHasPendingWritesProvider = StreamProvider<bool>((ref) {
+  final authState = ref.watch(authStateChangesProvider);
+  return authState.when(
+    data: (user) {
+      if (user == null) return Stream<bool>.value(false);
+      return ref.watch(userRepositoryProvider).watchHasPendingWrites(user.uid);
+    },
+    loading: () => const Stream<bool>.empty(),
+    error: (_, __) => Stream<bool>.value(false),
+  );
+});
+
 final userProfileProvider = StreamProvider<UserProfile?>((ref) {
   final authState = ref.watch(authStateChangesProvider);
   return authState.when(

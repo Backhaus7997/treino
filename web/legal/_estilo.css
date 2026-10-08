@@ -1,0 +1,87 @@
+/*
+ * ⚠️ GENERADO por tool/build_legal_pages.dart — no lo edites a mano.
+ *
+ * Mismo criterio que /abrir/_estilo.css: una hoja compartida en vez de un
+ * bloque inline por página, porque tres documentos con el mismo diseño y tres
+ * copias del CSS son tres oportunidades de que uno quede con el mint viejo.
+ *
+ * A diferencia de /abrir, estas páginas son de LECTURA LARGA: la medida de
+ * línea se acota en ~68ch y el interlineado sube. Un documento legal que no se
+ * puede leer es un documento legal que nadie lee.
+ */
+:root {
+  --ink: #0A0A0A;
+  --card: #0F1513;
+  --mint: #2CE5A2;
+  --bone: #FFFFFF;
+  --muted: #9BA8A1;
+  --line: #1E2724;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--bone);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px 72px;
+  min-height: 100vh;
+}
+
+main { width: 100%; max-width: 68ch; }
+
+.brand { margin-bottom: 32px; }
+.brand img { display: block; height: 40px; width: auto; }
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+}
+
+.lede {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+section {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 22px;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--mint);
+}
+
+p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.75;
+  font-size: 15px;
+}
+
+strong { color: var(--bone); font-weight: 600; }
+
+a { color: var(--mint); }
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 36px;
+  padding-top: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+footer a { color: var(--muted); }

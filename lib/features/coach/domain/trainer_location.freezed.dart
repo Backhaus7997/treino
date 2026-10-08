@@ -24,9 +24,13 @@ mixin _$TrainerLocation {
   TrainerLocationType get type => throw _privateConstructorUsedError;
   String? get gymId => throw _privateConstructorUsedError;
   String? get customLabel => throw _privateConstructorUsedError;
-  double get lat => throw _privateConstructorUsedError;
-  double get lng => throw _privateConstructorUsedError;
-  String get geohash => throw _privateConstructorUsedError;
+  double? get lat => throw _privateConstructorUsedError;
+  double? get lng => throw _privateConstructorUsedError;
+  String? get geohash => throw _privateConstructorUsedError;
+  String? get placeId => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get coordsFetchedAt => throw _privateConstructorUsedError;
+  bool? get stale => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerLocation to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -49,9 +53,12 @@ abstract class $TrainerLocationCopyWith<$Res> {
       TrainerLocationType type,
       String? gymId,
       String? customLabel,
-      double lat,
-      double lng,
-      String geohash});
+      double? lat,
+      double? lng,
+      String? geohash,
+      String? placeId,
+      @TimestampConverter() DateTime? coordsFetchedAt,
+      bool? stale});
 }
 
 /// @nodoc
@@ -73,9 +80,12 @@ class _$TrainerLocationCopyWithImpl<$Res, $Val extends TrainerLocation>
     Object? type = null,
     Object? gymId = freezed,
     Object? customLabel = freezed,
-    Object? lat = null,
-    Object? lng = null,
-    Object? geohash = null,
+    Object? lat = freezed,
+    Object? lng = freezed,
+    Object? geohash = freezed,
+    Object? placeId = freezed,
+    Object? coordsFetchedAt = freezed,
+    Object? stale = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -94,18 +104,30 @@ class _$TrainerLocationCopyWithImpl<$Res, $Val extends TrainerLocation>
           ? _value.customLabel
           : customLabel // ignore: cast_nullable_to_non_nullable
               as String?,
-      lat: null == lat
+      lat: freezed == lat
           ? _value.lat
           : lat // ignore: cast_nullable_to_non_nullable
-              as double,
-      lng: null == lng
+              as double?,
+      lng: freezed == lng
           ? _value.lng
           : lng // ignore: cast_nullable_to_non_nullable
-              as double,
-      geohash: null == geohash
+              as double?,
+      geohash: freezed == geohash
           ? _value.geohash
           : geohash // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      placeId: freezed == placeId
+          ? _value.placeId
+          : placeId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      coordsFetchedAt: freezed == coordsFetchedAt
+          ? _value.coordsFetchedAt
+          : coordsFetchedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      stale: freezed == stale
+          ? _value.stale
+          : stale // ignore: cast_nullable_to_non_nullable
+              as bool?,
     ) as $Val);
   }
 }
@@ -123,9 +145,12 @@ abstract class _$$TrainerLocationImplCopyWith<$Res>
       TrainerLocationType type,
       String? gymId,
       String? customLabel,
-      double lat,
-      double lng,
-      String geohash});
+      double? lat,
+      double? lng,
+      String? geohash,
+      String? placeId,
+      @TimestampConverter() DateTime? coordsFetchedAt,
+      bool? stale});
 }
 
 /// @nodoc
@@ -145,9 +170,12 @@ class __$$TrainerLocationImplCopyWithImpl<$Res>
     Object? type = null,
     Object? gymId = freezed,
     Object? customLabel = freezed,
-    Object? lat = null,
-    Object? lng = null,
-    Object? geohash = null,
+    Object? lat = freezed,
+    Object? lng = freezed,
+    Object? geohash = freezed,
+    Object? placeId = freezed,
+    Object? coordsFetchedAt = freezed,
+    Object? stale = freezed,
   }) {
     return _then(_$TrainerLocationImpl(
       id: null == id
@@ -166,18 +194,30 @@ class __$$TrainerLocationImplCopyWithImpl<$Res>
           ? _value.customLabel
           : customLabel // ignore: cast_nullable_to_non_nullable
               as String?,
-      lat: null == lat
+      lat: freezed == lat
           ? _value.lat
           : lat // ignore: cast_nullable_to_non_nullable
-              as double,
-      lng: null == lng
+              as double?,
+      lng: freezed == lng
           ? _value.lng
           : lng // ignore: cast_nullable_to_non_nullable
-              as double,
-      geohash: null == geohash
+              as double?,
+      geohash: freezed == geohash
           ? _value.geohash
           : geohash // ignore: cast_nullable_to_non_nullable
-              as String,
+              as String?,
+      placeId: freezed == placeId
+          ? _value.placeId
+          : placeId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      coordsFetchedAt: freezed == coordsFetchedAt
+          ? _value.coordsFetchedAt
+          : coordsFetchedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      stale: freezed == stale
+          ? _value.stale
+          : stale // ignore: cast_nullable_to_non_nullable
+              as bool?,
     ));
   }
 }
@@ -190,9 +230,12 @@ class _$TrainerLocationImpl implements _TrainerLocation {
       required this.type,
       this.gymId,
       this.customLabel,
-      required this.lat,
-      required this.lng,
-      required this.geohash});
+      this.lat,
+      this.lng,
+      this.geohash,
+      this.placeId,
+      @TimestampConverter() this.coordsFetchedAt,
+      this.stale});
 
   factory _$TrainerLocationImpl.fromJson(Map<String, dynamic> json) =>
       _$$TrainerLocationImplFromJson(json);
@@ -206,15 +249,22 @@ class _$TrainerLocationImpl implements _TrainerLocation {
   @override
   final String? customLabel;
   @override
-  final double lat;
+  final double? lat;
   @override
-  final double lng;
+  final double? lng;
   @override
-  final String geohash;
+  final String? geohash;
+  @override
+  final String? placeId;
+  @override
+  @TimestampConverter()
+  final DateTime? coordsFetchedAt;
+  @override
+  final bool? stale;
 
   @override
   String toString() {
-    return 'TrainerLocation(id: $id, type: $type, gymId: $gymId, customLabel: $customLabel, lat: $lat, lng: $lng, geohash: $geohash)';
+    return 'TrainerLocation(id: $id, type: $type, gymId: $gymId, customLabel: $customLabel, lat: $lat, lng: $lng, geohash: $geohash, placeId: $placeId, coordsFetchedAt: $coordsFetchedAt, stale: $stale)';
   }
 
   @override
@@ -229,13 +279,17 @@ class _$TrainerLocationImpl implements _TrainerLocation {
                 other.customLabel == customLabel) &&
             (identical(other.lat, lat) || other.lat == lat) &&
             (identical(other.lng, lng) || other.lng == lng) &&
-            (identical(other.geohash, geohash) || other.geohash == geohash));
+            (identical(other.geohash, geohash) || other.geohash == geohash) &&
+            (identical(other.placeId, placeId) || other.placeId == placeId) &&
+            (identical(other.coordsFetchedAt, coordsFetchedAt) ||
+                other.coordsFetchedAt == coordsFetchedAt) &&
+            (identical(other.stale, stale) || other.stale == stale));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, type, gymId, customLabel, lat, lng, geohash);
+  int get hashCode => Object.hash(runtimeType, id, type, gymId, customLabel,
+      lat, lng, geohash, placeId, coordsFetchedAt, stale);
 
   /// Create a copy of TrainerLocation
   /// with the given fields replaced by the non-null parameter values.
@@ -260,9 +314,12 @@ abstract class _TrainerLocation implements TrainerLocation {
       required final TrainerLocationType type,
       final String? gymId,
       final String? customLabel,
-      required final double lat,
-      required final double lng,
-      required final String geohash}) = _$TrainerLocationImpl;
+      final double? lat,
+      final double? lng,
+      final String? geohash,
+      final String? placeId,
+      @TimestampConverter() final DateTime? coordsFetchedAt,
+      final bool? stale}) = _$TrainerLocationImpl;
 
   factory _TrainerLocation.fromJson(Map<String, dynamic> json) =
       _$TrainerLocationImpl.fromJson;
@@ -276,11 +333,18 @@ abstract class _TrainerLocation implements TrainerLocation {
   @override
   String? get customLabel;
   @override
-  double get lat;
+  double? get lat;
   @override
-  double get lng;
+  double? get lng;
   @override
-  String get geohash;
+  String? get geohash;
+  @override
+  String? get placeId;
+  @override
+  @TimestampConverter()
+  DateTime? get coordsFetchedAt;
+  @override
+  bool? get stale;
 
   /// Create a copy of TrainerLocation
   /// with the given fields replaced by the non-null parameter values.

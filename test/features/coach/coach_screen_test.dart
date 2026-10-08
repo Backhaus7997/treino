@@ -38,7 +38,7 @@ ProviderContainer _container({UserProfile? profile}) => ProviderContainer(
         ),
         // Stubs para los providers de coach que las views nuevas observan.
         // Sin esto los streams quedan abiertos y pumpAndSettle nunca termina.
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         trainerLinksStreamProvider.overrideWith(
           (ref) => Stream.value(const <TrainerLink>[]),
         ),
@@ -50,7 +50,7 @@ ProviderContainer _loadingContainer() => ProviderContainer(
         userProfileProvider.overrideWith(
           (ref) => const Stream<UserProfile?>.empty(),
         ),
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         trainerLinksStreamProvider.overrideWith(
           (ref) => Stream.value(const <TrainerLink>[]),
         ),

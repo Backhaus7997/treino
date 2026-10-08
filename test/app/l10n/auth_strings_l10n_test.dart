@@ -221,7 +221,7 @@ void main() {
       final l10n = await _pumpAndGetL10n(tester);
       expect(
         l10n.authTrainerInquiryDialogBody,
-        'Para alta de entrenador, escribinos a equipo@treino.app',
+        'Para alta de entrenador, escribinos a treino@gettreino.com',
       );
     });
 

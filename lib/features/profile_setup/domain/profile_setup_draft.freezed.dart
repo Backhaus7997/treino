@@ -24,20 +24,26 @@ mixin _$ProfileSetupDraft {
   /// `UserProfile.avatarUrl`.
   String? get avatarLocalPath => throw _privateConstructorUsedError;
 
-  /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
+  /// Step 2 — fecha de nacimiento. Mapea a `UserProfile.bornAt`.
+  ///
+  /// OBLIGATORIO, a diferencia del resto de los campos del draft: es el gate
+  /// de edad mínima de la cuenta. Ver `ProfileSetupValidators.kMinAgeYears`.
+  DateTime? get bornAt => throw _privateConstructorUsedError;
+
+  /// Step 3 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
   /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   String? get gymId => throw _privateConstructorUsedError;
 
-  /// Step 3 — mapea a `UserProfile.experienceLevel`.
+  /// Step 4 — mapea a `UserProfile.experienceLevel`.
   ExperienceLevel? get experienceLevel => throw _privateConstructorUsedError;
 
-  /// Step 3 — mapea a `UserProfile.gender`.
+  /// Step 4 — mapea a `UserProfile.gender`.
   Gender? get gender => throw _privateConstructorUsedError;
 
-  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
+  /// Step 5 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
   double? get bodyWeightKg => throw _privateConstructorUsedError;
 
-  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
+  /// Step 5 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
   int? get heightCm => throw _privateConstructorUsedError;
 
   /// Create a copy of ProfileSetupDraft
@@ -56,6 +62,7 @@ abstract class $ProfileSetupDraftCopyWith<$Res> {
   $Res call(
       {String? username,
       String? avatarLocalPath,
+      DateTime? bornAt,
       String? gymId,
       ExperienceLevel? experienceLevel,
       Gender? gender,
@@ -80,6 +87,7 @@ class _$ProfileSetupDraftCopyWithImpl<$Res, $Val extends ProfileSetupDraft>
   $Res call({
     Object? username = freezed,
     Object? avatarLocalPath = freezed,
+    Object? bornAt = freezed,
     Object? gymId = freezed,
     Object? experienceLevel = freezed,
     Object? gender = freezed,
@@ -95,6 +103,10 @@ class _$ProfileSetupDraftCopyWithImpl<$Res, $Val extends ProfileSetupDraft>
           ? _value.avatarLocalPath
           : avatarLocalPath // ignore: cast_nullable_to_non_nullable
               as String?,
+      bornAt: freezed == bornAt
+          ? _value.bornAt
+          : bornAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
@@ -130,6 +142,7 @@ abstract class _$$ProfileSetupDraftImplCopyWith<$Res>
   $Res call(
       {String? username,
       String? avatarLocalPath,
+      DateTime? bornAt,
       String? gymId,
       ExperienceLevel? experienceLevel,
       Gender? gender,
@@ -152,6 +165,7 @@ class __$$ProfileSetupDraftImplCopyWithImpl<$Res>
   $Res call({
     Object? username = freezed,
     Object? avatarLocalPath = freezed,
+    Object? bornAt = freezed,
     Object? gymId = freezed,
     Object? experienceLevel = freezed,
     Object? gender = freezed,
@@ -167,6 +181,10 @@ class __$$ProfileSetupDraftImplCopyWithImpl<$Res>
           ? _value.avatarLocalPath
           : avatarLocalPath // ignore: cast_nullable_to_non_nullable
               as String?,
+      bornAt: freezed == bornAt
+          ? _value.bornAt
+          : bornAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       gymId: freezed == gymId
           ? _value.gymId
           : gymId // ignore: cast_nullable_to_non_nullable
@@ -197,6 +215,7 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
   const _$ProfileSetupDraftImpl(
       {this.username,
       this.avatarLocalPath,
+      this.bornAt,
       this.gymId,
       this.experienceLevel,
       this.gender,
@@ -214,30 +233,37 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
   @override
   final String? avatarLocalPath;
 
-  /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
+  /// Step 2 — fecha de nacimiento. Mapea a `UserProfile.bornAt`.
+  ///
+  /// OBLIGATORIO, a diferencia del resto de los campos del draft: es el gate
+  /// de edad mínima de la cuenta. Ver `ProfileSetupValidators.kMinAgeYears`.
+  @override
+  final DateTime? bornAt;
+
+  /// Step 3 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
   /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   @override
   final String? gymId;
 
-  /// Step 3 — mapea a `UserProfile.experienceLevel`.
+  /// Step 4 — mapea a `UserProfile.experienceLevel`.
   @override
   final ExperienceLevel? experienceLevel;
 
-  /// Step 3 — mapea a `UserProfile.gender`.
+  /// Step 4 — mapea a `UserProfile.gender`.
   @override
   final Gender? gender;
 
-  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
+  /// Step 5 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
   @override
   final double? bodyWeightKg;
 
-  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
+  /// Step 5 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
   @override
   final int? heightCm;
 
   @override
   String toString() {
-    return 'ProfileSetupDraft(username: $username, avatarLocalPath: $avatarLocalPath, gymId: $gymId, experienceLevel: $experienceLevel, gender: $gender, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm)';
+    return 'ProfileSetupDraft(username: $username, avatarLocalPath: $avatarLocalPath, bornAt: $bornAt, gymId: $gymId, experienceLevel: $experienceLevel, gender: $gender, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm)';
   }
 
   @override
@@ -249,6 +275,7 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
                 other.username == username) &&
             (identical(other.avatarLocalPath, avatarLocalPath) ||
                 other.avatarLocalPath == avatarLocalPath) &&
+            (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
             (identical(other.gymId, gymId) || other.gymId == gymId) &&
             (identical(other.experienceLevel, experienceLevel) ||
                 other.experienceLevel == experienceLevel) &&
@@ -260,8 +287,8 @@ class _$ProfileSetupDraftImpl extends _ProfileSetupDraft {
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, username, avatarLocalPath, gymId,
-      experienceLevel, gender, bodyWeightKg, heightCm);
+  int get hashCode => Object.hash(runtimeType, username, avatarLocalPath,
+      bornAt, gymId, experienceLevel, gender, bodyWeightKg, heightCm);
 
   /// Create a copy of ProfileSetupDraft
   /// with the given fields replaced by the non-null parameter values.
@@ -277,6 +304,7 @@ abstract class _ProfileSetupDraft extends ProfileSetupDraft {
   const factory _ProfileSetupDraft(
       {final String? username,
       final String? avatarLocalPath,
+      final DateTime? bornAt,
       final String? gymId,
       final ExperienceLevel? experienceLevel,
       final Gender? gender,
@@ -294,24 +322,31 @@ abstract class _ProfileSetupDraft extends ProfileSetupDraft {
   @override
   String? get avatarLocalPath;
 
-  /// Step 2 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
+  /// Step 2 — fecha de nacimiento. Mapea a `UserProfile.bornAt`.
+  ///
+  /// OBLIGATORIO, a diferencia del resto de los campos del draft: es el gate
+  /// de edad mínima de la cuenta. Ver `ProfileSetupValidators.kMinAgeYears`.
+  @override
+  DateTime? get bornAt;
+
+  /// Step 3 — `null` si el usuario aún no eligió, o [kNoGymId] si optó por
   /// "OTRO GYM / SIN GYM". Mapea a `UserProfile.gymId` (null en ambos casos).
   @override
   String? get gymId;
 
-  /// Step 3 — mapea a `UserProfile.experienceLevel`.
+  /// Step 4 — mapea a `UserProfile.experienceLevel`.
   @override
   ExperienceLevel? get experienceLevel;
 
-  /// Step 3 — mapea a `UserProfile.gender`.
+  /// Step 4 — mapea a `UserProfile.gender`.
   @override
   Gender? get gender;
 
-  /// Step 4 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
+  /// Step 5 — peso corporal en kilogramos. Mapea a `UserProfile.bodyWeightKg`.
   @override
   double? get bodyWeightKg;
 
-  /// Step 4 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
+  /// Step 5 — altura en centímetros (entera). Mapea a `UserProfile.heightCm`.
   @override
   int? get heightCm;
 

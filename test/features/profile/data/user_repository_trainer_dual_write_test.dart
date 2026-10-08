@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -28,6 +29,19 @@ void main() {
       updatedAt: now,
     );
     await firestore.collection('users').doc(uid).set(profile.toJson());
+  }
+
+  /// consentimiento-legal-versionado (R6): marca a [uid] con consentimiento
+  /// de ubicación YA otorgado, directo en Firestore — sin pasar por
+  /// `grantTrainerLocationConsent` (eso lo cubre su propio test file). Estas
+  /// pruebas de multi-location dual-write son anteriores al gate de R6 y
+  /// necesitan consentimiento pre-existente para seguir ejercitando lo que
+  /// siempre probaron: que un `update()` de ubicación normal, YA consentido,
+  /// propaga al espejo público.
+  Future<void> seedConsent(String uid) async {
+    await firestore.collection('users').doc(uid).update({
+      'trainerLocationConsentAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+    });
   }
 
   setUp(() {
@@ -436,9 +450,74 @@ void main() {
   // ---------------------------------------------------------------------------
   // Fase 6 Etapa 0 — Multi-location
   // ---------------------------------------------------------------------------
+  // #637 — el kill switch de consultas previas.
+  //
+  // Lo que prueba de verdad este grupo es el ALLOWLIST, que en este repo no
+  // vive en `firestore.rules` sino en Dart (`_trainerPublicFields`). Las rules
+  // de `trainerPublicProfiles` son owner-only SIN allowlist de campos, así que
+  // el campo se escribiría igual — lo que lo frena es el filtro de acá. Sin la
+  // entrada, el toggle guarda en `users/{uid}` y NUNCA llega al doc que mira la
+  // regla: el interruptor queda mudo y la UI no se entera.
+  group('UserRepository dual-write de acceptsInquiries (#637)', () {
+    test('acceptsInquiries:false propaga a trainerPublicProfiles', () async {
+      await seedDoc('trainer-ai-1');
+
+      await repo.update('trainer-ai-1', {'acceptsInquiries': false});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-1')
+          .get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['acceptsInquiries'], isFalse,
+          reason: 'es el único doc que lee la rule — si no llega acá, el '
+              'interruptor no apaga nada');
+    });
+
+    test('acceptsInquiries:true también propaga (volver a encender)', () async {
+      await seedDoc('trainer-ai-2');
+
+      await repo.update('trainer-ai-2', {'acceptsInquiries': false});
+      await repo.update('trainer-ai-2', {'acceptsInquiries': true});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-2')
+          .get();
+      expect(snap.data()!['acceptsInquiries'], isTrue);
+    });
+
+    test('y también queda en users/{uid}', () async {
+      await seedDoc('trainer-ai-3');
+
+      await repo.update('trainer-ai-3', {'acceptsInquiries': false});
+
+      final snap =
+          await firestore.collection('users').doc('trainer-ai-3').get();
+      expect(snap.data()!['acceptsInquiries'], isFalse);
+    });
+
+    test('un partial que NO lo menciona no lo pisa', () async {
+      await seedDoc('trainer-ai-4');
+      await repo.update('trainer-ai-4', {'acceptsInquiries': false});
+
+      // Guardar otra cosa cualquiera no puede resucitar las consultas.
+      await repo.update('trainer-ai-4', {'trainerBio': 'Otra bio bien larga.'});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-4')
+          .get();
+      expect(snap.data()!['acceptsInquiries'], isFalse);
+    });
+  });
+
   group('UserRepository multi-location dual-write', () {
     test('trainerLocations partial propaga a trainerPublicProfiles', () async {
       await seedDoc('trainer-ml-1');
+      // R6: sin consentimiento efectivo el subset filtra las claves de
+      // ubicación — este test es sobre el dual-write YA consentido.
+      await seedConsent('trainer-ml-1');
       final loc = {
         'id': 'loc-1',
         'type': 'gym',
@@ -482,6 +561,10 @@ void main() {
         'acepta trainerLocations vacío + trainerOffersOnline:true (solo virtual)',
         () async {
       await seedDoc('trainer-virtual');
+      // Sin ubicaciones que publicar no hay nada que consentir (spec:
+      // "Trainer with no published location is not prompted") — a
+      // propósito NO se llama seedConsent acá: el caso cubre justamente que
+      // un PF 100% virtual nunca necesitó otorgarlo.
       await repo.update('trainer-virtual', {
         'trainerLocations': <Map<String, Object?>>[],
         'trainerGeohashes': <String>[],
@@ -492,12 +575,17 @@ void main() {
           .doc('trainer-virtual')
           .get();
       expect(snap.data()!['trainerOffersOnline'], isTrue);
-      expect(snap.data()!['trainerLocations'], isEmpty);
+      // R6: sin consentimiento, la clave ni se escribe — ausente y `[]`
+      // representan lo mismo ("nada publicado"), así que se tolera null.
+      expect(snap.data()!['trainerLocations'] ?? const [], isEmpty);
     });
 
     test('acepta locations non-vacío + offersOnline:false (solo presencial)',
         () async {
       await seedDoc('trainer-presencial');
+      // R6: acá SÍ hay una ubicación real para publicar → hace falta
+      // consentimiento efectivo para que el dual-write la propague.
+      await seedConsent('trainer-presencial');
       await repo.update('trainer-presencial', {
         'trainerLocations': [
           {
@@ -535,7 +623,9 @@ void main() {
           .collection('trainerPublicProfiles')
           .doc('trainer-partial')
           .get();
-      expect(snap.data()!['trainerLocations'], isEmpty);
+      // R6: partial vacío + sin consentimiento previo → la clave ni se
+      // escribe; ausente y `[]` representan lo mismo acá ("nada publicado").
+      expect(snap.data()!['trainerLocations'] ?? const [], isEmpty);
     });
   });
 }

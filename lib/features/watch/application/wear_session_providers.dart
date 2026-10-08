@@ -14,8 +14,12 @@ import '../../workout/application/session_duration.dart'
 import '../../workout/domain/session.dart';
 import '../../workout/domain/set_log.dart';
 import '../../workout/domain/set_log_identity.dart';
+import '../../workout/domain/routine.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart'
+    show catalogLockActiveProvider;
 import '../domain/wear_workout_plan.dart';
 import '../domain/wear_workout_session.dart';
+import '../presentation/wear/wear_strings.dart';
 import '../presentation/wear/wear_view_models.dart';
 import 'wear_rest_providers.dart';
 
@@ -185,6 +189,46 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
     }
   }
 
+  /// `true` si el catálogo pago frena entrenar [rutina] — y en ese caso ya
+  /// dejó el estado en [WearSessionFailed] con el motivo.
+  ///
+  /// ## Por qué el reloj necesita su propio gate
+  ///
+  /// El #1066 cerró las tres puertas del catálogo en el TELÉFONO: la grilla,
+  /// "Seguir esta plantilla" y EMPEZAR. El reloj no pasa por ninguna de las
+  /// tres — escribe `users/{uid}/sessions` directo con el SDK. Sin esto, el
+  /// alumno free abre el reloj y entrena una plantilla paga sin que nada lo
+  /// frene.
+  ///
+  /// ## Por qué NO alcanza con la regla de Firestore
+  ///
+  /// Porque el reloj crea la sesión con `waitForServer: false`: para cuando el
+  /// servidor rechaza, la pantalla de entreno ya está abierta. La regla es la
+  /// ley y sigue siendo el enforcement real, pero llega tarde para la UX. Este
+  /// gate frena ANTES, con el mismo predicado que usa el teléfono
+  /// (`catalogLockActiveProvider`), para que las dos superficies no puedan
+  /// discrepar sobre la misma plantilla.
+  ///
+  /// El orden de las guardas es el del costo: `isPremium` es un campo ya
+  /// hidratado; el entitlement se lee después.
+  bool _catalogoPagoFrena(Routine rutina) {
+    if (!rutina.isPremium) return false;
+    if (!ref.read(catalogLockActiveProvider)) return false;
+    _set(const WearSessionFailed(WearStrings.plantillaPaga));
+    return true;
+  }
+
+  /// Lo que se hace cuando el servidor RECHAZA una sesión ya abierta en local.
+  ///
+  /// No es lo mismo que quedarse sin red: eso deja el `Future` pendiente y
+  /// Firestore lo reintenta solo. Un rechazo es definitivo, así que el atleta
+  /// tiene que enterarse en vez de entrenar una hora contra una sesión que no
+  /// existe en el servidor. Ver `SessionRepository.create`.
+  void _sesionRechazadaPorElServidor(Object error) {
+    debugPrint('[wear-session] el servidor rechazó la sesión — $error');
+    _set(const WearSessionFailed(WearStrings.sesionRechazada));
+  }
+
   /// Empieza el entreno de hoy, o se suma al que ya esté abierto.
   Future<void> start(WearTodaysWorkout hoy) async {
     if (state is WearSessionRunning || state is WearSessionOpening) return;
@@ -208,6 +252,17 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         return;
       }
 
+      // El gate del catálogo, también acá. `WearTodaysWorkout` no transporta
+      // `isPremium`, así que se resuelve la rutina — es el mismo provider que
+      // el resto del reloj ya consulta, así que normalmente sale de caché.
+      //
+      // Y no es un caso imposible: el #1066 impide que un free ACTIVE una
+      // plantilla paga, pero no toca las que ya estaban activas de antes, ni
+      // al que la activó mientras tenía derecho y después lo perdió.
+      final rutinaDeHoy =
+          await ref.read(routineByIdProvider(hoy.routineId).future);
+      if (rutinaDeHoy != null && _catalogoPagoFrena(rutinaDeHoy)) return;
+
       final creada = await repo.create(
         uid: uid,
         routineId: hoy.routineId,
@@ -216,6 +271,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         dayNumber: hoy.dayNumber,
         weekNumber: hoy.weekNumber,
         waitForServer: false,
+        onServerRejected: _sesionRechazadaPorElServidor,
       );
       debugPrint('[wear-session] entreno creado ${creada.id} '
           '(día ${creada.dayNumber}, semana ${creada.weekNumber})');
@@ -261,6 +317,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
       }
 
       final rutina = await ref.read(routineByIdProvider(routineId).future);
+      if (rutina != null && _catalogoPagoFrena(rutina)) return false;
       if (rutina == null || rutina.days.isEmpty) {
         _set(const WearSessionFailed('no se encontró la rutina'));
         return false;
@@ -306,6 +363,7 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
         dayNumber: posicion.dayNumber,
         weekNumber: posicion.weekNumber,
         waitForServer: false,
+        onServerRejected: _sesionRechazadaPorElServidor,
       );
       debugPrint('[wear-session] entreno creado desde la lista ${creada.id} '
           '(día ${creada.dayNumber}, semana ${creada.weekNumber})');

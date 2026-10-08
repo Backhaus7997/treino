@@ -34,11 +34,13 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
     show fmtArs;
 
 import '../../widgets/coach_hub_widgets.dart'
-    show KpiCard, TreinoEmptyState, TreinoFilterChips, TreinoSectionHeader;
+    show CoachHubSectionHero, KpiCard, TreinoEmptyState, TreinoFilterChips;
 import 'planes_filtro_provider.dart';
 import 'tarifas_model.dart';
 import 'tarifas_provider.dart';
 import 'widgets/tarifa_card.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Etiquetas (es-AR) de cada [PlanesFiltroCadencia], en el orden en que se
 /// muestran los chips.
@@ -61,7 +63,6 @@ class PlanesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final resumenAsync = ref.watch(tarifasResumenProvider);
     final filtro = ref.watch(planesFiltroProvider);
 
@@ -73,19 +74,10 @@ class PlanesScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           child: TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const TreinoSectionHeader(
-                  title: 'Planes comerciales', // i18n
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  'Precios que cobrás actualmente, agrupados por '
+            child: const CoachHubSectionHero(
+              title: 'Planes comerciales', // i18n
+              subtitle: 'Precios que cobrás actualmente, agrupados por '
                   'tarifa', // i18n
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
             ),
           ),
         ),
@@ -447,12 +439,10 @@ class _TarifasGridError extends StatelessWidget {
               style: TextStyle(color: palette.textMuted, fontSize: 14),
             ),
             const SizedBox(height: AppSpacing.s12),
-            TextButton(
+            TreinoButton(
+              label: 'Reintentar', // i18n
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              child: Text(
-                'Reintentar', // i18n
-                style: TextStyle(color: palette.accent, fontSize: 14),
-              ),
             ),
           ],
         ),

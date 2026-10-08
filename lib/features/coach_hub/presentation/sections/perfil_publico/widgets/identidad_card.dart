@@ -16,12 +16,15 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/domain/perfil_pf_validators.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 /// Card «IDENTIDAD» — columna izquierda de `PerfilPublicoScreen` (WU-03).
 class IdentidadCard extends ConsumerStatefulWidget {
@@ -54,12 +57,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
 
   // Mismo criterio que profile_edit_trainer_screen.dart: no vacía, ≥20
   // caracteres — evita bios "muertas" tipo "hola" en Coach Discovery.
-  String? get _bioError {
-    final value = _bio.text.trim();
-    if (value.isEmpty) return 'Escribí una bio.'; // i18n: Fase 11
-    if (value.length < 20) return 'Al menos 20 caracteres.'; // i18n: Fase 11
-    return null;
-  }
+  String? get _bioError => validarBio(_bio.text);
 
   bool get _canSave => _dirty && _bioError == null;
 
@@ -76,8 +74,14 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
         'trainerBio': _bio.text.trim(),
       });
       _toast('Bio guardada.'); // i18n: Fase 11
-    } catch (_) {
-      _toast('No se pudo guardar la bio. Probá de nuevo.'); // i18n: Fase 11
+    } catch (e) {
+      if (!mounted) return;
+      // `moderationBlockedMessage` va PRIMERO: "probá de nuevo" es consejo
+      // falso para un bloqueo del filtro de términos vetados — la misma bio
+      // va a fallar siempre.
+      _toast(e is ModerationBlockedException
+          ? AppL10n.of(context).moderationBlockedMessage
+          : 'No se pudo guardar la bio. Probá de nuevo.'); // i18n: Fase 11
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -203,7 +207,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
               key: const Key('identidad_card_bio_field'),
               controller: _bio,
               maxLines: 4,
-              maxLength: 280,
+              maxLength: kBioMaxLength,
               enabled: !_saving,
               onChanged: (_) => setState(() {}),
               style: TextStyle(color: palette.textPrimary, fontSize: 14),
@@ -227,29 +231,11 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
             const SizedBox(height: AppSpacing.s12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton(
+              child: TreinoButton(
                 key: const Key('identidad_card_save_button'),
-                onPressed: (_canSave && !_saving) ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.bgCard,
-                  disabledForegroundColor: palette.textMuted,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s18,
-                    vertical: AppSpacing.s12,
-                  ),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TreinoButtonTokens.foreground(context),
-                        ),
-                      )
-                    : const Text('GUARDAR'), // i18n: Fase 11
+                label: 'GUARDAR', // i18n: Fase 11
+                loading: _saving,
+                onPressed: _canSave ? _save : null,
               ),
             ),
           ],

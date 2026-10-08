@@ -19,6 +19,9 @@ import 'package:treino/features/feed/domain/routine_tag.dart';
 import 'package:treino/features/feed/domain/workout_snapshot.dart';
 import 'package:treino/features/feed/domain/workout_stats.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
+import 'package:treino/features/moderation/data/block_repository.dart';
+import 'package:treino/features/moderation/domain/block.dart';
 import 'package:treino/features/feed/presentation/widgets/post_card.dart';
 import 'package:treino/features/feed/presentation/widgets/workout_snapshot_detail.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
@@ -28,6 +31,8 @@ import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockPostRepository extends Mock implements PostRepository {}
+
+class MockBlockRepository extends Mock implements BlockRepository {}
 
 /// Snapshot mínimo con UN ejercicio identificable por nombre — sirve para
 /// distinguir qué post está expandido en una lista.
@@ -525,14 +530,18 @@ void main() {
       expect(find.byIcon(TreinoIcon.dotsThree), findsOneWidget);
     });
 
-    // SCENARIO-177: menu button is absent for a non-owner viewer
-    testWidgets('SCENARIO-177: overflow menu hidden when viewer is not owner',
-        (tester) async {
+    // SCENARIO-177 — actualizado por moderacion-reporte-y-bloqueo: el menú ya
+    // NO desaparece para un no-dueño autenticado. Antes sólo tenía
+    // Editar/Eliminar (acciones de dueño) así que se ocultaba entero; ahora
+    // ofrece Reportar/Bloquear, así que el ícono se ve igual.
+    testWidgets(
+        'SCENARIO-177: overflow menu STILL shows for a non-owner viewer '
+        '(Reportar/Bloquear)', (tester) async {
       final post = makePost(authorUid: 'u1');
       await tester.pumpWidget(_wrap(PostCard(post: post), viewerUid: 'u2'));
       await tester.pump();
 
-      expect(find.byIcon(TreinoIcon.dotsThree), findsNothing);
+      expect(find.byIcon(TreinoIcon.dotsThree), findsOneWidget);
     });
 
     testWidgets('overflow menu hidden when viewer is unauthenticated',
@@ -668,6 +677,62 @@ void main() {
 
         verifyNever(() => repo.delete(any()));
         expect(find.byType(AlertDialog), findsNothing);
+      });
+    });
+
+    // ── Non-owner overflow menu: Reportar/Bloquear (moderacion-reporte-y-bloqueo) ──
+
+    group('overflow menu (non-owner — moderación)', () {
+      testWidgets(
+          'tapping dotsThree opens Reportar/Bloquear, not Editar/Eliminar',
+          (tester) async {
+        final post = makePost(authorUid: 'u1', authorDisplayName: 'Tincho');
+        await tester.pumpWidget(_wrap(PostCard(post: post), viewerUid: 'u2'));
+        await tester.pump();
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Reportar'), findsOneWidget);
+        expect(find.text('Bloquear'), findsOneWidget);
+        expect(find.text('Editar'), findsNothing);
+        expect(find.text('Eliminar'), findsNothing);
+      });
+
+      testWidgets(
+          'tapping Bloquear then confirming calls BlockRepository.block '
+          'with (viewer, author)', (tester) async {
+        final blockRepo = MockBlockRepository();
+        when(() => blockRepo.block(any(), any())).thenAnswer(
+          (_) async => Block(
+            id: 'u2_u1',
+            blockerUid: 'u2',
+            blockedUid: 'u1',
+            members: const ['u2', 'u1'],
+            createdAt: DateTime.utc(2026, 1, 1),
+          ),
+        );
+        final post = makePost(authorUid: 'u1', authorDisplayName: 'Tincho');
+
+        await tester.pumpWidget(_wrap(
+          PostCard(post: post),
+          viewerUid: 'u2',
+          overrides: [blockRepositoryProvider.overrideWithValue(blockRepo)],
+        ));
+        await tester.pump();
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bloquear'));
+        await tester.pumpAndSettle();
+
+        // Sheet de confirmación (molde de UnfriendConfirmationSheet).
+        expect(find.text('¿Bloquear a Tincho?'), findsOneWidget);
+
+        await tester.tap(find.text('BLOQUEAR'));
+        await tester.pumpAndSettle();
+
+        verify(() => blockRepo.block('u2', 'u1')).called(1);
       });
     });
 

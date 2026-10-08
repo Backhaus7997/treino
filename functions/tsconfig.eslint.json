@@ -1,5 +1,5 @@
 {
-  // TSConfig que usa SOLO ESLint (`parserOptions.project` en `.eslintrc.js`).
+  // TSConfig que usa SOLO ESLint (`parserOptions.project` en `eslint.config.js`).
   //
   // `tsconfig.json` excluye `src/__tests__` a proposito: `npm run build` no
   // debe compilar los tests al bundle que se deploya a Functions. Pero el lint

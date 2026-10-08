@@ -37,7 +37,8 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
 
 /** Un documento crudo de `friendships`, tal como vino de Firestore. */
 export interface RawDoc {
@@ -75,8 +76,8 @@ export function buildSnapshotPayload(
 }
 
 async function main(): Promise<void> {
-  admin.initializeApp();
-  const db = admin.firestore();
+  initializeApp();
+  const db = getFirestore();
 
   // M-00 — gate de volumen. Una sola read-unit, sin traerse la colección.
   const agg = await db.collection("friendships").count().get();

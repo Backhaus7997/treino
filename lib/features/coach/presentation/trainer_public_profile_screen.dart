@@ -108,8 +108,16 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               // Antes, con un solo CTA, "PEDIR VÍNCULO" era primario por
               // inercia — y el efecto era que preguntarle algo a un entrenador
               // exigía elegirlo primero.
-              TrainerInquiryCta(trainerId: uid),
-              const SizedBox(height: AppSpacing.s12),
+              // #637 — el kill switch del PF, del lado que lo ve el alumno.
+              // Sin esto, apagar las consultas dejaba el botón puesto y la
+              // regla rebotaba la creación del chat: el alumno se comía un
+              // error por una decisión deliberada del PF. Se lee del perfil
+              // que esta pantalla YA tiene en mano, así que el CTA conserva su
+              // propiedad de no watchear ningún provider.
+              if (profile.acceptsInquiries) ...[
+                TrainerInquiryCta(trainerId: uid),
+                const SizedBox(height: AppSpacing.s12),
+              ],
               TrainerContactCtaStub(trainerId: uid),
               const SizedBox(height: 12),
               ReviewCta(trainerId: uid),

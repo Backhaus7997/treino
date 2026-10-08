@@ -63,7 +63,32 @@ class TrainerProfileView extends ConsumerWidget {
     final isVisible = pub != null;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+      // El inset inferior SUMA `MediaQuery.paddingOf(context).bottom`, no es
+      // un 28 fijo.
+      //
+      // El shell corre con `extendBody: true`, así que el `Scaffold` no le
+      // resta al body el alto de la barra flotante: lo publica en
+      // `padding.bottom` (margen + 8 + alto animado ≈ 94-114 con un home
+      // indicator de 34 — ver el dartdoc de `TreinoBottomBar`). Con 28 fijos
+      // el último ítem de esta lista quedaba DEBAJO del vidrio al final del
+      // scroll, sin forma de despejarlo.
+      //
+      // Y el último ítem es «Eliminar cuenta», que existe para cumplir el
+      // Apple Guideline 5.1.1(v) (ver el comentario de su `_MenuRow`). Medido
+      // en el simulador de iPhone 6.5" con `content_size
+      // accessibility-extra-large`: al tope del scroll el botón se leía
+      // A TRAVÉS de la barra y no había más scroll. A tamaño de texto normal
+      // la pantalla entra entera y el bug no se ve, que es por lo que
+      // sobrevivió.
+      //
+      // Es el mismo patrón del #830, y la rama de atleta
+      // (`profile_screen.dart`) ya lo hacía bien.
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        28 + MediaQuery.paddingOf(context).bottom,
+      ),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         // Header — TU CUENTA / YO
@@ -143,6 +168,21 @@ class TrainerProfileView extends ConsumerWidget {
         // "Configuración por defecto" menu row REMOVED 2026-05-28 — main
         // PR#4 pivot deleted the /profile/settings route. Settings surface
         // deferred to a future SDD (notifications/theme/language).
+        // Privacidad — la MISMA entrada que tiene el atleta.
+        //
+        // Va acá y no sólo en `_AthleteProfile` porque `ProfileScreen` reparte
+        // por rol: un entrenador en el teléfono ve esta vista y nunca la otra.
+        // Sin esto, `main.dart` le enciende la analítica y no tiene dónde
+        // apagarla — y el tab de Privacidad del Coach Hub le dice que «en el
+        // teléfono se configura aparte», o sea que lo manda a un lugar que para
+        // él no existe. Un cartel que miente, de los de AGENTS.md §11.1.
+        _MenuRow(
+          icon: TreinoIcon.shieldCheck,
+          label: 'Privacidad', // i18n: esta vista todavía no usa AppL10n
+          onTap: () => context.push('/profile/settings/privacidad'),
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.signOut,
           label: 'Cerrar sesión',

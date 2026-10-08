@@ -48,7 +48,7 @@
  * siguiente: cualquier clausula nueva se decide con la misma frase.
  */
 
-import * as admin from "firebase-admin";
+import { DocumentData } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import {
@@ -78,6 +78,9 @@ interface RawSubscription {
   tier?: unknown;
   status?: unknown;
   currentPeriodEnd?: unknown;
+  /** El PISO PREPAGO. Ver [leerPisoPrepago]: los dos campos van juntos. */
+  prepaidTier?: unknown;
+  prepaidUntil?: unknown;
 }
 
 /**
@@ -135,6 +138,70 @@ function toMillisOrNull(
 }
 
 /**
+ * Lee el PISO PREPAGO, que son DOS campos que valen solo juntos.
+ *
+ * ── Por que se cae ENTERO y por que eso ES degradacion ──
+ *
+ * Un piso a medias —`prepaidTier` sin `prepaidUntil`, o al reves— no significa
+ * nada: sin tier no hay limite que conservar, y sin fecha no hay hasta cuando.
+ * No se puede "degradar por campo" como con `tier` y `status`, porque el valor
+ * conservador de uno depende del otro.
+ *
+ * Y tirar el piso es BAJAR el limite, o sea revocar relaciones existentes, que
+ * es justo lo que la politica del encabezado prohibe. Por eso `degraded: true`
+ * es obligatorio acá y no opcional: con el flag, `sync-entitlements` saltea el
+ * `block` (la valvula ya existe) y no le bloquea alumnos a nadie por un dato que
+ * escribimos mal nosotros.
+ *
+ * ── Un piso AUSENTE no es degradacion ──
+ *
+ * Es el estado normal de la enorme mayoria de los PF —nadie tiene piso hasta que
+ * cambia de plan— igual que `subscription` ausente. Confundir "no hay piso" con
+ * "el piso esta roto" apagaria el bloqueo para todos.
+ *
+ * El chequeo de la fecha es ESTRUCTURAL (`toMillis` es funcion) y no
+ * `instanceof`, por lo mismo que [toMillisOrNull]: los tests corren contra un
+ * doble de firebase-admin donde el instanceof daria false para un Timestamp
+ * valido.
+ */
+function leerPisoPrepago(
+  sub: RawSubscription,
+  trainerId: string,
+): {
+  tier: SubscriptionTier | null;
+  untilMs: number | null;
+  degraded: boolean;
+} {
+  const { prepaidTier, prepaidUntil } = sub;
+  const vacio = { tier: null, untilMs: null, degraded: false };
+
+  if (prepaidTier == null && prepaidUntil == null) return vacio;
+
+  const tierOk = typeof prepaidTier === "string" && KNOWN_TIERS.has(prepaidTier);
+  const candidato = prepaidUntil as { toMillis?: unknown } | null;
+  const fechaOk =
+    candidato != null && typeof candidato.toMillis === "function";
+
+  if (!tierOk || !fechaOk) {
+    logger.warn(
+      "subscription-state: piso prepago ilegible — se descarta ENTERO",
+      {
+        trainerId,
+        prepaidTier,
+        prepaidUntil: typeof prepaidUntil,
+      },
+    );
+    return { tier: null, untilMs: null, degraded: true };
+  }
+
+  return {
+    tier: prepaidTier as SubscriptionTier,
+    untilMs: (candidato.toMillis as () => number)(),
+    degraded: false,
+  };
+}
+
+/**
  * Mapea `users/{uid}.subscription` al `SubscriptionState` puro que consume
  * `effectiveWeightLimit`. El campo en Firestore es `currentPeriodEnd`
  * (Timestamp); `effectiveWeightLimit` quiere `currentPeriodEndMs` (number) para
@@ -153,7 +220,7 @@ function toMillisOrNull(
  * olvidar.
  */
 export function toSubscriptionState(
-  data: admin.firestore.DocumentData | undefined,
+  data: DocumentData | undefined,
   trainerId: string,
 ): MappedSubscription {
   const raw: unknown = data?.subscription;
@@ -196,9 +263,16 @@ export function toSubscriptionState(
   }
 
   const periodEnd = toMillisOrNull(sub.currentPeriodEnd, trainerId);
+  const piso = leerPisoPrepago(sub, trainerId);
 
   return {
-    state: { tier, status, currentPeriodEndMs: periodEnd.ms },
-    degraded: degraded || periodEnd.degraded,
+    state: {
+      tier,
+      status,
+      currentPeriodEndMs: periodEnd.ms,
+      prepaidTier: piso.tier,
+      prepaidUntilMs: piso.untilMs,
+    },
+    degraded: degraded || periodEnd.degraded || piso.degraded,
   };
 }

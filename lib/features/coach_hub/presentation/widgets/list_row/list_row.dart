@@ -94,7 +94,18 @@ class TreinoListRow extends StatelessWidget {
             : TreinoListRowTokens.paddingV;
 
         return AnimatedContainer(
-          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+          // que estar donde está el cursor, no llegando.
+          //
+          // Con 180 ms, barrer una lista deja una ESTELA — la fila anterior sigue
+          // apagándose cuando la siguiente ya se encendió, y se ven tres o cuatro
+          // prendidas a la vez. El sidebar ya se comió este diagnóstico y lo bajó de
+          // 180 a 120; 120 deja una estela más corta, no ninguna. El PF lo reportó
+          // como «parpadeo al pasar el cursor sobre una lista».
+          //
+          // Queda `AnimatedContainer` y no `Container` porque el borde de foco sí
+          // tiene que animar: ése llega por teclado, donde el salto se nota.
+          duration: Duration.zero,
           curve: AppMotion.standard,
           color: bg,
           child: Padding(
@@ -118,7 +129,7 @@ class TreinoListRow extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: AppFonts.barlow,
                           fontWeight: FontWeight.w400,
-                          fontSize: 14,
+                          fontSize: AppTextSize.body,
                           color: states.disabled
                               ? tokens.disabledColor
                               : tokens.titleColor,
@@ -132,7 +143,7 @@ class TreinoListRow extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
                             fontWeight: FontWeight.w400,
-                            fontSize: 12,
+                            fontSize: AppTextSize.caption,
                             color: states.disabled
                                 ? tokens.disabledColor
                                 : tokens.subtitleColor,
@@ -182,7 +193,11 @@ class _SkeletonRow extends StatelessWidget {
               width: 140,
               height: 14,
               decoration: BoxDecoration(
-                color: tokens.hoverBackground,
+                // Relleno NEUTRO, no el color de hover. El skeleton se colgaba
+                // de `hoverBackground` cuando ese token era `bgCard`; ahora que
+                // el hover es acento al 6 %, colgarse de él pintaría las barras
+                // de carga de color menta.
+                color: tokens.skeletonBackground,
                 borderRadius:
                     BorderRadius.circular(TreinoListRowTokens.borderRadius / 4),
               ),

@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
@@ -15,13 +18,16 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Medidor de cupo del roster móvil (artboard G): «2 DE 2 · PLAN FREE».
 ///
 /// El valor del header es avisar ANTES del choque, así que lo que se testea es
 /// el contrato del string: numerador ponderado, denominador solo cuando el tier
-/// tiene tope, y estado visual distinto al llegar al límite.
+/// tiene tope, estado visual distinto al llegar al límite, y qué tier y qué
+/// tope rigen cuando el PF dio de baja su plan.
 
 const _headerKey = Key('plan-quota-header');
 
@@ -48,19 +54,31 @@ UserProfile _trainer(TrainerSubscription? subscription) => UserProfile(
       subscription: subscription,
     );
 
-/// `weightLimit` se deja sin setear a propósito: el header debe resolver el
-/// tope desde el TIER, no desde el denormalizado.
+/// `weightLimit` se deja sin setear a propósito: el servidor no escribe ese
+/// campo (ver [TrainerSubscription]), así que es la forma de los docs que
+/// escribe él. Sin el campo, el header toma el tope de la tabla del tier.
+/// Ojo, eso no quiere decir que lo ignore: si el doc lo trae, el header puede
+/// preferirlo a la tabla (las condiciones están en `_PlanQuotaHeader`). El
+/// Plan 3 que lo trae tiene su propio test.
 TrainerSubscription _sub(SubscriptionTier tier) => TrainerSubscription(
       tier: tier,
       status: SubscriptionStatus.active,
     );
 
+/// [firestore] siembra el doc `users/pf1` del que el medidor lee
+/// `planLimits`. Sin él no hay uid ni doc, y es el camino de los tests de
+/// arriba: la clave del servidor AUSENTE.
 Widget _harness({
   required List<TrainerLink> links,
   TrainerSubscription? subscription,
+  FakeFirebaseFirestore? firestore,
 }) =>
     ProviderScope(
       overrides: [
+        if (firestore != null) ...[
+          firestoreProvider.overrideWithValue(firestore),
+          currentUidProvider.overrideWithValue('pf1'),
+        ],
         userProfileProvider.overrideWith(
           (ref) => Stream<UserProfile?>.value(_trainer(subscription)),
         ),
@@ -91,6 +109,20 @@ String _headerText(WidgetTester tester) =>
 
 Color _headerColor(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(_headerKey)).style!.color!;
+
+/// El perfil que leyó el medidor, desde el MISMO contenedor que lo alimenta.
+///
+/// Una baja vencida y un perfil que no cargó dicen lo mismo en el header
+/// («PLAN FREE»), y este tab no dibuja el nombre del PF. Leerlo de acá es lo
+/// que prueba que el override se aplicó.
+UserProfile? _perfilLeido(WidgetTester tester) {
+  final perfil = ProviderScope.containerOf(
+    tester.element(find.byKey(_headerKey)),
+    listen: false,
+  ).read(userProfileProvider);
+  expect(perfil.hasValue, isTrue, reason: 'el perfil del PF no cargó');
+  return perfil.requireValue;
+}
 
 void main() {
   group('medidor de cupo — un tier, un denominador', () {
@@ -161,11 +193,11 @@ void main() {
       expect(text.toLowerCase(), isNot(contains('null')));
     });
 
-    testWidgets(
-        'Plan 3 con un weightLimit viejo denormalizado sigue sin denominador',
+    testWidgets('Plan 3 con un weightLimit en el doc sigue sin denominador',
         (tester) async {
-      // El CF puede haber dejado un `weightLimit: 15` de cuando el PF era
-      // Plan 2. El tier manda: si el header leyera el denormalizado, el plan
+      // El servidor no escribe `weightLimit` (ver `TrainerSubscription`), pero
+      // si un doc lo trajera igual, el tier manda: el header pregunta
+      // `tier.isUnlimited` ANTES de mirar el campo. Sin esa guarda, el plan
       // ilimitado mostraría un tope que no existe.
       await tester.pumpWidget(_harness(
         subscription: const TrainerSubscription(
@@ -180,22 +212,35 @@ void main() {
       expect(_headerText(tester), '1 ALUMNO · PLAN 3');
     });
 
-    testWidgets('ningún tier renderiza "null" en el header', (tester) async {
+    // Un testWidgets POR tier, no un loop adentro de uno solo. Re-pumpear
+    // `_harness` en el mismo test reusa el elemento del ProviderScope: el
+    // container sobrevive y sigue sirviendo el perfil de la primera vuelta.
+    // Medido: las cuatro vueltas dibujaban «1.5 DE 2 · PLAN FREE», y el test
+    // pasaba sin haber visto nunca un Plan 3.
+    group('ningún tier renderiza "null" en el header', () {
       for (final tier in SubscriptionTier.values) {
-        await tester.pumpWidget(_harness(
-          subscription: _sub(tier),
-          links: [
-            _link('a1', TrainerLinkStatus.active),
-            _link('a2', TrainerLinkStatus.paused),
-          ],
-        ));
-        await tester.pumpAndSettle();
+        testWidgets(tier.name, (tester) async {
+          await tester.pumpWidget(_harness(
+            subscription: _sub(tier),
+            links: [
+              _link('a1', TrainerLinkStatus.active),
+              _link('a2', TrainerLinkStatus.paused),
+            ],
+          ));
+          await tester.pumpAndSettle();
 
-        expect(
-          _headerText(tester).toLowerCase(),
-          isNot(contains('null')),
-          reason: 'el tier $tier filtró un null al header',
-        );
+          final text = _headerText(tester);
+          // Control: el header es el de ESTE tier. Sin esto, un harness que
+          // dibujara otro perfil pasaría el chequeo de abajo sin probar nada.
+          final etiqueta = switch (tier) {
+            SubscriptionTier.free => 'PLAN FREE',
+            SubscriptionTier.plan1 => 'PLAN 1',
+            SubscriptionTier.plan2 => 'PLAN 2',
+            SubscriptionTier.plan3 => 'PLAN 3',
+          };
+          expect(text, endsWith(etiqueta));
+          expect(text.toLowerCase(), isNot(contains('null')));
+        });
       }
     });
   });
@@ -336,6 +381,416 @@ void main() {
 
       expect(find.text('Sin alumnos activos todavía.'), findsOneWidget);
       expect(_headerText(tester), '0 DE 2 · PLAN FREE');
+    });
+  });
+
+  // ── Una baja ──
+  //
+  // El servidor le respeta el tier pago a una baja HASTA `currentPeriodEnd` y
+  // después la baja a Free (`limiteDelStatus` en
+  // `functions/src/subscriptions/effective-limit.ts`) sin reescribir
+  // `subscription`: el doc sigue diciendo el tier viejo. Para una baja, el
+  // medidor tiene que
+  // decir lo mismo que el servidor, como Facturación en la web.
+  group('medidor de cupo — plan dado de baja', () {
+    // Jueves 1/10/2026 12:00, LOCAL (`AppClock.freeze` lo exige). Los bordes
+    // van en UTC, una semana antes y una semana después. Según el timezone del
+    // runner, ese mediodía local es un instante entre el 30/9 22:00Z (UTC+14)
+    // y el 2/10 00:00Z (UTC−12): el borde más cercano queda a más de seis días
+    // en cualquiera.
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 1, 12)));
+    tearDown(AppClock.unfreeze);
+
+    final vencida = DateTime.utc(2026, 9, 24, 12);
+    final conDiasPagos = DateTime.utc(2026, 10, 8, 12);
+
+    /// El doc de un plan pago CON su `weightLimit`. El servidor no lo escribe
+    /// (`reconcile.ts` escribe tier, estado, fin de período y piso prepago),
+    /// pero un doc puede traerlo, y es la forma que distingue: sin él, un
+    /// arreglo que cambiara sólo el tier también daría «DE 2», y con él se le
+    /// colaría el «DE 7».
+    TrainerSubscription suscripcion({
+      required DateTime fin,
+      SubscriptionTier tier = SubscriptionTier.plan1,
+      SubscriptionStatus status = SubscriptionStatus.cancelled,
+    }) =>
+        TrainerSubscription(
+          tier: tier,
+          status: status,
+          weightLimit: tier.weightLimit,
+          currentPeriodEnd: fin,
+        );
+
+    final tresActivos = [
+      _link('a1', TrainerLinkStatus.active),
+      _link('a2', TrainerLinkStatus.active),
+      _link('a3', TrainerLinkStatus.active),
+    ];
+
+    testWidgets('baja vencida: PLAN FREE con el tope de Free, y pasado de tope',
+        (tester) async {
+      final palette = AppTheme.dark().extension<AppPalette>()!;
+
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(fin: vencida),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      // El perfil SE LEYÓ, y el doc sigue diciendo Plan 1 con su tope de 7.
+      // Sin esto el test pasaría igual con el override roto: un perfil que no
+      // carga también cae a Free.
+      final perfil = _perfilLeido(tester);
+      expect(perfil?.displayName, 'Profe');
+      expect(perfil?.subscription?.tier, SubscriptionTier.plan1);
+      expect(perfil?.subscription?.weightLimit, 7);
+
+      expect(_headerText(tester), '3 DE 2 · PLAN FREE');
+      expect(
+        _headerColor(tester),
+        palette.highlight,
+        reason: 'con 3 alumnos y el tope de Free, el PF ya está pasado',
+      );
+    });
+
+    // Control del de arriba: misma baja, mismo reloj, sólo cambia la fecha. Si
+    // el Free saliera de `cancelled` a secas y no del vencimiento, esto
+    // también diría Free.
+    testWidgets('baja con días pagos: sigue en PLAN 1 con el tope de Plan 1',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(fin: conDiasPagos),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+    });
+
+    // Control del eje del estado: con el plan ACTIVO el servidor ni mira la
+    // fecha (`limiteDelStatus` devuelve el tope del tier). Por vencimiento
+    // sólo cae una baja.
+    testWidgets('plan activo con el período vencido: sigue en PLAN 1',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(
+          fin: vencida,
+          status: SubscriptionStatus.active,
+        ),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+    });
+
+    // Plan 3 no tiene tope, así que acá no cambia sólo el nombre: vencida la
+    // baja, el medidor vuelve a tener denominador, el de Free.
+    testWidgets('Plan 3 con la baja vencida: vuelve a tener el tope de Free',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(tier: SubscriptionTier.plan3, fin: vencida),
+        links: [_link('a1', TrainerLinkStatus.active)],
+      ));
+      await tester.pumpAndSettle();
+
+      final perfil = _perfilLeido(tester);
+      expect(perfil?.displayName, 'Profe');
+      expect(perfil?.subscription?.tier, SubscriptionTier.plan3);
+
+      expect(_headerText(tester), '1 DE 2 · PLAN FREE');
+    });
+
+    // El tab puede seguir montado cuando vence la baja, y en ese borde no emite
+    // nadie: el servidor no reescribe `subscription` (el perfil no vuelve a
+    // emitir) y `AppClock` no avisa. Calculada en el build, la vigencia
+    // quedaba en «PLAN 1» hasta un rebuild ajeno. La lee
+    // `vigenciaDelPlanProvider`, que se recalcula solo al llegar al borde.
+    testWidgets('vence con el tab montado: pasa a PLAN FREE solo',
+        (tester) async {
+      final fin = DateTime.utc(2026, 10, 15, 15);
+      AppClock.freeze(fin.subtract(const Duration(hours: 1)).toLocal());
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(fin: fin),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+
+      // Sólo pasa la hora: el reloj cruza el fin y nada más cambia (ni el
+      // perfil ni los vínculos emiten de nuevo).
+      AppClock.freeze(fin.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      expect(_headerText(tester), '3 DE 2 · PLAN FREE');
+    });
+
+    // Control: con días pagos, el Plan 3 sigue sin tope.
+    testWidgets('Plan 3 con días pagos: sigue sin denominador', (tester) async {
+      await tester.pumpWidget(_harness(
+        subscription: suscripcion(
+          tier: SubscriptionTier.plan3,
+          fin: conDiasPagos,
+        ),
+        links: [_link('a1', TrainerLinkStatus.active)],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '1 ALUMNO · PLAN 3');
+    });
+  });
+
+  // ── El tope que publica el servidor (`planLimits.athletes`) ──
+  //
+  // El cliente no ve el tope REAL: `pending`/`paused` valen Free y el piso
+  // prepago sostiene un plan que la suscripción ya no tiene. El servidor
+  // publica el número que hace cumplir y el medidor lo toma de ahí. Estos
+  // tests siembran el doc con `FakeFirebaseFirestore` (el medidor lo lee crudo,
+  // `planLimits` no vive en `UserProfile`) y dejan el perfil del PF diciendo
+  // otra cosa: lo que se prueba es QUIÉN gana.
+  group('medidor de cupo — el tope que publica el servidor', () {
+    // Local, como pide `AppClock.freeze`. Los bordes salen de acá en UTC.
+    final ahora = DateTime(2026, 10, 1, 12);
+    setUp(() => AppClock.freeze(ahora));
+    tearDown(AppClock.unfreeze);
+
+    Future<FakeFirebaseFirestore> doc(Map<String, Object?> planLimits) async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('users').doc('pf1').set({
+        'uid': 'pf1',
+        'planLimits': planLimits,
+      });
+      return firestore;
+    }
+
+    final tresActivos = [
+      _link('a1', TrainerLinkStatus.active),
+      _link('a2', TrainerLinkStatus.active),
+      _link('a3', TrainerLinkStatus.active),
+    ];
+
+    // El mismo doc con y sin la clave: lo único que cambia es `athletes`.
+    group('clave ausente = el cálculo de siempre', () {
+      testWidgets('con `planLimits` de los otros topes pero sin `athletes`',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          firestore: await doc({'customExercises': 60, 'templates': null}),
+          subscription: _sub(SubscriptionTier.plan1),
+          links: tresActivos,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      });
+
+      testWidgets('una baja vencida sigue siendo Free por el reloj local',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          firestore: await doc({'customExercises': 60}),
+          subscription: TrainerSubscription(
+            tier: SubscriptionTier.plan1,
+            status: SubscriptionStatus.cancelled,
+            currentPeriodEnd: DateTime.utc(2026, 9, 24, 12),
+          ),
+          links: tresActivos,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(_headerText(tester), '3 DE 2 · PLAN FREE');
+      });
+
+      testWidgets('una baja con días pagos sigue en su plan', (tester) async {
+        await tester.pumpWidget(_harness(
+          firestore: await doc({'customExercises': 60}),
+          subscription: TrainerSubscription(
+            tier: SubscriptionTier.plan1,
+            status: SubscriptionStatus.cancelled,
+            currentPeriodEnd: DateTime.utc(2026, 10, 8, 12),
+          ),
+          links: tresActivos,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      });
+
+      testWidgets('un valor que no se entiende cuenta como ausente',
+          (tester) async {
+        await tester.pumpWidget(_harness(
+          firestore: await doc({'athletes': 'siete'}),
+          subscription: _sub(SubscriptionTier.plan1),
+          links: tresActivos,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(_headerText(tester), '3 DE 7 · PLAN 1');
+      });
+    });
+
+    testWidgets('manda el número del servidor: paused con Plan 2 → tope 2',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        firestore: await doc({
+          'athletes': 2,
+          'athletesHasta': null,
+          'athletesDespues': null,
+        }),
+        subscription: _sub(SubscriptionTier.plan2).copyWith(
+          status: SubscriptionStatus.paused,
+        ),
+        links: [_link('a1', TrainerLinkStatus.active)],
+      ));
+      await tester.pumpAndSettle();
+
+      // El doc dice Plan 2 y el servidor lo cuenta como Free. El medidor
+      // muestra el cupo del servidor Y un nombre que dice lo mismo que el
+      // número: «1 DE 2 · PLAN 2» sería una mentira a medias.
+      final perfil = _perfilLeido(tester);
+      expect(perfil?.subscription?.tier, SubscriptionTier.plan2);
+      expect(perfil?.subscription?.status, SubscriptionStatus.paused);
+      expect(_headerText(tester), '1 DE 2 · PLAN FREE');
+    });
+
+    testWidgets('al tope del servidor se pone en highlight', (tester) async {
+      final palette = AppTheme.dark().extension<AppPalette>()!;
+
+      await tester.pumpWidget(_harness(
+        firestore: await doc({'athletes': 2}),
+        subscription: _sub(SubscriptionTier.plan2),
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '2 DE 2 · PLAN FREE');
+      expect(_headerColor(tester), palette.highlight);
+    });
+
+    testWidgets(
+        'piso prepago: `athletes: null` con Plan 1 en el doc → sin tope',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        firestore: await doc({'athletes': null}),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      final perfil = _perfilLeido(tester);
+      expect(perfil?.subscription?.tier, SubscriptionTier.plan1);
+
+      final text = _headerText(tester);
+      expect(text, '3 ALUMNOS · PLAN 3');
+      expect(text, isNot(contains('DE')));
+      expect(text.toLowerCase(), isNot(contains('null')));
+    });
+
+    // La pareja que el tipo existe para separar: la MISMA suscripción, y lo
+    // único distinto es que la clave exista con `null` o no exista.
+    testWidgets('`athletes: null` (sin tope) y clave ausente NO son lo mismo',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        firestore: await doc({'athletes': null}),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+      final conNull = _headerText(tester);
+
+      // Desmontar de verdad antes del segundo: re-pumpear `_harness` reusa el
+      // ProviderScope (ver el comentario de «ningún tier renderiza null»).
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(_harness(
+        firestore: await doc({'customExercises': 60}),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+      final ausente = _headerText(tester);
+
+      expect(conNull, '3 ALUMNOS · PLAN 3');
+      expect(ausente, '3 DE 7 · PLAN 1');
+    });
+
+    testWidgets('un tope que ningún plan de la tabla tiene: sin nombre de plan',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        firestore: await doc({'athletes': 9}),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '3 DE 9');
+    });
+
+    testWidgets(
+        'athletesHasta en una hora: pasa a athletesDespues sin que emita el perfil',
+        (tester) async {
+      final hasta = ahora.toUtc().add(const Duration(hours: 1));
+      await tester.pumpWidget(_harness(
+        firestore: await doc({
+          'athletes': 7,
+          'athletesHasta': Timestamp.fromDate(hasta),
+          'athletesDespues': 2,
+        }),
+        // El doc sigue diciendo Plan 1 activo: el servidor no lo reescribe al
+        // vencer, y es la razón de que haga falta el borde.
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+      expect(_headerText(tester), '3 DE 7 · PLAN 1');
+
+      // Sólo pasa la hora. Ni el perfil ni el doc ni los vínculos emiten.
+      AppClock.freeze(hasta.add(const Duration(minutes: 1)).toLocal());
+      await tester.pump(const Duration(hours: 1));
+      await tester.pump();
+
+      expect(_headerText(tester), '3 DE 2 · PLAN FREE');
+    });
+
+    testWidgets('antes del borde todavía rige athletes', (tester) async {
+      final hasta = ahora.toUtc().add(const Duration(hours: 1));
+      await tester.pumpWidget(_harness(
+        firestore: await doc({
+          'athletes': 15,
+          'athletesHasta': Timestamp.fromDate(hasta),
+          'athletesDespues': 2,
+        }),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      // Pasan 30 minutos y el reloj también: el borde queda por delante.
+      AppClock.freeze(ahora.add(const Duration(minutes: 30)));
+      await tester.pump(const Duration(minutes: 30));
+      await tester.pump();
+
+      // 15 y no 7: con 7 el cálculo del cliente (Plan 1) daría lo mismo y el
+      // test no distinguiría al servidor de su fallback.
+      expect(_headerText(tester), '3 DE 15 · PLAN 2');
+    });
+
+    testWidgets('un borde que ya pasó al montar rige de entrada',
+        (tester) async {
+      await tester.pumpWidget(_harness(
+        firestore: await doc({
+          'athletes': 7,
+          'athletesHasta': Timestamp.fromDate(
+              ahora.toUtc().subtract(const Duration(days: 1))),
+          'athletesDespues': 2,
+        }),
+        subscription: _sub(SubscriptionTier.plan1),
+        links: tresActivos,
+      ));
+      await tester.pumpAndSettle();
+
+      expect(_headerText(tester), '3 DE 2 · PLAN FREE');
     });
   });
 }

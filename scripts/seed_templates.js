@@ -24,6 +24,7 @@
 const path = require('path');
 const templates = require('../docs/video-catalog-audit/improved-templates.json');
 const catalog = require('../docs/video-catalog-audit/enriched-catalog.json');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const WRITE = process.argv.includes('--write');
 
@@ -60,8 +61,8 @@ async function main() {
 
   // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla
   // cerrado; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-  const { admin } = require('./lib/admin').inicializarAdmin();
-  const db = admin.firestore();
+  const { app } = require('./lib/admin').inicializarAdmin();
+  const db = getFirestore(app);
   for (const t of templates) {
     const doc = { ...t, source: 'system', visibility: 'public' };
     await db.collection('routines').doc(t.id).set(doc);

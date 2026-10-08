@@ -333,5 +333,40 @@ void main() {
             'importado directamente en el widget',
       );
     });
+    // -------------------------------------------------------------------------
+    // Constraint angosto: el chip no puede desbordar
+    // -------------------------------------------------------------------------
+    testWidgets(
+        'un label mas ancho que el constraint elide en vez de desbordar',
+        (tester) async {
+      // La columna de filtros de Biblioteca mide 232 px con 18 de padding a
+      // cada lado: 196 utiles. Es el primer consumidor que aprieta al chip
+      // contra un techo — hasta ahora todos lo pusieron en filas de ancho
+      // completo, donde el constraint nunca mordia y el desborde no se veia.
+      await tester.pumpWidget(_wrap(
+        SizedBox(
+          width: 196,
+          child: TreinoFilterChips(
+            options: const ['PESO CORPORAL DE UNA PALABRA MUY LARGA'],
+            selected: const {},
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      expect(
+        tester.takeException(),
+        isNull,
+        reason: 'el chip no puede tirar RenderFlex overflow cuando el label '
+            'no entra: en la app eso sale como la franja amarilla y negra',
+      );
+
+      final texto = tester.widget<Text>(
+        find.text('PESO CORPORAL DE UNA PALABRA MUY LARGA'),
+      );
+      expect(texto.overflow, TextOverflow.ellipsis);
+      expect(texto.maxLines, 1);
+    });
   });
 }

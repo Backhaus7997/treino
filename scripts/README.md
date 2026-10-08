@@ -189,7 +189,57 @@ configuración.
 cd scripts && npm install   # firebase-admin
 ```
 
----
+#### ✅ `firebase-admin` está en 14.x — el candado se levantó
+
+Durante meses este archivo decía **«clavado en 13.x, y no es por comodidad»**.
+Ya no: `scripts/` usa los subpaths modulares y corre contra la v14.
+
+**Qué había pasado.** `firebase-admin@14` borró la API namespaced entera. El
+root export son once símbolos —`initializeApp`, `getApp`, `getApps`,
+`deleteApp`, `applicationDefault`, `cert`, `refreshToken`, `FirebaseError`,
+`FirebaseAppError`, `AppErrorCode`, `SDK_VERSION`— y `admin.apps`, `admin.app`,
+`admin.credential`, `admin.firestore`, `admin.auth`, `admin.storage` y
+`admin.messaging` quedaron todos `undefined`. Los scripts estaban escritos
+contra esa API en 88 lugares repartidos en 46 archivos, así que con la 14
+instalada ninguno arrancaba.
+
+El bump se mergeó **dos veces** (`cac2d6fa` y `de77562a`/#901) sin que nada se
+pusiera rojo, por dos motivos que se tapaban entre sí: el job `scripts-test` no
+corría `npm ci` —validaba sobre un paquete que jamás descargaba— y los tests que
+sí cargan un script lo hacen con un doble que tiene la API que el doble decide
+tener. El #971 arregló lo primero y agregó
+`test/firebase_admin_superficie.test.js`, que carga el SDK **de verdad**.
+
+**Cómo se migró.** Por PRs encadenados, en `openspec/changes/firebase-admin-modular/`,
+con un criterio: primero lo que no escribe en producción. `functions/` (que se
+deploya, o sea que su riesgo está gateado) antes que `scripts/` (que se corre a
+mano con la credencial de producción), y dentro de `scripts/` la puerta de
+inicialización primero y los cuatro que suben a Storage último — porque lo que
+Storage escribe no lo cubre el backup diario de Firestore.
+
+**Las equivalencias**, verificadas con `===` contra el paquete instalado, no de
+memoria:
+
+| namespaced | modular | subpath |
+| --- | --- | --- |
+| `admin.firestore()` | `getFirestore(app)` | `firebase-admin/firestore` |
+| `admin.firestore.Timestamp` / `.FieldValue` | `Timestamp` / `FieldValue` | `firebase-admin/firestore` |
+| `admin.auth()` | `getAuth(app)` | `firebase-admin/auth` |
+| `admin.storage()` | `getStorage(app)` | `firebase-admin/storage` |
+| `admin.apps` | `getApps()` | `firebase-admin/app` |
+| `admin.app()` | `getApp()` | `firebase-admin/app` |
+| `admin.credential.cert(x)` | `cert(x)` | `firebase-admin/app` |
+
+`admin.firestore() === getFirestore()` y `admin.firestore.Timestamp === Timestamp`
+daban **`true`** ya en la 13: son los mismos objetos. Por eso la migración se
+pudo hacer archivo por archivo, con los dos estilos conviviendo, y sin que un
+`instanceof Timestamp` cruzado dejara de andar.
+
+**Lo que queda vigilando.** `test/firebase_admin_superficie.test.js` sigue ahí y
+sigue extrayendo del código la lista de APIs que le exige al SDK instalado. Hoy
+esa lista está **vacía**, y ese cero es la señal de que la migración terminó. Si
+mañana alguien escribe `admin.messaging()` en un script nuevo, el trinquete lo
+empieza a chequear solo y se pone rojo contra la v14.
 
 ## Lo que sólo puede hacer un humano (#834)
 
@@ -292,7 +342,8 @@ fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
 
 | `npm run …` | Runs | Blast radius |
 |---|---|---|
-| `seed:exercises` / `seed:routines` / `seed:all` | `seed_workout_catalog.js` | `set()` over the whole `exercises` + `routines` stock catalogue |
+| `seed:exercises` | `seed_workout_catalog.js` | `set()` over the whole `exercises` stock catalogue |
+| `seed:templates` | `seed_templates.js` | dry-run by default; with `--write`, `set()` over the 7 catalogue templates |
 | `seed:trainers` | `seed_trainer_profiles.js` | upserts 5 `users/{uid}` + `trainerPublicProfiles/{uid}` |
 | **`seed:trainers:clear`** | `seed_trainer_profiles.js --clear` | **`batch.delete()`** on those same 10 docs |
 | `promote:trainer` | `promote_user_to_trainer.js` | flips `users/{uid}.role`, bypassing the role-immutability rule |
@@ -350,6 +401,62 @@ form is submitted. On save the user lands on `/home` as a discoverable trainer.
 
 ---
 
+## 🚨 functions/scripts/delete-accounts.ts — borrar cuentas de prueba por email
+
+Borra cuentas puntuales pasando por **la misma cascada que el botón "Eliminar
+cuenta"** de la app (`runDeleteAccount`, `functions/src/delete-account.ts`): no
+la reimplementa. Incluye la baja de Mercado Pago **fail-closed**, el
+`audit_log/{uid}` y el borrado de Auth **al final**. Vive en `functions/scripts/`
+(no se compila a `lib/`, no sale de `index.ts`, **no se despliega**).
+
+**Auth y Storage no tienen backup.** Lo que borra `--apply` ahí no vuelve.
+
+- **Dry-run por default.** Sin `--apply` imprime, por cuenta: uid, email,
+  providers, createdAt, lastSignIn, si existe `users/{uid}` y su `role`.
+- **`--project` es obligatorio** contra un proyecto real y tiene que coincidir
+  con la identidad de la credencial (`$TREINO_SA_KEY`). Imprime el cartel de
+  producción.
+- **Se niega, sin flag para saltearlo**, a borrar cuentas operativas:
+  `treino@gettreino.com`, `treinosupport@gettreino.com`, `treinopf@gmail.com`,
+  `testplaystore*@gmail.com`, `martin.backhaus@code-assurance.com`, cualquier
+  `*+*@gmail.com` y `*@privaterelay.appleid.com`.
+- **Se niega a borrar entrenadores** (`role == 'trainer'`) salvo `--allow-trainers`
+  (su cascada avisa a los alumnos vinculados).
+- Secuencial. Una excepción se reporta y sigue con la próxima. **Sale con código 1**
+  si alguna cuenta pedida no quedó borrada del todo (excepción, `partial`,
+  rechazada o email no encontrado). Un `partial` lo reintenta `retryPartialDeletions`.
+  El dry-run también sale con 1 si alguna cuenta no se borraría (email no
+  encontrado, rechazada o error de lectura): un preflight fallido no pasa por éxito.
+- Si la cuenta tiene suscripción de Mercado Pago hace falta
+  `MP_ACCESS_TOKEN` en el entorno; sin él la cascada tira y la cuenta queda intacta.
+
+Desde `functions/` (`--project` es obligatorio y se escribe explícito):
+
+```sh
+cd functions
+
+# 1. Dry-run contra PRODUCCIÓN (no escribe nada):
+TREINO_SA_KEY="$HOME/.config/treino/sa-key.json" \
+  npx --yes ts-node scripts/delete-accounts.ts --project treino-dev \
+  --emails=uno@example.com,dos@example.com      # o --file=emails.txt (uno por línea)
+
+# 2. El mismo comando + --apply: BORRA DE VERDAD en producción.
+TREINO_SA_KEY="$HOME/.config/treino/sa-key.json" \
+  npx --yes ts-node scripts/delete-accounts.ts --project treino-dev \
+  --emails=uno@example.com,dos@example.com --apply
+```
+
+Contra el emulador (sin credencial; Firestore, Auth **y** Storage tienen que estar
+desviados, o aborta):
+
+```sh
+firebase emulators:exec --only firestore,auth,storage --project demo-del \
+  "cd functions && npx --yes ts-node scripts/delete-accounts.ts --emails=uno@example.com"
+```
+
+Tests (emulador): `firebase emulators:exec --only firestore,auth,storage --project demo-del
+"npm --prefix functions test -- --runInBand delete-accounts-cli"`.
+
 ## seed_emulator_full.js (Emulator seed)
 
 EMULATOR-ONLY full-stack seed for manual testing. Refuses to run without
@@ -365,7 +472,7 @@ node scripts/seed_emulator_full.js --clear  # remove everything it created
 Populates: Auth users (3 coaches + 5 athletes, throwaway passwords printed at
 the end), `gyms`, `users` + `userPublicProfiles` + `trainerPublicProfiles`,
 `trainer_links`, `friendships`, the **`exercises` stock catalogue** (reused
-from `seed_workout_catalog.js` — same data prod uses), `routines`
+from `seed_workout_catalog.js` — NOT the same data prod uses, see below), `routines`
 (trainer-assigned plans + a public template), historical sessions under
 `users/{uid}/sessions` **with realistic `setLogs` subcollections**
 (deterministic progressive weights ramping onto each slot's `targetWeightKg`;
@@ -377,6 +484,19 @@ Dates are relative to the run instant; pin `SEED_NOW=<ISO date>` for
 reproducible data. Session `muscleGroup` values use the canonical English keys
 (`chest`, `back`, …) exactly like app-written data — Insights' muscle pipeline
 (radar, Músculos del día, Volumen por grupo) depends on them.
+
+**The `exercises` catalogue reused here is NOT prod's.** This line said "same
+data prod uses" and that was false, measured against production on 2026-09-14:
+`seed_workout_catalog.js` carries 25 exercises on the old id scheme
+(`bench-press`, `back-squat`); production has 793 on the current one
+(`bench-press-barra`, `push-up-pesocorporal`), and the two sets share **zero**
+ids. For the emulator that is fine — all these 25 are asked to do is give the
+exercise picker something to show, and `seed_emulator_full.js:1291` already
+documents that its routines use a third id set on purpose. The problem was the
+claim, not the data: believing this file mirrored production is what made
+`npm run seed:all` look harmless while it overwrote the catalogue templates
+with 116 dead exercise references. That half of the seeder was removed on
+2026-09-14; templates now come from `seed_templates.js`.
 
 ---
 
@@ -584,20 +704,30 @@ alguno de ellos empieza a tocar Storage.
 
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
-`firebase-admin` stubbeado, cero red y sin `node_modules`:
-`npm --prefix scripts test`. Los corre el job **`Scripts Test (scripts/test)`**
-de `.github/workflows/ci.yml`, así que borrar una línea de cableado pone el PR
-en rojo — antes de ese job la suite entera dependía de que alguien se acordara.
+`firebase-admin` stubbeado y cero red: `npm --prefix scripts test`. Los corre el
+job **`Scripts Test (scripts/test)`** de `.github/workflows/ci.yml`, así que
+borrar una línea de cableado pone el PR en rojo — antes de ese job la suite
+entera dependía de que alguien se acordara.
+
+⚠️ **Que anden sin `node_modules` es una propiedad del stub, no una virtud de la
+suite, y durante un tiempo estuvo escrito acá como si fuera lo segundo.** Esa
+frase describía un agujero: el job de CI no instalaba nada, así que ningún test
+podía observar el `firebase-admin` real y dependabot lo subió a una major que
+mata los 44 scripts sin que nada se pusiera rojo (dos veces). Hoy el job corre
+`npm ci` antes de la suite, y `test/firebase_admin_superficie.test.js` es el
+único test que carga el SDK de verdad — si tira `MODULE_NOT_FOUND`, alguien le
+sacó el install al job. Ver el candado de `firebase-admin` más arriba.
 
 El stub (`test/fixtures/stub_firebase_admin.js`) tapa los **dos** caminos de
 carga, porque los scripts de `migrations/` son `.mjs` y su `import` no pasa por
 `Module._load`: `Module._load` para CJS y `module.register()` —con los hooks de
 `test/fixtures/esm_stub_hooks.mjs`— para ESM. `register()` y no
-`registerHooks()` a propósito: la segunda existe recién en Node 22.15 y el job
-corre **Node 20**, donde el subproceso pasaba a cargar el `firebase-admin` de
-verdad. Ese modo es peor que un rojo, porque los tests que prueban la
+`registerHooks()` a propósito: la segunda existe recién en Node 22.15, y el piso
+de `scripts/` es **Node 22** (`engines.node`, `firebase-admin` 14.5 lo exige): en
+una 22.x anterior a la 22.15 el subproceso pasaba a cargar el `firebase-admin`
+de verdad. Ese modo es peor que un rojo, porque los tests que prueban la
 **ausencia** de un marcador quedan verdes midiendo nada. Por eso la intercepción
 ahora se **anuncia** (`STUB_ESM_INTERCEPTED`), los tests la exigen en cada
 corrida y `test/esm_stub_interception.test.js` la custodia con control negativo.
-Si tocás el stub, corré la suite en Node 20 —no sólo en el tuyo—:
-`npx -y node@20 --test test/*.test.js` desde `scripts/`.
+Si tocás el stub, corré la suite en Node 22 —no sólo en el tuyo—:
+`npx -y node@22 --test test/*.test.js` desde `scripts/`.

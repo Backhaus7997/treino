@@ -8,8 +8,20 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/coach_hub_app.dart';
+import 'core/analytics/analytics_consent.dart';
 import 'core/persistence/shared_prefs_provider.dart';
+import 'features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_dialog.dart'
+    show coachHubAccountDeletionOverrides;
 import 'firebase_options.dart';
+
+/// Overrides del `ProviderScope` raíz del Hub. Vive aparte de `main()` para
+/// poder probar que el cableado de producción (baja de cuenta incluida) existe.
+List<Override> coachHubProviderOverrides(SharedPreferences prefs) => [
+      // Synchronous by contract — see sharedPreferencesOverride (#543).
+      sharedPreferencesOverride(prefs),
+      // Baja de cuenta por popup / contraseña y sign-out directo (web).
+      ...coachHubAccountDeletionOverrides,
+    ];
 
 /// Entry point del TREINO Coach Hub (Flutter Web target).
 ///
@@ -42,13 +54,11 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Analytics: colección habilitada para tracking de actions del Coach Hub
-  // web. Crashlytics no aplica acá (no soporta web).
-  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-
-  // Coach Hub MVP NO usa Google Sign-In (decisión #2 del propose). Solo
-  // email/password. Por eso NO inicializamos `GoogleSignIn.instance` acá
-  // — el plugin web es scope aparte (Etapa 7.5 o follow-up).
+  // Google y Apple entran por `FirebaseAuth.signInWithPopup`, que no necesita
+  // el plugin `google_sign_in`. Por eso NO inicializamos `GoogleSignIn.instance`
+  // acá a propósito: `AuthService.signOut()` espera ese `initialize()` y, si
+  // nunca ocurre, se cuelga. El sign-out de `/not-allowed` va directo a
+  // `FirebaseAuth` (ver `coach_hub_not_allowed_screen.dart`).
 
   const useEmulator = bool.fromEnvironment(
     'USE_EMULATOR',
@@ -65,12 +75,16 @@ Future<void> main() async {
   // (ADR-LM-009). Mirrors lib/main.dart.
   final prefs = await SharedPreferences.getInstance();
 
+  // Analytics: según lo que el usuario haya elegido, NO siempre. Espejo de
+  // `lib/main.dart` — la Política de Privacidad promete poder revocar el
+  // consentimiento en cualquier momento, y eso vale para las dos superficies.
+  // La llamada vive acá abajo porque necesita las preferencias.
+  await FirebaseAnalytics.instance
+      .setAnalyticsCollectionEnabled(analyticsConsentFromPrefs(prefs));
+
   runApp(
     ProviderScope(
-      overrides: [
-        // Synchronous by contract — see sharedPreferencesOverride (#543).
-        sharedPreferencesOverride(prefs),
-      ],
+      overrides: coachHubProviderOverrides(prefs),
       child: const CoachHubApp(),
     ),
   );

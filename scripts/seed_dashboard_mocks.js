@@ -22,9 +22,10 @@
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // ── Targets (from diag_trainer_links.js --trainer-email mateopresset7@gmail.com)
 const TRAINER_ID = 'zCqIMvyJNpeZFdyHAD0zjhZu13g1';
@@ -69,7 +70,7 @@ function apptDoc({ athleteId, athleteDisplayName, startsAt, durationMin }) {
       trainerId: TRAINER_ID,
       athleteId,
       athleteDisplayName,
-      startsAt: admin.firestore.Timestamp.fromDate(startsAt),
+      startsAt: Timestamp.fromDate(startsAt),
       durationMin,
       status: 'confirmed',
       cancellationLog: [],
@@ -155,8 +156,8 @@ async function main() {
     uid: ACTIVE_ATHLETE_ID,
     routineId: 'seed_mock_routine',
     routineName: 'Push Day',
-    startedAt: admin.firestore.Timestamp.fromDate(startedAt),
-    finishedAt: admin.firestore.Timestamp.fromDate(finishedAt),
+    startedAt: Timestamp.fromDate(startedAt),
+    finishedAt: Timestamp.fromDate(finishedAt),
     totalVolumeKg: 3120,
     durationMin: slotDurationMin,
     status: 'finished',

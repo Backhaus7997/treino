@@ -4,7 +4,12 @@
  *
  * The exploit chain (all client-side, no trainer involvement):
  *   1. athlete creates trainer_links/{id} {athleteId: me, trainerId: victim,
- *      status: 'pending'}  — create rule allows it (no consent check).
+ *      status: 'pending'}  — el create ya NO admite cualquier `victim`: exige
+ *      que ese uid sea un PF de verdad (`tieneRolDePF`, firestore.rules ~208).
+ *      Cuando se escribió este archivo acá decía «create rule allows it (no
+ *      consent check)», y era cierto: la víctima podía ser cualquier cuenta.
+ *      La cadena sigue existiendo contra un PF REAL —que es el escenario que
+ *      el paso 2 cierra—, así que los fixtures siembran `role: 'trainer'`.
  *   2. athlete updates status pending -> active  — the update rule used to let
  *      EITHER member change status with no transition/actor validation.
  *   3. athlete creates reviews/{id} — gated on the link being
@@ -71,6 +76,8 @@ interface LinkFixture {
   acceptedAt?: number | null;
   pausedAt?: number | null;
   sharedWithTrainer?: boolean;
+  /** La razón con la que se terminó. Un `terminated` real la lleva. */
+  terminationReason?: string | null;
 }
 
 async function seedLink(linkId: string, fixture: LinkFixture): Promise<void> {
@@ -94,6 +101,30 @@ const LINK = `${TRAINER}_${ATHLETE}`;
 function ctxDb(uid: string) {
   return testEnv.authenticatedContext(uid).firestore();
 }
+
+/**
+ * `TRAINER` tiene que EXISTIR como PF para que el create del vínculo pase.
+ *
+ * El `create` de `trainer_links` exige `tieneRolDePF(trainerId)`
+ * (firestore.rules ~208): el campo peligroso de ese create es la CONTRAPARTE,
+ * porque el que escribe es el atleta.
+ *
+ * Y es coherente con lo que este archivo prueba. El header describe la cadena
+ * del forge y dice del paso 1: «create rule allows it (no consent check)». Eso
+ * dejó de ser cierto — ese paso ahora exige que el destinatario sea un PF de
+ * verdad. La cadena sigue existiendo para un PF REAL, que es el escenario que
+ * QA-SEC-002 cierra en el paso 2, así que sembrar el rol mantiene el archivo
+ * probando lo suyo en vez de aprobar por un deny que llega antes.
+ */
+beforeEach(async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection("users")
+      .doc(TRAINER)
+      .set({ uid: TRAINER, role: "trainer" });
+  });
+});
 
 describe("trainer_links update — QA-SEC-002 self-promotion", () => {
   it("DENIES the athlete promoting pending -> active (the forge)", async () => {
@@ -187,6 +218,228 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
     });
     const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
     await assertSucceeds(ref.update({ sharedWithTrainer: true }));
+  });
+});
+
+// ── `paused` sólo desde `active`: no se revive un vínculo muerto ─────────────
+//
+// La cláusula de `paused` pedía UNA sola cosa —que quien escribe sea el
+// trainer— y no miraba el estado de ORIGEN. Con eso, un ex-PF podía tomar un
+// vínculo que el alumno había TERMINADO, escribirle `paused`, y después llamar
+// a `resumeTrainerLink`: la callable sólo compara contra `'paused'`, así que lo
+// devolvía a `active`.
+//
+// Lo que eso le devuelve al ex-PF no es cosmético. `syncSessionShareOnTrainerLink`
+// re-otorga `session_shares/{athleteId}` en toda transición real hacia `active`,
+// y ese grant abre `sessions`, `setLogs`, `exerciseFeedback`, las mediciones y
+// las fotos de molestias del alumno — datos de SALUD, sobre una relación que el
+// alumno ya había cortado y sin que vuelva a consentir. De paso le SACA el share
+// al PF actual, que es last-writer-wins sobre `session_shares`.
+//
+// El alumno sólo recibe un push de "vinculación reanudada" y su única defensa es
+// volver a terminar, que el ex-PF puede deshacer otra vez. Sin tope.
+//
+// La regla ahora exige `resource.data.status == 'active'`, que es exactamente lo
+// que su propio comentario ya afirmaba ("un re-request legítimo crea un doc
+// nuevo, nunca revive el viejo") y lo que el cliente YA garantiza:
+// `TrainerLinkRepository.pause()` (~140) tira StateError si el status no es
+// `active`. O sea que esto no cierra ningún camino que un cliente legítimo use
+// — se pone al día con la intención escrita.
+//
+// El ancla del camino bueno vive arriba, en "allows the trainer to pause
+// (active -> paused) but NOT to resume".
+describe("trainer_links — `paused` sólo desde `active` (A2)", () => {
+  it("DENIEGA que el PF pause un vínculo TERMINADO (el paso 1 de revivirlo)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "terminated",
+      requestedAt: 1,
+      acceptedAt: 2,
+      terminationReason: "athlete-terminated",
+    });
+
+    const ref = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
+    await assertFails(ref.update({ status: "paused", pausedAt: 4 }));
+  });
+
+  // Variante del mismo agujero, y cierra de paso el camino de reseñas con
+  // cuentas títere: `reviews` gatea en `status in ['active','paused']`, así que
+  // un `pending` empujado a `paused` habilitaba la reseña sin que el vínculo
+  // hubiera pasado NUNCA por `acceptTrainerLink` — o sea, sin pagar el gate del
+  // peso ponderado.
+  it("DENIEGA que el PF pause una solicitud PENDING (saltearía el accept)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    const ref = ctxDb(TRAINER).collection(COL_LINKS).doc(LINK);
+    await assertFails(ref.update({ status: "paused", pausedAt: 4 }));
+  });
+
+  // Control: el que ya estaba pausado puede seguir escribiendo otras cosas sin
+  // tocar el status. La rama `status == resource.data.status` de la regla sigue
+  // viva, y si se rompiera, un `paused` quedaría congelado para siempre.
+  it("PERMITE un update que NO toca el status sobre un vínculo pausado", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "paused",
+      requestedAt: 1,
+      acceptedAt: 2,
+      pausedAt: 3,
+      sharedWithTrainer: false,
+    });
+
+    const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
+    await assertSucceeds(ref.update({ sharedWithTrainer: true }));
+  });
+
+  // Y terminar un pausado sigue andando: es la salida del alumno.
+  it("PERMITE terminar un vínculo pausado (la salida del alumno)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "paused",
+      requestedAt: 1,
+      acceptedAt: 2,
+      pausedAt: 3,
+    });
+
+    const ref = ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK);
+    await assertSucceeds(ref.update({ status: "terminated" }));
+  });
+});
+
+// ── terminationReason: quién puede escribir cada razón ──────────────────────
+//
+// `terminationReason` no estaba pineado ni acotado: cualquiera de los dos
+// members podía escribir la razón que quisiera. Eso subió de prioridad cuando
+// ese campo pasó a ser INPUT DE UN DELETE (`clasificarTerminacion` en
+// functions/src/purge-rejected-link.ts decide con él si el doc se borra).
+//
+// El ataque concreto: el PF rechaza una solicitud pero estampa
+// `cancelled-by-athlete`. La notificación y la fila de historial van SÓLO al
+// PF; el atleta no se entera de nada, y el doc después se purga. La solicitud
+// desaparece sin dejar rastro del lado del atleta.
+//
+// La regla NO puede pinear el campo inmutable —`decline`, `cancel` y
+// `terminate` lo escriben todos como parte de la transición—. Lo que hace es
+// atar las DOS razones que disparan el borrado a quien de verdad puede
+// causarlas.
+describe("trainer_links — terminationReason atado al actor", () => {
+  it("DENIEGA que el PF estampe 'cancelled-by-athlete' (silenciaría al atleta)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertFails(
+      ctxDb(TRAINER).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      }),
+    );
+  });
+
+  it("DENIEGA que el atleta estampe 'declined'", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertFails(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "declined",
+      }),
+    );
+  });
+
+  it("PERMITE el rechazo legítimo del PF ('declined')", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertSucceeds(
+      ctxDb(TRAINER).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "declined",
+      }),
+    );
+  });
+
+  it("PERMITE la cancelación legítima del atleta ('cancelled-by-athlete')", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertSucceeds(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      }),
+    );
+  });
+
+  it.each([
+    ["athlete-terminated"],
+    ["trainer-terminated"],
+    ["switched_trainer"],
+  ])(
+    "los DOS members siguen pudiendo terminar un vínculo real (reason=%s)",
+    async (reason) => {
+      // Estas razones NO disparan el borrado, así que no se acotan: el modelo
+      // sigue sin saber quién cortó, y atarlas sería inventar una regla que el
+      // producto no tiene.
+      for (const uid of [TRAINER, ATHLETE]) {
+        await seedLink(LINK, {
+          trainerId: TRAINER,
+          athleteId: ATHLETE,
+          status: "active",
+          requestedAt: 1,
+          acceptedAt: 2,
+        });
+
+        await assertSucceeds(
+          ctxDb(uid).collection(COL_LINKS).doc(LINK).update({
+            status: "terminated",
+            terminationReason: reason,
+          }),
+        );
+
+        await testEnv.clearFirestore();
+      }
+    },
+  );
+
+  it("PERMITE terminar sin razón (el campo es opcional)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "active",
+      requestedAt: 1,
+      acceptedAt: 2,
+    });
+
+    await assertSucceeds(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+      }),
+    );
   });
 });
 

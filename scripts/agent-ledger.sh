@@ -18,6 +18,13 @@ set -euo pipefail
 #   ./scripts/agent-ledger.sh release --all    # todo lo de este worktree
 #   ./scripts/agent-ledger.sh prune
 #
+# `release <scope>` dice "liberado" SÓLO si borró una fila. Si no borró, dice
+# que no y a qué worktree apunta la fila — un "liberado" que miente deja un
+# claim fantasma, y el próximo agente frena sobre un scope que nadie tiene.
+# Alcanza a los claims de este worktree y a los de un worktree ya borrado (el
+# agente terminó y se llevó su árbol); si la fila es de un worktree que sigue
+# existiendo, no la toca y te dice dónde está.
+#
 # La identidad de un agente es la SESIÓN, no el worktree. Varias sesiones de la
 # misma herramienta comparten árbol, y con el worktree como identidad `release`
 # sin scope se llevaba los claims de las otras y `check` contestaba "libre"
@@ -177,7 +184,7 @@ cmd_claim() {
 }
 
 cmd_release() {
-  local scope all=0 me sess tmp
+  local scope all=0 me sess tmp wt dead
   case "${1:-}" in
     --all) all=1; scope="" ;;
     # Mismo clean que uso claim al escribir, si no `release 826 ` no matchea.
@@ -186,15 +193,47 @@ cmd_release() {
   me="$(worktree)"; sess="$(session)"
   [ -f "$LEDGER" ] || { echo "ledger vacio"; return 0; }
 
+  # Los worktrees del ledger que ya no existen en disco. Se calcula ACA y no en
+  # awk porque awk no le puede preguntar al filesystem.
+  #
+  # POR QUE `-d` Y NO `git worktree list`: git es la fuente autoritativa de si
+  # un worktree sigue dado de alta, pero compararlo exige que el path que
+  # imprime `worktree list` sea TEXTUALMENTE el que guardo `rev-parse
+  # --show-toplevel` en la fila. En macOS /var es symlink a /private/var y los
+  # paths de git ya no coinciden entre si por ese motivo (lo documenta
+  # scripts/test/agent_ledger_identidad.test.js). Si no coinciden, un worktree
+  # VIVO se leeria como muerto y le borrariamos el claim — el bug que este
+  # script existe para evitar, en su direccion mas cara. `-d` es un stat sobre
+  # el string exacto de la fila: no hay traduccion que pueda fallar, y cuando
+  # falla lo hace del lado seguro (no limpia). El caso que deja afuera es la
+  # carpeta huerfana vacia que deja `git worktree remove` en Windows: ahi el
+  # dir existe, no se limpia, y el mensaje nombra el path para que lo veas.
+  #
+  # El tab delimita Y hace de centinela: el campo 4 nunca puede contener un tab
+  # (lo garantiza `field`), asi que buscar TAB<path>TAB no puede dar un falso
+  # positivo por prefijo — sin eso, `/wt` matchearia dentro de `/wt-link-rol`.
+  dead="$TAB"
+  while IFS="$TAB" read -r _ _ _ wt _; do
+    [ -n "${wt:-}" ] || continue
+    # Citado a proposito: en el PATRON de `case` lo entrecomillado es literal,
+    # asi que un path con `*`, `?` o `[` no se interpreta como glob.
+    case "$dead" in *"$TAB$wt$TAB"*) continue ;; esac
+    [ -d "$wt" ] || dead="$dead$wt$TAB"
+  done <<< "$(rows)"
+
   # Que se lleva cada forma, y por que:
   #
   #   release          las filas de ESTE worktree Y ESTA sesion. El worktree
   #                    solo no alcanza: paso el 2026-08-28 que tres claims
   #                    compartian `wt` y un release sin scope se llevo los tres.
-  #   release <scope>  ese scope en este worktree, sea de la sesion que sea. Es
-  #                    un acto explicito que nombra su objetivo — y es la unica
-  #                    salida manual para limpiar el claim de un agente muerto.
-  #                    Si la fila no era tuya, se avisa.
+  #   release <scope>  ese scope en este worktree O en un worktree que ya no
+  #                    existe en disco, sea de la sesion que sea. Es un acto
+  #                    explicito que nombra su objetivo — y es la unica salida
+  #                    manual para limpiar el claim de un agente muerto. El
+  #                    caso del worktree borrado es justamente el mas comun de
+  #                    esos (el agente termino y se llevo su arbol) y antes no
+  #                    tenia salida: habia que esperar las 8h de prune
+  #                    (LEDGER_STALE_HOURS). Si la fila no era tuya, se avisa.
   #   release --all    todo lo de este worktree. El barrido de antes, ahora hay
   #                    que pedirlo.
   #
@@ -209,26 +248,49 @@ cmd_release() {
   #
   # El temp lleva el PID: con el nombre fijo, dos worktrees liberando a la vez
   # escribian el mismo `.tmp` y se truncaban entre si.
+  #
+  # EL MENSAJE INFORMA FILAS BORRADAS, NO INTENTOS. `release <scope>` imprimia
+  # "liberado: <scope>" incondicionalmente, asi que cuando la fila apuntaba a
+  # otro worktree —o a uno ya borrado— decia que habia limpiado un claim que
+  # seguia en pie. Medido el 2026-10-06: un claim de 11 dias
+  # (`checkout-token`) sobrevivio a varios `release` porque cada uno contestaba
+  # que si. Es el mismo criterio que `contarBorradosReales` en
+  # scripts/cleanup_rejected_links.js: contar operaciones emitidas es contar
+  # intentos, y un cartel tranquilizador sin verificar es AGENTS.md § 11.1 —
+  # con el agravante de que el proximo agente le cree al ledger y frena sobre
+  # un scope que nadie tiene.
   tmp="$LEDGER.tmp.$$"
-  ME="$me" SS="$sess" SC="$scope" ALL="$all" OUT="$tmp" awk -F"$TAB" '
+  ME="$me" SS="$sess" SC="$scope" ALL="$all" OUT="$tmp" DEAD="$dead" awk -F"$TAB" '
     BEGIN {
       me  = ENVIRON["ME"]; ss = ENVIRON["SS"]; sc = ENVIRON["SC"]
       all = (ENVIRON["ALL"] == "1"); out = ENVIRON["OUT"]
+      dead = ENVIRON["DEAD"]
       # Crea el temp aunque no sobreviva ninguna fila, si no el mv revienta.
       printf "" > out
     }
     {
       mine = ($4 == me)
-      if      (!mine)     keep = 1
-      else if (sc != "")  keep = ($5 != sc)
+      # Huerfana = de otro worktree, y ese worktree ya no esta en disco. Solo
+      # la mira `release <scope>`: el pelado y --all siguen atados a ESTE
+      # arbol, que es lo que los hace predecibles.
+      huerfana = (!mine && index(dead, FS $4 FS) > 0)
+
+      if      (sc != "")  keep = !((mine || huerfana) && $5 == sc)
+      else if (!mine)     keep = 1
       else if (all)       keep = 0
       else                keep = ($7 != ss)
 
       if (keep) {
         print > out
         if (mine && sc == "" && !all) kept[++nk] = $5 "  (" $2 " · " $3 ")"
+        # Una fila con el scope pedido que SOBREVIVE solo puede ser de otro
+        # worktree vivo (si fuera de este, o huerfana, keep seria 0). Es el
+        # dato que le falta a quien esta limpiando el claim de un agente
+        # muerto: sin esto el mensaje decia "liberado" y no decia donde.
+        if (sc != "" && $5 == sc) otro[++notro] = $4 "  (" $2 " · " $3 ")"
       } else {
         ngone++
+        if (huerfana) huerf[++nh] = $4
         # Solo cuenta como ajena si se puede PROBAR que lo es. La fila sin
         # sesion (version vieja del script) puede ser tuya: avisar ahi seria
         # una advertencia falsa, que es peor que ninguna (AGENTS.md 11.1).
@@ -236,9 +298,25 @@ cmd_release() {
       }
     }
     END {
-      if      (sc != "") printf "liberado: %s\n", sc
-      else if (all)      printf "liberado: %d claim(s) de este worktree\n", ngone+0
-      else               printf "liberado: %d claim(s) de esta sesion\n", ngone+0
+      if (sc != "") {
+        if (ngone > 0) {
+          printf "liberado: %s", sc
+          if (ngone > 1) printf "  (%d filas)", ngone
+          printf "\n"
+          for (i = 1; i <= nh; i++)
+            printf "   su worktree ya no existe en disco: %s\n", huerf[i]
+        } else if (notro > 0) {
+          printf "NO liberado: no hay claim de '\''%s'\'' en este worktree.\n", sc
+          for (i = 1; i <= notro; i++) printf "   su fila apunta a %s\n", otro[i]
+          printf "   → ese worktree SI existe en disco: puede haber un agente vivo ahi.\n"
+          printf "     Si de verdad murio: corre el release DESDE ESE worktree, o borra\n"
+          printf "     el arbol y volve a correr este mismo comando.\n"
+        } else {
+          printf "NO liberado: no hay ningun claim de '\''%s'\'' en el ledger.\n", sc
+        }
+      }
+      else if (all) printf "liberado: %d claim(s) de este worktree\n", ngone+0
+      else          printf "liberado: %d claim(s) de esta sesion\n", ngone+0
 
       if (ns > 0) {
         if (sc != "") printf "ojo: '\''%s'\'' no era de esta sesion.\n", stolen[1]
@@ -331,6 +409,9 @@ case "${1:-list}" in
   check)   shift; cmd_check "$@" ;;
   prune)   cmd_prune ;;
   list|"") cmd_list ;;
-  -h|--help|help) sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//' ;;
+  # Hasta la primera linea VACIA, no hasta un numero de linea: el rango fijo
+  # ('3,30p') ya se habia quedado corto una vez al crecer el encabezado, y la
+  # ayuda salia cortada a mitad de frase sin que nada avisara.
+  -h|--help|help) sed -n '3,/^$/p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "comando desconocido: $1  (claim|release|check|list|prune)" ;;
 esac

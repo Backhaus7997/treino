@@ -4,7 +4,8 @@ Borrador para que el equipo lo revise **antes** de cargarlo en App Store
 Connect. Mismo inventario que [`data-safety.md`](./data-safety.md), reordenado
 según las categorías de Apple, que no son las de Google.
 
-Verificado contra el código el **2026-08-25**.
+Verificado contra el código el **2026-09-22**. La revisión anterior era del
+2026-08-25 y sus cuatro pendientes están cerrados al final del archivo.
 
 ---
 
@@ -95,18 +96,53 @@ crudos en `trainerLocations` — es un cambio de código, no de formulario.
 
 ---
 
+## Resuelto — lo que era pendiente y ya no
+
+- [x] **URL de política de privacidad.** **Publicada y verificada en vivo el
+      2026-09-22:** `https://gettreino.com/es/privacidad`. Es la URL que va en la
+      ficha.
+
+      Este renglón decía *"hoy no existe. Bloqueante duro"*, y era el único
+      bloqueante declarado del documento. Ya no lo es. La página se genera desde
+      `docs/legal/politica-de-privacidad.md` —fuente única— y `app.gettreino.com`
+      sirve el mismo texto desde el mismo lugar. Las dos superficies dejaron de
+      poder divergir.
+
+- [x] **In-app purchases: NO.** Y ahora es verdad.
+
+      ⚠️ **Antes NO lo era**, y conviene que quede escrito. Este renglón decía
+      que *"el binario iOS no tiene ningún flujo de pago"* mientras `pubspec.yaml`
+      arrastraba `purchases_flutter`, que trae StoreKit en iOS y
+      `com.android.billingclient:billing` en Android. Se declaraba una cosa y el
+      binario contenía la contraria.
+
+      Cerrado por los PRs #1201 (el SDK fuera del binario) y #1206 (el webhook y
+      su backend). **Nunca procesó una compra real.** El alumno paga por Mercado
+      Pago en `gettreino.com`, y el entrenador en el Coach Hub web.
+
+      ⚠️ Lo que SIGUE valiendo: si alguna vez el atleta paga por contenido digital
+      **desde la app**, aplica la **guideline 3.1.1** y hay que usar IAP de Apple,
+      no Mercado Pago. Eso además reabre el Beta App Review de TestFlight. Y la
+      app tampoco puede decir dónde se compra — nombrar la landing desde el
+      binario es un *call to action for purchase outside of the app* y tira abajo
+      la exención 3.1.3(f) del entrenador. Lo fija
+      `test/features/paywall/superficie_de_cobro_alumno_test.dart`.
+
+- [x] **Account deletion, guideline 5.1.1(v).** El borrado en cascada **sí** cubre
+      Storage: `functions/src/__tests__/cascade/storage.test.ts` verifica que
+      `deleteAvatar` borre `avatars/{uid}` en jpg y en heic, y que
+      `deleteAthleteStorage` limpie `temp/`, `customExerciseVideos/`,
+      `chatMedia/` y `athleteFiles/` del uid **sin tocar los de otros**.
+
+- [x] **Analytics en release: SÍ, activo.** Pero con un matiz que importa para la
+      ficha: pasa por `analyticsConsentFromPrefs`
+      (`lib/core/analytics/analytics_consent.dart:21`), que lee
+      `kAnalyticsConsentKey` con default `true`. Es **opt-out**: viene prendido y
+      el usuario lo puede apagar.
+
+      Apple no distingue obligatorio de opcional en las etiquetas, así que acá no
+      cambia nada. **En Play sí** — ver `data-safety.md`.
+
 ## Pendientes antes de cargar
 
-- [ ] **URL de política de privacidad.** App Store Connect la exige en la ficha.
-      Hoy no existe. Bloqueante duro, igual que en Play.
-- [ ] Confirmar si Analytics queda activo en release.
-- [ ] Revisar que el **account deletion** cumpla la guideline 5.1.1(v) — Apple
-      exige borrado de cuenta desde adentro de la app para toda app que permita
-      crearla. `account_deletion_notifier.dart` existe; falta verificar que el
-      borrado en cascada cubra Storage además de Firestore.
-- [ ] **In-app purchases**: depende de #644 (congelada). Con el código de hoy el
-      binario iOS **no** tiene ningún flujo de pago — el paywall del PF vive en
-      el Coach Hub **web**. Respuesta hoy: **no**.
-      ⚠️ Si alguna vez el atleta paga por contenido digital desde la app, aplica
-      la **guideline 3.1.1** y hay que usar IAP de Apple, no Mercado Pago. Eso
-      además reabre el Beta App Review de TestFlight.
+Ninguno bloqueante. Los cuatro de arriba están cerrados con evidencia.

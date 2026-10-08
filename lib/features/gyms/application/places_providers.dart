@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/utils/location_precision.dart';
 import '../../../core/utils/geohash.dart';
 import '../../profile/application/user_providers.dart'
     show userRepositoryProvider;
@@ -12,21 +13,47 @@ import '../domain/gym_suggestion.dart';
 import '../domain/nearby_gym.dart';
 import 'gym_providers.dart' show gymRepositoryProvider;
 
-/// Client key de Google Places. **DEBE estar RESTRINGIDA** en Google Cloud
-/// Console (project treino-dev → Credentials): API restriction = "Places API
-/// (New)". Un client key NO es un secreto — viaja en el binario de la app de
-/// todos modos, así que la protección real es la restricción de la key, no
-/// esconderla. Por eso va committeada como default acá: TODO build anda sin
-/// flags (flutter run, Xcode Archive, CI). `--dart-define=PLACES_CLIENT_KEY`
-/// la sigue pisando si se pasa (útil para rotarla sin recompilar el default).
+/// Client key de Google Places para la app mobile. **SIN default commiteado**:
+/// sin `--dart-define=PLACES_CLIENT_KEY=...` los servicios fallan explícito
+/// ([PlacesTextSearchConfigError] / [PlacesNearbySearchConfigError]) y la UI lo
+/// muestra como un problema de configuración, nunca como "no hay resultados".
+///
+/// Espeja a [kPlacesWebClientKey] (coach_hub/application/lugar_search_providers),
+/// que ya se hacía así para el navegador. Acá había un default committeado, y el
+/// comentario que lo justificaba decía dos cosas que no se sostienen en ESTE
+/// repo:
+///
+///   «viaja en el binario de todos modos» — cierto, pero sacarla de un APK es
+///   trabajo deliberado; de un repositorio PÚBLICO la levantan bots que
+///   escanean `AIza` solos, a las horas de cada push. No es la misma amenaza.
+///
+///   «la protección real es la restricción de la key» — a medias: la API
+///   restriction acota QUÉ API se puede llamar, no QUIÉN. Y una restricción por
+///   APP acá es imposible: estas llamadas REST mandan sólo `X-Goog-Api-Key` y
+///   `X-Goog-FieldMask`, nunca `X-Android-Package`/`X-Ios-Bundle-Identifier`.
+///   Con la key filtrada, lo ÚNICO que acota el gasto es el tope de cuota.
+///
+/// **DEBE estar RESTRINGIDA** igual (API restriction = "Places API (New)") y
+/// **DEBE tener tope de cuota diario** en Google Cloud Console. Ver CONTRIBUTING.
 ///
 /// Compartida por Text Search Y Place Details resolution (Plan B pivot — ver
 /// [ResolveGymPlaceService]).
-const String _placesClientKey = String.fromEnvironment(
-  'PLACES_CLIENT_KEY',
-  // ⬇️ PEGÁ ACÁ tu key RESTRINGIDA de Places (entre las comillas).
-  defaultValue: 'AIzaSyCQv4N2hTBppGlnJOdKrQViVUsi6yDYsgA',
-);
+const String _placesClientKey = String.fromEnvironment('PLACES_CLIENT_KEY');
+
+/// ¿Este error es "falta la key", y no "falló la red"?
+///
+/// Existe porque las dos pantallas que buscan gimnasios ofrecían REINTENTAR
+/// ante cualquier error, y para una key ausente eso es mentira: reintentar no
+/// la trae. Es el defecto de AGENTS.md §11.1 — un mensaje que describe mal lo
+/// que pasó — y se vuelve alcanzable justo ahora, cuando la key dejó de tener
+/// default.
+///
+/// Vive acá y no en cada widget para que los dos consumidores clasifiquen con
+/// el MISMO predicado: si mañana aparece un tercer servicio de Places, se agrega
+/// su tipo en un solo lugar.
+bool esFaltanteDeKeyDePlaces(Object error) =>
+    error is PlacesTextSearchConfigError ||
+    error is PlacesNearbySearchConfigError;
 
 /// Shared `http.Client` for Places requests (Text Search + Details). A
 /// single long-lived client (not `Provider.autoDispose`) matches the
@@ -36,11 +63,11 @@ final httpClientProvider = Provider<http.Client>((ref) => http.Client());
 /// Provider for [ResolveGymPlaceService] — CLIENT-SIDE (Plan B pivot).
 ///
 /// The original design called a `resolveGymPlace` Cloud Function (Admin SDK
-/// + server-side key in Secret Manager, `functions/src/places-search.ts`).
+/// + server-side key in Secret Manager).
 /// That CF CANNOT be deployed: GCP project `treino-dev` sits under org
 /// `code-assurance.com`, whose Domain-Restricted-Sharing policy blocks
-/// public (`allUsers`) invoker on Cloud Functions. The CF is SHELVED
-/// (kept, not exported from `functions/src/index.ts`) — resolution now
+/// public (`allUsers`) invoker on Cloud Functions. The CF was
+/// DELETED (it also persisted Google's name/address, #1338) — resolution now
 /// happens directly from the client via [ResolveGymPlaceService], reusing
 /// [gymRepositoryProvider] for the read-through cache/upsert and the same
 /// bundle-restricted [_placesClientKey] Text Search already uses.
@@ -93,7 +120,8 @@ final gymSearchLocationBiasProvider = FutureProvider.autoDispose<Position?>(
       final granted = permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse;
       if (!granted) return null;
-      return await Geolocator.getCurrentPosition();
+      return await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
     } catch (_) {
       return null;
     }
@@ -132,23 +160,44 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   /// "Cannot use ref after the widget was disposed" si la pantalla se
   /// desmontó mientras la operación estaba en vuelo. El estado se sigue
   /// publicando igual para quien quiera mostrar loading/error.
+  ///
+  /// Si el gym es nuevo (o está marcado `nameNeeded`) y no llegó [name], NO
+  /// se vincula nada: devuelve `false` y el estado trae `needsName: true`
+  /// para que la pantalla pida el nombre y vuelva a llamar con [name]
+  /// (el nombre lo escribe el usuario, nunca Google).
   Future<bool> select({
     required String uid,
     required String placeId,
+    String? name,
     bool useSessionToken = false,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final result = await ref.read(resolveGymPlaceServiceProvider).call(
-            placeId: placeId,
-            sessionToken: null,
-          );
+      final service = ref.read(resolveGymPlaceServiceProvider);
+      final userRepo = ref.read(userRepositoryProvider);
+      // Al nombrar un gym `nameNeeded`, la regla de Firestore exige que el
+      // usuario YA esté vinculado a él: el servicio llama este hook justo
+      // antes de escribir el nombre. Sin nombre tipeado no hay nada que
+      // nombrar, así que no se pasa.
+      final result = name == null
+          ? await service.call(
+              placeId: placeId,
+              sessionToken: null,
+              name: null,
+            )
+          : await service.call(
+              placeId: placeId,
+              sessionToken: null,
+              name: name,
+              beforeNaming: () => userRepo.update(uid, {'gymId': placeId}),
+            );
+      if (result.needsName) return result;
       await ref
           .read(userRepositoryProvider)
           .update(uid, {'gymId': result.gymId});
       return result;
     });
-    return !state.hasError;
+    return !state.hasError && state.valueOrNull?.needsName != true;
   }
 }
 
@@ -307,7 +356,8 @@ class NearbyLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         return;
       }
       _isPermissionDenied = false;
-      state = AsyncData(await Geolocator.getCurrentPosition());
+      state = AsyncData(await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings));
     } catch (_) {
       _isPermissionDenied = true;
       state = const AsyncData(null);
@@ -329,7 +379,8 @@ class NearbyLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         state = const AsyncData(null);
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
       state = AsyncData(pos);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -371,7 +422,11 @@ final nearbyLocationProvider =
 /// — `searchNearby` needs real coordinates, not the bucket string itself.
 /// Uses the same base32 alphabet as `geohash5` (core/utils/geohash.dart);
 /// duplicated here as the inverse operation rather than adding a shared
-/// decode function with only one caller.
+/// decode function. Ahora tiene DOS llamadores en este archivo
+/// (`nearbyGymsProvider` y la búsqueda por texto): los dos mandan a Places el
+/// centro de la celda y no el punto del usuario. Si aparece un tercero fuera
+/// de este archivo, ahí sí conviene moverlo a `core/utils/geohash.dart` al
+/// lado de su inversa.
 (double, double) _decodeGeohashBucketCenter(String bucket) {
   const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
   double minLat = -90.0, maxLat = 90.0;
@@ -542,6 +597,29 @@ final placesTextSearchProvider =
     if (disposed) return const [];
 
     final position = await ref.watch(gymSearchLocationBiasProvider.future);
+
+    // El bias va REDONDEADO al centro de la celda geohash5 (~4,9 km), igual
+    // que en `nearbyGymsProvider`. Antes viajaban `position.latitude` y
+    // `position.longitude` crudas. Dos razones para cambiarlo, y la segunda
+    // es un bug, no una preferencia:
+    //
+    // 1. Las coordenadas exactas del usuario no tienen por qué salir del
+    //    teléfono para sesgar una búsqueda de texto. La sección "4. Ubicación"
+    //    de `legal_content.dart` ahora afirma exactamente esto — que lo que
+    //    sale es una zona de ~5 km y no tu punto—, y una afirmación de ese
+    //    tipo en un texto legal tiene que ser cierta en el código.
+    //
+    // 2. La cache key YA era la celda (`_textSearchCacheKey`), así que dos
+    //    usuarios en la misma celda comparten resultados. Con el punto exacto
+    //    en el request, los resultados que reusaba el segundo los había
+    //    moldeado la posición precisa del PRIMERO. Mandar celda y cachear por
+    //    celda es lo consistente.
+    final biasBucket = position == null
+        ? null
+        : geohash5(position.latitude, position.longitude);
+    final biasCenter =
+        biasBucket == null ? null : _decodeGeohashBucketCenter(biasBucket);
+
     final cacheKey = _textSearchCacheKey(trimmed, position);
 
     final cache = ref.watch(textSearchCacheProvider);
@@ -551,8 +629,8 @@ final placesTextSearchProvider =
     final service = ref.watch(placesTextSearchServiceProvider);
     final results = await service.search(
       textQuery: trimmed,
-      biasLatitude: position?.latitude,
-      biasLongitude: position?.longitude,
+      biasLatitude: biasCenter?.$1,
+      biasLongitude: biasCenter?.$2,
     );
 
     cache.put(cacheKey, results);

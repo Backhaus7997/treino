@@ -55,13 +55,15 @@
  * carga inconsistente.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
-import { effectiveWeightLimit } from "./effective-limit";
+import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { toSubscriptionState } from "./subscription-state";
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
+import { resolveAthleteLimits, resolvePlanLimits } from "./trainer-plan-limits";
 
 /**
  * Lee los millis de un valor que DEBERIA ser un Timestamp, sin confiar en que
@@ -94,8 +96,41 @@ function readMillis(raw: unknown): number | null {
   return typeof ms === "number" && Number.isFinite(ms) ? ms : null;
 }
 
+/**
+ * Como se ve un `acceptedAt` que no se pudo leer, para que el aviso sirva para
+ * DECIDIR sin tener que abrir el documento.
+ *
+ * `typeof` solo NO alcanza, y esa fue la mitad de un falso positivo que vivio
+ * meses en Cloud Logging: en JavaScript `typeof null === "object"`, igual que
+ * un `{_seconds,_nanoseconds}` serializado y que un sentinel de
+ * `serverTimestamp()` que nunca resolvio. Las tres formas salian como
+ * `acceptedAtType: "object"` — la sana, la recuperable y la perdida — y no
+ * habia con que separarlas. Un aviso que no distingue el dato correcto del
+ * roto no mide nada: hace creer que hay corrupcion donde hay una solicitud de
+ * vinculo normal.
+ *
+ * Reporta las CLAVES crudas, no una categoria. Clasificar aca seria adivinar, y
+ * el que lee el log necesita el dato, no nuestra interpretacion:
+ * `{_seconds,_nanoseconds}` se lee solo, y un `{}` tambien dice lo suyo.
+ */
+function describeShape(raw: unknown): { acceptedAtType: string; acceptedAtKeys?: string[] } {
+  // null ANTES que typeof, porque `typeof null === "object"` es justamente la
+  // confusion que este helper existe para deshacer.
+  if (raw === null) return { acceptedAtType: "null" };
+  const acceptedAtType = typeof raw;
+  if (acceptedAtType !== "object") return { acceptedAtType };
+  return { acceptedAtType, acceptedAtKeys: Object.keys(raw as object).sort() };
+}
+
 export interface SyncEntitlementsResult {
   trainerId: string;
+  /**
+   * `users/{trainerId}` no existe (el PF borro la cuenta y el cascade ya paso
+   * por `deleteUserDocs`). No se escribio NADA: los demas campos vienen vacios
+   * y NO describen estado real. Los llamadores tienen que saltear mails y logs
+   * de reconciliacion.
+   */
+  missing?: true;
   /** `null` = sin limite (plan3). */
   limit: number | null;
   /**
@@ -111,6 +146,18 @@ export interface SyncEntitlementsResult {
    * ver la valvula.
    */
   blockedAthleteIds: string[];
+  /**
+   * El estado de suscripcion con el que se reconcilio. `null` = el documento
+   * NO tiene el mapa `subscription`, o sea que este PF nunca pago.
+   *
+   * Se devuelve —en vez de dejar que el llamador lea el documento otra vez—
+   * porque esa segunda lectura estaria FUERA de esta transaccion, y entre las
+   * dos el mapa puede cambiar. `decideProspectMail` decide sobre el mismo
+   * estado con el que se estaciono a la gente, o decide sobre otra cosa.
+   */
+  subscription: SubscriptionState | null;
+  /** El mapa existe pero no se pudo leer. Ver la valvula de degradacion. */
+  degraded: boolean;
 }
 
 /**
@@ -119,18 +166,19 @@ export interface SyncEntitlementsResult {
  * Idempotente EN `trainer_links`: si el estado ya es correcto los diffs salen
  * vacios y no se escribe un solo vinculo, asi el barrido diario no ensucia el
  * historial de los alumnos. El `tx.set` de `users/{trainerId}` NO es
- * condicional: corre siempre, con los mismos valores si nada cambio. Es una
+ * condicional: corre siempre, con los mismos valores si nada cambio (salvo si
+ * el documento no existe: ahi no se escribe nada, ver `missing`). Es una
  * escritura por corrida sobre UN documento, y `linkLoadReconcile` la dispara
  * en cada escritura de `trainer_links`; no genera loop porque la guarda
  * `subscriptionChanged` compara solo el mapa `subscription`, que este barrido
  * nunca toca.
  */
 export async function syncTrainerEntitlements(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
   nowMs?: number,
 ): Promise<SyncEntitlementsResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const clock = nowMs ?? Date.now();
 
   return db.runTransaction(async (tx) => {
@@ -141,11 +189,32 @@ export async function syncTrainerEntitlements(
       tx.get(db.collection("trainer_links").where("trainerId", "==", trainerId)),
     ]);
 
+    // El perfil no existe: el PF borro la cuenta (cascade de #1333) y este
+    // llamador es un trigger tardio (`linkLoadReconcile` dispara una vez por
+    // cada vinculo que el cascade termino). Sin esta guarda, `toSubscriptionState`
+    // lee `undefined` (= PF free, `degraded: false`), se bloquean alumnos con
+    // limite 2, y el `tx.set(..., {merge: true})` de abajo RESUCITA el doc como
+    // un fantasma sin role ni nada. La guarda va DENTRO de la transaccion: un
+    // `exists` afuera dejaria la misma ventana entre el chequeo y la escritura.
+    if (!trainerSnap.exists) {
+      return {
+        trainerId,
+        missing: true as const,
+        limit: null,
+        blocked: [],
+        unblocked: [],
+        weightedLoad: 0,
+        blockedAthleteIds: [],
+        subscription: null,
+        degraded: false,
+      };
+    }
+
     const { state: sub, degraded } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, clock);
 
     const rawLinks: BlockableLink[] = linksSnap.docs.map((doc) => {
-      const d = doc.data() as admin.firestore.DocumentData;
+      const d = doc.data() as DocumentData;
       // `acceptedAt` tampoco puede ir con cast a ciegas. Desde el slice 5
       // firestore.rules SI lo pinnea, y en los dos verbos: el `allow create` de
       // trainer_links solo admite null y el `allow update` lo congela
@@ -167,11 +236,38 @@ export async function syncTrainerEntitlements(
       // cliente — y `instanceof` ademas se rompe contra los dobles de test.
       const acceptedAt = d.acceptedAt;
       const acceptedAtMs = readMillis(acceptedAt);
-      if (acceptedAt !== undefined && acceptedAtMs === null) {
+      //
+      // EL AVISO NO SE DECIDE POR LA FORMA DEL VALOR, SE DECIDE POR SI IMPORTA.
+      //
+      // El guard viejo era `acceptedAt !== undefined`, y con eso un
+      // `acceptedAt: null` entraba: `readMillis` lo degrada a null por su
+      // propio `raw == null`, asi que el segundo termino tambien daba true.
+      // Pero null es la forma LEGAL de un vinculo todavia no aceptado —
+      // firestore.rules (~:1112) lo EXIGE en el `allow create` y
+      // `TrainerLinkRepository.request()` lo manda explicito, o sea que TODO
+      // vinculo nace asi. Como la query de arriba no filtra por status, cada
+      // pending viejo disparaba el warn en cada corrida: ~30 avisos diarios
+      // sobre datos perfectamente sanos, que es exactamente como un aviso deja
+      // de leerse.
+      //
+      // Y OJO CON EL ARREGLO FACIL: silenciar todo null de una perdia el caso
+      // que de verdad duele. Un `active`/`paused` SIN fecha no es un pending,
+      // es un vinculo vivo al que se le perdio el dato — y ese si compite por
+      // cupo, entra a `reconcileEntitlements` con POSITIVE_INFINITY y se
+      // estaciona PRIMERO. Ausente se tolera solo mientras el vinculo no este
+      // vivo; cualquier otra forma (string, mapa, lo que sea) se avisa siempre,
+      // porque viola el pin de rules en cualquier status.
+      const ausente = acceptedAt == null;
+      const vivo = d.status === "active" || d.status === "paused";
+      if (acceptedAtMs === null && (!ausente || vivo)) {
         logger.warn("syncTrainerEntitlements: acceptedAt no es un Timestamp", {
           trainerId,
           linkId: doc.id,
-          acceptedAtType: typeof acceptedAt,
+          // `status` porque decide si el aviso IMPORTA: `reconcileEntitlements`
+          // descarta todo lo que no sea active|paused, asi que una fecha rota en
+          // un pending no mueve a NADIE de lugar en la cola del limite.
+          status: typeof d.status === "string" ? d.status : "(sin status)",
+          ...describeShape(acceptedAt),
         });
       }
       return {
@@ -302,23 +398,72 @@ export async function syncTrainerEntitlements(
     for (const id of blockNow) {
       tx.update(db.collection("trainer_links").doc(id), {
         entitlement: "blocked",
-        blockedAt: admin.firestore.Timestamp.fromMillis(clock),
+        blockedAt: Timestamp.fromMillis(clock),
         blockedReason: "over-limit",
       });
     }
     for (const id of unblock) {
       tx.update(db.collection("trainer_links").doc(id), {
         entitlement: "entitled",
-        blockedAt: admin.firestore.FieldValue.delete(),
-        blockedReason: admin.firestore.FieldValue.delete(),
+        blockedAt: FieldValue.delete(),
+        blockedReason: FieldValue.delete(),
       });
     }
+    // ── planLimits (limite-ejercicios-pf.md, PR1) ──────────────────────────
+    //
+    // Mismo `sub`, mismo `degraded` y mismo `clock` con los que se calculo el
+    // tope de alumnos arriba: los dos topes tienen que salir del MISMO plan en
+    // el MISMO instante, y esta funcion ya corre en los tres caminos que
+    // importan (trigger de suscripcion, linkLoadReconcile, barrido de 04:00).
+    //
+    // `resolvePlanLimits` devuelve `null` para decir "no tocar" (solo pasa con
+    // `degraded === true`): si ADEMAS `resolveAthleteLimits` dice "no tocar" (lo
+    // mismo, con `degraded`), la clave `planLimits` se OMITE del
+    // objeto que se mergea, no se escribe como `{planLimits: null}` — con
+    // `degraded` no se decide nada sobre un documento que sabemos que leimos
+    // mal. Encendido o apagado, `resolvePlanLimits` SIEMPRE devuelve un mapa
+    // completo (nunca null) cuando `degraded` es false, así que las claves
+    // internas (`customExercises`, `templates`) viajan explícitas incluso en
+    // `null` (apagado) — con `merge: true`, omitir una clave es "no tocar", no
+    // "borrar", y un valor numerico previo quedaria pegado para siempre si no
+    // se sobreescribiera.
+    //
+    // Con `degraded` y un interruptor prendido y otro apagado, el mapa sale
+    // PARCIAL: la clave apagada en `null` y sin la prendida. `merge: true`
+    // mergea los mapas anidados campo por campo, así que la clave que no viaja
+    // queda como estaba (limite-plantillas-pf.md, PR1; ver el dartdoc de
+    // `resolvePlanLimits`).
+    //
+    // ── El tope de alumnos viaja en el MISMO mapa ────────────────────────────
+    //
+    // `resolveAthleteLimits` publica el tope efectivo de alumnos
+    // (`planLimits.athletes`, el mismo `effectiveWeightLimit` que `limit` de
+    // arriba, mas el proximo cambio por reloj) para que la app no tenga que
+    // adivinar lo que el servidor resuelve con `pending`/`paused` y con el piso
+    // prepago. Se mezcla con el mapa de los otros dos topes en UN solo objeto y
+    // no en una segunda escritura `planLimits.athletes`: con `merge: true` los
+    // mapas anidados se mergean campo por campo, asi que las claves que este
+    // `set` no nombra (las de una corrida degradada) quedan como estaban, y las
+    // que nombra —aunque valgan `null`— se pisan. Un solo `tx.set`, un solo
+    // camino: este es el UNICO escritor de `planLimits` del repo, y los tres
+    // llamadores (trigger de suscripcion, `linkLoadReconcile` y el barrido de
+    // las 04:00) pasan por aca.
+    const planLimits = resolvePlanLimits(sub, degraded, clock);
+    const athleteLimits = resolveAthleteLimits(sub, degraded, clock);
+    const trainerUpdate: Record<string, unknown> = {
+      weightedLoad,
+      blockedAthleteIds: blockedAthleteIdsNow,
+    };
+    if (planLimits !== null || athleteLimits !== null) {
+      trainerUpdate.planLimits = { ...planLimits, ...athleteLimits };
+    }
+
     // `merge: true` con un array REEMPLAZA el array entero, que es justo lo
     // que se quiere: el campo describe un estado completo, no un incremento.
     // Cuando no queda nadie bloqueado se escribe `[]` y el valor viejo muere.
     tx.set(
       db.collection("users").doc(trainerId),
-      { weightedLoad, blockedAthleteIds: blockedAthleteIdsNow },
+      trainerUpdate,
       { merge: true },
     );
 
@@ -329,6 +474,8 @@ export async function syncTrainerEntitlements(
       unblocked: unblock,
       weightedLoad,
       blockedAthleteIds: blockedAthleteIdsNow,
+      subscription: sub,
+      degraded,
     };
   });
 }

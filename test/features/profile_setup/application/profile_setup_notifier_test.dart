@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth, User;
@@ -6,16 +8,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart'
-    show firebaseAuthProvider;
+    show authStateChangesProvider, firebaseAuthProvider;
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
+import 'package:treino/features/gyms/application/places_providers.dart'
+    show resolveGymPlaceServiceProvider;
+import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userProfileProvider, userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
 class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
 
 class _MockUser extends Mock implements User {}
+
+class _MockResolveGymPlaceService extends Mock
+    implements ResolveGymPlaceService {}
 
 class _FakeAvatarUploadService implements AvatarUploadService {
   _FakeAvatarUploadService({this.error});
@@ -33,6 +44,13 @@ class _FakeAvatarUploadService implements AvatarUploadService {
   }
 }
 
+/// Fecha de nacimiento válida para el gate de edad mínima.
+///
+/// Fija y bien lejos del borde a propósito: estos tests miden el SUBMIT, no el
+/// cálculo de la edad. Ese tiene su propia suite en
+/// `profile_setup_validators_test.dart`, con los bordes y el 29 de febrero.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late _MockFirebaseAuth mockAuth;
@@ -49,7 +67,14 @@ void main() {
   });
 
   /// Seeds the users/{uid} doc so submit() can call update() on it.
-  Future<void> seedUserDoc(String uid) async {
+  ///
+  /// Por default es una cuenta de EMAIL: el registro ya estampó
+  /// `termsAcceptedAt`, así que el alta no pide el checkbox. Antes este doc se
+  /// sembraba sin el campo y los tests pasaban igual, porque la regla era
+  /// «perfil existente = ya consintió». Así es exactamente como nace el doc de
+  /// un alta con Google/Apple, y la regla la dejaba sin consentimiento: esa
+  /// forma ahora se siembra explícita con `conConsentimiento: false`.
+  Future<void> seedUserDoc(String uid, {bool conConsentimiento = true}) async {
     final now = DateTime.now().toUtc();
     await firestore.collection('users').doc(uid).set({
       'uid': uid,
@@ -58,16 +83,29 @@ void main() {
       'role': 'athlete',
       'createdAt': now,
       'updatedAt': now,
+      if (conConsentimiento)
+        'termsAcceptedAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1, 12)),
     });
   }
 
-  ProviderContainer makeContainer({AvatarUploadService? avatarService}) {
+  /// [perfilObservado] reemplaza lo que la app OBSERVA del perfil (el stream
+  /// de `userProfileProvider`, que puede venir de la caché local) sin tocar
+  /// lo que hay en el "servidor" (`firestore`). Por default, el stream sale
+  /// del mismo firestore y los dos coinciden.
+  ProviderContainer makeContainer({
+    AvatarUploadService? avatarService,
+    Stream<UserProfile?> Function()? perfilObservado,
+    List<Override> extraOverrides = const [],
+  }) {
     return ProviderContainer(overrides: [
+      ...extraOverrides,
       firestoreProvider.overrideWithValue(firestore),
       userRepositoryProvider.overrideWithValue(
         UserRepository(firestore: firestore),
       ),
       firebaseAuthProvider.overrideWithValue(mockAuth),
+      // El notifier ata su estado al uid logueado (ver su build()).
+      authStateChangesProvider.overrideWith((ref) => Stream.value(mockUser)),
       avatarUploadServiceProvider
           .overrideWithValue(avatarService ?? _FakeAvatarUploadService()),
       // QA-AUTH-001 (issue #434): submit() now reads userProfileProvider to
@@ -76,10 +114,16 @@ void main() {
       // mirrors production (userProfileProvider watches repo.watch(uid))
       // instead of wiring the real authStateChanges() stream chain.
       userProfileProvider.overrideWith(
-        (ref) => ref.watch(userRepositoryProvider).watch('u1'),
+        (ref) =>
+            perfilObservado?.call() ??
+            ref.watch(userRepositoryProvider).watch('u1'),
       ),
     ]);
   }
+
+  /// Un perfil observado que no emite nunca: queda en AsyncLoading, o sea
+  /// «todavía no se sabe» si hay consentimiento.
+  Stream<UserProfile?> nuncaEmite() => StreamController<UserProfile?>().stream;
 
   /// Primes [userProfileProvider] so its `.valueOrNull` is resolved (not
   /// AsyncLoading) by the time `submit()` reads it synchronously — mirrors
@@ -100,6 +144,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
 
     await notifier.submit();
 
@@ -124,6 +169,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
 
     await notifier.submit();
 
@@ -149,6 +195,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
     // QA-AUTH-001 (issue #434): sin `users/{uid}`, userProfileProvider
     // resuelve null — desde el código esto es indistinguible de una cuenta
     // OAuth nueva, así que ahora también exige el checkbox. Es el
@@ -196,6 +243,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       // termsAccepted se queda en su default (false) — checkbox sin marcar.
 
       await expectLater(
@@ -227,6 +275,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateTermsAccepted(true);
 
       await notifier.submit();
@@ -234,6 +283,32 @@ void main() {
       final usersSnap = await firestore.collection('users').doc('u1').get();
       expect(usersSnap.exists, isTrue);
       expect(usersSnap.data()!['termsAcceptedAt'], isNotNull);
+    });
+
+    // consentimiento-legal-versionado (R3): el mismo checkbox de OAuth
+    // acepta las 2 versiones vigentes — el partial que estampa
+    // termsAcceptedAt debe llevar también acceptedTermsVersion/
+    // acceptedPrivacyVersion.
+    test(
+        'OAuth new user with terms accepted — partial also includes '
+        'acceptedTermsVersion/acceptedPrivacyVersion', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+
+      await notifier.submit();
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['acceptedTermsVersion'], equals(kTermsVersion));
+      expect(
+        usersSnap.data()!['acceptedPrivacyVersion'],
+        equals(kPrivacyVersion),
+      );
     });
 
     test(
@@ -257,6 +332,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       // termsAccepted se queda en false — un perfil existente NO exige el
       // checkbox (ya aceptó en Register).
 
@@ -267,6 +343,143 @@ void main() {
       // Timestamp.toDate() returns a LOCAL DateTime — .toUtc() normalizes it
       // before comparing against the UTC fixture (mirrors TimestampConverter).
       expect(stored.toDate().toUtc(), equals(originalAcceptedAt));
+    });
+
+    // EL caso del bug. Así nace el doc de un alta con Google/Apple cuando el
+    // create del login anda: existe y no tiene `termsAcceptedAt`. Con la regla
+    // anterior («perfil existente = ya consintió») este submit pasaba sin el
+    // checkbox y la cuenta quedaba sin consentimiento. En producción, 2 de las
+    // 5 altas OAuth del 16 al 22/09.
+    test(
+        'OAuth con doc creado en el login (sin termsAcceptedAt) y sin marcar '
+        'el checkbox — submit tira terms-not-accepted y no escribe', () async {
+      await seedUserDoc('u1', conConsentimiento: false);
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+
+      await expectLater(
+        notifier.submit(),
+        throwsA(
+          isA<StateError>()
+              .having((e) => e.message, 'message', 'terms-not-accepted'),
+        ),
+      );
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['displayName'], isNull);
+      expect(usersSnap.data()!['termsAcceptedAt'], isNull);
+    });
+
+    test(
+        'OAuth con doc creado en el login y con el checkbox — estampa '
+        'termsAcceptedAt y las dos versiones', () async {
+      await seedUserDoc('u1', conConsentimiento: false);
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+
+      await notifier.submit();
+
+      final data =
+          (await firestore.collection('users').doc('u1').get()).data()!;
+      expect(data['termsAcceptedAt'], isNotNull);
+      expect(data['acceptedTermsVersion'], equals(kTermsVersion));
+      expect(data['acceptedPrivacyVersion'], equals(kPrivacyVersion));
+    });
+
+    // «No sé» no se trata como «hace falta» ni como «no hace falta»: se le
+    // pregunta al servidor. Leerlo como «hace falta» le pisaría a esta cuenta
+    // de email la evidencia original con un timestamp de hoy.
+    test(
+        'perfil sin cargar + cuenta de email — resuelve contra el servidor: '
+        'no exige el checkbox ni pisa la evidencia', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer(perfilObservado: nuncaEmite);
+      addTearDown(container.dispose);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+
+      await notifier.submit();
+
+      final data =
+          (await firestore.collection('users').doc('u1').get()).data()!;
+      expect(data['displayName'], equals('Carlos'));
+      expect(
+        (data['termsAcceptedAt'] as Timestamp).toDate().toUtc(),
+        equals(DateTime.utc(2026, 1, 1, 12)),
+      );
+    });
+
+    // Hallazgo de Codex en #1228. Lo que la app observa (la caché local) es
+    // una versión vieja del doc SIN `termsAcceptedAt`, pero el servidor sí lo
+    // tiene. La pantalla muestra el checkbox y la persona lo tilda: estampar
+    // sobre lo observado pisaría la evidencia original con la de hoy.
+    test(
+        'la caché dice que falta el consentimiento pero el servidor lo tiene '
+        '— no se pisa la evidencia', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer(
+        perfilObservado: () => Stream.value(
+          UserProfile(
+            uid: 'u1',
+            email: 'test@test.com',
+            displayName: null,
+            role: UserRole.athlete,
+            createdAt: DateTime.utc(2026, 1, 1),
+            updatedAt: DateTime.utc(2026, 1, 1),
+          ),
+        ),
+      );
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+
+      await notifier.submit();
+
+      final data =
+          (await firestore.collection('users').doc('u1').get()).data()!;
+      expect(data['displayName'], equals('Carlos'));
+      expect(
+        (data['termsAcceptedAt'] as Timestamp).toDate().toUtc(),
+        equals(DateTime.utc(2026, 1, 1, 12)),
+      );
+      expect(data.containsKey('acceptedTermsVersion'), isFalse);
+    });
+
+    test(
+        'perfil sin cargar + cuenta sin consentimiento — resuelve contra el '
+        'servidor y exige el checkbox', () async {
+      await seedUserDoc('u1', conConsentimiento: false);
+      final container = makeContainer(perfilObservado: nuncaEmite);
+      addTearDown(container.dispose);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+
+      await expectLater(
+        notifier.submit(),
+        throwsA(
+          isA<StateError>()
+              .having((e) => e.message, 'message', 'terms-not-accepted'),
+        ),
+      );
     });
   });
 
@@ -289,6 +502,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit(); // must NOT throw — best-effort policy stands
@@ -314,6 +528,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -331,6 +546,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -353,6 +569,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -368,6 +585,292 @@ void main() {
       final usersSnap = await firestore.collection('users').doc('u1').get();
       expect(usersSnap.data()!['avatarUrl'],
           equals('https://fake.url/avatar.jpg'));
+    });
+  });
+  // ──────────────────────────────────────────────────────────────────────────
+  // Gate de edad mínima en el submit
+  //
+  // El validador del paso 2 corre cuando el usuario elige la fecha, pero el
+  // draft se puede editar volviendo atrás con VOLVER. Esta es la red de
+  // seguridad, igual que la revalidación de unicidad del username.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('gate de edad mínima en submit', () {
+    test('un menor de la edad mínima no se persiste y submit tira', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      // ~10 años, relativo a hoy para que el test no envejezca.
+      notifier.updateBornAt(DateTime.utc(DateTime.now().year - 10, 1, 1));
+
+      await expectLater(notifier.submit(), throwsStateError);
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['displayName'], isNull,
+          reason: 'un submit rechazado no debe escribir NADA del perfil');
+      expect(container.read(profileSetupNotifierProvider).isSubmitting, isFalse,
+          reason: 'el spinner tiene que cortarse, no quedar colgado');
+    });
+
+    test('sin fecha tampoco persiste — el campo es obligatorio', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos'); // sin updateBornAt a propósito
+
+      await expectLater(notifier.submit(), throwsStateError);
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['displayName'], isNull);
+    });
+
+    test('una fecha válida sí se persiste en users/{uid}', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+
+      await notifier.submit();
+
+      final stored = (await firestore.collection('users').doc('u1').get())
+          .data()!['bornAt'];
+      final storedDate =
+          stored is Timestamp ? stored.toDate() : stored as DateTime;
+      expect(storedDate.toUtc(), equals(_adultBornAt));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // El alta es de UNA cuenta: el estado no sobrevive al cambio de cuenta.
+  //
+  // Hallazgo de la revisión del cambio de Términos: el provider es de raíz y
+  // «Cancelar cuenta» / «Cerrar sesión» no lo reiniciaban. La cuenta siguiente
+  // en la misma sesión de la app heredaba el checkbox tildado, y su EMPEZAR
+  // estampaba un consentimiento que nunca dio. Los tests del grupo de arriba
+  // no podían verlo: cada uno arma un contenedor nuevo.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('el alta es de UNA cuenta', () {
+    late StreamController<User?> auth;
+    late ProviderContainer container;
+
+    User usuario(String uid) {
+      final u = _MockUser();
+      when(() => u.uid).thenReturn(uid);
+      return u;
+    }
+
+    setUp(() {
+      auth = StreamController<User?>();
+      container = ProviderContainer(overrides: [
+        authStateChangesProvider.overrideWith((ref) => auth.stream),
+      ]);
+      // Vivo durante todo el test, como lo mantiene la pantalla del alta.
+      container.listen(profileSetupNotifierProvider, (_, __) {});
+    });
+
+    tearDown(() async {
+      container.dispose();
+      await auth.close();
+    });
+
+    Future<void> tildaLosTerminos(User cuenta) async {
+      auth.add(cuenta);
+      await pumpEventQueue();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateBornAt(_adultBornAt);
+      notifier.updateTermsAccepted(true);
+      expect(
+          container.read(profileSetupNotifierProvider).termsAccepted, isTrue);
+    }
+
+    test(
+        'cancelar la cuenta o cerrar sesión reinicia el checkbox y el borrador',
+        () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(null); // cancelOnboarding / signOut
+      await pumpEventQueue();
+
+      final estado = container.read(profileSetupNotifierProvider);
+      expect(estado.termsAccepted, isFalse);
+      expect(estado.draft.bornAt, isNull);
+      expect(estado.currentStep, 0);
+    });
+
+    test('la cuenta siguiente NO hereda el tilde de la anterior', () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(usuario('cuenta-b'));
+      await pumpEventQueue();
+
+      expect(
+          container.read(profileSetupNotifierProvider).termsAccepted, isFalse);
+    });
+
+    // Control: la escucha es por uid y no por evento. Firebase re-emite al
+    // usuario al refrescar el token; si eso reiniciara el alta, se perdería el
+    // borrador en el medio del onboarding.
+    test('el mismo uid re-emitido (refresh del token) NO reinicia el alta',
+        () async {
+      await tildaLosTerminos(usuario('cuenta-a'));
+
+      auth.add(usuario('cuenta-a'));
+      await pumpEventQueue();
+
+      final estado = container.read(profileSetupNotifierProvider);
+      expect(estado.termsAccepted, isTrue);
+      expect(estado.draft.bornAt, equals(_adultBornAt));
+    });
+  });
+
+  // Places (#1338): el nombre del gym lo escribe quien lo vincula, pero el
+  // alta recién se confirma en submit(). Crear/nombrar el doc compartido al
+  // tocar el gym dejaba el nombre de alguien que después elegía otro gym.
+  group('gym nuevo nombrado en el alta: se crea en el submit', () {
+    late _MockResolveGymPlaceService resolver;
+    late List<String> log;
+
+    setUpAll(() {
+      registerFallbackValue(() async {});
+    });
+
+    setUp(() {
+      resolver = _MockResolveGymPlaceService();
+      log = [];
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenAnswer((inv) async {
+        final placeId = inv.namedArguments[#placeId] as String;
+        final name = inv.namedArguments[#name] as String?;
+        log.add('resolve:$placeId:$name');
+        // Simula la creación del doc compartido, para que el dual-write de
+        // gymName del update (que lo lee) lo encuentre.
+        await firestore.collection('gyms').doc(placeId).set({
+          'id': placeId,
+          'name': name,
+          'lat': -31.4,
+          'lng': -64.2,
+          'geohash': '6e7sx',
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+          'source': 'google-places',
+        });
+        return ResolveGymPlaceResult(
+          gymId: placeId,
+          name: name ?? '',
+          source: 'google-places',
+        );
+      });
+    });
+
+    Future<ProviderContainer> arrancar() async {
+      await seedUserDoc('u1');
+      final container = makeContainer(
+        extraOverrides: [
+          resolveGymPlaceServiceProvider.overrideWithValue(resolver)
+        ],
+      );
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+      container.read(profileSetupNotifierProvider.notifier)
+        ..updateUsername('Carlos')
+        ..updateBornAt(_adultBornAt);
+      return container;
+    }
+
+    test(
+        'submit crea el gym con el nombre pendiente ANTES de vincular al usuario',
+        () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      // Tocar el gym y nombrarlo no escribe nada.
+      verifyNever(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          ));
+
+      await notifier.submit();
+
+      expect(log, ['resolve:ChIJ_A:Mi gimnasio']);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_A');
+      // El dual-write leyó el gym recién creado: el resolve fue antes del update.
+      final pub =
+          await firestore.collection('userPublicProfiles').doc('u1').get();
+      expect(pub.data()!['gymName'], 'Mi gimnasio');
+    });
+
+    test('nombrar A y elegir B: submit no toca A', () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Nombre para A');
+      notifier.updateGymId('ChIJ_B');
+
+      await notifier.submit();
+
+      expect(log, isEmpty);
+      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
+      expect(a.exists, isFalse);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_B');
+    });
+
+    test('abandonar el alta no escribe ningún gym', () async {
+      final container = await arrancar();
+      container
+          .read(profileSetupNotifierProvider.notifier)
+          .updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      container.dispose();
+
+      expect(log, isEmpty);
+      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
+      expect(a.exists, isFalse);
+    });
+
+    test('sin nombre pendiente (gym ya nombrado) submit no llama al resolver',
+        () async {
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A');
+
+      await notifier.submit();
+
+      expect(log, isEmpty);
+    });
+
+    test('si crear el gym falla, el usuario no queda vinculado', () async {
+      final container = await arrancar();
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            name: any(named: 'name'),
+            sessionToken: any(named: 'sessionToken'),
+            beforeNaming: any(named: 'beforeNaming'),
+          )).thenThrow(const ResolveGymPlaceFailure$Unknown());
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+
+      await expectLater(
+          notifier.submit(), throwsA(isA<ResolveGymPlaceFailure>()));
+
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], isNull);
     });
   });
 }

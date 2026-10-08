@@ -5,7 +5,11 @@
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "@homeAthleteFirstRunTitle": {"description": "Home first-run empty-state title for an athlete with no routine (usability finding 6)."},
   "homeAthleteFirstRunBody": "Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.",
-  "@homeAthleteFirstRunBody": {"description": "Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard."},
+  "@homeAthleteFirstRunBody": {"description": "Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard. Shown ONLY when the athlete has no active trainer link — the two-path twin is homeAthleteFirstRunBodyWithTrainer."},
+  "homeAthleteFirstRunBodyWithTrainer": "Ya tenés entrenador. Mientras tanto, creá tu propia rutina o explorá planes ya armados.",
+  "@homeAthleteFirstRunBodyWithTrainer": {"description": "Home first-run empty-state body for an athlete who ALREADY has an active trainer link but no plan yet. Names only the two paths whose buttons are drawn, in button order: create a routine, explore ready-made plans. Must not promise the third path — the 'find a trainer' CTA is hidden in this state. Deliberately says nothing about what the trainer is doing: an active link is confirmed, the trainer working on a plan is not."},
+  "homeAthleteFirstRunBodyNeutral": "Creá tu propia rutina o explorá planes ya armados.",
+  "@homeAthleteFirstRunBodyNeutral": {"description": "Home first-run empty-state body used when the athlete's trainer link could NOT be confirmed (loading, error, or a retained error). Names ONLY the two paths whose buttons are drawn, in button order, and says NOTHING about whether the athlete has a trainer — claiming either way would be an unverified statement about the user (AGENTS.md 11.1). Sibling of homeAthleteFirstRunBody (three paths, no trainer) and homeAthleteFirstRunBodyWithTrainer (two paths, trainer confirmed)."},
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
   "@homeAthleteFirstRunCreateCta": {"description": "Home first-run primary CTA to create a routine (finding 6)."},
   "homeAthleteFirstRunExplorePlansCta": "Explorar planes",
@@ -163,7 +167,7 @@
   "authForgotEditEmail": "Usar otra dirección",
   "@authForgotEditEmail": {"description": "Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16)."},
   "authTrainerInquiryDialogTitle": "Acceso de entrenador",
-  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a equipo@treino.app",
+  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a treino@gettreino.com",
   "authTrainerInquiryDialogClose": "Cerrar",
   "authTermsPlaceholder": "Próximamente",
   "authGoogleLabel": "GOOGLE",
@@ -206,10 +210,23 @@
     "description": "Snackbar cuando falla el getOrCreate del chat de consulta."
   },
   "coachCtaProximamente": "Próximamente — Etapa 3",
-  "coachLocationSheetTitle": "Permitir ubicación",
+  "coachLocationSheetTitle": "TU UBICACIÓN",
   "coachLocationSheetBody": "TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.",
-  "coachLocationSheetAccept": "ACEPTAR",
-  "coachLocationSheetDeny": "Ahora no",
+  "coachLocationSheetContinue": "CONTINUAR",
+  "coachLocationSettingsNoticeTitle": "UBICACIÓN DESACTIVADA",
+  "coachLocationSettingsNoticeBody": "Activá la ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.",
+  "coachLocationSettingsNoticeOpenSettings": "ABRIR AJUSTES",
+  "coachLocationSettingsNoticeContinueWithout": "Seguir sin ubicación",
+  "coachLocationServicesOffTitle": "SERVICIOS DE UBICACIÓN DESACTIVADOS",
+  "coachLocationServicesOffBody": "Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.",
+  "coachLocationSheetBodyGyms": "TREINO usa tu ubicación para mostrarte gimnasios cerca tuyo. Tu ubicación no es visible para otros usuarios.",
+  "coachLocationSheetBodyDetect": "TREINO usa tu ubicación una sola vez para detectar el lugar donde entrenás.",
+  "coachLocationSettingsNoticeBodyGyms": "Activá la ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.",
+  "coachLocationSettingsNoticeBodyDetect": "Activá la ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.",
+  "coachLocationServicesOffBodyGyms": "Activá los Servicios de ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.",
+  "coachLocationServicesOffBodyDetect": "Activá los Servicios de ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.",
+  "profileLocationPermissionNeeded": "Necesitamos permiso de ubicación.",
+  "profileLocationDetectFailed": "No pudimos detectar tu ubicación.",
   "coachMiPlanTitle": "MI PLAN",
   "coachMiPlanEmpty": "No tenés rutina asignada todavía.",
   "coachMiPlanError": "Error al cargar tu plan.",
@@ -234,6 +251,78 @@
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
   "agendaButtonLabel": "VER AGENDA DEL PF",
+  "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
+  "@athleteNutritionPlanButtonLabel": {
+    "description": "Botón de la tab Coach que abre el plan nutricional del alumno."
+  },
+  "athleteFilesButtonLabel": "MIS ARCHIVOS",
+  "@athleteFilesButtonLabel": {
+    "description": "Botón de la tab Coach que abre los archivos compartidos con el alumno."
+  },
+  "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
+  "@athleteNutritionPlanScreenTitle": {
+    "description": "Título de la pantalla read-only del plan nutricional del alumno."
+  },
+  "athleteNutritionChooseOneHint": "Elegí una",
+  "@athleteNutritionChooseOneHint": {
+    "description": "Indica que el alumno debe elegir una sola opción del grupo."
+  },
+  "athleteNutritionEmptyGroup": "Tu PF todavía no cargó opciones acá.",
+  "@athleteNutritionEmptyGroup": {
+    "description": "Se muestra cuando un grupo del plan nutricional no tiene ninguna opción cargada. Sin esto el grupo quedaba con el título y nada debajo, y se leía como un control esperando que el alumno eligiera algo."
+  },
+  "athleteNutritionAllHint": "Va todo",
+  "@athleteNutritionAllHint": {
+    "description": "Indica que el alumno debe incluir todas las opciones del grupo."
+  },
+  "athleteNutritionPlanEmpty": "Tu PF todavía no cargó tu plan nutricional.",
+  "@athleteNutritionPlanEmpty": {
+    "description": "Estado vacío cuando el PF todavía no creó un plan nutricional."
+  },
+  "athleteNutritionPlanLoadError": "No pudimos cargar tu plan nutricional.",
+  "@athleteNutritionPlanLoadError": {
+    "description": "Error al cargar el plan nutricional del alumno."
+  },
+  "athleteNutritionNeedsActiveLink": "Necesitás un vínculo activo con un PF para ver tu plan nutricional.",
+  "@athleteNutritionNeedsActiveLink": {
+    "description": "Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo."
+  },
+  "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
+  "@athleteLinkRequired": {
+    "description": "Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa."
+  },
+  "trainerAcceptsInquiriesTitle": "Acepto consultas",
+  "@trainerAcceptsInquiriesTitle": {
+    "description": "Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo."
+  },
+  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.",
+  "@trainerAcceptsInquiriesSubtitle": {
+    "description": "Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple."
+  },
+  "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
+  "@athleteLinkUnconfirmed": {
+    "description": "Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir."
+  },
+  "athleteLinkRequiredRetry": "Reintentar",
+  "@athleteLinkRequiredRetry": {
+    "description": "Botón del gate de vínculo: invalida el provider y vuelve a preguntar."
+  },
+  "athleteSessionMissing": "Tu sesión se cerró. Volvé a entrar.",
+  "@athleteSessionMissing": {
+    "description": "Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel."
+  },
+  "athleteFilesScreenTitle": "MIS ARCHIVOS",
+  "@athleteFilesScreenTitle": {
+    "description": "Título de la pantalla de archivos compartidos con el alumno."
+  },
+  "athleteFilesEmpty": "Tu PF todavía no compartió archivos con vos.",
+  "@athleteFilesEmpty": {
+    "description": "Estado vacío cuando ningún PF compartió archivos con el alumno."
+  },
+  "athleteFilesLoadError": "No pudimos cargar tus archivos.",
+  "@athleteFilesLoadError": {
+    "description": "Error al cargar los archivos compartidos con el alumno."
+  },
   "agendaScreenTitle": "Agenda",
   "agendaEmptyAvailability": "Tu PF todavía no configuró horarios.",
   "agendaBookingConfirmTitle": "Confirmar reserva",
@@ -481,6 +570,18 @@
     }
   },
   "workoutHistorialHeading": "HISTORIAL",
+  "coachSessionHistoryInProgress": "En curso",
+  "@coachSessionHistoryInProgress": {
+    "description": "Badge en el historial del PF para una sesión del alumno que todavía no terminó (finishedAt == null). El PF necesita distinguirla: un reporte de molestia puede llegarle mientras el entreno sigue."
+  },
+  "coachSessionHistoryIncomplete": "Sin completar",
+  "@coachSessionHistoryIncomplete": {
+    "description": "Badge en el historial del PF para una sesión terminada con wasFullyCompleted == false — incluidas las que el barrido de zombis cerró sola. Antes no se listaban en ningún lado."
+  },
+  "coachSessionHistoryEmpty": "Este alumno todavía no registró entrenamientos.",
+  "@coachSessionHistoryEmpty": {
+    "description": "Estado vacío del historial de sesiones del alumno, visto por el PF. No lleva CTA: el PF no puede entrenar por él."
+  },
   "workoutHistorialEmptyMessage": "Todavía no entrenaste.",
   "workoutHistorialEmptyCta": "Empezar entrenamiento",
   "workoutHistorialErrorMessage": "No pudimos cargar tu historial.",
@@ -694,6 +795,7 @@
   "eliminarCuentaSheetBodyPrefix": "Esta acción es ",
   "eliminarCuentaSheetBodyBold": "irreversible",
   "eliminarCuentaSheetBodySuffix": ". Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.",
+  "eliminarCuentaSheetSubscriptionNote": "Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.",
   "eliminarCuentaSheetDeleteCta": "ELIMINAR",
   "eliminarCuentaSheetCancelCta": "CANCELAR",
   "eliminarCuentaSheetLoadingLabel": "Eliminando tu cuenta...",
@@ -838,6 +940,10 @@
   "profileSetupCancelDialogTitle": "¿Cancelar la creación de tu cuenta?",
   "profileSetupCancelDialogBody": "Vamos a borrar tu cuenta. Esta acción no se puede deshacer.",
   "profileSetupCancelAccountError": "No pudimos cancelar la cuenta. Probá de nuevo.",
+  "profileSetupGymSelectError": "No pudimos cargar ese gimnasio. Probá de nuevo o elegí «OTRO GYM / SIN GYM».",
+  "@profileSetupGymSelectError": {
+    "description": "SnackBar del paso de gimnasio del alta cuando no se pudo resolver el gimnasio tocado. Nombra la opcion tal cual se ve en pantalla (esta hardcodeada en GymSearchBox, sin traducir)."
+  },
   "reAuthPasswordLabel": "Contraseña",
   "profileGymSearchHint": "Buscar gym",
   "profileEditTrainerTitleEdit": "Editá tu perfil profesional",
@@ -846,6 +952,20 @@
   "profileEditTrainerSaveError": "No pudimos guardar. Probá de nuevo.",
   "profileEditTrainerValidationSpecialty": "Elegí una especialidad.",
   "profileEditTrainerValidationLocation": "Agregá al menos una ubicación o activá clases virtuales.",
+  "trainerLocationConsentSheetTitle": "PUBLICAR TU UBICACIÓN",
+  "trainerLocationConsentSheetBody": "Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.",
+  "trainerLocationConsentSheetAccept": "ACEPTAR",
+  "trainerLocationConsentSheetRevoke": "APAGAR LA PUBLICACIÓN",
+  "profileEditTrainerConsentConfirmTitle": "¿Publicar esta ubicación?",
+  "profileEditTrainerConsentConfirmBody": "Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.",
+  "profileEditTrainerConsentConfirmAccept": "PUBLICAR",
+  "profileEditTrainerConsentConfirmCancel": "CANCELAR",
+  "profileEditTrainerPublished": "Visible para los atletas",
+  "profileEditTrainerNotPublished": "No publicada",
+  "legacyPrivacyNoticeTitle": "Actualizamos la Política de Privacidad",
+  "legacyPrivacyNoticeBody": "Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.",
+  "legacyPrivacyNoticeAction": "LEER LA POLÍTICA",
+  "legacyPrivacyNoticeDismiss": "Cerrar",
   "athleteDetailPlansSection": "PLANES ASIGNADOS",
   "athleteDetailProfileLoadError": "No pudimos cargar este perfil.",
   "athleteDetailPlanDeleteTitle": "Eliminar plan",
@@ -1213,6 +1333,12 @@
   },
   "routineEditorFillColumnA11y": "Replicar este valor en toda la columna",
   "@routineEditorFillColumnA11y": {},
+  "routineEditorNextCellLabel": "SIG.",
+  "@routineEditorNextCellLabel": {
+    "description": "Botón de la barra del teclado: salta a la celda siguiente (#910)."
+  },
+  "routineEditorNextCellA11y": "Ir a la celda siguiente",
+  "@routineEditorNextCellA11y": {},
   "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
   "@routineEditorAccessoryContext": {
     "description": "Contexto debajo de los atajos: sobre qué celda actúan.",
@@ -1577,6 +1703,170 @@
   "@coachHubSignOutError": {
     "description": "Inline error on the coach-hub not-allowed screen when signOut() fails (finding 8)."
   },
+  "coachHubOnboardingAgeTitle": "¿CUÁNDO NACISTE?",
+  "@coachHubOnboardingAgeTitle": {
+    "description": "Coach Hub onboarding, age step headline."
+  },
+  "coachHubOnboardingAgeBody": "Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.",
+  "@coachHubOnboardingAgeBody": {
+    "description": "Coach Hub onboarding, age step explanation (minimum age 13)."
+  },
+  "coachHubOnboardingAgeLabel": "FECHA DE NACIMIENTO",
+  "@coachHubOnboardingAgeLabel": {
+    "description": "Coach Hub onboarding, label above the date of birth field."
+  },
+  "coachHubOnboardingIdentityTitle": "¿CÓMO TE LLAMÁS?",
+  "@coachHubOnboardingIdentityTitle": {
+    "description": "Coach Hub onboarding, identity step headline."
+  },
+  "coachHubOnboardingIdentityBody": "Este es el nombre con el que te van a ver tus alumnos.",
+  "@coachHubOnboardingIdentityBody": {
+    "description": "Coach Hub onboarding, identity step explanation."
+  },
+  "coachHubOnboardingFirstNameLabel": "NOMBRE",
+  "@coachHubOnboardingFirstNameLabel": {
+    "description": "Coach Hub onboarding, first name field label."
+  },
+  "coachHubOnboardingLastNameLabel": "APELLIDO",
+  "@coachHubOnboardingLastNameLabel": {
+    "description": "Coach Hub onboarding, last name field label."
+  },
+  "coachHubOnboardingFirstNameRequired": "Ingresá tu nombre",
+  "@coachHubOnboardingFirstNameRequired": {
+    "description": "Coach Hub onboarding, inline error for an empty first name."
+  },
+  "coachHubOnboardingLastNameRequired": "Ingresá tu apellido",
+  "@coachHubOnboardingLastNameRequired": {
+    "description": "Coach Hub onboarding, inline error for an empty last name."
+  },
+  "coachHubOnboardingPfTitle": "TU PERFIL PROFESIONAL",
+  "@coachHubOnboardingPfTitle": {
+    "description": "Coach Hub onboarding, professional profile step headline."
+  },
+  "coachHubOnboardingPfBody": "Esto es lo que ven los alumnos cuando te buscan. Lo podés cambiar cuando quieras.",
+  "@coachHubOnboardingPfBody": {
+    "description": "Coach Hub onboarding, professional profile step explanation."
+  },
+  "coachHubOnboardingPfBioLabel": "BIO",
+  "@coachHubOnboardingPfBioLabel": {
+    "description": "Coach Hub onboarding, label above the bio field."
+  },
+  "coachHubOnboardingPfSpecialtyLabel": "ESPECIALIDAD",
+  "@coachHubOnboardingPfSpecialtyLabel": {
+    "description": "Coach Hub onboarding, label above the specialty chips."
+  },
+  "coachHubOnboardingPfRateLabel": "TARIFA MENSUAL (ARS)",
+  "@coachHubOnboardingPfRateLabel": {
+    "description": "Coach Hub onboarding, label above the monthly rate field."
+  },
+  "coachHubOnboardingPfModalityLabel": "MODALIDAD",
+  "@coachHubOnboardingPfModalityLabel": {
+    "description": "Coach Hub onboarding, label of the modality block (online and in-person)."
+  },
+  "coachHubOnboardingPfOnlineSwitch": "Doy clases online",
+  "@coachHubOnboardingPfOnlineSwitch": {
+    "description": "Coach Hub onboarding, switch label for online coaching."
+  },
+  "coachHubOnboardingPfModalityRequired": "Activá las clases online o sumá un lugar de entrenamiento.",
+  "@coachHubOnboardingPfModalityRequired": {
+    "description": "Coach Hub onboarding, hint shown while neither online nor a place is set."
+  },
+  "coachHubOnboardingPfLocationsLabel": "LUGARES DE ENTRENAMIENTO",
+  "@coachHubOnboardingPfLocationsLabel": {
+    "description": "Coach Hub onboarding, label above the in-person places."
+  },
+  "coachHubOnboardingPfLocationSearchLabel": "BUSCAR UN LUGAR",
+  "@coachHubOnboardingPfLocationSearchLabel": {
+    "description": "Coach Hub onboarding, label above the place search field."
+  },
+  "coachHubOnboardingPfLocationSearchHint": "Dirección o nombre del lugar",
+  "@coachHubOnboardingPfLocationSearchHint": {
+    "description": "Coach Hub onboarding, hint of the place search field."
+  },
+  "coachHubOnboardingPfLocationSearchButton": "Buscar",
+  "@coachHubOnboardingPfLocationSearchButton": {
+    "description": "Coach Hub onboarding, button that runs the place search."
+  },
+  "coachHubOnboardingPfLocationEmpty": "No encontramos ese lugar. Probá con la dirección completa.",
+  "@coachHubOnboardingPfLocationEmpty": {
+    "description": "Coach Hub onboarding, place search returned no results."
+  },
+  "coachHubOnboardingPfLocationDuplicate": "Ese lugar ya está en tu lista.",
+  "@coachHubOnboardingPfLocationDuplicate": {
+    "description": "Coach Hub onboarding, the picked place is already in the trainer's locations."
+  },
+  "coachHubOnboardingPfLocationNetworkError": "No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.",
+  "@coachHubOnboardingPfLocationNetworkError": {
+    "description": "Coach Hub onboarding, place search failed (network or HTTP)."
+  },
+  "coachHubOnboardingPfLocationConfigError": "La búsqueda de lugares no está disponible en este momento. Si das clases online, podés finalizar igual.",
+  "@coachHubOnboardingPfLocationConfigError": {
+    "description": "Coach Hub onboarding, place search is misconfigured (missing key). Must never read as 'no results'."
+  },
+  "coachHubOnboardingPfLocationRetry": "Reintentar",
+  "@coachHubOnboardingPfLocationRetry": {
+    "description": "Coach Hub onboarding, retry the place search."
+  },
+  "coachHubOnboardingPfLocationFound": "Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.",
+  "@coachHubOnboardingPfLocationFound": {
+    "description": "Coach Hub onboarding, shown after the place search found a place; asks the trainer to name it."
+  },
+  "coachHubOnboardingPfLocationLabelLabel": "NOMBRE DEL LUGAR",
+  "@coachHubOnboardingPfLocationLabelLabel": {
+    "description": "Coach Hub onboarding, label of the field where the trainer types the name of the place."
+  },
+  "coachHubOnboardingPfLocationLabelHint": "Ej: Mi estudio, Parque Sarmiento",
+  "@coachHubOnboardingPfLocationLabelHint": {
+    "description": "Coach Hub onboarding, hint of the place name field."
+  },
+  "coachHubOnboardingPfLocationAddButton": "Agregar lugar",
+  "@coachHubOnboardingPfLocationAddButton": {
+    "description": "Coach Hub onboarding, button that adds the found place with the typed name."
+  },
+  "coachHubOnboardingPfLocationRemove": "Quitar lugar",
+  "@coachHubOnboardingPfLocationRemove": {
+    "description": "Coach Hub onboarding, tooltip of the remove-place button."
+  },
+  "coachHubOnboardingPfLocationGymFallback": "Gimnasio",
+  "@coachHubOnboardingPfLocationGymFallback": {
+    "description": "Coach Hub onboarding, label of a legacy gym-type location that has no custom label."
+  },
+  "coachHubOnboardingPfFinish": "Finalizar",
+  "@coachHubOnboardingPfFinish": {
+    "description": "Coach Hub onboarding, final button of the professional profile step."
+  },
+  "coachHubOnboardingContinue": "Continuar",
+  "@coachHubOnboardingContinue": {
+    "description": "Coach Hub onboarding, continue button of the age and identity steps."
+  },
+  "coachHubOnboardingSaveError": "No pudimos guardar tus datos. Probá de nuevo.",
+  "@coachHubOnboardingSaveError": {
+    "description": "Coach Hub onboarding, inline error when saving a step fails."
+  },
+  "coachHubNotAllowedTitle": "SOLO PARA ENTRENADORES",
+  "@coachHubNotAllowedTitle": {
+    "description": "Coach Hub not-allowed screen \u2014 headline shown to a signed-in user without the trainer role."
+  },
+  "coachHubNotAllowedBody": "El Coach Hub es solo para entrenadores. Descargá la app de TREINO desde App Store o Play Store e iniciá sesión ahí.",
+  "@coachHubNotAllowedBody": {
+    "description": "Coach Hub not-allowed screen \u2014 explains the web is trainers-only and points to the mobile app. App Store and Play Store are named WITHOUT links (the app is not published yet)."
+  },
+  "coachHubNotAllowedContactPrompt": "¿Querés ser entrenador? Escribile al equipo.",
+  "@coachHubNotAllowedContactPrompt": {
+    "description": "Coach Hub not-allowed screen \u2014 line above the contact button for people who want to become a trainer."
+  },
+  "coachHubNotAllowedContactCta": "Contactar al equipo",
+  "@coachHubNotAllowedContactCta": {
+    "description": "Coach Hub not-allowed screen \u2014 label of the button that opens a mailto: to the team."
+  },
+  "coachHubNotAllowedMailSubject": "Quiero ser entrenador en TREINO",
+  "@coachHubNotAllowedMailSubject": {
+    "description": "Coach Hub not-allowed screen \u2014 subject of the mailto: draft. Contains spaces on purpose; encoded as %20."
+  },
+  "coachHubNotAllowedContactFallback": "No pudimos abrir tu correo. Escribinos a la dirección de arriba.",
+  "@coachHubNotAllowedContactFallback": {
+    "description": "Coach Hub not-allowed screen \u2014 inline message when the mailto: cannot be opened; points to the visible address."
+  },
   "coachHubLoginPrompt": "Ingresá con la cuenta que ya usás en la app móvil.",
   "@coachHubLoginPrompt": {
     "description": "Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account."
@@ -1839,9 +2129,9 @@
   "@coachHubAlumnosSearchHint": {
     "description": "Coach Hub web alumnos section — search field hint text."
   },
-  "coachHubAlumnosFilterAll": "Todos",
+  "coachHubAlumnosFilterAll": "Vigentes",
   "@coachHubAlumnosFilterAll": {
-    "description": "Coach Hub web alumnos section — 'All' filter chip label."
+    "description": "Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug."
   },
   "coachHubAlumnosFilterActivos": "Activos",
   "@coachHubAlumnosFilterActivos": {
@@ -1907,11 +2197,11 @@
   "@coachHubAlumnosStatusDebt": {
     "description": "Coach Hub web alumnos section — status badge for athletes with outstanding payments."
   },
-  "coachHubAlumnosStatusBlocked": "Bloqueado",
+  "coachHubAlumnosStatusBlocked": "Sin acceso",
   "@coachHubAlumnosStatusBlocked": {
     "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
   },
-  "coachHubAlumnosFilterBloqueados": "Bloqueados",
+  "coachHubAlumnosFilterBloqueados": "Sin acceso",
   "@coachHubAlumnosFilterBloqueados": {
     "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
   },
@@ -1982,13 +2272,13 @@
   "@coachHubAlumnoDetailNotasLoadError": {
     "description": "Coach Hub web alumno detail — error state when the note stream errors."
   },
-  "coachHubAlumnoDetailArchivosTitle": "Archivos privados",
+  "coachHubAlumnoDetailArchivosTitle": "Archivos del alumno",
   "@coachHubAlumnoDetailArchivosTitle": {
     "description": "Coach Hub web alumno detail — title of the Archivos tab body."
   },
-  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Solo vos los ves.",
+  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.",
   "@coachHubAlumnoDetailArchivosSubtitle": {
-    "description": "Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does."
+    "description": "Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno."
   },
   "coachHubAlumnoDetailArchivosUploadButton": "SUBIR ARCHIVO",
   "@coachHubAlumnoDetailArchivosUploadButton": {
@@ -2039,6 +2329,26 @@
   "coachHubAlumnoDetailArchivosDeleteError": "No pudimos eliminar el archivo.",
   "@coachHubAlumnoDetailArchivosDeleteError": {
     "description": "Coach Hub web alumno detail — snackbar when the delete flow fails."
+  },
+  "coachHubAlumnoDetailArchivosSharedLabel": "COMPARTIDO",
+  "@coachHubAlumnoDetailArchivosSharedLabel": {
+    "description": "Estado visible de un archivo compartido con el alumno."
+  },
+  "coachHubAlumnoDetailArchivosPrivateLabel": "PRIVADO",
+  "@coachHubAlumnoDetailArchivosPrivateLabel": {
+    "description": "Estado visible de un archivo que el alumno no puede ver."
+  },
+  "coachHubAlumnoDetailArchivosShareTooltip": "Compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosShareTooltip": {
+    "description": "Tooltip para habilitar el acceso del alumno a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosUnshareTooltip": "Dejar de compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosUnshareTooltip": {
+    "description": "Tooltip para quitarle al alumno el acceso a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosShareError": "No pudimos cambiar quién ve el archivo.",
+  "@coachHubAlumnoDetailArchivosShareError": {
+    "description": "Snackbar cuando falla el cambio de visibilidad de un archivo."
   },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {
@@ -2109,7 +2419,7 @@
   "postCardMenuA11y": "Opciones del post",
   "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
   "@postCardMenuA11y": {
-    "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
+    "description": "Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear)."
   },
   "postCardMenuEdit": "Editar",
   "@postCardMenuEdit": {
@@ -2186,6 +2496,10 @@
   "gymNearbyShowMore": "Ver más",
   "@gymNearbyShowMore": {
     "description": "gym-selection-v2 AD-4: reveals already-fetched nearby rows beyond the initial 8 — a pure local toggle, never a re-request."
+  },
+  "gymSearchConfigError": "La búsqueda de gyms no está disponible en esta versión de la app.",
+  "@gymSearchConfigError": {
+    "description": "Places client key missing at build time (no --dart-define=PLACES_CLIENT_KEY). Config error, NOT a network failure: must never read as 'no results' and must never offer retry — retrying cannot supply the key."
   },
   "gymNearbyLoadError": "No pudimos cargar los gyms cercanos.",
   "@gymNearbyLoadError": {
@@ -2266,6 +2580,39 @@
   "@chatMediaUploading": {},
   "chatMediaUploadFailed": "No pudimos subir el archivo. Probá de nuevo.",
   "@chatMediaUploadFailed": {},
+  "chatMediaQuotaFull": "Llegaste al tope de {maxMb} MB en fotos y videos de chat.",
+  "@chatMediaQuotaFull": {
+    "description": "Shown when the athlete's total chat media quota is exhausted, before opening the picker (#chat-media-quota). The MB figure is interpolated from kFreeMaxChatMediaBytes / kMaxChatMediaBytes — never hardcode it in the string.",
+    "placeholders": {
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaFileTooLarge": "El archivo pesa {fileMb} MB y el máximo es {maxMb} MB.",
+  "@chatMediaFileTooLarge": {
+    "description": "Shown after picking a file that exceeds the per-file cap (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaQuotaNotEnough": "El archivo pesa {fileMb} MB y te quedan {remainingMb} MB de cupo.",
+  "@chatMediaQuotaNotEnough": {
+    "description": "Shown after picking a file that fits the per-file cap but would cross the total byte quota (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "remainingMb": {
+        "type": "String"
+      }
+    }
+  },
   "chatMediaPreviewPhoto": "📷 Foto",
   "@chatMediaPreviewPhoto": {},
   "chatMediaPreviewVideo": "🎥 Video",
@@ -2457,6 +2804,18 @@
   "profileRoutinesActiveChip": "ACTIVA",
   "@profileRoutinesActiveChip": {
     "description": "Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip."
+  },
+  "profileSectionLegal": "Legales",
+  "@profileSectionLegal": {
+    "description": "Header of the Legal section group in the profile settings list."
+  },
+  "legalDocumentsTitle": "Documentos legales",
+  "@legalDocumentsTitle": {
+    "description": "Title of the legal documents index screen and its tile in the profile settings list."
+  },
+  "legalDocumentsSubtitle": "Términos, privacidad y más",
+  "@legalDocumentsSubtitle": {
+    "description": "Subtitle under the legal documents tile in the profile settings list."
   },
   "appearanceTitle": "Apariencia",
   "@appearanceTitle": {
@@ -3199,9 +3558,9 @@
   "@postPrivacyNoGymHint": {
     "description": "Hint shown under the PostPrivacySelector pills when the athlete has no gym, explaining why MI GYM is disabled."
   },
-  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "suggestedUsersTitle": "SUGERENCIAS PARA VOS",
   "@suggestedUsersTitle": {
-    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+    "description": "Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym."
   },
   "suggestedUserAnonymous": "Anónimo",
   "@suggestedUserAnonymous": {
@@ -3569,6 +3928,10 @@
   "@exerciseFeedbackNoteTagComment": {"description": "Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección."},
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
   "@exerciseFeedbackNoteTagDiscomfort": {"description": "Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito."},
+  "workoutHistorialTopeAlcanzado": "Puede haber entrenamientos más viejos que no entran en esta lista.",
+  "@workoutHistorialTopeAlcanzado": {"description": "Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). NO asertivo a proposito: llegar al tope no PRUEBA que haya mas atras (con exactamente 365 sesiones la condicion se cumple y no hay nada mas), y el numero de filas visibles puede ser menor porque el modo alumno filtra las incompletas. Sin el aviso la lista corta en silencio, con un aviso asertivo miente; esto informa sin afirmar."},
+  "dashboardActividadTopeAlcanzado": "Puede haber más actividad que no entra en esta lista.",
+  "@dashboardActividadTopeAlcanzado": {"description": "Pie de la pantalla completa de Actividad reciente cuando el feed llego al tope de datos (kRecentActivityMaxEntries). El Ver todo del dashboard lleva ahi, y sin esto mostraria las 50 mas nuevas como si fueran todas."},
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "@exerciseFeedbackNoteSetTag": {"description": "Serie a la que quedó anclado el reporte, al lado del tag.", "placeholders": {"setNumber": {"type": "int"}}},
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
@@ -3669,5 +4032,739 @@
   "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
   "@routineEditorSlotMenuMergeDown": {
     "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
+  },
+  "paywallFreePlanLimitTitle": "Esto es parte del plan pago",
+  "@paywallFreePlanLimitTitle": {
+    "description": "Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina."
+  },
+  "paywallFreePlanLimitDaysBody": "Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.",
+  "@paywallFreePlanLimitDaysBody": {
+    "description": "Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitWeeksBody": "Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.",
+  "@paywallFreePlanLimitWeeksBody": {
+    "description": "Cuerpo para el tope de SEMANAS."
+  },
+  "paywallFreePlanLimitShapeDaysBody": "Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeDaysBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitShapeWeeksBody": "Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeWeeksBody": {
+    "description": "El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitUpgrade": "Ver el plan pago",
+  "@paywallFreePlanLimitUpgrade": {
+    "description": "CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton."
+  },
+  "paywallFreePlanLimitDismiss": "Entendido",
+  "@paywallFreePlanLimitDismiss": {},
+  "paywallFreePlanLimitTemplateBody": "Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.",
+  "@paywallFreePlanLimitTemplateBody": {
+    "description": "Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado."
+  },
+  "paywallFreePlanLimitCustomizeTemplateBody": "Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.",
+  "@paywallFreePlanLimitCustomizeTemplateBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutPlantillasPremiumChip": "PLAN PAGO",
+  "@workoutPlantillasPremiumChip": {
+    "description": "Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira."
+  },
+  "progressionPeriodLast3Months": "3 meses",
+  "@progressionPeriodLast3Months": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy."
+  },
+  "progressionPeriodLast1Year": "1 año",
+  "@progressionPeriodLast1Year": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira."
+  },
+  "workoutRoutineFollow": "Seguir esta plantilla",
+  "@workoutRoutineFollow": {
+    "description": "Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'."
+  },
+  "workoutRoutineFollowing": "La estas siguiendo",
+  "@workoutRoutineFollowing": {
+    "description": "Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta."
+  },
+  "workoutRoutineFollowSuccess": "Listo, ahora seguís esta plantilla.",
+  "@workoutRoutineFollowSuccess": {},
+  "workoutRoutineFollowError": "No pudimos marcarla. Probá de nuevo.",
+  "@workoutRoutineFollowError": {},
+  "paywallFreePlanLimitRoutineCountBody": "Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.",
+  "@paywallFreePlanLimitRoutineCountBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free intenta guardar una rutina propia mas alla del tope. Aclara que seguir plantillas no consume cupo, porque desde #963 seguir no copia."
+  },
+  "paywallFreePlanLimitChartHistoryBody": "Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.",
+  "@paywallFreePlanLimitChartHistoryBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca un periodo de grafico del plan pago. Es el unico limite que no restringe lo que puede HACER sino hasta donde puede MIRAR lo que ya hizo."
+  },
+  "paywallFreePlanLimitProName": "TREINO Pro",
+  "@paywallFreePlanLimitProName": {
+    "description": "Nombre del plan pago del alumno en la tarjeta de la hoja de limite. Es el mismo nombre que usan la landing y los terminos de suscripcion."
+  },
+  "paywallFreePlanLimitProTagline": "Todo lo que ya usás, sin los topes del plan gratis.",
+  "@paywallFreePlanLimitProTagline": {
+    "description": "Bajada de la tarjeta TREINO Pro. La tarjeta DESCRIBE el plan y nada mas: no dice donde se consigue, ni cuanto sale, ni que va a llegar algo por otro canal. Bajo la Guideline 3.1.3(f) cualquiera de esas tres cosas es un 'call to action for purchase outside of the app' y se lleva puesta la exencion del ENTRENADOR. Ver superficie_de_cobro_alumno_test.dart."
+  },
+  "paywallFreePlanLimitProBenefitDays": "Rutinas de hasta {max} días",
+  "@paywallFreePlanLimitProBenefitDays": {
+    "description": "Beneficio de TREINO Pro. {max} sale de kMaxRoutineDays: el numero no se escribe a mano en la cadena.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitProBenefitWeeks": "Hasta {max} semanas, con periodización",
+  "@paywallFreePlanLimitProBenefitWeeks": {
+    "description": "Beneficio de TREINO Pro. {max} sale de kMaxRoutineWeeks.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitProBenefitTemplates": "Todas las plantillas del catálogo, de principiante a avanzado",
+  "@paywallFreePlanLimitProBenefitTemplates": {
+    "description": "Beneficio de TREINO Pro. El plan gratis sigue solo las de nivel principiante (docs/paywall-alumno-suelto.md §4.1.1)."
+  },
+  "paywallFreePlanLimitProBenefitCustomize": "Personalizar cualquier plantilla del catálogo",
+  "@paywallFreePlanLimitProBenefitCustomize": {
+    "description": "Beneficio de TREINO Pro. Seguir una plantilla tal cual es gratis; copiarla para editarla es lo pago."
+  },
+  "paywallFreePlanLimitProBenefitRoutines": "Hasta {max} rutinas propias",
+  "@paywallFreePlanLimitProBenefitRoutines": {
+    "description": "Beneficio de TREINO Pro. {max} sale de kMaxOwnRoutines.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitProBenefitCharts": "Gráficos de 3 meses y 1 año",
+  "@paywallFreePlanLimitProBenefitCharts": {
+    "description": "Beneficio de TREINO Pro. Los periodos son los nombres de los chips de los graficos, no un tope: por eso van escritos."
+  },
+  "paywallFreePlanLimitProMatchTag": "Lo que buscabas",
+  "@paywallFreePlanLimitProMatchTag": {
+    "description": "Etiqueta sobre el beneficio de TREINO Pro que corresponde al tope que el alumno acaba de tocar. Ese beneficio va primero y resaltado."
+  },
+  "paywallAlumnoTitulo": "TREINO Pro",
+  "@paywallAlumnoTitulo": {
+    "description": "Titulo del paywall del alumno."
+  },
+  "paywallAlumnoBajada": "Programá en serio: rutinas largas, periodización y todo tu historial.",
+  "@paywallAlumnoBajada": {
+    "description": "Bajada del paywall del alumno."
+  },
+  "paywallAlumnoPlanMensual": "Mensual",
+  "@paywallAlumnoPlanMensual": {
+    "description": "Nombre del plan mensual en el paywall del alumno."
+  },
+  "paywallAlumnoPlanAnual": "Anual",
+  "@paywallAlumnoPlanAnual": {
+    "description": "Nombre del plan anual en el paywall del alumno."
+  },
+  "paywallAlumnoAhorro": "2 meses gratis",
+  "@paywallAlumnoAhorro": {
+    "description": "Etiqueta del plan anual. NO dice un porcentaje: el descuento sale del precio de la tienda y un numero fijo se puede desincronizar."
+  },
+  "paywallAlumnoBeneficio1": "Rutinas de hasta 7 días",
+  "@paywallAlumnoBeneficio1": {
+    "description": "Beneficio 1 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio2": "16 semanas con periodización",
+  "@paywallAlumnoBeneficio2": {
+    "description": "Beneficio 2 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio3": "Gráficos de 3 meses y 1 año",
+  "@paywallAlumnoBeneficio3": {
+    "description": "Beneficio 3 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio4": "Las plantillas premium del catálogo",
+  "@paywallAlumnoBeneficio4": {
+    "description": "Beneficio 4 del plan pago del alumno."
+  },
+  "paywallAlumnoImpuestos": "Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.",
+  "@paywallAlumnoImpuestos": {
+    "description": "Aviso de impuestos del paywall del alumno. VA SIN MONTO Y SIN TIPO DE CAMBIO a proposito: el importe final lo define el emisor de la tarjeta al liquidar, asi que no lo podemos saber, y publicar un numero que puede salir mal es 'promoting a false price' (guideline 2.3.1(a), cuya pena escrita es la baja de la app y la terminacion de la cuenta). Ademas Google exige que 'In-app pricing must match the pricing displayed in the user-facing Play billing interface'."
+  },
+  "paywallAlumnoCta": "Suscribirme",
+  "@paywallAlumnoCta": {
+    "description": "CTA del paywall del alumno. NO lleva el precio adentro: el boton dispara la hoja del sistema, que muestra el precio de la tienda, y que el boton prometa otro numero es el peor lugar posible para una discrepancia."
+  },
+  "paywallAlumnoRestaurar": "Restaurar compras",
+  "@paywallAlumnoRestaurar": {
+    "description": "Restaurar compras. Apple lo EXIGE para suscripciones."
+  },
+  "paywallAlumnoSinPlanes": "No pudimos cargar los planes. Probá de nuevo en un rato.",
+  "@paywallAlumnoSinPlanes": {
+    "description": "Estado de error del paywall del alumno cuando la tienda no devuelve ningun plan."
+  },
+  "paywallAlumnoReintentar": "Reintentar",
+  "@paywallAlumnoReintentar": {
+    "description": "Boton de reintento del paywall del alumno."
+  },
+  "paywallAlumnoListo": "¡Listo! Ya tenés TREINO Pro.",
+  "@paywallAlumnoListo": {
+    "description": "Resultado: la compra se acredito."
+  },
+  "paywallAlumnoPendiente": "Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.",
+  "@paywallAlumnoPendiente": {
+    "description": "Resultado: pago diferido (Android) o Ask to Buy (iOS). NO es un error."
+  },
+  "paywallAlumnoErrorCompra": "No pudimos completar la compra. No se te cobró nada.",
+  "@paywallAlumnoErrorCompra": {
+    "description": "Resultado: la compra fallo."
+  },
+  "paywallAlumnoSinRestaurar": "No encontramos compras para restaurar en esta cuenta.",
+  "@paywallAlumnoSinRestaurar": {
+    "description": "Resultado de restaurar cuando no hay nada."
+  },
+  "moderationMenuA11y": "Más opciones",
+  "@moderationMenuA11y": {
+    "description": "Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header)."
+  },
+  "moderationReportAction": "Reportar",
+  "@moderationReportAction": {
+    "description": "Label of the Reportar item in the moderation overflow menu."
+  },
+  "moderationBlockAction": "Bloquear",
+  "@moderationBlockAction": {
+    "description": "Label of the Bloquear item in the moderation overflow menu."
+  },
+  "moderationReportSheetTitle": "¿Por qué lo reportás?",
+  "@moderationReportSheetTitle": {
+    "description": "Title of the report-reason bottom sheet."
+  },
+  "moderationReportReasonHarassment": "Acoso",
+  "@moderationReportReasonHarassment": {
+    "description": "Report reason: harassment."
+  },
+  "moderationReportReasonSexualContent": "Contenido sexual",
+  "@moderationReportReasonSexualContent": {
+    "description": "Report reason: sexual content."
+  },
+  "moderationReportReasonViolenceOrSelfHarm": "Violencia o autolesión",
+  "@moderationReportReasonViolenceOrSelfHarm": {
+    "description": "Report reason: violence or self-harm."
+  },
+  "moderationReportReasonDangerousHealthAdvice": "Consejo de salud peligroso",
+  "@moderationReportReasonDangerousHealthAdvice": {
+    "description": "Report reason: dangerous health advice."
+  },
+  "moderationReportReasonImpersonation": "Suplantación de identidad",
+  "@moderationReportReasonImpersonation": {
+    "description": "Report reason: impersonation."
+  },
+  "moderationReportReasonSpam": "Spam",
+  "@moderationReportReasonSpam": {
+    "description": "Report reason: spam."
+  },
+  "moderationReportReasonThirdPartyData": "Datos de terceros",
+  "@moderationReportReasonThirdPartyData": {
+    "description": "Report reason: third-party data (sharing someone else's personal data without consent)."
+  },
+  "moderationReportReasonIntellectualProperty": "Propiedad intelectual",
+  "@moderationReportReasonIntellectualProperty": {
+    "description": "Report reason: intellectual property infringement."
+  },
+  "moderationReportReasonOther": "Otro",
+  "@moderationReportReasonOther": {
+    "description": "Report reason: other / none of the above."
+  },
+  "moderationReportDetailHint": "Contanos más (opcional)",
+  "@moderationReportDetailHint": {
+    "description": "Hint text of the optional free-text detail field in the report sheet."
+  },
+  "moderationReportSubmit": "ENVIAR REPORTE",
+  "@moderationReportSubmit": {
+    "description": "Submit button of the report sheet. Disabled until a reason is selected."
+  },
+  "moderationReportCancel": "CANCELAR",
+  "@moderationReportCancel": {
+    "description": "Cancel/dismiss button of the report sheet."
+  },
+  "moderationReportSuccess": "Gracias, lo vamos a revisar.",
+  "@moderationReportSuccess": {
+    "description": "Success snackbar after submitting a report."
+  },
+  "moderationReportError": "No pudimos enviar el reporte. Probá de nuevo.",
+  "@moderationReportError": {
+    "description": "Error snackbar when submitting a report fails."
+  },
+  "moderationBlockConfirmTitle": "¿Bloquear a {name}?",
+  "@moderationBlockConfirmTitle": {
+    "description": "Title of the block confirmation sheet.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockConfirmBody": "No va a poder escribirte, seguirte ni reaccionar a tus posts.",
+  "@moderationBlockConfirmBody": {
+    "description": "Body line of the block confirmation sheet, explaining what blocking does."
+  },
+  "moderationBlockConfirmAction": "BLOQUEAR",
+  "@moderationBlockConfirmAction": {
+    "description": "Button that confirms blocking."
+  },
+  "moderationBlockDismiss": "CANCELAR",
+  "@moderationBlockDismiss": {
+    "description": "Button that dismisses the block confirmation sheet."
+  },
+  "moderationBlockSuccess": "Bloqueaste a {name}.",
+  "@moderationBlockSuccess": {
+    "description": "Success snackbar after blocking someone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockError": "No pudimos bloquear. Probá de nuevo.",
+  "@moderationBlockError": {
+    "description": "Error snackbar when blocking fails."
+  },
+  "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.",
+  "@moderationBlockedMessage": {
+    "description": "Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde."
+  },
+  "privacyTitle": "Privacidad",
+  "@privacyTitle": {
+    "description": "Titulo de la pantalla y de la seccion de privacidad en el perfil"
+  },
+  "privacyAnalyticsTitle": "Analítica de uso",
+  "@privacyAnalyticsTitle": {
+    "description": "Titulo del interruptor de analitica"
+  },
+  "privacyAnalyticsSubtitle": "Nos ayuda a entender qué partes de la app se usan.",
+  "@privacyAnalyticsSubtitle": {
+    "description": "Subtitulo del interruptor de analitica"
+  },
+  "privacyAnalyticsExplainer": "Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.",
+  "@privacyAnalyticsExplainer": {
+    "description": "Parrafo que explica que pasa al desactivar la analitica"
+  },
+  "privacyAnalyticsCrashNote": "No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.",
+  "@privacyAnalyticsCrashNote": {
+    "description": "Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue."
+  },
+  "privacyEntryTitle": "Analítica y correos",
+  "@privacyEntryTitle": {
+    "description": "Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica."
+  },
+  "privacyPromoEmailsTitle": "Correos promocionales",
+  "@privacyPromoEmailsTitle": {
+    "description": "Titulo del interruptor de correos promocionales en la pantalla de privacidad. Es una preferencia de la CUENTA, no del dispositivo. Sin 'plan', 'pago', 'suscripcion', 'precio', 'oferta', 'web' ni 'Pro': Guideline 3.1.3 de Apple, ver test/features/paywall/."
+  },
+  "privacyPromoEmailsSubtitle": "Si lo apagás, no te mandamos más. Los avisos de tu cuenta te siguen llegando.",
+  "@privacyPromoEmailsSubtitle": {
+    "description": "Subtitulo del interruptor de correos promocionales. 'Los avisos de tu cuenta' es cierto: solo los mails con prefKey se frenan, los operativos siguen saliendo. Mismas palabras prohibidas que el titulo."
+  },
+  "privacyPromoEmailsSaveError": "No pudimos guardar el cambio. Intentá de nuevo.",
+  "@privacyPromoEmailsSaveError": {
+    "description": "Snackbar cuando falla la escritura del interruptor de correos promocionales. El interruptor vuelve solo al valor real."
+  },
+  "customExerciseCounter": "{count} de {limit} ejercicios propios",
+  "@customExerciseCounter": {
+    "description": "Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "templateCounter": "{count} de {limit} plantillas",
+  "@templateCounter": {
+    "description": "Contador visible en la grilla de rutinas del Hub y en la seccion de plantillas del movil (docs/limite-plantillas-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "planLimitVerPlanesMovil": "VER PLANES",
+  "@planLimitVerPlanesMovil": {
+    "description": "CTA principal de los TRES avisos de tope del PF (alumnos, ejercicios propios, plantillas) en su forma MÓVIL: navega a /facturacion/planes, la pantalla informativa de precios (no compra nada — Guideline 3.1.3(f)). La WEB (Coach Hub) sigue con el string hardcodeado 'VER PLANES' a propósito (i18n Fase W3): no lo unifiques con esta clave."
+  },
+  "planLimitEntendido": "Entendido",
+  "@planLimitEntendido": {
+    "description": "Link de descarte de los TRES avisos de tope del PF en su forma MÓVIL. 'Entendido' y no 'Ahora no' porque no presupone ninguna oferta (decisión del dueño, 2026-09-29). La WEB sigue diciendo 'Ahora no', hardcodeado."
+  },
+  "planLimitPorMes": "/mes",
+  "@planLimitPorMes": {
+    "description": "Sufijo del precio en la tarjeta del siguiente plan de los avisos de tope (alumnos, ejercicios propios, plantillas), forma MÓVIL. Lleva la barra porque va pegado al monto ($12.000/mes). La WEB sigue con '/mes' hardcodeado (i18n Fase W3)."
+  },
+  "planLimitPlanAMedidaTitulo": "PLAN A MEDIDA",
+  "@planLimitPlanAMedidaTitulo": {
+    "description": "Título de la caja 'plan a medida' de los avisos de tope, forma MÓVIL: aparece cuando el PF ya está en el plan más grande y no hay siguiente tier. En producción no se alcanza (el servidor nunca bloquea a un PF sin tope), pero está localizada igual: un texto que puede renderizarse no puede quedar en castellano en la forma en inglés. La WEB lo tiene hardcodeado (i18n Fase W3)."
+  },
+  "planLimitContactanos": "CONTACTANOS",
+  "@planLimitContactanos": {
+    "description": "CTA del aviso de ALUMNOS cuando no hay siguiente tier, forma MÓVIL. Misma nota de inalcanzable que planLimitPlanAMedidaTitulo."
+  },
+  "planLimitAlumnosTituloTope": "LLEGASTE AL LÍMITE DE TU PLAN",
+  "@planLimitAlumnosTituloTope": {
+    "description": "Título del aviso de tope de ALUMNOS (paywall de bloqueo del PF), forma MÓVIL. La WEB sigue con el string hardcodeado idéntico — misma copy, dos fuentes a propósito (i18n Fase W3)."
+  },
+  "planLimitAlumnosTituloInactiva": "TU SUSCRIPCIÓN ESTÁ SUSPENDIDA",
+  "@planLimitAlumnosTituloInactiva": {
+    "description": "Título del aviso de ALUMNOS cuando la suscripción del PF no está activa (PlanLimitReason.subscriptionInactive), forma MÓVIL."
+  },
+  "planLimitAlumnosTituloBaja": "TU SUSCRIPCIÓN ESTÁ DADA DE BAJA",
+  "@planLimitAlumnosTituloBaja": {
+    "description": "Título del aviso de ALUMNOS con la suscripción inactiva cuando el status es cancelled (una baja, no una suspensión), forma MÓVIL. La caja de abajo dice «Estado: cancelada»: con el título de suspendida el modal se contradecía."
+  },
+  "planLimitAlumnosCuerpoInactivaExplicacion": "Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.",
+  "@planLimitAlumnosCuerpoInactivaExplicacion": {
+    "description": "Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés."
+  },
+  "planLimitAlumnosCuerpoTopeMovilLimitado": "Tu plan {plan} incluye {limit, plural, =1{1 alumno} other{{limit} alumnos}}.",
+  "@planLimitAlumnosCuerpoTopeMovilLimitado": {
+    "description": "Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier tiene cupo limitado. {plan} es el nombre del tier (tierName, no se traduce — ver plan_copy.dart).",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosCuerpoTopeMovilIlimitado": "Tu plan {plan} incluye alumnos sin límite.",
+  "@planLimitAlumnosCuerpoTopeMovilIlimitado": {
+    "description": "Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier (Plan 3) no tiene cupo. En la práctica inalcanzable — Plan 3 es ilimitado y el servidor nunca bloquea a un PF sin tope — se mantiene por completitud, mismo criterio que PLAN A MEDIDA.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitAlumnosPlanAMedidaCuerpo": "Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.",
+  "@planLimitAlumnosPlanAMedidaCuerpo": {
+    "description": "Cuerpo de la caja 'plan a medida' del aviso de ALUMNOS, forma MÓVIL. Inalcanzable en producción (ver planLimitPlanAMedidaTitulo). Es el texto hardcodeado de siempre, sin cambios: supone que el plan más grande topea en 15 alumnos, y desde que Plan 3 es ilimitado (kTierWeightLimits) eso ya no es así — revisar con producto antes de que esta caja pueda mostrarse."
+  },
+  "planLimitAlumnosPlanAMedidaSnack": "Muy pronto vas a poder tener más de 15 alumnos.",
+  "@planLimitAlumnosPlanAMedidaSnack": {
+    "description": "SnackBar que dispara CONTACTANOS en el aviso de ALUMNOS sin siguiente tier, forma MÓVIL (mock hasta que exista un canal de contacto). Inalcanzable en producción, misma nota que planLimitAlumnosPlanAMedidaCuerpo."
+  },
+  "planLimitReactivateTituloMovil": "TU PLAN: {plan}",
+  "@planLimitReactivateTituloMovil": {
+    "description": "Título de la caja de reactivación del aviso de ALUMNOS inactivo, forma MÓVIL. {plan} ya llega en mayúsculas (tierName(tier).toUpperCase()).",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitReactivateCuerpoMovil": "No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: {count, plural, =1{1 alumno} other{{count} alumnos}}.",
+  "@planLimitReactivateCuerpoMovil": {
+    "description": "Cuerpo de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — estado neutro, sin 'reactivá/regularizá/pagá' (Guideline 3.1.3(f)).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitVerEstadoMovil": "VER ESTADO",
+  "@planLimitVerEstadoMovil": {
+    "description": "CTA de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — describe lo que el botón hace (mostrar el SnackBar de estado), no lo que Apple prohíbe pedir. La WEB sigue diciendo 'REGULARIZAR', hardcodeado."
+  },
+  "planLimitReactivateEstadoMovil": "Estado: {estado}",
+  "@planLimitReactivateEstadoMovil": {
+    "description": "Caption de estado dentro de la caja de reactivación, forma MÓVIL. {estado} sale de una de las cinco claves planLimitEstado*.",
+    "placeholders": {
+      "estado": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitEstadoActiva": "activa",
+  "@planLimitEstadoActiva": {
+    "description": "Nombre del SubscriptionStatus.active para la caption 'Estado: …' del aviso de ALUMNOS inactivo, forma MÓVIL."
+  },
+  "planLimitEstadoPendiente": "pendiente de pago",
+  "@planLimitEstadoPendiente": {
+    "description": "Nombre del SubscriptionStatus.pending, misma caption."
+  },
+  "planLimitEstadoGracia": "con pago pendiente",
+  "@planLimitEstadoGracia": {
+    "description": "Nombre del SubscriptionStatus.grace (falló un cobro recurrente y Mercado Pago reintenta), misma caption."
+  },
+  "planLimitEstadoPausada": "pausada",
+  "@planLimitEstadoPausada": {
+    "description": "Nombre del SubscriptionStatus.paused, misma caption."
+  },
+  "planLimitEstadoCancelada": "cancelada",
+  "@planLimitEstadoCancelada": {
+    "description": "Nombre del SubscriptionStatus.cancelled, misma caption."
+  },
+  "planLimitAlumnosBeneficioLimitado": "Hasta {limit, plural, =1{1 alumno} other{{limit} alumnos}}",
+  "@planLimitAlumnosBeneficioLimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier tiene cupo limitado.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosBeneficioIlimitado": "Alumnos sin límite",
+  "@planLimitAlumnosBeneficioIlimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier no tiene tope."
+  },
+  "planLimitSuscripcionPausadaMovil": "Tu suscripción está pausada.",
+  "@planLimitSuscripcionPausadaMovil": {
+    "description": "SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva, forma MÓVIL (PlanCheckoutOnWebOnly — la única superficie de cobro en el móvil es informar el estado). Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart."
+  },
+  "planLimitSuscripcionBajaMovil": "Tu suscripción está dada de baja.",
+  "@planLimitSuscripcionBajaMovil": {
+    "description": "SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva y status cancelled, forma MÓVIL. Hermano de planLimitSuscripcionPausadaMovil: informa el estado, sin llamado a comprar. Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart."
+  },
+  "planLimitTrainerTituloEjercicios": "TOPE DE EJERCICIOS PROPIOS",
+  "@planLimitTrainerTituloEjercicios": {
+    "description": "Título del aviso de tope de EJERCICIOS PROPIOS del PF, forma MÓVIL. La WEB sigue con el string hardcodeado idéntico (i18n Fase W3)."
+  },
+  "planLimitTrainerTituloPlantillas": "TOPE DE PLANTILLAS",
+  "@planLimitTrainerTituloPlantillas": {
+    "description": "Título del aviso de tope de PLANTILLAS del PF, forma MÓVIL."
+  },
+  "planLimitTrainerPasadoTopeEjercicios": "Tenés {count, plural, =1{1 ejercicio propio} other{{count} ejercicios propios}} y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, borrá {toDelete}.",
+  "@planLimitTrainerPasadoTopeEjercicios": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. {toDelete} = count - limit + 1 (siempre >= 2 acá, porque count > limit): por eso 'borrá {toDelete}' va sin plural.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toDelete": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerPasadoTopePlantillas": "Tenés {count, plural, =1{1 plantilla} other{{count} plantillas}} y tu plan incluye {limit}. Conservás todas; para crear una nueva, archivá {toArchive}.",
+  "@planLimitTrainerPasadoTopePlantillas": {
+    "description": "Cuerpo del aviso de PLANTILLAS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. Género femenino ('todas', 'una nueva', 'archivá') a diferencia de ejercicios. {toArchive} = count - limit + 1.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toArchive": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaEjercicios": "Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}.",
+  "@planLimitTrainerInactivaEjercicios": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS cuando la suscripción está inactiva (lo decide resolveNoticeTier.inactive; la regla completa está en el dartdoc de esa función), forma MÓVIL. {plan} es el nominal, {planEfectivo} el que realmente aplica.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaPlantillas": "Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}.",
+  "@planLimitTrainerInactivaPlantillas": {
+    "description": "Igual que planLimitTrainerInactivaEjercicios, para PLANTILLAS.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosConTier": "Tu plan {plan} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.",
+  "@planLimitTrainerTopeEjerciciosConTier": {
+    "description": "Cuerpo del aviso de EJERCICIOS PROPIOS en el tope, forma MÓVIL, cuando se pudo resolver un tier efectivo para nombrar.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosGenerico": "Tu plan incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.",
+  "@planLimitTrainerTopeEjerciciosGenerico": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosConTier pero sin nombrar ningún tier — límite ajustado a mano sin match en la tabla, o propagación pendiente (AGENTS.md §11.1: no se afirma lo que no se sabe).",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasConTier": "Tu plan {plan} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.",
+  "@planLimitTrainerTopePlantillasConTier": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosConTier, para PLANTILLAS.",
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasGenerico": "Tu plan incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.",
+  "@planLimitTrainerTopePlantillasGenerico": {
+    "description": "Igual que planLimitTrainerTopeEjerciciosGenerico, para PLANTILLAS.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosLimitado": "Hasta {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}",
+  "@planLimitTrainerBeneficioEjerciciosLimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, con cupo limitado.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosIlimitado": "Ejercicios propios sin límite",
+  "@planLimitTrainerBeneficioEjerciciosIlimitado": {
+    "description": "Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, sin tope."
+  },
+  "planLimitTrainerBeneficioPlantillasLimitado": "Hasta {limit, plural, =1{1 plantilla} other{{limit} plantillas}}",
+  "@planLimitTrainerBeneficioPlantillasLimitado": {
+    "description": "Igual que planLimitTrainerBeneficioEjerciciosLimitado, para PLANTILLAS. Con las tablas de hoy (sólo Free tiene tope de plantillas, y Free nunca es 'el siguiente') la rama no se alcanza; existe para cuando la tabla cambie.",
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioPlantillasIlimitado": "Plantillas sin límite",
+  "@planLimitTrainerBeneficioPlantillasIlimitado": {
+    "description": "Igual que planLimitTrainerBeneficioEjerciciosIlimitado, para PLANTILLAS."
+  },
+  "planLimitTrainerPlanAMedidaCuerpo": "Estás en el plan más grande. Estamos preparando un plan a tu medida.",
+  "@planLimitTrainerPlanAMedidaCuerpo": {
+    "description": "Cuerpo de la caja 'plan a medida' de los avisos de EJERCICIOS PROPIOS y PLANTILLAS, forma MÓVIL. Inalcanzable con las tablas de hoy: para llegar acá el tier efectivo tendría que ser Plan 3, y Plan 3 no tiene un tope finito que resolveNoticeTier pueda matchear. Queda como red por si la tabla cambia."
+  },
+  "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}",
+  "@eliminarCuentaSheetTrainerUnlinkNotice": {
+    "description": "Aviso en la hoja de eliminar cuenta del entrenador: cuántos alumnos quedan desvinculados.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "eliminarCuentaSheetErrorSubscriptionCancel": "No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.",
+  "eliminarCuentaSheetErrorNotAllowed": "No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.",
+  "eliminarCuentaWebReauthTitle": "Confirmá tu identidad",
+  "eliminarCuentaWebReauthPasswordBody": "Por seguridad, ingresá tu contraseña para confirmar que sos vos.",
+  "eliminarCuentaWebReauthCta": "CONFIRMAR",
+  "eliminarCuentaWebPopupHint": "Para confirmar que sos vos, se va a abrir una ventana de {provider}.",
+  "@eliminarCuentaWebPopupHint": {
+    "description": "Aviso en el diálogo de eliminar cuenta del Coach Hub: la re-autenticación abre un popup del proveedor (Google o Apple).",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+  "gymNameDialogTitle": "Ponele nombre a tu gimnasio",
+  "@gymNameDialogTitle": {
+    "description": "Title of the dialog asking the user to name the gym they just picked (the name is typed by the first user, never taken from Google)."
+  },
+  "gymNameDialogBody": "Escribí el nombre con el que querés que lo vean los demás.",
+  "@gymNameDialogBody": {
+    "description": "Body of the gym name dialog."
+  },
+  "gymNameDialogHint": "Nombre del gimnasio",
+  "@gymNameDialogHint": {
+    "description": "Hint of the gym name text field."
+  },
+  "gymNameDialogConfirm": "GUARDAR",
+  "@gymNameDialogConfirm": {
+    "description": "Confirm button of the gym name dialog. Cancel reuses commonCancel."
+  },
+  "gymNamePromptTitle": "Tu gimnasio necesita un nombre",
+  "@gymNamePromptTitle": {
+    "description": "Título de la card de Inicio que pide nombrar el gimnasio vinculado cuando está marcado nameNeeded (migración de Places, #1338)."
+  },
+  "gymNamePromptBody": "Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.",
+  "@gymNamePromptBody": {
+    "description": "Cuerpo de la card que pide nombrar el gimnasio."
+  },
+  "gymNamePromptCta": "PONERLE NOMBRE",
+  "@gymNamePromptCta": {
+    "description": "Botón de la card que abre el diálogo para nombrar el gimnasio."
+  },
+  "gymNamePromptDismiss": "Ahora no",
+  "@gymNamePromptDismiss": {
+    "description": "Cierra la card de nombrar el gimnasio hasta la próxima sesión."
+  },
+  "gymNamePromptRaceMessage": "Alguien ya lo nombró: {name}.",
+  "@gymNamePromptRaceMessage": {
+    "description": "Snackbar cuando otro usuario nombró el gimnasio antes que vos; muestra el nombre ganador.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.",
+  "@coachHubOnboardingPfLocationStaleHint": {
+    "description": "Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo."
   }
 }

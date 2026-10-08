@@ -133,6 +133,48 @@ abstract final class AppColorPrimitives {
   static const Color reactionClapDark = Color(0xFFD99000);
 
   // ---------------------------------------------------------------------------
+  // Familia Podium (top 3 del leaderboard)
+  // ---------------------------------------------------------------------------
+  //
+  // Metálicos de podio para el numeral de puesto de las 3 primeras filas de
+  // Rankings. Son expresivos, como la familia Reactions: NO son estados
+  // semánticos y no se reusan fuera del podio.
+  //
+  // Los seis salen medidos contra `bgCard` de su propia paleta Y contra la
+  // fila propia (`bgCard` + accent al 8%), que es la variante más exigente.
+  // El numeral es texto de 15 px, o sea texto chico: la barra es 4,5:1 (WCAG
+  // AA 1.4.3), no el 3:1 de gráficos. Lo fija `podium_contrast_test.dart`.
+
+  /// `#FFCE45` — Oro del 1er puesto, estado dark.
+  static const Color podiumGold = Color(0xFFFFCE45);
+
+  /// `#8A6100` — Oro del 1er puesto, estado light.
+  ///
+  /// El candidato obvio era `#9A6B00`, un tono más brillante y más "oro". Da
+  /// 4,69:1 sobre `bgCard` —pasa— y **4,48:1 sobre la fila propia**, donde el
+  /// overlay de accent al 8% aclara el fondo y se come el margen. Por 0,02 de
+  /// ratio el token habría entrado a la paleta incumpliendo justo en la fila
+  /// que el atleta más mira: la suya.
+  static const Color podiumGoldDark = Color(0xFF8A6100);
+
+  /// `#C7CBD1` — Plata del 2do puesto, estado dark.
+  static const Color podiumSilver = Color(0xFFC7CBD1);
+
+  /// `#677079` — Plata del 2do puesto, estado light.
+  static const Color podiumSilverDark = Color(0xFF677079);
+
+  /// `#D9915A` — Bronce del 3er puesto, estado dark.
+  static const Color podiumBronze = Color(0xFFD9915A);
+
+  /// `#A05A1E` — Bronce del 3er puesto, estado light.
+  ///
+  /// Más rojizo que el `#8C5A2B` clásico: en light los tres metálicos caen
+  /// todos en la franja marrón y el bronce necesita separarse en tono del oro
+  /// oliva. Aun así el color NO es el único indicador — el numeral del puesto
+  /// se sigue leyendo al lado, así que un daltónico nunca depende del tono.
+  static const Color podiumBronzeDark = Color(0xFFA05A1E);
+
+  // ---------------------------------------------------------------------------
   // Colores neutros absolutos
   // ---------------------------------------------------------------------------
 
@@ -391,8 +433,11 @@ abstract final class AppRadius {
 abstract final class AppDecorativeRadii {
   /// `41.0` — Pill de la nav bar replicada en el deck (`OnboardingNavBar`).
   ///
-  /// Deliberadamente distinto del `36` de `TreinoBottomBar`: la réplica se
+  /// Deliberadamente distinto del `26` de `TreinoBottomBar`: la réplica se
   /// dibuja más chata que la barra real para que entre en el device preview.
+  /// (Decía `36`, que fue el valor de la barra real hasta que se la hizo
+  /// concéntrica con su pill. El dibujo no se tocó: nunca dependió de ese
+  /// número, sólo lo citaba para explicar por qué no coincide.)
   static const double navBarPill = 41.0;
 
   /// `34.0` — Esquina exterior del chasis blanco (`OnboardingDevicePreview`).
@@ -446,4 +491,79 @@ abstract final class AppFonts {
 
   /// `0.5` — Letter-spacing de headings condensados.
   static const double headingTracking = 0.5;
+}
+
+/// Capa 1 — Escala de tamaños de texto del sistema de diseño TREINO.
+///
+/// **Por qué existe.** [AppFonts] define familias, pesos y tracking, pero
+/// nunca definió tamaños: el dartdoc de arriba manda los `TextStyle` completos
+/// a `app_theme.dart` (ADR-DS2-009), y `app_theme.dart` sólo declara el
+/// `textTheme` de Material. Eso dejó un hueco exacto entre "el tema define
+/// estilos" y "el widget necesita un número", y el hueco se llenó a mano:
+/// **1879 `fontSize:` literales en 271 archivos, con 31 tamaños distintos**,
+/// medios píxeles incluidos (`11.5`, `12.5`, `9.5`). No fue descuido — color,
+/// spacing, radios, íconos y motion tienen todos su token y su guard, y se
+/// respetan. Tipografía no tenía ninguno de los dos.
+///
+/// **Cómo se eligieron los escalones.** No de una escala tipográfica de
+/// libro: de la distribución real del codebase. Los diez valores de abajo
+/// cubren 1609 de las 1879 ocurrencias, así que migrar es sobre todo
+/// mecánico y no un rediseño encubierto. Los que quedan afuera son deriva
+/// declarada — `11` (146 usos, un píxel abajo de [caption], haciendo el mismo
+/// trabajo), `15` (54, entre [body] y [bodyLarge]) y los medios píxeles.
+/// Migran al escalón más cercano, y eso SÍ cambia píxeles: por eso van como
+/// deuda registrada en `no_raw_font_size_scan_test.dart` y no de un saque.
+///
+/// **El racimo [caption]·[bodyDense]·[body] (12·13·14) está apretado a
+/// propósito, y se cierra ahí.** TREINO sirve una app de teléfono y un panel
+/// de escritorio desde el mismo código: un label, una fila de tabla del Coach
+/// Hub y un párrafo en un celular son tres roles reales que se pisan justo en
+/// el rango del texto chico. De [body] para arriba esa excusa no existe —son
+/// títulos y números hero— y todos los saltos son de 2px o más. Un escalón
+/// nuevo pegado a otro en ese tramo es deriva, no un rol; y un cuarto miembro
+/// del racimo reabre el problema que la escala vino a cerrar (`11` tenía 146
+/// usos un píxel abajo de [caption], haciendo su mismo trabajo). Los dos
+/// invariantes tienen test en `primitives_test.dart`.
+///
+/// ```dart
+/// Text(label, style: TextStyle(
+///   fontFamily: AppFonts.barlow,
+///   fontSize: AppTextSize.caption,
+///   fontWeight: AppFonts.w600,
+/// ))
+/// ```
+abstract final class AppTextSize {
+  /// `10` — Contadores de badge, timestamps, texto legal al pie.
+  /// El piso: abajo de esto no se lee en un teléfono.
+  static const double micro = 10;
+
+  /// `12` — Labels de campo, chips, metadatos, texto de ayuda.
+  static const double caption = 12;
+
+  /// `13` — Cuerpo denso: filas de tabla y listas del Coach Hub web, donde
+  /// entra un tercio más de contenido por pantalla. Ver la nota de clase
+  /// sobre por qué convive con [body].
+  static const double bodyDense = 13;
+
+  /// `14` — Cuerpo por defecto. Si dudás, es este.
+  static const double body = 14;
+
+  /// `16` — Cuerpo destacado y texto de input (abajo de 16 los navegadores
+  /// móviles hacen zoom al enfocar un campo).
+  static const double bodyLarge = 16;
+
+  /// `18` — Título de card.
+  static const double title = 18;
+
+  /// `20` — Título de sección.
+  static const double titleLarge = 20;
+
+  /// `24` — Heading de pantalla.
+  static const double heading = 24;
+
+  /// `28` — Número hero dentro de una card (KPI, racha).
+  static const double display = 28;
+
+  /// `32` — Número hero a nivel pantalla.
+  static const double displayLarge = 32;
 }

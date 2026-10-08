@@ -42,6 +42,22 @@
               `scripts/test/deep_links.test.js` cubre lo que se puede cubrir
               desde el repo.
             -->
+            <!--
+                Sin esto, Android abre la app por el `intent-filter` de abajo
+                pero el motor DESCARTA la URL: go_router nunca ve el
+                `?to=invitacion&pf=...` y el alumno aterriza en la home sin
+                invitación. El filtro por sí solo consigue que la app se abra,
+                no que se entere de POR QUÉ se abrió.
+
+                Es la simétrica de `FlutterDeepLinkingEnabled` en el
+                `Info.plist` de iOS. Las dos rutas que reciben —`/abrir/alumno`
+                y `/abrir/profe`— ya existen, y cualquier otra cae en
+                `NotFoundScreen` por el `errorBuilder` del router.
+            -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
+
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
@@ -49,6 +65,26 @@
                 <data android:scheme="https"
                       android:host="app.gettreino.com"
                       android:pathPrefix="/abrir"/>
+            </intent-filter>
+
+            <!--
+                Esquema propio — el rescate cuando el App Link no llega.
+
+                Los navegadores embebidos (WhatsApp, Instagram, la Custom Tab
+                de cualquier app) se quedan con la URL `https` en vez de
+                cedérsela a TREINO. Quien cae ahí aterriza en la página
+                `/abrir/...`, y el botón de esa página usa este esquema, que
+                ningún navegador puede reclamar como propio.
+
+                SIN `autoVerify`: no hay dominio que verificar. Y sin
+                `pathPrefix`, porque en `treino:///abrir/alumno` el host viene
+                vacío y el path completo es lo que importa.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="treino"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -62,6 +98,20 @@
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <!-- Canal por el que el SDK de FCM dibuja las notificaciones de
+             BACKGROUND, donde Dart no corre.
+
+             Tiene que ser EXACTAMENTE el mismo id que `kCanalDeAvisos`
+             (lib/features/notifications/data/local_notifications_service.dart),
+             que es el canal de las de primer plano. Si se desincronizan, el
+             usuario termina con DOS entradas de configuración para la misma
+             app y silenciar una no silencia la otra.
+
+             Lo fija `test/features/notifications/data/canal_unico_test.dart`,
+             que lee este archivo y compara contra la constante de Dart. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="treino_avisos" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

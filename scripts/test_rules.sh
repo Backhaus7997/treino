@@ -12,6 +12,43 @@
 # nothing to start beforehand. Needs Java 21+ — the Emulator Suite of
 # firebase-tools 15+ refuses to boot on anything older.
 #
+# ⚠️  NO ESQUIVES el Java 21 pinneando `firebase-tools@13`. Da CUATRO ROJOS
+#     FALSOS sobre reglas que están perfectas, y el mensaje no dice "emulador
+#     viejo": dice `PERMISSION_DENIED`, que es exactamente lo que dice un
+#     agujero de seguridad real. Ya mandó a alguien a buscar un bug inexistente
+#     en `firestore.rules` (2026-09-10).
+#
+#     La causa, aislada con un control negativo de ocho líneas —mismas reglas,
+#     mismo cliente, misma máquina, lo único que cambia es el .jar:
+#
+#       cloud-firestore-emulator v1.21.0 (fb-tools 15) → get() de un doc que NO
+#         existe devuelve `null`. Es el comportamiento de producción.
+#       cloud-firestore-emulator v1.19.8 (fb-tools 13) → el mismo get() tira
+#         `Service call error. Function: [get]` y revienta la evaluación entera
+#         de la regla, que termina denegando.
+#
+#     Este repo usa ese idiom a propósito y en varios lados
+#     (`paywallEnforcedFor`, `rutinaEsPaga` en firestore.rules): `let u =
+#     get(...)` seguido de `u != null && ...`, para fallar ABIERTO cuando el
+#     doc todavía no está. Contra el emulador 1.19.8 el guard `!= null` nunca
+#     llega a correr. Los cuatro que caen son SCENARIO-PERIOD-050,
+#     SCENARIO-PERIOD-054, SCENARIO-WPRES-RULES-01 y el "rutina inexistente"
+#     de athlete-paywall-sessions.test.js — los únicos cuyo fixture, a
+#     propósito, NO siembra el doc que el `get()` va a buscar.
+#
+#     En esta máquina el JDK 21 YA ESTÁ (Homebrew). **Ya no hay que anteponerlo
+#     a mano**: este script busca un JDK 21 cuando el del PATH no sirve, y
+#     `/opt/homebrew/opt/openjdk@21` es una de las rutas que mira. Ver
+#     `lib/java21.sh`. Antes acá decía:
+#
+#       JAVA_HOME=/opt/homebrew/opt/openjdk@21 \
+#       PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH \
+#       bash scripts/test_rules.sh
+#
+#     Verificado el 2026-09-10 sobre ecf0175a, sin cambios locales encima:
+#     con fb-tools 13 → 4 failed / 183 passed; con el comando de arriba →
+#     187/187, idéntico a lo que da el job `rules-test` de CI.
+#
 # Covers SCENARIO-130, SCENARIO-131, SCENARIO-132 (REQ-PFM-009, REQ-PFM-010),
 # and SCENARIO-CHATMEDIA-* (rules-hardening Slice A, storage chatMedia).
 #
@@ -37,6 +74,20 @@ if [[ ! -f "${RULES_TEST_DIR}/rules.test.js" ]]; then
   echo "Create it first (see companion JS suite)."
   exit 1
 fi
+
+# --- Java 21+, que firebase-tools 15+ exige ----------------------------------
+#
+# Esto es un NO-OP en CI: el job `rules-test` corre en ubuntu con un JDK 21 del
+# runner, y `asegurar_java21` retorna en su primera línea sin tocar nada. Sólo
+# actúa en las máquinas de desarrollo donde el `java` del PATH es viejo.
+#
+# Antes vivía como una receta escrita a mano en el comentario de arriba —el
+# `JAVA_HOME=/opt/homebrew/opt/openjdk@21` de la línea 41—. Una receta en un
+# comentario hay que encontrarla, copiarla y volver a pegarla cada vez que se
+# abre una terminal; el script la ejecuta solo.
+# shellcheck source=lib/java21.sh
+source "${SCRIPT_DIR}/lib/java21.sh"
+asegurar_java21 || exit 1
 
 # --- run via firebase emulators:exec -----------------------------------------
 #

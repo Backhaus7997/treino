@@ -8,8 +8,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/exercise_asset_image.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/custom_exercise_video_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -20,6 +26,19 @@ import 'package:treino/features/workout/domain/equipment_type.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 
 import '../../../../fixtures/exercises.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+
+UserProfile _trainerProfile() {
+  final now = DateTime.utc(2026, 1, 1);
+  return UserProfile(
+    uid: 'u1',
+    email: 'a@b.com',
+    displayName: null,
+    role: UserRole.trainer,
+    createdAt: now,
+    updatedAt: now,
+  );
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -188,10 +207,79 @@ void main() {
     ) async {
       await _openPicker(tester);
 
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'Agregar'),
+      // Por su LABEL, no por el tipo del widget: atarlo al tipo es lo que
+      // hizo que este test reventara al migrar al kit sin que nada se rompiera
+      // en pantalla.
+      final button = tester.widget<TreinoButton>(
+        find.widgetWithText(TreinoButton, 'Agregar'),
       );
       expect(button.onPressed, isNull);
+    });
+  });
+
+  group('ExercisePickerDialog (web) — foto del ejercicio', () {
+    testWidgets('cada ejercicio del catálogo dibuja su foto', (tester) async {
+      await _openPicker(tester);
+
+      // Sin esto el catálogo precargado se lee como una lista de nombres con
+      // el MISMO ícono repetido, y el PF tiene que saberse de memoria a qué se
+      // parece cada variante. El sheet del teléfono ya lo hacía; el picker web
+      // era el único que no.
+      expect(
+        find.byType(ExerciseAssetImage),
+        findsWidgets,
+        reason: 'el catálogo tiene que mostrar la foto de cada ejercicio',
+      );
+    });
+
+    testWidgets('el thumbnailUrl del doc llega al widget', (tester) async {
+      await _openPicker(
+        tester,
+        exercises: const [
+          Exercise(
+            id: 'bench-press',
+            name: 'Press de Banca',
+            muscleGroup: 'chest',
+            category: 'compound',
+            thumbnailUrl: 'https://example.test/bench.jpg',
+          ),
+        ],
+      );
+
+      // `thumbnailUrl` es el escalón 0 de la cascada: la foto REAL, un frame
+      // del propio video. Los assets bundleados quedan como su fallback.
+      //
+      // Este test existe porque el olvido silencioso es pasar `null` acá: el
+      // widget se dibuja igual, la cascada pinta la silueta del grupo muscular
+      // y NADA falla — sólo que la foto real nunca aparece.
+      final foto = tester.widget<ExerciseAssetImage>(
+        find.byType(ExerciseAssetImage),
+      );
+      expect(foto.thumbnailUrl, 'https://example.test/bench.jpg');
+      expect(foto.exerciseId, 'bench-press');
+      expect(foto.muscleGroup, 'chest');
+    });
+
+    testWidgets('un custom NO entra en la cascada del catálogo',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1').overrideWith(
+            (ref) => Stream<List<CustomExercise>>.value([_customBench]),
+          ),
+        ],
+      );
+
+      expect(find.text('Press plano casero'), findsOneWidget);
+      // Los ids de los customs no son los del catálogo: probar
+      // `assets/exercises/cx-1.png` es miss garantizado, y el escalón del
+      // grupo muscular pintaría una silueta ajena como si fuera el ejercicio.
+      // Mejor el ícono.
+      final ids = tester
+          .widgetList<ExerciseAssetImage>(find.byType(ExerciseAssetImage))
+          .map((w) => w.exerciseId);
+      expect(ids, isNot(contains('cx-1')));
     });
   });
 
@@ -222,6 +310,11 @@ void main() {
         // Both chest exercises + the quads one are visible before filtering.
         expect(find.text('Press de Banca'), findsOneWidget);
         expect(find.text('Sentadilla con Barra'), findsOneWidget);
+
+        // Los chips arrancan COLAPSADOS desde el #860: desplegados eran 4
+        // filas y dejaban 3 ejercicios visibles. Hay que abrirlos primero.
+        await tester.tap(find.byKey(const Key('picker_filtros_toggle')));
+        await tester.pumpAndSettle();
 
         // Tap the PECHO muscle chip — filters to chest-only.
         await tester.tap(find.text('PECHO'));
@@ -277,6 +370,71 @@ void main() {
         find.byKey(const Key('create_exercise_name_field')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('PF bajo el tope ⇒ tocarlo abre el formulario', (
+      tester,
+    ) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_trainerProfile())),
+          customExerciseQuotaProvider
+              .overrideWithValue(const AsyncValue.data((limit: 60, count: 1))),
+        ],
+      );
+      // `userProfileProvider` (StreamProvider) no lo watchea nadie en el
+      // build de `_ExercisePickerDialog` — sólo lo lee `intentarCrearEjercicioPropio`
+      // dentro del tap. Sin este warm-up, el `ref.read` del tap encuentra el
+      // provider recién inicializado en `AsyncLoading` (el stream override
+      // todavía no tuvo su tick), lee rol `null`, y el embudo deja pasar por
+      // fail-open — no porque el gate haya evaluado el tope, sino porque
+      // nunca llegó a mirarlo. Mismo patrón que
+      // `custom_exercise_limit_gate_test.dart`.
+      ProviderScope.containerOf(
+        tester.element(find.byKey(const Key('create_new_exercise_button'))),
+        listen: false,
+      ).read(userProfileProvider);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo ejercicio'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PF en el tope ⇒ NO abre el formulario y muestra el diálogo del '
+        'tope con VER PLANES', (tester) async {
+      // Seam de test: `kIsWeb` es una constante de compilación que bajo
+      // `flutter test` vale `false` siempre — sin esto el aviso saldría con
+      // la forma MÓVIL (sheet) en un test del picker WEB.
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          userProfileProvider
+              .overrideWith((ref) => Stream.value(_trainerProfile())),
+          customExerciseQuotaProvider
+              .overrideWithValue(const AsyncValue.data((limit: 1, count: 1))),
+        ],
+      );
+      // Ver el comentario del test anterior — mismo warm-up.
+      ProviderScope.containerOf(
+        tester.element(find.byKey(const Key('create_new_exercise_button'))),
+        listen: false,
+      ).read(userProfileProvider);
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('create_new_exercise_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuevo ejercicio'), findsNothing);
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     testWidgets('sin nombre no llama al repo y muestra el error', (
@@ -606,6 +764,43 @@ void main() {
         find.byKey(const Key('create_exercise_video_field')),
       );
       expect(field.controller?.text, 'https://vids.test/existing');
+    });
+  });
+
+  group('ExercisePickerDialog (web) — contador de ejercicios propios', () {
+    testWidgets('límite numérico ⇒ lo suma al encabezado "Tus ejercicios"',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1')
+              .overrideWith((ref) => Stream.value([_customBench])),
+          customExerciseQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: 60, count: 1)),
+          ),
+        ],
+      );
+
+      // `_SectionHeader` pasa el label por `.toUpperCase()`.
+      expect(find.text('TUS EJERCICIOS (1 DE 60)'), findsOneWidget);
+      expect(find.text('TUS EJERCICIOS'), findsNothing);
+    });
+
+    testWidgets('límite null (Plan 3 / interruptor apagado) ⇒ lo oculta',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1')
+              .overrideWith((ref) => Stream.value([_customBench])),
+          customExerciseQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: null, count: 1)),
+          ),
+        ],
+      );
+
+      expect(find.text('TUS EJERCICIOS'), findsOneWidget);
+      expect(find.textContaining('TUS EJERCICIOS ('), findsNothing);
     });
   });
 }

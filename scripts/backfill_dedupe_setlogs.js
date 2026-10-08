@@ -131,9 +131,10 @@ const { paraRespaldo, planSesion } = require('./lib/dedupe_setlogs_plan');
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // Escribir es OPT-IN. Un script que borra no puede tener el borrado por default.
 const APPLY = process.argv.includes('--apply');
@@ -142,7 +143,7 @@ const ONLY_UID = uidArgIndex !== -1 ? process.argv[uidArgIndex + 1] : null;
 
 /** Cómo reconocer un Timestamp de Firestore. Se le pasa a `paraRespaldo` para
  *  que el módulo de la decisión no tenga que arrastrar `firebase-admin`. */
-const aFecha = (v) => (v instanceof admin.firestore.Timestamp ? v.toDate() : null);
+const aFecha = (v) => (v instanceof Timestamp ? v.toDate() : null);
 
 const RESPALDO = path.join(__dirname, `dedupe-setlogs-backup-${Date.now()}.json`);
 let respaldoAbierto = false;

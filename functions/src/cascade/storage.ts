@@ -9,7 +9,9 @@
  * REQ-ACCDEL-CF-010 | ADR-ACCDEL-013
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 /**
  * Deletes the avatar file(s) for the given uid from Storage.
@@ -19,11 +21,11 @@ import * as admin from "firebase-admin";
  * (and other) avatars orphaned. Returns the number of objects deleted.
  */
 export async function deleteAvatar(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ deleted: number }> {
   // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013)
-  const bucket = admin.storage(app).bucket();
+  const bucket = getStorage(app).bucket();
   const [files] = await bucket.getFiles({ prefix: `avatars/${uid}` });
   // Guard against a different uid that merely has this uid as a prefix: only
   // `avatars/{uid}.<ext>` counts (the file name is exactly the uid + extension).
@@ -64,10 +66,10 @@ export async function deleteAvatar(
  * Returns the total number of objects deleted.
  */
 export async function deleteAthleteStorage(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ deleted: number }> {
-  const bucket = admin.storage(app).bucket();
+  const bucket = getStorage(app).bucket();
   let deleted = 0;
 
   const deleteByPrefix = async (prefix: string): Promise<void> => {
@@ -83,7 +85,7 @@ export async function deleteAthleteStorage(
 
   // chatMedia is keyed chatMedia/{chatId}/{uid}/… — the uid is the SECOND
   // segment, so there is no single prefix. Scope by the athlete's chats.
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const chats = await db
     .collection("chats")
     .where("members", "array-contains", uid)
@@ -102,4 +104,32 @@ export async function deleteAthleteStorage(
   deleted += owned.length;
 
   return { deleted };
+}
+
+/** Tope de DELETEs concurrentes de `deleteTrainerStorage`. */
+const TRAINER_DELETE_CHUNK = 20;
+
+/**
+ * T3 (#1333) — deletes the objects the PF authored for their athletes:
+ * `athleteFiles/{trainerId}_{athleteId}/**`, matched by the `{uid}_` prefix.
+ *
+ * The prefix includes the underscore on purpose: `athleteFiles/abc_` must not
+ * match a different trainer uid `abcd`. (`deleteAthleteStorage` handles the
+ * other half of the pair id — the athlete's.)
+ *
+ * The PF's custom exercise videos (`customExerciseVideos/{uid}/**`) are NOT
+ * handled here: `deleteAthleteStorage` already sweeps that uid-prefixed tree
+ * unconditionally on every deleteAccount call (V3 of the change).
+ */
+export async function deleteTrainerStorage(
+  app: App,
+  uid: string
+): Promise<void> {
+  const bucket = getStorage(app).bucket();
+  const [files] = await bucket.getFiles({ prefix: `athleteFiles/${uid}_` });
+  // Un PF con cientos de alumnos y varios archivos cada uno: un `Promise.all`
+  // sin tope abre todos los DELETE a la vez. Se borra por tandas.
+  for (let i = 0; i < files.length; i += TRAINER_DELETE_CHUNK) {
+    await Promise.all(files.slice(i, i + TRAINER_DELETE_CHUNK).map((f) => f.delete()));
+  }
 }

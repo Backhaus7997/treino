@@ -35,6 +35,32 @@
   </div>
 
   <h1>Esto se abre en la app</h1>
+
+  <!--
+    ─── El rescate, y por qué es la acción PRINCIPAL ─────────────────────────
+
+    El comentario de arriba decía que "abrí la app" no podía ser la acción
+    principal porque, para quien llegó hasta acá, ya había fallado. Eso valía
+    mientras el único que aterrizaba fuera alguien en una computadora o sin la
+    app instalada.
+
+    Hay un tercer caso, y es el más común de los tres: teléfono, app
+    instalada, y el link tocado dentro del navegador embebido de OTRA app.
+    WhatsApp abre los links en `SFSafariViewController` (y Android en una
+    Custom Tab), y en ese contexto el sistema le entrega la URL al navegador
+    en vez de a TREINO. Verificado en un iPhone 16 real.
+
+    Para esa persona abrir la app no falló: nunca se intentó. Y un link de
+    vuelta a `https://app.gettreino.com/...` tampoco la rescata, porque iOS
+    ignora los universal links cuando la navegación sale de una página del
+    propio dominio. Por eso el botón usa el esquema `treino://`, que ningún
+    navegador puede reclamar.
+
+    Va oculto y lo muestra el JS: sin JS no hay forma de arrastrar la query, y
+    un botón que abre la app PERDIENDO la invitación es peor que ninguno.
+  -->
+  <a class="cta" id="abrir-app" href="#" hidden>Abrir en TREINO</a>
+
   <p>
     Tu agenda, tus rutinas y tus mensajes con tu profe viven en la app de
     TREINO, en tu teléfono.
@@ -56,5 +82,20 @@
     <a href="https://gettreino.com">gettreino.com</a>
   </footer>
 </main>
+
+<script>
+  // La query original es el dato: `?to=invitacion&pf=XXX` es lo que convierte
+  // esto en una invitación y no en un "abrí la app" genérico. Se arrastra tal
+  // cual — parsearla acá sería una segunda fuente de verdad de algo que la app
+  // ya sabe leer.
+  (function () {
+    var boton = document.getElementById('abrir-app');
+    if (!boton) return;
+    // Tres barras: con dos, "abrir" se parsearía como host y el path quedaría
+    // en "/alumno" en vez de "/abrir/alumno".
+    boton.href = 'treino:///abrir/alumno' + window.location.search;
+    boton.hidden = false;
+  })();
+</script>
 </body>
 </html>

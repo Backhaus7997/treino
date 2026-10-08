@@ -30,8 +30,8 @@ import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
-import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../../../../../helpers/coach_hub_profiles.dart';
 import '../../../../../helpers/onboarding_test_helpers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -49,15 +49,8 @@ class _StubAuthNotifier extends AuthNotifier {
   }
 }
 
-UserProfile _trainerProfile() => UserProfile(
-      onboardingSeen: allSurfacesSeen(),
-      uid: 'test-uid',
-      email: 'trainer@example.com',
-      displayName: 'Mateo',
-      role: UserRole.trainer,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-    );
+UserProfile _trainerProfile() =>
+    trainerCompleto(onboardingSeen: allSurfacesSeen());
 
 Future<void> _pumpDashboardInShell(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1400, 900); // desktop → shell renders

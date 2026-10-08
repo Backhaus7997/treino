@@ -8,6 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Timestamp;
 
 import '../../../core/utils/firestore_write.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../domain/chat.dart';
 import '../domain/media_type.dart';
 import '../domain/message.dart';
@@ -156,6 +157,11 @@ class ChatRepository {
       throw ArgumentError(
           'sendMessage: mediaType es requerido cuando se adjunta mediaUrl.');
     }
+
+    // Guideline 1.2 de App Review. Sobre `trimmed` y no sobre `text` porque es
+    // lo que se persiste: filtrar una cosa y guardar otra deja un hueco del
+    // tamano de los espacios en blanco.
+    ModerationGuard.ensure(trimmed, campo: 'text');
 
     final batch = _firestore.batch();
     final msgRef = _messagesOf(chatId).doc();

@@ -8,6 +8,7 @@ import '../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../custom_exercise_limit_gate.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
 import '../../../workout/application/exercise_providers.dart';
@@ -156,6 +157,9 @@ class _ExercisePickerSheetContentState
     List<Exercise> defaults,
     List<CustomExercise> customs,
   ) async {
+    final canCreate = await intentarCrearEjercicioPropio(sheetContext, ref);
+    if (!canCreate || !sheetContext.mounted) return;
+
     final created = await Navigator.of(sheetContext).push<CustomExercise?>(
       MaterialPageRoute<CustomExercise?>(
         builder: (_) => Scaffold(

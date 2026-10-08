@@ -4,23 +4,97 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         DocumentSnapshot,
         FieldValue,
         FirebaseException,
-        FirebaseFirestore;
+        FirebaseFirestore,
+        QueryDocumentSnapshot,
+        Timestamp;
 
+import '../../../core/analytics/analytics_service.dart';
+import '../../../core/moderation/moderation_guard.dart';
+import '../../../core/telemetry/non_fatal.dart';
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
+import '../domain/routine_day.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_status.dart';
 import '../domain/routine_visibility.dart';
 import '../domain/template_rating.dart';
 
 class RoutineRepository {
-  RoutineRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  /// [analytics] es opcional y por default no emite nada.
+  ///
+  /// No es una puerta de atrás: es para los 24 tests que ya construían este
+  /// repo y a los que analytics no les importa. Hacerlo obligatorio los
+  /// obligaba a los 24 a pasar un mock que no miran, y triplicaba el diff de
+  /// este arreglo sin cambiar un comportamiento.
+  ///
+  /// El riesgo del default —que producción lo construya sin sink y el evento
+  /// se pierda en silencio, que es exactamente el bug que este cambio vino a
+  /// tapar— lo cierra un test que escanea `lib/` y falla si aparece una
+  /// construcción sin `analytics:`. Hoy hay una sola, en
+  /// `routine_providers.dart`.
+  RoutineRepository({
+    required FirebaseFirestore firestore,
+    AnalyticsService analytics = const NoopAnalyticsService(),
+  })  : _firestore = firestore,
+        _analytics = analytics;
 
   final FirebaseFirestore _firestore;
 
+  /// Sólo para `plan_assigned`, y la excepción está razonada en el dartdoc de
+  /// [createAssigned]. El resto de los eventos siguen viviendo en presentation,
+  /// que es la convención del repo.
+  final AnalyticsService _analytics;
+
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
+
+  /// Corre [ModerationGuard.ensure] sobre los CINCO campos de texto libre de
+  /// una rutina: `name`, `split`, `summary`, y los anidados `days[].name` /
+  /// `days[].slots[].notes`. Se llama ANTES de cualquier escritura — mismo
+  /// criterio que el resto del repo (`PostRepository`, `ChatRepository`,
+  /// `UserRepository`): el guard corre del lado de afuera del `.set()`/
+  /// `.update()`, nunca después, para que un texto vetado nunca llegue a
+  /// quedar publicado mientras la excepción todavía se está propagando.
+  ///
+  /// `athlete_notes` (notas privadas del PF sobre un alumno) NO pasa por acá
+  /// a propósito: vive en un repositorio y una colección totalmente
+  /// distintos, y el criterio de esta feature es "si otro usuario lo va a
+  /// leer, entra" — esas notas no las lee nadie más que su autor.
+  ///
+  /// No todos los métodos de escritura mandan los cuatro campos —
+  /// `updateUserOwned`, por ejemplo, nunca manda `split` ni `summary` (ver su
+  /// dartdoc) — así que cada caller pasa SÓLO lo que su propio payload
+  /// realmente escribe. Revisar un campo que no se va a persistir bloquearía
+  /// una edición por contenido que ni siquiera llega a Firestore; por eso
+  /// [split] y [summary] son opcionales acá y sus callers los omiten cuando
+  /// no forman parte del write.
+  ///
+  /// El `campo:` de los anidados usa la MISMA forma indexada que el registro
+  /// del servidor (`quarantineRoutineIfVetted` en
+  /// `functions/src/moderation/quarantine-vetted-content.ts`, p.ej.
+  /// `'days[1].slots[3].notes'`) y no una traducción al castellano: hoy nada
+  /// la parsea —[ModerationBlockedException] sólo se compara por tipo en
+  /// toda la UI, nunca por `campo`— así que la única ganancia real es en
+  /// logs y en poder correlacionar el mismo documento en los dos lados sin
+  /// traducir nada.
+  static void _ensureRoutineTextIsClean({
+    required String name,
+    String? split,
+    String? summary,
+    required List<RoutineDay> days,
+  }) {
+    ModerationGuard.ensure(name, campo: 'name');
+    ModerationGuard.ensure(split, campo: 'split');
+    ModerationGuard.ensure(summary, campo: 'summary');
+    for (var i = 0; i < days.length; i++) {
+      final day = days[i];
+      ModerationGuard.ensure(day.name, campo: 'days[$i].name');
+      for (var j = 0; j < day.slots.length; j++) {
+        ModerationGuard.ensure(day.slots[j].notes,
+            campo: 'days[$i].slots[$j].notes');
+      }
+    }
+  }
 
   /// Returns only system-seeded template routines (source == 'system').
   ///
@@ -82,6 +156,13 @@ class RoutineRepository {
         'user-created routines must not carry assignedTo',
       );
     }
+
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
 
     // Strip trainer-only keys before write — the Firestore create rule for
     // user-created routines requires that `assignedBy` and `assignedTo` be
@@ -194,6 +275,12 @@ class RoutineRepository {
     // editing a routine that carries a resumen, but may not change it.
     // Sending it here would make every athlete edit of such a routine fail
     // with permission-denied. The athlete editor has no summary field either.
+    //
+    // Same reason `split` and `summary` are OMITTED from the moderation
+    // guard call below: neither travels in this payload, so checking them
+    // would risk blocking an edit over content that never reaches Firestore.
+    _ensureRoutineTextIsClean(name: draft.name, days: draft.days);
+
     final json = <String, Object?>{
       'name': draft.name,
       'level': draft.level.toJson(),
@@ -237,6 +324,13 @@ class RoutineRepository {
     if (draft.id.isEmpty) {
       throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
     }
+
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
 
     // Build update payload with ONLY the content fields the trainer controls.
     // Omitting assignedBy, assignedTo, source, createdBy, createdAt, id,
@@ -291,6 +385,13 @@ class RoutineRepository {
       throw ArgumentError.value(draft.id, 'draft.id', 'must be non-empty');
     }
 
+    _ensureRoutineTextIsClean(
+      name: draft.name,
+      split: draft.split,
+      summary: draft.summary,
+      days: draft.days,
+    );
+
     // Build update payload with ONLY the content fields the trainer controls.
     // Omitting assignedBy, source, createdBy, createdAt, assignedTo, id,
     // visibility, and status keeps the update within the narrow
@@ -329,9 +430,29 @@ class RoutineRepository {
   /// remain intact (ADR-USR-04). Only the `status` field is mutated,
   /// matching the narrow Firestore update rule (REQ-USR-013).
   ///
+  /// Sirve a los DOS dueños posibles: el atleta con sus `user-created`
+  /// (UPDATE path 1) y el PF con sus `trainer-*` (UPDATE path 6). El segundo
+  /// caso NO estuvo cubierto por las reglas entre 2026-07-17 y hoy: el método
+  /// existía, el menú lo ofrecía, y los cinco paths denegaban. Ver el
+  /// comentario del path 6 en `firestore.rules`.
+  ///
   /// REQ-USR-006, SCENARIO-USR-010..011.
   Future<void> archive(String routineId) async {
     await _collection.doc(routineId).update({'status': 'archived'});
+  }
+
+  /// El camino de vuelta de [archive]: devuelve la rutina a `active`.
+  ///
+  /// No es una comodidad. Sin esto, archivar es un borrado con otro nombre y
+  /// todo diálogo que diga «la podés recuperar» miente — que es exactamente
+  /// lo que decía el de `routine_card_grid.dart` mientras esto no existía. El
+  /// filtro «Archivadas» te la MUESTRA; para volver a usarla hacía falta este
+  /// método y no estaba.
+  ///
+  /// Mismo diff angosto que [archive], misma regla (UPDATE path 1 para el
+  /// atleta, path 6 para el PF): sólo `status`, y sólo hacia 'active'.
+  Future<void> unarchive(String routineId) async {
+    await _collection.doc(routineId).update({'status': 'active'});
   }
 
   Future<Routine?> getById(String id) async {
@@ -382,6 +503,19 @@ class RoutineRepository {
   /// Requires a composite index on `assignedTo + source + createdAt`
   /// (declared in `firestore.indexes.json`).
   ///
+  /// Las ARCHIVADAS no se devuelven. Cuando el vínculo con el PF termina, la
+  /// Cloud Function `cleanupAssignedPlansOnUnlink` archiva los planes que ese
+  /// PF le había asignado — antes los borraba en duro, y eso dejaba huérfanas
+  /// las sesiones ya entrenadas (ADR-USR-04). Archivar SIN filtrar acá sería
+  /// peor que borrar: el ex-alumno seguiría viendo el plan en su lista.
+  ///
+  /// El filtro va del lado del CLIENTE y no como `where('status', ...)` a
+  /// propósito. Los docs viejos no tienen el campo `status` —el modelo lo
+  /// interpreta como `active` por retro-compat—, y una igualdad en Firestore
+  /// **excluye los documentos que no tienen el campo**: filtrar en el servidor
+  /// le escondería al alumno todos sus planes anteriores a Fase 6. Además así
+  /// no hace falta índice nuevo.
+  ///
   /// REQ-COACH-PLANS-001, SCENARIO-432, SCENARIO-433.
   Future<List<Routine>> listAssignedTo(String athleteId) async {
     final snap = await _collection
@@ -390,7 +524,108 @@ class RoutineRepository {
         .orderBy('createdAt', descending: true)
         .limit(20)
         .get();
-    return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+    return snap.docs
+        .map(_fromDoc)
+        .whereType<Routine>()
+        .where((r) => r.status != RoutineStatus.archived)
+        .toList();
+  }
+
+  /// Returns the plans [trainerId] assigned to [athleteId], newest first.
+  ///
+  /// This stays separate from [listAssignedTo] because athlete and trainer
+  /// reads prove different Firestore-rule branches: the athlete query proves
+  /// `uid == assignedTo`, while the trainer query must also constrain
+  /// `assignedBy == uid`. An optional parameter would make that security
+  /// distinction easy for a trainer call site to omit accidentally.
+  ///
+  /// Like [listPublishedTemplates], the Firestore query is equality-only so it
+  /// rides automatic single-field indexes. Adding `orderBy(createdAt)` would
+  /// require a composite index that is not deployed, so ordering happens in
+  /// Dart. [Routine] does not retain `createdAt`; therefore the raw snapshots
+  /// are sorted before [_fromDoc] maps them into domain objects.
+  Future<List<Routine>> listAssignedToByTrainer({
+    required String trainerId,
+    required String athleteId,
+  }) async {
+    if (trainerId.isEmpty || athleteId.isEmpty) return const [];
+
+    final snap = await _collection
+        .where('assignedTo', isEqualTo: athleteId)
+        .where('assignedBy', isEqualTo: trainerId)
+        .where('source', isEqualTo: 'trainer-assigned')
+        .get();
+    // `as Timestamp?` sería un cast, y un cast acá tira `TypeError` y se lleva
+    // puesta la LISTA ENTERA si UN solo doc trae `createdAt` con otra forma
+    // (un import viejo que lo dejó como String, por ejemplo). Sería el mismo
+    // modo de falla que este método viene a arreglar: la pantalla del PF en
+    // blanco por un doc raro. `is Timestamp` degrada ese doc a "sin fecha" y
+    // lo manda al fondo, que es un orden discutible pero nunca una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aCreatedAt = createdAtOf(a);
+        final bCreatedAt = createdAtOf(b);
+        // A pending serverTimestamp cannot be compared honestly. Keep nulls
+        // last until Firestore resolves them instead of guessing their order.
+        if (aCreatedAt == null) return bCreatedAt == null ? 0 : 1;
+        if (bCreatedAt == null) return -1;
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
+    return docs.take(20).map(_fromDoc).whereType<Routine>().toList();
+  }
+
+  /// TODAS las rutinas de las que [trainerId] es autor: sus plantillas y los
+  /// planes que le asignó a cualquier alumno, más nuevas primero.
+  ///
+  /// `assignedBy` es lo único que las une. Lo llevan las dos —una plantilla es
+  /// `trainer-template` con `assignedTo: null`, un plan es `trainer-assigned`
+  /// con el uid del alumno— y por eso alcanza una sola igualdad.
+  ///
+  /// Esta query es la contracara de [listAssignedTo]: aquélla parte del ALUMNO
+  /// y ésta parte del AUTOR. La pantalla de Rutinas del Coach Hub listaba
+  /// personas porque no existía esta segunda mirada.
+  ///
+  /// Equality-only, así que va sobre los índices automáticos de un solo campo:
+  /// **no necesita índice compuesto**. Agregarle `orderBy(createdAt)` sí lo
+  /// necesitaría, así que el orden se hace en Dart — mismo criterio que
+  /// [listAssignedToByTrainer], y por la misma razón: [Routine] no retiene
+  /// `createdAt`, así que se ordenan los snapshots crudos antes de mapear.
+  ///
+  /// Incluye las ARCHIVADAS. Para el PF son parte de su biblioteca —las suyas,
+  /// que se archivaron al terminar un vínculo— y esconderlas acá sería
+  /// perderlas; quien decide cómo mostrarlas es la pantalla.
+  Future<List<Routine>> listAuthoredBy(String trainerId) async {
+    if (trainerId.isEmpty) return const [];
+
+    final snap =
+        await _collection.where('assignedBy', isEqualTo: trainerId).get();
+
+    // `is Timestamp` y no un cast: un solo doc con `createdAt` de otra forma
+    // —un import viejo que lo dejó como String— tiraría `TypeError` y se
+    // llevaría puesta la lista entera, dejando la pantalla del PF en blanco.
+    // Degradarlo a "sin fecha" lo manda al fondo, que es discutible como orden
+    // pero nunca es una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aAt = createdAtOf(a);
+        final bAt = createdAtOf(b);
+        // Un `serverTimestamp` pendiente no se puede comparar con honestidad:
+        // queda último hasta que Firestore lo resuelve.
+        if (aAt == null) return bAt == null ? 0 : 1;
+        if (bAt == null) return -1;
+        return bAt.compareTo(aAt);
+      });
+    return docs.map(_fromDoc).whereType<Routine>().toList();
   }
 
   /// Persists a trainer-assigned plan.
@@ -404,6 +639,32 @@ class RoutineRepository {
   /// [FieldValue.serverTimestamp] at write time.
   ///
   /// Returns the saved [Routine] with its Firestore-generated [Routine.id].
+  ///
+  /// ## Acá se emite `plan_assigned`, y es la ÚNICA excepción a la convención
+  ///
+  /// En todo el resto de la app los eventos de analytics viven en
+  /// `presentation`. Éste no, por dos motivos:
+  ///
+  /// 1. **Este método ES la definición del evento.** No escribe "una rutina":
+  ///    exige `assignedBy` y `assignedTo` no vacíos y tira si faltan. Toda
+  ///    llamada que sobrevive a esas dos guardas es, por construcción, un PF
+  ///    asignándole un plan a un alumno. No hay forma de llamarlo y que el
+  ///    evento no corresponda.
+  /// 2. **Desde presentation ya se perdió dos veces.** Hay CINCO caminos que
+  ///    terminan acá —el editor de mobile, el editor web, el preview de plan,
+  ///    la card de plantilla del Coach Hub y `trainer_workout_view`— y sólo dos
+  ///    emitían el evento. `routine_created` había tenido el mismo agujero
+  ///    antes (ver el dartdoc de `RoutineActions.assignTemplate`) y se tapó
+  ///    sumándolo al call site que faltaba; el agujero volvió por otra puerta.
+  ///    Un evento que se emite en N lugares se rompe cuando aparece el N+1, y
+  ///    el síntoma es un número que se ve sano.
+  ///
+  /// Los tres parámetros salen de la rutina misma, sin nada que sepa sólo la
+  /// pantalla — otra señal de que el evento pertenece a esta capa. Compará con
+  /// `routine_created`, que lleva un `source` que SÓLO conoce el llamador: ése
+  /// se queda en presentation, y con razón.
+  ///
+  /// No se espera: el evento no puede demorar el retorno de la escritura.
   ///
   /// REQ-COACH-PLANS-002, SCENARIO-434, SCENARIO-435.
   Future<Routine> createAssigned(Routine routine) async {
@@ -422,9 +683,35 @@ class RoutineRepository {
       );
     }
 
+    _ensureRoutineTextIsClean(
+      name: routine.name,
+      split: routine.split,
+      summary: routine.summary,
+      days: routine.days,
+    );
+
     final json = routine.toJson()..remove('id');
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);
+
+    // Después del `add`, no antes: el evento dice "se asignó", y antes de que
+    // el servidor confirme todavía puede fallar.
+    // `fireAndForget` y NO `unawaited` pelado: si el evento rechaza —el
+    // plugin de analytics valida sus parámetros y tira— un `unawaited` deja
+    // ese error sin dueño y `main.dart` lo reporta como FATAL. O sea que una
+    // asignación que salió bien se convierte en un crash a la vista del PF.
+    //
+    // No es hipotético: pasó igual con `appointment_created`, y por eso existe
+    // este helper. Ver su dartdoc en `core/telemetry/non_fatal.dart`.
+    fireAndForget(
+      _analytics.logPlanAssigned(
+        routineId: ref.id,
+        assignedBy: routine.assignedBy!,
+        assignedTo: routine.assignedTo!,
+      ),
+      reason: 'logPlanAssigned',
+    );
+
     return routine.copyWith(id: ref.id);
   }
 
@@ -453,6 +740,14 @@ class RoutineRepository {
       assignedTo: null,
       visibility: RoutineVisibility.private,
     );
+
+    _ensureRoutineTextIsClean(
+      name: templateRoutine.name,
+      split: templateRoutine.split,
+      summary: templateRoutine.summary,
+      days: templateRoutine.days,
+    );
+
     final json = templateRoutine.toJson()..remove('id');
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);

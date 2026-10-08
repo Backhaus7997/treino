@@ -11,6 +11,9 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../empty_state/empty_state.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Previews del kit — Finding W3.
 @Preview(name: 'DataTable — normal', wrapper: coachHubPreviewWrapper)
@@ -61,11 +64,16 @@ Widget coachHubDataTableCellWidgetsPreview() => CoachHubDataTable(
     );
 
 /// Modelo de columna para [CoachHubDataTable].
+/// Alineación de una columna de [CoachHubDataTable] — gobierna el header y
+/// las celdas al mismo tiempo.
+enum CoachHubColumnAlign { start, end }
+
 @immutable
 class CoachHubColumn {
   const CoachHubColumn({
     required this.key,
     required this.label,
+    this.align = CoachHubColumnAlign.start,
     this.sortable = false,
     this.flex = 1,
   });
@@ -81,6 +89,18 @@ class CoachHubColumn {
 
   /// Factor de flex para el ancho relativo de la columna.
   final int flex;
+
+  /// Hacia dónde se alinean el header Y las celdas de esta columna.
+  ///
+  /// Van juntos a propósito. Antes el header era siempre un `Row` que
+  /// arrancaba a la izquierda, y las celdas alineaban por su cuenta: la
+  /// columna ACCIONES terminaba con el rótulo pegado al borde izquierdo y los
+  /// íconos al derecho, a media tabla de distancia. El PF lo reportó como
+  /// «acomodar bien simétricas todas las columnas, fijate cómo está la de
+  /// acciones».
+  ///
+  /// Declararlo una sola vez es lo que impide que vuelvan a separarse.
+  final CoachHubColumnAlign align;
 }
 
 /// Modelo de fila para [CoachHubDataTable].
@@ -122,6 +142,26 @@ class CoachHubRow {
 /// - SIN paginación en Fase 1 (diferida a Fase 3).
 ///
 /// Tokens: [TreinoTableTokens.of(context)] — nunca hex inline.
+///
+/// ## ESTA TABLA NO SCROLLEA. El scroll lo pone el consumidor.
+///
+/// Es un `Column` de filas: crece con el contenido y no tiene viewport propio.
+/// Montala adentro de algo que scrollee —un `SingleChildScrollView`, como hacen
+/// `alumnos_screen` y `pagos_web_screen`— y nunca adentro de un `Expanded` o de
+/// una caja de alto fijo.
+///
+/// **Y si te equivocás, no te vas a enterar por un error.** El `ClipRRect` que
+/// redondea las esquinas recorta el excedente **en silencio**: no hay rayas
+/// amarillas de `RenderFlex overflowed`, no hay log, no hay test que se ponga
+/// rojo. La pantalla se ve impecable y le faltan filas.
+///
+/// Pasó en producción: `pagos_web_screen` la tenía adentro de un `Expanded` y
+/// con 11 pagos cargados el PF veía 7. Lo reportó un usuario, no la suite.
+///
+/// Si necesitás que la tabla llene el alto y scrollee ella sola, eso todavía no
+/// existe — hay que agregarlo con un flag opt-in (el patrón de
+/// `AgendaWebDayList.fillHeight`), no envolviéndola en un `Expanded` y
+/// esperando lo mejor.
 ///
 /// Uso:
 /// ```dart
@@ -318,14 +358,36 @@ class _HeaderCell extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: column.align == CoachHubColumnAlign.end
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
-          Text(
-            column.label,
-            style: TextStyle(
-              fontFamily: AppFonts.barlow,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-              color: tokens.headerTextColor,
+          // `Flexible` + ellipsis: un rótulo más largo que su columna
+          // TRUNCABA LA APP, no el texto — franja amarilla y negra y una
+          // excepción de layout. La celda de datos (`_AlumnoCell`) ya se
+          // defendía así; el header no, y esa asimetría distorsionó los flex
+          // del roster: «ÚLTIMO ENTRENO» tenía flex 27 —275 px en desktop
+          // para mostrar «Hace 5 días»— porque era el número más chico con el
+          // que su header no reventaba a 900 px. El componente que no puede
+          // truncar termina cobrándole ancho a las columnas que sí importan.
+          Flexible(
+            child: Text(
+              // MAYÚSCULA acá y no en cada string. Los rótulos venían
+              // mezclados —«ALUMNO», «ESTADO» y «ÚLTIMO ENTRENO» salían de
+              // l10n en mayúscula, y «Rutina», «Plan» y «Vence» estaban
+              // escritos a mano capitalizados—, y la fila de headers se veía a
+              // dos alturas tipográficas distintas. Resolverlo en el
+              // componente es lo que impide que el próximo rótulo vuelva a
+              // desalinearse.
+              column.label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.caption,
+                color: tokens.headerTextColor,
+              ),
             ),
           ),
           if (column.sortable && isSorted) ...[
@@ -385,12 +447,28 @@ class _DataRows extends StatelessWidget {
         for (var i = 0; i < rows.length; i++) ...[
           if (i > 0)
             Divider(height: 1, thickness: 1, color: tokens.borderColor),
-          _DataRow(
-            row: rows[i],
-            columns: columns,
-            tokens: tokens,
-            isAlt: i.isOdd,
-            onTap: onRowTap != null ? () => onRowTap!(rows[i].id) : null,
+          // Entrada escalonada, la misma del resto del hub.
+          //
+          // Las filas aparecían todas de golpe: un bloque que se materializa
+          // entero no deja leer de dónde salió. Con el escalonado el ojo sigue
+          // el orden en el que llegan los datos, que es el mismo en el que se
+          // van a leer.
+          //
+          // `AppMotion.stagger` topea el retardo a los primeros 8 (maxItems),
+          // así que una tabla de cien filas no tarda cuatro segundos en
+          // terminar de aparecer: las de más abajo entran juntas, y de todas
+          // formas están fuera de pantalla.
+          //
+          // `TreinoFadeSlideIn` resuelve reduce-motion por dentro.
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(i),
+            child: _DataRow(
+              row: rows[i],
+              columns: columns,
+              tokens: tokens,
+              isAlt: i.isOdd,
+              onTap: onRowTap != null ? () => onRowTap!(rows[i].id) : null,
+            ),
           ),
         ],
       ],
@@ -435,7 +513,18 @@ class _DataRow extends StatelessWidget {
 
         return AnimatedContainer(
           key: Key('data_table_row_${row.id}'),
-          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+          // que estar donde está el cursor, no llegando.
+          //
+          // Con 180 ms, barrer una lista deja una ESTELA — la fila anterior sigue
+          // apagándose cuando la siguiente ya se encendió, y se ven tres o cuatro
+          // prendidas a la vez. El sidebar ya se comió este diagnóstico y lo bajó de
+          // 180 a 120; 120 deja una estela más corta, no ninguna. El PF lo reportó
+          // como «parpadeo al pasar el cursor sobre una lista».
+          //
+          // Queda `AnimatedContainer` y no `Container` porque el borde de foco sí
+          // tiene que animar: ése llega por teclado, donde el salto se nota.
+          duration: Duration.zero,
           curve: AppMotion.standard,
           decoration: BoxDecoration(
             color: bg,
@@ -447,22 +536,30 @@ class _DataRow extends StatelessWidget {
               for (final col in columns)
                 Expanded(
                   flex: col.flex,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TreinoTableTokens.cellPaddingH,
-                      vertical: TreinoTableTokens.cellPaddingV,
-                    ),
-                    child: row.cellWidgets[col.key] ??
-                        Text(
-                          row.cells[col.key] ?? '',
-                          style: TextStyle(
-                            fontFamily: AppFonts.barlow,
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                            color: AppPalette.of(ctx).textPrimary,
+                  child: Align(
+                    // La celda sigue la alineación DECLARADA en la columna, no
+                    // la que cada pantalla arme por dentro. Es la mitad que
+                    // hace que el header y el contenido no se separen.
+                    alignment: col.align == CoachHubColumnAlign.end
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TreinoTableTokens.cellPaddingH,
+                        vertical: TreinoTableTokens.cellPaddingV,
+                      ),
+                      child: row.cellWidgets[col.key] ??
+                          Text(
+                            row.cells[col.key] ?? '',
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              fontWeight: FontWeight.w400,
+                              fontSize: AppTextSize.body,
+                              color: AppPalette.of(ctx).textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    ),
                   ),
                 ),
             ],
@@ -553,20 +650,18 @@ class _ErrorState extends StatelessWidget {
             message,
             style: TextStyle(
               fontFamily: AppFonts.barlow,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               color: palette.textMuted,
             ),
             textAlign: TextAlign.center,
           ),
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.s12),
-            TextButton(
+            TreinoButton(
               key: const Key('data_table_retry'),
+              label: 'Reintentar',
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              child: Text(
-                'Reintentar',
-                style: TextStyle(color: palette.accent),
-              ),
             ),
           ],
         ],

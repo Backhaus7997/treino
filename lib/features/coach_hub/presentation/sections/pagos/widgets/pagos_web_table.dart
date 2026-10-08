@@ -28,10 +28,12 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 import '../../../widgets/coach_hub_widgets.dart'
-    show CoachHubColumn, CoachHubDataTable, CoachHubRow;
+    show CoachHubColumn, CoachHubColumnAlign, CoachHubDataTable, CoachHubRow;
 import 'pagos_estado.dart';
 import 'payment_format.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── PagosWebTable ─────────────────────────────────────────────────────────────
 
@@ -153,10 +155,23 @@ class PagosWebTable extends StatelessWidget {
             label: 'VENCIMIENTO',
             sortable: true,
             flex: 2), // i18n
-        const CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
+        const CoachHubColumn(
+            key: 'estado',
+            label: 'ESTADO', // i18n
+            // Ordenable como las otras tres. Faltaba, y es la que agrupa: con
+            // los pendientes juntos arriba, «a quién le tengo que cobrar» se
+            // contesta de un vistazo en vez de saltando entre pestañas.
+            sortable: true,
+            flex: 2),
         if (showActions)
           const CoachHubColumn(
-              key: 'acciones', label: 'ACCIONES', flex: 3), // i18n
+            key: 'acciones',
+            label: 'ACCIONES', // i18n
+            flex: 3,
+            // Los botones ya iban a la derecha; el rótulo no. Ahora los dos
+            // salen de la misma declaración.
+            align: CoachHubColumnAlign.end,
+          ),
       ],
       rows: [for (final p in payments) _rowFor(palette, p)],
       loading: loading,
@@ -307,8 +322,9 @@ class _EstadoBadge extends StatelessWidget {
 
 // ── _AccionesCell ────────────────────────────────────────────────────────────
 
-/// Botones de acción de la fila: Recordar (siempre, si hay callback) y
-/// Marcar pagado (solo si el pago está `pending`, si hay callback).
+/// Botones de acción de la fila: Recordar y Marcar pagado, los dos **sólo si
+/// el pago está `pending`** (y si hay callback). Un pago ya cobrado no tiene
+/// acción posible: no hay nada que recordar ni que volver a marcar.
 ///
 /// Sin `onRowTap` en `CoachHubDataTable` (ADR-F9-03) — no hay pelea de gestos
 /// entre el tap de fila y el tap de estos botones.
@@ -337,15 +353,24 @@ class _AccionesCell extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Flexible(
-          child: _AccionButton(
-            key: Key('pagos_accion_recordar_${payment.id}'),
-            icon: TreinoIcon.bell,
-            label: 'Recordar', // i18n
-            color: palette.textMuted,
-            onTap: onRecordar == null ? null : () => onRecordar!(payment),
+        // "Recordar" cuelga del ESTADO DE LA FILA, no de la pestaña.
+        //
+        // Antes se dibujaba siempre, y la regla "un pago cobrado no necesita
+        // recordatorio" vivía un nivel más arriba, en `showActions:
+        // filtro != PagosFiltro.pagados`. Eso funciona mientras cada pestaña
+        // sea homogénea — y "Todos" no lo es: con los 12 pagos cobrados, la
+        // campanita aparecía sobre las 12 filas. La misma fila ofrecía
+        // recordar en una pestaña y no en la otra.
+        if (pending)
+          Flexible(
+            child: _AccionButton(
+              key: Key('pagos_accion_recordar_${payment.id}'),
+              icon: TreinoIcon.bell,
+              label: 'Recordar', // i18n
+              color: palette.textMuted,
+              onTap: onRecordar == null ? null : () => onRecordar!(payment),
+            ),
           ),
-        ),
         if (pending) ...[
           const SizedBox(width: AppSpacing.hairline),
           Flexible(
@@ -387,29 +412,14 @@ class _AccionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
+    // Densidad de tabla (`xs`): esta acción vive dentro de una fila de
+    // `CoachHubDataTable`, donde el alto útil son 24 px.
+    return TreinoButton(
+      label: label,
+      icon: icon,
+      variant: TreinoButtonVariant.ghostAccent,
+      size: TreinoButtonSize.xs,
       onPressed: onTap,
-      style: TextButton.styleFrom(
-        foregroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12),
-          const SizedBox(width: AppSpacing.hairline),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

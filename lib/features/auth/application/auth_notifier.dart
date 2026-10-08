@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../notifications/application/notification_providers.dart';
+import '../data/auth_service.dart';
 import '../domain/auth_failure.dart';
 import 'auth_providers.dart';
 
@@ -33,27 +34,31 @@ class AuthNotifier extends AsyncNotifier<User?> {
   /// On user cancel ([AuthFailure.signInCancelled]) the state is restored
   /// to the previous user instead of going to AsyncError, so the UI does
   /// not flash an error banner for an intentional dismissal.
-  Future<void> signInWithGoogle() async {
-    final service = ref.read(authServiceProvider);
-    final previousUser = state.valueOrNull;
-    state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => service.signInWithGoogle());
-    if (result is AsyncError &&
-        result.error == const AuthFailure.signInCancelled()) {
-      // Silent restore — no banner for intentional dismissal.
-      state = AsyncData(previousUser);
-      return;
-    }
-    state = result;
-  }
+  Future<void> signInWithGoogle() => _socialSignIn((s) => s.signInWithGoogle());
 
   /// Triggers the native Apple Sign-In sheet. Same cancel-restore semantics
   /// as [signInWithGoogle].
-  Future<void> signInWithApple() async {
+  Future<void> signInWithApple() => _socialSignIn((s) => s.signInWithApple());
+
+  /// Google por popup (web, Coach Hub). Misma semantica de cancel que
+  /// [signInWithGoogle]. Sin `await` previo al servicio: el popup debe abrirse
+  /// dentro del gesto del usuario.
+  Future<void> signInWithGooglePopup() =>
+      _socialSignIn((s) => s.signInWithGooglePopup());
+
+  /// Apple por popup (web, Coach Hub). Misma semantica que
+  /// [signInWithGooglePopup].
+  Future<void> signInWithApplePopup() =>
+      _socialSignIn((s) => s.signInWithApplePopup());
+
+  /// Comun a los cuatro caminos sociales: loading, guard y restauracion
+  /// silenciosa del usuario previo si el usuario cancela. Todo es sincrono
+  /// hasta invocar al servicio.
+  Future<void> _socialSignIn(Future<User> Function(AuthService) action) async {
     final service = ref.read(authServiceProvider);
     final previousUser = state.valueOrNull;
     state = const AsyncLoading();
-    final result = await AsyncValue.guard(() => service.signInWithApple());
+    final result = await AsyncValue.guard(() => action(service));
     if (result is AsyncError &&
         result.error == const AuthFailure.signInCancelled()) {
       // Silent restore — no banner for intentional dismissal.

@@ -6,7 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../gyms/presentation/gym_name_prompt_card.dart';
+import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
@@ -74,8 +77,10 @@ class TrainerDashboardTab extends ConsumerWidget {
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
+        // Aviso de gym sin nombre (#1338); colapsa salvo que corresponda.
+        const GymNamePromptCard(),
         // #393: pending requests are NOT shown inline here anymore — they live
-        // in the bell modal (_showPendingRequestsSheet) so they don't clutter
+        // in the «Solicitudes» tab of the notification centre so they don't clutter
         // the dashboard.
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
@@ -95,11 +100,9 @@ class TrainerDashboardTab extends ConsumerWidget {
         const SizedBox(height: 8),
         const _EntrenaronHoyList(),
         const SizedBox(height: 20),
-        _SectionHeader(
-          label: AppL10n.of(context).dashboardActividadRecienteSectionLabel,
-        ),
+        const _ActividadRecienteHeader(),
         const SizedBox(height: 8),
-        const _ActividadRecienteList(),
+        const _ActividadRecienteList(limit: kRecentActivityPreviewCount),
         const SizedBox(height: 20),
         _PagosPorCobrarSection(palette: palette),
         const SizedBox(height: 20),
@@ -118,17 +121,14 @@ class _DashboardHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     final name = profileAsync.valueOrNull?.displayName ?? '';
     final firstName = name.isEmpty ? '' : name.split(RegExp(r'\s+')).first;
     final initials = _initials(name);
-    final pendingCount = (linksAsync.valueOrNull ?? const [])
-        .where((l) => l.status == TrainerLinkStatus.pending)
-        .length;
-    // A failed links read must not silently hide the badge: flag it so the bell
-    // shows an error dot (and its sheet a retry) instead of a false empty "0".
-    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
+    // El conteo de pendientes y su estado de error se fueron con la campana
+    // vieja: ahora el badge lo pone `NotificationBell` desde el centro de
+    // notificaciones, y el error de lectura lo muestra `PendingRequestsView`
+    // en su propia pestaña, con reintento.
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,12 +161,16 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ),
             ),
-            _BellWithBadge(
-              badgeCount: pendingCount,
-              showError: linksHasError,
-              palette: palette,
-              onTap: () => _showPendingRequestsSheet(context),
-            ),
+            // La campana del dashboard era la ÚNICA puerta a las solicitudes
+            // pendientes (#393), y abría un bottom sheet. Ahora las solicitudes
+            // son una sub-pestaña del centro de notificaciones, así que la
+            // campana lleva ahí como en el resto de la app: un solo ícono, un
+            // solo destino.
+            //
+            // El bottom sheet que abría se elimina con ella: era su único
+            // llamador. La lista sobrevive como `PendingRequestsView`, que es
+            // lo que monta la pestaña — se muda de host, no se duplica.
+            const NotificationBell(),
             const SizedBox(width: 12),
             // Shortcut straight to the professional-profile EDITOR, not to the
             // PERFIL tab: from the dashboard the useful destination is the
@@ -442,6 +446,8 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
           reason: failure.reason == 'subscription-inactive'
               ? PlanLimitReason.subscriptionInactive
               : PlanLimitReason.planLimit,
+          subscriptionStatus:
+              ref.read(currentTrainerSubscriptionStatusProvider),
         ),
       );
     } on LinkPromotionFailure$PromotionPrecondition {
@@ -903,43 +909,59 @@ class DejarFeedbackSheetTestHarness extends StatelessWidget {
   Widget build(BuildContext context) => const _DejarFeedbackSheet();
 }
 
-void _showPendingRequestsSheet(BuildContext context) {
-  final palette = AppPalette.of(context);
-  showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: palette.bgCard,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-    ),
-    builder: (_) => const _PendingRequestsSheet(),
-  );
-}
-
-class _PendingRequestsSheet extends ConsumerStatefulWidget {
-  const _PendingRequestsSheet();
+/// Test-only harness que monta la lista de ENTRENARON HOY sola, sin el grafo
+/// de providers del dashboard entero (mismo criterio que los otros harnesses
+/// de este archivo). Existe para poder verificar a dónde navega una fila.
+///
+/// @visibleForTesting
+class EntrenaronHoyListTestHarness extends StatelessWidget {
+  const EntrenaronHoyListTestHarness({super.key});
 
   @override
-  ConsumerState<_PendingRequestsSheet> createState() =>
-      _PendingRequestsSheetState();
+  Widget build(BuildContext context) => const _EntrenaronHoyList();
 }
 
-class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
-  /// Latches once the sheet has shown at least one request.
-  ///
-  /// It distinguishes the two ways of ending up with an empty list, which need
-  /// OPPOSITE behaviour:
-  /// - opened with none → show the empty state and STAY (the bell is now
-  ///   always tappable, so this is a legitimate way to open the sheet);
-  /// - opened with some and the last one was just accepted/declined →
-  ///   auto-close, so the sheet does not sit there with nothing in it.
-  ///
-  /// Written during build without setState on purpose: it never needs to
-  /// trigger a rebuild of its own — the stream already rebuilds us, and this
-  /// only records what that rebuild showed.
-  bool _hadAny = false;
+/// Test-only harness que monta la lista de ACTIVIDAD RECIENTE sola.
+///
+/// @visibleForTesting
+class ActividadRecienteListTestHarness extends StatelessWidget {
+  const ActividadRecienteListTestHarness({super.key, this.limit});
 
+  /// Tope de presentación. `null` = todas, igual que la pantalla completa.
+  final int? limit;
+
+  @override
+  Widget build(BuildContext context) => _ActividadRecienteList(limit: limit);
+}
+
+/// Harness del header de «Actividad reciente», para testear el «Ver todo»
+/// condicional sin montar el dashboard entero con sus diez providers.
+class ActividadRecienteHeaderTestHarness extends StatelessWidget {
+  const ActividadRecienteHeaderTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _ActividadRecienteHeader();
+}
+
+/// Lista de solicitudes de vinculación pendientes del PF, con accept/decline.
+///
+/// Vive en la sub-pestaña «Solicitudes» del centro de notificaciones. Antes era
+/// el contenido de un bottom sheet que abría la campana del dashboard, y ése
+/// era el ÚNICO camino: no existía ruta que llevara a las pendientes, así que
+/// ningún deep link podía apuntarles. El sheet se eliminó al mudarse acá.
+///
+/// No se auto-cierra al quedar vacía —el modal sí lo hacía— porque una pestaña
+/// que se desmonta sola le saca el piso al PF justo después de aceptar la
+/// última solicitud.
+class PendingRequestsView extends ConsumerStatefulWidget {
+  const PendingRequestsView({super.key});
+
+  @override
+  ConsumerState<PendingRequestsView> createState() =>
+      _PendingRequestsViewState();
+}
+
+class _PendingRequestsViewState extends ConsumerState<PendingRequestsView> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -992,14 +1014,6 @@ class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
         .where((l) => l.status == TrainerLinkStatus.pending)
         .toList();
 
-    if (pending.isNotEmpty) _hadAny = true;
-
-    if (pending.isEmpty && _hadAny) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) Navigator.of(context).maybePop();
-      });
-    }
-
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(
@@ -1050,7 +1064,7 @@ class PendingRequestsSheetTestHarness extends StatelessWidget {
   const PendingRequestsSheetTestHarness({super.key});
 
   @override
-  Widget build(BuildContext context) => const _PendingRequestsSheet();
+  Widget build(BuildContext context) => const PendingRequestsView();
 }
 
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────
@@ -1510,7 +1524,12 @@ class _EntrenaronHoyRow extends ConsumerWidget {
     final session = entry.session;
 
     return InkWell(
-      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
+      // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
+      // había que ir a buscarla a mano.
+      onTap: () => context.push(
+        '/coach/athlete/${entry.athleteId}/session/${session.id}',
+      ),
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1567,8 +1586,122 @@ class _EntrenaronHoyRow extends ConsumerWidget {
 
 // ── Actividad reciente ────────────────────────────────────────────────────────
 
+/// La lista completa de «Actividad reciente», detrás del «Ver todo».
+///
+/// Muestra la MISMA ventana de 7 días que el dashboard —no más días— sin el
+/// tope de presentación: el dashboard corta en [kRecentActivityPreviewCount]
+/// para no comerse la pantalla, y acá se ve todo lo que el provider trae.
+///
+/// Reusa [_ActividadRecienteList] con `limit: null` en vez de duplicar las
+/// filas. La lección está escrita en el test de `SessionExerciseBlock`: si el
+/// render vive duplicado por pantalla, hay que mantener dos copias y alguna se
+/// queda atrás.
+///
+/// **No es** la `SessionHistoryScreen` parametrizada que sugería el plan del
+/// PF §3. Ésa es el historial de UN alumno (`coachAthleteId`); este feed es de
+/// todos los alumnos a la vez, así que no hay parámetro que la haga servir.
+class RecentActivityScreen extends StatelessWidget {
+  const RecentActivityScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Scaffold(
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: l10n.commonBack,
+                      icon: Icon(TreinoIcon.back,
+                          size: 20, color: palette.textPrimary),
+                      // `canPop` antes de `pop`: la ruta es top-level y se
+                      // llega por push desde el dashboard, pero un deep link
+                      // puede montarla sin nada debajo.
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/coach'),
+                    ),
+                    const SizedBox(width: 6),
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        l10n.dashboardActividadRecienteSectionLabel,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          letterSpacing: 1.0,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: _ActividadRecienteList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El header de «Actividad reciente», con su «Ver todo» CONDICIONAL.
+///
+/// El trailing aparece sólo si hay más entradas de las que el dashboard
+/// muestra. Un «Ver todo» que lleva a una pantalla con exactamente las mismas
+/// cinco filas no es un adorno inofensivo: entrena al PF a ignorarlo, y el día
+/// que sí haya algo detrás no lo va a tocar. Es la versión de UI de la
+/// advertencia falsa de AGENTS.md §11.1 — un cartel que promete y no cumple
+/// desactiva la atención justo donde hacía falta.
+class _ActividadRecienteHeader extends ConsumerWidget {
+  const _ActividadRecienteHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+    // `select` y no el AsyncValue entero: al header sólo le importa SI hay más
+    // filas de las que entran, no cuáles son ni en qué orden. Sin el select se
+    // rebuildearía con cada cambio del feed para no cambiar un pixel
+    // (AGENTS.md regla 6).
+    final hayMas = ref.watch(
+      recentActivityProvider.select(
+        (a) => (a.valueOrNull?.length ?? 0) > kRecentActivityPreviewCount,
+      ),
+    );
+
+    return _SectionHeader(
+      label: l10n.dashboardActividadRecienteSectionLabel,
+      trailingLabel: hayMas ? l10n.workoutHistorialSeeAll : null,
+      trailingOnTap: hayMas ? () => context.push('/coach/actividad') : null,
+    );
+  }
+}
+
+/// La lista de «Actividad reciente».
+///
+/// [limit] es el tope de PRESENTACIÓN, no el de datos — el provider ya corta en
+/// [kRecentActivityMaxEntries]. `null` muestra todo lo que traiga, que es lo que
+/// hace la pantalla completa; el dashboard pasa
+/// [kRecentActivityPreviewCount] y deja el resto detrás del «Ver todo».
 class _ActividadRecienteList extends ConsumerWidget {
-  const _ActividadRecienteList();
+  const _ActividadRecienteList({this.limit});
+
+  final int? limit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1589,15 +1722,32 @@ class _ActividadRecienteList extends ConsumerWidget {
       );
     }
 
-    final entries = activityAsync.valueOrNull ?? const [];
-    if (entries.isEmpty) {
+    final all = activityAsync.valueOrNull ?? const <RecentActivityEntry>[];
+    if (all.isEmpty) {
       return _PlaceholderCard(
         palette: palette,
         message: l10n.dashboardSinActividadReciente,
       );
     }
+    final cap = limit;
+    final entries =
+        (cap != null && all.length > cap) ? all.sublist(0, cap) : all;
 
-    return Container(
+    // El tope de DATOS del provider, que esta pantalla no puede superar aunque
+    // no ponga tope de presentación.
+    //
+    // Sin este aviso, el «Ver todo» del dashboard llevaba a una pantalla que
+    // mostraba las 50 más nuevas COMO SI FUERAN TODAS — exactamente la falla
+    // que este mismo change combate en el header (un «Ver todo» que no cumple
+    // lo que promete entrena al PF a ignorarlo). Lo marcó Codex en el #1161, y
+    // tenía razón: el corte ocurre en el provider, antes de que la pantalla vea
+    // un solo dato, así que ella no tenía forma de saberlo ni de decirlo.
+    //
+    // Sólo en la pantalla completa (`limit == null`). En el dashboard el tope
+    // que se ve es el de presentación y ya lo declara el «Ver todo».
+    final puedeFaltar = cap == null && all.length >= kRecentActivityMaxEntries;
+
+    final lista = Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1619,6 +1769,30 @@ class _ActividadRecienteList extends ConsumerWidget {
         ],
       ),
     );
+
+    if (!puedeFaltar) return lista;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        lista,
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.s12),
+          child: Text(
+            // «Puede haber», no «hay»: llegar al tope no prueba que falte algo
+            // —con exactamente 50 entradas la condición se cumple y no hay
+            // ninguna más—, y un cartel que promete lo que no puede respaldar
+            // es la misma falla en la otra dirección (AGENTS.md §11.1).
+            l10n.dashboardActividadTopeAlcanzado,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1638,7 +1812,12 @@ class _ActividadRecienteRow extends ConsumerWidget {
     final session = entry.session;
 
     return InkWell(
-      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
+      // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
+      // había que ir a buscarla a mano.
+      onTap: () => context.push(
+        '/coach/athlete/${entry.athleteId}/session/${session.id}',
+      ),
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

@@ -1,0 +1,41 @@
+{
+  "$comment": "GENERADO POR scripts/build_legal_content.py en el repo `treino`. Es el indice liviano de legal-content.json — mismo orden, mismos slugs. NO EDITAR A MANO.",
+  "documents": [
+    {
+      "slug": "terminos",
+      "title": "Términos y Condiciones"
+    },
+    {
+      "slug": "suscripcion",
+      "title": "Términos de Suscripción"
+    },
+    {
+      "slug": "privacidad",
+      "title": "Política de Privacidad"
+    },
+    {
+      "slug": "descargo-medico",
+      "title": "Descargo Médico"
+    },
+    {
+      "slug": "consentimiento-salud",
+      "title": "Consentimiento de datos de salud"
+    },
+    {
+      "slug": "comunidad",
+      "title": "Normas de Comunidad"
+    },
+    {
+      "slug": "entrenadores",
+      "title": "Términos para Entrenadores"
+    },
+    {
+      "slug": "retencion",
+      "title": "Retención y eliminación de datos"
+    },
+    {
+      "slug": "aviso-legal",
+      "title": "Aviso Legal"
+    }
+  ]
+}

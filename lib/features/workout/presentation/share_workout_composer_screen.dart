@@ -13,6 +13,7 @@ import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/application/create_post_notifier.dart' show kMaxPostChars;
 import '../../feed/domain/post_privacy.dart';
@@ -163,6 +164,13 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
       );
       if (!context.mounted) return;
       context.go('/workout');
+    } on ModerationBlockedException catch (_) {
+      // `workoutSnackShareError` invita a reintentar, y para un bloqueo eso es
+      // consejo falso: el mismo texto va a fallar siempre.
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.moderationBlockedMessage)),
+      );
     } catch (_) {
       if (!mounted) return;
       messenger.showSnackBar(

@@ -405,8 +405,7 @@ void main() {
 
     // "GUARDAR PLANTILLA" y no "GUARDAR CAMBIOS": desde #871 el editor de
     // PLANTILLAS tiene copy propio. Antes reusaba el de asignar un plan.
-    await tester
-        .tap(find.widgetWithText(ElevatedButton, 'GUARDAR PLANTILLA'));
+    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR PLANTILLA'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateTemplate(

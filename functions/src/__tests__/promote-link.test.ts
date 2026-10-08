@@ -5,7 +5,7 @@
  * Java 21 / the Firestore emulator.
  */
 
-// `admin.firestore` is both a factory AND the namespace holding the
+// `dobleNamespaced().firestore` is both a factory AND the namespace holding the
 // `Timestamp`/`FieldValue` sentinels the gate writes. The double has to carry
 // both, or the write path silently can't be exercised.
 jest.mock("firebase-admin", () => {
@@ -20,7 +20,28 @@ jest.mock("firebase-admin", () => {
   return { firestore };
 });
 
-import * as admin from "firebase-admin";
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue/Timestamp de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
+import { App } from "firebase-admin/app";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   createFakeFirestore,
   FakeDoc,
@@ -33,11 +54,11 @@ import {
 
 function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   const { db, state } = createFakeFirestore(seed);
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return state;
 }
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 const link = (overrides: Record<string, unknown> = {}) => ({
   trainerId: "trainer-1",
@@ -129,6 +150,70 @@ describe("syncTrainerLoad — precondition ladder", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid-argument" });
   });
+
+  // Defensa en profundidad del gate de rol que `firestore.rules` le puso al
+  // `create` de `trainer_links`. Esta callable va por Admin SDK y SE SALTEA las
+  // reglas, así que es la otra mitad del camino: un vínculo trucho que ya
+  // estuviera en la base —creado antes del fix— se promovía igual.
+  //
+  // El ataque que cierra: dos cuentas de ATLETA se nombran entrenador una a la
+  // otra y se aceptan. Con el vínculo activo, `hasActiveTrainerLink` apaga
+  // `athletePaywallEnforced` y las dos quedan exentas del tope.
+  it("permission-denied — el 'trainer' del vínculo tiene rol de atleta", async () => {
+    install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { role: "athlete", subscription: plan1Active } },
+    });
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+      }),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+  });
+
+  // El ANCLA de la asimetría, y por qué el chequeo de arriba mira el valor y no
+  // la ausencia: NINGÚN fixture de este archivo siembra `role` —ni los de más
+  // abajo, ni los de promote-link.emulator.test.ts—, porque `syncTrainerLoad`
+  // nunca lo necesitó. Un chequeo fail-CLOSED los pondría todos en rojo, y en
+  // producción le rompería el aceptar a cualquier PF legacy cuyo doc no tenga
+  // el campo.
+  //
+  // No debilita el gate: el ataque usa cuentas del signup PÚBLICO, que escribe
+  // `role: 'athlete'` explícito (firestore.rules ~296). Un rol ausente es un
+  // doc viejo, no un atacante.
+  it("rol ausente NO frena la promoción (PF legacy sin el campo)", async () => {
+    const state = install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { subscription: plan1Active } },
+    });
+    const result = await syncTrainerLoad(app, {
+      promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+    });
+    expect(result.promoted).toBe(true);
+    expect(state.trainer_links.L1.status).toBe("active");
+  });
+
+  // El gate de rol va SÓLO en el camino de promoción. `linkLoadReconcile`
+  // entra acá con `promotion: null` para recomputar
+  // `users/{trainerId}.weightedLoad`, que es denormalizado y PARA MOSTRAR: el
+  // gate nunca le cree y siempre recalcula en vivo (REQ-PAYWALL-GATE-006).
+  //
+  // Bloquear ese camino no autoriza nada y sí rompe algo: el trigger tiene un
+  // catch-and-log, así que el número que ve un entrenador quedaría viejo en
+  // silencio. Sin este test, mover el chequeo una llave más afuera pasa la
+  // review sin que nada se ponga rojo.
+  it("reconcile (promotion:null) recomputa aunque el rol no sea trainer", async () => {
+    const state = install({
+      trainer_links: { L1: link({ status: "active" }) },
+      users: { "trainer-1": { role: "athlete", subscription: plan1Active } },
+    });
+    const result = await syncTrainerLoad(app, {
+      trainerId: "trainer-1",
+      promotion: null,
+    });
+    expect(result.promoted).toBe(false);
+    expect(state.users["trainer-1"].weightedLoad).toBe(1.0);
+  });
 });
 
 describe("syncTrainerLoad — gate boundary (strict <=)", () => {
@@ -198,12 +283,12 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
 
     expect(state.trainer_links.L1.status).toBe("active");
     expect(state.trainer_links.L1.acceptedAt).toEqual(
-      admin.firestore.Timestamp.fromMillis(1_700_000_000_000),
+      Timestamp.fromMillis(1_700_000_000_000),
     );
   });
 
   it("resume clears pausedAt and does NOT restamp acceptedAt (replaces repository.resume)", async () => {
-    const originalAcceptedAt = admin.firestore.Timestamp.fromMillis(1_600_000_000_000);
+    const originalAcceptedAt = Timestamp.fromMillis(1_600_000_000_000);
     const state = install({
       trainer_links: {
         ...seedActiveLinks(2),
@@ -211,7 +296,7 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
           athleteId: "paused-1",
           status: "paused",
           acceptedAt: originalAcceptedAt,
-          pausedAt: admin.firestore.Timestamp.fromMillis(1_650_000_000_000),
+          pausedAt: Timestamp.fromMillis(1_650_000_000_000),
         }),
       },
       users: { "trainer-1": { subscription: plan1Active } },
@@ -223,9 +308,79 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
     });
 
     expect(state.trainer_links.L1.status).toBe("active");
-    expect(state.trainer_links.L1.pausedAt).toBe(admin.firestore.FieldValue.delete());
+    expect(state.trainer_links.L1.pausedAt).toBe(FieldValue.delete());
     // Preserved — a resumed link is NOT a new one (repository.resume contract).
     expect(state.trainer_links.L1.acceptedAt).toEqual(originalAcceptedAt);
+  });
+
+  // A2 — defensa en profundidad del gate que `firestore.rules` le puso a
+  // `paused` (sólo desde `active`). Esta callable va por Admin SDK y SE SALTEA
+  // las reglas, así que un vínculo que YA quedó en ese estado —revivido antes
+  // del fix, o escrito por un script— se resumía igual.
+  //
+  // Y lo que el resume devuelve son datos de SALUD del alumno:
+  // `syncSessionShareOnTrainerLink` re-otorga `session_shares` en la transición
+  // a `active`, sobre una relación que el alumno ya había cortado.
+  //
+  // El discriminador es la EVIDENCIA POSITIVA de que se terminó, no la ausencia
+  // de algo: `acceptedAt` NO sirve para esto —el repo lo llama «un DEFECTO DE
+  // DATOS, no evidencia de lealtad» en select-blocked-links.ts ~192, o sea que
+  // un vínculo real viejo puede no tenerlo— y exigirlo rompería resumes
+  // legítimos. `terminatedAt` y `terminationReason`, en cambio, sólo aparecen
+  // cuando alguien terminó el vínculo.
+  it("A2: DENIEGA resumir un vínculo que arrastra terminatedAt", async () => {
+    install({
+      trainer_links: {
+        L1: link({
+          status: "paused",
+          acceptedAt: Timestamp.fromMillis(1_600_000_000_000),
+          terminatedAt: Timestamp.fromMillis(1_650_000_000_000),
+        }),
+      },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "paused" },
+      }),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("A2: DENIEGA resumir un vínculo que arrastra terminationReason", async () => {
+    install({
+      trainer_links: {
+        L1: link({
+          status: "paused",
+          acceptedAt: Timestamp.fromMillis(1_600_000_000_000),
+          terminationReason: "athlete-terminated",
+        }),
+      },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    await expect(
+      syncTrainerLoad(app, {
+        promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "paused" },
+      }),
+    ).rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  // El ancla de que esto NO toca el accept: una solicitud `pending` no arrastra
+  // nada, y aceptar tiene que seguir andando. El ancla del resume legítimo vive
+  // arriba, en "resume clears pausedAt and does NOT restamp acceptedAt".
+  it("A2: aceptar un pending limpio sigue andando", async () => {
+    const state = install({
+      trainer_links: { L1: link() },
+      users: { "trainer-1": { role: "trainer", subscription: plan1Active } },
+    });
+
+    const result = await syncTrainerLoad(app, {
+      promotion: { linkId: "L1", callerUid: "trainer-1", expectedFromStatus: "pending" },
+    });
+
+    expect(result.promoted).toBe(true);
+    expect(state.trainer_links.L1.status).toBe("active");
   });
 
   it("reconciliation (promotion:null) touches no link fields", async () => {

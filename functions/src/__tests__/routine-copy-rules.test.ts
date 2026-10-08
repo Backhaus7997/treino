@@ -225,11 +225,21 @@ describe("copia de plantilla → rutina del atleta (#647)", () => {
       // update la aceptaba: la rutina quedaba imposible de editar para
       // siempre, con el permission-denied apareciendo recién en la primera
       // edición. Modo de falla de #563.
+      //
+      // ⚠️ LA CLAVE DE EJEMPLO CAMBIÓ, y vale la pena saber por qué. Este test
+      // usaba `copiedFrom`, que en su momento era el nombre más natural para
+      // «una clave que nadie conoce». El 2026-09-16 ese campo pasó a EXISTIR
+      // —es el sello de procedencia, ver el bloque de abajo— y el test se puso
+      // rojo justo como tenía que ponerse: el set de campos cambió y él lo
+      // detectó. Se le cambió el ejemplo, no la intención.
+      //
+      // Moraleja para el próximo: el ejemplo de «clave desconocida» conviene
+      // que sea algo que NUNCA vaya a ser un campo de verdad.
       await assertFails(
         asUser(ATHLETE)
           .collection(COL)
           .doc("copy-unknown")
-          .set(copyPayload({ copiedFrom: "ppl-principiante" })),
+          .set(copyPayload({ campoQueNoExisteNiVaAExistir: "x" })),
       );
     });
   });
@@ -271,6 +281,115 @@ describe("copia de plantilla → rutina del atleta (#647)", () => {
           .collection(COL)
           .doc(id)
           .update({ name: "Te la robo" }),
+      );
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  EL SELLO DE PROCEDENCIA (`copiedFrom`)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // Hasta este slice el servidor sabia de TAMANIO (`withinFreeRoutineShape`) y
+  // de nada mas: no tenia una sola clausula sobre COPIAR. El cliente gateaba
+  // «Usar como base», pero eso es una garantia del cliente.
+  //
+  // QUE PRUEBA ESTE BLOQUE, dicho sin inflarlo: que una copia SELLADA de una
+  // plantilla del catalogo la rechaza el servidor cuando al atleta se le aplica
+  // el paywall. NO prueba —ni puede— que un payload fabricado que omita el
+  // sello sea rechazado: el sello lo pone el cliente. Eso esta escrito tambien
+  // al lado de la regla, para que nadie lea este archivo y crea que la puerta
+  // quedo blindada.
+  describe("CREATE — el sello de procedencia", () => {
+    const CATALOGO = "plantilla-del-sistema";
+
+    /** Enciende o apaga el paywall para el atleta de estos tests. */
+    async function paywall(activo: boolean) {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await ctx.firestore().collection("users").doc(ATHLETE)
+          .set({ athletePaywallEnforced: activo }, { merge: true });
+      });
+    }
+
+    beforeEach(async () => {
+      await seed(CATALOGO, {
+        name: "Plantilla del catalogo",
+        source: "system",
+        isPremium: true,
+        days: [],
+        numWeeks: 1,
+      });
+    });
+
+    it("con el paywall APAGADO la copia sellada pasa", async () => {
+      // Es el estado de HOY en produccion: 0 de 59 usuarios con el paywall
+      // encendido. Si esto fallara, el sello estaria cobrando antes de tiempo.
+      await paywall(false);
+      await assertSucceeds(
+        asUser(ATHLETE).collection(COL).doc("sello-libre")
+          .set(copyPayload({ copiedFrom: CATALOGO })),
+      );
+    });
+
+    it("con el paywall ENCENDIDO la copia sellada del catalogo se DENIEGA", async () => {
+      await paywall(true);
+      await assertFails(
+        asUser(ATHLETE).collection(COL).doc("sello-bloqueado")
+          .set(copyPayload({ copiedFrom: CATALOGO, days: [], numWeeks: 1 })),
+      );
+    });
+
+    it("una rutina propia SIN sello sigue pasando con el paywall encendido", async () => {
+      // La guarda barata: escribir desde cero no toca `copiedFrom`, no paga
+      // ninguna lectura extra, y no puede quedar bloqueada por este cambio.
+      await paywall(true);
+      await assertSucceeds(
+        asUser(ATHLETE).collection(COL).doc("sin-sello")
+          .set(copyPayload({ days: [], numWeeks: 1 })),
+      );
+    });
+
+    it("copiar de OTRA rutina de atleta no se bloquea: el sello mira `source`", async () => {
+      // El sello no dice «esto es una copia», dice «esto vino de ALLA». Copiar
+      // una rutina propia o la de un amigo no es el problema que esto cuida.
+      await paywall(true);
+      await seed("rutina-de-un-amigo", copyPayload({ createdBy: OTHER_ATHLETE }));
+      await assertSucceeds(
+        asUser(ATHLETE).collection(COL).doc("copia-de-par")
+          .set(copyPayload({ copiedFrom: "rutina-de-un-amigo", days: [], numWeeks: 1 })),
+      );
+    });
+
+    it("un `copiedFrom` que apunta a la nada NO rompe la escritura", async () => {
+      // Falla ABIERTO, igual que `rutinaEsPaga`: un id colgado es un problema
+      // de datos, no de cobro, y una regla que revienta rebota la escritura con
+      // un mensaje que no dice nada.
+      await paywall(true);
+      await assertSucceeds(
+        asUser(ATHLETE).collection(COL).doc("sello-colgado")
+          .set(copyPayload({ copiedFrom: "no-existe-esta-rutina", days: [], numWeeks: 1 })),
+      );
+    });
+
+    it("el sello es INMUTABLE: no se puede sacar despues", async () => {
+      // Si se pudiera limpiar, la regla del create seria decorativa: copias
+      // sellada con el paywall apagado, lo encienden, y la borras.
+      await paywall(false);
+      const id = "sello-inmutable";
+      await seed(id, copyPayload({ copiedFrom: CATALOGO }));
+      await assertFails(
+        asUser(ATHLETE).collection(COL).doc(id).update({ copiedFrom: null }),
+      );
+    });
+
+    it("la copia sellada sigue siendo EDITABLE por su duenio", async () => {
+      // El modo de falla del #563, otra vez: un campo nuevo que el `hasOnly`
+      // no conoce brickea la edicion y el permission-denied llega lejos de la
+      // escritura que lo causo.
+      await paywall(false);
+      const id = "sello-editable";
+      await seed(id, copyPayload({ copiedFrom: CATALOGO }));
+      await assertSucceeds(
+        asUser(ATHLETE).collection(COL).doc(id).update({ name: "Mi version v2" }),
       );
     });
   });

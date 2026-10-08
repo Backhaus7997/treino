@@ -322,10 +322,19 @@ bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 
 ### 7. Calidad gates (antes de cada commit)
 
-1. `flutter analyze` → **0 issues**.
-2. `dart format .`.
+1. `flutter analyze` → sin **errores**. (El CI corre
+   `--no-fatal-warnings --no-fatal-infos`: hay deuda de `info` preexistente en el l10n
+   generado que no traba los PRs. No introduzcas nuevos.)
+2. `dart format .` — **lo verifica el CI** (job `Analyze`, paso `Format`). Un PR con
+   archivos sin formatear se pone rojo.
 3. `flutter test` (verde si hay tests del cambio).
 4. Si tocaste freezed → `dart run build_runner build --delete-conflicting-outputs`.
+
+El paso 2 fue honor system hasta el 2026-09-11, y para entonces `main` tenía **44
+archivos sin formatear**. El costo no era estético: `dart format` sobre un archivo sucio
+mete hunks ajenos —14 en `routine_editor_screen.dart`, uno de ellos rompiendo un lint—
+así que el que corría el gate se llevaba un diff que no era suyo y el que no lo corría no
+pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
 
 ### 8. Branching y PRs
 
@@ -334,8 +343,9 @@ bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 - PR con **1+ approve**, **squash and merge**, branch auto-delete.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
 - Si modificás `AGENTS.md` o algo en `docs/` → reviewer aprueba **explícitamente** la modificación de las reglas.
-- **Después de todo rebase y antes de todo force-push**, por cada archivo del diff:
-  `diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'` — ver §11.
+- **Después de todo rebase y antes de todo force-push**:
+  `git diff origin/main HEAD | rg '^-[^-]'` — ver §11.2, que explica por qué NO va con
+  `diff` a secas (en Windows reporta el archivo entero como borrado).
 
 → Detalle en [docs/workflow.md](./docs/workflow.md).
 
@@ -362,13 +372,26 @@ worktrees en `.claude/worktrees/`. Cuatro reglas:
 Si `check` sale con error, **frená y confirmá** con el usuario antes de seguir.
 Dos ramas arreglando el mismo bug es la forma más cara de perder trabajo.
 
+Si el claim que te frena sale marcado `← VIEJO, capaz murió`, limpialo con
+`release <scope>` (abajo) en vez de esperar las 8h de `prune`.
+
 **b. Al arrancar, anotate. Al terminar o abandonar, borrate.**
 
 ```bash
 ./scripts/agent-ledger.sh claim 826 "banner de entornos en docs"
 ./scripts/agent-ledger.sh release          # sólo los claims de ESTA sesión
+./scripts/agent-ledger.sh release 826      # ese scope, para limpiar un claim muerto
 ./scripts/agent-ledger.sh release --all    # todo lo de este worktree
 ```
+
+`release <scope>` dice `liberado:` **sólo si borró una fila**, y si no borró dice
+a qué worktree apunta. Hasta el 2026-10-06 lo decía siempre, así que el camino
+más común de limpieza —un agente terminó, borró su worktree, y otro corre el
+`release` desde la raíz— contestaba que sí y dejaba el claim en pie. El día que
+se arregló había un claim de **once días** que se había comido varios `release`
+de esa forma. Alcanza a los claims de este worktree y a los de un worktree que
+ya no existe en disco; si el worktree sigue existiendo no lo toca, porque puede
+haber un agente vivo ahí.
 
 El ledger vive en `.git/agent-ledger.tsv` — el único directorio que comparten
 todos los worktrees y que nunca se commitea. No lo edites a mano. Si tu
@@ -438,16 +461,46 @@ Pasó con `scripts/README.md`: el rebase lo auto-mergeó sin conflicto y el resu
 reintroducía, palabra por palabra, las afirmaciones falsas que el PR pisado existía
 para corregir.
 
-**El chequeo, obligatorio antes de todo force-push post-rebase**, por cada archivo del
-diff:
+**El chequeo, obligatorio antes de todo force-push post-rebase.** Compara tu rama contra
+`main` y lista lo que estás sacando:
 
 ```bash
-diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'
+git diff origin/main HEAD | rg '^-[^-]'
 ```
 
 - Salida vacía → tu cambio es **aditivo**. Seguí.
 - Cualquier salida → estás **borrando** algo que está en `main`. Que sea a propósito, y
-  que quede escrito en el mensaje del commit por qué.
+  que quede escrito en el mensaje del commit por qué. El header de cada hunk (`--- a/…`)
+  dice de qué archivo es cada línea.
+
+### ⚠️ Por qué NO se usa `diff` a secas
+
+Este chequeo vivió escrito como `diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'`,
+por archivo. **En Windows eso da un falso positivo total**, y el modo de falla es el peor
+posible para una verificación: grita en TODOS los archivos, todo el tiempo.
+
+El motivo es `core.autocrlf=true`, que es la configuración normal de este repo en Windows.
+Git deja los archivos del working tree en **CRLF** —después de un `checkout`, un `reset`,
+un `stash pop` o, justamente, un **rebase**— mientras que `git show` escribe el blob a un
+pipe en **LF**. `diff` compara las dos cosas byte a byte, ve todas las líneas distintas, y
+reporta el archivo entero como borrado.
+
+Medido el 2026-09-11 sobre un archivo cuyo contenido no había cambiado: **69 líneas**
+"borradas" con `diff`, **0** con `git diff`. En otro, **222** sobre un cambio real de 2.
+
+Y aparece justo donde este chequeo se aplica: post-rebase los archivos vienen de git, o
+sea CRLF. Lo hace parecer inofensivo que NO falle cuando el archivo lo escribió otra
+herramienta (un script, un editor con LF) — así que el mismo comando miente o no según
+quién tocó el archivo por última vez, que es lo peor de los dos mundos.
+
+`git diff` no tiene el problema porque aplica las reglas de fin de línea del repo en vez
+de comparar bytes crudos. Si por algún motivo necesitás la forma con `diff`, va con
+`--strip-trailing-cr` —medido, también da 0— pero preferí `git diff`: no depende de qué
+implementación de `diff` tengas en el PATH.
+
+Es el mismo principio de §11.1, del otro lado: una advertencia falsa desactiva la
+sospecha, y una que grita siempre entrena a ignorarla. Las dos terminan igual — el día
+que el chequeo tenga algo real que decir, nadie lo va a estar mirando.
 
 ## Setup desde una máquina nueva
 

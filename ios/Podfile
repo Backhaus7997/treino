@@ -1,4 +1,4 @@
-platform :ios, '14.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -38,5 +38,17 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # Xcode 27 rechaza cualquier target por debajo de 15.0, y varios pods
+    # declaran mínimos viejísimos por su cuenta (medidos: desde 9.0). Sin este
+    # forzado, `flutter build ipa` muere con «Encountered error while archiving
+    # for device» y NO nombra la causa: el log sólo trae avisos de Target
+    # Integrity, ni un error de compilación.
+    #
+    # Va acá y no sólo en `platform :ios` porque `flutter_additional_ios_build_settings`
+    # respeta el mínimo que cada pod declara: subir la plataforma del Podfile
+    # no alcanza para los que piden menos.
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
   end
 end

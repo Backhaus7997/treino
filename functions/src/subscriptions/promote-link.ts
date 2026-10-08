@@ -34,7 +34,16 @@
  * transaction that writes it.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import {
+  DocumentData,
+  DocumentReference,
+  FieldValue,
+  Firestore,
+  Timestamp,
+  Transaction,
+  getFirestore,
+} from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
@@ -96,19 +105,51 @@ export function promotionDenialReason(
   return limit < nominalLimit ? "subscription-inactive" : "plan-limit";
 }
 
-type LinkDoc = WeightedLink & { id: string; status: string };
+export type LinkDoc = WeightedLink & { id: string; status: string };
+
+/**
+ * Lee los `trainer_links` vivos de un PF DENTRO de la transacción dada — la
+ * MISMA query que usa el gate acá abajo, extraída para que
+ * `trainer-limit-mail.ts` pueda pedir la MISMA carga en vivo (hallazgo de
+ * Codex sobre #1267, P2) sin reimplementar el mapeo doc→WeightedLink ni el
+ * filtro/dedupe que ya vive en `computeWeightedLoad` — ver ese módulo, "POR
+ * QUÉ ALUMNOS NO USA `weightedLoad`".
+ *
+ * Exportada en vez de compartida por otro medio a propósito: este archivo
+ * documenta un orden de lecturas "load-bearing" (ver el encabezado, D-1), y
+ * una función que sólo LEE dentro de la `tx` que el llamador ya abrió no le
+ * agrega ningún paso nuevo a ese orden — el llamador decide cuándo invocarla.
+ */
+export async function readTrainerLinks(
+  tx: Transaction,
+  db: Firestore,
+  trainerId: string,
+): Promise<LinkDoc[]> {
+  const linksSnap = await tx.get(
+    db.collection("trainer_links").where("trainerId", "==", trainerId),
+  );
+  return linksSnap.docs.map((doc) => {
+    const data = doc.data() as DocumentData;
+    return {
+      id: doc.id,
+      athleteId: data.athleteId as string,
+      status: data.status as LinkDoc["status"],
+      entitlement: data.entitlement as WeightedLink["entitlement"],
+    };
+  });
+}
 
 export async function syncTrainerLoad(
-  app: admin.app.App,
+  app: App,
   input: SyncTrainerLoadInput,
 ): Promise<SyncTrainerLoadResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const nowMs = input.nowMs ?? Date.now();
   const promotion = input.promotion;
 
   return db.runTransaction(async (tx) => {
     let trainerId = input.trainerId;
-    let linkRef: admin.firestore.DocumentReference | null = null;
+    let linkRef: DocumentReference | null = null;
     let alreadyActive = false;
 
     // ── 1-2. Read + validate the promoted link FIRST (design D-1 step 1-2) ──
@@ -123,7 +164,7 @@ export async function syncTrainerLoad(
         throw new HttpsError("not-found", "Link not found.");
       }
 
-      const linkData = linkSnap.data() as admin.firestore.DocumentData;
+      const linkData = linkSnap.data() as DocumentData;
       trainerId = linkData.trainerId as string;
 
       if (promotion.callerUid !== trainerId) {
@@ -138,6 +179,31 @@ export async function syncTrainerLoad(
         throw new HttpsError("failed-precondition", "wrong-status");
       } else if (linkData.entitlement === "blocked") {
         throw new HttpsError("failed-precondition", "link-blocked");
+      } else if (
+        linkData.terminatedAt != null || linkData.terminationReason != null
+      ) {
+        // ── A2: un vínculo TERMINADO no se revive ─────────────────────────
+        //
+        // Defensa en profundidad del gate que `firestore.rules` le puso a
+        // `paused` (sólo desde `active`). Esta callable va por Admin SDK y SE
+        // SALTEA las reglas, así que es la otra mitad del camino: un vínculo
+        // que YA haya quedado `paused` arrastrando su terminación —revivido
+        // antes de ese gate, o escrito por un script— se resumía igual.
+        //
+        // Lo que el resume devuelve son datos de SALUD:
+        // `syncSessionShareOnTrainerLink` re-otorga `session_shares` en la
+        // transición a `active`, y eso abre `sessions`, `setLogs`,
+        // `exerciseFeedback`, las mediciones y las fotos de molestias — sobre
+        // una relación que el alumno ya cortó y sin que vuelva a consentir.
+        // De paso le saca el share al PF actual.
+        //
+        // EVIDENCIA POSITIVA, no ausencia. `acceptedAt` NO sirve de
+        // discriminador: el repo lo llama «un DEFECTO DE DATOS, no evidencia
+        // de lealtad» (select-blocked-links.ts ~192) y un vínculo real viejo
+        // puede no tenerlo, así que exigirlo rompería resumes legítimos.
+        // `terminatedAt` y `terminationReason` sólo los escribe una
+        // terminación.
+        throw new HttpsError("failed-precondition", "link-terminated");
       }
     }
 
@@ -146,9 +212,9 @@ export async function syncTrainerLoad(
     }
 
     // ── 3. Reads-before-writes: subscription + full live link set, parallel ──
-    const [trainerSnap, linksSnap] = await Promise.all([
+    const [trainerSnap, currentLinks] = await Promise.all([
       tx.get(db.collection("users").doc(trainerId)),
-      tx.get(db.collection("trainer_links").where("trainerId", "==", trainerId)),
+      readTrainerLinks(tx, db, trainerId),
     ]);
 
     if (!trainerSnap.exists) {
@@ -157,6 +223,52 @@ export async function syncTrainerLoad(
       // catch-and-log wrapper (mirrors link-aggregate.ts) turns this into a
       // warning instead of a retry storm; see link-load-reconcile.ts.
       throw new HttpsError("not-found", "Trainer profile not found.");
+    }
+
+    // ── El 'trainer' del vínculo tiene que ser un PF ────────────────────────
+    //
+    // Defensa en profundidad del gate que `firestore.rules` le puso al `create`
+    // de `trainer_links` (~1368). Esta callable va por Admin SDK y SE SALTEA
+    // las reglas, así que es la OTRA mitad del camino de escritura: sin esto,
+    // un vínculo trucho que ya estuviera en la base —creado antes de ese gate—
+    // se promovía igual, y con el vínculo activo `hasActiveTrainerLink` apaga
+    // `athletePaywallEnforced` para el alumno. O sea: dos cuentas de atleta que
+    // se nombran entrenador una a la otra y se aceptan quedaban las dos exentas
+    // del tope.
+    //
+    // GRATIS: `trainerSnap` ya está leído arriba para la suscripción. No agrega
+    // ni una lectura ni cambia el punto de serialización de la transacción.
+    //
+    // MIRA EL VALOR, NO LA AUSENCIA — y la asimetría con la regla (que sí falla
+    // cerrado) es deliberada. Ningún fixture de `promote-link.test.ts` ni de
+    // `promote-link.emulator.test.ts` siembra `role`, porque esta función nunca
+    // lo necesitó; y en producción un PF legacy sin el campo existe de verdad
+    // (ver el default de `paywallEnforcedFor` en las rules, que falla abierto
+    // por el mismo motivo). Fail-closed acá le rompería el aceptar a esa gente
+    // para tapar un residuo que el gate del create ya no deja crecer.
+    //
+    // No lo debilita: el ataque usa cuentas del signup PÚBLICO, y ese camino
+    // escribe `role: 'athlete'` explícito (firestore.rules ~296) con el campo
+    // pineado inmutable en el update. Un rol ausente es un doc viejo, no un
+    // atacante. Las dos ramas están fijadas por tests.
+    //
+    // SÓLO EN EL CAMINO DE PROMOCIÓN, y el `promotion &&` no es cosmético.
+    // `linkLoadReconcile` llama a esta función con `promotion: null` para
+    // recomputar `users/{trainerId}.weightedLoad`, que es DENORMALIZADO Y PARA
+    // MOSTRAR: el gate nunca le cree y siempre recalcula en vivo desde
+    // `trainer_links` (REQ-PAYWALL-GATE-006). Bloquear ese camino no compra
+    // seguridad —no autoriza nada— y sí cuesta: el trigger tiene un
+    // catch-and-log, así que el número que ve un entrenador se quedaría viejo
+    // en silencio si su doc tuviera el rol raro. Autorizar es trabajo del
+    // camino que ESCRIBE el `status`; mantener un contador de display, no.
+    if (promotion) {
+      const trainerRole = trainerSnap.data()?.role as string | undefined;
+      if (trainerRole !== undefined && trainerRole !== "trainer") {
+        throw new HttpsError(
+          "permission-denied",
+          "The link's trainer is not a trainer.",
+        );
+      }
     }
 
     // `degraded` se IGNORA aca a proposito — ver la POLITICA en
@@ -169,15 +281,6 @@ export async function syncTrainerLoad(
     const { state: sub } = toSubscriptionState(trainerSnap.data(), trainerId);
     const limit = effectiveWeightLimit(sub, nowMs);
 
-    const currentLinks: LinkDoc[] = linksSnap.docs.map((doc) => {
-      const data = doc.data() as admin.firestore.DocumentData;
-      return {
-        id: doc.id,
-        athleteId: data.athleteId as string,
-        status: data.status as LinkDoc["status"],
-        entitlement: data.entitlement as WeightedLink["entitlement"],
-      };
-    });
     const currentLoad = computeWeightedLoad(currentLinks as unknown as WeightedLink[]);
 
     // ── 4. Project (pure) — force the target link to 'active' unless it's
@@ -226,10 +329,10 @@ export async function syncTrainerLoad(
         status: "active",
         ...(promotion.expectedFromStatus === "pending"
           // accept: stamp the start of the relationship.
-          ? { acceptedAt: admin.firestore.Timestamp.fromMillis(nowMs) }
+          ? { acceptedAt: Timestamp.fromMillis(nowMs) }
           // resume: clear the pause marker; acceptedAt is PRESERVED — a
           // resumed link is not a new one.
-          : { pausedAt: admin.firestore.FieldValue.delete() }),
+          : { pausedAt: FieldValue.delete() }),
       });
     }
     // Step 6 ALWAYS runs (design D-1) — this read-write pair on

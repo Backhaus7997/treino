@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -30,6 +32,7 @@ import '../../workout/domain/routine_visibility.dart';
 import '../application/cf_providers.dart';
 import '../application/plan_import_providers.dart';
 import '../domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Preview del plan importado. Muestra:
 /// - Nombre / días / semanas / nivel
@@ -45,6 +48,20 @@ class CoachHubPlanPreviewScreen extends ConsumerStatefulWidget {
       _CoachHubPlanPreviewScreenState();
 }
 
+/// Resultado de intentar asignarle el plan importado a UN atleta, dentro del
+/// batch en paralelo de [_CoachHubPlanPreviewScreenState._assign]. `null` en
+/// el `Future.wait` sigue significando éxito — mismo criterio que antes de
+/// este fix, que sólo guardaba el `athleteId` en el fallo.
+///
+/// Antes de esto el catch-all devolvía nada más que el id y perdía la
+/// excepción real: un `ModerationBlockedException` (contenido vetado —
+/// reintentar no sirve NUNCA, el mismo plan vuelve a fallar igual) se
+/// mostraba con el mismo "Probá de nuevo" que un fallo de red (donde
+/// reintentar sí puede andar). Mismo patrón que `ResultadoDePublicar` en
+/// `routine_actions_provider.dart`: se preserva la categoría en el resultado
+/// del batch en vez de aplanarla en el `catch`.
+typedef _FalloAsignacion = ({String athleteId, String? campoBloqueo});
+
 class _CoachHubPlanPreviewScreenState
     extends ConsumerState<CoachHubPlanPreviewScreen> {
   final Set<String> _selectedAthleteIds = <String>{};
@@ -55,6 +72,20 @@ class _CoachHubPlanPreviewScreenState
   /// Used to warn before leaving the preview, since the parsed+mapped plan lives
   /// in an ephemeral autoDispose provider and is lost on back-navigation.
   bool _hasManualMappings = false;
+
+  /// Se prende cuando la asignación salió bien y esta pantalla se está yendo
+  /// al dashboard por decisión propia.
+  ///
+  /// Existe porque el éxito hace DOS cosas: limpia `parsedPlanProvider` y
+  /// navega. Limpiarlo deja el plan en `null`, y `build` trata "plan null"
+  /// como "alguien entró acá sin haber subido nada" y agenda un
+  /// `go('/upload-plan')` en un post-frame. Esa red de seguridad le ganaba al
+  /// `go('/dashboard')` del éxito: el PF asignaba, veía el cartel de que salió
+  /// bien, y aterrizaba de nuevo en la pantalla de subir archivo.
+  ///
+  /// Medido con un test de un solo alumno contra el código anterior a la
+  /// paralelización, así que no lo trajo ese cambio: estaba desde antes.
+  bool _saliendoAlDashboard = false;
 
   /// Confirms before destroying the parsed (and possibly manually-mapped) plan
   /// by navigating back to the upload screen. Returns `true` if the trainer
@@ -76,15 +107,16 @@ class _CoachHubPlanPreviewScreenState
             style: TextStyle(color: palette.textMuted, fontSize: 14),
           ),
           actions: [
-            TextButton(
+            TreinoButton(
+              label: l10n.commonCancel,
+              variant: TreinoButtonVariant.ghost,
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.commonCancel,
-                  style: TextStyle(color: palette.textMuted)),
             ),
-            TextButton(
+            const SizedBox(width: AppSpacing.s8),
+            TreinoButton(
+              label: l10n.coachHubPreviewDiscardConfirm,
+              variant: TreinoButtonVariant.danger,
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.coachHubPreviewDiscardConfirm,
-                  style: TextStyle(color: palette.danger)),
             ),
           ],
         );
@@ -136,28 +168,89 @@ class _CoachHubPlanPreviewScreenState
 
     final repo = ref.read(routineRepositoryProvider);
     final athleteIds = _selectedAthleteIds.toList();
-    final failed = <String>[];
-
     final analytics = ref.read(analyticsServiceProvider);
-    for (final athleteId in athleteIds) {
+
+    // En PARALELO, no en serie.
+    //
+    // `createAssigned` termina en un `_collection.add(...)`, y ese future
+    // resuelve cuando el SERVIDOR confirma la escritura — no cuando entra en
+    // la caché local. Con un `for` y un `await` adentro, eso encadenaba una
+    // ida y vuelta de red POR ALUMNO: asignarle el plan a cinco costaba cinco
+    // esperas en fila cuando la red puede llevarlas juntas. Es el único lugar
+    // de las cuatro superficies de asignación donde el costo se multiplica,
+    // y por eso se arregla sin esperar la medición del resto: no hay número
+    // que pueda justificar serializarlas.
+    //
+    // Cada future atrapa SU error y devuelve el id del alumno que falló, o
+    // null si salió bien. `Future.wait` a secas aborta con el primer error y
+    // se perdería tanto el resultado de los demás como el detalle de CUÁL
+    // falló — que es justo lo que alimenta el reintento acotado de abajo.
+    // `Future.wait` preserva el orden de entrada, así que `failed` sigue
+    // saliendo en orden de selección, igual que con el loop.
+    // Tipo de retorno EXPLICITO a propósito: sin él, Dart tiene que inferir
+    // el tipo de la función a partir de tres `return` con formas distintas
+    // (`null`, un record con `campoBloqueo: String`, uno con
+    // `campoBloqueo: null`) y unificarlos de abajo hacia arriba. Anotado, cada
+    // `return` se chequea CONTRA `_FalloAsignacion?` en vez de aportar a esa
+    // inferencia — sin esto `campoBloqueo: null` podía terminar tipado `Null`
+    // en vez de `String?` y romper la forma que espera `_FalloAsignacion`.
+    Future<_FalloAsignacion?> intentarAsignar(String athleteId) async {
       final routine = _buildRoutine(
         plan: plan,
         trainerUid: trainerUid,
         athleteId: athleteId,
       );
       try {
-        final created = await repo.createAssigned(routine);
-        analytics.logPlanAssigned(
-          routineId: created.id,
-          assignedBy: trainerUid,
-          assignedTo: athleteId,
+        // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es
+        // donde su dartdoc siempre dijo que estaba. `routine_created` sí se
+        // queda — lleva un `source` que sólo conoce el llamador.
+        await repo.createAssigned(routine);
+        analytics.logRoutineCreated(
+          source: RoutineCreationSource.trainerAssigned,
+          daysCount: routine.days.length,
+          weeksCount: routine.numWeeks,
         );
+        return null;
+      } on ModerationBlockedException catch (e) {
+        // Rama propia y NO el catch-all de abajo: `_ensureRoutineTextIsClean`
+        // (routine_repository.dart) corre sobre el MISMO `plan`
+        // (name/split/summary/days) para los N atletas de este batch —
+        // si el guard bloquea a uno los bloquea a TODOS, con el mismo
+        // `campo`. Caer en el catch-all acá era justo el bug: mostraba
+        // "Probá de nuevo" sobre un plan que va a fallar siempre, sin
+        // ninguna guía de qué corregir.
+        return (athleteId: athleteId, campoBloqueo: e.campo);
       } catch (_) {
-        failed.add(athleteId);
+        return (athleteId: athleteId, campoBloqueo: null);
       }
     }
 
+    final resultados = await Future.wait(athleteIds.map(intentarAsignar));
+    final failed = resultados.whereType<_FalloAsignacion>().toList();
+
     if (!mounted) return;
+
+    // Bloqueo del filtro de términos vetados: por el determinismo de arriba,
+    // si ALGUNO de los fallos trae `campoBloqueo` es porque TODOS los
+    // atletas de este batch comparten el mismo plan bloqueado. No hay
+    // subconjunto que reintentar -- "Probá de nuevo" es consejo falso acá -- y
+    // un mensaje por atleta repetiría N veces lo mismo cuando es un plan
+    // bloqueado, no N fallos independientes. `ubicacionLegible` le ahorra al
+    // PF adivinar cuál de hasta 40 notas (5 días x 8 slots) fue.
+    final campoBloqueado = failed
+        .map((f) => f.campoBloqueo)
+        .firstWhere((campo) => campo != null, orElse: () => null);
+    if (campoBloqueado != null) {
+      final l10n = AppL10n.of(context);
+      final ubicacion = ModerationGuard.ubicacionLegible(campoBloqueado);
+      setState(() {
+        _error = ubicacion == null
+            ? l10n.moderationBlockedMessage
+            : '$ubicacion: ${l10n.moderationBlockedMessage}';
+        _saving = false;
+      });
+      return;
+    }
 
     // Total failure: nothing was saved. Keep the parsed plan and the current
     // selection so the trainer can retry without re-uploading the Excel.
@@ -178,7 +271,7 @@ class _CoachHubPlanPreviewScreenState
       setState(() {
         _selectedAthleteIds
           ..clear()
-          ..addAll(failed);
+          ..addAll(failed.map((f) => f.athleteId));
         _error = 'Plan asignado a $ok atleta(s). ${failed.length} fallaron. '
             'Quedaron seleccionados para reintentar.';
         _saving = false;
@@ -187,6 +280,10 @@ class _CoachHubPlanPreviewScreenState
     }
 
     // Full success: clear the parsed plan and move on to the dashboard.
+    // El orden importa menos que la bandera: limpiar el plan dispara el
+    // rebuild con `plan == null`, y sin `_saliendoAlDashboard` la red de
+    // seguridad de `build` nos manda a `/upload-plan` pisando este `go`.
+    _saliendoAlDashboard = true;
     ref.read(parsedPlanProvider.notifier).state = null;
     final msg = athleteIds.length == 1
         ? 'Plan asignado correctamente.'
@@ -334,9 +431,13 @@ class _CoachHubPlanPreviewScreenState
     final profile = ref.watch(userProfileProvider).valueOrNull;
 
     if (plan == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/upload-plan');
-      });
+      // El `return` de abajo va SIEMPRE —sin plan no hay nada que dibujar—,
+      // pero el rebote a subir archivo sólo si no nos estamos yendo solos.
+      if (!_saliendoAlDashboard) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_saliendoAlDashboard) context.go('/upload-plan');
+        });
+      }
       return Scaffold(
         backgroundColor: palette.bg,
         body: Center(child: CircularProgressIndicator(color: palette.accent)),
@@ -410,36 +511,13 @@ class _CoachHubPlanPreviewScreenState
                       ),
                     ],
                     const SizedBox(height: 18),
-                    ElevatedButton(
-                      onPressed:
-                          _saving ? null : () => _assign(plan, profile.uid),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                        disabledBackgroundColor:
-                            palette.accent.withValues(alpha: 0.3),
-                      ),
-                      child: _saving
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : Text(
-                              _selectedAthleteIds.length > 1
-                                  ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
-                                  : 'ASIGNAR PLAN',
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 1.4,
-                              ),
-                            ),
+                    TreinoButton(
+                      label: _selectedAthleteIds.length > 1
+                          ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
+                          : 'ASIGNAR PLAN',
+                      expand: true,
+                      loading: _saving,
+                      onPressed: () => _assign(plan, profile.uid),
                     ),
                   ],
                 ),
@@ -466,10 +544,11 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(
-          onPressed: onBack,
-          icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
+        TreinoIconButton(
+          icon: TreinoIcon.arrowLeft,
           tooltip: 'Volver',
+          color: palette.textPrimary,
+          onPressed: onBack,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -710,25 +789,12 @@ class _DayCard extends StatelessWidget {
                         ),
                         if (i.exerciseId == null) ...[
                           const SizedBox(height: 6),
-                          TextButton.icon(
+                          TreinoButton(
+                            label: 'Asignar manualmente',
+                            icon: TreinoIcon.search,
+                            variant: TreinoButtonVariant.ghostAccent,
+                            size: TreinoButtonSize.sm,
                             onPressed: () => onPickManual(index, i),
-                            icon: Icon(
-                              TreinoIcon.search,
-                              size: 16,
-                              color: palette.accent,
-                            ),
-                            label: Text(
-                              'Asignar manualmente',
-                              style: TextStyle(
-                                color: palette.accent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              minimumSize: const Size(0, 44),
-                            ),
                           ),
                         ],
                       ],
@@ -947,9 +1013,10 @@ class _AthletePicker extends ConsumerWidget {
     // accepted/paused/terminated elsewhere updates the list live. ADR-CHLM-03.
     final linksAsync = ref.watch(trainerLinksStreamProvider);
     return linksAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
+      // Skeleton y no spinner: lo que viene es una LISTA de alumnos y su forma
+      // ya la conocemos. El spinner medía 36px y la lista mide varios cientos,
+      // así que al llegar los datos el bloque saltaba.
+      loading: () => const CoachHubSkeleton(filas: 3),
       error: (_, __) => Text(
         'No pudimos cargar tus alumnos.',
         style: TextStyle(color: palette.textMuted),

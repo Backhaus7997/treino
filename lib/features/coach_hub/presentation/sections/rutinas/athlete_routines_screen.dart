@@ -17,6 +17,8 @@ import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 
@@ -52,7 +54,10 @@ class AthleteRoutinesScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userPublicProfileProvider(athleteId));
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
     final name = rawName.isEmpty ? 'el alumno' : rawName; // i18n
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final routinesKey = (trainerId: trainerId, athleteId: athleteId);
+    final routinesAsync =
+        ref.watch(assignedRoutinesByTrainerProvider(routinesKey));
     final statusFilter = ref.watch(_statusFilterProvider);
     final allRoutines = routinesAsync.valueOrNull ?? const <Routine>[];
     final active =
@@ -71,19 +76,35 @@ class AthleteRoutinesScreen extends ConsumerWidget {
             delay: AppMotion.stagger(0),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
-                  onPressed: () => context.pop(),
+                TreinoIconButton(
+                  icon: TreinoIcon.arrowLeft,
+                  tooltip: 'Volver', // i18n
+                  color: palette.textMuted,
+                  // `pop()` a secas asume que SIEMPRE se llego empujando.
+                  // No es cierto: a esta pantalla se entra desde Rutinas (con
+                  // `push`) y tambien desde Alumnos, y basta un link directo o
+                  // un refresh del navegador para que la pila este vacia. Ahi
+                  // la flecha no hacia nada — el PF: «el boton de ir para
+                  // atras no funciona».
+                  //
+                  // El fallback va a /rutinas, que es la lista de la que esta
+                  // pantalla es el detalle.
+                  onPressed: () =>
+                      context.canPop() ? context.pop() : context.go('/rutinas'),
                 ),
                 const SizedBox(width: AppSpacing.hairline),
                 Expanded(
-                  child: TreinoSectionHeader(
+                  child: CoachHubSectionHero(
                     title: 'Rutinas de $name', // i18n
                     count: routinesAsync.hasValue ? visible.length : null,
-                    action: TreinoSectionHeaderAction(
-                      label: 'Nueva rutina', // i18n
-                      onTap: () => context.push('/routine-editor/$athleteId'),
-                    ),
+                    actions: [
+                      CoachHubHeroAction(
+                        label: 'Nueva rutina', // i18n
+                        icon: TreinoIcon.plus,
+                        onTap: () => context.push('/routine-editor/$athleteId'),
+                        primary: true,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -124,6 +145,7 @@ class AthleteRoutinesScreen extends ConsumerWidget {
               routinesAsync: routinesAsync,
               visible: visible,
               statusFilter: statusFilter,
+              trainerId: trainerId,
               athleteId: athleteId,
             ),
           ),
@@ -155,12 +177,18 @@ class _AthleteRoutinesBody extends ConsumerWidget {
     required this.routinesAsync,
     required this.visible,
     required this.statusFilter,
+    required this.trainerId,
     required this.athleteId,
   });
 
   final AsyncValue<List<Routine>> routinesAsync;
   final List<Routine> visible;
   final RoutineStatus statusFilter;
+
+  /// Mitad del par que forma la clave de `assignedRoutinesByTrainerProvider`.
+  /// Baja como field en vez de releerse acá para que el "Reintentar" invalide
+  /// EXACTAMENTE la misma clave que el padre está mirando.
+  final String trainerId;
   final String athleteId;
 
   @override
@@ -182,7 +210,9 @@ class _AthleteRoutinesBody extends ConsumerWidget {
         icon: TreinoIcon.errorState,
         title: 'No pudimos cargar las rutinas.', // i18n
         ctaLabel: 'Reintentar', // i18n
-        onCtaTap: () => ref.invalidate(assignedRoutinesProvider(athleteId)),
+        onCtaTap: () => ref.invalidate(assignedRoutinesByTrainerProvider(
+          (trainerId: trainerId, athleteId: athleteId),
+        )),
       );
     }
 
@@ -208,6 +238,7 @@ class _AthleteRoutinesBody extends ConsumerWidget {
             delay: AppMotion.stagger(i),
             child: _RoutineRow(
               routine: visible[i],
+              trainerId: trainerId,
               athleteId: athleteId,
               archived: statusFilter == RoutineStatus.archived,
             ),
@@ -230,11 +261,21 @@ class _AthleteRoutinesBody extends ConsumerWidget {
 class _RoutineRow extends ConsumerStatefulWidget {
   const _RoutineRow({
     required this.routine,
+    required this.trainerId,
     required this.athleteId,
     this.archived = false,
   });
 
   final Routine routine;
+
+  /// Baja por field y NO se relee con `ref.read(currentUidProvider)` acá
+  /// abajo. `archive()` invalida por CLAVE, y la clave tiene que ser la MISMA
+  /// que la pantalla está mirando: una segunda lectura del uid puede devolver
+  /// otro valor (el stream de auth reemitiendo) y entonces la invalidación
+  /// apunta a un provider que nadie observa. Eso no rompe ni tira excepción —
+  /// deja la rutina archivada en pantalla hasta recargar, que es el fallo
+  /// silencioso que `trainerId` existe para hacer imposible.
+  final String trainerId;
   final String athleteId;
   final bool archived;
 
@@ -272,6 +313,7 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
 
     final ok = await ref.read(routineActionsProvider.notifier).archive(
           routineId: widget.routine.id,
+          trainerId: widget.trainerId,
           athleteId: widget.athleteId,
         );
 
@@ -325,13 +367,12 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
         children: [
           Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
           const SizedBox(width: AppSpacing.s8),
-          IconButton(
+          TreinoIconButton(
             key: ValueKey('routine_row_archive_button_${routine.id}'),
+            icon: TreinoIcon.archive,
             tooltip: 'Archivar', // i18n
-            icon: Icon(TreinoIcon.archive, size: 18, color: palette.textMuted),
+            color: palette.textMuted,
             onPressed: _handleArchiveTap,
-            visualDensity: VisualDensity.compact,
-            splashRadius: 16,
           ),
         ],
       );

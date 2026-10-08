@@ -280,7 +280,7 @@ class _MobileBody extends StatelessWidget {
               width: 34,
               height: 5,
               decoration: BoxDecoration(
-                color: palette.textMuted.withValues(alpha: 0.30),
+                color: palette.textMuted.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
@@ -388,7 +388,7 @@ class _Block extends StatelessWidget {
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: spec.accent
-            ? palette.accent.withValues(alpha: 0.80)
+            ? palette.accent.withValues(alpha: 0.8)
             : palette.textMuted.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(AppDecorativeRadii.illustrationBar),
       ),
@@ -401,7 +401,7 @@ class _Block extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: spec.accent
                           ? palette.bgCard.withValues(alpha: 0.55)
-                          : palette.textMuted.withValues(alpha: 0.30),
+                          : palette.textMuted.withValues(alpha: 0.3),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -448,7 +448,7 @@ class _Pill extends StatelessWidget {
       height: 15,
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: palette.textMuted.withValues(alpha: 0.10),
+        color: palette.textMuted.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(

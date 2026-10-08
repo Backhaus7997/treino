@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
@@ -30,7 +31,7 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         // overrides currentAthleteLinkProvider with, so the existing per-test
         // overrides keep driving the view unchanged.
         currentAthleteLinkAnyStatusProvider.overrideWith(
-            (ref) => ref.watch(currentAthleteLinkProvider.future)),
+            (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
         ...overrides,
       ],
       child: MaterialApp(
@@ -74,7 +75,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
           trainerDiscoveryProvider.overrideWith((_) async => []),
         ],
       ));
@@ -89,7 +90,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -101,12 +103,81 @@ void main() {
       expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
     });
 
+    // Los tres accesos eran `OutlinedButton` idénticos, en el orden en que se
+    // fueron agregando: agenda, nutrición, archivos. Sin jerarquía visual
+    // ninguno "entraba" más que otro, y el más importante quedaba en el medio.
+    //
+    // Se testea el ORDEN y la JERARQUÍA juntos porque por separado cada uno
+    // pasa con el bug del otro puesto: reordenar sin destacar deja tres
+    // botones iguales, y destacar sin reordenar deja el primario en el medio.
+    testWidgets('el plan nutricional va primero y es el único relleno',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      final yNutricion =
+          tester.getTopLeft(find.text(l10n.athleteNutritionPlanButtonLabel)).dy;
+      final yArchivos =
+          tester.getTopLeft(find.text(l10n.athleteFilesButtonLabel)).dy;
+      final yAgenda = tester.getTopLeft(find.text(l10n.agendaButtonLabel)).dy;
+
+      expect(yNutricion, lessThan(yArchivos),
+          reason: 'el plan nutricional es lo que el alumno viene a buscar');
+      expect(yArchivos, lessThan(yAgenda),
+          reason: 'la agenda queda última: hoy aporta poco dato propio');
+
+      // La jerarquía se afirma sobre el FONDO, no sobre el tipo de widget.
+      //
+      // Los tres accesos son `OutlinedButton` con `backgroundColor` del token,
+      // así que contar `ElevatedButton` daría 1 (sólo MENSAJE) tanto si el
+      // plan nutricional está relleno como si no. Ese assert pasaba en verde
+      // con el cambio puesto Y sin él: no medía nada.
+      Color? fondoDe(String etiqueta) {
+        final boton = tester.widget<OutlinedButton>(
+          find
+              .ancestor(
+                of: find.text(etiqueta),
+                matching: find.byType(OutlinedButton),
+              )
+              .first,
+        );
+        return boton.style?.backgroundColor?.resolve(<WidgetState>{});
+      }
+
+      final palette = AppPalette.of(
+        tester.element(find.text(l10n.athleteFilesButtonLabel)),
+      );
+
+      // Decisión de producto del maintainer, contra la recomendación del
+      // design system (el CTA relleno es uno por pantalla y «MENSAJE» ya lo
+      // es). Queda fijado acá para que un refactor no lo "corrija" solo.
+      expect(fondoDe(l10n.athleteNutritionPlanButtonLabel), palette.accent,
+          reason: 'el plan nutricional va RELLENO, por decisión de producto');
+      for (final delineado in [
+        l10n.athleteFilesButtonLabel,
+        l10n.agendaButtonLabel,
+      ]) {
+        expect(fondoDe(delineado), isNot(palette.accent),
+            reason: '$delineado va delineado, no relleno');
+      }
+    });
+
     testWidgets('Fase B: status active → muestra botón MENSAJE',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -121,8 +192,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -145,8 +216,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) async => _makeLink(status: TrainerLinkStatus.paused)),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.paused))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -166,8 +237,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -189,7 +260,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) => completer.future),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => completer.future.asStream()),
         ],
       ));
       await tester.pump();
@@ -211,7 +283,8 @@ void main() {
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) async => _makeLink()),
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(_makeLink())),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
           ],
@@ -234,8 +307,8 @@ void main() {
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
-            currentAthleteLinkProvider.overrideWith(
-                (ref) async => _makeLink(status: TrainerLinkStatus.pending)),
+            currentAthleteLinkProvider.overrideWith((ref) =>
+                Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
           ],
@@ -260,8 +333,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachViewTestHarness(),
         overrides: [
-          currentAthleteLinkProvider
-              .overrideWith((ref) async => _makeLink(trainerId: trainerId)),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Stream.value(_makeLink(trainerId: trainerId))),
           userPublicProfileProvider(trainerId)
               .overrideWith((ref) => Stream.value(_makePub())),
           hasUnreadFromProvider(trainerId).overrideWith((ref) => true),
@@ -279,8 +352,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachViewTestHarness(),
         overrides: [
-          currentAthleteLinkProvider
-              .overrideWith((ref) async => _makeLink(trainerId: trainerId)),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Stream.value(_makeLink(trainerId: trainerId))),
           userPublicProfileProvider(trainerId)
               .overrideWith((ref) => Stream.value(_makePub())),
           hasUnreadFromProvider(trainerId).overrideWith((ref) => false),

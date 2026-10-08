@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../profile/application/user_providers.dart';
 import '../../workout/application/assigned_routine_providers.dart';
+import '../../workout/application/routine_providers.dart' show routinesProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider;
 import '../../workout/application/user_routines_providers.dart';
@@ -85,11 +86,34 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
     // reimplementa en Swift y los fixtures de
     // `conformance/routine_selection.json` son el contrato entre ambas. Acá
     // solo se resuelven las entradas y se traduce el id de vuelta a Routine.
-    final resolvedId = resolveActiveRoutineId(
+    var resolvedId = resolveActiveRoutineId(
       activeRoutineId: activeId,
       assignedIds: [for (final r in assigned) r.id],
       selfCreatedIds: [for (final r in selfCreated) r.id],
     );
+
+    // El catálogo se carga SÓLO si hace falta, y hace falta en un único caso:
+    // hay marcador y no matcheó contra los planes del atleta. Ahí el marcador
+    // puede ser una plantilla del sistema que el atleta eligió SEGUIR sin
+    // copiarla — o un id obsoleto de verdad, que sigue cayendo a la cadena.
+    //
+    // Watchearlo siempre le costaría a TODA la Home una lectura de las 7
+    // plantillas que la enorme mayoría no necesita: quien tiene plan del PF o
+    // rutina propia ya resolvió arriba. Un `watch` condicional es legal en
+    // Riverpod — el set de dependencias cambia entre builds y el provider se
+    // recomputa cuando corresponde.
+    List<Routine> catalog = const [];
+    final markerFellThrough =
+        activeId != null && activeId.isNotEmpty && resolvedId != activeId;
+    if (markerFellThrough) {
+      catalog = await ref.watch(routinesProvider.future);
+      resolvedId = resolveActiveRoutineId(
+        activeRoutineId: activeId,
+        assignedIds: [for (final r in assigned) r.id],
+        selfCreatedIds: [for (final r in selfCreated) r.id],
+        catalogIds: [for (final r in catalog) r.id],
+      );
+    }
 
     Routine? routine;
     if (resolvedId != null) {
@@ -101,6 +125,9 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
       }
       routine ??= () {
         for (final r in selfCreated) {
+          if (r.id == resolvedId) return r;
+        }
+        for (final r in catalog) {
           if (r.id == resolvedId) return r;
         }
         return null;

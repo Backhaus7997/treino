@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         CollectionReference,
         DocumentSnapshot,
         FieldPath,
+        FieldValue,
         FirebaseFirestore,
         SetOptions;
 
@@ -41,6 +42,12 @@ class GymRepository {
     return _fromDoc(snap);
   }
 
+  /// Stream de `gyms/{id}`: emite el gym en vivo y `null` si no existe (o si
+  /// el doc no se puede parsear). Lo usa el aviso de «nombrá tu gimnasio»
+  /// para desaparecer solo cuando alguien —vos u otro— lo nombra.
+  Stream<Gym?> watchById(String id) =>
+      _collection.doc(id).snapshots().map(_fromDoc);
+
   /// Crea o actualiza `gyms/{gym.id}` con merge:true.
   ///
   /// Usado por el read-through cache client-side de `ResolveGymPlaceService`
@@ -48,6 +55,27 @@ class GymRepository {
   /// se upsertea acá antes de asignarlo a `users/{uid}.gymId`.
   Future<void> upsert(Gym gym) async {
     await _collection.doc(gym.id).set(gym.toJson(), SetOptions(merge: true));
+  }
+
+  /// Crea `gyms/{gym.id}` desde un lugar de Google. Guarda SOLO lo que la
+  /// política de Places permite: el place_id (id del doc), el nombre que
+  /// escribió el usuario, lat/lng/geohash y `coordsFetchedAt` (hora del
+  /// servidor: la regla exige `request.time`). Nunca `address` ni otro texto
+  /// de Google.
+  Future<void> createFromPlace(Gym gym) async {
+    final data = gym.toJson()
+      ..remove('address')
+      ..removeWhere((_, v) => v == null)
+      ..['coordsFetchedAt'] = FieldValue.serverTimestamp()
+      ..['placeStatus'] = 'ok';
+    // `nameNeeded` solo existe en docs migrados; un gym nuevo nunca lo trae.
+    if (data['nameNeeded'] == false) data.remove('nameNeeded');
+    await _collection.doc(gym.id).set(data);
+  }
+
+  /// Fija el nombre de un gym marcado `nameNeeded` y baja la marca.
+  Future<void> setName(String gymId, String name) async {
+    await _collection.doc(gymId).update({'name': name, 'nameNeeded': false});
   }
 
   /// Batch lookup. `whereIn` está capado a 30 valores en Firestore —

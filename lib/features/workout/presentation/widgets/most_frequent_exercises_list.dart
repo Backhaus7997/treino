@@ -58,6 +58,8 @@ class MostFrequentExercisesList extends StatelessWidget {
     required this.labels,
     required this.onSelectExercise,
     required this.onSelectPeriod,
+    this.lockedPeriods = const {},
+    this.onLockedPeriodTap,
   });
 
   final List<ExerciseFrequencyEntry> entries;
@@ -65,6 +67,11 @@ class MostFrequentExercisesList extends StatelessWidget {
   final MostFrequentExercisesListLabels labels;
   final void Function(String exerciseId) onSelectExercise;
   final void Function(ChartPeriod period) onSelectPeriod;
+
+  /// Se reenvían tal cual a [ChartPeriodSelector] — ver su dartdoc. Este
+  /// widget tampoco resuelve el paywall por su cuenta: lo decide el call site.
+  final Set<ChartPeriod> lockedPeriods;
+  final void Function(ChartPeriod)? onLockedPeriodTap;
 
   @override
   Widget build(BuildContext context) {
@@ -90,6 +97,8 @@ class MostFrequentExercisesList extends StatelessWidget {
               selected: selectedPeriod,
               labels: labels.periodLabels,
               onSelect: onSelectPeriod,
+              lockedPeriods: lockedPeriods,
+              onLockedTap: onLockedPeriodTap,
             ),
           ],
         ),

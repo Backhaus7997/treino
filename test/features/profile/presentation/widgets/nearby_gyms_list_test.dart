@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/location_permission_gateway.dart';
 import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
@@ -16,6 +17,8 @@ import 'package:treino/features/gyms/domain/nearby_gym.dart';
 import 'package:treino/features/profile/presentation/widgets/nearby_gyms_list.dart';
 import 'package:treino/features/profile_setup/presentation/widgets/gym_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../../../helpers/fake_location_permission_gateway.dart';
 
 class MockResolveGymPlaceService extends Mock
     implements ResolveGymPlaceService {}
@@ -59,10 +62,17 @@ class _FakeNearbyLocationNotifier extends NearbyLocationNotifier {
 
   int checkSilentlyCallCount = 0;
 
+  int requestPermissionCallCount = 0;
+
   @override
   Future<void> checkSilently() async {
     checkSilentlyCallCount++;
     // No-op — state already set by the constructor for this fake.
+  }
+
+  @override
+  Future<void> requestPermission() async {
+    requestPermissionCallCount++;
   }
 }
 
@@ -109,6 +119,80 @@ void main() {
         findsOneWidget,
       );
       expect(fake.checkSilentlyCallCount, 1);
+    });
+
+    testWidgets(
+        'tap en la affordance: mensaje con UN solo CONTINUAR que lleva al '
+        'pedido del SO (Guideline 5.1.1(iv))', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: false);
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        locationPermissionGatewayProvider.overrideWithValue(
+          FakeLocationPermissionGateway(
+            LocationPermission.denied,
+            requestResult: LocationPermission.whileInUse,
+          ),
+        ),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Activar ubicación para ver gyms cercanos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CONTINUAR'), findsOneWidget);
+      expect(find.text('Ahora no'), findsNothing);
+      expect(fake.requestPermissionCallCount, 0);
+
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(fake.requestPermissionCallCount, 1);
+    });
+
+    testWidgets(
+        'tap en la affordance con permiso denegado de forma permanente: '
+        'aviso con Ajustes y NO se pide al SO', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: false);
+      final gateway =
+          FakeLocationPermissionGateway(LocationPermission.deniedForever);
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        locationPermissionGatewayProvider.overrideWithValue(gateway),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Activar ubicación para ver gyms cercanos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ABRIR AJUSTES'));
+      await tester.pumpAndSettle();
+
+      expect(gateway.openSettingsCalls, 1);
+      expect(fake.requestPermissionCallCount, 0);
+    });
+
+    testWidgets(
+        'Android: request → deniedForever muestra el aviso DE GIMNASIOS '
+        '(no el de entrenadores) y no re-pide', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: false);
+      final gateway = FakeLocationPermissionGateway(
+        LocationPermission.denied,
+        requestResult: LocationPermission.deniedForever,
+      );
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        locationPermissionGatewayProvider.overrideWithValue(gateway),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Activar ubicación para ver gyms cercanos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CONTINUAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('ver gimnasios cerca tuyo'), findsOneWidget);
+      expect(find.textContaining('entrenadores'), findsNothing);
+      expect(find.textContaining('Online'), findsNothing);
+      expect(fake.requestPermissionCallCount, 0);
     });
   });
 
@@ -169,6 +253,20 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
       expect(find.textContaining('No pudimos'), findsNothing);
       expect(find.byType(NearbyGymsList), findsOneWidget);
+      expect(find.text('Google Maps'), findsNothing);
+    });
+
+    testWidgets('con resultados de Places se atribuye a «Google Maps»',
+        (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: true);
+
+      await tester.pumpWidget(_wrap(overrides: [
+        nearbyLocationProvider.overrideWith((ref) => fake),
+        nearbyGymsProvider(_bucket).overrideWith((ref) async => [_gym('a')]),
+      ]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Google Maps'), findsOneWidget);
     });
 
     testWidgets(
@@ -332,10 +430,10 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'gym-0',
             name: 'Gym gym-0',
-            address: 'Address gym-0',
             source: 'google-places',
           ));
 
@@ -358,6 +456,7 @@ void main() {
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
+            name: any(named: 'name'),
           ));
     });
 

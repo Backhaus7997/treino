@@ -700,7 +700,7 @@ class TrainerFeedPreview extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const TSectionHeader(title: 'PERSONAS DE TU GYM'),
+        const TSectionHeader(title: 'SUGERENCIAS PARA VOS'),
         const SizedBox(height: 8),
         TCard(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

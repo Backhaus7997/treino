@@ -1,10 +1,18 @@
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, FirebaseFirestore, SetOptions, Timestamp;
+    show
+        CollectionReference,
+        FirebaseFirestore,
+        GetOptions,
+        SetOptions,
+        Source,
+        Timestamp;
 
+import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
+import '../domain/notification_pref_keys.dart';
 import '../domain/user_profile.dart';
 import '../domain/user_role.dart';
 
@@ -61,6 +69,10 @@ class UserRepository {
     'trainerLocations',
     'trainerGeohashes',
     'trainerOffersOnline',
+    // #637 — kill switch de consultas previas. Sin esta entrada el toggle
+    // escribe en `users/{uid}` y NUNCA llega a `trainerPublicProfiles`, que es
+    // el único doc que mira la rule. El interruptor quedaría mudo.
+    'acceptsInquiries',
     // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
     // Those fields are written exclusively by the reviewAggregate Cloud Function
     // and must never be propagated by client dual-write.
@@ -92,6 +104,27 @@ class UserRepository {
       'avatarUrl': profile.avatarUrl,
       'gymId': profile.gymId,
     };
+  }
+
+  /// Payload del ALTA de `users/{uid}`: el `toJson()` del perfil, sin la clave
+  /// `bornAt` cuando no hay fecha.
+  ///
+  /// `toJson()` emite la clave en null (json_serializable lo hace por
+  /// defecto), y la primera versión de `bornAtOk` en firestore.rules
+  /// preguntaba `'bornAt' in data`, que es true aunque el valor sea null:
+  /// denegaba el alta entera y nadie nuevo podía terminar de registrarse
+  /// (sep-2026). La regla ya trata null como ausente, pero el alta no puede
+  /// depender de eso: sin la clave, este payload pasa con las DOS versiones
+  /// de la regla. Mismo criterio que `createUserOwned` con `assignedTo` en
+  /// `RoutineRepository`.
+  ///
+  /// Sólo `bornAt`, a propósito: sacar todos los null cambiaría la forma de
+  /// cada campo del doc, y una regla que lee un campo sin `get()` tira error
+  /// de evaluación sobre la clave ausente, no sobre el null.
+  static Map<String, dynamic> _altaPayload(UserProfile profile) {
+    final json = profile.toJson();
+    if (json['bornAt'] == null) json.remove('bornAt');
+    return json;
   }
 
   /// Builds a partial public update map from a raw update [partial], deriving
@@ -143,13 +176,18 @@ class UserRepository {
   /// Resolves the composed brand-branch display name for [gymId].
   ///
   /// - `null` or [kNoGymId] → `null`, no lookup attempted.
+  /// - Gym flagged `nameNeeded` → `null` (its stored name isn't user-typed).
   /// - Unknown/unresolvable id → `null`, logged, never throws — a stale or
   ///   deleted gym doc must not abort the whole `update()` batch.
   Future<String?> _resolveGymName(String? gymId) async {
     if (gymId == null || gymId == kNoGymId) return null;
     try {
       final gym = await _gyms.getById(gymId);
-      return gym?.name;
+      // Un gym marcado `nameNeeded` guarda un nombre que vino de Google: no
+      // se copia al perfil público (política de Places, #1338). El nombre
+      // vuelve a copiarse cuando alguien lo nombra.
+      if (gym == null || gym.nameNeeded) return null;
+      return gym.name;
     } catch (e, st) {
       developer.log(
         'UserRepository: failed to resolve gymName for gymId=$gymId',
@@ -173,10 +211,19 @@ class UserRepository {
   /// card in sync. `displayNameLowercase` is always derived when `displayName`
   /// is present.
   ///
+  /// [hasLocationConsent] (consentimiento-legal-versionado, R6): gates the
+  /// CURRENT multi-location keys (`trainerLocations`, `trainerGeohashes`) —
+  /// when `false`, a partial carrying either is silently withheld from the
+  /// public mirror instead of republishing a location the trainer never
+  /// consented to. `trainerOffersOnline` is NOT a location key and always
+  /// flows regardless of this gate. See [update] for how the caller resolves
+  /// the effective consent value it passes in here.
+  ///
   /// REQ-COACH-DISC-DUAL-001.
   Map<String, Object?>? _trainerPublicSubsetFromPartial(
     Map<String, Object?> partial, {
     required String uid,
+    required bool hasLocationConsent,
   }) {
     final hasTrainerField =
         partial.keys.any((k) => _trainerPublicFields.contains(k));
@@ -216,19 +263,61 @@ class UserRepository {
       result['trainerExperienceYears'] = partial['trainerExperienceYears'];
     }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
-    if (partial.containsKey('trainerLocations')) {
-      result['trainerLocations'] = partial['trainerLocations'];
-    }
-    if (partial.containsKey('trainerGeohashes')) {
-      result['trainerGeohashes'] = partial['trainerGeohashes'];
+    // R6: withheld entirely when there is no effective consent — this is
+    // the choke point that makes the anti-republish guarantee a property of
+    // the repo, not an assumption about the caller.
+    if (hasLocationConsent) {
+      if (partial.containsKey('trainerLocations')) {
+        // Un lugar `stale` o sin coordenadas no se publica: el espejo lo lee
+        // cualquier autenticado y el servidor ya le borró las coordenadas.
+        result['trainerLocations'] =
+            _publishableLocations(partial['trainerLocations']);
+      }
+      if (partial.containsKey('trainerGeohashes')) {
+        result['trainerGeohashes'] = partial['trainerGeohashes'];
+      }
     }
     if (partial.containsKey('trainerOffersOnline')) {
       result['trainerOffersOnline'] = partial['trainerOffersOnline'];
+    }
+    if (partial.containsKey('acceptsInquiries')) {
+      result['acceptsInquiries'] = partial['acceptsInquiries'];
     }
     // ADR-TPO-001: include uid so the Firestore create rule passes on
     // the first-ever write. SetOptions(merge:true) makes this idempotent.
     result['uid'] = uid;
     return result;
+  }
+
+  /// Resolves whether the trainer has EFFECTIVE location-publication consent
+  /// at write time, for [_trainerPublicSubsetFromPartial]'s [hasLocationConsent]
+  /// gate (R6).
+  ///
+  /// The partial WINS over what is stored — if [partial] itself carries
+  /// `trainerLocationConsentAt`, its non-null-ness settles the answer with no
+  /// read. `update()` never sets that key on the hot path (consent state only
+  /// changes via [grantTrainerLocationConsent] / [revokeTrainerLocationConsent]),
+  /// so in practice this branch matters for those two callers, not for an
+  /// ordinary form save.
+  ///
+  /// Otherwise, a `get()` on `users/{uid}` is performed ONLY when [partial]
+  /// is actually touching the current multi-location fields
+  /// (`trainerLocations` / `trainerGeohashes`) — never on the hot path of an
+  /// unrelated save (e.g. a bio-only edit never pays this read).
+  Future<bool> _resolveEffectiveLocationConsent(
+    String uid,
+    Map<String, Object?> partial,
+  ) async {
+    if (partial.containsKey('trainerLocationConsentAt')) {
+      return partial['trainerLocationConsentAt'] != null;
+    }
+    final touchesLocationData = partial.containsKey('trainerLocations') ||
+        partial.containsKey('trainerGeohashes');
+    if (!touchesLocationData) return false;
+
+    final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    return data != null && data['trainerLocationConsentAt'] != null;
   }
 
   /// Valida que el partial NO deje al PF en estado inválido. Combinación
@@ -255,6 +344,42 @@ class UserRepository {
     }
   }
 
+  /// Los lugares que sí se espejan a `trainerPublicProfiles`: sin `stale` y con
+  /// `lat`/`lng`. Es la misma regla que `TrainerLocation.isPublishable`, sobre
+  /// los maps de `toJson()`; así el cliente no puede republicar coordenadas de
+  /// un lugar que el servidor purgó (30 días de Places).
+  static List<Object?> _publishableLocations(Object? locations) {
+    if (locations is! List) return const [];
+    return [
+      for (final l in locations)
+        if (l is Map &&
+            l['stale'] != true &&
+            l['lat'] != null &&
+            l['lng'] != null)
+          l,
+    ];
+  }
+
+  /// Mínimo `coordsFetchedAt` entre los lugares con `placeId` que el job aún
+  /// debe mirar; `null` si no hay. Un lugar `stale` cuenta SOLO si conserva su
+  /// fecha (purgado por un fallo transitorio: el job lo reintenta); sin fecha es
+  /// NOT_FOUND y no se reintenta. Debe coincidir con `isRetryable` del job.
+  /// Acepta los maps de `TrainerLocation.toJson()` (Timestamp) y DateTime.
+  static Timestamp? _masViejoCoordsFetchedAt(Object? locations) {
+    if (locations is! List) return null;
+    DateTime? min;
+    for (final l in locations) {
+      if (l is! Map || l['placeId'] == null) continue;
+      final raw = l['coordsFetchedAt'];
+      final t = raw is Timestamp
+          ? raw.toDate().toUtc()
+          : (raw is DateTime ? raw.toUtc() : null);
+      if (t == null) continue;
+      if (min == null || t.isBefore(min)) min = t;
+    }
+    return min == null ? null : Timestamp.fromDate(min);
+  }
+
   // ---------------------------------------------------------------------------
   // Public API
   // ---------------------------------------------------------------------------
@@ -268,10 +393,19 @@ class UserRepository {
   /// the time `AuthService.signUpWithEmail` reaches this call the user has
   /// already accepted. `null` leaves the field unset, matching a legacy
   /// pre-feature account.
+  ///
+  /// [acceptedTermsVersion] / [acceptedPrivacyVersion]
+  /// (consentimiento-legal-versionado, R3): same nullable pattern as
+  /// [termsAcceptedAt] — the caller stamping consent MUST pass the current
+  /// `kTermsVersion`/`kPrivacyVersion` in the SAME call that sets
+  /// [termsAcceptedAt]. Never inferred here: this method has no opinion on
+  /// what "current" means, callers own that.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
     DateTime? termsAcceptedAt,
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -284,10 +418,12 @@ class UserRepository {
       createdAt: now,
       updatedAt: now,
       termsAcceptedAt: termsAcceptedAt,
+      acceptedTermsVersion: acceptedTermsVersion,
+      acceptedPrivacyVersion: acceptedPrivacyVersion,
     );
 
     final batch = _firestore.batch();
-    batch.set(_users.doc(uid), profile.toJson());
+    batch.set(_users.doc(uid), _altaPayload(profile));
     batch.set(
       _userPublicProfiles.doc(uid),
       _publicSubsetFromProfile(profile),
@@ -318,7 +454,7 @@ class UserRepository {
     );
 
     final batch = _firestore.batch();
-    batch.set(_users.doc(uid), profile.toJson(), SetOptions(merge: true));
+    batch.set(_users.doc(uid), _altaPayload(profile), SetOptions(merge: true));
     batch.set(
       _userPublicProfiles.doc(uid),
       _publicSubsetFromProfile(profile),
@@ -329,6 +465,21 @@ class UserRepository {
 
   Future<UserProfile?> get(String uid) async {
     final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    if (!snap.exists || data == null) return null;
+    return UserProfile.fromJson(data);
+  }
+
+  /// Como [get], pero del SERVIDOR: nunca de la caché local.
+  ///
+  /// Para decisiones que escriben evidencia, como el consentimiento del alta.
+  /// La caché puede tener una versión vieja del doc, y decidir sobre ella
+  /// pisaría lo que ya está en el servidor. Sin conexión tira, a propósito:
+  /// es preferible no poder terminar el alta a registrar consentimiento sobre
+  /// un dato que no se pudo confirmar.
+  Future<UserProfile?> getFromServer(String uid) async {
+    final snap =
+        await _users.doc(uid).get(const GetOptions(source: Source.server));
     final data = snap.data();
     if (!snap.exists || data == null) return null;
     return UserProfile.fromJson(data);
@@ -346,15 +497,271 @@ class UserRepository {
   ///     REQ-COACH-DISC-DUAL-001.
   ///
   /// All three writes are in a single batch.commit() — no partial state.
-  Future<void> update(String uid, Map<String, Object?> partial) async {
-    _assertTrainerLocationStateIsValid(partial);
-    final sanitized = Map<String, Object?>.fromEntries(
-      partial.entries.where((e) => !_immutableFields.contains(e.key)),
-    )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
+  ///
+  /// [grantLocationConsent] (P1-d): otorga el consentimiento de publicación
+  /// DENTRO de este mismo batch, en vez de pedirle al caller que llame antes a
+  /// [grantTrainerLocationConsent].
+  ///
+  /// Sin esto, el flujo de "acepto y guardo" del form eran DOS commits: el
+  /// primero republicaba en el espejo las ubicaciones VIEJAS —las que
+  /// [grantTrainerLocationConsent] relee de Firestore, porque las nuevas
+  /// todavía no se guardaron— y el segundo recién escribía las del formulario.
+  /// Entre los dos, el espejo público quedaba con coordenadas que el PF no
+  /// consintió publicar; y si el segundo fallaba, quedaban ahí para siempre.
+  ///
+  /// Con el flag no hay relectura ni ventana: los timestamps entran al mismo
+  /// partial, la primera rama de [_resolveEffectiveLocationConsent] resuelve
+  /// el gate sin `get()`, y el espejo recibe las ubicaciones del FORMULARIO
+  /// —lo que el PF efectivamente consintió— en el único commit que hay.
+  /// Deja anotado que el alumno chocó un tope del plano free.
+  ///
+  /// ── Para qué sirve, y por qué NO lo lee la app ──
+  ///
+  /// Para que el backend pueda mandarle un mail contándole que hay una salida.
+  /// La app no puede decírselo: la Guideline 3.1.3(f) de Apple exime del IAP a
+  /// las apps companion siempre que no haya compras adentro **ni llamados a
+  /// comprar afuera**, y ese amparo es lo que sostiene el cobro del entrenador.
+  /// La hoja de límite no cambia ni una palabra por esto — lo que se escribe
+  /// acá es invisible, y Apple revisa la interfaz.
+  ///
+  /// El mail está explícitamente permitido: *«send communications outside of
+  /// the app to their user base about purchasing methods other than in-app
+  /// purchase»*.
+  ///
+  /// ── Por qué NO pasa por [update] ──
+  ///
+  /// Porque [update] resuelve el subset público, el consentimiento de
+  /// ubicación y el guard de moderación: una LECTURA y un batch por cada tope
+  /// tocado, para anotar dos campos que sólo mira una función. Esto es una
+  /// escritura sola, con `merge`.
+  ///
+  /// ── Total: nunca tira ──
+  ///
+  /// Se llama al abrir la hoja, y la hoja tiene que abrirse igual. Que el
+  /// usuario no vea el mensaje que explica por qué no puede hacer algo —porque
+  /// falló una anotación que no le importa— sería cambiarle un límite
+  /// explicado por uno mudo.
+  Future<void> registrarTopeTocado(String uid, String tope) async {
+    try {
+      await _users.doc(uid).set(
+        <String, Object?>{
+          'freePlanLimitHitKind': tope,
+          'freePlanLimitHitAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      // Ver el dartdoc: la hoja abre igual.
+    }
+  }
 
-    final publicSubset = await _publicSubsetFromPartial(partial, uid: uid);
-    final trainerPublicSubset =
-        _trainerPublicSubsetFromPartial(partial, uid: uid);
+  /// Deja anotado que el PF chocó un tope del PLAN PAGO (no el free del
+  /// alumno — ver [registrarTopeTocado] para ese).
+  ///
+  /// Calcado de [registrarTopeTocado]: misma forma, mismo catch silencioso,
+  /// mismo motivo. Lo lee `sweepTrainerLimitMail` (PR4,
+  /// `functions/src/subscriptions/trainer-limit-mail.ts`) para mandarle al PF
+  /// un mail contándole dónde se paga — la app no puede decírselo desde
+  /// adentro del binario, mismo amparo 3.1.3(f) que documenta
+  /// [registrarTopeTocado].
+  ///
+  /// [kind] tipado como el `String` que ya usa `registrarTopeTocado` — el
+  /// contrato del campo (docs/limite-ejercicios-pf.md §2) es
+  /// `trainerLimitHitKind: string`, y hoy el único valor que existe es
+  /// `'customExercises'`. No se lo angosta a un enum de un solo caso porque
+  /// el próximo tope del PF (plantillas públicas, espacio de archivos) suma
+  /// un valor sin tocar la firma, mismo criterio que `planLimits` como mapa.
+  ///
+  /// Nunca tira: se llama desde el embudo de creación, y la app tiene que
+  /// poder seguir mostrando el aviso aunque la anotación falle.
+  Future<void> registrarTopeDelPlanPf(String uid, String kind) async {
+    try {
+      await _users.doc(uid).set(
+        <String, Object?>{
+          'trainerLimitHitKind': kind,
+          'trainerLimitHitAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        },
+        SetOptions(merge: true),
+      );
+    } catch (_) {
+      // Ver el dartdoc: el aviso se muestra igual.
+    }
+  }
+
+  /// ¿El usuario acepta correos promocionales? Se lee de
+  /// `users/{uid}.notificationPrefs.novedades_plan.email`.
+  ///
+  /// **Ausente = `true`**, igual que el servidor (`emailChannelAllowed` en
+  /// `functions/src/mail/send-queued-mail.ts`: sólo un `false` EXPLÍCITO frena
+  /// el envío). Si la app asumiera lo contrario, mostraría «apagado» a quien
+  /// sigue recibiendo los correos: un cartel que miente.
+  ///
+  /// Mismo filtro de caché que [watch]: un snapshot de caché de un doc que no
+  /// existe todavía NO es una respuesta, y emitirlo como `true` dejaría
+  /// prender el interruptor sobre un «no sé». Sólo un snapshot confirmado por
+  /// el servidor puede decir que el documento no está.
+  ///
+  /// `distinct()` porque el listener recibe el documento ENTERO: un cambio de
+  /// cualquier otro campo del perfil no tiene que despertar a la pantalla.
+  Stream<bool> watchCorreosPromocionales(String uid) {
+    return _users
+        .doc(uid)
+        .snapshots()
+        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .map((snap) => _correosPromocionalesDe(snap.data()))
+        .distinct();
+  }
+
+  /// Prende o apaga los correos promocionales del usuario.
+  ///
+  /// Escribe el MAPA ANIDADO, no la clave con puntos: en un `set` (a
+  /// diferencia de un `update`) `'notificationPrefs.novedades_plan.email'` se
+  /// guarda como un campo cuyo NOMBRE contiene los puntos, que ni el servidor
+  /// ni la app leen. Con `merge: true` el merge es profundo, así que no pisa
+  /// las demás filas de `notificationPrefs` —la matriz que el Coach Hub guarda
+  /// completa— ni el canal `push` de esta misma fila.
+  ///
+  /// No pasa por [update]: no hay perfil público que espejar ni moderación que
+  /// correr, y [update] lee Firestore para resolver el consentimiento de
+  /// ubicación. Patrón liviano de [registrarTopeTocado].
+  ///
+  /// A diferencia de [registrarTopeTocado], **sí tira**: el que llama tiene
+  /// que enterarse de que no se guardó para no dejarle al usuario un
+  /// interruptor apagado sobre un correo que va a seguir llegando.
+  Future<void> setCorreosPromocionales(String uid, bool habilitado) {
+    return _users.doc(uid).set(
+      <String, Object?>{
+        'notificationPrefs': <String, Object?>{
+          kPrefCorreosPromocionales: <String, Object?>{'email': habilitado},
+        },
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Lee la preferencia de un documento crudo. Sólo un `false` EXPLÍCITO es
+  /// «no»: cualquier otra cosa —campo ausente, mapa vacío, un tipo inesperado—
+  /// es «sí», que es lo que haría el servidor con ese mismo documento.
+  static bool _correosPromocionalesDe(Map<String, Object?>? data) {
+    final prefs = data?['notificationPrefs'];
+    if (prefs is! Map) return true;
+    final fila = prefs[kPrefCorreosPromocionales];
+    if (fila is! Map) return true;
+    return fila['email'] != false;
+  }
+
+  /// #1336 — espejo del nombre cuando el partial lleva `displayName` pero
+  /// ningún campo de PF (Coach Hub, Ajustes → Cuenta).
+  ///
+  /// [_trainerPublicSubsetFromPartial] se apaga sin campo de PF a propósito
+  /// (regresión #58: el alta de un alumno mandaba `displayName` y la rule
+  /// denegaba el batch). Acá la guarda es el ROL, no la forma del partial:
+  /// sólo si `users/{uid}.role == 'trainer'` se espeja, que es exactamente la
+  /// condición que exige la rule de `trainerPublicProfiles`. Un alumno nunca
+  /// entra, así que #58 sigue cerrado.
+  ///
+  /// SÓLO ACTUALIZA: si `trainerPublicProfiles/{uid}` no existe no lo crea. Un
+  /// partial de nombre solo no es una tarjeta completa, y `listAll()` no filtra
+  /// por completitud: crearla acá metería una tarjeta pelada al descubrimiento
+  /// (el paso `cuenta` del onboarding corre antes que `pf`, que es quien la
+  /// crea). Tampoco espeja un nombre vacío: anularía `displayNameLowercase` y
+  /// la tarjeta saldría del `orderBy`.
+  ///
+  /// Cuesta dos lecturas, sólo cuando el partial trae `displayName` y no hay
+  /// otro disparador.
+  Future<Map<String, Object?>?> _trainerNameOnlySubset(
+    String uid,
+    Map<String, Object?> partial,
+  ) async {
+    if (!partial.containsKey('displayName')) return null;
+    final snap = await _users.doc(uid).get();
+    if (snap.data()?['role'] != UserRole.trainer.name) return null;
+    final name = (partial['displayName'] as String?)?.trim();
+    if (name == null || name.isEmpty) return null;
+    final card = await _trainerPublicProfiles.doc(uid).get();
+    if (!card.exists) return null;
+    return {
+      'uid': uid,
+      'displayName': partial['displayName'],
+      'displayNameLowercase': name.toLowerCase(),
+    };
+  }
+
+  Future<void> update(
+    String uid,
+    Map<String, Object?> partial, {
+    bool grantLocationConsent = false,
+  }) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final efectivo = grantLocationConsent
+        ? <String, Object?>{
+            ...partial,
+            'trainerLocationConsentAt': now,
+            'trainerLocationConsentPromptedAt': now,
+          }
+        : partial;
+
+    // Guideline 1.2 de App Review. El `displayName` es el texto libre que mas
+    // se ve: aparece en cada post, cada mensaje y cada tarjeta de descubrimiento.
+    //
+    // Se filtra aca —en el unico `update` publico— y no en cada llamador,
+    // porque el repositorio es el cuello de botella. `getOrCreate` no necesita
+    // el guard: escribe `displayName: null` por construccion.
+    if (efectivo.containsKey('displayName')) {
+      ModerationGuard.ensure(efectivo['displayName'] as String?,
+          campo: 'displayName');
+    }
+
+    // La bio del PF (`trainerBio`) es texto libre que cualquier autenticado
+    // lee en trainerPublicProfiles/{uid} (firestore.rules:1843) — a
+    // diferencia de `users/{uid}`, que es owner-only. Mismo partial, mismo
+    // guard: [_trainerPublicSubsetFromPartial] dual-escribe `trainerBio` a
+    // los dos documentos desde este mismo `efectivo` en el batch de abajo,
+    // así que un solo `ensure` cubre las dos escrituras.
+    if (efectivo.containsKey('trainerBio')) {
+      ModerationGuard.ensure(efectivo['trainerBio'] as String?,
+          campo: 'trainerBio');
+    }
+
+    // Las etiquetas de `trainerLocations` (`customLabel`) las escribe el PF y se
+    // espejan a trainerPublicProfiles, que lee cualquier autenticado: mismo
+    // riesgo y mismo guard que la bio. Se valida cada una, en el cuello de
+    // botella, para cubrir todos los escritores (mobile y Hub).
+    final lugares = efectivo['trainerLocations'];
+    if (lugares is List) {
+      for (var i = 0; i < lugares.length; i++) {
+        final lugar = lugares[i];
+        final etiqueta = lugar is Map ? lugar['customLabel'] : null;
+        if (etiqueta is String) {
+          ModerationGuard.ensure(etiqueta,
+              campo: 'trainerLocations[$i].customLabel');
+        }
+      }
+    }
+
+    _assertTrainerLocationStateIsValid(efectivo);
+    final sanitized = Map<String, Object?>.fromEntries(
+      efectivo.entries.where((e) => !_immutableFields.contains(e.key)),
+    )..['updatedAt'] = now;
+    // Más viejo `coordsFetchedAt` de los lugares con `placeId`: el job de
+    // refresco consulta este campo (Firestore no filtra dentro de un array de
+    // maps). Se deriva ACÁ, en el cuello de botella, para que cualquier
+    // escritor de `trainerLocations` lo deje consistente. Solo `users/`: no
+    // está en `_trainerPublicFields`, así que no se espeja.
+    if (efectivo.containsKey('trainerLocations')) {
+      sanitized['trainerLocationsCoordsFetchedAt'] =
+          _masViejoCoordsFetchedAt(efectivo['trainerLocations']);
+    }
+
+    final publicSubset = await _publicSubsetFromPartial(efectivo, uid: uid);
+    final hasLocationConsent =
+        await _resolveEffectiveLocationConsent(uid, efectivo);
+    final trainerPublicSubset = _trainerPublicSubsetFromPartial(
+          efectivo,
+          uid: uid,
+          hasLocationConsent: hasLocationConsent,
+        ) ??
+        await _trainerNameOnlySubset(uid, efectivo);
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
@@ -384,6 +791,91 @@ class UserRepository {
     await batch.commit();
   }
 
+  /// Grants trainer location-publication consent (R8) — the ACCEPT exit of
+  /// the consent prompt, and the confirmation before a trainer's first-ever
+  /// location save (D-F).
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: stamps `trainerLocationConsentAt` AND
+  ///    `trainerLocationConsentPromptedAt` to now.
+  ///  - `trainerPublicProfiles/{uid}`: RE-MIRRORS the trainer's
+  ///    currently-stored `trainerLocations`/`trainerGeohashes`. This is not
+  ///    optional — a consent-only write carries no location keys, so without
+  ///    the explicit re-mirror the trainer would be stamped as consented
+  ///    while `_trainerPublicSubsetFromPartial`'s gate (R6) has nothing to
+  ///    let through yet, leaving them "consented but invisible" (design D-C).
+  Future<void> grantTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final snap = await _users.doc(uid).get();
+    final stored = snap.data();
+
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': now,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': _publishableLocations(stored?['trainerLocations']),
+        'trainerGeohashes': stored?['trainerGeohashes'] ?? const <Object?>[],
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
+  /// Revokes trainer location-publication consent (R8) — the "APAGAR LA
+  /// PUBLICACIÓN" exit of the consent prompt, and the revoke path from
+  /// `profile_edit_trainer_screen.dart`'s status row.
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: writes ONLY `{trainerLocationConsentAt: null,
+  ///    trainerLocationConsentPromptedAt: now}` — ZERO location-guard keys.
+  ///    T1: `_assertTrainerLocationStateIsValid` only evaluates when a
+  ///    partial contains BOTH `trainerLocations` and `trainerOffersOnline`;
+  ///    since neither is ever in this partial, the guard is a correct no-op
+  ///    and the trainer's private location data on `users/{uid}` (including
+  ///    the deprecated singular fields) is left completely untouched — no
+  ///    data loss for exercising a legal right.
+  ///  - `trainerPublicProfiles/{uid}`: clears all 5 location keys
+  ///    (`trainerLocations`, `trainerGeohashes`, `trainerLatitude`,
+  ///    `trainerLongitude`, `trainerGeohash`). `trainerOffersOnline` is NOT a
+  ///    location key and is left untouched — a trainer who does not also
+  ///    offer online classes becomes unreachable via nearby-location search,
+  ///    which is the accepted consequence of their own choice (design R3),
+  ///    not something this method compensates for by forcing the flag.
+  Future<void> revokeTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': null,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': const <Object?>[],
+        'trainerGeohashes': const <Object?>[],
+        'trainerLatitude': null,
+        'trainerLongitude': null,
+        'trainerGeohash': null,
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
   Stream<UserProfile?> watch(String uid) {
     return _users
         .doc(uid)
@@ -397,6 +889,30 @@ class UserRepository {
       if (!snap.exists || data == null) return null;
       return UserProfile.fromJson(data);
     });
+  }
+
+  /// `true` mientras `users/{uid}` tenga escrituras locales sin confirmar.
+  ///
+  /// Firestore aplica un `update()` en el cache ANTES de que el servidor lo
+  /// acepte —compensacion de latencia— y `snapshots()` emite ese valor
+  /// optimista con `hasPendingWrites == true`. [watch] descarta la metadata al
+  /// mapear al modelo, asi que quien lo consume no puede distinguir un dato
+  /// confirmado de uno que todavia puede volver atras.
+  ///
+  /// Para casi toda la UI eso es lo que se quiere: el usuario ve su cambio al
+  /// instante. Para un GATE no: dejar pasar a alguien con una escritura sin
+  /// confirmar significa que si el servidor la rechaza, vuelve al gate sin
+  /// explicacion y con la pantalla que podia mostrarle el error ya desmontada.
+  ///
+  /// El listener es el MISMO que el de [watch] —Firestore comparte el snapshot
+  /// entre suscriptores del mismo documento— asi que no cuesta una lectura
+  /// extra.
+  Stream<bool> watchHasPendingWrites(String uid) {
+    return _users
+        .doc(uid)
+        .snapshots(includeMetadataChanges: true)
+        .map((snap) => snap.metadata.hasPendingWrites)
+        .distinct();
   }
 
   Future<void> delete(String uid) async {

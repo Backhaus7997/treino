@@ -14,29 +14,33 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
+import { TRAINER_ACCOUNT_DELETED_REASON } from "../cascade/trainer-data";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
+import { trainerEntry } from "../mail/templates";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-appointment-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Id del turno de todos los fixtures. Es el `scope` del dedupe del mail. */
 const APPT_ID = "appt-test";
@@ -53,22 +57,30 @@ const APPT_ID = "appt-test";
  * así que `formatDateAR(undefined)` devolvía `""` y el mail salía sin fecha ni
  * hora. Nadie lo asserteaba y el test quedaba verde.
  */
-const APPT_STARTS_AT = admin.firestore.Timestamp.fromDate(
+const APPT_STARTS_AT = Timestamp.fromDate(
   new Date("2026-08-26T22:00:00Z"),
 );
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
-async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
-  await db().collection("users").doc(uid).set({ uid, fcmTokens });
+async function seedUser(
+  uid: string,
+  fcmTokens: string[],
+  notificationPrefs?: Record<string, Record<string, boolean>>,
+): Promise<void> {
+  await db().collection("users").doc(uid).set({
+    uid,
+    fcmTokens,
+    ...(notificationPrefs ? { notificationPrefs } : {}),
+  });
 }
 
 async function cleanup(...uids: string[]): Promise<void> {
@@ -116,13 +128,30 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
     await notifyOnAppointmentHandler(testApp, APPT_ID, undefined, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-632");
     expect(callArg.tokens).not.toContain("athlete-token-632");
     // QA-NOT-002: el trainer va a SU agenda (ruta role-aware), no al host de
     // atleta /coach/agenda que le mostraba "Necesitás un vínculo con un PF".
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
     expect(callArg.data?.kind).toBe("appointment");
+  });
+
+  it("does not gate the non-matrix requested branch", async () => {
+    await seedUser(trainerId, ["trainer-token-632"], {
+      sesion_cancelada: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      undefined,
+      { trainerId, athleteId, status: "requested", startsAt: APPT_STARTS_AT },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -153,7 +182,7 @@ describe("SCENARIO-633: requested→confirmed → notify athlete", () => {
     await notifyOnAppointmentHandler(testApp, APPT_ID, beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-633");
     expect(callArg.tokens).not.toContain("trainer-token-633");
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
@@ -226,9 +255,64 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
     await notifyOnAppointmentHandler(testApp, APPT_ID, beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-634");
     expect(callArg.tokens).toContain("athlete-token-634");
+  });
+
+  it("respects sesion_cancelada push=false for each recipient", async () => {
+    await seedUser(trainerId, ["trainer-token-634"], {
+      sesion_cancelada: { push: false },
+    });
+    await seedUser(athleteId, ["athlete-token-634"], {
+      sesion_cancelada: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // Encontrado en revisión adversarial: notify-link-change.ts y este archivo
+  // eran los únicos 2 productores tocados por el destino fino sin ningún
+  // test sobre `ctaUrl` — el mismo patrón de QA-API-001 arriba (un test que
+  // asertea el push y nada del mail deja pasar una regresión real en la
+  // misma rama).
+  it("el mail al PF lleva el CTA a su agenda, no a la entrada bare", async () => {
+    const beforeData = { trainerId, athleteId, status: "confirmed" };
+    const afterData = {
+      trainerId,
+      athleteId,
+      status: "cancelled",
+      startsAt: APPT_STARTS_AT,
+    };
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      beforeData,
+      afterData,
+      makeMockMessaging(),
+    );
+
+    const snap = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey("appointment-cancelled", APPT_ID, trainerId))
+      .get();
+    expect(snap.exists).toBe(true);
+    expect(snap.data()?.params?.ctaUrl).toBe(trainerEntry({ to: "agenda" }));
   });
 });
 
@@ -273,6 +357,79 @@ describe("SCENARIO-635: reason=athlete-account-deleted → sendFcm NOT called", 
     await expect(
       notifyOnAppointmentHandler(testApp, APPT_ID, undefined, afterData, mock),
     ).resolves.not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1333 — el PF borra su cuenta: reason === 'trainer-account-deleted' → skip.
+// El alumno se entera por UN push del vinculo (notify-link-change), no por N
+// pushes de turnos (una serie recurrente los multiplicaria).
+// ---------------------------------------------------------------------------
+describe("SC-PSD-12: reason=trainer-account-deleted → sendFcm NOT called", () => {
+  const trainerId = "trainer-appt-psd12";
+  const athleteId = "athlete-appt-psd12";
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-psd12"]);
+    await seedUser(athleteId, ["athlete-token-psd12"]);
+  });
+
+  afterEach(() => cleanup(trainerId, athleteId));
+
+  it("no manda push cuando la cascada del PF cancela el turno", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        reason: TRAINER_ACCOUNT_DELETED_REASON,
+        cancelledBy: trainerId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  it("una cancelacion normal del PF SIGUE avisando al alumno (el guard no la traga)", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        cancelledBy: trainerId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+  });
+
+  it("se mira la ESCRITURA: un cambio posterior sobre un turno ya marcado vuelve a avisar", async () => {
+    const mock = makeMockMessaging();
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed", reason: TRAINER_ACCOUNT_DELETED_REASON },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        reason: TRAINER_ACCOUNT_DELETED_REASON,
+        cancelledBy: athleteId,
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
   });
 });
 

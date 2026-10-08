@@ -1,0 +1,405 @@
+// custom_exercise_limit_gate_test.dart — el embudo único de "crear ejercicio
+// propio" (docs/limite-ejercicios-pf.md PR3).
+//
+// Dos ejes se prueban acá:
+//   1. El alumno NUNCA se bloquea, pase lo que pase con la cuota — se corta
+//      por rol antes de mirar el número.
+//   2. Bajo/en/sobre el tope, con el borde de E6: `count == limit` YA
+//      bloquea (no hace falta pasarse).
+//
+// Y que la anotación (`registrarTopeDelPlanPf`) se dispare sólo cuando
+// corresponde, con el `kind` correcto — es lo que el mail del PR4 necesita
+// para saber a quién escribirle y por qué.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
+import 'package:treino/features/coach/presentation/custom_exercise_limit_gate.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/l10n/app_l10n.dart';
+
+class _RepoFalso extends Mock implements UserRepository {}
+
+const _uid = 'u1';
+
+UserProfile _profile(UserRole role, {TrainerSubscription? subscription}) {
+  final now = DateTime.utc(2026, 1, 1);
+  return UserProfile(
+    uid: _uid,
+    email: 'a@b.com',
+    displayName: null,
+    role: role,
+    createdAt: now,
+    updatedAt: now,
+    subscription: subscription,
+  );
+}
+
+/// Monta un botón que corre [intentarCrearEjercicioPropio] (o, con [rebote],
+/// [mostrarAvisoTopeEjerciciosPorRebote]) y devuelve lo que resolvió.
+///
+/// `null` = todavía no resolvió: el rebote espera a que se cierre el aviso,
+/// así que con el aviso abierto no hay resultado.
+///
+/// [subscription] es el tier NOMINAL del PF (lo que pagó) — default `null`
+/// (Free, sin backfill). Sirve para el Cambio 2 (P1): probar que el aviso
+/// nombra el tier EFECTIVO (el que explica `quota.limit`), no éste a ciegas.
+Future<bool?> _correr(
+  WidgetTester tester, {
+  required UserRole role,
+  required AsyncValue<CustomExerciseQuota> quota,
+  required UserRepository repo,
+  String? uid = _uid,
+  bool rebote = false,
+  TrainerSubscription? subscription,
+}) async {
+  bool? resultado;
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(role, subscription: subscription)),
+        ),
+        customExerciseQuotaProvider.overrideWithValue(quota),
+        currentUidProvider.overrideWithValue(uid),
+        userRepositoryProvider.overrideWithValue(repo),
+      ],
+      child: MaterialApp(
+        // El bloqueo real ahora abre el aviso visual
+        // (`showCustomExerciseLimitNotice`), y la forma móvil usa `AppL10n`
+        // — sin delegates acá el `build` de `_CustomExerciseLimitSheet`
+        // revienta con "Null check operator used on a null value" apenas
+        // este test corre junto a otros (Localizations sin resolver).
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: Scaffold(
+          body: Consumer(
+            builder: (context, ref, _) {
+              // `watch` fuerza la suscripción temprana al stream para que ya
+              // esté resuelto cuando el tap llame a `ref.read` adentro del
+              // embudo — un `ref.read` suelto en el primer frame no alcanza
+              // a esperar la emisión async de `Stream.value`.
+              ref.watch(userProfileProvider);
+              return ElevatedButton(
+                onPressed: () async {
+                  resultado = rebote
+                      ? await mostrarAvisoTopeEjerciciosPorRebote(context, ref)
+                      : await intentarCrearEjercicioPropio(context, ref);
+                },
+                child: const Text('crear'),
+              );
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+  // Deja asentar la emisión async del stream de perfil.
+  await tester.pump();
+
+  await tester.tap(find.text('crear'));
+  await tester.pumpAndSettle();
+
+  return resultado;
+}
+
+void main() {
+  setUpAll(() {
+    registerFallbackValue('');
+  });
+
+  group('intentarCrearEjercicioPropio — el alumno nunca se bloquea', () {
+    testWidgets(
+        'alumno con cuota EN el tope (si fuera PF) igual puede crear, y no '
+        'anota nada', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.athlete,
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isTrue);
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group('intentarCrearEjercicioPropio — PF bajo el tope', () {
+    testWidgets('count < limit ⇒ puede crear, sin anotar', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 19)),
+        repo: repo,
+      );
+
+      expect(ok, isTrue);
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+
+    testWidgets('sin tope (limit null) ⇒ puede crear con cualquier conteo',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: null, count: 999)),
+        repo: repo,
+      );
+
+      expect(ok, isTrue);
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group('intentarCrearEjercicioPropio — PF en o sobre el tope', () {
+    testWidgets('E6 — count == limit YA bloquea, y anota el kind correcto',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets('E3 — sobre el tope (bajó de plan) también bloquea la creación',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 25)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets('⚠️ si la anotación falla, el gate igual bloquea sin tirar',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenThrow(Exception('firestore caído'));
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+    });
+  });
+
+  group('mostrarAvisoTopeEjerciciosPorRebote — el servidor rechazó el create',
+      () {
+    testWidgets(
+        '⚠️ el PF rebotado queda anotado para el mail, como en el embudo',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final mostro = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+        rebote: true,
+      );
+
+      // El aviso quedó abierto: el rebote todavía lo está esperando.
+      expect(mostro, isNull);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets(
+        '⚠️ con la cuota local cargando, anota igual (el servidor ya decidió) '
+        'y cae al error genérico', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final mostro = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.loading(),
+        repo: repo,
+        rebote: true,
+      );
+
+      expect(mostro, isFalse);
+      verify(() => repo.registrarTopeDelPlanPf(
+            _uid,
+            kTrainerLimitHitKindCustomExercises,
+          )).called(1);
+    });
+
+    testWidgets('un alumno rebotado no se anota', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      await _correr(
+        tester,
+        role: UserRole.athlete,
+        quota: const AsyncValue.data((limit: null, count: 3)),
+        repo: repo,
+        rebote: true,
+      );
+
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group('intentarCrearEjercicioPropio — fail-open mientras carga', () {
+    testWidgets('cuota en AsyncLoading ⇒ no bloquea (el servidor manda)',
+        (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        quota: const AsyncValue.loading(),
+        repo: repo,
+      );
+
+      expect(ok, isTrue);
+      verifyNever(() => repo.registrarTopeDelPlanPf(any(), any()));
+    });
+  });
+
+  group(
+      'intentarCrearEjercicioPropio — Cambio 2 (P1): el aviso nombra el '
+      'tier EFECTIVO, no el nominal a ciegas', () {
+    testWidgets(
+        'piso prepago: nominal Free, limit del servidor ya es el de Plan 2 '
+        '⇒ el aviso nombra Plan 2', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        // Sin `subscription`: nominal es Free. El límite que bloqueó (120)
+        // es el de Plan 2 — un piso prepago subió el efectivo por encima.
+        quota: const AsyncValue.data((limit: 120, count: 120)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('Tu plan Plan 2 incluye'), findsOneWidget);
+      expect(find.textContaining('Tu plan Free incluye'), findsNothing);
+    });
+
+    testWidgets(
+        'suscripción Plan 1 PAUSADA: limit del servidor ya es el de Free '
+        '⇒ el aviso dice Free e inactiva, no Plan 1', (tester) async {
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.paused,
+        ),
+        // El servidor ya colapsó el efectivo a Free (20).
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(
+        find.textContaining('Tu suscripción a Plan 1 no está activa'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Tu plan Plan 1 incluye'), findsNothing);
+      // Sin upsell: no se le ofrece "el siguiente" a quien ya pagó Plan 1.
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+
+    testWidgets(
+        'segundo hallazgo (Codex, 2026-09-29): Plan 1 ACTIVA con el límite '
+        'todavía en Free (propagación pendiente) ⇒ genérico, nunca "no '
+        'está activa"', (tester) async {
+      // MISMO limit/nominal que el test de arriba — la ÚNICA diferencia es
+      // el status: `active`, no `paused`. Antes de este segundo fix,
+      // `resolveNoticeTier` comparaba límites (efectivo Free < nominal
+      // Plan 1) y decía "inactiva" en los dos casos por igual — mintiendo
+      // acá, porque la suscripción SÍ está activa (AGENTS.md §11.1).
+      final repo = _RepoFalso();
+      when(() => repo.registrarTopeDelPlanPf(any(), any()))
+          .thenAnswer((_) async {});
+
+      final ok = await _correr(
+        tester,
+        role: UserRole.trainer,
+        subscription: const TrainerSubscription(
+          tier: SubscriptionTier.plan1,
+          status: SubscriptionStatus.active,
+        ),
+        quota: const AsyncValue.data((limit: 20, count: 20)),
+        repo: repo,
+      );
+
+      expect(ok, isFalse);
+      expect(find.textContaining('no está activa'), findsNothing);
+      expect(
+        find.text('Tu plan incluye 20 ejercicios propios. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Plan 1 incluye'), findsNothing);
+      expect(find.text('PLAN 2'), findsNothing);
+    });
+  });
+}

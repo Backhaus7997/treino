@@ -31,7 +31,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.textContaining('equipo@treino.app'), findsOneWidget);
+      expect(find.textContaining('treino@gettreino.com'), findsOneWidget);
     });
 
     testWidgets('AlertDialog has Cerrar button that closes it', (tester) async {

@@ -10,6 +10,14 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
+
+/// Fecha de nacimiento de un adulto.
+///
+/// Desde el gate de edad mínima, un perfil "completo" incluye `bornAt`: sin él
+/// `authRedirect` manda a `/birth-date`, que es exactamente lo que le pasa a
+/// una cuenta creada antes del requisito.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
 
 class MockUser extends Mock implements User {}
 
@@ -45,6 +53,9 @@ UserProfile _completeProfile() => UserProfile(
       uid: 'test-uid',
       email: 'test@example.com',
       displayName: 'tincho',
+      bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'test@example.com'),
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
@@ -320,6 +331,9 @@ void main() {
         uid: 'test-trainer-uid',
         email: 'trainer@example.com',
         displayName: 'pf-mauro',
+        bornAt: _adultBornAt,
+        emailVerification:
+            mailConfirmadoPara(UserRole.trainer, 'trainer@example.com'),
         role: UserRole.trainer,
         createdAt: DateTime.utc(2026, 1, 1),
         updatedAt: DateTime.utc(2026, 1, 1),

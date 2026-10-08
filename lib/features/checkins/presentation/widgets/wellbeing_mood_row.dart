@@ -57,11 +57,35 @@ class WellbeingMoodGlyph extends StatelessWidget {
         fit: BoxFit.scaleDown,
         child: Text(
           emoji,
-          // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
-          // render as tofu "?" — the theme's Barlow families carry no emoji and
-          // the automatic platform fallback doesn't kick in there (likely an
-          // engine/Impeller simulator issue). The explicit fallback pins the
-          // system emoji font; physical-device verification is still pending.
+          // #456 — conviene leerlo entero antes de tocar este `style`.
+          //
+          // En el SIMULADOR de iOS estos glifos salen como tofu "?". Eso esta
+          // medido y es reproducible: iPhone 17 Pro Max y iPad Pro 13" (M5),
+          // 2026-09-21.
+          //
+          // En hardware real NO esta reproducido: en un **iPhone 16 con iOS
+          // 27** se ven bien. Esa es UNA configuracion, y no alcanza para
+          // concluir que ningun usuario lo sufre — quedan sin probar otros
+          // modelos de iPhone, cualquier iPad fisico, otras versiones de iOS y
+          // otras del engine de Flutter. Si lo ves en tofu en un device, es un
+          // hallazgo nuevo: sumá ahi el modelo y la version, y reabri.
+          //
+          // Lo que NO es: un problema de seleccion de fuente. Se probaron
+          // cuatro variantes del mismo glifo lado a lado y las CUATRO dieron
+          // tofu — este `fontFamilyFallback`, `inherit: false` (sin ninguna
+          // familia heredada), `fontFamily: 'Apple Color Emoji'` explicito, y
+          // `fontFamilyFallback: ['.AppleColorEmoji']` con el nombre de
+          // sistema. La variante sin familia es la que manda: el tema Barlow no
+          // tiene nada que ver. En ese simulador el motor no resuelve el glifo
+          // con ningun nombre de familia.
+          //
+          // Corolario, acotado al simulador: si lo ves en tofu AHI, no gastes
+          // tiempo en el `style` — esas cuatro variantes ya se probaron.
+          // Contrastalo con un device antes de sacar cualquier conclusion.
+          //
+          // El `fontFamilyFallback` se deja puesto: la verificacion en device
+          // se hizo CON el, asi que no esta probado que sobre. Sacarlo seria un
+          // cambio sin medir.
           style: TextStyle(
             fontSize: fontSize,
             fontFamilyFallback: const ['Apple Color Emoji'],

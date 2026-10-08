@@ -33,6 +33,7 @@ import '../../../../profile/domain/user_profile.dart';
 import '../../../../profile/domain/user_profile_trainer_completeness.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'widgets/coach_discovery_preview_card.dart';
+import 'widgets/consultas_card.dart';
 import 'widgets/especialidad_precio_card.dart';
 import 'widgets/identidad_card.dart';
 
@@ -54,7 +55,6 @@ class PerfilPublicoScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
 
     return SingleChildScrollView(
@@ -67,19 +67,10 @@ class PerfilPublicoScreen extends ConsumerWidget {
         children: [
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const TreinoSectionHeader(
-                  title: 'Perfil público', // i18n: Fase 11
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  'Así te ven los alumnos potenciales en TREINO Coach '
+            child: const CoachHubSectionHero(
+              title: 'Perfil público', // i18n: Fase 11
+              subtitle: 'Así te ven los alumnos potenciales en TREINO Coach '
                   'Discovery.', // i18n: Fase 11
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: AppSpacing.s18),
@@ -309,6 +300,8 @@ class _PerfilPublicoDosColumnas extends StatelessWidget {
           IdentidadCard(profile: profile),
           const SizedBox(height: AppSpacing.s18),
           EspecialidadPrecioCard(profile: profile),
+          const SizedBox(height: AppSpacing.s18),
+          ConsultasCard(profile: profile),
           const SizedBox(height: AppSpacing.s18),
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(2),

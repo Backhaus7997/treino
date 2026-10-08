@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../../../core/widgets/motion/treino_tappable.dart';
+import '../../../../core/widgets/photo_viewer_screen.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../domain/exercise_feedback.dart';
@@ -139,6 +141,25 @@ class ExerciseFeedbackNote extends StatelessWidget {
   }
 }
 
+/// El adjunto del reporte: miniatura de 140 px que abre [PhotoViewerScreen].
+///
+/// **La miniatura y el visor NO comparten bounds, y es a propósito.** Acá los
+/// `memCache*` existen para que una foto de cámara no entre entera en memoria
+/// sólo para pintarse en 140 px (AGENTS.md regla 6, y el PF puede tener varias
+/// abiertas). El visor, en cambio, la muestra completa y con pinch-zoom: si
+/// heredara estos límites, ampliar mostraría la miniatura pixelada y el feature
+/// no serviría para lo único que importa, que es MIRAR bien lo que el alumno
+/// mandó. Por eso el visor define los suyos y este widget le pasa la URL, no su
+/// configuración.
+///
+/// El tap va por [TreinoTappable] y no por un `GestureDetector` propio: es el
+/// mismo camino que usa la foto del chat, el único call-site que existía antes
+/// de este cambio.
+///
+/// El [Semantics] de afuera SÍ hace falta. `TreinoTappable` es un
+/// `GestureDetector` con escala y no aporta rol ni etiqueta, así que sin esto
+/// el lector de pantalla anuncia una imagen sin nombre y sin forma de saber que
+/// se puede abrir.
 class _FeedbackPhoto extends StatelessWidget {
   const _FeedbackPhoto({required this.url});
 
@@ -147,31 +168,51 @@ class _FeedbackPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: 140,
-        height: 140,
-        fit: BoxFit.cover,
-        // Sin los memCache bounds, una foto de cámara entra entera en memoria
-        // para pintarse en 140 px — y el PF puede tener varias abiertas en la
-        // misma sesión (AGENTS.md regla 6).
-        memCacheWidth: 280,
-        memCacheHeight: 280,
-        placeholder: (_, __) => Container(
-          width: 140,
-          height: 140,
-          color: palette.bg,
-        ),
-        // Un 403 acá NO es raro: la URL con token vive dentro del documento, y
-        // el objeto puede haberse borrado (cascade de cuenta) mientras el doc
-        // sigue en una caché local. Vale más un placeholder que una excepción.
-        errorWidget: (_, __, ___) => Container(
-          width: 140,
-          height: 140,
-          color: palette.bg,
-          child: Icon(TreinoIcon.image, color: palette.textMuted),
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      button: true,
+      // La CLAVE arrastra el prefijo `chatMedia` de su primer call-site; el
+      // TEXTO ("Ver foto") es genérico y correcto también acá. Renombrarla
+      // tocaría los cinco archivos de l10n y el chat sin cambiar una sola
+      // palabra en pantalla — queda anotado como deuda de naming, no escondido.
+      label: l10n.chatMediaViewFullscreen,
+      child: TreinoTappable(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PhotoViewerScreen(imageUrl: url),
+            ),
+          );
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: CachedNetworkImage(
+            imageUrl: url,
+            width: 140,
+            height: 140,
+            fit: BoxFit.cover,
+            // Sin los memCache bounds, una foto de cámara entra entera en
+            // memoria para pintarse en 140 px — y el PF puede tener varias
+            // abiertas en la misma sesión (AGENTS.md regla 6).
+            memCacheWidth: 280,
+            memCacheHeight: 280,
+            placeholder: (_, __) => Container(
+              width: 140,
+              height: 140,
+              color: palette.bg,
+            ),
+            // Un 403 acá NO es raro: la URL con token vive dentro del
+            // documento, y el objeto puede haberse borrado (cascade de cuenta)
+            // mientras el doc sigue en una caché local. Vale más un placeholder
+            // que una excepción. El visor trata el mismo caso con su propio
+            // cartel, así que abrir una foto muerta tampoco revienta.
+            errorWidget: (_, __, ___) => Container(
+              width: 140,
+              height: 140,
+              color: palette.bg,
+              child: Icon(TreinoIcon.image, color: palette.textMuted),
+            ),
+          ),
         ),
       ),
     );

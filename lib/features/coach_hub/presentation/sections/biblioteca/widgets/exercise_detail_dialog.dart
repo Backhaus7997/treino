@@ -51,8 +51,46 @@ void showExerciseDetailDialog(
   );
 }
 
-class _ExerciseDetailDialog extends ConsumerWidget {
+class _ExerciseDetailDialog extends StatelessWidget {
   const _ExerciseDetailDialog({
+    required this.exerciseId,
+    this.ownerId,
+    this.exerciseName,
+  });
+
+  final String exerciseId;
+  final String? ownerId;
+  final String? exerciseName;
+
+  @override
+  Widget build(BuildContext context) {
+    return TreinoDialog(
+      title: exerciseName ?? 'Ejercicio', // i18n
+      primaryLabel: 'Cerrar', // i18n
+      onPrimaryTap: () => Navigator.of(context).pop(),
+      body: SizedBox(
+        width: 520,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 560),
+          child: SingleChildScrollView(
+            child: ExerciseDetailBody(
+              exerciseId: exerciseId,
+              ownerId: ownerId,
+              exerciseName: exerciseName,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Body único del detalle, compartido por el diálogo modal y el panel lateral.
+///
+/// Mantener el fetch y sus estados acá evita que ambos hospedajes diverjan.
+class ExerciseDetailBody extends ConsumerWidget {
+  const ExerciseDetailBody({
+    super.key,
     required this.exerciseId,
     this.ownerId,
     this.exerciseName,
@@ -72,34 +110,21 @@ class _ExerciseDetailDialog extends ConsumerWidget {
       )),
     );
 
-    return TreinoDialog(
-      title: exerciseName ?? 'Ejercicio', // i18n
-      primaryLabel: 'Cerrar', // i18n
-      onPrimaryTap: () => Navigator.of(context).pop(),
-      body: SizedBox(
-        width: 520,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 560),
-          child: SingleChildScrollView(
-            child: TreinoStateSwitcher(
-              childKey: ValueKey(_stateKey(exerciseAsync)),
-              child: exerciseAsync.when(
-                loading: () => const _ExerciseDetailSkeleton(),
-                error: (e, _) => const _ExerciseDetailMessage(
-                  text: 'No pudimos cargar el ejercicio.', // i18n
-                ),
-                data: (exercise) {
-                  if (exercise == null) {
-                    return const _ExerciseDetailMessage(
-                      text: 'Ejercicio no encontrado.', // i18n
-                    );
-                  }
-                  return _ExerciseDetailContent(exercise: exercise);
-                },
-              ),
-            ),
-          ),
+    return TreinoStateSwitcher(
+      childKey: ValueKey(_stateKey(exerciseAsync)),
+      child: exerciseAsync.when(
+        loading: () => const _ExerciseDetailSkeleton(),
+        error: (e, _) => const _ExerciseDetailMessage(
+          text: 'No pudimos cargar el ejercicio.', // i18n
         ),
+        data: (exercise) {
+          if (exercise == null) {
+            return const _ExerciseDetailMessage(
+              text: 'Ejercicio no encontrado.', // i18n
+            );
+          }
+          return _ExerciseDetailContent(exercise: exercise);
+        },
       ),
     );
   }

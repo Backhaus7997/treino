@@ -17,6 +17,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/analytics/analytics_service.dart';
+import '../../../../../core/telemetry/non_fatal.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -28,6 +30,7 @@ import '../../../../coach/domain/trainer_link_status.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../widgets/coach_hub_widgets.dart';
 
 // ─── NewSessionDialog ─────────────────────────────────────────────────────────
 
@@ -195,14 +198,30 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
 
       final note = _noteController.text.trim();
 
-      await ref.read(appointmentRepositoryProvider).createByTrainer(
-            trainerId: trainerId,
-            athleteId: athleteId,
-            athleteDisplayName: athleteDisplayName,
-            startsAt: startsAt,
-            durationMin: dur,
-            noteBefore: note.isEmpty ? null : note,
-          );
+      // Ver la nota en `new_session_sheet.dart`: el servicio se lee antes del
+      // await porque después el `ref` puede estar disposeado.
+      final analytics = ref.read(analyticsServiceProvider);
+
+      final appt =
+          await ref.read(appointmentRepositoryProvider).createByTrainer(
+                trainerId: trainerId,
+                athleteId: athleteId,
+                athleteDisplayName: athleteDisplayName,
+                startsAt: startsAt,
+                durationMin: dur,
+                noteBefore: note.isEmpty ? null : note,
+              );
+
+      // Ver la nota del mismo evento en `new_session_sheet.dart`: va antes del
+      // guard de `mounted` porque la cita ya está escrita.
+      fireAndForget(
+        analytics.logAppointmentCreated(
+          appointmentId: appt.id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+        ),
+        reason: 'analytics: appointment_created (Coach Hub) falló',
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -280,30 +299,15 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [
-          OutlinedButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textPrimary,
-              ),
-            ),
           ),
-          ElevatedButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Cargar igual', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-            ),
-            child: Text(
-              'Cargar igual', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
           ),
         ],
       ),
@@ -456,42 +460,16 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          style: TextButton.styleFrom(foregroundColor: palette.textMuted),
-          child: Text(
-            'Cancelar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: (_saving || !hasActiveLinks) ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            shape: const StadiumBorder(),
-            disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
-          ),
-          child: _saving
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: TreinoButtonTokens.foreground(context),
-                  ),
-                )
-              : Text(
-                  'REGISTRAR SESIÓN', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                  ),
-                ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'REGISTRAR SESIÓN', // i18n
+          loading: _saving,
+          onPressed: hasActiveLinks ? _submit : null,
         ),
       ],
     );
@@ -518,25 +496,14 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DropdownButtonFormField<String>(
+    return TreinoDropdown<String>(
       initialValue: selectedId,
       hint: Text(
         'Seleccioná un alumno', // i18n
         style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
       ),
-      dropdownColor: palette.bgCard,
-      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
       decoration: InputDecoration(
-        filled: true,
         fillColor: palette.bg,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent, width: 1.5),
-        ),
       ),
       items: links.map((link) {
         final profileAsync =

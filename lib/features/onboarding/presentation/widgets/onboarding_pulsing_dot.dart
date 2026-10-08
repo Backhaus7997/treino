@@ -38,6 +38,13 @@ class _OnboardingPulsingDotState extends State<OnboardingPulsingDot>
     parent: _controller,
     // easeInOut in both directions, so the brightest and dimmest points hold
     // for a beat instead of snapping.
+    //
+    // Deliberately NOT `AppMotion.emphasized`, and this is the one place in
+    // the app where a raw `Curves` is correct. Every token curve is tuned for
+    // motion that RESPONDS to the user — front-loaded, so it feels immediate.
+    // This is the opposite: an ambient loop nobody triggered, where the point
+    // is the pause at each end. `emphasized` would make the dot snap between
+    // bright and dim, which reads as a blink, not a breath.
     curve: Curves.easeInOut,
     reverseCurve: Curves.easeInOut,
   );

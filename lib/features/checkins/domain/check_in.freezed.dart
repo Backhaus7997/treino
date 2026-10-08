@@ -59,6 +59,7 @@ mixin _$CheckIn {
 
   /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
   /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+// ignore: invalid_annotation_target
   @JsonKey(includeToJson: false, includeFromJson: false)
   String? get id => throw _privateConstructorUsedError;
 
@@ -299,6 +300,7 @@ class _$CheckInImpl implements _CheckIn {
 
   /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
   /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false, includeFromJson: false)
   final String? id;
@@ -415,6 +417,7 @@ abstract class _CheckIn implements CheckIn {
 
   /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
   /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(includeToJson: false, includeFromJson: false)
   String? get id;

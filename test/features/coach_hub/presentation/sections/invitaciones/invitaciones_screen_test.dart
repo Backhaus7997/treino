@@ -16,9 +16,15 @@ import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/data/trainer_link_repository.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/coach_hub/presentation/sections/invitaciones/invitaciones_screen.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
@@ -43,6 +49,19 @@ TrainerLink _link(
 UserPublicProfile _prof(String uid, String name) =>
     UserPublicProfile(uid: uid, displayName: name);
 
+UserProfile _trainer(SubscriptionStatus status) => UserProfile(
+      uid: 't1',
+      email: 'profe@test.com',
+      displayName: 'Profe',
+      role: UserRole.trainer,
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
+      subscription: TrainerSubscription(
+        tier: SubscriptionTier.plan1,
+        status: status,
+      ),
+    );
+
 Future<void> _pump(
   WidgetTester tester, {
   Stream<List<TrainerLink>>? linksStream,
@@ -50,6 +69,7 @@ Future<void> _pump(
   List<UserPublicProfile> profiles = const [],
   TrainerLinkRepository? repo,
   TrainerLinkPromotionService? promotionService,
+  SubscriptionStatus? subscriptionStatus,
   // `false` cuando el stream de links queda colgado en loading a propósito
   // (TreinoShimmer corre en loop infinito — pumpAndSettle no termina nunca).
   bool settle = true,
@@ -71,6 +91,10 @@ Future<void> _pump(
         userPublicProfileProvider.overrideWith(
           (ref, uid) => Stream.value(profileByUid[uid]),
         ),
+        if (subscriptionStatus != null)
+          userProfileProvider.overrideWith(
+            (ref) => Stream.value(_trainer(subscriptionStatus)),
+          ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
         if (promotionService != null)
           trainerLinkPromotionServiceProvider
@@ -201,17 +225,20 @@ void main() {
         ),
         findsOneWidget,
       );
+      // El chip Rechazadas ya no existe, y el `terminated` sembrado arriba no
+      // se cuenta en ningún otro: el badge de Aceptadas se queda en 0.
+      expect(find.byKey(const Key('filter_chip_Rechazadas')), findsNothing);
       expect(
         find.descendant(
-          of: find.byKey(const Key('filter_chip_Rechazadas')),
+          of: find.byKey(const Key('filter_chip_Aceptadas')),
           matching: find.text('1'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
     });
   });
 
-  group('InvitacionesScreen — tabs Aceptadas y Rechazadas (WU-05)', () {
+  group('InvitacionesScreen — tab Aceptadas (WU-05)', () {
     testWidgets('Aceptadas: sin solicitudes aceptadas → estado vacío honesto',
         (tester) async {
       await _pump(
@@ -229,7 +256,7 @@ void main() {
       );
     });
 
-    testWidgets('Rechazadas: sin solicitudes rechazadas → estado vacío honesto',
+    testWidgets('no hay chip Rechazadas: sólo Pendientes y Aceptadas',
         (tester) async {
       await _pump(
         tester,
@@ -237,51 +264,44 @@ void main() {
         profiles: [_prof('a1', 'Ana García')],
       );
 
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('No rechazaste ninguna solicitud.'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('filter_chip_Pendientes')), findsOneWidget);
+      expect(find.byKey(const Key('filter_chip_Aceptadas')), findsOneWidget);
+      expect(find.byKey(const Key('filter_chip_Rechazadas')), findsNothing);
     });
 
-    testWidgets('Rechazadas filtra solo terminated', (tester) async {
+    testWidgets('un terminated no aparece en ningún tab', (tester) async {
+      // Los rechazos ya no se persisten (purge-rejected-link.ts), pero los
+      // `terminated` con acceptedAt != null —vínculos reales terminados—
+      // SIGUEN llegando por el stream. No tienen que colarse en Aceptadas.
       await _pump(
         tester,
         links: [
           _link('a1', TrainerLinkStatus.pending, id: 'l_a1'),
-          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
           _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
         ],
         profiles: [
           _prof('a1', 'Ana García'),
-          _prof('a2', 'Beto López'),
           _prof('a3', 'Caro Díaz'),
         ],
       );
 
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('solicitud_card_l_a3')), findsNothing);
 
-      expect(find.byKey(const Key('solicitud_card_l_a1')), findsNothing);
-      expect(find.byKey(const Key('solicitud_card_l_a2')), findsNothing);
-      expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('solicitud_card_l_a3')), findsNothing);
+      expect(
+        find.text('Todavía no aceptaste ninguna solicitud.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets(
-        'Aceptadas y Rechazadas son read-only: sin botones aceptar/rechazar',
+    testWidgets('Aceptadas es read-only: sin botones aceptar/rechazar',
         (tester) async {
       await _pump(
         tester,
-        links: [
-          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
-          _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
-        ],
-        profiles: [
-          _prof('a2', 'Beto López'),
-          _prof('a3', 'Caro Díaz'),
-        ],
+        links: [_link('a2', TrainerLinkStatus.active, id: 'l_a2')],
+        profiles: [_prof('a2', 'Beto López')],
       );
 
       await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
@@ -289,12 +309,6 @@ void main() {
       expect(find.byKey(const Key('accept_l_a2')), findsNothing);
       expect(find.byKey(const Key('decline_l_a2')), findsNothing);
       expect(find.text('ACEPTADA'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('accept_l_a3')), findsNothing);
-      expect(find.byKey(const Key('decline_l_a3')), findsNothing);
-      expect(find.text('RECHAZADA'), findsOneWidget);
     });
 
     testWidgets('ordena las tarjetas por requestedAt DESC dentro del tab',
@@ -373,34 +387,110 @@ void main() {
       );
     });
 
-    testWidgets('Aceptadas y Rechazadas: smoke dark+light sin crash',
-        (tester) async {
+    testWidgets('Aceptadas: smoke dark+light sin crash', (tester) async {
       for (final theme in [AppTheme.dark(), AppTheme.light()]) {
         await _pump(
           tester,
           theme: theme,
-          links: [
-            _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
-            _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
-          ],
-          profiles: [
-            _prof('a2', 'Beto López'),
-            _prof('a3', 'Caro Díaz'),
-          ],
+          links: [_link('a2', TrainerLinkStatus.active, id: 'l_a2')],
+          profiles: [_prof('a2', 'Beto López')],
         );
 
         await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('solicitud_card_l_a2')), findsOneWidget);
-
-        await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
       }
     });
   });
 
   group('InvitacionesScreen — acciones aceptar/rechazar', () {
+    for (final status in [
+      SubscriptionStatus.cancelled,
+      SubscriptionStatus.paused,
+    ]) {
+      testWidgets(
+          'subscription-inactive + ${status.name} usa el estado actual del perfil',
+          (tester) async {
+        debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+        addTearDown(() => debugPlanLimitPaywallForm = null);
+        final svc = _MockPromotionService();
+        when(() => svc.accept(any())).thenThrow(
+          const LinkPromotionFailure$PlanLimitReached(
+            reason: 'subscription-inactive',
+            tier: SubscriptionTier.plan1,
+            limit: 2,
+            currentLoad: 2,
+            projectedLoad: 3,
+          ),
+        );
+
+        await _pump(
+          tester,
+          links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
+          profiles: [_prof('a1', 'Ana García')],
+          promotionService: svc,
+          subscriptionStatus: status,
+        );
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(InvitacionesScreen)),
+          listen: false,
+        );
+        await container.read(userProfileProvider.future);
+
+        await tester.tap(find.byKey(const Key('accept_l1')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('dialog_primary_button')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.pumpAndSettle();
+
+        final expected = status == SubscriptionStatus.cancelled
+            ? 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'
+            : 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA';
+        expect(find.text(expected), findsOneWidget);
+      });
+    }
+
+    testWidgets(
+        'subscription-inactive con el perfil leído como active (status '
+        'ausente o desconocido) no dibuja «Estado: activa»', (tester) async {
+      debugPlanLimitPaywallForm = PlanLimitPaywallForm.dialog;
+      addTearDown(() => debugPlanLimitPaywallForm = null);
+      final svc = _MockPromotionService();
+      when(() => svc.accept(any())).thenThrow(
+        const LinkPromotionFailure$PlanLimitReached(
+          reason: 'subscription-inactive',
+          tier: SubscriptionTier.plan1,
+          limit: 2,
+          currentLoad: 2,
+          projectedLoad: 3,
+        ),
+      );
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.pending, id: 'l1')],
+        profiles: [_prof('a1', 'Ana García')],
+        promotionService: svc,
+        subscriptionStatus: SubscriptionStatus.active,
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(InvitacionesScreen)),
+        listen: false,
+      );
+      await container.read(userProfileProvider.future);
+
+      await tester.tap(find.byKey(const Key('accept_l1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('dialog_primary_button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'), findsOneWidget);
+      expect(find.textContaining('Estado:'), findsNothing);
+    });
+
     testWidgets(
         'aceptar → dialog de confirmación → svc.accept + snackbar de éxito',
         (tester) async {

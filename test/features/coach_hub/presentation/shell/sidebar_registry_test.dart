@@ -7,9 +7,9 @@ void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
         'tiene exactamente 11 items (7 post-W2 reduce + Rutinas + Solicitudes '
-        '+ Nutrición + Perfil público): Dashboard, Alumnos, Solicitudes, '
-        'Agenda, Chat, Perfil público, Biblioteca, Nutrición, Rutinas, '
-        'Pagos, Ajustes', () {
+        '+ Nutrición + Perfil público + Moderación): Dashboard, Alumnos, '
+        'Solicitudes, Agenda, Chat, Perfil público, Biblioteca, Nutrición, '
+        'Rutinas, Pagos, Moderación', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
@@ -29,14 +29,24 @@ void main() {
       // por URL directa — llevando el total de 9 a 10.
       //
       // Fase 11 WU-01 (ADR-F11-01): Perfil público se agrega al grupo
-      // GESTIÓN, inmediatamente después de Chat — llevando el total de 10
-      // a 11.
+      // GESTIÓN, inmediatamente después de Chat — llevando el total de 9 a 10.
+      // (Este párrafo decía «de 10 a 11» y era falso: la aserción era 10 y los
+      // items enumerados, diez. Un número equivocado al lado del que manda es
+      // exactamente lo que hace dudar del que manda.)
+      //
+      // Moderación se agrega al grupo CUENTA — llevando el total de 10 a 11.
+      // Es la primera superficie de STAFF del hub: vive en el registry como
+      // cualquier otro item, pero su `visibleProvider` la esconde de todo el
+      // que no tenga el claim `moderator`. Para un entrenador el sidebar sigue
+      // teniendo diez.
       expect(sidebarRegistry.length, 11);
     });
 
-    test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
-      // CUENTA queda vacío porque Reportes se removió del registry —
-      // se filtra por items.isNotEmpty en el widget y no se renderea.
+    test('cubre los grupos activos post-reduce, cada uno no vacío', () {
+      // CUENTA volvió a tener un item —Moderación— pero NO se lista acá: para
+      // un entrenador sigue vacío, porque el único que tiene se filtra por
+      // `visibleProvider`. El widget además lo saltea por `items.isNotEmpty`,
+      // así que el header no se dibuja.
       const activeGroups = [
         SidebarGroup.gestion,
         SidebarGroup.recursos,
@@ -50,11 +60,16 @@ void main() {
       }
     });
 
-    test('los grupos legacy + CUENTA quedan sin items en el registry', () {
+    test('los grupos legacy quedan sin items en el registry', () {
       // El enum los mantiene para que items futuros no rompan la firma;
       // el registry no los referencia post-reduce.
+      //
+      // CUENTA salió de esta lista: volvió a tener un item, «Moderación». No es
+      // un retroceso del reduce —lo que se removió ahí fue «Reportes», una
+      // sección de negocio sin scope— sino una superficie de STAFF, que además
+      // sólo se le renderiza a quien tiene el claim `moderator`. Para un
+      // entrenador el grupo sigue sin existir.
       const emptyGroups = [
-        SidebarGroup.cuenta, // Reportes removido — sin scope todavía
         SidebarGroup.resumen,
         SidebarGroup.alumnos,
         SidebarGroup.plan,
@@ -71,11 +86,10 @@ void main() {
       }
     });
 
-    test('el grupo ajustes tiene exactamente 1 item [SCENARIO-751]', () {
+    test('el grupo ajustes no agrega un segundo acceso a cuenta', () {
       final ajustes =
           sidebarRegistry.where((i) => i.group == SidebarGroup.ajustes);
-      expect(ajustes.length, 1);
-      expect(ajustes.single.id, 'ajustes');
+      expect(ajustes, isEmpty);
     });
 
     test('los ids son únicos', () {
@@ -100,7 +114,12 @@ void main() {
           '/nutricion',
           '/rutinas',
           '/pagos',
-          '/ajustes',
+          // Staff. Sólo se renderiza con el claim `moderator` (ver
+          // `moderacionSidebarItems.visibleProvider`), pero vive en el registry
+          // como cualquier otro: el filtro de visibilidad corre DESPUES, en el
+          // sidebar. Si esta ruta desapareciera de acá, el item no existiria
+          // para nadie.
+          '/moderacion',
         },
       );
     });
@@ -142,7 +161,6 @@ void main() {
 
       // Equivalentes en castellano que DEBEN estar (subset post-reduce).
       for (final esLabel in [
-        'Ajustes',
         'Alumnos',
         'Solicitudes',
         'Pagos',
@@ -167,6 +185,12 @@ void main() {
       ]) {
         expect(labels, isNot(contains(enLabel)));
       }
+    });
+
+    test('la metadata de /ajustes sigue titulando el top bar', () {
+      final item = activeSidebarItem('/ajustes');
+      expect(item?.id, 'cuenta');
+      expect(item?.label, 'Mi cuenta');
     });
 
     test('cada iconBuilder devuelve un IconData no nulo', () {

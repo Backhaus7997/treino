@@ -1,12 +1,24 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show
+        CollectionReference,
+        DocumentReference,
+        DocumentSnapshot,
+        FirebaseFirestore,
+        SnapshotMetadata,
+        Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
 // ignore_for_file: avoid_dynamic_calls
+// Los dobles de watchHasPendingWrites mockean tipos selados de cloud_firestore
+// (mismo trato que trainer_link_repository_cache_fria_test.dart).
+// ignore_for_file: subtype_of_sealed_class
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -94,6 +106,49 @@ void main() {
       expect(stored.toDate().toUtc(), equals(acceptedAt));
     });
 
+    // consentimiento-legal-versionado (R3): con termsAcceptedAt seteado, el
+    // doc también debe persistir la versión aceptada de cada documento.
+    test(
+        'getOrCreate with termsAcceptedAt also persists '
+        'acceptedTermsVersion/acceptedPrivacyVersion on the new doc', () async {
+      final acceptedAt = DateTime.utc(2026, 6, 1, 9, 30);
+
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-version-1',
+        email: 'a@b.com',
+        termsAcceptedAt: acceptedAt,
+        acceptedTermsVersion: kTermsVersion,
+        acceptedPrivacyVersion: kPrivacyVersion,
+      );
+
+      expect(result.acceptedTermsVersion, equals(kTermsVersion));
+      expect(result.acceptedPrivacyVersion, equals(kPrivacyVersion));
+
+      final snap =
+          await firestore.collection('users').doc('uid-terms-version-1').get();
+      expect(snap.data()!['acceptedTermsVersion'], equals(kTermsVersion));
+      expect(snap.data()!['acceptedPrivacyVersion'], equals(kPrivacyVersion));
+    });
+
+    // OAuth backfill paths never pass version params either — must stay
+    // unset, same contract as termsAcceptedAt above.
+    test(
+        'getOrCreate without version params leaves both null/absent on the '
+        'new doc', () async {
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-version-2',
+        email: 'a@b.com',
+      );
+
+      expect(result.acceptedTermsVersion, isNull);
+      expect(result.acceptedPrivacyVersion, isNull);
+
+      final snap =
+          await firestore.collection('users').doc('uid-terms-version-2').get();
+      expect(snap.data()!['acceptedTermsVersion'], isNull);
+      expect(snap.data()!['acceptedPrivacyVersion'], isNull);
+    });
+
     // OAuth backfill paths never pass termsAcceptedAt — it must stay unset.
     test(
         'getOrCreate without termsAcceptedAt leaves it null/absent on the new doc',
@@ -129,6 +184,31 @@ void main() {
       expect(result.email, equals('seed@test.com'));
       // Seeded doc has displayName null
       expect(result.displayName, isNull);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Alta sin fecha: la clave `bornAt` va AUSENTE, no en null
+  // ---------------------------------------------------------------------------
+  //
+  // firestore.rules llegó a denegar `bornAt: null` en el create (preguntaba
+  // `'bornAt' in data`) y nadie nuevo podía terminar el alta, con los tests de
+  // reglas en verde porque sembraban el doc sin la clave. Estos dos miran la
+  // CLAVE y no el valor: `snap.data()!['bornAt']` da null en los dos casos y
+  // no distingue nada.
+  group('Alta sin fecha — bornAt ausente, no null', () {
+    test('getOrCreate no escribe la clave bornAt', () async {
+      await repo.getOrCreate(uid: 'uid-alta-1', email: 'a@b.com');
+
+      final snap = await firestore.collection('users').doc('uid-alta-1').get();
+      expect(snap.data()!.containsKey('bornAt'), isFalse);
+    });
+
+    test('createIfAbsent no escribe la clave bornAt', () async {
+      await repo.createIfAbsent(uid: 'uid-alta-2', email: 'a@b.com');
+
+      final snap = await firestore.collection('users').doc('uid-alta-2').get();
+      expect(snap.data()!.containsKey('bornAt'), isFalse);
     });
   });
 
@@ -369,6 +449,24 @@ void main() {
     });
 
     test(
+        'a gym flagged nameNeeded never leaks its Google-derived name into '
+        'userPublicProfiles.gymName', () async {
+      await seedGymDoc(firestore, 'ChIJ_flagged', name: 'Nombre de Google');
+      await firestore
+          .collection('gyms')
+          .doc('ChIJ_flagged')
+          .update({'nameNeeded': true});
+      await seedDoc('u-gym-2');
+
+      await repo.update('u-gym-2', {'gymId': 'ChIJ_flagged'});
+
+      final pubSnap =
+          await firestore.collection('userPublicProfiles').doc('u-gym-2').get();
+      expect(pubSnap.data()!['gymId'], equals('ChIJ_flagged'));
+      expect(pubSnap.data()!['gymName'], isNull);
+    });
+
+    test(
         'SCENARIO-525: update with gymId=kNoGymId writes gymName:null with no '
         'gym resolution attempted', () async {
       await seedDoc('u-gym-2');
@@ -543,4 +641,116 @@ void main() {
       expect(profile.displayName, isNull);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // registrarTopeDelPlanPf — docs/limite-ejercicios-pf.md §2 y PR4
+  // ---------------------------------------------------------------------------
+  group('UserRepository.registrarTopeDelPlanPf', () {
+    test('escribe trainerLimitHitKind y trainerLimitHitAt', () async {
+      await seedDoc('trainer-1');
+
+      await repo.registrarTopeDelPlanPf('trainer-1', 'customExercises');
+
+      final snap = await firestore.collection('users').doc('trainer-1').get();
+      expect(snap.data()!['trainerLimitHitKind'], equals('customExercises'));
+      expect(snap.data()!['trainerLimitHitAt'], isA<Timestamp>());
+    });
+
+    test('hace merge: no pisa el resto del documento', () async {
+      await seedDoc('trainer-2');
+
+      await repo.registrarTopeDelPlanPf('trainer-2', 'customExercises');
+
+      final snap = await firestore.collection('users').doc('trainer-2').get();
+      // El seed puso email/role/etc — merge: true no debe haberlos borrado.
+      expect(snap.data()!['email'], equals('seed@test.com'));
+      expect(snap.data()!['role'], equals('athlete'));
+    });
+
+    test('no tira si el doc no existe (set con merge lo crea)', () async {
+      // `registrarTopeTocado` usa `.set(merge: true)`, que no exige que el
+      // doc exista de antes — mismo comportamiento acá, y el catch interno
+      // asegura que ni siquiera un error de Firestore se propague.
+      await expectLater(
+        repo.registrarTopeDelPlanPf('trainer-inexistente', 'customExercises'),
+        completes,
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // watchHasPendingWrites — la senal de pendiente que leen los gates
+  // ---------------------------------------------------------------------------
+  //
+  // fake_cloud_firestore NO emula la metadata (hasPendingWrites siempre false,
+  // e ignora includeMetadataChanges), asi que el ack del servidor no se puede
+  // observar con el fake. Se inyecta un doble de Firestore cuyo `snapshots`
+  // se comporta como el SDK real: SOLO entrega el ack (pending -> false sobre
+  // datos identicos) si se pidio includeMetadataChanges: true.
+  group('UserRepository.watchHasPendingWrites', () {
+    late _MockFirestore fs;
+    late _MockCollection col;
+    late _MockDocRef doc;
+    bool? requestedIncludeMetadata;
+
+    DocumentSnapshot<Map<String, Object?>> snap({required bool pending}) {
+      final meta = _MockMetadata();
+      when(() => meta.hasPendingWrites).thenReturn(pending);
+      final s = _MockSnap();
+      when(() => s.metadata).thenReturn(meta);
+      return s;
+    }
+
+    setUp(() {
+      fs = _MockFirestore();
+      col = _MockCollection();
+      doc = _MockDocRef();
+      requestedIncludeMetadata = null;
+      when(() => fs.collection('users')).thenReturn(col);
+      when(() => col.doc('uid-p')).thenReturn(doc);
+      when(() => doc.snapshots(
+            includeMetadataChanges: any(named: 'includeMetadataChanges'),
+          )).thenAnswer((inv) {
+        final include =
+            inv.namedArguments[#includeMetadataChanges] as bool? ?? false;
+        requestedIncludeMetadata = include;
+        return Stream.fromIterable([
+          // Escritura local optimista.
+          snap(pending: true),
+          // Ack del servidor sobre datos identicos: el SDK real lo entrega
+          // SOLO con includeMetadataChanges: true.
+          if (include) snap(pending: false),
+          // Un segundo evento de metadata que no cambia el valor.
+          if (include) snap(pending: false),
+        ]);
+      });
+    });
+
+    test(
+        'pide includeMetadataChanges: true y emite true, luego false, sin '
+        'repetidos', () async {
+      final repo = UserRepository(
+        firestore: fs,
+        gyms: GymRepository(firestore: FakeFirebaseFirestore()),
+      );
+
+      final values = await repo.watchHasPendingWrites('uid-p').toList();
+
+      expect(requestedIncludeMetadata, isTrue);
+      expect(values, [true, false]);
+    });
+  });
 }
+
+class _MockFirestore extends Mock implements FirebaseFirestore {}
+
+class _MockCollection extends Mock
+    implements CollectionReference<Map<String, Object?>> {}
+
+class _MockDocRef extends Mock
+    implements DocumentReference<Map<String, Object?>> {}
+
+class _MockSnap extends Mock
+    implements DocumentSnapshot<Map<String, Object?>> {}
+
+class _MockMetadata extends Mock implements SnapshotMetadata {}

@@ -21,9 +21,9 @@ Todo cuelga de `gettreino.com`, que ya es tuyo y cuyo DNS ya vive en Vercel
 
 | Nombre | Apunta a | Para qué |
 |---|---|---|
-| `gettreino.com` | Vercel · proyecto `treino-app` | Landing pública (ya anda) |
+| `gettreino.com` | Vercel · proyecto `treino-app` | Landing pública (ya anda). También es dominio de envío en Resend: el remitente visible es `treino@gettreino.com` |
 | `app.gettreino.com` | Vercel · proyecto nuevo | Coach Hub web |
-| `send.gettreino.com` | Resend | Remitente del email |
+| `send.gettreino.com` | Resend | Return-path (MX y SPF) del envío; hasta el 2026-09-30 fue también el remitente |
 | `auth.gettreino.com` | Firebase Hosting | Action handler de reseteo |
 
 **Un subdominio por servicio, a propósito.** Cada uno falla solo. Si algún día
@@ -36,10 +36,14 @@ se lastima la reputación de envío, no se lleva puesta la web.
 El dominio raíz tiene hoy:
 
 ```
-gettreino.com  TXT  "v=spf1 include:mailgun.org ~all"
+gettreino.com  TXT  "v=spf1 include:mailgun.org include:_spf.google.com ~all"
 ```
 
-Algo tuyo ya manda mail desde ahí (probablemente el formulario de la landing).
+Ese registro **ya está mergeado**: lleva Mailgun *y* Google Workspace. Ver
+[§ Google Workspace](#google-workspace) más abajo.
+
+Mailgun está en uso de verdad — hay un DKIM `mg-tidio._domainkey` de hace meses,
+así que ese include **no se saca**.
 
 **No se pueden tener dos registros SPF en el mismo dominio.** Si agregás el de
 Resend en la raíz y queda un segundo `v=spf1`, SPF no falla para el nuevo:
@@ -47,8 +51,48 @@ Resend en la raíz y queda un segundo `v=spf1`, SPF no falla para el nuevo:
 de Mailgun.
 
 Mandar desde `send.gettreino.com` esquiva esto por completo — el subdominio
-tiene su propio SPF, independiente del de la raíz. **No toques el TXT de la
-raíz.**
+tiene su propio SPF, independiente del de la raíz. **Para Resend no toques el
+TXT de la raíz.**
+
+> **Si algún día agregás otro emisor en la raíz**, la regla es *editar* ese único
+> registro y sumarle su `include:`, nunca crear un segundo `v=spf1`. En Vercel:
+>
+> ```bash
+> vercel dns ls gettreino.com --limit 100     # buscar el id del TXT con v=spf1
+> vercel dns update <rec_id> --value "v=spf1 include:... include:... ~all"
+> ```
+>
+> `vercel dns update` pide confirmación interactiva porque sobrescribe un
+> registro vivo — no se puede automatizar, y está bien que así sea. Después
+> verificá que quede **uno solo**:
+>
+> ```bash
+> dig +short TXT gettreino.com | grep -c 'v=spf1'   # tiene que dar 1
+> ```
+
+---
+
+## Google Workspace — casilla de contacto
+
+Configurado el **2026-09-01**. Es el canal de contacto y de ejercicio de
+derechos que citan los documentos de [`docs/legal/`](./legal/README.md).
+
+| Qué | Valor |
+|---|---|
+| Casilla | `treino@gettreino.com` |
+| MX | `1 smtp.google.com` |
+| DKIM | `google._domainkey` |
+| SPF | mergeado en el TXT de la raíz (ver arriba) |
+| DMARC | `v=DMARC1; p=none; rua=mailto:treino@gettreino.com` |
+
+**El SPF se mergeó, no se duplicó.** El registro de la raíz pasó de
+`include:mailgun.org ~all` a incluir también `include:_spf.google.com`. Si
+alguien lo "limpia" sacando el include de Google, todo lo que responda esa
+casilla se va a spam — y ahí adentro viajan las respuestas a pedidos de habeas
+data, que tienen plazo legal.
+
+Pendiente: la prueba de punta a punta (enviar desde afuera, responder, y
+confirmar `SPF/DKIM/DMARC: PASS` en las cabeceras del mensaje recibido).
 
 ---
 
@@ -83,9 +127,21 @@ firebase functions:secrets:set RESEND_API_KEY --project prod
 > comandos de este runbook.
 
 El remitente por defecto ya está en el código
-(`MAIL_FROM = "TREINO <equipo@send.gettreino.com>"`,
-`functions/src/mail/send-queued-mail.ts`). Si querés otro, se sobrescribe con la
-variable de entorno `MAIL_FROM` — no hace falta tocar código.
+(`MAIL_FROM = "TREINO <treino@gettreino.com>"`,
+`functions/src/mail/send-queued-mail.ts`), y `functions/.env.treino-dev` lo
+repite: **ese archivo gana** sobre el default, así que hay que cambiar los dos.
+
+Desde el 2026-09-30 el remitente es `treino@gettreino.com`, un buzón real: las
+respuestas llegan a una persona (antes salía de `equipo@send.gettreino.com`, que
+no tiene buzón). Para eso `gettreino.com` está agregado en Resend además de
+`send.gettreino.com`: su DKIM va en `resend._domainkey`, y el MX y el SPF de
+`send` los comparten. **La raíz no necesita otro SPF**: el SPF se evalúa contra
+el return-path (`send.gettreino.com`), que está alineado con el remitente por
+ser del mismo dominio de organización, y el DKIM también alinea. Sigue valiendo
+lo de arriba: para Resend no toques el TXT de la raíz.
+
+Si querés otro remitente, se sobrescribe con la variable de entorno `MAIL_FROM`,
+y **el dominio tiene que estar verificado en Resend** o cada envío devuelve 403.
 
 ---
 
@@ -197,6 +253,37 @@ publicación de la app.
 
 ---
 
+## Pedido de baja de correos promocionales que llega por mail
+
+Alguien le escribe a `treino@gettreino.com` pidiendo no recibir más correos
+promocionales. Dos caminos:
+
+1. **Que lo haga la persona.** Respondele que use el link «dejá de recibir
+   correos promocionales» del pie de cualquier correo promocional de TREINO.
+   Existe desde el deploy del pie (orden en
+   [`openspec/changes/baja-de-correos-promocionales/design.md`](../openspec/changes/baja-de-correos-promocionales/design.md)
+   §10); un correo anterior no lo tiene.
+2. **Que lo haga el operador**, en la consola de Firebase: Authentication, buscá
+   la cuenta por mail y copiá el `uid`; después Firestore → `users/{uid}` →
+   `notificationPrefs` → `novedades_plan` → `email` = `false` (boolean). Si el
+   mapa `notificationPrefs` o `novedades_plan` no existe, se crea. **Poné
+   `false`, no borres el campo**: la clave ausente cuenta como prendida.
+
+⚠️ `treino-dev` es producción: es un documento de un usuario real. Confirmá que
+el `uid` es el del mail que pidió la baja antes de escribir.
+
+`sendQueuedMail` lee esa preferencia **al enviar**, así que también frena un
+correo que ya estaba encolado. Frena los mails comerciales con `prefKey`
+`novedades_plan` y el bloque de venta de `limit-reached`. **No** frena los avisos
+operativos de la cuenta: un aviso de que los alumnos quedaron en solo lectura le
+sigue llegando a quien se dio de baja de lo promocional.
+
+El link del pie lo firma el secreto `BAJA_PROMOCIONALES_KEY` (propio, no se
+reusa otro). Rotarlo invalida todos los links ya enviados: sólo ante una
+filtración.
+
+---
+
 ## Deuda conocida
 
 - **Sin deep links.** No hay `assetlinks.json`, ni associated domains, ni
@@ -208,5 +295,9 @@ publicación de la app.
   el vacío. Decidir entre `noreply@` o un `Reply-To` a una casilla real.
 - **`gettreino-vercel.app` no existe** (NXDOMAIN) y sigue listado en Vercel →
   Domains. Basura para limpiar.
-- **El canal push no lee `notificationPrefs`.** Las CFs mandan siempre. Email sí
-  lo respeta en las dos filas de `kEmailBackedTypes`.
+- **Push y email leen `notificationPrefs`, pero sólo si el productor pasa
+  `prefKey`.** `sendFcm` salta a quien tiene `notificationPrefs.<prefKey>.push ===
+  false` (`functions/src/notifications/send-fcm.ts:133-141`) y `sendQueuedMail`
+  hace lo mismo con `.email === false`; un push o un mail sin `prefKey` no se
+  frena nunca. Es opt-out: la clave ausente cuenta como prendida. El Coach Hub
+  sólo dibuja la casilla de email en las dos filas de `kEmailBackedTypes`.

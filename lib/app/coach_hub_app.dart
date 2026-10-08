@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/auth/application/auth_providers.dart';
+import '../features/coach_hub/application/coach_hub_router_refresh.dart';
 import '../l10n/app_l10n.dart';
 import 'coach_hub_router.dart';
 import 'locale_resolver.dart';
@@ -27,7 +27,7 @@ class _CoachHubAppState extends ConsumerState<CoachHubApp> {
   @override
   void initState() {
     super.initState();
-    final refresh = ref.read(routerRefreshNotifierProvider);
+    final refresh = ref.read(coachHubRouterRefreshProvider);
     _router = buildCoachHubRouter(refreshListenable: refresh, read: ref.read);
   }
 

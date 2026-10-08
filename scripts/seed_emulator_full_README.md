@@ -59,11 +59,35 @@ created on the first run; subsequent runs update them.
 
 ## 3. Run the app against the emulator
 
-In another terminal:
+In another terminal. Mobile app:
 
 ```sh
 flutter run --dart-define=USE_EMULATOR=true
 ```
+
+Coach Hub (the Flutter **web** target):
+
+```sh
+flutter run -t lib/main_coach_hub.dart -d web-server \
+  --web-hostname 127.0.0.1 --web-port 5555 \
+  --dart-define=USE_EMULATOR=true
+```
+
+Both targets point Firestore at `localhost:8080` and Auth at `localhost:9099`
+(`lib/main.dart`, `lib/main_coach_hub.dart:53-60`), while the page above is
+served from `127.0.0.1`. That mismatch is not a problem, and it is worth knowing
+why, because it looks like one: the emulator binds IPv4 `127.0.0.1` only, and on
+macOS `localhost` resolves to `::1` *and* `127.0.0.1`. Measured — the connection
+lands on IPv4 either way:
+
+```sh
+curl -s -o /dev/null -w 'ip=%{remote_ip}\n' http://localhost:9099/   # -> ip=127.0.0.1
+lsof -nP -iTCP:9099 -sTCP:LISTEN                                     # -> 127.0.0.1:9099 only
+```
+
+The two *are* different origins, though, so every Auth call gets a CORS
+preflight and the emulator answers it (`OPTIONS ... 204 No Content`). That
+preflight is normal, not a symptom.
 
 ---
 
@@ -103,6 +127,95 @@ npm run seed:emulator:clear
 | `ignacio@emulator.treino` | `Emulator1234!` | Ignacio Torres | Hierro Palermo | advanced |
 | `rocio@emulator.treino` | `Emulator1234!` | Rocío Medina | Hierro Palermo | beginner |
 | `facundo@emulator.treino` | `Emulator1234!` | Facundo Ríos | Hierro Palermo | intermediate |
+
+---
+
+## Is the app REALLY on the emulator?
+
+Measured 2026-09-07 on `lib/main_coach_hub.dart` with
+`--dart-define=USE_EMULATOR=true`: **yes**, both Auth and Firestore. The wiring
+in `main_coach_hub.dart:53-60` works. This section exists because the obvious
+way to check it produces a convincing false positive, and that cost an
+afternoon.
+
+### The trap — the emulator URL CONTAINS the production host
+
+The Auth emulator does not invent its own path scheme. It mounts the real
+Identity Toolkit path underneath itself, so the URL the SDK actually calls is:
+
+```
+http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIza...
+```
+
+`identitytoolkit.googleapis.com` there is a **path segment, not the origin**. A
+`window.fetch` hook, a grep over a log, or any truncated readout will show that
+substring on a perfectly correct emulator call. Reading it as
+`https://identitytoolkit.googleapis.com/...` — "the app is talking to
+production" — is wrong, and the request body is identical either way, so the
+body proves nothing:
+
+```json
+{"returnSecureToken":true,"email":"...","password":"...","clientType":"CLIENT_TYPE_WEB"}
+```
+
+Same trap in the other direction: the red bar at the bottom of the page,
+`Running in emulator mode. Do not use with production credentials.`, is injected
+by the Firebase JS SDK's `connectAuthEmulator`, not by this repo:
+
+```sh
+rg -n 'Do not use with production credentials' .   # -> no hits
+```
+
+It proves the emulator wiring was applied to the default `FirebaseAuth`
+instance. It does **not** prove where any individual request went.
+
+### What actually decides it
+
+Sign in as a user that exists ONLY in the emulator. If the app lets you in,
+the call reached the emulator — there is no other explanation. Create one, note
+`lastLoginAt`, log in from the app, and read it again:
+
+```sh
+curl -s -X POST -H 'Authorization: Bearer owner' -H 'Content-Type: application/json' \
+  'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/treino-dev/accounts:query' \
+  -d '{}' \
+| python3 -c 'import sys,json;[print(u.get("email"),u.get("lastLoginAt")) for u in json.load(sys.stdin)["userInfo"]]'
+```
+
+Two things to know about that endpoint: it is a **POST**, and it needs
+`Authorization: Bearer owner`. `GET /emulator/v1/projects/<id>/accounts` answers
+`{"message":"Method GET not allowed"}` — a body with no `userInfo` key, which a
+careless parser reports as "0 users" instead of as an error. Same for Firestore:
+a plain `curl` of a document returns `403 PERMISSION_DENIED` because the
+emulator applies `firestore.rules` to the REST API too. Add the owner token.
+
+For the network view, read it in browser devtools (CDP level), not from a
+`fetch` hook. Firestore is unambiguous there because it has no host-in-path
+trick:
+
+```
+http://localhost:8080/google.firestore.v1.Firestore/Listen/channel?...&database=projects%2Ftreino-dev%2Fdatabases%2F(default)
+```
+
+### "La contraseña es incorrecta" was telling the truth
+
+The seed password is `Emulator1234!` for **every** account (table above).
+`emulador123` belongs to no seeded user, and the emulator rejects it:
+
+```sh
+curl -s -X POST 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"coach.lautaro@emulator.treino","password":"emulador123","returnSecureToken":true}'
+# -> {"error":{"code":400,"message":"INVALID_PASSWORD", ...}}
+```
+
+The emulator answers `400 INVALID_PASSWORD`, the SDK maps it to
+`wrong-password`, and `AuthFailure` renders "La contraseña es incorrecta"
+(`lib/features/auth/domain/auth_failure.dart:40-58`). A wrong password against
+production renders the same string, so **the UI message is not evidence of where
+the call went, in either direction**. Note also that `network-request-failed`
+maps to "Sin conexión", not to the password message: if you are seeing the
+password error, a request was made and a server answered it.
 
 ---
 

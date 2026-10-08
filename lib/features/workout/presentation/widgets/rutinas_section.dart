@@ -14,7 +14,7 @@ import '../../../profile/application/user_providers.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../application/assigned_routine_providers.dart';
 import '../../application/routine_providers.dart'
-    show routineRepositoryProvider;
+    show invalidateRoutineById, routineRepositoryProvider;
 import '../../application/session_providers.dart' show currentUidProvider;
 import '../../application/unified_routines_providers.dart';
 import '../../application/user_routines_providers.dart';
@@ -352,8 +352,14 @@ class _RoutineCard extends ConsumerWidget {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
+    // Captured before the async gap so the cache drop survives an unmount.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(routineRepositoryProvider).archive(routine.id);
+      // Archivar sólo cambia `status` en el doc. Los lectores one-shot
+      // cachean el doc entero, así que sin esto la rutina archivada sigue
+      // siendo arrancable hasta que se reinicie la app.
+      invalidateRoutineById(container, routine.id);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.workoutMisRutinasArchiveSuccess)),

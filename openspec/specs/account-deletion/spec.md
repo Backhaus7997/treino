@@ -9,7 +9,7 @@
 
 ## TL;DR
 
-Athlete-initiated irreversible account deletion flow with Cloud Function cascade, provider-aware re-auth (password/Google/Apple), and full data cleanup across 8+ Firestore collections, Storage, Firebase Auth, and audit logging. Delivered via 3 chained PRs (#103, #106, #112) to main.
+Irreversible account deletion flow for athletes and trainers, with Cloud Function cascade, provider-aware re-auth (password/Google/Apple), and full data cleanup across 8+ Firestore collections, Storage, Firebase Auth, and audit logging. Trainer self-deletion added via follow-up PRs (#1341, #1343, #1346, #1350). For trainers: cascade terminates links with new reason `trainer-account-deleted`, cancels future appointments, deletes templates and training data, but retains payments and keeps athlete routines/chats intact.
 
 ---
 
@@ -34,9 +34,8 @@ This spec defines 3 coordinated capabilities, all NEW (no prior specs to merge):
 ### Out of Scope
 
 - Pre-delete data export (deferred GDPR work)
-- Trainer self-deletion (CF rejects)
 - Soft-delete / grace period
-- Email notifications
+- Email notifications (trainer unlink notice is push only)
 - Account restoration
 - Storage rules audit
 
@@ -68,14 +67,157 @@ The CF MUST verify `context.auth.uid === data.uid`. If they differ, MUST throw `
 
 ---
 
-### REQ-ACCDEL-CF-003 — Trainer Role Rejection
+### REQ-ACCDEL-CF-003 — Trainer Self-Deletion (Inverted: SCENARIO-535)
 
-The CF MUST read the caller's `users/{uid}.role` field. If `role === 'trainer'`, MUST throw `HttpsError('permission-denied', 'trainers cannot self-delete')`.
+The CF MUST allow trainers to self-delete their accounts. The caller's `users/{uid}.role` field is no longer a guard; trainers proceed through the same deletion flow as athletes. The CF MUST execute an unconditional trainer cascade (runs on every call; for athletes, all queries return empty/no-op).
 
-#### SCENARIO-535: Trainer calls deleteAccount
+#### SCENARIO-535: Trainer calls deleteAccount and succeeds
 - **Given** an authenticated user whose `users/{uid}.role` is `'trainer'`
 - **When** they call `deleteAccount({ uid: <their_uid> })`
-- **Then** the CF throws `HttpsError` with code `permission-denied`
+- **Then** the CF succeeds, the trainer cascade executes (terminating links, cancelling future appointments, deleting templates and data), and Auth + users/{uid} are deleted
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003A — Trainer Cascade Idempotency
+
+The trainer cascade MUST run unconditionally on every `deleteAccount` call. For athlete accounts, all trainer-keyed queries return empty (no-op). The cascade MUST NOT depend on `users/{uid}` existing; idempotency across re-runs is guaranteed by trainer-keyed queries.
+
+#### SCENARIO-PSD-01: Trainer cascade is a no-op for athletes
+- **Given** an authenticated athlete (no trainer data)
+- **When** the CF executes the trainer cascade
+- **Then** no documents are created, modified, or deleted
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-02: Re-run after partial failure completes cleanly
+- **Given** the CF previously ran and deleted Firestore docs but failed on Storage
+- **When** the CF is called again for the same trainer uid
+- **Then** the trainer cascade re-executes, finding zero residual trainer-keyed docs
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003B — Trainer Links Termination with New Reason
+
+The CF MUST query `trainer_links/*` where `trainerId == uid` (not `athleteId`; this is the inverse direction) and update each link in a non-terminal state: `status = 'terminated'`, `reason = 'trainer-account-deleted'` (new constant), `terminatedAt = <server timestamp>`. The `notify-link-change` trigger MUST dispatch a new athlete-notification «Tu entrenador cerró su cuenta» for each terminated link.
+
+#### SCENARIO-PSD-03: Active trainer link is terminated with trainer-account-deleted reason
+- **Given** an athlete with a `trainer_links` doc where `trainerId == <trainer_uid>` and `status` is active/paused
+- **When** the trainer deletes their account
+- **Then** the link updates: `status == 'terminated'` and `reason == 'trainer-account-deleted'`
+- **And** the athlete receives a notification «Tu entrenador cerró su cuenta»
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-04: Pending trainer link is purged (with notice)
+- **Given** a `trainer_links` doc with `status == 'pending'` and `trainerId == <trainer_uid>`
+- **When** the trainer deletes their account
+- **Then** the link is terminated with reason `trainer-account-deleted`
+- **And** the athlete receives a different message «Solicitud sin efecto»
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003C — Trainer Future Appointments Cancelled
+
+The CF MUST query `appointments/*` where `trainerId == uid AND status in ['requested', 'confirmed'] AND startsAt > now()` and update each: `status = 'cancelled'`, `reason = 'trainer-account-deleted'`, `cancelledBy = uid`, and append to `cancellationLog`. The athlete MUST NOT receive a per-appointment notice (`notify-appointment` skips this reason); the link-termination notice is the only one, and it MUST NOT claim the appointments were cancelled, since this step can fail and return `partial`.
+
+#### SCENARIO-PSD-05: Trainer future appointments are cancelled
+- **Given** a trainer with 1 past and 1 future confirmed appointment where `trainerId == <trainer_uid>`
+- **When** the trainer deletes their account
+- **Then** the future appointment has `status == 'cancelled'` and `reason == 'trainer-account-deleted'`
+- **And** the athlete receives NO per-appointment notice (`notify-appointment` suppresses it for this reason); the link notice is the only one
+- **And** the past appointment remains untouched
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-06: Trainer availability rules and overrides are deleted
+- **Given** a trainer with `coach_availability_rules` and `coach_availability_overrides` where `trainerId == uid`
+- **When** the trainer deletes their account
+- **Then** all matching rules and overrides are deleted
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003D — Trainer Data Deletion (Notes, Billing, Files, Follow-up, Nutrition, Reviews)
+
+The CF MUST delete the following collections/documents where `trainerId == uid`:
+- `athlete_notes`, `athlete_billing`, `athlete_files`
+- `follow_up_entries`, `nutrition_plans`
+- `reviews` received by the trainer (`trainerId == uid`); reviews the trainer wrote as an athlete keep the existing athlete-side retention
+- `session_shares`, `profile_shares` (where the athlete granted access to this trainer)
+
+Storage files matching pattern `athleteFiles/{trainerId}_*` MUST be deleted.
+
+#### SCENARIO-PSD-07: Trainer-written athlete data is deleted
+- **Given** a trainer with `athlete_notes`, `follow_up_entries`, `nutrition_plans` where `trainerId == uid`
+- **When** the trainer deletes their account
+- **Then** all matching docs are deleted
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-08: Trainer Storage files are deleted
+- **Given** a trainer with Storage files matching `athleteFiles/{trainerId}_*`
+- **When** the trainer deletes their account
+- **Then** all matching files are removed from Storage
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003E — Trainer Templates Deleted (Including Published)
+
+The CF MUST query `routines/*` where `assignedBy == uid AND source == 'trainer-template'` (using recursiveDelete to cascade to sub-collections) and delete all matching docs. Published templates have `visibility == 'public'` but are the same collection; no separate query is needed.
+
+#### SCENARIO-PSD-09: Trainer templates (including published) are deleted
+- **Given** a trainer with 5 template routines (some `visibility == 'public'`) where `assignedBy == uid`
+- **When** the trainer deletes their account
+- **Then** all 5 routines are deleted
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-10: Athlete-assigned routines remain for the athlete
+- **Given** an athlete with a routine `assignedBy == <trainer_uid>` and `assignedTo == <athlete_uid>`
+- **When** the trainer deletes their account
+- **Then** the routine remains in the athlete's account and is usable
+- **Test target**: CF integration test (emulator)
+
+#### SCENARIO-PSD-11: cleanup-assigned-plans does NOT archive routines linked with trainer-account-deleted reason
+- **Given** an athlete with an active routine linked via a `trainer_links` doc with `reason == 'trainer-account-deleted'`
+- **When** `cleanup-assigned-plans` trigger fires for this link
+- **Then** the routine is NOT archived (other reasons archive per current behavior)
+- **Test target**: CF integration test + cleanup-assigned-plans test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003F — Trainer Payments Retained (Fiscal Requirement)
+
+The CF MUST NOT delete or modify `payments/*` where `trainerId == uid`. Payments are a fiscal record and MUST be retained indefinitely.
+
+#### SCENARIO-PSD-12: Trainer payments are retained
+- **Given** a trainer with `payments` docs where `trainerId == uid`
+- **When** the trainer deletes their account
+- **Then** all payment docs remain unchanged
+- **Test target**: CF integration test (emulator)
+
+---
+
+### REQ-ACCDEL-CF-003G — Chats Remain for Athletes
+
+Chats where a trainer is a member MUST remain in the athlete's chat list. The trainer's identity resolves to "cuenta eliminada" (deleted account) at render time if `userPublicProfiles/{trainerId}` is missing.
+
+#### SCENARIO-PSD-13: Chat history remains after trainer deletion
+- **Given** a chat thread where a trainer is a member and messages exist
+- **When** the trainer deletes their account
+- **Then** the chat and all messages remain for the athlete
+- **And** the trainer's sender name displays as "cuenta eliminada"
+- **Test target**: Chat UI test with missing `userPublicProfiles` entry
+
+---
+
+### REQ-ACCDEL-CF-003H — No Resurrecting Ghost Trainer Docs
+
+The CF MUST ensure triggers (`link-aggregate`, `link-load-reconcile`, `recountTemplates`, etc.) do not re-create trainer-keyed docs after the cascade completes. This is enforced by switching non-transactional exists-checks to `update()` operations (NOT_FOUND caught and logged).
+
+#### SCENARIO-PSD-14: Triggers do not resurrect trainer-keyed docs
+- **Given** a trainer fully deleted via the cascade
+- **When** async triggers (`link-aggregate`, `review-aggregate`) attempt to sync
+- **Then** they complete without re-creating trainer docs
 - **Test target**: CF integration test (emulator)
 
 ---
@@ -354,7 +496,15 @@ Chat UI MUST render sender name as "Usuario eliminado" (es-AR; marked `// i18n: 
 |---|---|---|---|
 | REQ-ACCDEL-CF-001 | Callable function exists | SCENARIO-533 | ✅ |
 | REQ-ACCDEL-CF-002 | Anti-spoofing guard | SCENARIO-534 | ✅ |
-| REQ-ACCDEL-CF-003 | Trainer role rejection | SCENARIO-535 | ✅ |
+| REQ-ACCDEL-CF-003 | Trainer self-deletion (inverted) | SCENARIO-535 | ✅ |
+| REQ-ACCDEL-CF-003A | Trainer cascade idempotency | SCENARIO-PSD-01, PSD-02 | ✅ |
+| REQ-ACCDEL-CF-003B | Trainer links termination | SCENARIO-PSD-03, PSD-04 | ✅ |
+| REQ-ACCDEL-CF-003C | Trainer appointments cancelled | SCENARIO-PSD-05, PSD-06 | ✅ |
+| REQ-ACCDEL-CF-003D | Trainer data deletion | SCENARIO-PSD-07, PSD-08 | ✅ |
+| REQ-ACCDEL-CF-003E | Trainer templates deleted | SCENARIO-PSD-09, PSD-10, PSD-11 | ✅ |
+| REQ-ACCDEL-CF-003F | Trainer payments retained | SCENARIO-PSD-12 | ✅ |
+| REQ-ACCDEL-CF-003G | Chats remain for athletes | SCENARIO-PSD-13 | ✅ |
+| REQ-ACCDEL-CF-003H | No ghost trainer docs | SCENARIO-PSD-14 | ✅ |
 | REQ-ACCDEL-CF-004 | Main user docs deleted | SCENARIO-536, 537 | ✅ |
 | REQ-ACCDEL-CF-005 | Friendships sweep | SCENARIO-538, 539 | ✅ |
 | REQ-ACCDEL-CF-006 | Posts anonymized | SCENARIO-540, 541 | ✅ |
@@ -421,6 +571,8 @@ Chat UI MUST render sender name as "Usuario eliminado" (es-AR; marked `// i18n: 
 4. CF service account refactor to `firebase-adminsdk-fbsvc` (cleaner IAM model)
 5. Node 20 → 22 + firebase-functions upgrade (deprecation warnings)
 6. gymSearchQueryProvider autoDispose (arrastre from profile-screen-rewrite SDD)
+7. ~~Partial deletion retry automation (issue #1353)~~ DONE: scheduled `retryPartialDeletions` (daily 06:00 ART) re-runs ONLY the data cascade (`cascade/run-data-cascade.ts`) over `audit_log where status == 'partial'` (limit 50/run); never MP, never Auth (unless the original error was `auth:`), no re-notification (terminated links / cancelled appointments are filtered, so no write, so no trigger). Tracks `retryCount`/`lastRetryAt`; success sets `status: 'success'` + `retriedAt`; the 5th failed attempt sets `status: 'failed'` and logs at error level
+8. Coach Hub web delete button for trainers (issue #1334, follow-up)
 
 ---
 
@@ -435,9 +587,19 @@ Chat UI MUST render sender name as "Usuario eliminado" (es-AR; marked `// i18n: 
 ---
 
 **Engram references** (SDD artifacts):
+
+### Original change (account-deletion):
 - sdd/account-deletion/proposal (obs #115)
 - sdd/account-deletion/spec (obs #116)
 - sdd/account-deletion/design (obs #117)
 - sdd/account-deletion/tasks (obs #118)
 - sdd/account-deletion/apply-progress (obs #119)
 - sdd/account-deletion/verify-report (obs #123)
+
+### Follow-up change (pf-self-delete, issue #1333):
+- sdd/pf-self-delete/proposal (obs #1336)
+- sdd/pf-self-delete/spec (obs #1338)
+- sdd/pf-self-delete/design (obs #1339)
+- sdd/pf-self-delete/tasks (obs #1342)
+- sdd/pf-self-delete/apply-progress (obs #1344)
+- sdd/pf-self-delete/archive-report (this archive)

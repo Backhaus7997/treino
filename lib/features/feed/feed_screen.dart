@@ -18,11 +18,10 @@ import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../gyms/domain/gym.dart' show kNoGymId;
-import '../notifications/application/notification_history_providers.dart';
+import '../moderation/application/moderation_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../profile/domain/user_role.dart';
-import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/feed_pagination_notifier.dart';
 import 'application/post_providers.dart';
@@ -348,9 +347,8 @@ class _FeedActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final uid = ref.watch(currentUidProvider);
-    final notificationBadge =
-        uid == null ? 0 : ref.watch(notificationHeaderBadgeProvider(uid));
+    // La campana se mudó a la pantalla principal (`NotificationBell`): el feed
+    // ya no la muestra, así que tampoco mira su badge.
     // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
     // Only user↔user (social) chats feed this badge — messages from the
     // athlete's coach live under the COACH tab badge. See
@@ -365,56 +363,6 @@ class _FeedActions extends ConsumerWidget {
       key: const ValueKey('feed-header-actions'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        Semantics(
-          button: true,
-          label: notificationBadge > 0
-              ? l10n.notificationBellWithCountA11y(notificationBadge)
-              : l10n.notificationBellA11y,
-          child: TreinoTappable(
-            onTap: () => context.push('/feed/notifications'),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: _kFeedActionTapTarget,
-                minHeight: _kFeedActionTapTarget,
-              ),
-              child: Center(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const _FeedIconBubble(icon: TreinoIcon.bell),
-                    if (notificationBadge > 0)
-                      Positioned(
-                        top: -2,
-                        right: -3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          constraints: const BoxConstraints(minWidth: 16),
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            notificationBadge > 9 ? '9+' : '$notificationBadge',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.barlow(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: spacing),
         Semantics(
           button: true,
           label: unreadChats > 0
@@ -677,10 +625,29 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
           )
         else
           SliverPadding(
-            padding: EdgeInsets.only(bottom: bottomInset),
+            // El vacío arranca ARRIBA, no en el medio del alto sobrante.
+            //
+            // `SliverFillRemaining` entrega todo lo que queda de viewport, y el
+            // `Center` de `FeedEmptyState` lo usaba entero: en un teléfono el
+            // mensaje caía a ~480px de los chips de filtro, con un pozo negro
+            // en el medio que no era ni separación ni contenido. Y con
+            // «Seguidores» arrastraba abajo a las sugerencias, que son
+            // justamente la salida del estado vacío.
+            //
+            // `align: start` lo sube; el padding de arriba es la separación
+            // deliberada respecto de los filtros. Se mantiene
+            // `hasScrollBody: false` para que la pantalla siga sin scroll
+            // cuando no hay nada.
+            padding: EdgeInsets.only(
+              top: AppSpacing.s20,
+              bottom: bottomInset,
+            ),
             sliver: SliverFillRemaining(
               hasScrollBody: false,
-              child: widget.content.emptyState,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: widget.content.emptyState,
+              ),
             ),
           ),
       ],
@@ -913,7 +880,10 @@ class _AmigosBody extends ConsumerWidget {
         if (posts.isEmpty) {
           return _FeedContent.empty(
             Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              // `min` y no el `center` que había: el alineado vertical lo
+              // decide el `Align` del sliver, y centrar acá adentro volvía a
+              // empujar el par al medio del alto sobrante.
+              mainAxisSize: MainAxisSize.min,
               children: [
                 FeedEmptyState(
                   message: AppL10n.of(context).feedEmptyFollowing,
@@ -959,6 +929,7 @@ class _MiGymBody extends ConsumerWidget {
     final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+    final blockedUids = ref.watch(myBlockedUidsProvider);
 
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
@@ -988,14 +959,23 @@ class _MiGymBody extends ConsumerWidget {
             FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
         }
-        if (posts.isEmpty) {
+        // moderacion-reporte-y-bloqueo: oculta las tarjetas de autores
+        // bloqueados. COSMÉTICO, no un control de seguridad — el read de
+        // `posts` sigue siendo el mismo para todo el tier gym (design.md →
+        // "Lo que queda cosmético, y se dice"); esto sólo evita mostrárselas
+        // en ESTE cliente. `pagination` se calcula sobre el `posts` SIN
+        // filtrar para no perder el tipo `PaginatedPostList` (isLoadingMore /
+        // hasMore) que `.where().toList()` no preserva.
+        final visiblePosts =
+            posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
+        if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
-          posts: posts,
+          posts: visiblePosts,
           suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
@@ -1030,6 +1010,7 @@ class _PublicoBody extends ConsumerWidget {
     final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+    final blockedUids = ref.watch(myBlockedUidsProvider);
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(feedPublicProvider),
@@ -1042,14 +1023,20 @@ class _PublicoBody extends ConsumerWidget {
         ref.invalidate(feedPublicProvider);
       },
       dataBuilder: (context, posts) {
-        if (posts.isEmpty) {
+        // moderacion-reporte-y-bloqueo: oculta las tarjetas de autores
+        // bloqueados. COSMÉTICO — ver la nota gemela en `_MiGymBody`.
+        // `pagination` lee del `posts` SIN filtrar para conservar
+        // `PaginatedPostList` (isLoadingMore/hasMore).
+        final visiblePosts =
+            posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
+        if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
-          posts: posts,
+          posts: visiblePosts,
           suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {

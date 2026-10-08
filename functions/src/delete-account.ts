@@ -1,19 +1,30 @@
 /**
  * deleteAccount — Firebase Callable Cloud Function handler.
  *
- * Full cascade handler (PR#2): handles auth guard, anti-spoofing, trainer role guard,
- * audit log, full Firestore/Storage cascade, and Auth user deletion (last).
+ * Full cascade handler (PR#2): handles auth guard, anti-spoofing, audit log,
+ * full Firestore/Storage cascade, and Auth user deletion (last).
+ *
+ * Trainers (role == 'trainer') delete their account like anyone else (#1333,
+ * Apple 5.1.1(v)). There is NO role guard: the trainer steps (T1-T5, from
+ * `cascade/trainer-data.ts`) run on EVERY call and are no-ops for an athlete.
+ *
+ * Steps 4-9 (the Firestore/Storage data cascade) live in
+ * `cascade/run-data-cascade.ts`, shared with the retry of `partial` deletions
+ * (`retention/retry-partial-deletions.ts`, #1353).
  *
  * Cascade order (REQ-ACCDEL-CF-012: Auth MUST be last):
  *   1. Validate + anti-spoof (callable wrapper)
- *   2. Trainer role guard
+ *  2b. Cancel live Mercado Pago subscriptions — FAIL-CLOSED: if MP cannot be
+ *      reached the account is NOT touched (see cascade/subscriptions.ts)
  *   3. Audit log: started
  *   4. Sweep follows
  *   5. Delete posts
- *   6. Terminate trainer links
- *   7. Cancel future appointments
+ *   6. Terminate trainer links (as athlete)            + T1 as trainer
+ *   7. Cancel future appointments (as athlete)         + T2 as trainer
  *   8. Delete storage avatar
- *  8d. Delete the athlete's routines (assigned plans + own routines)
+ *  8b. Athlete storage                                 + T3 trainer storage
+ *  8c. Athlete-owned data                              + T4 trainer data
+ *  8d. Delete the athlete's routines                   + T5 trainer templates
  *   9. Delete user docs (users + userPublicProfiles + trainerPublicProfiles)
  *  10. Update audit log with cascade results
  *  11. Delete Auth user (LAST — REQ-ACCDEL-CF-012)
@@ -24,18 +35,18 @@
  *       ACCDEL-014 (anti-spoofing).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
-import { sweepFollows } from "./cascade/friendships";
-import { deletePosts } from "./cascade/posts";
-import { terminateTrainerLinks } from "./cascade/trainer-links";
-import { cancelFutureAppointments } from "./cascade/appointments";
-import { deleteAvatar, deleteAthleteStorage } from "./cascade/storage";
-import { deleteAthleteOwnedData } from "./cascade/athlete-data";
-import { deleteAthleteRoutines } from "./cascade/routines";
-import { deleteUserDocs } from "./cascade/users";
+import { runDataCascade } from "./cascade/run-data-cascade";
+import {
+  CancelarAlEliminarDeps,
+  cancelarSuscripcionesAntesDeEliminar,
+} from "./cascade/subscriptions";
+import { createMpClient } from "./subscriptions/mp/client";
 import {
   DeleteAccountRequest,
   DeleteAccountResponse,
@@ -46,13 +57,32 @@ import {
  * without an app already existing (e.g. in test environments that set up
  * their own named apps before importing).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
     // No default app yet — initialize one.
-    return admin.initializeApp();
+    return initializeApp();
   }
+}
+
+/**
+ * Token de Mercado Pago: solo hace falta para dar de baja la suscripcion de
+ * quien elimina la cuenta. Vive aca y no en el callable para que el default de
+ * `runDeleteAccount` sea el REAL: olvidarse de pasarlo no puede dejar una cuenta
+ * borrada con el cobro vivo.
+ */
+const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
+
+export type DeleteAccountDeps = CancelarAlEliminarDeps;
+
+function depsReales(): DeleteAccountDeps {
+  return {
+    // Perezoso: `createMpClient` tira con el token vacio, y casi ninguna cuenta
+    // tiene planes. Solo se construye si hay algo que cancelar.
+    getMpClient: () => createMpClient(MP_ACCESS_TOKEN.value()),
+    nowMs: Date.now(),
+  };
 }
 
 /**
@@ -65,115 +95,38 @@ function getApp(): admin.app.App {
  * audit log and response.
  */
 export async function runDeleteAccount(
-  app: admin.app.App,
+  app: App,
   uid: string,
-  provider: string
+  provider: string,
+  deps: DeleteAccountDeps = depsReales()
 ): Promise<DeleteAccountResponse> {
-  const db = admin.firestore(app);
-
-  // ── Guard: trainers cannot self-delete (REQ-ACCDEL-CF-003) ─────────────
-  const userSnap = await db.collection("users").doc(uid).get();
-  if (userSnap.exists) {
-    const role = userSnap.data()?.role as string | undefined;
-    if (role === "trainer") {
-      throw new HttpsError(
-        "permission-denied",
-        "trainers cannot self-delete"
-      );
-    }
-  }
+  // ── Paso 2b: dar de baja las suscripciones de Mercado Pago — FAIL-CLOSED ──
+  // A diferencia de todo lo que sigue, NO acumula el error y sigue: si no se
+  // pudo cancelar, tira y la cuenta queda intacta. Borrarla con el cobro vivo
+  // deja a la persona pagando sin ninguna puerta para darse de baja. Ver
+  // `cascade/subscriptions.ts`. Es una BAJA (sin reembolso), no un arrepentimiento.
+  const suscripcionesCanceladas = await cancelarSuscripcionesAntesDeEliminar(
+    app,
+    uid,
+    deps
+  );
 
   // ── Audit log: started ─────────────────────────────────────────────────
   await writeStarted(app, uid, provider);
 
-  const errors: string[] = [];
+  // ── Pasos de datos (Firestore + Storage), en `cascade/run-data-cascade.ts` ─
+  // Los comparte el reintento de los `partial` (#1353). Cada uno va en su
+  // try/catch: uno que falla no frena a los demas.
+  const cascade = await runDataCascade(app, uid);
+  const errors: string[] = [...cascade.errors];
   const deletedCollections: string[] = [];
-
-  // ── Step 4: Sweep follows ──────────────────────────────────────────────
-  try {
-    await sweepFollows(app, uid);
-    deletedCollections.push("follows");
-  } catch (err: unknown) {
-    errors.push(`follows: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 5: Delete posts ────────────────────────────────────────────────
-  try {
-    await deletePosts(app, uid);
-    deletedCollections.push("posts");
-  } catch (err: unknown) {
-    errors.push(`posts: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 6: Terminate trainer links ───────────────────────────────────
-  try {
-    await terminateTrainerLinks(app, uid);
-    deletedCollections.push("trainer_links");
-  } catch (err: unknown) {
-    errors.push(`trainer_links: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 7: Cancel future appointments ────────────────────────────────
-  try {
-    await cancelFutureAppointments(app, uid);
-    deletedCollections.push("appointments");
-  } catch (err: unknown) {
-    errors.push(`appointments: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8: Delete storage avatar ─────────────────────────────────────
-  // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013).
-  try {
-    await deleteAvatar(app, uid);
-    deletedCollections.push("storage");
-  } catch (err: unknown) {
-    errors.push(`storage: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8b: Delete the athlete's other Storage objects (QA-CMP-002) ───
-  // chatMedia / customExerciseVideos / temp uploads / athleteFiles.
-  try {
-    await deleteAthleteStorage(app, uid);
-    deletedCollections.push("storage-athlete");
-  } catch (err: unknown) {
-    errors.push(`storage-athlete: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8c: Delete athlete-owned Firestore data (QA-CMP-003) ──────────
-  // measurements, performance_tests, profile_shares, session_shares,
-  // athlete_billing, athlete_notes, follow_up_entries, nutrition_plans.
-  try {
-    await deleteAthleteOwnedData(app, uid);
-    deletedCollections.push("athlete-data");
-  } catch (err: unknown) {
-    errors.push(`athlete-data: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 8d: Delete the athlete's routines (QA-CMP-004) ────────────────
-  // `routines where assignedTo == uid` (the plans their trainer built for
-  // them) + `routines where createdBy == uid` (their own). recursiveDelete,
-  // so the `ratings` subcollection goes with the parent. The disposition and
-  // the reason `assignedBy` is NOT swept live in cascade/routines.ts.
-  try {
-    await deleteAthleteRoutines(app, uid);
-    deletedCollections.push("routines");
-  } catch (err: unknown) {
-    errors.push(`routines: ${(err as Error).message ?? String(err)}`);
-  }
-
-  // ── Step 9: Delete user docs ───────────────────────────────────────────
-  try {
-    await deleteUserDocs(app, uid);
-    deletedCollections.push("users");
-    deletedCollections.push("userPublicProfiles");
-  } catch (err: unknown) {
-    errors.push(`users: ${(err as Error).message ?? String(err)}`);
-  }
+  if (suscripcionesCanceladas > 0) deletedCollections.push("mp-subscriptions");
+  deletedCollections.push(...cascade.deletedCollections);
 
   // ── Step 10-11: Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────
-  // MUST be last — so role guard still works if retry happens mid-cascade.
+  // MUST be last — so a retry after a mid-cascade failure still finds the account.
   try {
-    await admin.auth(app).deleteUser(uid);
+    await getAuth(app).deleteUser(uid);
     deletedCollections.push("users-auth");
   } catch (authErr: unknown) {
     // Idempotency (REQ-ACCDEL-CF-013): if the user was already deleted
@@ -257,7 +210,7 @@ export const deleteAccountHandler = functions.onCall(
   // `jsonPayload.message:"Callable request verification"` y pedir cero INVALID
   // por plataforma. Hasta entonces esto es deuda, no decision de diseno, y
   // figura como tal en el registry de appcheck-enforcement.test.ts.
-  { region: "southamerica-east1" },
+  { region: "southamerica-east1", secrets: [MP_ACCESS_TOKEN] },
   async (request): Promise<DeleteAccountResponse> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {
@@ -280,7 +233,7 @@ export const deleteAccountHandler = functions.onCall(
       | undefined;
     const provider = tokenFirebase?.sign_in_provider ?? "unknown";
 
-    const app = getApp();
+    const app = ensureApp();
     return runDeleteAccount(app, data.uid, provider);
   }
 );

@@ -65,11 +65,11 @@ void main() {
       }
     });
 
-    test('whatsapp arranca apagado en todo — no hay canal implementado', () {
-      for (final t in kNotifTypes) {
-        expect(prefs.isOn(t.key, NotifChannel.whatsapp), isFalse,
-            reason: t.key);
-      }
+    test('los canales son exactamente los que entregan: email y push', () {
+      // Guarda contra el modo de falla que costó la columna de WhatsApp: un
+      // canal en el enum sin entrega detrás rinde casillas que el PF tilda y
+      // no hacen nada. Sumar uno acá obliga a cablearlo primero.
+      expect(NotifChannel.values, [NotifChannel.email, NotifChannel.push]);
     });
   });
 

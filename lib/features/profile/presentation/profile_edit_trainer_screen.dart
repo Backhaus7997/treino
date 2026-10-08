@@ -1,20 +1,25 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../core/utils/location_precision.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../coach/application/location_permission_gateway.dart';
+import '../../coach/presentation/widgets/location_permission_flow.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
+import '../application/trainer_location_consent_providers.dart';
 import '../application/user_providers.dart';
 import '../domain/user_profile.dart';
 
@@ -63,7 +68,17 @@ class _ProfileEditTrainerScreenState
   final _experienceController = TextEditingController();
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
+
+  /// Las ubicaciones con las que ABRIO el formulario, para saber si el
+  /// guardado las toca. Se sella en `_initFromProfile`, que corre una sola vez.
+  final List<TrainerLocation> _locationsAlAbrir = [];
   bool _offersOnline = false;
+  // Arranca en true: es el default de la rule, y un PF que nunca tocó el
+  // toggle SÍ acepta consultas.
+  bool _acceptsInquiries = true;
+
+  /// Si el PF tocó el switch en ESTA pantalla. Ver el `_save()`.
+  bool _acceptsInquiriesTocado = false;
   bool _initialized = false;
   bool _saving = false;
   String? _error;
@@ -88,7 +103,11 @@ class _ProfileEditTrainerScreenState
     _locations
       ..clear()
       ..addAll(profile.trainerLocations);
+    _locationsAlAbrir
+      ..clear()
+      ..addAll(profile.trainerLocations);
     _offersOnline = profile.trainerOffersOnline;
+    _acceptsInquiries = profile.acceptsInquiries;
     _initialized = true;
   }
 
@@ -118,14 +137,7 @@ class _ProfileEditTrainerScreenState
     );
     if (picked == null) return;
     setState(() {
-      _locations.add(TrainerLocation(
-        id: 'gym-${picked.id}',
-        type: TrainerLocationType.gym,
-        gymId: picked.id,
-        lat: picked.lat,
-        lng: picked.lng,
-        geohash: picked.geohash,
-      ));
+      _locations.add(trainerLocationFromGym(picked));
       _error = null;
     });
   }
@@ -163,6 +175,74 @@ class _ProfileEditTrainerScreenState
     });
   }
 
+  /// Confirmación previa a la primera publicación de la ubicación.
+  ///
+  /// Deliberadamente NO reusa `TrainerLocationConsentSheet`: ese sheet es el
+  /// camino de re-consentimiento para el PF que YA tiene ubicaciones
+  /// publicadas y ofrece apagar la publicación. Acá el PF está en el acto
+  /// opuesto —está por publicar por primera vez, con intención explícita—, y
+  /// ofrecerle "APAGAR LA PUBLICACIÓN" sobre algo que todavía no publicó no
+  /// tiene sentido. Son dos entradas distintas al mismo consentimiento.
+  Future<bool> _askLocationConsent() async {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('profile_edit_trainer_consent_confirm'),
+        backgroundColor: palette.bgElevated,
+        title: Text(
+          l10n.profileEditTrainerConsentConfirmTitle,
+          style: TextStyle(color: palette.textPrimary),
+        ),
+        content: Text(
+          l10n.profileEditTrainerConsentConfirmBody,
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('profile_edit_trainer_consent_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              l10n.profileEditTrainerConsentConfirmCancel,
+              style: TextStyle(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            key: const Key('profile_edit_trainer_consent_accept'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              l10n.profileEditTrainerConsentConfirmAccept,
+              style: TextStyle(
+                color: palette.accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return accepted ?? false;
+  }
+
+  /// Apaga la publicación de la ubicación desde la fila de estado (P1-a).
+  ///
+  /// Sin diálogo de confirmación, igual que el botón equivalente del sheet:
+  /// es la acción REVERSIBLE del par (volver a publicar es guardar el form), y
+  /// meterle fricción a la salida de un consentimiento es exactamente lo que
+  /// el RGPD llama un patrón oscuro. La fricción va del lado de publicar, que
+  /// es donde ya está.
+  ///
+  /// `revokeTrainerLocationConsent` NO toca `trainerLocations` en `users/`:
+  /// vacía el espejo público y nada más. El PF no pierde lo que cargó por
+  /// ejercer un derecho.
+  Future<void> _revokeLocationConsent(String uid) async {
+    await ref.read(userRepositoryProvider).revokeTrainerLocationConsent(uid);
+    // El espejo cambió y el provider ya lo leyó: sin esto la fila sigue
+    // diciendo "publicada" hasta el próximo rebuild que lo invalide solo.
+    ref.invalidate(trainerLocationPublishedProvider);
+  }
+
   Future<void> _save(String uid) async {
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
@@ -175,6 +255,66 @@ class _ProfileEditTrainerScreenState
       setState(() =>
           _error = AppL10n.of(context).profileEditTrainerValidationLocation);
       return;
+    }
+
+    // Se resuelve acá y se aplica abajo, en el único `update()`.
+    var otorgaConsentimiento = false;
+
+    // consentimiento-legal-versionado (T2): pedir el consentimiento ANTES
+    // del primer publish.
+    //
+    // Sin esto, el PF recién promovido cae en el peor de los mundos: el sheet
+    // de re-consentimiento no le aplica (no tenía ubicaciones, así que
+    // `shouldAskTrainerLocationConsentProvider` da false), y al guardar la
+    // primera `_resolveEffectiveLocationConsent` descarta la ubicación del
+    // espejo público **en silencio**. Guardaría feliz, y no aparecería en
+    // discovery, sin un solo error que se lo explique.
+    // P1-c: y SOLO si este guardado toca las ubicaciones.
+    //
+    // Mirando unicamente `consentAt == null` volvia a preguntar en CADA
+    // guardado posterior de un PF que revoco —aunque solo hubiera editado su
+    // bio o su tarifa— y decir que no abortaba el guardado entero. Cuando se
+    // escribio esa condicion el unico modo de quedar en ese estado era cerrar
+    // el sheet sin decidir, que pasa una vez y nunca mas. Despues apareco el
+    // boton de APAGAR LA PUBLICACION en el perfil profesional y el estado paso
+    // a tener una puerta de entrada deliberada, asi que la molestia dejo de
+    // ser teorica.
+    //
+    // Lo que el consentimiento cubre es PUBLICAR ubicaciones, no guardar el
+    // perfil. Si la lista no cambio, no hay nada nuevo que publicar y no hay
+    // nada que consentir: el guardado pasa derecho y
+    // `_resolveEffectiveLocationConsent` deja el espejo como estaba.
+    //
+    // El caso que motivo el gate sigue cubierto: el PF que publica por primera
+    // vez va de cero ubicaciones a una, o sea que la lista cambia.
+    final perfil = ref.read(userProfileProvider).valueOrNull;
+    final tocaUbicaciones = !listEquals(_locations, _locationsAlAbrir);
+    // La supresion vale SOLO para quien ya decidio algo.
+    //
+    // Al PF que nunca vio el prompt hay que preguntarle igual, aunque no toque
+    // la lista, porque a esta pantalla se puede llegar SIN pasar por /home:
+    // `router.dart:190-194` REDIRIGE al PF con perfil incompleto a
+    // /profile/edit-trainer?mode=onboarding. Es un redirect, no un push, asi
+    // que HomeScreen no se monta y su `TrainerLocationConsentGate` no existe.
+    // Sin esta mitad, ese PF guardaba y se iba sin que nadie le preguntara
+    // nunca, con su ubicacion ya publicada en el espejo.
+    final yaLePreguntamos = perfil?.trainerLocationConsentPromptedAt != null;
+    if (_locations.isNotEmpty &&
+        perfil?.trainerLocationConsentAt == null &&
+        (!yaLePreguntamos || tocaUbicaciones)) {
+      final consented = await _askLocationConsent();
+      if (!mounted) return;
+      // Cancelar aborta el guardado y deja el form intacto: lo que cargó sigue
+      // en pantalla. Un "cancelar" que además le vacía la lista sería otra
+      // falla silenciosa, en la dirección opuesta.
+      if (!consented) return;
+      // P1-d: NO se otorga con un commit aparte. `grantTrainerLocationConsent`
+      // relee de Firestore y republica las ubicaciones VIEJAS —las nuevas
+      // todavía están sólo en el form—, así que entre ese commit y el del
+      // guardado el espejo público mostraba coordenadas que el PF no
+      // consintió. Y si el segundo fallaba, quedaban ahí para siempre.
+      // El consentimiento viaja en el MISMO batch que el formulario.
+      otorgaConsentimiento = true;
     }
 
     setState(() {
@@ -194,8 +334,20 @@ class _ProfileEditTrainerScreenState
           ? null
           : int.parse(_experienceController.text.trim()),
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
-      'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
+      // Un lugar `stale` ya no se publica: no entra a la búsqueda.
+      'trainerGeohashes': _locations
+          .where((l) => l.isPublishable)
+          .map((l) => l.geohash)
+          .whereType<String>()
+          .toSet()
+          .toList(),
       'trainerOffersOnline': _offersOnline,
+      // Sólo si el PF lo tocó ACÁ. El switch se edita también desde el Coach
+      // Hub, que persiste al instante: si el form quedó abierto, mandarlo
+      // siempre revierte en silencio el valor más nuevo al guardar cualquier
+      // otro campo. `_initFromProfile` corre una sola vez, así que el valor
+      // que tenemos en mano puede estar viejo y no hay forma de saberlo.
+      if (_acceptsInquiriesTocado) 'acceptsInquiries': _acceptsInquiries,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
       // y el mapa los renderea como pin físico aunque el PF haya borrado
@@ -206,7 +358,11 @@ class _ProfileEditTrainerScreenState
     };
 
     try {
-      await ref.read(userRepositoryProvider).update(uid, partial);
+      await ref.read(userRepositoryProvider).update(
+            uid,
+            partial,
+            grantLocationConsent: otorgaConsentimiento,
+          );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -218,10 +374,15 @@ class _ProfileEditTrainerScreenState
       } else {
         context.pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // `moderationBlockedMessage` va PRIMERO: `profileEditTrainerSaveError`
+      // invita a reintentar, y para un bloqueo del filtro de términos
+      // vetados eso es consejo falso — el mismo texto va a fallar siempre.
       setState(() {
-        _error = AppL10n.of(context).profileEditTrainerSaveError;
+        _error = e is ModerationBlockedException
+            ? AppL10n.of(context).moderationBlockedMessage
+            : AppL10n.of(context).profileEditTrainerSaveError;
         _saving = false;
       });
     }
@@ -353,13 +514,96 @@ class _ProfileEditTrainerScreenState
               onAdd: _addCustom,
               onRemove: _removeLocation,
             ),
+            // consentimiento-legal-versionado (T2): el estado real de
+            // publicación, no el de la lista. `revokeTrainerLocationConsent`
+            // NO toca `trainerLocations` en `users/{uid}` — sólo vacía el
+            // espejo público —, así que después de revocar la lista sigue
+            // llena. Leer la lista para pintar este estado le mentiría al PF
+            // exactamente igual que le mentía el texto legal viejo.
+            if (_locations.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              ref.watch(trainerLocationPublishedProvider).when(
+                    // P1-b. Mientras el espejo no contestó no se pinta nada:
+                    // mostrar "No publicada" sobre un "todavía no sé" es el
+                    // mismo error, del otro lado.
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (publicada) => Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            key: const Key(
+                              'profile_edit_trainer_publication_status',
+                            ),
+                            publicada
+                                ? l10n.profileEditTrainerPublished
+                                : l10n.profileEditTrainerNotPublished,
+                            style: TextStyle(
+                              color: publicada
+                                  ? palette.accent
+                                  : palette.textMuted,
+                              fontSize: AppTextSize.bodyDense,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        // P1-a. El sheet le promete al PF "Podés apagar esto
+                        // cuando quieras desde tu perfil profesional", y hasta
+                        // acá esa frase era falsa: `revokeTrainerLocationConsent`
+                        // tenía UN solo call site, adentro del sheet, y el sheet
+                        // es de una sola vez —cualquiera de sus tres salidas
+                        // estampa `promptedAt` y lo suprime para siempre—. El
+                        // dartdoc del método ya decía "and the revoke path from
+                        // profile_edit_trainer_screen.dart's status row": el
+                        // caller estaba documentado y nunca se escribió.
+                        //
+                        // Un consentimiento que no se puede retirar no es
+                        // consentimiento: la Ley 25.326 y el RGPD lo piden
+                        // revocable con la misma facilidad con que se otorgó.
+                        if (publicada)
+                          TextButton(
+                            key: const Key(
+                              'profile_edit_trainer_revoke_button',
+                            ),
+                            onPressed: () =>
+                                _revokeLocationConsent(profile.uid),
+                            child: Text(
+                              l10n.trainerLocationConsentSheetRevoke,
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: AppTextSize.bodyDense,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+            ],
             const SizedBox(height: 18),
-            _OnlineToggle(
+            _ToggleCard(
               palette: palette,
+              title: 'Doy clases virtuales',
+              subtitle: 'Atletas de cualquier zona pueden contactarte.',
               value: _offersOnline,
               onChanged: (v) => setState(() {
                 _offersOnline = v;
                 _error = null;
+              }),
+            ),
+            const SizedBox(height: 12),
+            // #637 — el kill switch de las consultas previas. Vive acá, al lado
+            // de "doy clases virtuales", porque las dos responden la misma
+            // pregunta: por dónde te puede alcanzar un alumno que todavía no
+            // es tuyo.
+            _ToggleCard(
+              palette: palette,
+              title: l10n.trainerAcceptsInquiriesTitle,
+              subtitle: l10n.trainerAcceptsInquiriesSubtitle,
+              value: _acceptsInquiries,
+              onChanged: (v) => setState(() {
+                _acceptsInquiries = v;
+                _acceptsInquiriesTocado = true;
               }),
             ),
             if (_error != null) ...[
@@ -701,8 +945,11 @@ class _CustomLocationsSection extends StatelessWidget {
                         palette: palette,
                         icon: TreinoIcon.mapPin,
                         title: loc.customLabel ?? 'Lugar propio',
-                        subtitle:
-                            '${loc.lat.toStringAsFixed(4)}, ${loc.lng.toStringAsFixed(4)}',
+                        // Un lugar vencido no tiene coordenadas (el servidor las
+                        // borró a los 30 días): se pide volver a elegirlo.
+                        subtitle: loc.isPublishable
+                            ? '${loc.lat!.toStringAsFixed(4)}, ${loc.lng!.toStringAsFixed(4)}'
+                            : 'Lugar vencido: volvé a elegirlo',
                         onRemove: () => onRemove(loc),
                       ),
                     ))
@@ -805,13 +1052,20 @@ class _LocationCard extends StatelessWidget {
 
 // ── Online toggle ────────────────────────────────────────────────────────────
 
-class _OnlineToggle extends StatelessWidget {
-  const _OnlineToggle({
+/// Tarjeta con un switch. Nació como `_OnlineToggle` para "doy clases
+/// virtuales" y se generalizó al sumar el de consultas (#637): mismo control,
+/// mismo contenedor, distinto contenido.
+class _ToggleCard extends StatelessWidget {
+  const _ToggleCard({
     required this.palette,
+    required this.title,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
   final AppPalette palette;
+  final String title;
+  final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
@@ -827,14 +1081,14 @@ class _OnlineToggle extends StatelessWidget {
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(
-          'Doy clases virtuales',
+          title,
           style: TextStyle(
             color: palette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
-          'Atletas de cualquier zona pueden contactarte.',
+          subtitle,
           style: TextStyle(color: palette.textMuted, fontSize: 12),
         ),
         value: value,
@@ -1005,14 +1259,15 @@ class _CustomLocationDraft {
   final double lng;
 }
 
-class _CustomLocationSheet extends StatefulWidget {
+class _CustomLocationSheet extends ConsumerStatefulWidget {
   const _CustomLocationSheet();
 
   @override
-  State<_CustomLocationSheet> createState() => _CustomLocationSheetState();
+  ConsumerState<_CustomLocationSheet> createState() =>
+      _CustomLocationSheetState();
 }
 
-class _CustomLocationSheetState extends State<_CustomLocationSheet> {
+class _CustomLocationSheetState extends ConsumerState<_CustomLocationSheet> {
   final _labelController = TextEditingController();
   double? _lat;
   double? _lng;
@@ -1027,32 +1282,40 @@ class _CustomLocationSheetState extends State<_CustomLocationSheet> {
 
   Future<void> _detect() async {
     if (_detecting) return;
-    setState(() {
-      _detecting = true;
-      _error = null;
-    });
+    final l10n = AppL10n.of(context);
+    final gateway = ref.read(locationPermissionGatewayProvider);
+    setState(() => _error = null);
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        setState(() {
-          _error = 'Necesitamos permiso de ubicación.';
-          _detecting = false;
-        });
+      // Mismo flujo que el resto de la app (Guideline 5.1.1(iv)): CONTINUAR
+      // previo al diálogo del SO, o aviso con Ajustes si el SO ya no puede
+      // preguntar / los Servicios de ubicación están apagados. El spinner
+      // arranca DESPUÉS: mientras el usuario lee el mensaje no se está
+      // detectando nada.
+      final outcome = await presentLocationPermissionFlow(
+        context,
+        gateway,
+        purpose: LocationPurpose.trainerDetect,
+      );
+      if (!mounted) return;
+      if (outcome == LocationFlowOutcome.denied) {
+        setState(() => _error = l10n.profileLocationPermissionNeeded);
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      if (!outcome.proceed) return;
+      setState(() => _detecting = true);
+      // El flujo ya consultó y, si hacía falta, PIDIÓ el permiso: `granted`
+      // significa otorgado, no hay que volver a pedir.
+      final pos = await gateway.currentPosition(kTrainerLocationSettings);
+      if (!mounted) return;
       setState(() {
         _lat = pos.latitude;
         _lng = pos.longitude;
         _detecting = false;
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() {
-        _error = 'No pudimos detectar tu ubicación.';
+        _error = l10n.profileLocationDetectFailed;
         _detecting = false;
       });
     }

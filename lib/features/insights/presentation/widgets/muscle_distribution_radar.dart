@@ -272,7 +272,7 @@ class _Radar extends StatelessWidget {
             if (hasCurrent || !hasPrevious)
               RadarDataSet(
                 dataEntries: currentEntries,
-                fillColor: palette.accent.withValues(alpha: 0.20),
+                fillColor: palette.accent.withValues(alpha: 0.2),
                 borderColor: palette.accent,
                 borderWidth: 2.5,
                 entryRadius: 3.5,

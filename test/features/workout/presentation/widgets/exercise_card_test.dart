@@ -84,8 +84,7 @@ void main() {
     'dark': AppPalette.mintMagenta,
     'light': AppPalette.mintMagentaLight,
   }.entries) {
-    testWidgets(
-        '${entry.key}: el borde marca error SÓLO con la card cerrada',
+    testWidgets('${entry.key}: el borde marca error SÓLO con la card cerrada',
         (tester) async {
       final palette = entry.value;
       Future<BoxDecoration> bordeCon({

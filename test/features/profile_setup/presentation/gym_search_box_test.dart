@@ -7,7 +7,7 @@
 // pumping the real 300/600ms window.
 //
 // Drives the shared GymSearchBox widget directly — the single search box
-// that step_2_gym.dart and profile_gym_screen.dart both wrap. Covers spec
+// that step_3_gym.dart and profile_gym_screen.dart both wrap. Covers spec
 // gym-catalog "Athlete gym selection is a single debounced search": type ->
 // debounced suggestions, tap -> selection callback, kNoGymId option,
 // loading/error+retry/empty-results states, and works without location
@@ -99,6 +99,8 @@ void main() {
     expect(find.byType(GymCard), findsWidgets);
     expect(find.text('QIVOX Villa Warcalde'), findsOneWidget);
     expect(find.text('Some street 123'), findsOneWidget);
+    // Política de Places: resultados fuera de un mapa de Google => atribución.
+    expect(find.text('Google Maps'), findsOneWidget);
   });
 
   testWidgets('typing under 3 characters never calls the service',
@@ -214,6 +216,42 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  // La key de Places dejó de tener default committeado, así que "la app se
+  // compiló sin la key" pasó a ser un estado alcanzable. NO se parece a un
+  // error de red: reintentar no la trae, y ofrecer el botón sería prometer una
+  // salida que no existe (AGENTS.md §11.1).
+  //
+  // El `findsNothing` del botón es la mitad que importa. Sin él, el test pasaría
+  // igual mostrando el mensaje nuevo CON un «Reintentar» al lado.
+  testWidgets(
+      'sin la key: mensaje de configuración y NINGÚN botón de reintentar',
+      (tester) async {
+    when(() => mockService.search(
+              textQuery: any(named: 'textQuery'),
+              biasLatitude: any(named: 'biasLatitude'),
+              biasLongitude: any(named: 'biasLongitude'),
+            ))
+        .thenThrow(
+            const PlacesTextSearchConfigError('PLACES_CLIENT_KEY is empty'));
+
+    await tester.pumpWidget(_wrap(
+      overrides: [
+        placesTextSearchServiceProvider.overrideWithValue(mockService),
+        gymSearchLocationBiasProvider.overrideWith((ref) async => null),
+      ],
+      selectedGymId: null,
+      onGymIdSelected: (_) {},
+    ));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'qivox');
+    await tester.pump(const Duration(milliseconds: 5));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('no está disponible'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Reintentar'), findsNothing);
+  });
+
   testWidgets('shows an error state with retry when the search fails',
       (tester) async {
     when(() => mockService.search(
@@ -275,6 +313,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sin resultados para "zzz-no-match"'), findsOneWidget);
+    expect(find.text('Google Maps'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 

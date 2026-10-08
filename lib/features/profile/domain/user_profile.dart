@@ -9,6 +9,7 @@ import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
 import 'user_role.dart';
+import 'verified_email.dart';
 
 part 'user_profile.freezed.dart';
 part 'user_profile.g.dart';
@@ -53,6 +54,42 @@ class UserProfile with _$UserProfile {
     // OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
     // cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
     @TimestampConverter() DateTime? termsAcceptedAt,
+    // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+    // `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+    // documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+    // en cada uno de los 3 caminos de aceptación (signup email, submit de
+    // ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+    // sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+    // ni "aceptó la vigente".
+    //
+    // `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+    // consentimiento DISTINTO e independiente del gate de versión de arriba:
+    // habilitan la publicación de la ubicación del PF en el mapa. Se
+    // disparan recién en la promoción a `trainer`, nunca en signup ni en
+    // ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+    // aceptó la Política vigente y es promovido después IGUAL necesita este
+    // consentimiento aparte (spec: comparar sólo versiones no cubre ese
+    // caso).
+    //
+    // Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+    // debe resolver exactamente esto):
+    //
+    // | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+    // |-----------|------------|-------------------------------------|---------|----------------------|
+    // | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+    // | set       | set        | otorgado                             | no      | sí                   |
+    // | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+    // | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+    //
+    // `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+    // no "¿consintió?". Es lo único que gatea el re-display del sheet —
+    // NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+    // relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+    // gatear por ahí reabriría el sheet en cada arranque).
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
+    @TimestampConverter() DateTime? trainerLocationConsentAt,
+    @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
     // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
     String? trainerBio,
     String? trainerSpecialty,
@@ -92,6 +129,15 @@ class UserProfile with _$UserProfile {
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
 
+    /// Kill switch del PF para las consultas previas (#637).
+    ///
+    /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+    /// cosmética: `firestore.rules` lee este campo con
+    /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+    /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+    /// TODOS los PF existentes sin que ninguno lo haya pedido.
+    @Default(true) bool acceptsInquiries,
+
     // ── Athlete active routine (home today's card PR#2) ───────────────────
     // Points to the user-created routine the athlete picked as "the one I'm
     // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -109,6 +155,21 @@ class UserProfile with _$UserProfile {
     // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
     TrainerSubscription? subscription,
     double? weightedLoad,
+
+    // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+    // `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+    // Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+    // de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+    // Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+    // Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+    // Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+    // tiene que ser la del rol de HOY y del mail de Auth de HOY.
+    // `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+    // alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false)
+    @Default(<String, VerifiedEmail>{})
+    Map<String, VerifiedEmail> emailVerification,
 
     // ── Welcome tour seen-flags (issue #627) ────────────────────────────
     // Map of `OnboardingSurface.wireKey` → version of the tour that user

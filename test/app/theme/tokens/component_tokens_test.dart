@@ -162,4 +162,54 @@ void main() {
       expect(border, const Color(0x1A000000));
     });
   });
+
+  group('TreinoCardTokens.glow — el mismo alpha no pesa igual en los dos temas',
+      () {
+    // Un pump por test, a propósito: pumpear dos temas dentro del mismo test
+    // depende de cómo Flutter reusa elements entre árboles idénticos, y eso no
+    // es lo que se quiere probar acá.
+    Future<LinearGradient> glowFor(WidgetTester tester, AppPalette p) async {
+      late LinearGradient g;
+      await tester.pumpWidget(
+        _withTheme(
+          palette: p,
+          child: Builder(
+            builder: (ctx) {
+              g = TreinoCardTokens.glow(ctx);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      return g;
+    }
+
+    testWidgets('dark conserva el alpha pedido y la rampa larga',
+        (tester) async {
+      final g = await glowFor(tester, AppPalette.mintMagenta);
+      expect(g.colors.first.a, closeTo(0.12, 0.001));
+      expect(g.stops![1], 0.45);
+    });
+
+    testWidgets('light tiñe la mitad y corta la rampa antes', (tester) async {
+      final g = await glowFor(tester, AppPalette.mintMagentaLight);
+
+      // Sobre casi-negro el mint translúcido SUMA luz y se lee como un brillo
+      // en la esquina; sobre blanco TIÑE. Con el mismo alpha y la misma rampa,
+      // cuatro KPIs en fila en tema claro se veían como una mancha verde que
+      // cubría media card.
+      expect(g.colors.first.a, closeTo(0.06, 0.001));
+      expect(g.stops![1], 0.28);
+    });
+
+    testWidgets(
+        'la rama la decide la luminancia del fondo, no ThemeData.brightness',
+        (tester) async {
+      // `_withTheme` arma el ThemeData SIN `brightness`, así que Flutter lo
+      // deja en `light` para las dos paletas. Si el token mirara ese campo, la
+      // paleta OSCURA tomaría la rama de light — y este assert lo caza.
+      final g = await glowFor(tester, AppPalette.mintMagenta);
+      expect(g.stops![1], 0.45);
+    });
+  });
 }

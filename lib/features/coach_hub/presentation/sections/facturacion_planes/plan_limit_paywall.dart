@@ -1,13 +1,17 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
-import '../../../../../core/widgets/motion/treino_tappable.dart';
-import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../../l10n/app_l10n.dart';
 import '../../../../coach/domain/subscription_tier.dart';
+import '../../../../profile/application/user_providers.dart';
+import 'plan_checkout.dart';
+import 'plan_copy.dart';
+import 'plan_limit_shared.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
 /// supera el límite de su plan (Fase 7, PR3 UI — el trigger real es el
@@ -43,6 +47,31 @@ enum PlanLimitReason { planLimit, subscriptionInactive }
 ///   pulgar llega al CTA y el gesto de descarte es el nativo del sistema.
 enum PlanLimitPaywallForm { dialog, sheet }
 
+/// Estado de suscripción del perfil del PF, para explicar un rechazo
+/// `subscription-inactive` del servidor.
+///
+/// Los rechazos del servidor no incluyen el estado, así que los callsites leen
+/// este provider en el `catch`, no durante build. Mantener la extracción acá
+/// evita que cada pantalla interprete el perfil de una manera distinta.
+///
+/// `active` y `grace` dan `null`: contradicen el rechazo. Pasa con un status
+/// ausente o desconocido, que el servidor normaliza a `paused`
+/// (`subscription-state.ts`) y Dart a `active` (`SubscriptionStatusX.fromJson`).
+/// Pasarlo haría que el modal dijera «suspendida» con «Estado: activa» abajo;
+/// sin status dice «suspendida» sin la caja, como antes de #1314.
+final currentTrainerSubscriptionStatusProvider =
+    Provider<SubscriptionStatus?>((ref) {
+  final status = ref.watch(
+    userProfileProvider.select(
+      (profile) => profile.valueOrNull?.subscription?.status,
+    ),
+  );
+  return switch (status) {
+    SubscriptionStatus.active || SubscriptionStatus.grace => null,
+    _ => status,
+  };
+});
+
 /// Fuerza la forma del paywall. SÓLO para tests.
 ///
 /// `kIsWeb` es una constante de COMPILACIÓN: bajo `flutter test` (que corre en
@@ -68,22 +97,31 @@ Future<void> showPlanLimitPaywall(
   SubscriptionStatus? subscriptionStatus,
   String? billingRoute,
 }) {
+  final form = _resolveForm();
   // Un solo contenido para las dos envolturas. Si mañana cambia el copy o el
   // CTA, cambia UNA vez: duplicarlo garantiza que tarde o temprano web y móvil
   // digan cosas distintas y nadie se entere hasta que lo reporte un usuario.
+  //
+  // `isWeb` viaja con el contenido, no sólo con la envoltura: desde la
+  // decisión del dueño del 2026-09-29 el COPY también depende de la
+  // superficie —el móvil no puede tener "calls to action for purchase
+  // outside of the app" (Guideline 3.1.3(f))—, así que el mismo booleano que
+  // elige sheet-vs-dialog ahora también elige "vende" vs "informa". Una sola
+  // fuente de verdad, nunca dos `kIsWeb` sueltos que puedan desincronizarse.
   final content = _PlanLimitPaywallContent(
     currentTier: currentTier,
     reason: reason,
     subscriptionStatus: subscriptionStatus,
     billingRoute: billingRoute,
+    isWeb: form == PlanLimitPaywallForm.dialog,
   );
   final barrierColor = Colors.black.withValues(alpha: 0.6);
 
-  if (_resolveForm() == PlanLimitPaywallForm.dialog) {
+  if (form == PlanLimitPaywallForm.dialog) {
     return showDialog<void>(
       context: context,
       barrierColor: barrierColor,
-      builder: (_) => _PlanLimitPaywallDialog(content: content),
+      builder: (_) => PlanLimitDialogShell(content: content),
     );
   }
 
@@ -102,19 +140,31 @@ Future<void> showPlanLimitPaywall(
     // El contenido pasa la mitad de la pantalla con textScale de accesibilidad.
     // Sin esto el sheet se topa contra el 50% y se corta.
     isScrollControlled: true,
-    // El fondo real lo pinta `_PlanLimitPaywallSheet` en su propio Container:
-    // es la única forma de redondear SÓLO las esquinas de arriba sin que el
+    // El fondo real lo pinta `PlanLimitSheetShell` en su propio Container: es
+    // la única forma de redondear SÓLO las esquinas de arriba sin que el
     // material del sheet dibuje su rectángulo debajo.
     backgroundColor: Colors.transparent,
     barrierColor: barrierColor,
-    builder: (_) => _PlanLimitPaywallSheet(content: content),
+    builder: (_) => PlanLimitSheetShell(content: content),
   );
 }
 
-/// Envoltura DIALOG — web. Card centrada, ancho acotado, esquinas todas
-/// redondeadas.
-class _PlanLimitPaywallDialog extends StatelessWidget {
-  const _PlanLimitPaywallDialog({required this.content});
+/// Envoltura DIALOG — web/escritorio. Card centrada, ancho acotado, esquinas
+/// todas redondeadas.
+///
+/// - [dialog] es la forma de WEB (Coach Hub): una app de escritorio con
+///   sidebar y ventana ancha. Un panel que sube desde el borde inferior ahí
+///   es un error de plataforma, no una decisión estética.
+///
+/// Pública y usada TAMBIÉN por `trainer_limit_notice.dart` (el aviso de
+/// ejercicios propios y plantillas) — mismo estilo, misma implementación,
+/// para que las tres envolturas nunca diverjan. Se queda en este archivo (no
+/// en `plan_limit_shared.dart`) porque su padding ya tiene deuda de spacing
+/// registrada en los scanners de `test/app/theme/tokens/`; moverla a un
+/// archivo nuevo la hubiera obligado a re-tunear pixels que nadie pidió
+/// tocar (AGENTS.md §2 — un archivo nuevo no hereda esa allowlist).
+class PlanLimitDialogShell extends StatelessWidget {
+  const PlanLimitDialogShell({super.key, required this.content});
 
   final Widget content;
 
@@ -140,19 +190,26 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
   }
 }
 
-/// Envoltura SHEET — móvil. Sube desde abajo, ancho completo, pegado al borde
-/// inferior, redondeado sólo arriba.
-class _PlanLimitPaywallSheet extends StatelessWidget {
-  const _PlanLimitPaywallSheet({required this.content});
+/// Envoltura SHEET — móvil. Sube desde abajo, ancho completo, pegado al
+/// borde inferior, redondeado sólo arriba, descartable deslizando. Es la
+/// forma de MÓVIL: el pulgar llega al CTA y el gesto de descarte es el
+/// nativo del sistema.
+///
+/// Misma nota que [PlanLimitDialogShell]: pública, compartida con
+/// `trainer_limit_notice.dart`, y se queda en este archivo por su deuda de
+/// spacing ya registrada.
+class PlanLimitSheetShell extends StatelessWidget {
+  const PlanLimitSheetShell({super.key, required this.content});
 
   final Widget content;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // Techo de altura: `isScrollControlled` habilita la pantalla entera, y sin
-    // techo un contenido alto (textScale de accesibilidad) empuja el sheet
-    // hasta desbordar. Con techo, el `SingleChildScrollView` de abajo scrollea.
+    // Techo de altura: `isScrollControlled` habilita la pantalla entera, y
+    // sin techo un contenido alto (textScale de accesibilidad) empuja el
+    // sheet hasta desbordar. Con techo, el `SingleChildScrollView` de abajo
+    // scrollea.
     final maxHeight = MediaQuery.sizeOf(context).height * 0.9;
 
     return Padding(
@@ -168,7 +225,7 @@ class _PlanLimitPaywallSheet extends StatelessWidget {
             top: BorderSide(color: palette.accent.withValues(alpha: 0.33)),
           ),
         ),
-        // `bottom: true` — la barra de gestos no se come el "Ahora no".
+        // `bottom: true` — la barra de gestos no se come el CTA de abajo.
         // `top: false` — el sheet nunca llega a la barra de estado.
         child: SafeArea(
           top: false,
@@ -179,8 +236,8 @@ class _PlanLimitPaywallSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Handle de arrastre: la señal de que esto se descarta
-                // deslizando, no sólo con el "Ahora no". 40x4 con `border` y
-                // radio 2 es la medida que ya usan los ~25 sheets del repo
+                // deslizando, no sólo con el CTA. 40x4 con `border` y radio 2
+                // es la medida que ya usan los ~25 sheets del repo
                 // (`athlete_picker_sheet`, `set_entry_sheet`,
                 // `review_bottom_sheet`, …): otro ancho se lee como otro
                 // control.
@@ -205,15 +262,16 @@ class _PlanLimitPaywallSheet extends StatelessWidget {
 
 /// Contenido del paywall — EL MISMO en las dos envolturas.
 ///
-/// Vive separado de [_PlanLimitPaywallDialog] y [_PlanLimitPaywallSheet] a
-/// propósito: las envolturas deciden CÓMO entra a la pantalla, esto decide QUÉ
-/// dice. Un cambio de copy toca un solo lugar.
+/// Vive separado de [PlanLimitDialogShell] y [PlanLimitSheetShell] a
+/// propósito: las envolturas deciden CÓMO entra a la pantalla, esto decide
+/// QUÉ dice. Un cambio de copy toca un solo lugar.
 class _PlanLimitPaywallContent extends StatelessWidget {
   const _PlanLimitPaywallContent({
     required this.currentTier,
     this.reason = PlanLimitReason.planLimit,
     this.subscriptionStatus,
     this.billingRoute,
+    required this.isWeb,
   });
 
   final SubscriptionTier currentTier;
@@ -225,58 +283,49 @@ class _PlanLimitPaywallContent extends StatelessWidget {
   /// en vez de navegar a una ruta inexistente y morir.
   final String? billingRoute;
 
+  /// `true` = superficie WEB (Coach Hub), que sí vende. `false` = MÓVIL, que
+  /// sólo informa (Guideline 3.1.3(f) — ver el dartdoc de
+  /// [showPlanLimitPaywall]). Decisión del dueño, 2026-09-29: mismo estilo
+  /// visual en las dos, pero sin verbos de compra en el móvil.
+  final bool isWeb;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final isInactive = reason == PlanLimitReason.subscriptionInactive;
+    // Una baja no es una suspensión: el PF la pidió. Decirle «suspendida» con
+    // «Estado: cancelada» en la caja de abajo es contradecirse en el mismo
+    // modal (Codex, #1314). Acá sólo se mira el status: que la baja ya haya
+    // vencido (y por eso esté inactiva) lo decide quien abre el modal con
+    // [PlanLimitReason.subscriptionInactive]. Los que abren el modal por un
+    // rechazo del servidor no pasan status, y siguen con el título genérico.
+    // El resto de la rama inactiva —cuerpo, caja, CTA— es el mismo.
+    final dadaDeBaja =
+        isInactive && subscriptionStatus == SubscriptionStatus.cancelled;
     // `reason` MANDA sobre el tier: un plan2 con la suscripción suspendida
     // necesita regularizar, no el aviso del plan a-medida del tope.
     final next = isInactive ? null : currentTier.nextTier;
-
+    // Dos superficies, dos fuentes de texto (hallazgo Codex, PR #1266). La WEB
+    // sigue con sus strings hardcodeados de siempre (`i18n: Fase W3`, sin
+    // cambios) y el MÓVIL sale de AppL10n, con su traducción al inglés —
+    // antes de este fix el aviso de ALUMNOS ni siquiera pasaba por AppL10n:
+    // estaba en castellano hardcodeado en las dos superficies. Los `AppL10n`
+    // sólo se resuelven en las ramas móviles (`AppL10n.of(context)` revienta
+    // sin delegates; la web no los necesita, y sus tests tampoco).
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Ícono + título.
-        Center(
-          child: Container(
-            width: 58,
-            height: 58,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: palette.accent.withValues(alpha: 0.08),
-              border: Border.all(color: palette.accent.withValues(alpha: 0.33)),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(TreinoIcon.lock, size: 28, color: palette.accent),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          isInactive
-              ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
-              : 'LLEGASTE AL LÍMITE DE TU PLAN', // i18n: Fase W3
-          textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textPrimary,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.5,
-          ),
+        PlanLimitHeader(
+          title: _title(context, isInactive, dadaDeBaja: dadaDeBaja),
+          palette: palette,
         ),
         const SizedBox(height: 8),
         Text(
-          isInactive
-              // TODO(producto): copy placeholder — pendiente de revisión
-              // antes de cerrar el PR (diseño D-2, riesgo residual 4).
-              ? 'Mientras tu suscripción no esté al día, tu cuenta '
-                  'funciona con el límite del plan Free. Ningún alumno '
-                  'se elimina.' // i18n: Fase W3
-              : 'Tu plan ${_tierName(currentTier)} incluye '
-                  '${_cupoTexto(currentTier)}. Para sumar más, '
-                  'subí de plan.', // i18n: Fase W3
+          _body(context, isInactive),
           textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+          style:
+              TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
         const SizedBox(height: 22),
         if (isInactive)
@@ -284,180 +333,130 @@ class _PlanLimitPaywallContent extends StatelessWidget {
             currentTier: currentTier,
             status: subscriptionStatus,
             palette: palette,
+            isWeb: isWeb,
           )
         else if (next != null)
-          _UpsellBox(nextTier: next, palette: palette)
+          PlanLimitUpsellBox(
+            nextTier: next,
+            beneficio: _beneficio(context, next),
+            porMes: isWeb
+                ? '/mes' // i18n: Fase W3
+                : AppL10n.of(context).planLimitPorMes,
+            palette: palette,
+            sellCta: isWeb,
+          )
         else
-          _CustomPlanBox(palette: palette),
+          PlanLimitCustomTierBox(
+            title: isWeb
+                ? 'PLAN A MEDIDA' // i18n: Fase W3
+                : AppL10n.of(context).planLimitPlanAMedidaTitulo,
+            body: isWeb
+                ? 'Estás en el plan más grande. Para más de 15 alumnos '
+                    'estamos preparando un plan a tu medida.' // i18n: Fase W3
+                : AppL10n.of(context).planLimitAlumnosPlanAMedidaCuerpo,
+            palette: palette,
+          ),
         const SizedBox(height: 20),
         // CTA principal.
         _PrimaryCta(
           hasNext: next != null,
           isInactive: isInactive,
+          dadaDeBaja: dadaDeBaja,
           billingRoute: billingRoute,
           palette: palette,
+          isWeb: isWeb,
         ),
         const SizedBox(height: 10),
-        TreinoTappable(
+        PlanLimitDismissLink(
+          // Móvil: "Entendido" — "Ahora no" presupone una oferta que el
+          // móvil ya no hace (decisión del dueño, 2026-09-29).
+          label: isWeb
+              ? 'Ahora no' // i18n: Fase W3
+              : AppL10n.of(context).planLimitEntendido,
           onTap: () => Navigator.of(context).pop(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Text(
-              'Ahora no', // i18n: Fase W3
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: palette.textMuted,
-                fontSize: 13,
-              ),
-            ),
-          ),
         ),
       ],
     );
   }
-}
 
-/// Caja de upsell al siguiente tier: nombre + precio-héroe + rango de alumnos.
-class _UpsellBox extends StatelessWidget {
-  const _UpsellBox({required this.nextTier, required this.palette});
+  /// Título del aviso.
+  String _title(
+    BuildContext context,
+    bool isInactive, {
+    required bool dadaDeBaja,
+  }) {
+    if (isWeb) {
+      if (dadaDeBaja) {
+        return 'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'; // i18n: Fase W3
+      }
+      return isInactive
+          ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
+          : 'LLEGASTE AL LÍMITE DE TU PLAN'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    if (dadaDeBaja) return l10n.planLimitAlumnosTituloBaja;
+    return isInactive
+        ? l10n.planLimitAlumnosTituloInactiva
+        : l10n.planLimitAlumnosTituloTope;
+  }
 
-  final SubscriptionTier nextTier;
-  final AppPalette palette;
+  /// Cuerpo del aviso, en la superficie que corresponda.
+  String _body(BuildContext context, bool isInactive) {
+    if (isWeb) {
+      if (isInactive) {
+        // TODO(producto): copy placeholder — pendiente de revisión antes de
+        // cerrar el PR (diseño D-2, riesgo residual 4).
+        return 'Mientras tu suscripción no esté al día, tu cuenta '
+            'funciona con el límite del plan Free. Ningún alumno '
+            'se elimina.'; // i18n: Fase W3
+      }
+      return 'Tu plan ${tierName(currentTier)} incluye '
+          '${cupoTexto(currentTier)}. Para sumar más, '
+          'subí de plan.'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    if (isInactive) return l10n.planLimitAlumnosCuerpoInactivaExplicacion;
+    // Móvil, decisión del dueño 2026-09-29: sólo el estado — sin "para sumar
+    // más, subí de plan" (3.1.3(f)). Guard:
+    // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+    final cupo = currentTier.weightLimit;
+    return cupo == null
+        ? l10n.planLimitAlumnosCuerpoTopeMovilIlimitado(tierName(currentTier))
+        : l10n.planLimitAlumnosCuerpoTopeMovilLimitado(
+            tierName(currentTier), cupo);
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final price = kTierPricesArs[nextTier]!;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        border: Border.all(color: palette.accent),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'PASATE A ${_tierName(nextTier).toUpperCase()}', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
-              color: palette.accent,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Precio-héroe. El Row no lleva `Flexible` y con textScale alto se
-          // pasa del ancho de la caja: dentro del sheet móvil (390 pt menos
-          // los paddings) eso ya son rayas amarillas a textScale 2.0.
-          // `scaleDown` lo achica en vez de recortarlo — un precio cortado
-          // («39.0…») MIENTE, uno más chico sigue siendo cierto. Mismo
-          // criterio (y misma causa) que `_PriceFit` en la pricing page.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, right: 2),
-                  child: Text(
-                    '\$',
-                    style: GoogleFonts.barlowCondensed(
-                      color: palette.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  _formatArs(price.monthly),
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.textPrimary,
-                    fontSize: 40,
-                    fontWeight: FontWeight.w800,
-                    height: 1.0,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 18, left: 4),
-                  child: Text(
-                    '/mes', // i18n: Fase W3
-                    style: TextStyle(color: palette.textMuted, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            nextTier.isUnlimited
-                ? 'Alumnos sin límite' // i18n: Fase W3
-                : 'Hasta ${nextTier.weightLimit} alumnos', // i18n: Fase W3
-            style: TextStyle(
-              color: palette.textMuted,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
+  /// El beneficio del siguiente tier ([next]) para la tarjeta de upsell.
+  /// `weightLimit == null` = SIN LÍMITE (Plan 3), nunca se interpola.
+  String _beneficio(BuildContext context, SubscriptionTier next) {
+    if (isWeb) {
+      return next.isUnlimited
+          ? 'Alumnos sin límite' // i18n: Fase W3
+          : 'Hasta ${next.weightLimit} alumnos'; // i18n: Fase W3
+    }
+    final l10n = AppL10n.of(context);
+    final cupo = next.weightLimit;
+    return cupo == null
+        ? l10n.planLimitAlumnosBeneficioIlimitado
+        : l10n.planLimitAlumnosBeneficioLimitado(cupo);
   }
 }
 
-/// Caja para cuando el PF ya está en Plan 2 (tope Fase 1) — plan a-medida.
-class _CustomPlanBox extends StatelessWidget {
-  const _CustomPlanBox({required this.palette});
-
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'PLAN A MEDIDA', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
-              color: palette.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Estás en el plan más grande. Para más de 15 alumnos '
-            'estamos preparando un plan a tu medida.', // i18n: Fase W3
-            textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Caja de la rama `subscription-inactive`. Hermana de [_UpsellBox], pero
-/// SIN precio-héroe: el precio no es la pregunta acá — el PF ya compró este
-/// plan, sólo hay que reactivarlo.
+/// Caja de la rama `subscription-inactive`. Hermana de [PlanLimitUpsellBox],
+/// pero SIN precio-héroe: el precio no es la pregunta acá — el PF ya compró
+/// este plan, sólo hay que reactivarlo.
 class _ReactivateBox extends StatelessWidget {
   const _ReactivateBox({
     required this.currentTier,
     required this.status,
     required this.palette,
+    required this.isWeb,
   });
 
   final SubscriptionTier currentTier;
   final SubscriptionStatus? status;
   final AppPalette palette;
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
@@ -471,8 +470,12 @@ class _ReactivateBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'TU PLAN: ${_tierName(currentTier).toUpperCase()}', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            isWeb
+                ? 'TU PLAN: ${tierName(currentTier).toUpperCase()}' // i18n: Fase W3
+                : AppL10n.of(context).planLimitReactivateTituloMovil(
+                    tierName(currentTier).toUpperCase()),
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -481,17 +484,32 @@ class _ReactivateBox extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            // TODO(producto): copy placeholder — pendiente de revisión.
-            'Reactivalo y volvés a tus ${_cupoTexto(currentTier)} '
-            'al instante.', // i18n: Fase W3
+            isWeb
+                // TODO(producto): copy placeholder — pendiente de revisión.
+                ? 'Reactivalo y volvés a tus ${cupoTexto(currentTier)} '
+                    'al instante.' // i18n: Fase W3
+                // Móvil, decisión del dueño 2026-09-29: estado neutro, sin
+                // "reactivalo/reactivá/regularizá/pagá" (3.1.3(f)). El
+                // efectivo acá SIEMPRE es Free: `subscriptionInactive` es
+                // justo "lo que pagaste no está al día", y el derecho cae a
+                // Free (mismo criterio que `effectiveWeightLimit` del
+                // servidor). Guard:
+                // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+                : AppL10n.of(context).planLimitReactivateCuerpoMovil(
+                    SubscriptionTier.free.weightLimit!),
             textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.bodyDense),
           ),
           if (status != null) ...[
             const SizedBox(height: 8),
             Text(
-              'Estado: ${_statusName(status!)}', // i18n: Fase W3
-              style: TextStyle(color: palette.textMuted, fontSize: 12),
+              isWeb
+                  ? 'Estado: ${_statusName(status!)}' // i18n: Fase W3
+                  : AppL10n.of(context).planLimitReactivateEstadoMovil(
+                      _statusNameMovil(AppL10n.of(context), status!)),
+              style: TextStyle(
+                  color: palette.textMuted, fontSize: AppTextSize.caption),
             ),
           ],
         ],
@@ -504,61 +522,126 @@ class _PrimaryCta extends StatelessWidget {
   const _PrimaryCta({
     required this.hasNext,
     required this.isInactive,
+    required this.dadaDeBaja,
     required this.billingRoute,
     required this.palette,
+    required this.isWeb,
   });
 
   final bool hasNext;
   final bool isInactive;
+
+  /// Rama inactiva con la suscripción `cancelled`: el SnackBar no puede decir
+  /// «pausada» de una baja.
+  final bool dadaDeBaja;
   final String? billingRoute;
   final AppPalette palette;
+  final bool isWeb;
 
   @override
   Widget build(BuildContext context) {
     if (isInactive) {
-      return TreinoTappable(
+      // El texto del SnackBar se resuelve ACÁ y no adentro del `onTap`: ahí
+      // ya se hizo `pop()` del modal y no se vuelve a leer su contexto. La
+      // WEB sigue con el hardcodeado de siempre (`i18n: Fase W3`); el MÓVIL
+      // sale de AppL10n.
+      final estado = switch ((isWeb, dadaDeBaja)) {
+        (true, true) => 'Tu suscripción está dada de baja.', // i18n: Fase W3
+        (true, false) => 'Tu suscripción está pausada.', // i18n: Fase W3
+        (false, true) => AppL10n.of(context).planLimitSuscripcionBajaMovil,
+        (false, false) => AppL10n.of(context).planLimitSuscripcionPausadaMovil,
+      };
+      return PlanLimitAccentButton(
+        // "REGULARIZAR" es un verbo de pago — en el móvil, con el SnackBar
+        // de abajo ya diciendo el estado, el botón pasa a describir lo que
+        // efectivamente hace ("VER ESTADO") y no lo que Apple prohíbe pedir
+        // (3.1.3(f)). Decisión del dueño, 2026-09-29. Guard:
+        // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart`.
+        label: isWeb
+            ? 'REGULARIZAR' // i18n: Fase W3
+            : AppL10n.of(context).planLimitVerEstadoMovil,
         onTap: () {
+          // REACTIVAR ES COBRAR. Este CTA es el otro punto de entrada al pago
+          // que se ve DESDE EL TELEFONO (dashboard movil -> aceptar solicitud
+          // con la suscripcion pausada -> este modal), y es donde el dia que se
+          // cablee Mercado Pago alguien va a escribir la llamada: reactivar es
+          // la mitad del negocio de una suscripcion y la pricing page ni
+          // siquiera se lo ofrece a quien ya tiene el plan.
+          //
+          // Por eso pasa por el MISMO guard que la pricing page y no por
+          // `billingRoute == null`. La ruta es un string que hoy correlaciona
+          // con la superficie de casualidad (solo los callsites del Coach Hub
+          // la pasan): el dia que alguien agregue '/ajustes' al router movil,
+          // esa correlacion se rompe sin que nadie lo revise. La superficie no.
+          //
+          // El `switch` es exhaustivo sobre el sellado: una tercera superficie
+          // rompe la compilacion aca tambien.
+          final checkout = resolvePlanCheckout();
           final route = billingRoute;
           Navigator.of(context).pop();
-          if (route == null) {
-            // Superficie sin vista de facturacion (la app movil no tiene
-            // ninguna). Antes esto navegaba a '/ajustes' fijo y en movil moria
-            // contra una ruta inexistente: el modal decia lo correcto y el
-            // boton no hacia nada. Mejor decirlo que fingirlo.
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Regularizá tu suscripción desde TREINO web.',
-                ), // i18n: Fase W3
-              ),
-            );
-            return;
+          switch (checkout) {
+            case PlanCheckoutOnWebOnly():
+              // ⚠️ ACA DECIA DONDE SE REGULARIZA, Y ESO ERA EL PROBLEMA.
+              //
+              // El comentario que estaba aca razonaba sobre 3.1.3(c) —«no
+              // navega, no linkea y no abre nada»— y miraba el COBRO. La
+              // clausula que muerde es otra: 3.1.3(f) ampara la app del PF
+              // «provided there is no purchasing inside the app, **or calls to
+              // action for purchase outside of the app**». Un call to action no
+              // necesita abrir nada: alcanza con decir donde se paga.
+              //
+              // Y el amparo se cae solo el dia que el ALUMNO compre por IAP:
+              // ahi el binario deja de ser una «free app» y 3.1.3(f) no le
+              // aplica mas, por su propio texto.
+              //
+              // Ahora dice el ESTADO de la cuenta y nada mas. Eso no es un CTA
+              // de compra externa: es un hecho sobre su suscripcion.
+              //
+              // ⚠️ SE PIERDE ALGO REAL, Y NO ES GRATIS: el PF que entro por el
+              // telefono se queda sin saber que hacer. El encabezado de
+              // `pricing_screen.dart` lo cuantifica — es el 100% del funnel de
+              // $12.000-$39.000 por mes. Recuperarlo NO puede ser un cartel
+              // acá: tiene que salir por fuera de la app (un mail), que es lo
+              // unico que Apple no gobierna.
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(estado)),
+              );
+            case PlanCheckoutAvailable():
+              if (route == null) {
+                // Superficie que cobra pero sin vista de facturacion cableada.
+                // Antes esto navegaba a '/ajustes' fijo y en movil moria contra
+                // una ruta inexistente: el modal decia lo correcto y el boton
+                // no hacia nada. Mejor decirlo que fingirlo.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(estado)),
+                );
+                return;
+              }
+              // NUNCA mandar a /facturacion/planes aca: es la pagina de upsell,
+              // el mensaje opuesto al que necesita quien ya pago.
+              // TODO(producto): deep-link al tab de Facturacion cuando exista.
+              context.push(route);
           }
-          // NUNCA mandar a /facturacion/planes acá: es la página de upsell, el
-          // mensaje opuesto al que necesita quien ya pagó.
-          // TODO(producto): deep-link al tab de Facturación cuando exista.
-          context.push(route);
         },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: palette.accent,
-            borderRadius: BorderRadius.circular(9999),
-          ),
-          child: Text(
-            'REGULARIZAR', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
-              color: TreinoButtonTokens.foreground(context),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-            ),
-          ),
-        ),
       );
     }
-    return TreinoTappable(
+    // Sin siguiente tier ('CONTACTANOS' + su SnackBar) la rama es inalcanzable
+    // en producción —Plan 3 es ilimitado en alumnos, así que el servidor nunca
+    // bloquea a un PF sin tope; mismo criterio que PLAN A MEDIDA— pero SE
+    // RENDERIZA (los tests la ejercitan), así que la forma móvil tampoco puede
+    // quedar en castellano acá. Resueltos antes del `onTap`, igual que arriba.
+    final contactanos = isWeb
+        ? 'CONTACTANOS' // i18n: Fase W3
+        : AppL10n.of(context).planLimitContactanos;
+    final muyPronto = isWeb
+        ? 'Muy pronto vas a poder tener más de 15 alumnos.' // i18n: Fase W3
+        : AppL10n.of(context).planLimitAlumnosPlanAMedidaSnack;
+    return PlanLimitAccentButton(
+      label: !hasNext
+          ? contactanos
+          : (isWeb
+              ? 'VER PLANES' // i18n: Fase W3
+              : AppL10n.of(context).planLimitVerPlanesMovil),
       onTap: () {
         Navigator.of(context).pop();
         if (hasNext) {
@@ -567,35 +650,15 @@ class _PrimaryCta extends StatelessWidget {
         } else {
           // Plan 2 tope: aviso del plan a-medida (mock hasta canal de contacto).
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Muy pronto vas a poder tener más de 15 alumnos.',
-              ), // i18n: Fase W3
-            ),
+            SnackBar(content: Text(muyPronto)),
           );
         }
       },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: Text(
-          hasNext ? 'VER PLANES' : 'CONTACTANOS', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
-            color: TreinoButtonTokens.foreground(context),
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
-          ),
-        ),
-      ),
     );
   }
 }
 
+/// Nombre del estado para la WEB — hardcodeado, sin cambios (i18n: Fase W3).
 String _statusName(SubscriptionStatus status) => switch (status) {
       SubscriptionStatus.active => 'activa', // i18n: Fase W3
       SubscriptionStatus.pending => 'pendiente de pago', // i18n: Fase W3
@@ -604,29 +667,14 @@ String _statusName(SubscriptionStatus status) => switch (status) {
       SubscriptionStatus.cancelled => 'cancelada', // i18n: Fase W3
     };
 
-/// Cupo del tier en texto.
-///
-/// `weightLimit == null` (plan3) NO es un dato faltante: significa SIN
-/// LÍMITE. Interpolarlo directo renderiza la palabra «null» — y eso fue
-/// exactamente lo que se publicó: el upsell al plan más caro decía
-/// «Hasta null alumnos». Cualquier lugar que muestre el cupo pasa por acá.
-String _cupoTexto(SubscriptionTier tier) => tier.isUnlimited
-    ? 'alumnos sin límite' // i18n: Fase W3
-    : '${tier.weightLimit} alumnos'; // i18n: Fase W3
-
-String _tierName(SubscriptionTier tier) => switch (tier) {
-      SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
+/// Hermano de [_statusName] para el MÓVIL — mismo estado, vía AppL10n
+/// (hallazgo Codex, 2026-09-29: el móvil no tenía forma de decir esto en
+/// inglés).
+String _statusNameMovil(AppL10n l10n, SubscriptionStatus status) =>
+    switch (status) {
+      SubscriptionStatus.active => l10n.planLimitEstadoActiva,
+      SubscriptionStatus.pending => l10n.planLimitEstadoPendiente,
+      SubscriptionStatus.grace => l10n.planLimitEstadoGracia,
+      SubscriptionStatus.paused => l10n.planLimitEstadoPausada,
+      SubscriptionStatus.cancelled => l10n.planLimitEstadoCancelada,
     };
-
-String _formatArs(int amount) {
-  final s = amount.toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write('.');
-    buf.write(s[i]);
-  }
-  return buf.toString();
-}

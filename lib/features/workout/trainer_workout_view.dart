@@ -6,10 +6,13 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../coach/application/template_quota_provider.dart';
+import '../coach/presentation/template_limit_gate.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import 'application/routine_providers.dart';
@@ -55,8 +58,17 @@ class TrainerWorkoutView extends ConsumerWidget {
       // dentro de SingleChildScrollView scrollea como una sola unidad, sin
       // reciclar Elements por ítem (ver doc de TreinoFadeSlideIn).
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        physics: const ClampingScrollPhysics(),
+        // + bottom inset: el shell usa `Scaffold(extendBody: true)` y la
+        // barra flotante pasa POR ENCIMA del body, así que sin este extra la
+        // última plantilla queda tapada. Mismo patrón que `workout_screen
+        // .dart`, `home_screen.dart` y `trainer_coach_view.dart`.
+        padding: EdgeInsets.fromLTRB(
+          0,
+          20,
+          0,
+          20 + MediaQuery.paddingOf(context).bottom,
+        ),
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -219,6 +231,12 @@ class _TemplateLibrarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Contador «N de límite plantillas» (docs/limite-plantillas-pf.md PR3,
+    // "El contador visible"). El count sale del MISMO provider que gatea (ya
+    // filtra archivadas) para no mostrar un número que el gate no usa. Con
+    // límite null (Plan 3 o interruptor apagado) no se muestra nada.
+    final quota = ref.watch(templateQuotaProvider).valueOrNull;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -243,7 +261,15 @@ class _TemplateLibrarySection extends ConsumerWidget {
                 ),
               ),
               TextButton.icon(
-                onPressed: () => context.push('/workout/template-editor'),
+                // docs/limite-plantillas-pf.md PR3: gatear ANTES de abrir el
+                // editor, para que el PF no arme una plantilla entera y
+                // recién al guardar se entere del tope.
+                onPressed: () async {
+                  if (await intentarCrearPlantilla(context, ref) &&
+                      context.mounted) {
+                    context.push('/workout/template-editor');
+                  }
+                },
                 icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
                 label: Text(
                   'NUEVA',
@@ -257,6 +283,17 @@ class _TemplateLibrarySection extends ConsumerWidget {
               ),
             ],
           ),
+          if (quota?.limit != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, bottom: 2),
+              child: Text(
+                AppL10n.of(context).templateCounter(quota!.count, quota.limit!),
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
           const SizedBox(height: 4),
           _SharedToggleRow(
             palette: palette,
@@ -431,6 +468,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
   bool _publishing = false;
 
   Future<void> _onDelete(BuildContext context) async {
+    // Captured BEFORE the confirmation dialog, not just before the write: the
+    // cache drop must land even if this card is disposed mid-delete, and a
+    // BuildContext read after an async gap is exactly what we cannot do then.
+    final container = ProviderScope.containerOf(context, listen: false);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -477,6 +518,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       await ref
           .read(routineRepositoryProvider)
           .deleteRoutine(widget.template.id);
+      // The stream-backed list heals itself; the one-shot single-doc caches do
+      // not. Without this, `routineByIdProvider` keeps handing out a routine
+      // whose Firestore doc no longer exists for the rest of the process.
+      invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Plantilla eliminada.')),
@@ -493,6 +538,8 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
   }
 
   Future<void> _onTogglePublished(BuildContext context) async {
+    // Captured BEFORE the confirmation dialog — see _onDelete.
+    final container = ProviderScope.containerOf(context, listen: false);
     final isPublished = widget.template.visibility == RoutineVisibility.public;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -547,6 +594,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       } else {
         await repo.publishTemplate(widget.template.id);
       }
+      // `visibility` is exactly what the cached copy gets wrong here: an
+      // unpublished template stays "public" for every one-shot reader, and
+      // `visibleRoutineByIdProvider` keeps resolving it instead of null.
+      invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -574,11 +625,19 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
     setState(() => _assigning = true);
+    // Capturado antes del await: `ref` después de un dispose tira.
+    final analytics = ref.read(analyticsServiceProvider);
     try {
       await ref.read(routineRepositoryProvider).assignTemplateToAthlete(
             template: widget.template,
             athleteId: athleteId,
           );
+      // La copia asignada nace con la forma de la plantilla.
+      analytics.logRoutineCreated(
+        source: RoutineCreationSource.trainerAssigned,
+        daysCount: widget.template.days.length,
+        weeksCount: widget.template.numWeeks,
+      );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Plantilla asignada al alumno.')),

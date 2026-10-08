@@ -27,22 +27,19 @@
  * RESPUESTA. Cerrarlo pide un delay constante artificial; se documenta en vez
  * de fingir que no esta.
  *
- * ESTADO: desplegado, pero EL CLIENTE TODAVIA NO LO LLAMA.
- *
- * `AuthService.sendPasswordResetEmail` y `sendEmailVerification`
- * (lib/features/auth/data/auth_service.dart:121 y :130) siguen yendo a
- * FirebaseAuth directo, asi que los mails de recuperacion aun salen por las
- * plantillas default. Es a proposito: `treino-dev` es produccion y el padron de
- * Auth es uno solo, no hay donde ensayar. Primero se comprueba a mano que estos
- * callables mandan bien, y recien despues se migra el cliente — sobre un flujo
- * donde el usuario ya esta afuera de su cuenta, ese orden no es opcional.
+ * ESTADO: desplegado y EN USO. `AuthService.sendPasswordResetEmail` y
+ * `sendEmailVerification` (lib/features/auth/data/auth_service.dart) llaman a
+ * estos dos callables. Hasta 2026-10-01 este bloque decia que el cliente
+ * todavia no los llamaba, y ya no era cierto.
  *
  * `requestPasswordReset` es un endpoint SIN autenticar que escribe en
  * Firestore. Se publico recien cuando `send.gettreino.com` quedo verificado en
  * Resend: antes habria encolado mail que despues fallaba con 403.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -50,11 +47,11 @@ import { logger } from "firebase-functions";
 import { APP_ENTRY_ATHLETE, APP_ENTRY_TRAINER } from "../mail/templates";
 import { enqueueMail } from "../mail/enqueue-mail";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -186,11 +183,11 @@ export function resetOutcomeFor(
  * es federada, y la respuesta del callable no cambia.
  */
 async function entradaSegunRol(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string> {
   try {
-    const snap = await admin.firestore(app).collection("users").doc(uid).get();
+    const snap = await getFirestore(app).collection("users").doc(uid).get();
     return snap.data()?.role === "trainer"
       ? APP_ENTRY_TRAINER
       : APP_ENTRY_ATHLETE;
@@ -221,7 +218,7 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * @param nowMs - Reloj, inyectado para que los tests fijen la ventana.
  */
 export async function runRequestPasswordReset(
-  app: admin.app.App,
+  app: App,
   email: unknown,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
@@ -234,7 +231,7 @@ export async function runRequestPasswordReset(
     // El uid primero: el outbox guarda destinatarios por uid y resuelve la
     // direccion recien al enviar, asi que un cambio de email entre el pedido y
     // el envio sigue llegando a donde tiene que llegar.
-    const user = await admin.auth(app).getUserByEmail(normalized);
+    const user = await getAuth(app).getUserByEmail(normalized);
     const kind = resetOutcomeFor(user.providerData.map((p) => p.providerId));
     const scope = `${user.uid}_${throttleWindow(nowMs)}`;
 
@@ -251,13 +248,18 @@ export async function runRequestPasswordReset(
       return OK;
     }
 
-    const link = await admin.auth(app).generatePasswordResetLink(normalized);
+    const link = await getAuth(app).generatePasswordResetLink(normalized);
 
     await enqueueMail(app, {
       toUid: user.uid,
       kind,
       scope,
       params: { actionLink: rewriteActionHost(link) },
+      // Generar el link de arriba INVALIDA el anterior del mismo usuario. Si
+      // el throttle descarta este mail, el que ya está encolado queda con un
+      // código muerto y el usuario ve "expired or already used" sobre un mail
+      // recién llegado. Con esto, el pedido nuevo le pisa el link al viejo.
+      refreshPendingParams: true,
     });
   } catch (error: unknown) {
     // Se traga TODO a proposito — incluido user-not-found. Se logea para
@@ -282,12 +284,12 @@ export async function runRequestPasswordReset(
  * @param nowMs - Reloj, inyectado en tests.
  */
 export async function runRequestEmailVerification(
-  app: admin.app.App,
+  app: App,
   uid: string,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
   try {
-    const user = await admin.auth(app).getUser(uid);
+    const user = await getAuth(app).getUser(uid);
 
     if (!user.email) {
       logger.info("requestEmailVerification: el usuario no tiene email", { uid });
@@ -300,8 +302,7 @@ export async function runRequestEmailVerification(
       return OK;
     }
 
-    const link = await admin
-      .auth(app)
+    const link = await getAuth(app)
       .generateEmailVerificationLink(user.email);
 
     await enqueueMail(app, {
@@ -309,6 +310,9 @@ export async function runRequestEmailVerification(
       kind: "email-verification",
       scope: `${uid}_${throttleWindow(nowMs)}`,
       params: { actionLink: rewriteActionHost(link) },
+      // Mismo motivo que en el reseteo: `generateEmailVerificationLink`
+      // invalida el código anterior.
+      refreshPendingParams: true,
     });
   } catch (error: unknown) {
     logger.warn("requestEmailVerification: no se encolo", { uid, error });
@@ -390,7 +394,7 @@ export const requestPasswordReset = functions.onCall(
   { region: "southamerica-east1" },
   async (request) => {
     const email = (request.data ?? {}).email;
-    return runRequestPasswordReset(getApp(), email);
+    return runRequestPasswordReset(ensureApp(), email);
   },
 );
 
@@ -401,6 +405,6 @@ export const requestEmailVerification = functions.onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
-    return runRequestEmailVerification(getApp(), request.auth.uid);
+    return runRequestEmailVerification(ensureApp(), request.auth.uid);
   },
 );

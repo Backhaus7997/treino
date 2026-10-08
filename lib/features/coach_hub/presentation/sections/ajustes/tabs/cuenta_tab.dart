@@ -1,9 +1,12 @@
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -11,6 +14,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -207,6 +211,9 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
     }
     final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
     setState(() => _saving = true);
+    // Capturado ANTES del await: `AppL10n.of(context)` del otro lado es un
+    // contexto que pudo morir, y el analizador lo marca.
+    final copyBloqueado = AppL10n.of(context).moderationBlockedMessage;
     try {
       await ref.read(userRepositoryProvider).update(widget.profile.uid, {
         'firstName': first,
@@ -215,6 +222,11 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
         'displayName': displayName,
       });
       _toast('Cambios guardados'); // i18n: Fase W3
+    } on ModerationBlockedException catch (_) {
+      // El `displayName` pasa por el filtro de términos vetados. El texto de
+      // abajo invita a reintentar, y para un bloqueo eso es consejo falso: el
+      // mismo nombre va a fallar siempre.
+      _toast(copyBloqueado);
     } catch (_) {
       _toast('No se pudieron guardar los cambios. Probá de nuevo.'); // i18n
     } finally {
@@ -235,25 +247,10 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
       children: [
         Align(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: (_canSave && !_saving) ? _save : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-              disabledBackgroundColor: palette.bgCard,
-              disabledForegroundColor: palette.textMuted,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-            ),
-            child: _saving
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: TreinoButtonTokens.foreground(context),
-                    ),
-                  )
-                : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3
+          child: TreinoButton(
+            label: 'GUARDAR CAMBIOS', // i18n: Fase W3
+            loading: _saving,
+            onPressed: _canSave ? _save : null,
           ),
         ),
         const SizedBox(height: 16),
@@ -441,13 +438,40 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
       // huérfano en avatars/{uid}.jpg con la UI diciendo que lo quitó. Hasta
       // #765 esto era best-effort y mentía siempre. `deleteStored()` sí tolera
       // `object-not-found` — que no haya objeto es el estado deseado.
-      await ref.read(avatarWebUploaderProvider).deleteStored();
-      await ref
-          .read(userRepositoryProvider)
-          .update(widget.profile.uid, {'avatarUrl': null});
+      //
+      // Los dos pasos van en `try` SEPARADOS: son dos backends distintos
+      // (Storage y Firestore) con reglas distintas, y el `catch (_)` único que
+      // había hacía imposible saber cuál de los dos falló. Un PF reportó
+      // «no me funciona lo de sacar la foto» y lo único que había para
+      // diagnosticar era ese mensaje genérico, que sirve igual para un permiso
+      // de Storage denegado que para una escritura de Firestore rechazada.
+      try {
+        await ref.read(avatarWebUploaderProvider).deleteStored();
+      } on FirebaseException catch (e) {
+        // i18n: Fase W3
+        _toast('No se pudo borrar la imagen del servidor (${e.code}). '
+            'Probá de nuevo.');
+        return;
+      }
+
+      try {
+        await ref
+            .read(userRepositoryProvider)
+            .update(widget.profile.uid, {'avatarUrl': null});
+      } on FirebaseException catch (e) {
+        // La imagen YA se borró de Storage pero el perfil sigue apuntándola:
+        // el estado es inconsistente y el mensaje tiene que decirlo, no un
+        // «probá de nuevo» que sugiere que no pasó nada.
+        // i18n: Fase W3
+        _toast('La imagen se borró pero el perfil no se actualizó '
+            '(${e.code}). Recargá la página.');
+        return;
+      }
+
       _toast('Foto quitada'); // i18n: Fase W3
-    } catch (_) {
-      _toast('No se pudo quitar la foto. Probá de nuevo.'); // i18n: Fase W3
+    } catch (e) {
+      // i18n: Fase W3
+      _toast('No se pudo quitar la foto: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -503,23 +527,17 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  OutlinedButton(
-                    onPressed: _busy ? null : _changePhoto,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('CAMBIAR FOTO'), // i18n: Fase W3
+                  TreinoButton(
+                    label: 'CAMBIAR FOTO', // i18n: Fase W3
+                    variant: TreinoButtonVariant.secondary,
+                    loading: _busy,
+                    onPressed: _changePhoto,
                   ),
                   if (hasAvatar)
-                    TextButton(
+                    TreinoButton(
+                      label: 'QUITAR', // i18n: Fase W3
+                      variant: TreinoButtonVariant.danger,
                       onPressed: _busy ? null : _removePhoto,
-                      style: TextButton.styleFrom(
-                        foregroundColor: palette.danger,
-                      ),
-                      child: const Text('QUITAR'), // i18n: Fase W3
                     ),
                 ],
               ),
@@ -567,8 +585,10 @@ class _DangerZone extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             // i18n: Fase W3
-            'Tu cuenta tiene $alumnos. Eliminar la cuenta cancela todos los '
-            'planes y emite los reembolsos correspondientes.',
+            'Tu cuenta tiene $alumnos. Eliminar la cuenta no devuelve el dinero '
+            'del período en curso. Si solo querés dejar de pagar, dá de baja tu '
+            'plan desde Facturación: conservás el acceso hasta el final del '
+            'período que ya pagaste.',
             style: TextStyle(color: palette.textMuted, fontSize: 13),
           ),
           const SizedBox(height: 16),
@@ -576,21 +596,20 @@ class _DangerZone extends ConsumerWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              OutlinedButton(
+              // Pausar NO es destructivo —se revierte— así que se queda en
+              // secundario. Eliminar la cuenta sí, y ahora se ve distinto.
+              // Antes eran dos pills iguales salvo por el color del borde:
+              // `warning` y `danger` uno al lado del otro, que a ojo son «dos
+              // botones de peligro» y no una escalación.
+              TreinoButton(
+                label: 'PAUSAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.secondary,
                 onPressed: () => _confirmPausarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.warning,
-                  side: BorderSide(color: palette.warning),
-                ),
-                child: const Text('PAUSAR CUENTA'), // i18n: Fase W3
               ),
-              OutlinedButton(
-                onPressed: () => _confirmEliminarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.danger,
-                  side: BorderSide(color: palette.danger),
-                ),
-                child: const Text('ELIMINAR CUENTA'), // i18n: Fase W3
+              TreinoButton(
+                label: 'ELIMINAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.danger,
+                onPressed: () => showEliminarCuentaDialog(context),
               ),
             ],
           ),
@@ -751,30 +770,6 @@ class _Muted extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Confirmación honesta de ELIMINAR CUENTA (ADR-F12-01/F12-08): eliminar la
-/// cuenta se gestiona desde la app móvil (políticas de las stores) — no hay
-/// backend web para ejecutarlo, así que el dialog nunca promete una acción
-/// que no corre. `Entendido` sólo cierra el dialog, no muta nada.
-Future<void> _confirmEliminarCuenta(BuildContext context) {
-  return showTreinoDialog<void>(
-    context,
-    builder: (ctx) => TreinoDialog(
-      title: 'Eliminar cuenta', // i18n: Fase W3
-      body: const Text(
-        // i18n: Fase W3
-        'La eliminación de tu cuenta se gestiona desde la app TREINO, '
-        'según las políticas de las tiendas de aplicaciones. Próximamente '
-        'vas a poder hacerlo también desde acá.',
-      ),
-      destructive: true,
-      primaryLabel: 'Entendido', // i18n: Fase W3
-      onPrimaryTap: () => Navigator.of(ctx).maybePop(),
-      secondaryLabel: 'Cancelar', // i18n: Fase W3
-      onSecondaryTap: () => Navigator.of(ctx).maybePop(),
-    ),
-  );
 }
 
 /// Confirmación honesta de PAUSAR CUENTA: todavía no hay backend web para

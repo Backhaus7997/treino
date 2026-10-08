@@ -24,6 +24,12 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.signInCancelled() = _SignInCancelled;
   const factory AuthFailure.accountExistsWithDifferentCredential() =
       _AccountExistsWithDifferentCredential;
+  const factory AuthFailure.popupBlocked() = _PopupBlocked;
+  const factory AuthFailure.providerUnavailable() = _ProviderUnavailable;
+
+  /// La persona eligió OTRA cuenta en el popup de re-autenticación
+  /// (`user-mismatch`): hay que repetir con la cuenta con la que entró.
+  const factory AuthFailure.accountMismatch() = _AccountMismatch;
   const factory AuthFailure.unknown(String code) = _Unknown;
   const factory AuthFailure.profileCreateFailed({Object? cause}) =
       _ProfileCreateFailed;
@@ -32,6 +38,15 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
   const factory AuthFailure.requiresRecentLogin() = _RequiresRecentLogin;
   const factory AuthFailure.reAuthFailed({String? provider}) = _ReAuthFailed;
   const factory AuthFailure.deletionFailed({Object? cause}) = _DeletionFailed;
+
+  /// El servidor rechazó el borrado con `permission-denied` (y no por login
+  /// reciente). Con el servidor viejo es lo que recibía un entrenador.
+  const factory AuthFailure.deletionNotAllowed() = _DeletionNotAllowed;
+
+  /// No se pudo dar de baja la suscripción de Mercado Pago (`unavailable`):
+  /// el servidor falla cerrado y NO borró la cuenta. Reintentar es lo correcto.
+  const factory AuthFailure.subscriptionCancelFailed() =
+      _SubscriptionCancelFailed;
 
   factory AuthFailure.fromFirebase(FirebaseAuthException e) => switch (e.code) {
         'invalid-email' => const AuthFailure.invalidEmail(),
@@ -47,6 +62,7 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         'account-exists-with-different-credential' =>
           const AuthFailure.accountExistsWithDifferentCredential(),
         'requires-recent-login' => const AuthFailure.requiresRecentLogin(),
+        'user-mismatch' => const AuthFailure.accountMismatch(),
         final code => AuthFailure.unknown(code),
       };
 
@@ -64,7 +80,16 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
           'Sin conexión. Revisá tu internet e intentá de nuevo',
         _SignInCancelled() => 'Cancelaste el inicio de sesión',
         _AccountExistsWithDifferentCredential() =>
-          'Ya existe una cuenta con ese email usando otro método de inicio',
+          'Ya tenés una cuenta con ese email. Entrá con el método que usaste '
+              'al registrarte',
+        _PopupBlocked() =>
+          'Tu navegador bloqueó la ventana. Permití ventanas emergentes y '
+              'probá de nuevo',
+        _ProviderUnavailable() =>
+          'Este método no está disponible. Entrá con email o escribinos al '
+              'equipo',
+        _AccountMismatch() =>
+          'Usá la misma cuenta con la que entraste para confirmar',
         _Unknown() => 'Algo salió mal. Intentá de nuevo',
         _ProfileCreateFailed() =>
           'Hubo un problema creando tu perfil. Probá de nuevo',
@@ -75,5 +100,12 @@ sealed class AuthFailure with _$AuthFailure implements Exception {
         _ReAuthFailed() => 'No pudimos verificar tu identidad. Probá de nuevo.',
         // i18n: Fase 6 Etapa 3
         _DeletionFailed() => 'No pudimos eliminar tu cuenta. Probá de nuevo.',
+        // i18n: la hoja de eliminar cuenta muestra estas dos por l10n.
+        _DeletionNotAllowed() =>
+          'No pudimos eliminar tu cuenta desde la app. Escribinos y lo '
+              'resolvemos.',
+        _SubscriptionCancelFailed() =>
+          'No pudimos cancelar tu suscripción, así que tu cuenta no se '
+              'eliminó. Probá de nuevo en unos minutos.',
       };
 }

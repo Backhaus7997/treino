@@ -26,10 +26,12 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
@@ -85,7 +87,14 @@ UserPublicProfile _rankedProfile({
       bestDeadliftKg: bestDeadliftKg,
     );
 
-Widget _buildScreen({required List<Override> overrides}) {
+/// [textScaler] y [barraFlotante] simulan la letra de accesibilidad y el shell:
+/// con `extendBody: true` la barra flotante se dibuja encima del cuerpo y
+/// publica su alto en `MediaQuery.padding.bottom`.
+Widget _buildScreen({
+  required List<Override> overrides,
+  TextScaler textScaler = TextScaler.noScaling,
+  double barraFlotante = 0,
+}) {
   final router = GoRouter(
     initialLocation: '/profile/rankings',
     routes: [
@@ -112,6 +121,16 @@ Widget _buildScreen({required List<Override> overrides}) {
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
       routerConfig: router,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: textScaler,
+            padding: mq.padding.copyWith(bottom: barraFlotante),
+          ),
+          child: child!,
+        );
+      },
     ),
   );
 }
@@ -217,6 +236,51 @@ void main() {
       // competitionRanks, not the old index+1.
       expect(find.text('2'), findsNothing);
       expect(find.text('3'), findsOneWidget);
+    });
+
+    testWidgets(
+        'el top 3 pinta el numeral de puesto con su metálico y el 4º vuelve '
+        'a textMuted', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+            _rankedProfile(uid: 'u3', displayName: 'Coti', racha: 9),
+            _rankedProfile(uid: 'u4', displayName: 'Ana', racha: 7),
+            _rankedProfile(uid: 'u5', displayName: 'Bau', racha: 4),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      const p = AppPalette.mintMagenta;
+      expect(_rankColor(tester, row: 'u2', rank: '1'), p.podiumGold);
+      expect(_rankColor(tester, row: 'u3', rank: '2'), p.podiumSilver);
+      expect(_rankColor(tester, row: 'u4', rank: '3'), p.podiumBronze);
+      expect(_rankColor(tester, row: 'u5', rank: '4'), p.textMuted);
+    });
+
+    testWidgets(
+        'con empate en el 1º hay DOS oros y el siguiente es bronce: la plata '
+        'no se le regala al 3er puesto', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+            _rankedProfile(uid: 'u3', displayName: 'Coti', racha: 12),
+            _rankedProfile(uid: 'u4', displayName: 'Ana', racha: 9),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      const p = AppPalette.mintMagenta;
+      expect(_rankColor(tester, row: 'u2', rank: '1'), p.podiumGold);
+      expect(_rankColor(tester, row: 'u3', rank: '1'), p.podiumGold);
+      // Ana entra 3ª, no 2ª: le toca bronce. Si el podio se pintara por índice
+      // de fila en vez de por puesto, acá saldría plata.
+      expect(_rankColor(tester, row: 'u4', rank: '3'), p.podiumBronze);
+      expect(_rankColor(tester, row: 'u4', rank: '3'), isNot(p.podiumSilver));
     });
 
     testWidgets('current user is highlighted when present in a leaderboard',
@@ -698,6 +762,103 @@ void main() {
           greaterThanOrEqualTo(44.0),
         );
       });
+
+      // ──────────────────────────────────────────────────────────────────
+      // Letra al máximo de accesibilidad (≈3,1× en iOS). La invitación era un
+      // Column centrado sin scroll: el texto pasaba el alto disponible y el
+      // botón quedaba 234 px por debajo del borde — el alumno no podía
+      // sumarse a los rankings (iPhone 17e, 2026-10-02).
+      //
+      // Estructural, no de ancho: `google_fonts` mide con la fuente de
+      // fallback, más ancha, o sea más alta. Si algo, el rojo sale antes.
+      // ──────────────────────────────────────────────────────────────────
+      group('letra al máximo de accesibilidad', () {
+        const barra = 100.0;
+
+        Future<void> pumpInvitacion(WidgetTester tester) async {
+          tester.view.physicalSize = const Size(1170, 2532); // iPhone 17e
+          tester.view.devicePixelRatio = 3;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(_buildScreen(
+            overrides: [
+              ...baseOverrides(rankingOptIn: false),
+              rankingOptInControllerProvider
+                  .overrideWithValue(_FakeRankingOptInController()),
+            ],
+            textScaler: const TextScaler.linear(3.1),
+            barraFlotante: barra,
+          ));
+          await tester.pumpAndSettle();
+        }
+
+        testWidgets(
+            'nada desborda y el botón se alcanza scrolleando, por encima de '
+            'la barra flotante', (tester) async {
+          await pumpInvitacion(tester);
+          expect(tester.takeException(), isNull);
+
+          await tester.drag(
+            find.byKey(const Key('rankings_invitation_state')),
+            const Offset(0, -3000),
+          );
+          await tester.pumpAndSettle();
+
+          final boton = tester.getRect(find.byType(ElevatedButton));
+          expect(boton.bottom, lessThanOrEqualTo(844 - barra));
+        });
+
+        testWidgets(
+            'a escala 1 no scrollea y queda centrada en lo que la barra deja '
+            'ver', (tester) async {
+          tester.view.physicalSize = const Size(1170, 2532);
+          tester.view.devicePixelRatio = 3;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(_buildScreen(
+            overrides: [
+              ...baseOverrides(rankingOptIn: false),
+              rankingOptInControllerProvider
+                  .overrideWithValue(_FakeRankingOptInController()),
+            ],
+            barraFlotante: barra,
+          ));
+          await tester.pumpAndSettle();
+
+          final invitacion = find.byKey(const Key('rankings_invitation_state'));
+          final scroll =
+              find.ancestor(of: invitacion, matching: find.byType(Scrollable));
+          expect(
+            tester
+                .state<ScrollableState>(scroll.first)
+                .position
+                .maxScrollExtent,
+            0,
+            reason: 'a escala 1 no hay nada que scrollear',
+          );
+          final area = tester.getRect(scroll.first);
+          expect(
+            tester.getCenter(invitacion).dy,
+            moreOrLessEquals(area.top + (area.height - barra) / 2,
+                epsilon: 0.5),
+          );
+        });
+
+        testWidgets('el botón crece con el texto en vez de recortarlo',
+            (tester) async {
+          await pumpInvitacion(tester);
+
+          // El alto que el label NECESITA a esa escala, no el que le tocó:
+          // el RenderParagraph se recorta al alto que le da el botón, así que
+          // comparar contra su `size` saldría verde con el botón de 44 fijo.
+          final label = tester.renderObject<RenderParagraph>(
+            find.text('ACTIVAR RANKINGS'),
+          );
+          final necesita = label.getMinIntrinsicHeight(label.size.width);
+          expect(
+            tester.getSize(find.byType(ElevatedButton)).height,
+            greaterThanOrEqualTo(necesita),
+          );
+        });
+      });
     });
   });
 
@@ -728,6 +889,47 @@ void main() {
     });
     test('empty → []', () {
       expect(competitionRanks(<num>[]), <int>[]);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Podio del top 3 — mapeo puesto → metálico (no widget pumping).
+  // ──────────────────────────────────────────────────────────────────────
+  group('podiumColor', () {
+    const p = AppPalette.mintMagenta;
+
+    test('1º oro, 2º plata, 3º bronce', () {
+      expect(podiumColor(1, p), p.podiumGold);
+      expect(podiumColor(2, p), p.podiumSilver);
+      expect(podiumColor(3, p), p.podiumBronze);
+    });
+
+    test('del 4º en adelante no hay metálico', () {
+      expect(podiumColor(4, p), isNull);
+      expect(podiumColor(5, p), isNull);
+      expect(podiumColor(50, p), isNull);
+    });
+
+    test('mapea por PUESTO, así que los empates de competitionRanks mandan',
+        () {
+      // Board 1, 1, 3: dos oros, ninguna plata, y el bronce al que entró 3º.
+      final ranks = competitionRanks([12, 12, 9]);
+      expect(ranks.map((r) => podiumColor(r, p)).toList(),
+          [p.podiumGold, p.podiumGold, p.podiumBronze]);
+    });
+
+    test('triple empate arriba: tres oros y el 4º sin metálico', () {
+      final ranks = competitionRanks([12, 12, 12, 5]);
+      expect(ranks.map((r) => podiumColor(r, p)).toList(),
+          [p.podiumGold, p.podiumGold, p.podiumGold, null]);
+    });
+
+    test('resuelve contra la paleta que recibe, no contra una constante', () {
+      // Un metálico hardcodeado pasaría los tests de arriba y rompería el
+      // tema claro en silencio.
+      expect(podiumColor(1, AppPalette.mintMagentaLight),
+          AppPalette.mintMagentaLight.podiumGold);
+      expect(podiumColor(1, AppPalette.mintMagentaLight), isNot(p.podiumGold));
     });
   });
 
@@ -829,4 +1031,24 @@ class _FakeRankingOptInController implements RankingOptInControllerBase {
 
   @override
   Future<void> syncGymIfDesynced(String uid) async {}
+}
+
+/// Color del numeral de puesto de la fila del atleta [row], verificando de
+/// paso que ese puesto sea [rank].
+///
+/// Va por la key del numeral y NO por su texto: puesto y métrica de una misma
+/// fila pueden ser el mismo string —el 4º con una racha de 4 semanas— y ahí
+/// `find.text` devuelve dos widgets con estilos distintos.
+Color? _rankColor(
+  WidgetTester tester, {
+  required String row,
+  required String rank,
+}) {
+  final finder = find.byKey(Key('rankings_rank_$row'));
+  expect(finder, findsOneWidget,
+      reason: 'no encontré el numeral de puesto de la fila $row');
+  final text = tester.widget<Text>(finder);
+  expect(text.data, rank,
+      reason: 'la fila $row no está en el puesto $rank que espera el test');
+  return text.style?.color;
 }

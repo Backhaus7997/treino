@@ -4,6 +4,8 @@
   "notFoundCta": "",
   "homeAthleteFirstRunTitle": "Start training",
   "homeAthleteFirstRunBody": "Create your own routine, explore ready-made plans, or find a trainer to guide you.",
+  "homeAthleteFirstRunBodyWithTrainer": "You already have a trainer. In the meantime, create your own routine or explore ready-made plans.",
+  "homeAthleteFirstRunBodyNeutral": "Create your own routine or explore ready-made plans.",
   "homeAthleteFirstRunCreateCta": "CREATE ROUTINE",
   "homeAthleteFirstRunExplorePlansCta": "Explore plans",
   "homeAthleteFirstRunFindTrainerCta": "Find a trainer",
@@ -129,10 +131,23 @@
   "coachInquiryCtaError": "We couldn't open the chat. Please try again.",
   "@coachInquiryCtaError": {},
   "coachCtaProximamente": "",
-  "coachLocationSheetTitle": "",
-  "coachLocationSheetBody": "",
-  "coachLocationSheetAccept": "",
-  "coachLocationSheetDeny": "",
+  "coachLocationSheetTitle": "YOUR LOCATION",
+  "coachLocationSheetBody": "TREINO uses your location to show you trainers near you. Your location is not visible to other users.",
+  "coachLocationSheetContinue": "CONTINUE",
+  "coachLocationSettingsNoticeTitle": "LOCATION IS OFF",
+  "coachLocationSettingsNoticeBody": "Turn on location in Settings to see trainers near you. You can also continue without it and browse Online trainers.",
+  "coachLocationSettingsNoticeOpenSettings": "OPEN SETTINGS",
+  "coachLocationSettingsNoticeContinueWithout": "Continue without location",
+  "coachLocationServicesOffTitle": "LOCATION SERVICES ARE OFF",
+  "coachLocationServicesOffBody": "Turn on Location Services in Settings to see trainers near you. You can also continue without it and browse Online trainers.",
+  "coachLocationSheetBodyGyms": "TREINO uses your location to show you gyms near you. Your location is not visible to other users.",
+  "coachLocationSheetBodyDetect": "TREINO uses your location once to detect where you train.",
+  "coachLocationSettingsNoticeBodyGyms": "Turn on location in Settings to see gyms near you. Meanwhile you can search for yours by name.",
+  "coachLocationSettingsNoticeBodyDetect": "Turn on location in Settings to detect your location. You can also pick a gym from the list.",
+  "coachLocationServicesOffBodyGyms": "Turn on Location Services in Settings to see gyms near you. Meanwhile you can search for yours by name.",
+  "coachLocationServicesOffBodyDetect": "Turn on Location Services in Settings to detect your location. You can also pick a gym from the list.",
+  "profileLocationPermissionNeeded": "We need location permission.",
+  "profileLocationDetectFailed": "We couldn't detect your location.",
   "coachMiPlanTitle": "",
   "coachMiPlanEmpty": "",
   "coachMiPlanError": "",
@@ -156,7 +171,25 @@
   "coachEditorUpdateLabel": "",
   "coachUpdatePlanSuccess": "",
   "coachExercisePicker": "",
-  "agendaButtonLabel": "",
+  "agendaButtonLabel": "VIEW TRAINER AGENDA",
+  "athleteNutritionPlanButtonLabel": "MY NUTRITION PLAN",
+  "athleteFilesButtonLabel": "MY FILES",
+  "athleteNutritionPlanScreenTitle": "NUTRITION PLAN",
+  "athleteNutritionChooseOneHint": "Choose one",
+  "athleteNutritionEmptyGroup": "Your coach has not added options here yet.",
+  "athleteNutritionAllHint": "Include all",
+  "athleteNutritionPlanEmpty": "Your trainer hasn't added your nutrition plan yet.",
+  "athleteNutritionPlanLoadError": "We couldn't load your nutrition plan.",
+  "athleteNutritionNeedsActiveLink": "You need an active trainer link to view your nutrition plan.",
+  "athleteLinkRequired": "We couldn't find an active trainer link.",
+  "trainerAcceptsInquiriesTitle": "Accept inquiries",
+  "trainerAcceptsInquiriesSubtitle": "Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.",
+  "athleteLinkUnconfirmed": "We couldn't confirm your trainer link.",
+  "athleteLinkRequiredRetry": "Retry",
+  "athleteSessionMissing": "Your session ended. Please sign in again.",
+  "athleteFilesScreenTitle": "MY FILES",
+  "athleteFilesEmpty": "Your trainer hasn't shared any files with you yet.",
+  "athleteFilesLoadError": "We couldn't load your files.",
   "agendaScreenTitle": "",
   "agendaEmptyAvailability": "",
   "agendaBookingConfirmTitle": "",
@@ -315,6 +348,9 @@
   "wellbeingEditButton": "Edit",
   "wellbeingSaveError": "We couldn't save your check-in. Try again.",
   "workoutHistorialHeading": "",
+  "coachSessionHistoryInProgress": "",
+  "coachSessionHistoryIncomplete": "",
+  "coachSessionHistoryEmpty": "",
   "workoutHistorialEmptyMessage": "",
   "workoutHistorialEmptyCta": "",
   "workoutHistorialErrorMessage": "",
@@ -708,6 +744,12 @@
   },
   "routineEditorFillColumnA11y": "Replicate this value down the column",
   "@routineEditorFillColumnA11y": {},
+  "routineEditorNextCellLabel": "NEXT",
+  "@routineEditorNextCellLabel": {
+    "description": "Botón de la barra del teclado: salta a la celda siguiente (#910)."
+  },
+  "routineEditorNextCellA11y": "Go to the next cell",
+  "@routineEditorNextCellA11y": {},
   "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
   "@routineEditorAccessoryContext": {
     "description": "Context line under the shortcuts: which cell they act on.",
@@ -932,6 +974,47 @@
   "agendaSaveSuccess": "Schedule saved.",
   "coachHubSectionLoadError": "We couldn't load this section.",
   "coachHubSignOutError": "We couldn't sign you out. Please try again.",
+  "coachHubOnboardingAgeTitle": "WHEN WERE YOU BORN?",
+  "coachHubOnboardingAgeBody": "We need your date of birth to activate your trainer account. You must be 13 or older.",
+  "coachHubOnboardingAgeLabel": "DATE OF BIRTH",
+  "coachHubOnboardingIdentityTitle": "WHAT'S YOUR NAME?",
+  "coachHubOnboardingIdentityBody": "This is the name your clients will see.",
+  "coachHubOnboardingFirstNameLabel": "FIRST NAME",
+  "coachHubOnboardingLastNameLabel": "LAST NAME",
+  "coachHubOnboardingFirstNameRequired": "Enter your first name",
+  "coachHubOnboardingLastNameRequired": "Enter your last name",
+  "coachHubOnboardingPfTitle": "YOUR PROFESSIONAL PROFILE",
+  "coachHubOnboardingPfBody": "This is what students see when they look for you. You can change it any time.",
+  "coachHubOnboardingPfBioLabel": "BIO",
+  "coachHubOnboardingPfSpecialtyLabel": "SPECIALTY",
+  "coachHubOnboardingPfRateLabel": "MONTHLY RATE (ARS)",
+  "coachHubOnboardingPfModalityLabel": "MODALITY",
+  "coachHubOnboardingPfOnlineSwitch": "I teach online",
+  "coachHubOnboardingPfModalityRequired": "Turn on online classes or add a training place.",
+  "coachHubOnboardingPfLocationsLabel": "TRAINING PLACES",
+  "coachHubOnboardingPfLocationSearchLabel": "SEARCH A PLACE",
+  "coachHubOnboardingPfLocationSearchHint": "Address or place name",
+  "coachHubOnboardingPfLocationSearchButton": "Search",
+  "coachHubOnboardingPfLocationEmpty": "We couldn't find that place. Try the full address.",
+  "coachHubOnboardingPfLocationDuplicate": "That place is already in your list.",
+  "coachHubOnboardingPfLocationNetworkError": "We couldn't search for the place. Check your connection and try again.",
+  "coachHubOnboardingPfLocationConfigError": "Place search is not available right now. If you teach online, you can still finish.",
+  "coachHubOnboardingPfLocationRetry": "Retry",
+  "coachHubOnboardingPfLocationFound": "We found the place. Name it the way your clients will see it.",
+  "coachHubOnboardingPfLocationLabelLabel": "PLACE NAME",
+  "coachHubOnboardingPfLocationLabelHint": "E.g. My studio, Sarmiento Park",
+  "coachHubOnboardingPfLocationAddButton": "Add place",
+  "coachHubOnboardingPfLocationRemove": "Remove place",
+  "coachHubOnboardingPfLocationGymFallback": "Gym",
+  "coachHubOnboardingPfFinish": "Finish",
+  "coachHubOnboardingContinue": "Continue",
+  "coachHubOnboardingSaveError": "We couldn't save your details. Please try again.",
+  "coachHubNotAllowedTitle": "TRAINERS ONLY",
+  "coachHubNotAllowedBody": "The Coach Hub is only for trainers. Download the TREINO app from the App Store or Play Store and sign in there.",
+  "coachHubNotAllowedContactPrompt": "Want to become a trainer? Get in touch with the team.",
+  "coachHubNotAllowedContactCta": "Contact the team",
+  "coachHubNotAllowedMailSubject": "I want to be a trainer on TREINO",
+  "coachHubNotAllowedContactFallback": "We couldn't open your email app. Write to us at the address above.",
   "coachHubLoginPrompt": "Sign in with the same account you use on the mobile app.",
   "coachHubLoginEmailLabel": "Email",
   "coachHubLoginEmailRequired": "Enter your email",
@@ -989,7 +1072,7 @@
   "coachHubAlumnosTitle": "ATHLETES",
   "coachHubAlumnosSummary": "{total} total · {active} active",
   "coachHubAlumnosSearchHint": "Search by name…",
-  "coachHubAlumnosFilterAll": "All",
+  "coachHubAlumnosFilterAll": "Current",
   "coachHubAlumnosFilterActivos": "Active",
   "coachHubAlumnosFilterConDeuda": "Overdue",
   "coachHubAlumnosFilterPausados": "Paused",
@@ -1006,11 +1089,11 @@
   "coachHubAlumnosLastWorkoutToday": "Today",
   "coachHubAlumnosStatusActive": "Active",
   "coachHubAlumnosStatusDebt": "Overdue",
-  "coachHubAlumnosStatusBlocked": "Blocked",
+  "coachHubAlumnosStatusBlocked": "No access",
   "@coachHubAlumnosStatusBlocked": {
     "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
   },
-  "coachHubAlumnosFilterBloqueados": "Blocked",
+  "coachHubAlumnosFilterBloqueados": "No access",
   "@coachHubAlumnosFilterBloqueados": {
     "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
   },
@@ -1031,8 +1114,8 @@
   "coachHubAlumnoDetailNotasSaveSuccess": "Note saved.",
   "coachHubAlumnoDetailNotasSaveError": "We couldn't save the note. Please try again.",
   "coachHubAlumnoDetailNotasLoadError": "We couldn't load the note.",
-  "coachHubAlumnoDetailArchivosTitle": "Private files",
-  "coachHubAlumnoDetailArchivosSubtitle": "PDFs and photos you upload about this athlete. Only you can see them.",
+  "coachHubAlumnoDetailArchivosTitle": "Athlete files",
+  "coachHubAlumnoDetailArchivosSubtitle": "PDFs and photos you upload about this athlete. Choose which ones you share.",
   "coachHubAlumnoDetailArchivosUploadButton": "UPLOAD FILE",
   "coachHubAlumnoDetailArchivosEmpty": "You haven't uploaded any files about this athlete yet.",
   "coachHubAlumnoDetailArchivosLoadError": "We couldn't load the files.",
@@ -1044,6 +1127,11 @@
   "coachHubAlumnoDetailArchivosDeleteTitle": "Delete file?",
   "coachHubAlumnoDetailArchivosDeleteBody": "«{fileName}» will be removed from Storage and from the history. This can't be undone.",
   "coachHubAlumnoDetailArchivosDeleteError": "We couldn't delete the file.",
+  "coachHubAlumnoDetailArchivosSharedLabel": "SHARED",
+  "coachHubAlumnoDetailArchivosPrivateLabel": "PRIVATE",
+  "coachHubAlumnoDetailArchivosShareTooltip": "Share with athlete",
+  "coachHubAlumnoDetailArchivosUnshareTooltip": "Stop sharing with athlete",
+  "coachHubAlumnoDetailArchivosShareError": "We couldn't change who can see the file.",
   "feedLoadError": "We couldn't load your feed. Please try again.",
   "createPostLoadError": "We couldn't open the editor. Please try again.",
   "insightsLoadError": "We couldn't load your insights. Please try again.",
@@ -1087,6 +1175,7 @@
   "profileGymSaveError": "We couldn't save your gym. Please try again.",
   "gymNearbyLocationAffordance": "Turn on location to see nearby gyms",
   "gymNearbyShowMore": "Show more",
+  "gymSearchConfigError": "Gym search isn't available in this version of the app.",
   "gymNearbyLoadError": "We couldn't load nearby gyms.",
   "feedPullToRefreshA11y": "Pull to refresh",
   "logFieldInvalidNumber": "Enter a valid number",
@@ -1096,6 +1185,7 @@
   "profileSetupUsernameTaken": "That username is already taken",
   "profileSetupUsernameAvailable": "Username available",
   "profileSetupUsernameCheckError": "We couldn't check the username. Try again.",
+  "profileSetupGymSelectError": "We couldn't load that gym. Try again or pick «OTRO GYM / SIN GYM».",
   "routineEditorDiscardTitle": "Discard changes?",
   "routineEditorDiscardBody": "If you leave now you'll lose your unsaved changes.",
   "routineEditorDiscardConfirm": "Discard",
@@ -1115,6 +1205,9 @@
   "chatPickVideoLabel": "Video",
   "chatMediaUploading": "Uploading…",
   "chatMediaUploadFailed": "We couldn't upload the file. Please try again.",
+  "chatMediaQuotaFull": "You've reached the {maxMb} MB limit for chat photos and videos.",
+  "chatMediaFileTooLarge": "The file is {fileMb} MB and the maximum is {maxMb} MB.",
+  "chatMediaQuotaNotEnough": "The file is {fileMb} MB and you have {remainingMb} MB left.",
   "chatMediaPreviewPhoto": "📷 Photo",
   "chatMediaPreviewVideo": "🎥 Video",
   "chatMediaViewFullscreen": "View photo",
@@ -1181,6 +1274,9 @@
   "profileRoutinesNoTrainerCta": "",
   "profileRoutinesNoOwnBody": "",
   "profileRoutinesActiveChip": "",
+  "profileSectionLegal": "Legal",
+  "legalDocumentsTitle": "Legal documents",
+  "legalDocumentsSubtitle": "Terms, privacy and more",
   "appearanceTitle": "Appearance",
   "appearanceSystem": "System",
   "appearanceSystemDesc": "Follows the device theme",
@@ -1381,9 +1477,9 @@
   "postPrivacyGym": "MY GYM",
   "postPrivacyPublic": "PUBLIC",
   "postPrivacyNoGymHint": "Join a gym to post here",
-  "suggestedUsersTitle": "PEOPLE FROM YOUR GYM",
+  "suggestedUsersTitle": "SUGGESTED FOR YOU",
   "@suggestedUsersTitle": {
-    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+    "description": "Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym."
   },
   "suggestedUserAnonymous": "Anonymous",
   "@suggestedUserAnonymous": {
@@ -1690,6 +1786,10 @@
   "@exerciseFeedbackNoteTagComment": {},
   "exerciseFeedbackNoteTagDiscomfort": "DISCOMFORT",
   "@exerciseFeedbackNoteTagDiscomfort": {},
+  "workoutHistorialTopeAlcanzado": "There may be older workouts that don't fit in this list.",
+  "@workoutHistorialTopeAlcanzado": {},
+  "dashboardActividadTopeAlcanzado": "There may be more activity that doesn't fit in this list.",
+  "@dashboardActividadTopeAlcanzado": {},
   "exerciseFeedbackNoteSetTag": "SET {setNumber}",
   "@exerciseFeedbackNoteSetTag": {"placeholders": {"setNumber": {"type": "int"}}},
   "coachSessionFeedbackLoadError": "We could not load the athlete's reports.",
@@ -1770,5 +1870,401 @@
   "routineEditorSlotMenuUngroup": "Remove from superset",
   "@routineEditorSlotMenuUngroup": {},
   "routineEditorSlotMenuMergeDown": "Merge with the one below",
-  "@routineEditorSlotMenuMergeDown": {}
+  "@routineEditorSlotMenuMergeDown": {},
+  "trainerLocationConsentSheetTitle": "PUBLISH YOUR LOCATION",
+  "@trainerLocationConsentSheetTitle": {},
+  "trainerLocationConsentSheetBody": "Athletes will be able to see where you train and how far it is from them. You can turn this off anytime from your professional profile.",
+  "@trainerLocationConsentSheetBody": {},
+  "trainerLocationConsentSheetAccept": "ACCEPT",
+  "@trainerLocationConsentSheetAccept": {},
+  "trainerLocationConsentSheetRevoke": "TURN OFF PUBLISHING",
+  "@trainerLocationConsentSheetRevoke": {},
+  "profileEditTrainerConsentConfirmTitle": "Publish this location?",
+  "@profileEditTrainerConsentConfirmTitle": {},
+  "profileEditTrainerConsentConfirmBody": "Saving will make this location visible to athletes, with its pin on the map and the distance to them. You can turn it off anytime.",
+  "@profileEditTrainerConsentConfirmBody": {},
+  "profileEditTrainerConsentConfirmAccept": "PUBLISH",
+  "@profileEditTrainerConsentConfirmAccept": {},
+  "profileEditTrainerConsentConfirmCancel": "CANCEL",
+  "@profileEditTrainerConsentConfirmCancel": {},
+  "profileEditTrainerPublished": "Visible to athletes",
+  "@profileEditTrainerPublished": {},
+  "profileEditTrainerNotPublished": "Not published",
+  "@profileEditTrainerNotPublished": {},
+  "legacyPrivacyNoticeTitle": "We updated our Privacy Policy",
+  "@legacyPrivacyNoticeTitle": {},
+  "legacyPrivacyNoticeBody": "We clarified how we handle your location. Nothing changed about what we collect from you.",
+  "@legacyPrivacyNoticeBody": {},
+  "legacyPrivacyNoticeAction": "READ THE POLICY",
+  "@legacyPrivacyNoticeAction": {},
+  "legacyPrivacyNoticeDismiss": "Dismiss",
+  "@legacyPrivacyNoticeDismiss": {},
+  "paywallFreePlanLimitTitle": "",
+  "@paywallFreePlanLimitTitle": {},
+  "paywallFreePlanLimitDaysBody": "",
+  "@paywallFreePlanLimitDaysBody": {},
+  "paywallFreePlanLimitWeeksBody": "",
+  "@paywallFreePlanLimitWeeksBody": {},
+  "paywallFreePlanLimitUpgrade": "",
+  "@paywallFreePlanLimitUpgrade": {},
+  "paywallFreePlanLimitDismiss": "",
+  "@paywallFreePlanLimitDismiss": {},
+  "paywallFreePlanLimitTemplateBody": "",
+  "@paywallFreePlanLimitTemplateBody": {},
+  "workoutPlantillasPremiumChip": "",
+  "@workoutPlantillasPremiumChip": {},
+  "progressionPeriodLast3Months": "",
+  "@progressionPeriodLast3Months": {},
+  "progressionPeriodLast1Year": "",
+  "@progressionPeriodLast1Year": {},
+  "workoutRoutineFollow": "",
+  "@workoutRoutineFollow": {},
+  "workoutRoutineFollowing": "",
+  "@workoutRoutineFollowing": {},
+  "workoutRoutineFollowSuccess": "",
+  "@workoutRoutineFollowSuccess": {},
+  "workoutRoutineFollowError": "",
+  "@workoutRoutineFollowError": {},
+  "paywallFreePlanLimitRoutineCountBody": "",
+  "@paywallFreePlanLimitRoutineCountBody": {},
+  "paywallFreePlanLimitChartHistoryBody": "",
+  "@paywallFreePlanLimitChartHistoryBody": {},
+  "paywallFreePlanLimitCustomizeTemplateBody": "",
+  "@paywallFreePlanLimitCustomizeTemplateBody": {},
+  "paywallFreePlanLimitShapeDaysBody": "",
+  "@paywallFreePlanLimitShapeDaysBody": {},
+  "paywallFreePlanLimitShapeWeeksBody": "",
+  "@paywallFreePlanLimitShapeWeeksBody": {},
+  "paywallFreePlanLimitProName": "",
+  "@paywallFreePlanLimitProName": {},
+  "paywallFreePlanLimitProTagline": "",
+  "@paywallFreePlanLimitProTagline": {},
+  "paywallFreePlanLimitProBenefitDays": "",
+  "@paywallFreePlanLimitProBenefitDays": {},
+  "paywallFreePlanLimitProBenefitWeeks": "",
+  "@paywallFreePlanLimitProBenefitWeeks": {},
+  "paywallFreePlanLimitProBenefitTemplates": "",
+  "@paywallFreePlanLimitProBenefitTemplates": {},
+  "paywallFreePlanLimitProBenefitCustomize": "",
+  "@paywallFreePlanLimitProBenefitCustomize": {},
+  "paywallFreePlanLimitProBenefitRoutines": "",
+  "@paywallFreePlanLimitProBenefitRoutines": {},
+  "paywallFreePlanLimitProBenefitCharts": "",
+  "@paywallFreePlanLimitProBenefitCharts": {},
+  "paywallFreePlanLimitProMatchTag": "",
+  "@paywallFreePlanLimitProMatchTag": {},
+  "paywallAlumnoTitulo": "",
+  "@paywallAlumnoTitulo": {},
+  "paywallAlumnoBajada": "",
+  "@paywallAlumnoBajada": {},
+  "paywallAlumnoPlanMensual": "",
+  "@paywallAlumnoPlanMensual": {},
+  "paywallAlumnoPlanAnual": "",
+  "@paywallAlumnoPlanAnual": {},
+  "paywallAlumnoAhorro": "",
+  "@paywallAlumnoAhorro": {},
+  "paywallAlumnoBeneficio1": "",
+  "@paywallAlumnoBeneficio1": {},
+  "paywallAlumnoBeneficio2": "",
+  "@paywallAlumnoBeneficio2": {},
+  "paywallAlumnoBeneficio3": "",
+  "@paywallAlumnoBeneficio3": {},
+  "paywallAlumnoBeneficio4": "",
+  "@paywallAlumnoBeneficio4": {},
+  "paywallAlumnoImpuestos": "",
+  "@paywallAlumnoImpuestos": {},
+  "paywallAlumnoCta": "",
+  "@paywallAlumnoCta": {},
+  "paywallAlumnoRestaurar": "",
+  "@paywallAlumnoRestaurar": {},
+  "paywallAlumnoSinPlanes": "",
+  "@paywallAlumnoSinPlanes": {},
+  "paywallAlumnoReintentar": "",
+  "@paywallAlumnoReintentar": {},
+  "paywallAlumnoListo": "",
+  "@paywallAlumnoListo": {},
+  "paywallAlumnoPendiente": "",
+  "@paywallAlumnoPendiente": {},
+  "paywallAlumnoErrorCompra": "",
+  "@paywallAlumnoErrorCompra": {},
+  "paywallAlumnoSinRestaurar": "",
+  "@paywallAlumnoSinRestaurar": {},
+  "moderationMenuA11y": "More options",
+  "moderationReportAction": "Report",
+  "moderationBlockAction": "Block",
+  "moderationReportSheetTitle": "Why are you reporting this?",
+  "moderationReportReasonHarassment": "Harassment",
+  "moderationReportReasonSexualContent": "Sexual content",
+  "moderationReportReasonViolenceOrSelfHarm": "Violence or self-harm",
+  "moderationReportReasonDangerousHealthAdvice": "Dangerous health advice",
+  "moderationReportReasonImpersonation": "Impersonation",
+  "moderationReportReasonSpam": "Spam",
+  "moderationReportReasonThirdPartyData": "Third-party data",
+  "moderationReportReasonIntellectualProperty": "Intellectual property",
+  "moderationReportReasonOther": "Other",
+  "moderationReportDetailHint": "Tell us more (optional)",
+  "moderationReportSubmit": "SUBMIT REPORT",
+  "moderationReportCancel": "CANCEL",
+  "moderationReportSuccess": "Thanks, we'll review it.",
+  "moderationReportError": "We couldn't send the report. Try again.",
+  "moderationBlockConfirmTitle": "Block {name}?",
+  "@moderationBlockConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockConfirmBody": "They won't be able to message you, follow you, or react to your posts.",
+  "moderationBlockConfirmAction": "BLOCK",
+  "moderationBlockDismiss": "CANCEL",
+  "moderationBlockSuccess": "You blocked {name}.",
+  "@moderationBlockSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockError": "We couldn't block them. Try again.",
+  "moderationBlockedMessage": "That text can't be posted because it breaks the Community Guidelines. Please review it and try again.",
+  "@moderationBlockedMessage": {},
+  "privacyTitle": "Privacy",
+  "privacyAnalyticsTitle": "Usage analytics",
+  "privacyAnalyticsSubtitle": "Helps us understand which parts of the app get used.",
+  "privacyAnalyticsExplainer": "If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.",
+  "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.",
+  "privacyEntryTitle": "Analytics and emails",
+  "privacyPromoEmailsTitle": "Promotional emails",
+  "privacyPromoEmailsSubtitle": "Turn it off and we'll stop sending them. Account notices still reach you.",
+  "privacyPromoEmailsSaveError": "We couldn't save the change. Try again.",
+  "customExerciseCounter": "{count} of {limit} custom exercises",
+  "@customExerciseCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "templateCounter": "{count} of {limit} templates",
+  "@templateCounter": {
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "format": "decimalPattern"
+      },
+      "limit": {
+        "type": "int",
+        "format": "decimalPattern"
+      }
+    }
+  },
+  "planLimitVerPlanesMovil": "VIEW PLANS",
+  "planLimitEntendido": "Got it",
+  "planLimitPorMes": "/month",
+  "planLimitPlanAMedidaTitulo": "CUSTOM PLAN",
+  "planLimitContactanos": "CONTACT US",
+  "planLimitAlumnosTituloTope": "YOU REACHED YOUR PLAN LIMIT",
+  "planLimitAlumnosTituloInactiva": "YOUR SUBSCRIPTION IS SUSPENDED",
+  "planLimitAlumnosTituloBaja": "YOUR SUBSCRIPTION IS CANCELLED",
+  "planLimitAlumnosCuerpoInactivaExplicacion": "While your subscription isn't up to date, your account works with the Free plan limit. No student is removed.",
+  "planLimitAlumnosCuerpoTopeMovilLimitado": "Your {plan} plan includes {limit, plural, =1{1 student} other{{limit} students}}.",
+  "@planLimitAlumnosCuerpoTopeMovilLimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosCuerpoTopeMovilIlimitado": "Your {plan} plan includes unlimited students.",
+  "@planLimitAlumnosCuerpoTopeMovilIlimitado": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitAlumnosPlanAMedidaCuerpo": "You're on the largest plan. For more than 15 students, we're preparing a custom plan for you.",
+  "planLimitAlumnosPlanAMedidaSnack": "Soon you'll be able to have more than 15 students.",
+  "planLimitReactivateTituloMovil": "YOUR PLAN: {plan}",
+  "@planLimitReactivateTituloMovil": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitReactivateCuerpoMovil": "It isn't active. Meanwhile, your account has the Free plan limit: {count, plural, =1{1 student} other{{count} students}}.",
+  "@planLimitReactivateCuerpoMovil": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitVerEstadoMovil": "VIEW STATUS",
+  "planLimitReactivateEstadoMovil": "Status: {estado}",
+  "@planLimitReactivateEstadoMovil": {
+    "placeholders": {
+      "estado": {
+        "type": "String"
+      }
+    }
+  },
+  "planLimitEstadoActiva": "active",
+  "planLimitEstadoPendiente": "payment pending",
+  "planLimitEstadoGracia": "payment past due",
+  "planLimitEstadoPausada": "paused",
+  "planLimitEstadoCancelada": "cancelled",
+  "planLimitAlumnosBeneficioLimitado": "Up to {limit, plural, =1{1 student} other{{limit} students}}",
+  "@planLimitAlumnosBeneficioLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitAlumnosBeneficioIlimitado": "Unlimited students",
+  "planLimitSuscripcionPausadaMovil": "Your subscription is paused.",
+  "planLimitSuscripcionBajaMovil": "Your subscription is cancelled.",
+  "planLimitTrainerTituloEjercicios": "CUSTOM EXERCISE LIMIT",
+  "planLimitTrainerTituloPlantillas": "TEMPLATE LIMIT",
+  "planLimitTrainerPasadoTopeEjercicios": "You have {count, plural, =1{1 custom exercise} other{{count} custom exercises}} and your plan includes {limit}. You keep them all; to create a new one, delete {toDelete}.",
+  "@planLimitTrainerPasadoTopeEjercicios": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toDelete": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerPasadoTopePlantillas": "You have {count, plural, =1{1 template} other{{count} templates}} and your plan includes {limit}. You keep them all; to create a new one, archive {toArchive}.",
+  "@planLimitTrainerPasadoTopePlantillas": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "limit": {
+        "type": "int"
+      },
+      "toArchive": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaEjercicios": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}.",
+  "@planLimitTrainerInactivaEjercicios": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerInactivaPlantillas": "Your {plan} subscription isn't active. Meanwhile, your {planEfectivo} plan includes {limit, plural, =1{1 template} other{{limit} templates}}.",
+  "@planLimitTrainerInactivaPlantillas": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "planEfectivo": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosConTier": "Your {plan} plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopeEjerciciosGenerico": "Your plan includes {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}. You can edit or delete the ones you already have.",
+  "@planLimitTrainerTopeEjerciciosGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasConTier": "Your {plan} plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasConTier": {
+    "placeholders": {
+      "plan": {
+        "type": "String"
+      },
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerTopePlantillasGenerico": "Your plan includes {limit, plural, =1{1 template} other{{limit} templates}}. You can edit or archive the ones you already have.",
+  "@planLimitTrainerTopePlantillasGenerico": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosLimitado": "Up to {limit, plural, =1{1 custom exercise} other{{limit} custom exercises}}",
+  "@planLimitTrainerBeneficioEjerciciosLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioEjerciciosIlimitado": "Unlimited custom exercises",
+  "planLimitTrainerBeneficioPlantillasLimitado": "Up to {limit, plural, =1{1 template} other{{limit} templates}}",
+  "@planLimitTrainerBeneficioPlantillasLimitado": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "planLimitTrainerBeneficioPlantillasIlimitado": "Unlimited templates",
+  "planLimitTrainerPlanAMedidaCuerpo": "You're on the largest plan. We're preparing a custom plan for you.",
+  "eliminarCuentaSheetTrainerUnlinkNotice": "{count, plural, =1{1 athlete will be unlinked. We'll let them know.} other{{count} athletes will be unlinked. We'll let them know.}}",
+  "eliminarCuentaSheetErrorSubscriptionCancel": "We couldn't cancel your subscription, so your account was not deleted. Please try again in a few minutes.",
+  "eliminarCuentaSheetErrorNotAllowed": "We couldn't delete your account from the app. Contact us and we'll sort it out.",
+  "eliminarCuentaWebReauthTitle": "Confirm your identity",
+  "eliminarCuentaWebReauthPasswordBody": "For your security, enter your password to confirm it's you.",
+  "eliminarCuentaWebReauthCta": "CONFIRM",
+  "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open.",
+  "gymNameDialogTitle": "Name your gym",
+  "gymNameDialogBody": "Type the name you want other people to see.",
+  "gymNameDialogHint": "Gym name",
+  "gymNameDialogConfirm": "SAVE",
+  "gymNamePromptTitle": "Your gym needs a name",
+  "gymNamePromptBody": "Help us out: what is it called? Everyone who trains there will see it.",
+  "gymNamePromptCta": "NAME IT",
+  "gymNamePromptDismiss": "Not now",
+  "gymNamePromptRaceMessage": "Someone already named it: {name}.",
+  "coachHubOnboardingPfLocationStaleHint": "This place is no longer available. Pick this place again so people can find you."
 }

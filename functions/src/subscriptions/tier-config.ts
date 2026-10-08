@@ -14,6 +14,22 @@ export type SubscriptionTier = "free" | "plan1" | "plan2" | "plan3";
 export type SubscriptionCycle = "monthly" | "annual";
 
 /**
+ * El nombre del plan que lee una persona. Espejo de `tierName()` en
+ * `plan_copy.dart`.
+ *
+ * Vive acá y no en el mail porque lo usan dos lados que tienen que decir lo
+ * mismo: el texto de los mails y el nombre del plan que Mercado Pago muestra en
+ * su checkout, en la lista de suscripciones y en el mail de cada cobro. Con el
+ * código crudo, el PF veía «TREINO — plan1 (mensual)».
+ */
+export const TIER_LABELS: Record<SubscriptionTier, string> = {
+  free: "Free",
+  plan1: "Plan 1",
+  plan2: "Plan 2",
+  plan3: "Plan 3",
+};
+
+/**
  * Weighted-load limit per tier (active=1.0, paused=0.5 count toward it).
  *
  * `null` = SIN LIMITE (plan3). Se eligio null y no Infinity ni un numero
@@ -27,6 +43,53 @@ export const TIER_WEIGHT_LIMITS: Record<SubscriptionTier, number | null> = {
   free: 2,
   plan1: 7,
   plan2: 15,
+  plan3: null,
+};
+
+/**
+ * Tope de ejercicios propios (`users/{uid}/customExercises`) por plan del PF
+ * (limite-ejercicios-pf.md, PR1). Mismo criterio y mismo motivo que
+ * `TIER_WEIGHT_LIMITS`: `null` = SIN TOPE (plan3), nunca "sin dato" — con
+ * `??` en vez de un chequeo de propiedad, el plan mas caro devolveria 20 en
+ * vez de ilimitado y compilaria perfecto.
+ *
+ * La escalera CRECE EN EL MISMO ORDEN que `TIER_WEIGHT_LIMITS`
+ * (free < plan1 < plan2 < plan3): `effectiveTier` en `effective-limit.ts`
+ * reusa `tierLimit` + `limitRank` de esa escalera para rankear TIERS al
+ * resolver el piso prepago, y eso solo da la respuesta correcta si las dos
+ * escaleras avanzan juntas. `tier-config.test.ts` lo prueba.
+ *
+ * Debe mantenerse espejada a mano en `kTierCustomExerciseLimits`
+ * (`lib/features/coach/domain/subscription_tier.dart`, PR3) — mismo patron
+ * que `TIER_WEIGHT_LIMITS`/`kTierWeightLimits`.
+ */
+export const TIER_CUSTOM_EXERCISE_LIMITS: Record<SubscriptionTier, number | null> = {
+  free: 20,
+  plan1: 60,
+  plan2: 120,
+  plan3: null, // SIN TOPE — mismo criterio y mismo motivo que TIER_WEIGHT_LIMITS
+};
+
+/**
+ * Tope de plantillas del PF por plan (limite-plantillas-pf.md, PR1): cuentan
+ * los `routines` con `source == 'trainer-template'` y `assignedBy == uid` que
+ * no estan archivados, publicados o no. Mismo criterio de `null` que las dos
+ * de arriba: SIN TOPE, nunca "sin dato".
+ *
+ * Solo el Free tiene tope (decision P2 del plan): la plantilla es la promesa
+ * central del producto para el PF, y topearla en un plan pago pega en lo que
+ * se vende. Por eso la escalera es monotona NO ESTRICTA (3, sin tope, sin
+ * tope, sin tope) — a diferencia de `TIER_CUSTOM_EXERCISE_LIMITS`, que crece
+ * en cada escalon. `tier-config.test.ts` pide lo que esta puede cumplir: que
+ * ningun escalon baje.
+ *
+ * Debe mantenerse espejada a mano en `kTierTemplateLimits`
+ * (`lib/features/coach/domain/subscription_tier.dart`, PR3).
+ */
+export const TIER_TEMPLATE_LIMITS: Record<SubscriptionTier, number | null> = {
+  free: 3,
+  plan1: null,
+  plan2: null,
   plan3: null,
 };
 

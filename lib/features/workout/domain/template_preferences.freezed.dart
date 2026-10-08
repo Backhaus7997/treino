@@ -40,6 +40,7 @@ mixin _$TemplatePreferences {
   /// route them to `/profile-unavailable` (#544). An unknown goal has to
   /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
   /// [priorityGroups] already do for their own unknown keys.
+// ignore: invalid_annotation_target
   @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   RoutineGoal? get goal => throw _privateConstructorUsedError;
 
@@ -205,6 +206,7 @@ class _$TemplatePreferencesImpl extends _TemplatePreferences {
   /// route them to `/profile-unavailable` (#544). An unknown goal has to
   /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
   /// [priorityGroups] already do for their own unknown keys.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   final RoutineGoal? goal;
@@ -303,6 +305,7 @@ abstract class _TemplatePreferences extends TemplatePreferences {
   /// route them to `/profile-unavailable` (#544). An unknown goal has to
   /// degrade to "no preference", exactly like [RoutineGoal.fromWireKey] and
   /// [priorityGroups] already do for their own unknown keys.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   RoutineGoal? get goal;

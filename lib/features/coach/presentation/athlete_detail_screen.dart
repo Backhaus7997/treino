@@ -37,7 +37,7 @@ import '../../insights/domain/chart_period.dart';
 import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/exercise_frequency_providers.dart';
 import '../../workout/application/routine_providers.dart'
-    show routineRepositoryProvider;
+    show invalidateRoutineById, routineRepositoryProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider, coachSessionSetLogsProvider;
 import '../../workout/domain/routine.dart';
@@ -74,7 +74,9 @@ class AthleteDetailScreen extends ConsumerWidget {
     final trainerUid = ref.watch(currentUidProvider) ?? '';
 
     final profileAsync = ref.watch(userPublicProfileProvider(athleteId));
-    final plansAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final plansAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid, athleteId: athleteId),
+    ));
 
     return Column(
       children: [
@@ -390,7 +392,7 @@ class _PlanesSection extends ConsumerWidget {
               ),
             ),
             data: (allPlans) {
-              // Client-side filter: only show plans assigned by current trainer
+              // Redundante desde que assignedBy también vive en la query.
               final myPlans =
                   allPlans.where((r) => r.assignedBy == trainerUid).toList();
 
@@ -490,9 +492,17 @@ class _PlanesSection extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    // Captured before the async gap so the cache drop survives an unmount.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(routineRepositoryProvider).deleteRoutine(plan.id);
-      ref.invalidate(assignedRoutinesProvider(athleteId));
+      ref.invalidate(assignedRoutinesByTrainerProvider(
+        (trainerId: trainerUid, athleteId: athleteId),
+      ));
+      // The athlete's list is not the only reader: the one-shot single-doc
+      // caches would keep serving the deleted plan for the rest of the
+      // process, "empezar sesión" included.
+      invalidateRoutineById(container, plan.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1936,6 +1946,107 @@ class _NotaEditor extends StatelessWidget {
 bool _isCompleted(session) =>
     session.status == SessionStatus.finished && session.wasFullyCompleted;
 
+/// La sesión que el alumno está entrenando AHORA, o null si no hay ninguna.
+///
+/// Devuelve la MÁS RECIENTE por `startedAt`, no "la primera que aparezca":
+/// puede haber más de una `active` a la vez. Una sesión abandonada sin cerrar
+/// queda colgada en ese estado hasta que el barrido la levanta, así que un
+/// alumno con una colgada de anteayer y una de verdad ahora mismo tiene dos, y
+/// mandar al PF a la vieja es mandarlo a un entrenamiento muerto.
+Session? _enCurso(List<Session> sessions) {
+  Session? masReciente;
+  for (final s in sessions) {
+    if (s.status != SessionStatus.active) continue;
+    if (masReciente == null || s.startedAt.isAfter(masReciente.startedAt)) {
+      masReciente = s;
+    }
+  }
+  return masReciente;
+}
+
+/// El entrenamiento EN CURSO, arriba de todo en la ficha del alumno.
+///
+/// Hasta este cambio la sesión en curso no aparecía en NINGUNA superficie de la
+/// ficha: `_isCompleted` exige `status == finished` **y** `wasFullyCompleted`,
+/// así que la descartaba dos veces. No es que estuviera abajo — no estaba.
+///
+/// Va fuera de la card del historial y no como su primera fila. Es lo único de
+/// esta pantalla que está pasando ahora mismo; puesta entre las terminadas,
+/// aunque fuera primera, se lee como una fila más y el PF tiene que buscarla.
+///
+/// El tint al 8% sobre `textPrimary` es el mismo par que usa
+/// [ExerciseFeedbackNote], elegido porque ahí ya está medido en las DOS
+/// paletas (AGENTS.md §2: todo par con `accent` de fondo se mide en las dos).
+/// El color acompaña; lo que distingue es la PALABRA del tag.
+class _SesionEnCursoCard extends StatelessWidget {
+  const _SesionEnCursoCard({required this.session, required this.athleteId});
+
+  final Session session;
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final nombre = session.routineName.trim();
+
+    return Semantics(
+      button: true,
+      label: '${l10n.coachSessionHistoryInProgress}'
+          '${nombre.isEmpty ? '' : ': $nombre'}',
+      child: TreinoTappable(
+        onTap: () => context.push(
+          '/coach/athlete/$athleteId/session/${session.id}',
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s12,
+          ),
+          decoration: BoxDecoration(
+            color: palette.accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Icon(TreinoIcon.play, size: 14, color: palette.accent),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.coachSessionHistoryInProgress.toUpperCase(),
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    if (nombre.isNotEmpty)
+                      Text(
+                        nombre,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(TreinoIcon.chevronRight, size: 16, color: palette.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Mobile "Historial de sesiones" section (REQ-SETLOGS-010).
 ///
 /// Watches [sessionsByUidProvider] for [athleteId], filters to completed
@@ -1956,14 +2067,50 @@ class _EntrenamientosSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Section header ────────────────────────────────────────────────
-        Text(
-          'HISTORIAL DE SESIONES',
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'HISTORIAL DE SESIONES',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            // La puerta al historial completo. Esta sección corta en 20 y
+            // ADEMÁS descarta las sesiones en curso e incompletas
+            // (`_isCompleted`), así que lo que se ve acá no es "las últimas
+            // 20": es "las últimas 20 de las que califican". La pantalla
+            // completa no filtra nada.
+            // `shrinkWrap` y no el tap target por defecto: un TextButton
+            // normal reserva 48 px de alto, y este header mide 12. Dejarlo
+            // así engordaba la sección 33 px y empujaba la primera fila fuera
+            // de alcance — lo detectaron siete tests de esta pantalla, con el
+            // warning de hit test que dice que el tap "no hit-testea sobre el
+            // widget". No era un detalle de tests: la fila se volvía difícil de
+            // tocar de verdad.
+            TextButton(
+              onPressed: () =>
+                  context.push('/coach/athlete/$athleteId/historial'),
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+              ),
+              child: Text(
+                l10n.workoutHistorialSeeAll,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
 
@@ -1986,8 +2133,9 @@ class _EntrenamientosSection extends ConsumerWidget {
             ),
           ),
           data: (sessions) {
+            final enCurso = _enCurso(sessions);
             final finished = sessions.where(_isCompleted).take(20).toList();
-            if (finished.isEmpty) {
+            if (enCurso == null && finished.isEmpty) {
               return _card(
                 palette: palette,
                 child: Text(
@@ -1997,19 +2145,35 @@ class _EntrenamientosSection extends ConsumerWidget {
                 ),
               );
             }
-            return _card(
-              palette: palette,
-              child: Column(
-                children: [
-                  for (var i = 0; i < finished.length; i++) ...[
-                    if (i > 0) Divider(color: palette.border, height: 1),
-                    _ExpandableSessionRow(
-                      session: finished[i],
-                      athleteId: athleteId,
-                    ),
-                  ],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Arriba de todo y SOLA, fuera de la card del historial: es lo
+                // único de esta pantalla que está pasando ahora mismo, y
+                // mezclarla entre las terminadas la vuelve una fila más.
+                if (enCurso != null) ...[
+                  _SesionEnCursoCard(
+                    session: enCurso,
+                    athleteId: athleteId,
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
                 ],
-              ),
+                if (finished.isNotEmpty)
+                  _card(
+                    palette: palette,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < finished.length; i++) ...[
+                          if (i > 0) Divider(color: palette.border, height: 1),
+                          _ExpandableSessionRow(
+                            session: finished[i],
+                            athleteId: athleteId,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -2128,6 +2292,8 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               last30dLabel: l10n.progressionPeriodLast30Days,
               thisWeekLabel: l10n.progressionPeriodThisWeek,
               monthLabel: l10n.progressionPeriodMonth,
+              last3mLabel: l10n.progressionPeriodLast3Months,
+              last1yLabel: l10n.progressionPeriodLast1Year,
             ),
             localeName: l10n.localeName,
             personalRecordsLabels: PersonalRecordsListLabels(
@@ -2199,6 +2365,8 @@ class _MostFrequentExercisesSectionState
             last30dLabel: l10n.progressionPeriodLast30Days,
             thisWeekLabel: l10n.progressionPeriodThisWeek,
             monthLabel: l10n.progressionPeriodMonth,
+            last3mLabel: l10n.progressionPeriodLast3Months,
+            last1yLabel: l10n.progressionPeriodLast1Year,
           ),
         ),
       ),

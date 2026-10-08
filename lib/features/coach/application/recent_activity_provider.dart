@@ -20,8 +20,26 @@ class RecentActivityEntry {
 /// Days the recent-activity window spans (today + the previous 6 ART days).
 const _kRecentActivityDays = 7;
 
-/// Max entries surfaced in the feed.
-const _kRecentActivityLimit = 8;
+/// Tope de DATOS: cuántas entradas devuelve el provider como mucho.
+///
+/// No es el tope de lo que se VE — ese es [kRecentActivityPreviewCount], y
+/// vive del lado del widget. Confundir los dos es lo que tenía el dashboard
+/// hasta acá: un solo número (8) que hacía las dos cosas, así que "mostrar
+/// menos en el dashboard" y "poder ver más en otra pantalla" eran la misma
+/// palanca y se peleaban.
+///
+/// Existe igual, y alto, porque el feed es multi-alumno: un PF con 30 alumnos
+/// activos entrenando cuatro veces por semana junta ~840 sesiones en la
+/// ventana de 7 días. El corte protege la memoria y el render, no el diseño.
+const kRecentActivityMaxEntries = 50;
+
+/// Tope de PRESENTACIÓN: cuántas filas muestra el dashboard antes de mandar
+/// al «Ver todo».
+///
+/// Cinco y no ocho porque el dashboard es un resumen y la lista venía comiéndose
+/// la pantalla — arriba tiene «Próximas sesiones» y «Entrenaron hoy», y abajo
+/// «Pagos por cobrar», que quedaban debajo del pliegue.
+const kRecentActivityPreviewCount = 5;
 
 /// A newest-first feed of the trainer's athletes' finished sessions over the
 /// last [_kRecentActivityDays] ART days.
@@ -109,8 +127,8 @@ final recentActivityProvider =
       .sort((a, b) => b.session.finishedAt!.compareTo(a.session.finishedAt!));
 
   return AsyncValue.data(
-    entries.length > _kRecentActivityLimit
-        ? entries.sublist(0, _kRecentActivityLimit)
+    entries.length > kRecentActivityMaxEntries
+        ? entries.sublist(0, kRecentActivityMaxEntries)
         : entries,
   );
 });

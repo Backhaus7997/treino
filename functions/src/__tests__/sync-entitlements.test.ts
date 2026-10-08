@@ -13,6 +13,25 @@ jest.mock("firebase-admin", () => {
   return { firestore };
 });
 
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue/Timestamp de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 // El barrido logea (error cuando saltea por degradacion). Sin este mock el
 // suite escupe ruido y el test de la valvula no tendria como observarlo.
 const errorSpy = jest.fn();
@@ -24,16 +43,19 @@ jest.mock("firebase-functions", () => ({
   },
 }));
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
+import * as trainerPlanLimits from "../subscriptions/trainer-plan-limits";
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 function install(seed: Partial<FakeFirestoreState>) {
   const { db, state } = createFakeFirestore(seed);
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return state;
 }
 
@@ -50,6 +72,27 @@ const lnk = (o: Record<string, unknown>) => ({
 beforeEach(() => jest.clearAllMocks());
 
 describe("syncTrainerEntitlements", () => {
+  it("si users/{trainerId} no existe NO lo recrea y no toca los vinculos (#1333)", async () => {
+    // El cascade de borrado del PF termina vinculos (N triggers async) y luego
+    // borra users/{uid}: un linkLoadReconcile tardio no puede resucitarlo.
+    const state = install({
+      users: {},
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        L2: lnk({ athleteId: "a2", acceptedAt: ts(200) }),
+        L3: lnk({ athleteId: "a3", acceptedAt: ts(900) }),
+      },
+    });
+
+    const r = await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1).toBeUndefined();
+    expect(r.missing).toBe(true);
+    expect(r.blocked).toEqual([]);
+    expect(r.unblocked).toEqual([]);
+    expect(state.trainer_links.L3.entitlement).toBe("entitled");
+  });
+
   it("sin suscripcion (Free 2) bloquea el excedente y deja los 2 mas antiguos", async () => {
     const state = install({
       users: { t1: {} },
@@ -117,7 +160,7 @@ describe("syncTrainerEntitlements", () => {
     expect(r.unblocked).toEqual(["L1"]);
     expect(state.trainer_links.L1.entitlement).toBe("entitled");
     expect(state.trainer_links.L1.blockedAt).toBe(
-      admin.firestore.FieldValue.delete(),
+      FieldValue.delete(),
     );
     // El array anterior se REEMPLAZA entero: si sobreviviera al merge, el
     // enforcement futuro seguiria viendo bloqueado a alguien ya devuelto.
@@ -170,7 +213,7 @@ describe("syncTrainerEntitlements", () => {
     const primera = await syncTrainerEntitlements(app, "t1", 5_000);
     expect(primera.blocked).toEqual(["L2"]);
 
-    (admin.firestore as unknown as jest.Mock).mockReturnValue(
+    (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(
       createFakeFirestore(state).db,
     );
     const segunda = await syncTrainerEntitlements(app, "t1", 5_000);
@@ -487,5 +530,452 @@ describe("syncTrainerEntitlements — acceptedAt corrupto", () => {
     // discriminaria. Por eso el mas nuevo es L3 y ademas el ultimo por id.
     expect(r.blockedAthleteIds).toEqual(["a3"]);
     expect(state.trainer_links.L3.entitlement).toBe("blocked");
+  });
+});
+
+/**
+ * El aviso de `acceptedAt` — que es un INSTRUMENTO DE MEDICION, y estuvo roto.
+ *
+ * Durante meses Cloud Logging mostro ~30 `acceptedAt no es un Timestamp` por
+ * corrida con `acceptedAtType: "object"`, y se leyeron como corrupcion de datos
+ * en produccion. No lo eran: el guard era `acceptedAt !== undefined`, que deja
+ * pasar el `null` LEGAL de todo vinculo no aceptado, y el payload reportaba
+ * `typeof`, que en JavaScript devuelve `"object"` para null. La forma sana, la
+ * recuperable (`{_seconds,_nanoseconds}`) y la perdida salian las tres iguales.
+ *
+ * Estos cuatro casos son los que el aviso tiene que saber separar. Cada uno
+ * falla con alguna version anterior del codigo: son mutacion, no decorado.
+ */
+describe("syncTrainerEntitlements — el aviso de acceptedAt separa lo sano de lo roto", () => {
+  const warnSpy = (
+    jest.requireMock("firebase-functions") as { logger: { warn: jest.Mock } }
+  ).logger.warn;
+
+  const avisos = () =>
+    warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === "string" && msg.includes("acceptedAt no es un Timestamp"),
+    );
+
+  it("NO avisa por un pending con acceptedAt null — es la forma que exigen las rules", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        PEND: lnk({ athleteId: "a2", status: "pending", acceptedAt: null }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Con el guard viejo (`!== undefined`) esto logeaba, y con
+    // `acceptedAtType: "object"` — identico a lo que se leia en produccion.
+    expect(avisos()).toEqual([]);
+  });
+
+  it("SI avisa por un ACTIVE sin fecha, que es el que se estaciona primero", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        VIVO: lnk({ athleteId: "a2", status: "active", acceptedAt: null }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Silenciar TODO null hubiera perdido este caso, que es el unico null que
+    // de verdad duele: entra a reconcileEntitlements con POSITIVE_INFINITY.
+    // `"null"` y no `"object"`: el aviso tiene que nombrar lo que encontro.
+    expect(avisos()).toEqual([
+      [
+        expect.stringContaining("acceptedAt no es un Timestamp"),
+        expect.objectContaining({
+          linkId: "VIVO",
+          status: "active",
+          acceptedAtType: "null",
+        }),
+      ],
+    ]);
+  });
+
+  it("dice QUE FORMA tiene un objeto, no solo que es un objeto", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        RAW: lnk({ athleteId: "a2", acceptedAt: { _seconds: 7, _nanoseconds: 0 } }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Las CLAVES son lo que separa un Timestamp serializado (recuperable sin
+    // perdida) de un sentinel que nunca resolvio. Con `typeof` a secas las dos
+    // decian `"object"` y habia que abrir el documento para saber cual era.
+    expect(avisos()).toEqual([
+      [
+        expect.anything(),
+        expect.objectContaining({
+          linkId: "RAW",
+          acceptedAtType: "object",
+          acceptedAtKeys: ["_nanoseconds", "_seconds"],
+        }),
+      ],
+    ]);
+  });
+
+  it("una forma ilegal se avisa aunque el vinculo no compita por cupo", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        STR: lnk({ athleteId: "a2", status: "pending", acceptedAt: "2026-01-01" }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // La tolerancia es solo para el AUSENTE. Un string viola el pin de
+    // firestore.rules en cualquier status, y eso hay que mirarlo igual.
+    expect(avisos()).toEqual([
+      [
+        expect.anything(),
+        expect.objectContaining({ linkId: "STR", status: "pending", acceptedAtType: "string" }),
+      ],
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planLimits (limite-ejercicios-pf.md, PR1) — el `tx.set` de
+// `users/{trainerId}` tambien tiene que llevar el tope de ejercicios propios,
+// calculado con el MISMO `sub`/`degraded`/`clock` que ya usa el tope de
+// alumnos en esta misma funcion.
+// ---------------------------------------------------------------------------
+
+describe("syncTrainerEntitlements — planLimits", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("con los interruptores encendidos (hoy), escribe el tope del plan: plan1 → 60 ejercicios", async () => {
+    // TRAINER_EXERCISE_LIMITS_ENABLED se encendió el 2026-09-25
+    // (limite-ejercicios-pf.md §4). Sin mockear nada: este es el
+    // comportamiento REAL con el flag como está hoy en producción. El camino
+    // apagado (`{customExercises: null}` explícito para todos) lo cubre
+    // trainer-plan-limits.test.ts con `enabled=false`.
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Plantillas: el tope es sólo del Free (TIER_TEMPLATE_LIMITS), así que un
+    // Plan 1 lleva `templates: null` aunque ese interruptor también esté
+    // encendido.
+    // Y el tope de alumnos viaja en el MISMO mapa (plan1 = 7, sin cambio por
+    // reloj): las tres claves de `athletes*` explicitas. Detalle en el describe
+    // de «planLimits.athletes» de abajo.
+    expect(state.users.t1.planLimits).toEqual({
+      customExercises: 60,
+      templates: null,
+      athletes: 7,
+      athletesHasta: null,
+      athletesDespues: null,
+    });
+  });
+
+  // Los siguientes tres tests mockean `resolvePlanLimits` (y `resolveAthleteLimits`,
+  // que tambien dice «no tocar» con `degraded`) en vez de depender
+  // de `degraded` + el interruptor real: asi se prueba la INTEGRACION (que el
+  // `tx.set` haga lo correcto con lo que `resolvePlanLimits` devuelva) por
+  // separado de la DECISION (que valor corresponde a cada estado, ya cubierta
+  // en trainer-plan-limits.test.ts). Probarlo con el interruptor real
+  // apagado no podria ejercitar la rama "no tocar", porque apagado siempre
+  // devuelve `{customExercises: null}` — nunca `null` — sea cual sea
+  // `degraded`.
+  it("cuando resolvePlanLimits devuelve null (no tocar), la clave planLimits se OMITE del todo", async () => {
+    jest.spyOn(trainerPlanLimits, "resolvePlanLimits").mockReturnValue(null);
+    jest.spyOn(trainerPlanLimits, "resolveAthleteLimits").mockReturnValue(null);
+
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toBeUndefined();
+  });
+
+  it("no pisa un planLimits previo cuando resolvePlanLimits dice «no tocar»", async () => {
+    // Si `t1` ya tenia un planLimits escrito por una corrida sana anterior,
+    // una corrida que devuelve "no tocar" no tiene que tocarlo: ni limpiarlo
+    // ni reescribirlo. El fake de Firestore aplica merge semantics (spread
+    // shallow), igual que Firestore real con un valor de mapa completo.
+    jest.spyOn(trainerPlanLimits, "resolvePlanLimits").mockReturnValue(null);
+    jest.spyOn(trainerPlanLimits, "resolveAthleteLimits").mockReturnValue(null);
+
+    const state = install({
+      users: {
+        t1: {
+          subscription: { tier: "plan1", status: "active" },
+          planLimits: { customExercises: 60 },
+        },
+      },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toEqual({ customExercises: 60 });
+  });
+
+  it("cuando resolvePlanLimits devuelve un numero, se escribe tal cual", async () => {
+    jest
+      .spyOn(trainerPlanLimits, "resolvePlanLimits")
+      .mockReturnValue({ customExercises: 60 });
+    jest.spyOn(trainerPlanLimits, "resolveAthleteLimits").mockReturnValue(null);
+
+    const state = install({
+      users: { t1: { subscription: { tier: "plan1", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    expect(state.users.t1.planLimits).toEqual({ customExercises: 60 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// planLimits.athletes — el servidor publica el tope EFECTIVO de alumnos, el
+// mismo `effectiveWeightLimit` con el que reconcilia los vinculos, para que la
+// app no tenga que adivinar los estados que el servidor trata aparte
+// (`pending`/`paused` = Free, y el piso prepago). SIN mockear nada: es el
+// comportamiento real de punta a punta (sub -> toSubscriptionState -> tx.set).
+// ---------------------------------------------------------------------------
+
+describe("syncTrainerEntitlements — planLimits.athletes (tope efectivo de alumnos)", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const NOW = 10_000;
+
+  /** Corre un sync contra un PF con esa `subscription` y devuelve su planLimits. */
+  async function planLimitsDe(
+    subscription: Record<string, unknown> | undefined,
+    extra: Record<string, unknown> = {},
+  ) {
+    const state = install({
+      users: { t1: { ...(subscription ? { subscription } : {}), ...extra } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+    await syncTrainerEntitlements(app, "t1", NOW);
+    return state.users.t1.planLimits as Record<string, unknown>;
+  }
+
+  const hastaMs = (pl: Record<string, unknown>) =>
+    (pl.athletesHasta as { toMillis: () => number } | null)?.toMillis() ?? null;
+
+  it("sin mapa subscription (nunca pago) → Free: 2", async () => {
+    const pl = await planLimitsDe(undefined);
+    expect(pl.athletes).toBe(2);
+    expect(hastaMs(pl)).toBeNull();
+    expect(pl.athletesDespues).toBeNull();
+  });
+
+  it("pending → Free (2), aunque el tier nominal sea plan2", async () => {
+    const pl = await planLimitsDe({ tier: "plan2", status: "pending" });
+    expect(pl.athletes).toBe(2);
+  });
+
+  it("paused → Free (2), aunque el tier nominal sea plan2", async () => {
+    const pl = await planLimitsDe({ tier: "plan2", status: "paused" });
+    expect(pl.athletes).toBe(2);
+  });
+
+  it("paused + piso prepago vigente → el tope del piso, y programa la vuelta a Free", async () => {
+    const pl = await planLimitsDe({
+      tier: "plan1",
+      status: "paused",
+      prepaidTier: "plan2",
+      prepaidUntil: ts(50_000),
+    });
+    expect(pl.athletes).toBe(15);
+    expect(hastaMs(pl)).toBe(50_000);
+    expect(pl.athletesDespues).toBe(2);
+  });
+
+  it("paused + piso prepago VENCIDO → Free, sin cambio programado", async () => {
+    const pl = await planLimitsDe({
+      tier: "plan1",
+      status: "paused",
+      prepaidTier: "plan2",
+      prepaidUntil: ts(NOW - 1),
+    });
+    expect(pl.athletes).toBe(2);
+    expect(hastaMs(pl)).toBeNull();
+  });
+
+  it("cancelled dentro del periodo → el tope pago, y programa la caida a Free al vencer", async () => {
+    const pl = await planLimitsDe({
+      tier: "plan2",
+      status: "cancelled",
+      currentPeriodEnd: ts(20_000),
+    });
+    expect(pl.athletes).toBe(15);
+    expect(hastaMs(pl)).toBe(20_000);
+    expect(pl.athletesDespues).toBe(2);
+  });
+
+  it("cancelled vencido → Free, sin cambio programado", async () => {
+    const pl = await planLimitsDe({
+      tier: "plan2",
+      status: "cancelled",
+      currentPeriodEnd: ts(NOW - 1),
+    });
+    expect(pl.athletes).toBe(2);
+    expect(hastaMs(pl)).toBeNull();
+  });
+
+  it("active plan2 → 15, sin cambio programado (el periodo de un active no vence solo)", async () => {
+    // El `currentPeriodEnd` de un active pasa de largo hasta que MP avisa: no
+    // es un cambio por reloj y NO tiene que salir como `athletesHasta`.
+    const pl = await planLimitsDe({
+      tier: "plan2",
+      status: "active",
+      currentPeriodEnd: ts(20_000),
+    });
+    expect(pl.athletes).toBe(15);
+    expect(hastaMs(pl)).toBeNull();
+    expect(pl.athletesDespues).toBeNull();
+  });
+
+  it("plan3 → `athletes: null` EXPLICITO (sin tope), con la clave presente", async () => {
+    const pl = await planLimitsDe({ tier: "plan3", status: "active" });
+    // `toHaveProperty(..., null)` y no `toBeNull()`: una clave AUSENTE tambien
+    // es `undefined`, no `null`, y la app distingue «ausente = el servidor no lo
+    // calculo» de «null = sin tope».
+    expect(pl).toHaveProperty("athletes", null);
+    expect(pl).toHaveProperty("athletesHasta", null);
+    expect(pl).toHaveProperty("athletesDespues", null);
+  });
+
+  it("downgrade con piso vigente de plan3 → el piso gana: `athletes: null`, y programa el plan1", async () => {
+    const pl = await planLimitsDe({
+      tier: "plan1",
+      status: "active",
+      prepaidTier: "plan3",
+      prepaidUntil: ts(50_000),
+    });
+    expect(pl).toHaveProperty("athletes", null);
+    expect(hastaMs(pl)).toBe(50_000);
+    // Aca el `null` de `athletesDespues` NO es ambiguo porque hay `athletesHasta`;
+    // el valor que tiene que salir es el del plan1 (7), no null.
+    expect(pl.athletesDespues).toBe(7);
+  });
+
+  it("downgrade plan3 → plan1 cancelled con piso: el cambio programado es el PRIMER quiebre real", async () => {
+    // cancelled plan1 vence en 20_000 (→ Free) pero el piso plan2 sigue hasta
+    // 50_000: en 20_000 el limite pasa de 15 (piso) a... 15, no cambia; recien
+    // en 50_000 baja a Free. El candidato 20_000 se saltea solo.
+    const pl = await planLimitsDe({
+      tier: "plan1",
+      status: "cancelled",
+      currentPeriodEnd: ts(20_000),
+      prepaidTier: "plan2",
+      prepaidUntil: ts(50_000),
+    });
+    expect(pl.athletes).toBe(15);
+    expect(hastaMs(pl)).toBe(50_000);
+    expect(pl.athletesDespues).toBe(2);
+  });
+
+  it("una corrida sana PISA el valor viejo (no queda pegado): plan3 sobre un 15 previo → null", async () => {
+    const pl = await planLimitsDe(
+      { tier: "plan3", status: "active" },
+      { planLimits: { customExercises: 120, athletes: 15, athletesHasta: ts(1), athletesDespues: 2 } },
+    );
+    expect(pl.athletes).toBeNull();
+    expect(pl.athletesHasta).toBeNull();
+    expect(pl.athletesDespues).toBeNull();
+  });
+
+  it("degradado: NO publica el tope (omite las claves) y deja lo que habia", async () => {
+    // El limite que sale de un `subscription` roto es el fallback, no lo que el
+    // PF pago: publicarlo le diria a la app «Free» a quien capaz pago plan3.
+    const state = install({
+      users: {
+        t1: {
+          subscription: { tier: "typo", status: "active" },
+          planLimits: { customExercises: 120, athletes: 15, athletesHasta: null, athletesDespues: null },
+        },
+      },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", NOW);
+
+    const pl = state.users.t1.planLimits as Record<string, unknown>;
+    expect(pl.athletes).toBe(15);
+    expect(pl.customExercises).toBe(120);
+  });
+
+  it("degradado y sin planLimits previo: `athletes` queda AUSENTE (el cliente usa su fallback)", async () => {
+    const state = install({
+      users: { t1: { subscription: { tier: "typo", status: "active" } } },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    await syncTrainerEntitlements(app, "t1", NOW);
+
+    // Con los dos interruptores encendidos y `degraded`, `resolvePlanLimits`
+    // tambien dice «no tocar»: no se escribe ni `planLimits`.
+    expect(state.users.t1.planLimits).toBeUndefined();
+  });
+});
+
+describe("syncTrainerEntitlements — planLimits.athletes coincide con el limite que reconcilia", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const NOW = 10_000;
+  const casos: Array<[string, Record<string, unknown> | undefined, number | null]> = [
+    ["sin suscripcion", undefined, 2],
+    ["active plan2", { tier: "plan2", status: "active" }, 15],
+    ["pending plan2", { tier: "plan2", status: "pending" }, 2],
+    [
+      "paused + piso plan2 vigente",
+      { tier: "plan1", status: "paused", prepaidTier: "plan2", prepaidUntil: ts(50_000) },
+      15,
+    ],
+    [
+      "cancelled dentro del periodo",
+      { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(20_000) },
+      15,
+    ],
+    [
+      "cancelled vencido",
+      { tier: "plan2", status: "cancelled", currentPeriodEnd: ts(NOW - 1) },
+      2,
+    ],
+    ["plan3", { tier: "plan3", status: "active" }, null],
+    [
+      "plan1 con piso plan3",
+      { tier: "plan1", status: "active", prepaidTier: "plan3", prepaidUntil: ts(50_000) },
+      null,
+    ],
+  ];
+
+  it.each(casos)("%s: planLimits.athletes === result.limit", async (_n, subscription, esperado) => {
+    const state = install({
+      users: { t1: subscription ? { subscription } : {} },
+      trainer_links: { L1: lnk({ athleteId: "a1" }) },
+    });
+
+    const r = await syncTrainerEntitlements(app, "t1", NOW);
+
+    const pl = state.users.t1.planLimits as Record<string, unknown>;
+    // `toBe` y no `toEqual`: null contra undefined tiene que distinguirse.
+    expect(pl.athletes).toBe(r.limit);
+    expect(r.limit).toBe(esperado);
   });
 });

@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
@@ -196,5 +197,55 @@ void main() {
         expect(container.read(selectedChatIdProvider), _chatId);
       },
     );
+
+    testWidgets('al abrir un chat, el pane recibe el `peerUid`',
+        (tester) async {
+      // `ChatDetailPane.peerUid` es el arranque en caliente: sin él, el header
+      // dice «Usuario eliminado» hasta que resuelve el nombre.
+      //
+      // El parámetro existía, estaba cableado adentro del pane y lo cubrían
+      // siete tests — y NINGUNA pantalla se lo pasaba: su único consumidor era
+      // un modal que se sacó. Quedó como código vivo, testeado y muerto al
+      // mismo tiempo, que es la forma más fácil de que alguien lo borre por
+      // «limpieza». Este test es lo que lo ata a una pantalla real.
+      final chat = _stubChat(lastMessageText: 'Hola');
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWithValue(_pfUid),
+        chatsForCurrentUserProvider.overrideWith(
+          (ref) => Stream<List<Chat>>.value([chat]),
+        ),
+        userPublicProfileProvider(_athleteUid).overrideWith(
+          (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: Size(1200, 800)),
+          child: UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              localizationsDelegates: AppL10n.localizationsDelegates,
+              supportedLocales: AppL10n.supportedLocales,
+              locale: const Locale('es', 'AR'),
+              home: const Scaffold(body: ChatSectionScreen()),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('chat_row_$_chatId')));
+      await tester.pumpAndSettle();
+
+      final pane = tester.widget<ChatDetailPane>(find.byType(ChatDetailPane));
+      expect(
+        pane.peerUid,
+        _athleteUid,
+        reason: 'el otro miembro del chat, no el PF logueado',
+      );
+    });
   });
 }

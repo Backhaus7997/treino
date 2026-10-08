@@ -68,8 +68,14 @@ Future<void> initFirebaseForEmulators() async {
 }
 
 /// Pumps the REAL [TreinoApp] (same widget `main.dart` runs) inside a
-/// [ProviderScope], eager-overriding [sharedPreferencesProvider] exactly like
-/// production does (ADR-LM-009) so `.requireValue` is safe at provider init.
+/// [ProviderScope], eager-overriding [sharedPreferencesProvider] con la MISMA
+/// función que usa `main.dart` — `sharedPreferencesOverride()` (ADR-LM-009)—
+/// así `.requireValue` es seguro en el init de los providers.
+///
+/// Esta línea decía "exactly like production does" mientras el override de
+/// abajo tenía un `async` que producción no tiene. Ahora llama a la función
+/// compartida, que es la única forma de que la afirmación no se vuelva falsa
+/// sola: si producción cambia el override, esto cambia con ella.
 ///
 /// [overrides] lets a suite stub providers that would otherwise reach out to
 /// device-only services.
@@ -87,7 +93,20 @@ Future<void> pumpTreinoApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        sharedPreferencesProvider.overrideWith((_) async => prefs),
+        // `sharedPreferencesOverride()` y NO un override inline. Acá había
+        // `overrideWith((_) async => prefs)`, con el `async` que el dartdoc de
+        // `shared_prefs_provider.dart:20` prohíbe con todas las letras: un
+        // callback `async` devuelve un Future —aunque ya esté completo, cuesta
+        // un microtask— y deja el provider en `AsyncLoading` el primer frame,
+        // así que `app.dart:208` tiraba
+        // `Bad state: Tried to call requireValue on an AsyncValue that has no
+        // value` antes de pintar nada. Es el #543 otra vez.
+        //
+        // El comentario de abajo decía que esto replicaba producción "exactly".
+        // No lo hacía — y esa es la parte cara: ninguna de las cinco suites
+        // llegaba a montar la app, y el mensaje hablaba de Riverpod, no del
+        // override. Nadie lo vio porque nunca se había corrido ninguna.
+        sharedPreferencesOverride(prefs),
         ...overrides,
       ],
       child: const TreinoApp(),

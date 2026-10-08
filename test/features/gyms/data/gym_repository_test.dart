@@ -83,6 +83,45 @@ void main() {
     });
   });
 
+  group('gym purgado por la política de 30 días de Places', () {
+    // El job borra lat/lng/geohash (no se pueden cachear más de 30 días): el
+    // doc sobrevive con su nombre y su place_id, pero sin coordenadas.
+    Future<void> sembrarPurgado(String id) =>
+        firestore.collection('gyms').doc(id).set({
+          ..._gymDoc(
+              name: 'Gym purgado', lat: 0, lng: 0, source: 'google-places'),
+          'lat': null,
+          'lng': null,
+          'geohash': null,
+          'coordsFetchedAt': Timestamp.fromDate(DateTime.utc(1970)),
+        });
+
+    test('listAll lo oculta y el resto del catálogo sigue saliendo', () async {
+      await sembrarPurgado('purgado');
+      await firestore
+          .collection('gyms')
+          .doc('vivo')
+          .set(_gymDoc(name: 'Gym vivo', lat: -34.6, lng: -58.4));
+
+      final gyms = await repo.listAll();
+
+      expect(gyms.map((g) => g.id), ['vivo']);
+    });
+
+    test('getById / getByIds no rompen: devuelven null / lo omiten', () async {
+      await sembrarPurgado('purgado');
+
+      expect(await repo.getById('purgado'), isNull);
+      expect(await repo.getByIds(['purgado']), isEmpty);
+    });
+
+    test('listByGeohashes no lo encuentra (ya no tiene geohash)', () async {
+      await sembrarPurgado('purgado');
+
+      expect(await repo.listByGeohashes(['6d6m7']), isEmpty);
+    });
+  });
+
   group('GymRepository.getById', () {
     test('devuelve null cuando el gym no existe', () async {
       expect(await repo.getById('nope'), isNull);

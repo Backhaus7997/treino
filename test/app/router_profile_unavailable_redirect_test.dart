@@ -11,6 +11,14 @@ import 'package:treino/features/profile/application/account_deletion_notifier.da
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import '../helpers/mail_test_helpers.dart';
+
+/// Fecha de nacimiento de un adulto.
+///
+/// Desde el gate de edad mínima, un perfil "completo" incluye `bornAt`: sin él
+/// `authRedirect` manda a `/birth-date`, que es exactamente lo que le pasa a
+/// una cuenta creada antes del requisito.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
 
 /// Issue #544 — "autenticado pero sin perfil accesible" deja la app en
 /// skeleton infinito. authRedirect ahora detecta `hasError` en
@@ -38,6 +46,9 @@ UserProfile _athleteProfile() => UserProfile(
       uid: 'athlete-uid',
       email: 'athlete@example.com',
       displayName: 'sporty',
+      bornAt: _adultBornAt,
+      emailVerification:
+          mailConfirmadoPara(UserRole.athlete, 'athlete@example.com'),
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,

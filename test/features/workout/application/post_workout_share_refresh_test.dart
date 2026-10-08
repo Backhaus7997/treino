@@ -23,6 +23,7 @@ import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -109,6 +110,9 @@ void main() {
         ),
         followingProvider('u1').overrideWith(
           (ref) => Stream.value(const ['u2']),
+        ),
+        blockedUidsProvider('u1').overrideWith(
+          (ref) => Stream.value(const <String>[]),
         ),
         postRepositoryProvider.overrideWithValue(repo),
       ],

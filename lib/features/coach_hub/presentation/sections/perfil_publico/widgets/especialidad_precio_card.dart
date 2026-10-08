@@ -28,9 +28,11 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach/domain/trainer_specialty.dart';
 import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chips.dart'
     show SpecialtyLabels;
+import 'package:treino/features/coach_hub/domain/perfil_pf_validators.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Card «ESPECIALIDAD» + «PRECIO MENSUAL» — columna izquierda de
 /// `PerfilPublicoScreen` (WU-04).
@@ -73,15 +75,7 @@ class _EspecialidadPrecioCardState
 
   // Mismo criterio que profile_edit_trainer_screen.dart: entero, mínimo
   // $500, máximo $999999.
-  String? get _priceError {
-    final raw = _price.text.trim();
-    if (raw.isEmpty) return 'Ingresá un precio.'; // i18n: Fase 11
-    final n = int.tryParse(raw);
-    if (n == null) return 'Ingresá un número entero.'; // i18n: Fase 11
-    if (n < 500) return 'Mínimo \$500.'; // i18n: Fase 11
-    if (n > 999999) return 'Máximo \$999999.'; // i18n: Fase 11
-    return null;
-  }
+  String? get _priceError => validarPrecio(_price.text);
 
   bool get _canSave =>
       _dirty && _priceError == null && _specialty != null && !_saving;
@@ -222,29 +216,11 @@ class _EspecialidadPrecioCardState
             const SizedBox(height: AppSpacing.s12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton(
+              child: TreinoButton(
                 key: const Key('especialidad_precio_card_save_button'),
+                label: 'GUARDAR', // i18n: Fase 11
+                loading: _saving,
                 onPressed: _canSave ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.bgCard,
-                  disabledForegroundColor: palette.textMuted,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s18,
-                    vertical: AppSpacing.s12,
-                  ),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TreinoButtonTokens.foreground(context),
-                        ),
-                      )
-                    : const Text('GUARDAR'), // i18n: Fase 11
               ),
             ),
             const SizedBox(height: AppSpacing.s18),

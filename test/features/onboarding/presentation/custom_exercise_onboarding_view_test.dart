@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_slides.dart';
+import 'package:treino/features/onboarding/presentation/onboarding_card_content.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_view.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -20,6 +21,7 @@ Future<void> _pump(
   CustomExerciseOnboardingLayout layout = CustomExerciseOnboardingLayout.sheet,
   ThemeData? theme,
   Size size = const Size(390, 844),
+  List<OnboardingCardContent> slides = athleteCustomExerciseSlides,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -32,7 +34,7 @@ Future<void> _pump(
       locale: const Locale('es', 'AR'),
       home: Scaffold(
         body: CustomExerciseOnboardingView(
-          slides: athleteCustomExerciseSlides,
+          slides: slides,
           layout: layout,
           onFinish: onFinish,
           onSkip: onSkip,
@@ -55,26 +57,26 @@ Future<void> _next(WidgetTester tester) async {
 
 void main() {
   group('CustomExerciseOnboardingView', () {
-    testWidgets('shows three slides and walks through all of them',
+    testWidgets('camina TODAS las slides del deck, sean las que sean',
         (tester) async {
       await _pump(tester, onFinish: () {}, onSkip: () {});
 
-      // The deck itself is the source of truth for "three".
-      expect(athleteCustomExerciseSlides, hasLength(3));
-
+      // Derivado del deck, no hardcodeado: este test se rompió cuando el deck
+      // pasó de 6 a 9 slides, y lo único que probaba de más era el número 6.
+      final total = athleteCustomExerciseSlides.length;
       final pager = tester.widget<PageView>(find.byKey(_pagerKey));
-      expect(pager.childrenDelegate.estimatedChildCount, 3);
+      expect(pager.childrenDelegate.estimatedChildCount, total);
 
-      expect(find.text('¿FALTA UN EJERCICIO? CREÁLO VOS'), findsOneWidget);
-      expect(find.text('PASO 1 DE 3'), findsOneWidget);
-
-      await _next(tester);
-      expect(find.text('SUMALE UN VIDEO'), findsOneWidget);
-      expect(find.text('PASO 2 DE 3'), findsOneWidget);
-
-      await _next(tester);
-      expect(find.text('USALO EN CUALQUIER RUTINA'), findsOneWidget);
-      expect(find.text('PASO 3 DE 3'), findsOneWidget);
+      for (var i = 0; i < total; i++) {
+        expect(
+          find.text(athleteCustomExerciseSlides[i].title),
+          findsOneWidget,
+          reason: 'slide ${i + 1} de $total',
+        );
+        expect(find.text('PASO ${i + 1} DE $total'), findsOneWidget);
+        if (i < total - 1) await _next(tester);
+      }
+      expect(drainLayoutFailure(tester), isNull);
     });
 
     testWidgets(
@@ -82,13 +84,12 @@ void main() {
         (tester) async {
       await _pump(tester, onFinish: () {}, onSkip: () {});
 
-      expect(find.text('SIGUIENTE'), findsOneWidget);
-      expect(find.text('CREAR MI EJERCICIO'), findsNothing);
+      for (var i = 0; i < athleteCustomExerciseSlides.length - 1; i++) {
+        expect(find.text('SIGUIENTE'), findsOneWidget, reason: 'slide $i');
+        expect(find.text('CREAR MI EJERCICIO'), findsNothing);
+        await _next(tester);
+      }
 
-      await _next(tester);
-      expect(find.text('SIGUIENTE'), findsOneWidget);
-
-      await _next(tester);
       expect(find.text('SIGUIENTE'), findsNothing);
       expect(find.text('CREAR MI EJERCICIO'), findsOneWidget);
     });
@@ -98,8 +99,9 @@ void main() {
       var finished = 0;
       await _pump(tester, onFinish: () => finished++, onSkip: () {});
 
-      await _next(tester);
-      await _next(tester);
+      for (var i = 0; i < athleteCustomExerciseSlides.length - 1; i++) {
+        await _next(tester);
+      }
       expect(finished, 0, reason: 'must not fire while advancing');
 
       await tester.tap(find.byKey(_ctaKey));
@@ -112,11 +114,11 @@ void main() {
       var skipped = 0;
       await _pump(tester, onFinish: () {}, onSkip: () => skipped++);
 
-      expect(find.byKey(_skipKey), findsOneWidget);
-      await _next(tester);
-      expect(find.byKey(_skipKey), findsOneWidget);
+      for (var i = 0; i < athleteCustomExerciseSlides.length - 1; i++) {
+        expect(find.byKey(_skipKey), findsOneWidget, reason: 'slide $i');
+        await _next(tester);
+      }
 
-      await _next(tester);
       expect(
         find.byKey(_skipKey),
         findsNothing,
@@ -124,6 +126,44 @@ void main() {
       );
       expect(skipped, 0);
     });
+
+    // Un test POR DECK, no un loop adentro de uno: el `PageView` conserva su
+    // página entre `pumpWidget`s —mismo tipo de widget, mismo elemento— así
+    // que el segundo deck arrancaba donde había quedado el primero.
+    for (final deck in {
+      'alumno': athleteCustomExerciseSlides,
+      'entrenador': trainerCustomExerciseSlides,
+      'coach hub': trainerWebCustomExerciseSlides,
+    }.entries) {
+      testWidgets('cada slide del deck «${deck.key}» se dibuja sin desbordar',
+          (tester) async {
+        // Las ilustraciones son widgets con medidas fijas dentro de un
+        // `FittedBox`. El canvas de 320x236 es el único guard, y un cuerpo
+        // nuevo que se pase de largo no lo agarra ningún otro test: el
+        // walkthrough camina SÓLO el deck del alumno, y las de la web no las
+        // miraba nadie.
+        await _pump(
+          tester,
+          onFinish: () {},
+          onSkip: () {},
+          slides: deck.value,
+        );
+
+        for (var i = 0; i < deck.value.length; i++) {
+          expect(
+            find.text(deck.value[i].title),
+            findsOneWidget,
+            reason: 'slide ${i + 1} de ${deck.value.length}',
+          );
+          expect(
+            drainLayoutFailure(tester),
+            isNull,
+            reason: '«${deck.value[i].title}» desborda',
+          );
+          if (i < deck.value.length - 1) await _next(tester);
+        }
+      });
+    }
 
     testWidgets('SALTAR calls back from the first slide', (tester) async {
       var skipped = 0;
@@ -147,11 +187,12 @@ void main() {
         (tester) async {
       await _pump(tester, onFinish: () {}, onSkip: () {});
 
-      expect(find.bySemanticsLabel('Paso 1 de 3'), findsOneWidget);
+      final total = athleteCustomExerciseSlides.length;
+      expect(find.bySemanticsLabel('Paso 1 de $total'), findsOneWidget);
 
       await _next(tester);
-      expect(find.bySemanticsLabel('Paso 2 de 3'), findsOneWidget);
-      expect(find.bySemanticsLabel('Paso 1 de 3'), findsNothing);
+      expect(find.bySemanticsLabel('Paso 2 de $total'), findsOneWidget);
+      expect(find.bySemanticsLabel('Paso 1 de $total'), findsNothing);
     });
 
     testWidgets('survives a 320x568 screen at 2x text scale', (tester) async {
@@ -217,7 +258,7 @@ void main() {
 
     testWidgets('the trainer deck differs from the athlete one on slide 3',
         (tester) async {
-      expect(trainerCustomExerciseSlides, hasLength(3));
+      expect(trainerCustomExerciseSlides, hasLength(9));
       expect(
         trainerCustomExerciseSlides[2].title,
         'ASIGNALO A TUS ALUMNOS',

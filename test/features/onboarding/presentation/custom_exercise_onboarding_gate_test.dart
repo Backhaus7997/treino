@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
+import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_slides.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_view.dart';
@@ -17,7 +20,11 @@ class _CapturingUserRepository extends Fake implements UserRepository {
   bool shouldThrow = false;
 
   @override
-  Future<void> update(String uid, Map<String, Object?> partial) async {
+  Future<void> update(
+    String uid,
+    Map<String, Object?> partial, {
+    bool grantLocationConsent = false,
+  }) async {
     updateCount++;
     capturedPartial = partial;
     if (shouldThrow) throw Exception('simulated failure');
@@ -56,9 +63,10 @@ UserProfile _profile({
 /// Stands in for the routine editor: fires the gate once from a post-frame
 /// callback in create mode, exactly as `RoutineEditorScreen.initState` does.
 class _Host extends ConsumerStatefulWidget {
-  const _Host({required this.surface});
+  const _Host({required this.surface, this.alCrearEjercicio});
 
   final OnboardingSurface surface;
+  final Future<void> Function()? alCrearEjercicio;
 
   @override
   ConsumerState<_Host> createState() => _HostState();
@@ -74,6 +82,7 @@ class _HostState extends ConsumerState<_Host> {
         context: context,
         ref: ref,
         surface: widget.surface,
+        alCrearEjercicio: widget.alCrearEjercicio,
       );
     });
   }
@@ -121,6 +130,61 @@ Future<void> _tapAndSettle(WidgetTester tester, Key key) async {
   }
 }
 
+/// Igual que [_pump] pero con un `GoRouter` de verdad, porque el CTA NAVEGA y
+/// `context.push` sobre un `MaterialApp(home:)` explota.
+Future<void> _pumpConRouter(
+  WidgetTester tester, {
+  required _CapturingUserRepository repo,
+  UserProfile? profile,
+  Future<void> Function()? alCrearEjercicio,
+  OnboardingSurface surface = OnboardingSurface.customExerciseAthleteMobile,
+  AsyncValue<CustomExerciseQuota>? quota,
+}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => Scaffold(
+          body: _Host(
+            surface: surface,
+            alCrearEjercicio: alCrearEjercicio,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/profile/my-exercises/:exId',
+        builder: (_, state) => Scaffold(
+          body: Text('EDITOR:${state.pathParameters['exId']}'),
+        ),
+      ),
+    ],
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        userRepositoryProvider.overrideWithValue(repo),
+        userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+        if (quota != null) customExerciseQuotaProvider.overrideWithValue(quota),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        routerConfig: router,
+      ),
+    ),
+  );
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+}
+
 void main() {
   group('maybeShowCustomExerciseOnboarding', () {
     testWidgets('presents the sheet for a user who has not seen it',
@@ -139,7 +203,14 @@ void main() {
         tester,
         repo: repo,
         profile: _profile(
-          onboardingSeen: {..._toursSeen, 'customExerciseAthleteMobile': 1},
+          onboardingSeen: {
+            ..._toursSeen,
+            // La versión ACTUAL, no un 1 literal: "ya lo vio" significa que vio
+            // ESTA versión. Con el número escrito a mano, subir la versión
+            // rompía este test aunque el comportamiento fuera el correcto.
+            'customExerciseAthleteMobile':
+                OnboardingSurface.customExerciseAthleteMobile.currentVersion,
+          },
         ),
       );
 
@@ -164,12 +235,22 @@ void main() {
     testWidgets('marks the surface seen when the CTA finishes it',
         (tester) async {
       final repo = _CapturingUserRepository();
-      await _pump(tester, repo: repo, profile: _profile());
+      // Con router: desde que el CTA navega, `context.push` sobre un
+      // `MaterialApp(home:)` revienta. Lo que este test mide —que se persista
+      // el flag— no cambia.
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
 
       const cta = Key('custom_exercise_onboarding_primary_cta');
-      await _tapAndSettle(tester, cta); // slide 2
-      await _tapAndSettle(tester, cta); // slide 3
-      await _tapAndSettle(tester, cta); // finish
+      // Un tap por slide — el último es el que cierra. Derivado del DECK y no
+      // escrito a mano: con los taps contados a mano, sumar una slide rompía
+      // este test aunque el flujo siguiera funcionando, y el mensaje ("no se
+      // cerró") no decía que el problema era el conteo.
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
 
       expect(find.byType(CustomExerciseOnboardingView), findsNothing);
       expect(repo.updateCount, 1);
@@ -178,7 +259,8 @@ void main() {
         {
           'onboardingSeen': {
             ..._toursSeen,
-            'customExerciseAthleteMobile': 1,
+            'customExerciseAthleteMobile':
+                OnboardingSurface.customExerciseAthleteMobile.currentVersion,
           },
         },
         reason: 'the WHOLE map is written, never a single-key partial',
@@ -199,7 +281,7 @@ void main() {
       expect(
         (repo.capturedPartial!['onboardingSeen']!
             as Map)['customExerciseAthleteMobile'],
-        1,
+        OnboardingSurface.customExerciseAthleteMobile.currentVersion,
         reason: 'skipping is a real exit, not a postponement',
       );
     });
@@ -245,6 +327,149 @@ void main() {
 
       expect(find.byType(Dialog), findsOneWidget);
       expect(find.byType(CustomExerciseOnboardingView), findsOneWidget);
+    });
+
+    testWidgets('el CTA lleva al editor de ejercicio, no sólo cierra el modal',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      // El botón dice "CREAR MI EJERCICIO". Hasta este fix el gate le pasaba el
+      // MISMO callback a `onFinish` y a `onSkip`, así que sólo cerraba: un
+      // botón que nombra una acción y no la ejecuta enseña a no creerle.
+      expect(
+        find.text('EDITOR:new'),
+        findsOneWidget,
+        reason: 'el CTA tiene que abrir el editor en blanco',
+      );
+    });
+
+    testWidgets('SALTAR cierra y NO navega', (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
+
+      await _tapAndSettle(
+        tester,
+        const Key('custom_exercise_onboarding_skip_button'),
+      );
+
+      // La otra mitad del fix: separar los callbacks sirve sólo si saltar
+      // sigue siendo saltar.
+      expect(find.byType(CustomExerciseOnboardingView), findsNothing);
+      expect(find.text('EDITOR:new'), findsNothing);
+    });
+
+    testWidgets('el callback inyectado gana sobre la ruta por default',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      var llamado = 0;
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(),
+        alCrearEjercicio: () async => llamado++,
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      // El destino NO es el mismo en las dos superficies: el teléfono navega a
+      // una ruta y el Coach Hub abre un diálogo, porque ahí el editor de
+      // ejercicios propios no está ruteado. Con el callback puesto, la ruta
+      // por default no corre.
+      expect(llamado, 1, reason: 'el CTA usa el callback inyectado');
+      expect(find.text('EDITOR:new'), findsNothing,
+          reason: 'y NO navega a la ruta del móvil');
+    });
+
+    testWidgets('SALTAR no dispara el callback', (tester) async {
+      final repo = _CapturingUserRepository();
+      var llamado = 0;
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(),
+        alCrearEjercicio: () async => llamado++,
+      );
+
+      await _tapAndSettle(
+        tester,
+        const Key('custom_exercise_onboarding_skip_button'),
+      );
+
+      expect(llamado, 0);
+    });
+
+    // ── El CTA es un punto de entrada más al embudo del tope ──────────────
+    // (docs/limite-ejercicios-pf.md PR3, entrada #3: "Móvil: onboarding de
+    // ejercicios"). Surface TRAINER porque el tope es exclusivo del PF (E4)
+    // — un alumno con `customExerciseAthleteMobile` ya está cubierto por los
+    // tests de arriba, que pasan con la cuota REAL (no overrideada) porque el
+    // corte por rol pasa primero.
+    testWidgets('PF bajo el tope ⇒ el CTA navega al editor', (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(role: UserRole.trainer),
+        surface: OnboardingSurface.customExerciseTrainerMobile,
+        quota: const AsyncValue.data((limit: 60, count: 1)),
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseTrainerMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      expect(find.text('EDITOR:new'), findsOneWidget);
+    });
+
+    testWidgets(
+        'PF en el tope ⇒ el CTA NO navega y muestra el aviso de sólo-estado',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(role: UserRole.trainer),
+        surface: OnboardingSurface.customExerciseTrainerMobile,
+        quota: const AsyncValue.data((limit: 1, count: 1)),
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseTrainerMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      expect(find.text('EDITOR:new'), findsNothing);
+      expect(find.text('TOPE DE EJERCICIOS PROPIOS'), findsOneWidget);
+      // El número es el límite REAL con el que bloqueó el gate, no la tabla
+      // estática del tier. Móvil: sin "para sumar más, subí de plan"
+      // (Guideline 3.1.3(f), decisión del dueño 2026-09-29).
+      expect(
+        find.textContaining('incluye 1 ejercicio propio. Podés editar o '
+            'borrar los que ya tenés.'),
+        findsOneWidget,
+      );
     });
   });
 }

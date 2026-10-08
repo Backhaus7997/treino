@@ -345,7 +345,12 @@ class _CreatePostHeader extends ConsumerWidget {
                         final successMessage = state.isEditing
                             ? l10n.feedPostUpdatedSuccess
                             : l10n.feedPostPublishedSuccess;
-                        final ok = await notifier.submit();
+                        final ok = await notifier.submit(
+                          // Resuelto acá porque acá hay contexto. Ver el
+                          // dartdoc de `submit`.
+                          moderationMessage:
+                              AppL10n.of(context).moderationBlockedMessage,
+                        );
                         if (ok && context.mounted) {
                           messenger
                             ..hideCurrentSnackBar()

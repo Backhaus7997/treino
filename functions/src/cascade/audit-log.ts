@@ -5,7 +5,8 @@
  * No firestore.rules change is required for this write path.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 type FinalStatus = "success" | "partial" | "failed";
 
@@ -14,16 +15,16 @@ type FinalStatus = "success" | "partial" | "failed";
  * Idempotent — safe to call on retry.
  */
 export async function writeStarted(
-  app: admin.app.App,
+  app: App,
   uid: string,
   provider: string
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   await db.collection("audit_log").doc(uid).set({
     uid,
     status: "started",
     provider,
-    startedAt: admin.firestore.FieldValue.serverTimestamp(),
+    startedAt: FieldValue.serverTimestamp(),
   });
 }
 
@@ -32,16 +33,16 @@ export async function writeStarted(
  * Should be called after all cascade steps complete (success, partial, or failed).
  */
 export async function writeFinal(
-  app: admin.app.App,
+  app: App,
   uid: string,
   status: FinalStatus,
   deletedCollections: string[],
   errors: string[]
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   await db.collection("audit_log").doc(uid).update({
     status,
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    completedAt: FieldValue.serverTimestamp(),
     deletedCollections,
     errors,
   });

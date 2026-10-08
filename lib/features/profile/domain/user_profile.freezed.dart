@@ -51,6 +51,44 @@ mixin _$UserProfile {
 // cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
   @TimestampConverter()
   DateTime? get termsAcceptedAt =>
+      throw _privateConstructorUsedError; // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  int? get acceptedTermsVersion => throw _privateConstructorUsedError;
+  int? get acceptedPrivacyVersion => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentAt => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentPromptedAt =>
       throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   String? get trainerBio => throw _privateConstructorUsedError;
   String? get trainerSpecialty => throw _privateConstructorUsedError;
@@ -91,7 +129,16 @@ mixin _$UserProfile {
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
   List<String> get trainerGeohashes => throw _privateConstructorUsedError;
-  bool get trainerOffersOnline =>
+  bool get trainerOffersOnline => throw _privateConstructorUsedError;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  bool get acceptsInquiries =>
       throw _privateConstructorUsedError; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -108,6 +155,19 @@ mixin _$UserProfile {
 // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
   TrainerSubscription? get subscription => throw _privateConstructorUsedError;
   double? get weightedLoad =>
+      throw _privateConstructorUsedError; // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail> get emailVerification =>
       throw _privateConstructorUsedError; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
@@ -171,6 +231,10 @@ abstract class $UserProfileCopyWith<$Res> {
       String? phone,
       @TimestampConverter() DateTime? bornAt,
       @TimestampConverter() DateTime? termsAcceptedAt,
+      int? acceptedTermsVersion,
+      int? acceptedPrivacyVersion,
+      @TimestampConverter() DateTime? trainerLocationConsentAt,
+      @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -182,9 +246,12 @@ abstract class $UserProfileCopyWith<$Res> {
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      Map<String, VerifiedEmail> emailVerification,
       Map<String, int> onboardingSeen,
       TemplatePreferences? templatePreferences});
 
@@ -224,6 +291,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? phone = freezed,
     Object? bornAt = freezed,
     Object? termsAcceptedAt = freezed,
+    Object? acceptedTermsVersion = freezed,
+    Object? acceptedPrivacyVersion = freezed,
+    Object? trainerLocationConsentAt = freezed,
+    Object? trainerLocationConsentPromptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -235,9 +306,11 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
+    Object? emailVerification = null,
     Object? onboardingSeen = null,
     Object? templatePreferences = freezed,
   }) {
@@ -310,6 +383,23 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.termsAcceptedAt
           : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      acceptedTermsVersion: freezed == acceptedTermsVersion
+          ? _value.acceptedTermsVersion
+          : acceptedTermsVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      acceptedPrivacyVersion: freezed == acceptedPrivacyVersion
+          ? _value.acceptedPrivacyVersion
+          : acceptedPrivacyVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      trainerLocationConsentAt: freezed == trainerLocationConsentAt
+          ? _value.trainerLocationConsentAt
+          : trainerLocationConsentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      trainerLocationConsentPromptedAt: freezed ==
+              trainerLocationConsentPromptedAt
+          ? _value.trainerLocationConsentPromptedAt
+          : trainerLocationConsentPromptedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
           : trainerBio // ignore: cast_nullable_to_non_nullable
@@ -354,6 +444,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -366,6 +460,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
+      emailVerification: null == emailVerification
+          ? _value.emailVerification
+          : emailVerification // ignore: cast_nullable_to_non_nullable
+              as Map<String, VerifiedEmail>,
       onboardingSeen: null == onboardingSeen
           ? _value.onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
@@ -433,6 +531,10 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? phone,
       @TimestampConverter() DateTime? bornAt,
       @TimestampConverter() DateTime? termsAcceptedAt,
+      int? acceptedTermsVersion,
+      int? acceptedPrivacyVersion,
+      @TimestampConverter() DateTime? trainerLocationConsentAt,
+      @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -444,9 +546,12 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      Map<String, VerifiedEmail> emailVerification,
       Map<String, int> onboardingSeen,
       TemplatePreferences? templatePreferences});
 
@@ -486,6 +591,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? phone = freezed,
     Object? bornAt = freezed,
     Object? termsAcceptedAt = freezed,
+    Object? acceptedTermsVersion = freezed,
+    Object? acceptedPrivacyVersion = freezed,
+    Object? trainerLocationConsentAt = freezed,
+    Object? trainerLocationConsentPromptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -497,9 +606,11 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
+    Object? emailVerification = null,
     Object? onboardingSeen = null,
     Object? templatePreferences = freezed,
   }) {
@@ -572,6 +683,23 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.termsAcceptedAt
           : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      acceptedTermsVersion: freezed == acceptedTermsVersion
+          ? _value.acceptedTermsVersion
+          : acceptedTermsVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      acceptedPrivacyVersion: freezed == acceptedPrivacyVersion
+          ? _value.acceptedPrivacyVersion
+          : acceptedPrivacyVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      trainerLocationConsentAt: freezed == trainerLocationConsentAt
+          ? _value.trainerLocationConsentAt
+          : trainerLocationConsentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      trainerLocationConsentPromptedAt: freezed ==
+              trainerLocationConsentPromptedAt
+          ? _value.trainerLocationConsentPromptedAt
+          : trainerLocationConsentPromptedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
           : trainerBio // ignore: cast_nullable_to_non_nullable
@@ -616,6 +744,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -628,6 +760,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.weightedLoad
           : weightedLoad // ignore: cast_nullable_to_non_nullable
               as double?,
+      emailVerification: null == emailVerification
+          ? _value._emailVerification
+          : emailVerification // ignore: cast_nullable_to_non_nullable
+              as Map<String, VerifiedEmail>,
       onboardingSeen: null == onboardingSeen
           ? _value._onboardingSeen
           : onboardingSeen // ignore: cast_nullable_to_non_nullable
@@ -661,6 +797,10 @@ class _$UserProfileImpl implements _UserProfile {
       this.phone,
       @TimestampConverter() this.bornAt,
       @TimestampConverter() this.termsAcceptedAt,
+      this.acceptedTermsVersion,
+      this.acceptedPrivacyVersion,
+      @TimestampConverter() this.trainerLocationConsentAt,
+      @TimestampConverter() this.trainerLocationConsentPromptedAt,
       this.trainerBio,
       this.trainerSpecialty,
       this.trainerMonthlyRate,
@@ -672,13 +812,18 @@ class _$UserProfileImpl implements _UserProfile {
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
+      this.acceptsInquiries = true,
       this.activeRoutineId,
       this.subscription,
       this.weightedLoad,
+      @JsonKey(includeToJson: false)
+      final Map<String, VerifiedEmail> emailVerification =
+          const <String, VerifiedEmail>{},
       final Map<String, int> onboardingSeen = const <String, int>{},
       this.templatePreferences})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes,
+        _emailVerification = emailVerification,
         _onboardingSeen = onboardingSeen;
 
   factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -732,6 +877,48 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @TimestampConverter()
   final DateTime? termsAcceptedAt;
+// ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  @override
+  final int? acceptedTermsVersion;
+  @override
+  final int? acceptedPrivacyVersion;
+  @override
+  @TimestampConverter()
+  final DateTime? trainerLocationConsentAt;
+  @override
+  @TimestampConverter()
+  final DateTime? trainerLocationConsentPromptedAt;
 // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   final String? trainerBio;
@@ -801,6 +988,17 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @JsonKey()
   final bool trainerOffersOnline;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  @override
+  @JsonKey()
+  final bool acceptsInquiries;
 // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -820,6 +1018,38 @@ class _$UserProfileImpl implements _UserProfile {
   final TrainerSubscription? subscription;
   @override
   final double? weightedLoad;
+// ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  final Map<String, VerifiedEmail> _emailVerification;
+// ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail> get emailVerification {
+    if (_emailVerification is EqualUnmodifiableMapView)
+      return _emailVerification;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_emailVerification);
+  }
+
 // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
@@ -872,7 +1102,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, emailVerification: $emailVerification, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -907,6 +1137,15 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
             (identical(other.termsAcceptedAt, termsAcceptedAt) ||
                 other.termsAcceptedAt == termsAcceptedAt) &&
+            (identical(other.acceptedTermsVersion, acceptedTermsVersion) ||
+                other.acceptedTermsVersion == acceptedTermsVersion) &&
+            (identical(other.acceptedPrivacyVersion, acceptedPrivacyVersion) ||
+                other.acceptedPrivacyVersion == acceptedPrivacyVersion) &&
+            (identical(other.trainerLocationConsentAt, trainerLocationConsentAt) ||
+                other.trainerLocationConsentAt == trainerLocationConsentAt) &&
+            (identical(other.trainerLocationConsentPromptedAt, trainerLocationConsentPromptedAt) ||
+                other.trainerLocationConsentPromptedAt ==
+                    trainerLocationConsentPromptedAt) &&
             (identical(other.trainerBio, trainerBio) ||
                 other.trainerBio == trainerBio) &&
             (identical(other.trainerSpecialty, trainerSpecialty) ||
@@ -929,6 +1168,8 @@ class _$UserProfileImpl implements _UserProfile {
                 .equals(other._trainerGeohashes, _trainerGeohashes) &&
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
                 other.trainerOffersOnline == trainerOffersOnline) &&
+            (identical(other.acceptsInquiries, acceptsInquiries) ||
+                other.acceptsInquiries == acceptsInquiries) &&
             (identical(other.activeRoutineId, activeRoutineId) ||
                 other.activeRoutineId == activeRoutineId) &&
             (identical(other.subscription, subscription) ||
@@ -936,9 +1177,10 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.weightedLoad, weightedLoad) ||
                 other.weightedLoad == weightedLoad) &&
             const DeepCollectionEquality()
+                .equals(other._emailVerification, _emailVerification) &&
+            const DeepCollectionEquality()
                 .equals(other._onboardingSeen, _onboardingSeen) &&
-            (identical(other.templatePreferences, templatePreferences) ||
-                other.templatePreferences == templatePreferences));
+            (identical(other.templatePreferences, templatePreferences) || other.templatePreferences == templatePreferences));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -962,6 +1204,10 @@ class _$UserProfileImpl implements _UserProfile {
         phone,
         bornAt,
         termsAcceptedAt,
+        acceptedTermsVersion,
+        acceptedPrivacyVersion,
+        trainerLocationConsentAt,
+        trainerLocationConsentPromptedAt,
         trainerBio,
         trainerSpecialty,
         trainerMonthlyRate,
@@ -973,9 +1219,11 @@ class _$UserProfileImpl implements _UserProfile {
         const DeepCollectionEquality().hash(_trainerLocations),
         const DeepCollectionEquality().hash(_trainerGeohashes),
         trainerOffersOnline,
+        acceptsInquiries,
         activeRoutineId,
         subscription,
         weightedLoad,
+        const DeepCollectionEquality().hash(_emailVerification),
         const DeepCollectionEquality().hash(_onboardingSeen),
         templatePreferences
       ]);
@@ -1015,6 +1263,10 @@ abstract class _UserProfile implements UserProfile {
       final String? phone,
       @TimestampConverter() final DateTime? bornAt,
       @TimestampConverter() final DateTime? termsAcceptedAt,
+      final int? acceptedTermsVersion,
+      final int? acceptedPrivacyVersion,
+      @TimestampConverter() final DateTime? trainerLocationConsentAt,
+      @TimestampConverter() final DateTime? trainerLocationConsentPromptedAt,
       final String? trainerBio,
       final String? trainerSpecialty,
       final int? trainerMonthlyRate,
@@ -1026,9 +1278,12 @@ abstract class _UserProfile implements UserProfile {
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
+      final bool acceptsInquiries,
       final String? activeRoutineId,
       final TrainerSubscription? subscription,
       final double? weightedLoad,
+      @JsonKey(includeToJson: false)
+      final Map<String, VerifiedEmail> emailVerification,
       final Map<String, int> onboardingSeen,
       final TemplatePreferences? templatePreferences}) = _$UserProfileImpl;
 
@@ -1083,7 +1338,49 @@ abstract class _UserProfile implements UserProfile {
   @override
   @TimestampConverter()
   DateTime?
-      get termsAcceptedAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+      get termsAcceptedAt; // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  @override
+  int? get acceptedTermsVersion;
+  @override
+  int? get acceptedPrivacyVersion;
+  @override
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentAt;
+  @override
+  @TimestampConverter()
+  DateTime?
+      get trainerLocationConsentPromptedAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   String? get trainerBio;
   @override
@@ -1130,8 +1427,18 @@ abstract class _UserProfile implements UserProfile {
   @override
   List<String> get trainerGeohashes;
   @override
+  bool get trainerOffersOnline;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  @override
   bool
-      get trainerOffersOnline; // ── Athlete active routine (home today's card PR#2) ───────────────────
+      get acceptsInquiries; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
 // card when the user has multiple self-created routines and no trainer
@@ -1150,7 +1457,21 @@ abstract class _UserProfile implements UserProfile {
   TrainerSubscription? get subscription;
   @override
   double?
-      get weightedLoad; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
+      get weightedLoad; // ── Mail confirmado con código (functions/src/auth/codigo-de-verificacion.ts) ──
+// `{'athlete': {email, verifiedAt}, 'trainer': {...}}`: una entrada por rol.
+// Lo escribe SOLO la Cloud Function `verificarCodigoDeMail` cuando el código
+// de 6 dígitos coincide (firestore.rules lo pinea en create y update).
+// Vacío ⇒ el router manda a la pantalla del código, a TODOS: también a
+// Google y Apple, que ya traen `emailVerified` en true y por eso no sirve.
+// Quién está verificado lo decide `correoVerificadoParaElRol`: la entrada
+// tiene que ser la del rol de HOY y del mail de Auth de HOY.
+// `includeToJson: false`: el cliente nunca lo escribe, ni siquiera en el
+// alta, que manda el `toJson()` entero (`UserRepository._altaPayload`).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  Map<String, VerifiedEmail>
+      get emailVerification; // ── Welcome tour seen-flags (issue #627) ────────────────────────────
 // Map of `OnboardingSurface.wireKey` → version of the tour that user
 // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
 // existing accounts need no backfill and no migration.

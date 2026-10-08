@@ -35,8 +35,8 @@ import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
-import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../helpers/coach_hub_profiles.dart';
 import '../helpers/onboarding_test_helpers.dart';
 
 import 'gate_environment.dart';
@@ -87,14 +87,14 @@ const List<GateAthlete> kGateAthletes = [
 ///
 /// Si algún día el tour merece su propio golden, va como pantalla aparte y con
 /// su porqué escrito — no colándose arriba de las otras cinco.
-UserProfile gateTrainerProfile() => UserProfile(
+UserProfile gateTrainerProfile() => trainerCompleto(
       uid: kGateTrainerId,
       email: 'mateo@treino.app',
       displayName: kGateTrainerName,
-      role: UserRole.trainer,
+      onboardingSeen: allSurfacesSeen(),
+    ).copyWith(
       createdAt: DateTime.utc(2025, 9, 1),
       updatedAt: DateTime.utc(2026, 1, 12),
-      onboardingSeen: allSurfacesSeen(),
     );
 
 /// Perfil público de un alumno, sin avatar remoto (ver dartdoc de la librería).

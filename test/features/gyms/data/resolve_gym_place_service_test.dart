@@ -10,16 +10,41 @@
 //   3. Errors never crash — surfaced as ResolveGymPlaceFailure.
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show FirebaseException, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
 
 class MockHttpClient extends Mock implements http.Client {}
+
+/// Simula la carrera: otro usuario nombró el gym entre nuestro `getById` y
+/// nuestro `setName`, así que la regla deniega el segundo escritor.
+class _RacingGymRepository extends GymRepository {
+  _RacingGymRepository(this._db, {this.winnerName}) : super(firestore: _db);
+
+  final FakeFirebaseFirestore _db;
+  final String? winnerName;
+
+  @override
+  Future<void> setName(String gymId, String name) async {
+    if (winnerName != null) {
+      await _db
+          .collection('gyms')
+          .doc(gymId)
+          .update({'name': winnerName, 'nameNeeded': false});
+    }
+    throw FirebaseException(
+      plugin: 'cloud_firestore',
+      code: 'permission-denied',
+    );
+  }
+}
 
 void main() {
   setUpAll(() {
@@ -45,11 +70,17 @@ void main() {
     );
   });
 
+  Map<String, Object?> detailsBody() => {
+        'id': 'ChIJ_place_2',
+        'displayName': {'text': 'Texto de Google que NO se guarda'},
+        'formattedAddress': 'Dirección de Google que NO se guarda',
+        'location': {'latitude': -34.61, 'longitude': -58.44},
+      };
+
   group('ResolveGymPlaceService.call — read-through cache', () {
     test('cache hit: returns the existing gym without calling http', () async {
       await firestore.collection('gyms').doc('ChIJ_place_1').set({
         'name': 'SportClub Belgrano',
-        'address': 'Cabildo 1789, CABA',
         'lat': -34.5598,
         'lng': -58.4615,
         'geohash': '6d6m7',
@@ -61,23 +92,198 @@ void main() {
 
       expect(result.gymId, 'ChIJ_place_1');
       expect(result.name, 'SportClub Belgrano');
+      expect(result.needsName, isFalse);
       verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
+    });
+
+    test('cache hit ignores a typed name: the first user\'s name wins',
+        () async {
+      await firestore.collection('gyms').doc('ChIJ_place_1').set({
+        'name': 'SportClub Belgrano',
+        'lat': -34.5598,
+        'lng': -58.4615,
+        'geohash': '6d6m7',
+        'source': 'google-places',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+
+      final result =
+          await sut.call(placeId: 'ChIJ_place_1', name: 'Otro nombre');
+
+      expect(result.name, 'SportClub Belgrano');
+      final doc = await firestore.collection('gyms').doc('ChIJ_place_1').get();
+      expect(doc.data()!['name'], 'SportClub Belgrano');
+    });
+
+    test('gym flagged nameNeeded and no name typed: asks for it, no write',
+        () async {
+      await firestore.collection('gyms').doc('ChIJ_place_9').set({
+        'name': 'Marcador',
+        'nameNeeded': true,
+        'lat': -34.5,
+        'lng': -58.4,
+        'geohash': '6d6m7',
+        'source': 'google-places',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+
+      final result = await sut.call(placeId: 'ChIJ_place_9');
+
+      expect(result.needsName, isTrue);
+      expect(result.gymId, 'ChIJ_place_9');
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
+    });
+
+    test('gym flagged nameNeeded and a name typed: stores it, clears the flag',
+        () async {
+      await firestore.collection('gyms').doc('ChIJ_place_9').set({
+        'name': 'Marcador',
+        'nameNeeded': true,
+        'lat': -34.5,
+        'lng': -58.4,
+        'geohash': '6d6m7',
+        'source': 'google-places',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+
+      final result =
+          await sut.call(placeId: 'ChIJ_place_9', name: '  Mi gimnasio ');
+
+      expect(result.needsName, isFalse);
+      expect(result.name, 'Mi gimnasio');
+      final data =
+          (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+              .data()!;
+      expect(data['name'], 'Mi gimnasio');
+      expect(data['nameNeeded'], isFalse);
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
+    });
+
+    test('a blocked name is rejected by moderation and never written',
+        () async {
+      await firestore.collection('gyms').doc('ChIJ_place_9').set({
+        'name': 'Marcador',
+        'nameNeeded': true,
+        'lat': -34.5,
+        'lng': -58.4,
+        'geohash': '6d6m7',
+        'source': 'google-places',
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+      });
+
+      await expectLater(
+        () => sut.call(placeId: 'ChIJ_place_9', name: 'puta madre'),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+      final data =
+          (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+              .data()!;
+      expect(data['name'], 'Marcador');
+    });
+  });
+
+  group('ResolveGymPlaceService.call — naming a nameNeeded gym', () {
+    Future<void> seedNeedingName() =>
+        firestore.collection('gyms').doc('ChIJ_place_9').set({
+          'name': 'Marcador',
+          'nameNeeded': true,
+          'lat': -34.5,
+          'lng': -58.4,
+          'geohash': '6d6m7',
+          'source': 'google-places',
+          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+        });
+
+    test('existing gym without a user name reports existsUnnamed', () async {
+      await seedNeedingName();
+
+      final result = await sut.call(placeId: 'ChIJ_place_9');
+
+      expect(result.needsName, isTrue);
+      expect(result.existsUnnamed, isTrue);
+    });
+
+    test('a brand-new gym asking for a name is NOT existsUnnamed', () async {
+      final result = await sut.call(placeId: 'ChIJ_place_new');
+
+      expect(result.needsName, isTrue);
+      expect(result.existsUnnamed, isFalse);
+    });
+
+    test('beforeNaming runs BEFORE the name is written (rules need the link)',
+        () async {
+      await seedNeedingName();
+      String? nameSeenByCallback;
+
+      await sut.call(
+        placeId: 'ChIJ_place_9',
+        name: 'Mi gimnasio',
+        beforeNaming: () async {
+          nameSeenByCallback =
+              (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+                  .data()!['name'] as String;
+        },
+      );
+
+      expect(nameSeenByCallback, 'Marcador');
+      final data =
+          (await firestore.collection('gyms').doc('ChIJ_place_9').get())
+              .data()!;
+      expect(data['name'], 'Mi gimnasio');
+    });
+
+    test(
+        'permission-denied on setName because someone named it first: '
+        'returns the winner\'s name', () async {
+      await seedNeedingName();
+      final racing =
+          _RacingGymRepository(firestore, winnerName: 'Gym del otro');
+      final svc = ResolveGymPlaceService(
+        gymRepository: racing,
+        httpClient: mockClient,
+        clientApiKey: 'test-client-key',
+      );
+
+      final result = await svc.call(placeId: 'ChIJ_place_9', name: 'Mi gym');
+
+      expect(result.needsName, isFalse);
+      expect(result.name, 'Gym del otro');
+    });
+
+    test('permission-denied on setName with the gym still unnamed rethrows',
+        () async {
+      await seedNeedingName();
+      final denying = _RacingGymRepository(firestore);
+      final svc = ResolveGymPlaceService(
+        gymRepository: denying,
+        httpClient: mockClient,
+        clientApiKey: 'test-client-key',
+      );
+
+      await expectLater(
+        () => svc.call(placeId: 'ChIJ_place_9', name: 'Mi gym'),
+        throwsA(isA<FirebaseException>()),
+      );
     });
   });
 
   group('ResolveGymPlaceService.call — cache miss', () {
-    test('GETs Place Details (New) with the field mask and client key',
+    test('without a typed name it asks for it and never calls Google',
         () async {
-      when(() => mockClient.get(any(), headers: any(named: 'headers')))
-          .thenAnswer((_) async => okResponse({
-                'id': 'ChIJ_place_2',
-                'displayName': {'text': 'Megatlon Recoleta'},
-                'formattedAddress': 'Av. Callao 1234, CABA',
-                'location': {'latitude': -34.59, 'longitude': -58.39},
-                'types': ['gym', 'health'],
-              }));
+      final result = await sut.call(placeId: 'ChIJ_place_2');
 
-      await sut.call(placeId: 'ChIJ_place_2');
+      expect(result.needsName, isTrue);
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
+      expect(
+          (await firestore.collection('gyms').doc('ChIJ_place_2').get()).exists,
+          isFalse);
+    });
+
+    test('GETs Place Details (New) asking ONLY for location', () async {
+      when(() => mockClient.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async => okResponse(detailsBody()));
+
+      await sut.call(placeId: 'ChIJ_place_2', name: 'Mi gym');
 
       final captured = verify(() => mockClient.get(
             captureAny(),
@@ -92,23 +298,18 @@ void main() {
         'https://places.googleapis.com/v1/places/ChIJ_place_2',
       );
       expect(headers['X-Goog-Api-Key'], 'test-client-key');
-      expect(
-        headers['X-Goog-FieldMask'],
-        'id,displayName,formattedAddress,location,types',
-      );
+      expect(headers['X-Goog-FieldMask'], 'location');
     });
 
     test('appends sessionToken as a query param when provided', () async {
       when(() => mockClient.get(any(), headers: any(named: 'headers')))
-          .thenAnswer((_) async => okResponse({
-                'id': 'ChIJ_place_2',
-                'displayName': {'text': 'Megatlon Recoleta'},
-                'formattedAddress': 'Av. Callao 1234, CABA',
-                'location': {'latitude': -34.59, 'longitude': -58.39},
-                'types': ['gym'],
-              }));
+          .thenAnswer((_) async => okResponse(detailsBody()));
 
-      await sut.call(placeId: 'ChIJ_place_2', sessionToken: 'tok-1');
+      await sut.call(
+        placeId: 'ChIJ_place_2',
+        name: 'Mi gym',
+        sessionToken: 'tok-1',
+      );
 
       final captured = verify(() =>
               mockClient.get(captureAny(), headers: any(named: 'headers')))
@@ -117,44 +318,47 @@ void main() {
       expect(uri.queryParameters['sessionToken'], 'tok-1');
     });
 
-    test('maps the Place Details response onto a Gym and upserts it', () async {
+    test('stores the typed name + coords, and NO Google text', () async {
       when(() => mockClient.get(any(), headers: any(named: 'headers')))
-          .thenAnswer((_) async => okResponse({
-                'id': 'ChIJ_place_3',
-                'displayName': {'text': 'SmartFit Caballito'},
-                'formattedAddress': 'Rivadavia 5000, CABA',
-                'location': {'latitude': -34.61, 'longitude': -58.44},
-                'types': ['gym'],
-              }));
+          .thenAnswer((_) async => okResponse(detailsBody()));
 
-      final result = await sut.call(placeId: 'ChIJ_place_3');
+      final result =
+          await sut.call(placeId: 'ChIJ_place_3', name: ' SmartFit Cabal ');
 
       expect(result.gymId, 'ChIJ_place_3');
-      expect(result.name, 'SmartFit Caballito');
-      expect(result.address, 'Rivadavia 5000, CABA');
+      expect(result.name, 'SmartFit Cabal');
+      expect(result.needsName, isFalse);
       expect(result.source, 'google-places');
 
+      final raw = (await firestore.collection('gyms').doc('ChIJ_place_3').get())
+          .data()!;
+      expect(raw['name'], 'SmartFit Cabal');
+      expect(raw.containsKey('address'), isFalse);
+      expect(raw['lat'], -34.61);
+      expect(raw['lng'], -58.44);
+      expect(raw['geohash'], isNotEmpty);
+      expect(raw['coordsFetchedAt'], isNotNull);
+      expect(raw['placeStatus'], 'ok');
+      expect(raw.toString(), isNot(contains('Google')));
+
       final stored = await gymRepository.getById('ChIJ_place_3');
-      expect(stored, isNotNull);
-      expect(stored!.name, 'SmartFit Caballito');
-      expect(stored.lat, -34.61);
-      expect(stored.lng, -58.44);
-      expect(stored.source, GymSource.googlePlaces);
-      expect(stored.brandId, isNull);
-      expect(stored.branchName, isNull);
+      expect(stored!.source, GymSource.googlePlaces);
+      expect(stored.coordsFetchedAt, isNotNull);
+    });
+
+    test('a blocked name is rejected before any http call', () async {
+      await expectLater(
+        () => sut.call(placeId: 'ChIJ_place_2', name: 'puta madre'),
+        throwsA(isA<ModerationBlockedException>()),
+      );
+      verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
     });
 
     test('second call for the same placeId hits the cache, not http', () async {
       when(() => mockClient.get(any(), headers: any(named: 'headers')))
-          .thenAnswer((_) async => okResponse({
-                'id': 'ChIJ_place_4',
-                'displayName': {'text': 'Cacheado Gym'},
-                'formattedAddress': null,
-                'location': {'latitude': 0.0, 'longitude': 0.0},
-                'types': ['gym'],
-              }));
+          .thenAnswer((_) async => okResponse(detailsBody()));
 
-      await sut.call(placeId: 'ChIJ_place_4');
+      await sut.call(placeId: 'ChIJ_place_4', name: 'Cacheado Gym');
       await sut.call(placeId: 'ChIJ_place_4');
 
       verify(() => mockClient.get(any(), headers: any(named: 'headers')))
@@ -171,7 +375,7 @@ void main() {
       );
 
       await expectLater(
-        () => noKeySut.call(placeId: 'ChIJ_place_5'),
+        () => noKeySut.call(placeId: 'ChIJ_place_5', name: 'Mi gym'),
         throwsA(isA<ResolveGymPlaceFailure>()),
       );
       verifyNever(() => mockClient.get(any(), headers: any(named: 'headers')));
@@ -183,7 +387,7 @@ void main() {
           .thenAnswer((_) async => http.Response('server error', 500));
 
       await expectLater(
-        () => sut.call(placeId: 'ChIJ_place_6'),
+        () => sut.call(placeId: 'ChIJ_place_6', name: 'Mi gym'),
         throwsA(
           predicate<ResolveGymPlaceFailure>(
             (e) => !e.toString().contains('test-client-key'),
@@ -197,7 +401,7 @@ void main() {
           .thenThrow(Exception('socket closed'));
 
       await expectLater(
-        () => sut.call(placeId: 'ChIJ_place_7'),
+        () => sut.call(placeId: 'ChIJ_place_7', name: 'Mi gym'),
         throwsA(isA<ResolveGymPlaceFailure>()),
       );
     });
@@ -206,11 +410,10 @@ void main() {
       when(() => mockClient.get(any(), headers: any(named: 'headers')))
           .thenAnswer((_) async => okResponse({
                 'id': 'ChIJ_place_8',
-                'displayName': {'text': 'Incompleto'},
               }));
 
       await expectLater(
-        () => sut.call(placeId: 'ChIJ_place_8'),
+        () => sut.call(placeId: 'ChIJ_place_8', name: 'Mi gym'),
         throwsA(isA<ResolveGymPlaceFailure>()),
       );
     });

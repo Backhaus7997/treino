@@ -4,6 +4,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/empty_state/empty_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Envuelve en MaterialApp con el tema dado.
 Widget _wrap(Widget widget, {ThemeData? theme}) => MaterialApp(
@@ -91,7 +92,7 @@ void main() {
         ),
       ));
       await tester.pump();
-      expect(find.byType(TextButton), findsNothing);
+      expect(find.byType(TreinoButton), findsNothing);
     });
 
     // -------------------------------------------------------------------------

@@ -1,0 +1,7 @@
+Mejoras en el editor de rutinas y arreglos.
+
+- Arrastrá ejercicios con el agarre nuevo: se arma o se deshace una superserie soltando uno encima del otro, y la lista scrollea sola mientras arrastrás.
+- El ejercicio sin completar se marca en rojo y ya no se despliega solo.
+- "Crear mi ejercicio" ahora abre el editor en vez de cerrar el modal.
+- Insights: volumen por grupo muscular, racha semanal y aviso del reporte mensual.
+- Podio del ranking con los tres primeros destacados.

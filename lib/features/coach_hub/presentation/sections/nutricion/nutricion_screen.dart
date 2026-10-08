@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../app/theme/app_motion.dart';
-import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -34,7 +33,6 @@ class NutricionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final entriesAsync = ref.watch(nutricionEntriesProvider);
     final filtro = ref.watch(nutricionFiltroProvider);
     final counts = nutricionFiltroCounts(entriesAsync.valueOrNull ?? const []);
@@ -49,19 +47,11 @@ class NutricionScreen extends ConsumerWidget {
         children: [
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TreinoSectionHeader(
-                  title: 'Nutrición', // i18n: Fase W6
-                  count: counts[NutricionFiltro.todos],
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
+            child: CoachHubSectionHero(
+              title: 'Nutrición', // i18n: Fase W6
+              count: counts[NutricionFiltro.todos],
+              subtitle:
                   'Planes de alimentación de tus alumnos activos.', // i18n: Fase W6
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: AppSpacing.s18),
@@ -105,7 +95,22 @@ class NutricionScreen extends ConsumerWidget {
                         ),
                         entry: entry,
                         onTap: () =>
-                            context.go('/alumnos/${entry.link.athleteId}'),
+                            // `push` y no `go`, y con `?tab=plan`.
+                            //
+                            // Con `go` la entrada de historial se REEMPLAZA:
+                            // para el router el PF estaba en Alumnos, asi que
+                            // la flecha atras lo devolvia ahi y no a
+                            // Nutricion. Y sin el `tab` caia en Resumen y
+                            // tenia que buscar la pestana a mano.
+                            //
+                            // Las dos mitades del mismo reporte: «si entro a
+                            // un alumno, que me mande directamente al
+                            // apartado para cargarle plan nutricional,
+                            // derecho, y si vuelvo atras me manda a la lista
+                            // de alumnos, no de nutricion».
+                            context.push(
+                          '/alumnos/${entry.link.athleteId}?tab=plan',
+                        ),
                       ),
                       if (entry != filtered.last)
                         const SizedBox(height: AppSpacing.s8),

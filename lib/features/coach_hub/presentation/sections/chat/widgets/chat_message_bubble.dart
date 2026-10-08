@@ -118,6 +118,11 @@ class ChatMessageBubble extends StatelessWidget {
                   child: FirebaseStorageVideoPlayer(
                     url: videoUrl!,
                     palette: palette,
+                    // Tap-to-load, mismo motivo que en el bubble de mobile:
+                    // esto vive en el `ListView.builder` de `chat_detail_pane`
+                    // y el auto-init descarga un video por cada uno que pasa
+                    // por pantalla, sin que nadie pida verlo.
+                    autoInicializar: false,
                   ),
                 ),
                 if (text.isNotEmpty) const SizedBox(height: 6),

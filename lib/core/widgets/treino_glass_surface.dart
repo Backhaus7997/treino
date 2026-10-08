@@ -71,7 +71,7 @@ class TreinoGlassSurface extends StatelessWidget {
             end: Alignment.bottomRight,
             stops: const [0, 0.42, 1],
             colors: [
-              palette.textPrimary.withValues(alpha: 0.10),
+              palette.textPrimary.withValues(alpha: 0.1),
               Colors.transparent,
               palette.textPrimary.withValues(alpha: 0.04),
             ],

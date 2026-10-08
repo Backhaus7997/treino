@@ -32,7 +32,59 @@ abstract class AnalyticsService {
     required int durationSeconds,
   });
 
+  /// Se guardó una rutina NUEVA en `routines` — desde cualquier editor y por
+  /// cualquier actor. Es el evento que dice qué FORMA tienen las rutinas que
+  /// la gente arma de verdad; sin él, "¿cuánta gente querría un segundo día?"
+  /// no se puede responder.
+  ///
+  /// [source] separa al alumno suelto (el único segmento que un paywall
+  /// tocaría) del ruido del PF. Las asignadas por un profe se cuentan igual y
+  /// se filtran en el reporte — omitirlas dejaría el evento ciego a la mitad
+  /// de las rutinas y sesgaría la comparación.
+  ///
+  /// Solo contadores y un enum: nada que identifique a una persona.
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  });
+
+  /// "Agregar día" en el editor — la rutina pasó de N a N+1 días.
+  ///
+  /// [daysCount] es el total DESPUÉS de agregar. Es el instante exacto en que
+  /// un tope de días mordería, por eso se mide antes de que exista ninguno.
+  /// Se emite también mientras la rutina todavía no se guardó: la fricción
+  /// ocurre al agregar, no al guardar.
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  });
+
+  /// Lo mismo que [logRoutineDayAdded], sobre el eje de semanas.
+  ///
+  /// [weeksCount] es el total DESPUÉS de agregar. En el editor web las semanas
+  /// son un stepper numérico, así que un salto de 1 a 4 es UN evento con
+  /// `weeks_count: 4`, no tres.
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  });
+
   /// `RoutineRepository.createAssigned` — un PF asignó un plan a un atleta.
+  ///
+  /// Se emite **desde el repositorio y desde ningún otro lado**, que es la
+  /// única excepción a "los eventos viven en presentation" y está razonada en
+  /// el dartdoc de `createAssigned`. En resumen: ese método exige `assignedBy`
+  /// y `assignedTo`, así que toda llamada que sobrevive a sus guardas ES una
+  /// asignación, y hay cinco caminos de UI que terminan ahí.
+  ///
+  /// Esta línea describía ese diseño desde el principio y el código no lo
+  /// cumplía: sólo dos de los cinco caminos emitían, así que el evento contaba
+  /// menos de la mitad de las asignaciones sin que nada se viera roto. Si
+  /// alguna vez te tienta agregar la llamada en una pantalla, es que el evento
+  /// se está volviendo a escapar — arreglalo en el repositorio.
+  ///
+  /// Lo fija `test/features/workout/data/plan_assigned_una_sola_capa_test.dart`.
   Future<void> logPlanAssigned({
     required String routineId,
     required String assignedBy,
@@ -54,11 +106,24 @@ abstract class AnalyticsService {
     required String senderId,
   });
 
-  /// `AppointmentRepository.book` — cita propuesta/confirmada.
+  /// El PF agendó sesión(es) con un alumno.
+  ///
+  /// El docstring anterior decía `AppointmentRepository.book`, y eso apuntaba
+  /// a un método MUERTO: `book()` es el auto-booking del atleta, sin
+  /// llamadores en `lib/` desde #831 y con su rama de reactivación ya cerrada
+  /// por reglas. Los dos creadores vivos son `createByTrainer` y
+  /// `createRecurringByTrainer`.
+  ///
+  /// [appointmentId] es `null` para una serie recurrente: ahí no hay UNA cita,
+  /// y `createRecurringByTrainer` devuelve sólo cuántas creó. Ese es también
+  /// el motivo de [occurrences]: una serie de 8 semanas son 8 sesiones
+  /// agendadas, y contarlas como 1 subreporta la adopción de la feature
+  /// justo en el caso donde más se usa.
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   });
 
   /// Una ruta quedó visible. Lo dispara `RouteAnalytics` en cada navegación.
@@ -82,7 +147,89 @@ abstract class AnalyticsService {
     required String surface,
     required String tab,
   });
+
+  /// Una escritura del PF rebotó con `permission-denied`.
+  ///
+  /// **Es la única señal server-visible que va a existir de esto.** Firestore
+  /// no loguea en ningún lado consultable las denegaciones de reglas, y el
+  /// Coach Hub web no inicializa Crashlytics (`main_coach_hub.dart`). Si este
+  /// evento no lo cuenta, el primer incidente del enforcement es invisible y
+  /// nos enteramos por WhatsApp.
+  ///
+  /// Por eso los campos son los que responden las preguntas del día del
+  /// incidente, no los que salían gratis:
+  ///
+  /// - [trainerId] — CUÁNTOS PF distintos y CUÁLES. Va explícito porque la app
+  ///   nunca llama a `setUserId`: el `user_pseudo_id` que Firebase agrega solo
+  ///   identifica la INSTALACIÓN, así que sin este campo no se pueden contar
+  ///   PF únicos ni cruzar el rebote contra su `subscription` en Firestore.
+  /// - [athleteId] — sobre qué alumno rebotó. Distingue "un alumno puntual"
+  ///   de "todos los del PF".
+  /// - [collection] — qué se estaba escribiendo (`routines`, …). Separa "una
+  ///   cláusula puntual quedó mal" de "el PF está frenado entero".
+  /// - [operation] — `create` o `update`. No es lo mismo no poder tomar
+  ///   trabajo nuevo que no poder tocar lo que ya tenía; lo segundo es mucho
+  ///   más grave y la respuesta operativa es otra.
+  /// - [surface] — desde dónde (`routine_editor_web`, …). La misma colección
+  ///   se escribe desde web y desde móvil, y el arreglo no es el mismo.
+  /// - [athleteEntitlement] — `blocked` si el alumno figuraba en
+  ///   `users/{trainerId}.blockedAthleteIds` cuando rebotó, `entitled` si no,
+  ///   `unknown` si ese doc todavía no había cargado, `not_applicable` si la
+  ///   escritura no era sobre ningún alumno (una plantilla del PF). Es el
+  ///   campo que dice si el paywall EXPLICA la denegación: un pico de
+  ///   `entitled` no es un problema de cobro, es una regla rota, y ahí mirar
+  ///   facturación es perder el día.
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  });
 }
+
+/// Quién creó la rutina y desde dónde — la dimensión `source` de los tres
+/// eventos de forma de rutina (`routine_created`, `routine_day_added`,
+/// `routine_week_added`).
+///
+/// No es `RoutineSource`: ese enum es el contrato del DOCUMENTO en Firestore y
+/// colapsa "armada de cero" y "usar como base" en un mismo `user-created`.
+/// Acá esa diferencia ES el dato: un alumno que copia una plantilla de 4 días
+/// no chocaría contra un límite igual que uno que armó 4 días a mano.
+///
+/// Los valores van en snake_case como todo parámetro de este archivo.
+enum RoutineCreationSource {
+  /// Alumno, editor en blanco (`SelfCreating`).
+  self('self'),
+
+  /// Alumno, "Usar como base" sobre una plantilla (`SelfCustomizing`, #647).
+  selfFromTemplate('self_from_template'),
+
+  /// PF asignando a un alumno: editor móvil o web, preview de Excel, o
+  /// "Asignar a alumno" sobre una plantilla propia.
+  trainerAssigned('trainer_assigned'),
+
+  /// PF guardando una plantilla propia sin alumno (`TrainerTemplating`).
+  trainerTemplate('trainer_template');
+
+  const RoutineCreationSource(this.wireName);
+
+  /// Valor que viaja en el parámetro `source`.
+  final String wireName;
+}
+
+/// El nombre del evento, en UN solo lugar.
+///
+/// El resto de los eventos de este archivo tiene el string escrito dos veces
+/// —en [FirebaseAnalyticsService] y en el `FakeAnalyticsService` de los
+/// tests— y sólo la copia del fake queda asserteada. Para los demás eso es un
+/// riesgo tolerable; para éste no: es la ÚNICA señal server-visible del
+/// enforcement, así que un typo en la copia que shipea lo deja fuera de
+/// BigQuery con la suite entera en verde, y nadie se entera hasta el día del
+/// incidente. Con la constante compartida, el test que pinea el literal pinea
+/// también lo que se manda de verdad.
+const String kPaywallWriteDeniedEvent = 'paywall_write_denied';
 
 /// Implementación real basada en Firebase Analytics.
 class FirebaseAnalyticsService implements AnalyticsService {
@@ -115,6 +262,47 @@ class FirebaseAnalyticsService implements AnalyticsService {
           'routine_id': routineId,
           'session_id': sessionId,
           'duration_seconds': durationSeconds,
+        },
+      );
+
+  @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_created',
+        parameters: {
+          'source': source.wireName,
+          'days_count': daysCount,
+          'weeks_count': weeksCount,
+        },
+      );
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_day_added',
+        parameters: {
+          'source': source.wireName,
+          'days_count': daysCount,
+        },
+      );
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_week_added',
+        parameters: {
+          'source': source.wireName,
+          'weeks_count': weeksCount,
         },
       );
 
@@ -167,16 +355,27 @@ class FirebaseAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) =>
       _analytics.logEvent(
         name: 'appointment_created',
         parameters: {
-          'appointment_id': appointmentId,
+          if (appointmentId != null) 'appointment_id': appointmentId,
           'trainer_id': trainerId,
           'athlete_id': athleteId,
+          'occurrences': occurrences,
+          // Deriva de `occurrences`, pero se manda explícito para que
+          // segmentar en la consola sea un filtro y no una fórmula.
+          //
+          // Y va como STRING, no como bool: `firebase_analytics` sólo acepta
+          // `String` o `num` como valor de parámetro
+          // (`_assertParameterTypesAreCorrect`, firebase_analytics 11.6.0).
+          // Un bool rompía el evento entero — en debug por el assert, y en
+          // release en silencio, porque los asserts se strippean.
+          'booking_type': occurrences > 1 ? 'series' : 'single',
         },
       );
 
@@ -196,6 +395,27 @@ class FirebaseAnalyticsService implements AnalyticsService {
         parameters: {
           'surface': surface,
           'tab': tab,
+        },
+      );
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  }) =>
+      _analytics.logEvent(
+        name: kPaywallWriteDeniedEvent,
+        parameters: {
+          'trainer_id': trainerId,
+          'athlete_id': athleteId,
+          'collection': collection,
+          'operation': operation,
+          'surface': surface,
+          'athlete_entitlement': athleteEntitlement,
         },
       );
 }
@@ -218,6 +438,25 @@ class NoopAnalyticsService implements AnalyticsService {
     required String routineId,
     required String sessionId,
     required int durationSeconds,
+  }) async {}
+
+  @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) async {}
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) async {}
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
   }) async {}
 
   @override
@@ -244,9 +483,10 @@ class NoopAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) async {}
 
   @override
@@ -256,6 +496,16 @@ class NoopAnalyticsService implements AnalyticsService {
   Future<void> logSubTabViewed({
     required String surface,
     required String tab,
+  }) async {}
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
   }) async {}
 }
 

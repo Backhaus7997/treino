@@ -513,9 +513,11 @@ void main() {
         chatsForCurrentUserProvider.overrideWith(
           (ref) => Stream.value(chats),
         ),
-        currentAthleteLinkProvider.overrideWith((ref) async => coachUid == null
-            ? null
-            : makeLink(trainerId: coachUid, athleteId: uid ?? 'me')),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(
+              coachUid == null
+                  ? null
+                  : makeLink(trainerId: coachUid, athleteId: uid ?? 'me'),
+            )),
       ]);
       addTearDown(container.dispose);
       return container;

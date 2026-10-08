@@ -7,9 +7,9 @@
 // Runs against the Firebase EMULATORS only (Auth 9099, Firestore 8080 on
 // 127.0.0.1). Never cloud. See integration_test/README.md to enable + run.
 //
-// SEED CONTRACT (do before running — via emulator UI, the Admin SDK, or a
-// `firebase emulators:exec` seed script):
-//   • Auth emulator: a user { email: kSeedEmail, password: kSeedPassword },
+// SEED CONTRACT — ya lo cumple `scripts/seed_emulator_full.js`. Corré
+// `bash scripts/emulator.sh` y después `npm --prefix scripts run seed:emulator`:
+//   • Auth emulator: Martín (`kMartin.email` / `kSeedPassword`),
 //     emailVerified = true.
 //   • Firestore emulator: users/{uid} with a non-null `displayName` (otherwise
 //     authRedirect sends the user to /profile-setup, not /home — see
@@ -22,10 +22,12 @@ import 'package:integration_test/integration_test.dart';
 import 'package:treino/features/home/home_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/seed_ids.dart';
 
-// TODO(seed): replace with the credentials of the seeded emulator user.
-const String kSeedEmail = 'e2e.athlete@treino.test';
-const String kSeedPassword = 'Treino1234';
+// Las credenciales salen de `support/seed_ids.dart`, generado desde el seed.
+// Acá decía `e2e.athlete@treino.test` / `Treino1234`, que no corresponde a
+// ningún usuario sembrado: el login fallaba hablando de credenciales en vez de
+// decir que faltaba el fixture. Ver el encabezado de `seed_ids.dart`.
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -44,7 +46,7 @@ void main() {
       reason: 'anonymous user should land on /welcome',
     );
 
-    await signInViaUi(tester, email: kSeedEmail, password: kSeedPassword);
+    await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);
 
     // Landed on the home tab of the shell.
     expect(

@@ -38,7 +38,12 @@ mixin _$TrainerPublicProfile {
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
   List<String> get trainerGeohashes => throw _privateConstructorUsedError;
-  bool get trainerOffersOnline =>
+  bool get trainerOffersOnline => throw _privateConstructorUsedError;
+
+  /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
+  /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue siendo consultable.
+  bool get acceptsInquiries =>
       throw _privateConstructorUsedError; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
@@ -88,6 +93,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -124,6 +130,7 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
@@ -186,6 +193,10 @@ class _$TrainerPublicProfileCopyWithImpl<$Res,
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       averageRating: freezed == averageRating
           ? _value.averageRating
           : averageRating // ignore: cast_nullable_to_non_nullable
@@ -230,6 +241,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       double? averageRating,
       int reviewCount,
       int? trainerExperienceYears,
@@ -263,6 +275,7 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? averageRating = freezed,
     Object? reviewCount = null,
     Object? trainerExperienceYears = freezed,
@@ -325,6 +338,10 @@ class __$$TrainerPublicProfileImplCopyWithImpl<$Res>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       averageRating: freezed == averageRating
           ? _value.averageRating
           : averageRating // ignore: cast_nullable_to_non_nullable
@@ -364,6 +381,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
+      this.acceptsInquiries = true,
       this.averageRating,
       this.reviewCount = 0,
       this.trainerExperienceYears,
@@ -424,6 +442,13 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   @override
   @JsonKey()
   final bool trainerOffersOnline;
+
+  /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
+  /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue siendo consultable.
+  @override
+  @JsonKey()
+  final bool acceptsInquiries;
 // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
@@ -448,7 +473,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
 
   @override
   String toString() {
-    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount)';
+    return 'TrainerPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerGeohash: $trainerGeohash, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, averageRating: $averageRating, reviewCount: $reviewCount, trainerExperienceYears: $trainerExperienceYears, athleteCount: $athleteCount)';
   }
 
   @override
@@ -483,6 +508,8 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
                 .equals(other._trainerGeohashes, _trainerGeohashes) &&
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
                 other.trainerOffersOnline == trainerOffersOnline) &&
+            (identical(other.acceptsInquiries, acceptsInquiries) ||
+                other.acceptsInquiries == acceptsInquiries) &&
             (identical(other.averageRating, averageRating) ||
                 other.averageRating == averageRating) &&
             (identical(other.reviewCount, reviewCount) ||
@@ -495,26 +522,28 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      uid,
-      displayName,
-      displayNameLowercase,
-      avatarUrl,
-      trainerBio,
-      trainerSpecialty,
-      trainerGeohash,
-      trainerLatitude,
-      trainerLongitude,
-      trainerMonthlyRate,
-      paymentAlias,
-      const DeepCollectionEquality().hash(_trainerLocations),
-      const DeepCollectionEquality().hash(_trainerGeohashes),
-      trainerOffersOnline,
-      averageRating,
-      reviewCount,
-      trainerExperienceYears,
-      athleteCount);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        uid,
+        displayName,
+        displayNameLowercase,
+        avatarUrl,
+        trainerBio,
+        trainerSpecialty,
+        trainerGeohash,
+        trainerLatitude,
+        trainerLongitude,
+        trainerMonthlyRate,
+        paymentAlias,
+        const DeepCollectionEquality().hash(_trainerLocations),
+        const DeepCollectionEquality().hash(_trainerGeohashes),
+        trainerOffersOnline,
+        acceptsInquiries,
+        averageRating,
+        reviewCount,
+        trainerExperienceYears,
+        athleteCount
+      ]);
 
   /// Create a copy of TrainerPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -551,6 +580,7 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
+      final bool acceptsInquiries,
       final double? averageRating,
       final int reviewCount,
       final int? trainerExperienceYears,
@@ -590,8 +620,14 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   @override
   List<String> get trainerGeohashes;
   @override
+  bool get trainerOffersOnline;
+
+  /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
+  /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
+  /// perfil legacy sin el campo sigue siendo consultable.
+  @override
   bool
-      get trainerOffersOnline; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
+      get acceptsInquiries; // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
 // Written exclusively by the reviewAggregate Cloud Function.
 // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.
 // ADR-RV-005: MUST NOT appear in UserRepository._trainerPublicFields.

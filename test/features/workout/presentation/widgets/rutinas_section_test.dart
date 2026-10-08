@@ -176,7 +176,7 @@ Future<_Mocks> _pumpSection(
         userProfileProvider.overrideWith(
           (ref) => Stream.value(_profile(activeRoutineId: activeRoutineId)),
         ),
-        currentAthleteLinkProvider.overrideWith((ref) async => link),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
         userPublicProfileProvider('trainer-1').overrideWith(
           (ref) => Stream.value(
             const UserPublicProfile(

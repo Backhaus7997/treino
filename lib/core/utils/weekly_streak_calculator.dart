@@ -1,5 +1,6 @@
 import '../../features/workout/domain/routine.dart';
 import '../../features/workout/domain/session.dart';
+import 'app_clock.dart';
 import 'argentina_time.dart';
 
 /// Fallback de objetivo semanal cuando el atleta no tiene rutina activa, o la
@@ -64,6 +65,13 @@ int weeklyTargetFromRoutine(Routine? routine) {
 /// internamente. NO le pases `argentinaNow()`, sería doble corrimiento. Mismo
 /// contrato que `computeStreak`.
 ///
+/// Omitirlo cae en [AppClock.now], no en `DateTime.now()`: es el mismo
+/// instante real en producción (passthrough), pero deja que un test congele
+/// el reloj y fije la semana en curso. Sin ese seam, todo test de widget que
+/// muestre la racha depende del día de la semana en que corra el CI — que es
+/// exactamente cómo `monthly_report_screen_test` se rompió solo un martes,
+/// con `main` limpio y sin ningún commit de por medio.
+///
 /// O(n) para bucketear + O(racha) para contar.
 int computeWeeklyStreak({
   required List<Session> sessions,
@@ -98,7 +106,7 @@ int computeWeeklyStreak({
   // la racha se volvería "semanas desde que existe el mundo".
   final target = weeklyTarget > 0 ? weeklyTarget : weeklyStreakFallbackTarget;
 
-  final nowArt = toArgentina((now ?? DateTime.now()).toUtc());
+  final nowArt = toArgentina((now ?? AppClock.now()).toUtc());
   final currentWeek = mondayOfWeekArt(nowArt);
 
   // Sesiones que califican, contadas por lunes de su semana ART.

@@ -19,7 +19,14 @@ void main() {
   setUp(() {
     messaging = MockFirebaseMessaging();
     repo = MockFcmTokenRepository();
-    service = FcmService(messaging: messaging, repository: repo);
+    // `Duration.zero`: el backoff real suma 31s de reloj y ningún test puede
+    // esperar eso. Lo que se testea es la SECUENCIA de reintentos, no cuánto
+    // duermen.
+    service = FcmService(
+      messaging: messaging,
+      repository: repo,
+      esperaBaseDeReintento: Duration.zero,
+    );
 
     // Default stubs — can be overridden per test.
     when(() => repo.saveToken(any(), any())).thenAnswer((_) async {});
@@ -131,6 +138,69 @@ void main() {
           returnsNormally,
         );
 
+        verifyNever(() => repo.saveToken(any(), any()));
+      },
+    );
+
+    // El bug del iPhone 16 (2026-09-14): `apns-token-not-set` en el PRIMER
+    // intento no puede ser definitivo.
+    //
+    // El caso real es una reinstalación sobre un permiso YA concedido: ahí
+    // `PermissionGate` no vuelve a preguntar —ya está `authorized`— así que no
+    // re-invoca `init`, y `onTokenRefresh` tampoco cubre el primer token. Sin
+    // reintento el dispositivo se queda sin token PARA SIEMPRE, sin un error
+    // visible: la cuenta tenía 10 tokens de instalaciones viejas, FCM los
+    // aceptaba los 10, y al teléfono de la mano no le llegaba nada.
+    test(
+      'getToken falla con apns-token-not-set y ANDA al tercer intento → '
+      'el token se guarda igual',
+      () async {
+        const uid = 'user-apns-tardio';
+        var intentos = 0;
+
+        when(() => messaging.getToken()).thenAnswer((_) async {
+          intentos++;
+          if (intentos < 3) {
+            throw FirebaseException(
+              plugin: 'firebase_messaging',
+              code: 'apns-token-not-set',
+              message: 'APNS token has not been set yet.',
+            );
+          }
+          return 'token-tardio';
+        });
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => const Stream<String>.empty());
+
+        await service.init(uid);
+
+        expect(intentos, equals(3), reason: 'no reintentó');
+        verify(() => repo.saveToken(uid, 'token-tardio')).called(1);
+      },
+    );
+
+    test(
+      'un error que NO es apns-token-not-set no se reintenta',
+      () async {
+        const uid = 'user-otro-error';
+        var intentos = 0;
+
+        when(() => messaging.getToken()).thenAnswer((_) async {
+          intentos++;
+          throw FirebaseException(
+            plugin: 'firebase_messaging',
+            code: 'unknown',
+            message: 'algo distinto',
+          );
+        });
+        when(() => messaging.onTokenRefresh)
+            .thenAnswer((_) => const Stream<String>.empty());
+
+        await service.init(uid);
+
+        // Reintentar un error que no es de aprovisionamiento sólo demora el
+        // arranque cinco veces para llegar al mismo lugar.
+        expect(intentos, equals(1));
         verifyNever(() => repo.saveToken(any(), any()));
       },
     );

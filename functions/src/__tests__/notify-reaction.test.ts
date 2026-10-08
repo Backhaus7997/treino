@@ -6,7 +6,9 @@
  * a mocked Messaging instance.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import {
   notifyOnReactionHandler,
   resolveReactionNotification,
@@ -95,25 +97,25 @@ describe("resolveReactionNotification — pure truth table", () => {
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-reaction-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(
-      async (message: admin.messaging.MulticastMessage) => ({
+      async (message: MulticastMessage) => ({
         successCount: message.tokens.length,
         failureCount: 0,
         responses: message.tokens.map(() => ({
@@ -122,7 +124,7 @@ function makeMockMessaging(): admin.messaging.Messaging {
         })),
       }),
     ),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function cleanup(postId: string, ...uids: string[]): Promise<void> {
@@ -170,7 +172,7 @@ describe("notifyOnReactionHandler — integration", () => {
 
     expect(messaging.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const message = (messaging.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(message.tokens).toEqual(["author-token"]);
     expect(message.notification).toEqual({
       title: "TREINO",

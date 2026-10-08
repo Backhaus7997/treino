@@ -12,22 +12,28 @@
 ///
 /// Componentes exportados:
 /// - [TreinoAvatar] (`avatar/`)
+/// - [TreinoButton] / [TreinoIconButton] (`button/`)
 /// - [CoachHubDataTable] (`data_table/`)
 /// - [KpiCard] (`kpi_card/`)
 /// - [TreinoFilterChips] (`filter_chips/`)
 /// - [TreinoListRow] (`list_row/`)
 /// - [TreinoSectionHeader] (`section_header/`)
+/// - [CoachHubSectionHero] (`section_hero/`)
 /// - [TreinoEmptyState] (`empty_state/`)
 /// - [TreinoDialog] / [showTreinoDialog] (`dialog/`)
 /// - [TreinoInteractiveState] (resolver de interacción, fuente única de verdad)
 library;
 
 export 'avatar/treino_avatar.dart';
+export 'button/treino_button.dart';
 export 'data_table/coach_hub_data_table.dart';
 export 'dialog/treino_dialog.dart';
 export 'empty_state/empty_state.dart';
 export 'filter_chips/filter_chips.dart';
 export 'kpi_card/kpi_card.dart';
 export 'list_row/list_row.dart';
+export 'pager/coach_hub_pager.dart';
 export 'section_header/section_header.dart';
+export 'section_hero/section_hero.dart';
 export 'treino_interactive_state.dart';
+export 'treino_dropdown.dart';

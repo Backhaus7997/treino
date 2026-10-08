@@ -167,8 +167,10 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
   // `computeWeeklyStreak`.
   // NB: bucketea en el frame ART internamente (#411). Su `now` es un instante
   // REAL (se normaliza con `.toUtc()` adentro) — pasarle el `now` ya framed en
-  // ART de más arriba sería doble corrimiento, así que lo dejamos caer a
-  // `DateTime.now()`, igual que el resto de los callers.
+  // ART de más arriba sería doble corrimiento, así que lo dejamos caer a su
+  // default, igual que el resto de los callers. Ese default es `AppClock.now()`
+  // (passthrough en producción), no `DateTime.now()`: es lo que deja congelable
+  // la semana en curso desde un test.
   final streak = computeWeeklyStreak(
     sessions: allSessions,
     weeklyTarget: weeklyTarget,

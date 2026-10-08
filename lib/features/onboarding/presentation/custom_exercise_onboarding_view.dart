@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -129,10 +130,16 @@ class _CustomExerciseOnboardingViewState
       builder: (context, constraints) {
         // grabber 22 + gap 14 + dots 6 + gap 14 + actions 52.
         const chrome = 108.0;
-        // art 150 + gaps 30 + kicker 12 + title ~48 (it wraps to two lines) +
+        // art 150 + gaps 36 + kicker 12 + title ~48 (it wraps to two lines) +
         // body ~60. Scaled with the text, because the copy is what grows.
+        //
+        // Los gaps pasaron de 30 a 36 al abrir el aire entre la ilustración y
+        // el texto (14 → `AppSpacing.s20`). El total sube con ellos: esta cuenta
+        // es lo único que evita que el pager se coma el sheet, así que si se
+        // desactualiza vuelve la banda muerta que el comentario de arriba
+        // describe.
         final textScale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final wanted = 300.0 * textScale;
+        final wanted = 306.0 * textScale;
         final available = constraints.maxHeight - chrome;
         final pagerHeight =
             available > 0 && wanted > available ? available : wanted;
@@ -250,7 +257,11 @@ class _SheetSlide extends StatelessWidget {
           ExcludeSemantics(
             child: SizedBox(height: 150, child: content.illustration),
           ),
-          const SizedBox(height: 14),
+          // Mismo ritmo que el onboarding inicial: la ilustración se separa del
+          // texto con `s20`, no con el `s14` que tenía. Es el mismo patrón
+          // visual —dibujo arriba, copy abajo— y no había razón para que los
+          // dos onboardings respiraran distinto.
+          const SizedBox(height: AppSpacing.s20),
           OnboardingKicker(step),
           const SizedBox(height: 8),
           OnboardingTitle(content.title),

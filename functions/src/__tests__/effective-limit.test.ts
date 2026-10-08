@@ -4,6 +4,8 @@
 
 import {
   effectiveWeightLimit,
+  proximoCambioDeLimite,
+  suscripcionInactiva,
   SubscriptionState,
   SubscriptionStatus,
   SUBSCRIPTION_STATUSES,
@@ -152,5 +154,453 @@ describe("exhaustividad — cada status de la union tiene una respuesta DECIDIDA
     expect(effectiveWeightLimit({ tier: "plan3", status }, NOW)).toBe(
       PLAN3_POR_STATUS[status],
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EL PISO PREPAGO.
+//
+// Existe porque un PF que bajaba de plan3 (SIN TOPE) a plan1 (7) perdia el
+// remanente que YA HABIA PAGADO: el reconciliador escribia el tier nuevo y el
+// `currentPeriodEnd` del plan3 desaparecia del entitlement. El limite caia en el
+// acto y el trigger le bloqueaba alumnos en la MISMA invocacion.
+//
+// Es un PISO, nunca un techo: solo puede SUBIR el limite. Esa asimetria es lo
+// que hace seguro el cambio para los cuatro consumidores de este modulo — se
+// puede regalar cupo, nunca sacarlo.
+// ---------------------------------------------------------------------------
+
+import {
+  PisoPrepago,
+  limitRank,
+  resolverPisoPrepago,
+  tierLimit,
+} from "../subscriptions/effective-limit";
+
+/** Una suscripcion con piso, que es lo que este bloque prueba. */
+const conPiso = (
+  tier: SubscriptionState["tier"],
+  status: SubscriptionState["status"],
+  piso: { tier: SubscriptionState["tier"]; untilMs: number } | null,
+  currentPeriodEndMs: number | null = null,
+): SubscriptionState => ({
+  tier,
+  status,
+  currentPeriodEndMs,
+  prepaidTier: piso === null ? null : piso.tier,
+  prepaidUntilMs: piso === null ? null : piso.untilMs,
+});
+
+describe("effectiveWeightLimit — el piso prepago", () => {
+  it("un piso plan3 sobre un plan1 activo da SIN TOPE, no 7", () => {
+    // El caso que un `Math.max` a secas rompe en silencio: `null` es plan3 = SIN
+    // TOPE, o sea el MAYOR, y crudo vale 0. Por eso la comparacion va por rango.
+    expect(effectiveWeightLimit(
+      conPiso("plan1", "active", { tier: "plan3", untilMs: NOW + 1 }), NOW))
+      .toBeNull();
+  });
+
+  it("un piso VENCIDO no aporta nada", () => {
+    expect(effectiveWeightLimit(
+      conPiso("plan1", "active", { tier: "plan3", untilMs: NOW }), NOW)).toBe(7);
+    expect(effectiveWeightLimit(
+      conPiso("plan1", "active", { tier: "plan3", untilMs: NOW - 1 }), NOW))
+      .toBe(7);
+  });
+
+  it("un piso MENOR que el plan vigente no baja nada — es piso, no techo", () => {
+    expect(effectiveWeightLimit(
+      conPiso("plan2", "active", { tier: "plan1", untilMs: NOW + 1 }), NOW))
+      .toBe(15);
+  });
+
+  it("el piso NO pasa por el switch de status: un `pending` igual lo conserva", () => {
+    // Un `pending` resuelve a Free. Si el piso pasara por el switch se perderia
+    // justo cuando mas hace falta: el PF compro un plan que todavia no autorizo,
+    // y mientras tanto conserva lo que ya pago.
+    expect(effectiveWeightLimit(
+      conPiso("plan1", "pending", { tier: "plan2", untilMs: NOW + 1 }), NOW))
+      .toBe(15);
+  });
+
+  it("un `paused` con piso vivo tampoco cae a Free", () => {
+    expect(effectiveWeightLimit(
+      conPiso("plan1", "paused", { tier: "plan2", untilMs: NOW + 1 }), NOW))
+      .toBe(15);
+  });
+
+  const incompletos: [string, Partial<SubscriptionState>][] = [
+    ["solo tier", { prepaidTier: "plan3", prepaidUntilMs: null }],
+    ["solo fecha", { prepaidTier: null, prepaidUntilMs: NOW + 1 }],
+  ];
+  for (const [caso, patch] of incompletos) {
+    it(`un piso con ${caso} se ignora`, () => {
+      expect(effectiveWeightLimit(
+        { tier: "plan1", status: "active", ...patch }, NOW)).toBe(7);
+    });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// suscripcionInactiva — hallazgo de Codex sobre #1267 (P2 de esta ronda): el
+// piso prepago sostiene al PF en su plan pago aunque el `status` diga
+// `pending`/`paused`, así que "inactiva" no puede mirar sólo `status` — tiene
+// que comparar el tier EFECTIVO (con el piso) contra el NOMINAL. Ver el
+// docblock de la función para la definición completa.
+// ─────────────────────────────────────────────────────────────────────────
+describe("suscripcionInactiva — el piso prepago la sostiene en su plan", () => {
+  it("`paused` con piso vigente del MISMO plan no es inactiva — el efectivo no cayó", () => {
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "paused", { tier: "plan1", untilMs: NOW + 1 }),
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("`paused` con el piso VENCIDO sí es inactiva — el efectivo cayó a Free", () => {
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "paused", { tier: "plan1", untilMs: NOW - 1 }),
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
+  it("`paused` sin ningún piso sí es inactiva — mismo resultado que antes de este fix", () => {
+    expect(suscripcionInactiva(conPiso("plan1", "paused", null), NOW)).toBe(true);
+  });
+
+  it("`pending` con piso vigente de un plan MAYOR tampoco es inactiva", () => {
+    // El piso sostiene el efectivo en plan2, por ENCIMA del nominal (plan1) —
+    // el efectivo no cayó por debajo del nominal, así que sigue sin ser
+    // "inactiva" aunque el status diga `pending`.
+    expect(
+      suscripcionInactiva(
+        conPiso("plan1", "pending", { tier: "plan2", untilMs: NOW + 1 }),
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("`cancelled` con período todavía vigente no es inactiva — conserva el nominal", () => {
+    expect(
+      suscripcionInactiva(conPiso("plan1", "cancelled", null, NOW + 1), NOW),
+    ).toBe(false);
+  });
+
+  it("`cancelled` ya vencido, sin piso, sí es inactiva", () => {
+    expect(
+      suscripcionInactiva(conPiso("plan1", "cancelled", null, NOW - 1), NOW),
+    ).toBe(true);
+  });
+
+  it("`active`/`grace` nunca son inactivas — el efectivo es el nominal por definición", () => {
+    expect(suscripcionInactiva(conPiso("plan2", "active", null), NOW)).toBe(false);
+    expect(suscripcionInactiva(conPiso("plan2", "grace", null), NOW)).toBe(false);
+  });
+
+  it("sin `subscription` (Free, nunca se suscribió) no es inactiva", () => {
+    expect(suscripcionInactiva(null, NOW)).toBe(false);
+    expect(suscripcionInactiva(undefined, NOW)).toBe(false);
+  });
+});
+
+describe("resolverPisoPrepago — que se conserva al cambiar de plan", () => {
+  const vigente = (
+    tier: SubscriptionState["tier"],
+    hastaMs: number | null,
+  ): SubscriptionState => ({
+    tier, status: "active", currentPeriodEndMs: hastaMs,
+  });
+
+  it("el DOWNGRADE arma piso con lo que se estaba por pisar", () => {
+    expect(resolverPisoPrepago(
+      vigente("plan3", NOW + 1000), "plan1", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan3", untilMs: NOW + 1000 });
+  });
+
+  it("el UPGRADE no arma piso: no hay nada que conservar", () => {
+    expect(resolverPisoPrepago(
+      vigente("plan1", NOW + 1000), "plan3", "active", NOW)).toBeNull();
+  });
+
+  it("reconciliar el MISMO plan no captura piso, y conserva el que habia", () => {
+    // El bug de la version ingenua, que compara contra el limite EFECTIVO: ese
+    // ya incluye el piso, asi que un plan1 con piso plan3 se veria a si mismo
+    // como downgrade y capturaria un piso de plan1 CADA NOCHE. Escritura diaria
+    // de `users/{uid}` = disparo diario del trigger que decide mails.
+    const actual: SubscriptionState = {
+      tier: "plan1",
+      status: "active",
+      currentPeriodEndMs: NOW + 500,
+      prepaidTier: "plan3",
+      prepaidUntilMs: NOW + 1000,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan1", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan3", untilMs: NOW + 1000 });
+  });
+
+  it("un piso vivo NUNCA se tira, aunque el plan nuevo sea mayor", () => {
+    // Tirarlo BAJA el limite, y bajar el limite es revocar relaciones
+    // existentes — lo que la politica de `subscription-state.ts` prohibe.
+    const actual: SubscriptionState = {
+      tier: "plan1",
+      status: "active",
+      currentPeriodEndMs: null,
+      prepaidTier: "plan2",
+      prepaidUntilMs: NOW + 1000,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan3", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan2", untilMs: NOW + 1000 });
+  });
+
+  it("un piso VENCIDO no se arrastra", () => {
+    const actual: SubscriptionState = {
+      tier: "plan1",
+      status: "active",
+      currentPeriodEndMs: null,
+      prepaidTier: "plan3",
+      prepaidUntilMs: NOW - 1,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan1", "active", NOW)).toBeNull();
+  });
+
+  it("gana el piso de MAYOR tier, no el de fecha mas lejana", () => {
+    const actual: SubscriptionState = {
+      tier: "plan3",
+      status: "active",
+      currentPeriodEndMs: NOW + 10,
+      prepaidTier: "plan2",
+      prepaidUntilMs: NOW + 100_000,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan1", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan3", untilMs: NOW + 10 });
+  });
+
+  it("con el mismo tier gana la fecha mas lejana", () => {
+    const actual: SubscriptionState = {
+      tier: "plan2",
+      status: "active",
+      currentPeriodEndMs: NOW + 10,
+      prepaidTier: "plan2",
+      prepaidUntilMs: NOW + 100_000,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan1", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan2", untilMs: NOW + 100_000 });
+  });
+
+  it("sin `currentPeriodEnd` no hay piso que armar", () => {
+    // Los PF sembrados a mano con el Admin SDK no lo tienen: degradan al
+    // comportamiento de siempre, con un warn que los nombra en el reconciliador.
+    expect(resolverPisoPrepago(
+      vigente("plan3", null), "plan1", "active", NOW)).toBeNull();
+  });
+
+  it("un periodo YA VENCIDO no arma piso", () => {
+    expect(resolverPisoPrepago(
+      vigente("plan3", NOW), "plan1", "active", NOW)).toBeNull();
+  });
+
+  for (const entrante of ["pending", "paused", "cancelled"] as const) {
+    it(`un \`${entrante}\` entrante NO captura piso nuevo`, () => {
+      // Solo `active` y `grace` confirman una compra. Un `pending` no compro
+      // nada todavia, y los terminales son otra politica.
+      expect(resolverPisoPrepago(
+        vigente("plan3", NOW + 1000), "plan1", entrante, NOW)).toBeNull();
+    });
+  }
+
+  it("pero un `grace` SI: hay medio de pago y la nueva va a cobrar", () => {
+    expect(resolverPisoPrepago(
+      vigente("plan3", NOW + 1000), "plan1", "grace", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan3", untilMs: NOW + 1000 });
+  });
+
+  it("un `cancelled` vigente tambien es un periodo pago que se conserva", () => {
+    // Se dio de baja de plan3 y despues compro plan1: le quedan meses de plan3
+    // que pago. Sin esta rama tambien se le evaporaban.
+    const actual: SubscriptionState = {
+      tier: "plan3", status: "cancelled", currentPeriodEndMs: NOW + 1000,
+    };
+
+    expect(resolverPisoPrepago(actual, "plan1", "active", NOW))
+      .toEqual<PisoPrepago>({ tier: "plan3", untilMs: NOW + 1000 });
+  });
+
+  it("sin suscripcion previa no hay piso", () => {
+    expect(resolverPisoPrepago(null, "plan1", "active", NOW)).toBeNull();
+    expect(resolverPisoPrepago(undefined, "plan1", "active", NOW)).toBeNull();
+  });
+});
+
+describe("limitRank y tierLimit — la trampa de null=SIN TOPE, ya exportada", () => {
+  it("null rankea por encima de cualquier numero", () => {
+    expect(limitRank(null)).toBe(Number.POSITIVE_INFINITY);
+    expect(limitRank(null) > limitRank(15)).toBe(true);
+  });
+
+  it("tierLimit no camina la cadena de prototipos", () => {
+    expect(tierLimit("plan3")).toBeNull();
+    expect(tierLimit("free")).toBe(2);
+    // "toString" existe en el prototipo: con `in` devolvia una FUNCION tipada
+    // como number|null y rompia toda comparacion aguas abajo, en silencio.
+    expect(tierLimit("toString" as never)).toBe(2);
+  });
+});
+
+describe("proximoCambioDeLimite", () => {
+  const conPiso = (
+    base: SubscriptionState,
+    prepaidTier: SubscriptionState["tier"],
+    prepaidUntilMs: number,
+  ): SubscriptionState => ({ ...base, prepaidTier, prepaidUntilMs });
+
+  it("sin suscripcion, o un active/grace/pending/paused sin piso → null (nada por reloj)", () => {
+    expect(proximoCambioDeLimite(null, NOW)).toBeNull();
+    expect(proximoCambioDeLimite(undefined, NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "active"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "grace"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "pending"), NOW)).toBeNull();
+    expect(proximoCambioDeLimite(sub("plan2", "paused"), NOW)).toBeNull();
+  });
+
+  it("un active con currentPeriodEnd futuro NO es un cambio: el periodo pasa de largo hasta que MP avisa", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "active", NOW + 1000), NOW)).toBeNull();
+  });
+
+  it("cancelled dentro del periodo → cae a Free exactamente en currentPeriodEnd", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "cancelled", NOW + 1000), NOW)).toEqual({
+      atMs: NOW + 1000,
+      limit: 2,
+    });
+  });
+
+  it("cancelled ya vencido → null", () => {
+    expect(proximoCambioDeLimite(sub("plan2", "cancelled", NOW - 1), NOW)).toBeNull();
+  });
+
+  it("el instante exacto del vencimiento YA es el valor nuevo (cancelled: nowMs < end)", () => {
+    // En `atMs` el limite efectivo ya es `limit`: el cliente puede cambiar en `>=`.
+    const c = proximoCambioDeLimite(sub("plan2", "cancelled", NOW + 1000), NOW)!;
+    expect(effectiveWeightLimit(sub("plan2", "cancelled", NOW + 1000), c.atMs)).toBe(c.limit);
+    expect(effectiveWeightLimit(sub("plan2", "cancelled", NOW + 1000), c.atMs - 1)).toBe(15);
+  });
+
+  it("piso prepago vigente sobre un paused → vuelve a Free al vencer el piso", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan1", "paused"), "plan2", NOW + 500), NOW),
+    ).toEqual({ atMs: NOW + 500, limit: 2 });
+  });
+
+  it("piso vigente de plan3 sobre un plan1 active → baja a 7 (el nominal), no a Free", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan1", "active"), "plan3", NOW + 500), NOW),
+    ).toEqual({ atMs: NOW + 500, limit: 7 });
+  });
+
+  it("un candidato que no cambia nada (el cancelled vence con el piso sin tope aun vigente) se saltea", () => {
+    // plan1 cancelled hasta NOW+100 (→ Free) pero piso plan3 (sin tope) hasta
+    // NOW+900: en NOW+100 el limite sigue siendo sin tope; el cambio real es
+    // NOW+900, y baja a Free.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan1", "cancelled", NOW + 100), "plan3", NOW + 900),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("piso que no sostiene nada (el plan actual es igual o mayor) no genera cambio", () => {
+    expect(
+      proximoCambioDeLimite(conPiso(sub("plan2", "active"), "plan1", NOW + 500), NOW),
+    ).toBeNull();
+  });
+
+  it("cancelled que vence ANTES que el piso: el candidato que no cambia nada se saltea y gana el que si", () => {
+    // plan1 cancelled hasta NOW+100 (→ Free), piso plan2 hasta NOW+900.
+    // Limite actual 15 (piso). En NOW+100 sigue 15 → no es cambio. En NOW+900 → 2.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan1", "cancelled", NOW + 100), "plan2", NOW + 900),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("piso que vence ANTES que el cancelled: gana el primero que cambia", () => {
+    // plan2 cancelled hasta NOW+900, piso plan1 hasta NOW+100: actual 15.
+    // En NOW+100 el piso (7) ya no importa, el cancelled sostiene 15: sin cambio.
+    // En NOW+900 → 2.
+    expect(
+      proximoCambioDeLimite(
+        conPiso(sub("plan2", "cancelled", NOW + 900), "plan1", NOW + 100),
+        NOW,
+      ),
+    ).toEqual({ atMs: NOW + 900, limit: 2 });
+  });
+
+  it("ignora fechas pasadas y no numericas", () => {
+    expect(
+      proximoCambioDeLimite(
+        { tier: "plan2", status: "cancelled", currentPeriodEndMs: NaN, prepaidTier: "plan3", prepaidUntilMs: NOW - 5 },
+        NOW,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("proximoCambioDeLimite — invariante sobre toda la matriz de estados", () => {
+  const estados: SubscriptionState[] = [];
+  for (const tier of ["free", "plan1", "plan2", "plan3"] as const) {
+    for (const status of SUBSCRIPTION_STATUSES) {
+      for (const end of [NOW - 1, NOW + 100, NOW + 900, null]) {
+        for (const piso of [null, "plan1", "plan2", "plan3"] as const) {
+          for (const hasta of [NOW - 1, NOW + 100, NOW + 900]) {
+            estados.push({
+              tier,
+              status,
+              currentPeriodEndMs: end,
+              prepaidTier: piso,
+              prepaidUntilMs: piso ? hasta : null,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  it("con cambio: atMs-1 vale lo actual y atMs ya vale `limit`", () => {
+    let conCambio = 0;
+    for (const e of estados) {
+      const c = proximoCambioDeLimite(e, NOW);
+      if (!c) continue;
+      conCambio++;
+      expect(c.atMs).toBeGreaterThan(NOW);
+      expect(effectiveWeightLimit(e, c.atMs - 1)).toBe(effectiveWeightLimit(e, NOW));
+      expect(effectiveWeightLimit(e, c.atMs)).toBe(c.limit);
+      expect(c.limit).not.toBe(effectiveWeightLimit(e, NOW));
+    }
+    // Control: la matriz tiene que ejercitar la rama, si no el test es vacuo.
+    expect(conCambio).toBeGreaterThan(0);
+  });
+
+  it("sin cambio: pasado el ultimo quiebre el limite sigue siendo el actual", () => {
+    let sinCambio = 0;
+    for (const e of estados) {
+      if (proximoCambioDeLimite(e, NOW)) continue;
+      sinCambio++;
+      const quiebres = [e.currentPeriodEndMs, e.prepaidUntilMs].filter(
+        (t): t is number => typeof t === "number",
+      );
+      const despues = Math.max(NOW, ...quiebres) + 1;
+      expect(effectiveWeightLimit(e, despues)).toBe(effectiveWeightLimit(e, NOW));
+    }
+    expect(sinCambio).toBeGreaterThan(0);
   });
 });

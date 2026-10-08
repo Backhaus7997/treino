@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 
+import '../../../core/telemetry/non_fatal.dart';
 import '../domain/auth_failure.dart';
+import '../presentation/legal/legal_content.dart';
+import '../../profile/data/account_deletion_service.dart';
 import '../../profile/data/user_repository.dart';
 import 'apple_sign_in_gateway.dart';
 import 'nonce_helpers.dart';
@@ -16,11 +21,13 @@ class AuthService {
     FirebaseFunctions? functions,
     GoogleSignIn? googleSignIn,
     AppleSignInGateway appleGateway = const RealAppleSignInGateway(),
+    NonFatalReporter? nonFatalReporter,
   })  : _auth = firebaseAuth,
         _userRepository = userRepository,
         _injectedFunctions = functions,
         _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
-        _appleGateway = appleGateway;
+        _appleGateway = appleGateway,
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal;
 
   /// La misma región de todas las CFs de TREINO. Si no coincide, la llamada
   /// sale a `us-central1` y devuelve NOT_FOUND.
@@ -32,7 +39,7 @@ class AuthService {
   /// `[DEFAULT]` en el acto, así que construirlo en la lista de
   /// inicialización ataba la CONSTRUCCIÓN de `AuthService` a que
   /// `Firebase.initializeApp()` ya hubiera terminado — incluso para los
-  /// caminos que nunca mandan un mail (reauth, signOut, cancelOnboarding).
+  /// caminos que nunca mandan un mail (reauth, signOut).
   /// El provider de Riverpod lo arma eager, así que eso convertía un detalle
   /// del canal de mails en una precondición de toda la capa de auth.
   late final FirebaseFunctions _functions = _injectedFunctions ??
@@ -42,6 +49,23 @@ class AuthService {
   final UserRepository _userRepository;
   final GoogleSignIn _googleSignIn;
   final AppleSignInGateway _appleGateway;
+  final NonFatalReporter _reportNonFatal;
+
+  /// El `createIfAbsent` de después del login sigue siendo best-effort —el
+  /// login ya salió bien y no se rompe por esto—, pero ya no en silencio.
+  ///
+  /// En producción, en 3 de las 5 altas con Google/Apple del 16 al 22/09,
+  /// `users/{uid}` no nació en el login: apareció entre 34 y 95 s después.
+  /// Mientras tanto la cuenta recorrió el alta sin documento, y el paso de
+  /// gimnasio, que escribía ahí, fallaba. El `catch (_) {}` que había en los
+  /// tres logins se tragó el porqué, y sin él no hay forma de saberlo.
+  void _reportarAltaFallida(Object error, StackTrace stack, String camino) {
+    unawaited(_reportNonFatal(
+      error,
+      stack,
+      reason: 'AuthService.$camino: createIfAbsent falló después del login',
+    ));
+  }
 
   /// Creates the user, best-effort sends the verification email (a failure here
   /// is swallowed — it can be resent later), then atomically creates the
@@ -67,24 +91,11 @@ class AuthService {
     final user = cred.user!;
 
     try {
-      // Verification is best-effort: a failure here must NOT orphan the
-      // freshly created Auth user. The user can re-send later via
-      // [sendEmailVerification] from the verify-email screen.
-      //
-      // El catch es a TODO a propósito, y el `on FirebaseAuthException` de
-      // antes ya se quedaba corto: el `catch` de rollback vive adentro del
-      // try de `getOrCreate`, así que cualquier excepción que se escape de
-      // acá saltea la creación del perfil Y el rollback. El usuario queda en
-      // Auth, sin doc en Firestore y sin nadie que lo limpie. Con el mail
-      // saliendo por un callable la superficie se ensancha
-      // (FirebaseFunctionsException, AuthFailure, red), así que el catch
-      // tiene que cubrir lo que el comentario ya prometía.
-      try {
-        await sendEmailVerification();
-      } catch (_) {
-        // Swallow — signup continues; verification can be resent.
-      }
-
+      // El alta YA NO manda el mail de verificación con link. Lo reemplaza el
+      // código de 6 dígitos de la pantalla obligatoria (`VerifyMailScreen`), que
+      // pasan todas las cuentas —también Google y Apple— y cuyo mail además
+      // explica cómo se paga. Mandar los dos era confirmar lo mismo con dos
+      // mails distintos, y el del link ni siquiera destraba la pantalla.
       try {
         await _userRepository.getOrCreate(
           uid: user.uid,
@@ -94,6 +105,11 @@ class AuthService {
           // that leads here) — so the signup itself IS the email flow's
           // consent event (QA-AUTH-001, issue #434).
           termsAcceptedAt: DateTime.now().toUtc(),
+          // consentimiento-legal-versionado (R3): the same checkbox accepts
+          // BOTH documents at their current text, so both versions are
+          // stamped in this same call.
+          acceptedTermsVersion: kTermsVersion,
+          acceptedPrivacyVersion: kPrivacyVersion,
         );
       } catch (firestoreError) {
         // Rollback: best-effort delete the orphan Auth user.
@@ -138,8 +154,8 @@ class AuthService {
         uid: user.uid,
         email: email,
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithEmail');
     }
 
     return user;
@@ -291,8 +307,8 @@ class AuthService {
         uid: cred.user!.uid,
         email: cred.user!.email ?? '',
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithGoogle');
     }
 
     return cred.user!;
@@ -353,11 +369,90 @@ class AuthService {
         uid: cred.user!.uid,
         email: cred.user!.email ?? '',
       );
-    } catch (_) {
-      // Swallow — auth already succeeded; createIfAbsent is best-effort.
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, 'signInWithApple');
     }
 
     return cred.user!;
+  }
+
+  /// Entra con Google por popup. **Sólo web** (Coach Hub): en mobile se usa
+  /// [signInWithGoogle]. No lleva `assert(kIsWeb)`; en una plataforma sin popup
+  /// el SDK falla solo.
+  ///
+  /// `select_account` fuerza el selector: sin él, tras un sign-out el popup
+  /// reentra silencioso con la última cuenta.
+  ///
+  /// Invariante: ningún `await` entre el tap y `signInWithPopup`. Si lo hay, el
+  /// navegador pierde la activación del usuario y bloquea la ventana.
+  Future<User> signInWithGooglePopup() => _signInWithPopup(
+        GoogleAuthProvider()
+          ..setCustomParameters(const {'prompt': 'select_account'}),
+        'signInWithGooglePopup',
+      );
+
+  /// Entra con Apple por popup. **Sólo web** (Coach Hub): en mobile se usa
+  /// [signInWithApple]. Mismo invariante de activación que
+  /// [signInWithGooglePopup].
+  Future<User> signInWithApplePopup() => _signInWithPopup(
+        OAuthProvider('apple.com')
+          ..addScope('email')
+          ..addScope('name'),
+        'signInWithApplePopup',
+      );
+
+  Future<User> _signInWithPopup(AuthProvider provider, String camino) async {
+    final UserCredential cred;
+    try {
+      cred = await _auth.signInWithPopup(provider);
+    } on FirebaseAuthException catch (e, st) {
+      throw _failureFromPopup(e, st, camino);
+    }
+
+    final user = cred.user!;
+    // Mismo backfill best-effort que los logins mobile. `User.email` es
+    // nullable en firebase_auth, de ahí el `?? ''`.
+    try {
+      await _userRepository.createIfAbsent(
+        uid: user.uid,
+        email: user.email ?? '',
+      );
+    } catch (e, st) {
+      _reportarAltaFallida(e, st, camino);
+    }
+    return user;
+  }
+
+  /// Mapeo acotado al camino del popup: NO vive en [AuthFailure.fromFirebase]
+  /// porque `operation-not-allowed` e `invalid-credential` significan otra
+  /// cosa en el login/alta por email.
+  AuthFailure _failureFromPopup(
+    FirebaseAuthException e,
+    StackTrace st,
+    String camino,
+  ) {
+    switch (e.code) {
+      case 'popup-closed-by-user':
+      case 'cancelled-popup-request':
+      case 'user-cancelled':
+        return const AuthFailure.signInCancelled();
+      case 'popup-blocked':
+        return const AuthFailure.popupBlocked();
+      case 'unauthorized-domain':
+      case 'operation-not-allowed':
+      case 'invalid-credential':
+        // Configuración rota (consola / dominio): no es culpa de la persona,
+        // así que se reporta. En popup `invalid-credential` es el rechazo de
+        // Firebase a la credencial del IdP, no una contraseña.
+        unawaited(_reportNonFatal(
+          e,
+          st,
+          reason: 'AuthService.$camino: proveedor no disponible (${e.code})',
+        ));
+        return const AuthFailure.providerUnavailable();
+      default:
+        return AuthFailure.fromFirebase(e);
+    }
   }
 
   // ── Re-auth helpers (Fase 6 Etapa 3 — account-deletion PR#3) ────────────────
@@ -445,6 +540,48 @@ class AuthService {
     );
   }
 
+  /// Re-autentica con Google por popup. **Sólo web** (Coach Hub), donde
+  /// [getGoogleCredential] no funciona. Mismo invariante que
+  /// [signInWithGooglePopup]: ningún `await` entre el tap y el popup.
+  ///
+  /// Throws [AuthFailure.signInCancelled] si cierra el popup,
+  /// [AuthFailure.popupBlocked] si el navegador lo bloquea.
+  Future<void> reauthenticateWithGooglePopup() => _reauthenticateWithPopup(
+        GoogleAuthProvider()
+          ..setCustomParameters(const {'prompt': 'select_account'}),
+        'reauthenticateWithGooglePopup',
+      );
+
+  /// Re-autentica con Apple por popup. **Sólo web** (Coach Hub).
+  Future<void> reauthenticateWithApplePopup() => _reauthenticateWithPopup(
+        OAuthProvider('apple.com')
+          ..addScope('email')
+          ..addScope('name'),
+        'reauthenticateWithApplePopup',
+      );
+
+  Future<void> _reauthenticateWithPopup(
+    AuthProvider provider,
+    String camino,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) throw const AuthFailure.userNotFound();
+    try {
+      await user.reauthenticateWithPopup(provider);
+    } on FirebaseAuthException catch (e, st) {
+      throw _failureFromPopup(e, st, camino);
+    } catch (e, st) {
+      // Cualquier otra cosa del SDK web (interop JS, etc.) no puede escapar
+      // sin mensaje: sube como falla de re-auth y se reporta.
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.$camino: excepción inesperada',
+      ));
+      throw const AuthFailure.reAuthFailed();
+    }
+  }
+
   /// Triggers Apple re-authentication via Firebase's
   /// `reauthenticateWithProvider` flow. Returns a SENTINEL credential that
   /// [reauthenticate] recognizes as "already done, skip" — because the
@@ -507,50 +644,93 @@ class AuthService {
   }
 
   /// Hard-cancel onboarding for a user who just signed up and wants to bail
-  /// from ProfileSetup step 0. Deletes the Firestore profile doc (best-effort)
-  /// and then the Firebase Auth user (mandatory). The Auth delete auto-signs
-  /// the user out; we still clean the Google session cache so the next picker
-  /// shows fresh.
+  /// from ProfileSetup step 0. Va por el MISMO camino que «Eliminar cuenta» de
+  /// Ajustes: el callable `deleteAccount`, que corre la cascada completa y
+  /// borra la cuenta de Auth al final. Acá sólo queda cerrar la sesión local,
+  /// y la de Google para que el próximo picker salga limpio.
   ///
-  /// Throws [AuthFailure] on Firebase Auth delete failure (e.g.
-  /// `requires-recent-login` on stale tokens). On Firestore delete failure
-  /// we swallow and proceed — the Auth delete is the source of truth for
-  /// account existence.
+  /// Throws [AuthFailure.deletionFailed] si el callable falla o si la cuenta
+  /// de Auth sigue existiendo. En ese caso no toca la sesión: la cuenta sigue
+  /// viva y entera, y la persona puede reintentar.
   Future<void> cancelOnboarding() async {
     final user = _auth.currentUser;
     if (user == null) return;
 
-    // Best-effort delete of the Firestore profile doc.
+    // Acá antes estaba `UserRepository.delete`, que tira SIEMPRE (las reglas
+    // le niegan el delete al cliente): el catch se lo tragaba, `user.delete()`
+    // borraba sólo la cuenta de Auth, y `users/{uid}` y
+    // `userPublicProfiles/{uid}` quedaban para siempre, con el mail de alguien
+    // que pidió no tener cuenta.
+    //
+    // La cascada es la COMPLETA y no una corta del alta: el alta sin terminar
+    // se reconoce por `displayName == null`, y ese campo el dueño lo puede
+    // volver a null (las reglas no lo pinean). Una cascada corta sobre una
+    // cuenta establecida le dejaba huérfanos los posts, rutinas y vínculos.
+    final DeletionResult resultado;
     try {
-      await _userRepository.delete(user.uid);
-    } catch (_) {
-      // Continue — Auth delete is what removes the account from Firebase.
-    }
-
-    // Mandatory delete of the Firebase Auth user.
-    try {
-      await user.delete();
-    } on FirebaseAuthException catch (e) {
-      // Stale-auth escape hatch: if the user no longer exists server-side
-      // (e.g., previously deleted by the account-deletion Cloud Function or
-      // by Firebase Console while this client still had a cached token),
-      // user.delete() returns user-not-found / token-expired. The local
-      // session is the only thing left to clean up — force-sign-out so the
-      // user is not stuck in a phantom auth state on profile-setup.
-      const staleAuthCodes = {
-        'user-not-found',
-        'user-token-expired',
-        'invalid-user-token',
-      };
-      if (staleAuthCodes.contains(e.code)) {
-        await _auth.signOut();
-      } else {
-        throw AuthFailure.fromFirebase(e);
+      resultado = await AccountDeletionService(functions: _functions)
+          .call(uid: user.uid);
+    } catch (e) {
+      // Un error no prueba que el servidor no haya borrado: la respuesta se
+      // puede perder con la cascada ya hecha. Si Auth confirma que la cuenta
+      // no existe, la baja salió, y tirar acá restauraría la sesión en la
+      // pantalla y reactivaría los reintentos del alta sobre una cuenta
+      // borrada.
+      if (await _laCuentaYaNoExiste(user)) {
+        await _cerrarSesionDeCuentaBorrada();
+        return;
       }
+      // Viva, o sin forma de saberlo: no se sigue. Borrar Auth sin la cascada
+      // es exactamente lo que dejaba los docs sin dueño.
+      throw AuthFailure.deletionFailed(cause: e);
     }
 
-    // Cleanup Google session cache. Firebase Auth is already cleared by
-    // user.delete(); this only matters if the user used Google to sign up.
+    // La misma señal que usa Ajustes (`AccountDeletionNotifier`): la cuenta se
+    // fue si y sólo si el servidor llegó a borrar Auth. Un `partial` sin eso es
+    // una cuenta viva, y se reintenta.
+    if (!resultado.deletedCollections.contains('users-auth')) {
+      throw AuthFailure.deletionFailed(cause: resultado.errors);
+    }
+
+    await _cerrarSesionDeCuentaBorrada();
+  }
+
+  /// `true` sólo si Auth CONFIRMA que la cuenta ya no existe. Sin red, o ante
+  /// cualquier otra respuesta, `false`: se la trata como viva.
+  ///
+  /// Sólo `user-not-found`. `user-token-expired` e `invalid-user-token` dicen
+  /// que la credencial no sirve, no que la cuenta no exista: salen también si
+  /// se cambió la contraseña en otro dispositivo. Tomarlos por baja le diría a
+  /// la persona que canceló con la cuenta y los docs vivos. Un falso negativo,
+  /// en cambio, cuesta un reintento, y `deleteAccount` es idempotente.
+  Future<bool> _laCuentaYaNoExiste(User user) async {
+    try {
+      await user.reload();
+      return false;
+    } on FirebaseAuthException catch (e) {
+      return e.code == 'user-not-found';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// La cuenta ya no existe: queda la sesión local. NO tira. Si tirara,
+  /// `AuthNotifier` restauraría el usuario y la pantalla reactivaría los
+  /// reintentos del alta sobre una cuenta borrada.
+  Future<void> _cerrarSesionDeCuentaBorrada() async {
+    try {
+      await _auth.signOut();
+    } catch (e, st) {
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: 'AuthService.cancelOnboarding: signOut falló con la cuenta '
+            'ya borrada',
+      ));
+    }
+
+    // Cleanup Google session cache. Only matters if the user signed up with
+    // Google.
     try {
       await _googleSignIn.signOut();
     } catch (_) {

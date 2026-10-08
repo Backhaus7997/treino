@@ -56,7 +56,8 @@
  *     npx ts-node scripts/backfill-follow-counters.ts --apply
  */
 
-import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
 
 interface Tally {
   followers: number;
@@ -139,8 +140,8 @@ export function tallyFollowCountersFromEdges(
 
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
-  admin.initializeApp();
-  const db = admin.firestore();
+  initializeApp();
+  const db = getFirestore();
 
   console.log(
     `\n=== backfill-follow-counters (${apply ? "APPLY" : "DRY RUN"}) ===\n`,

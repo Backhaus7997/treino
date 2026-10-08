@@ -28,14 +28,15 @@ import 'package:treino/features/workout/presentation/post_workout_summary_screen
 import 'package:treino/features/workout/presentation/session_player_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/seed_ids.dart';
 
-// TODO(seed): credentials of the seeded athlete.
-const String kSeedEmail = 'e2e.athlete@treino.test';
-const String kSeedPassword = 'Treino1234';
+// Credenciales e ids: `support/seed_ids.dart`, generado desde el seed. Acá
+// decía `e2e.athlete@treino.test`, que no corresponde a ningún usuario
+// sembrado. Ver el encabezado de `seed_ids.dart`.
 
 // TODO(seed): id of the routine assigned to the seeded athlete, and the day to
 // train. `dayNumber` is 1-based on the wire (see router).
-const String kRoutineId = 'REPLACE_WITH_SEEDED_ROUTINE_ID';
+const String kRoutineId = kAssignedRoutineId;
 const int kDayNumber = 1;
 
 void main() {
@@ -48,7 +49,7 @@ void main() {
     await ensureSignedOut(tester);
     await pumpTreinoApp(tester);
 
-    await signInViaUi(tester, email: kSeedEmail, password: kSeedPassword);
+    await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);
 
     // Deep-link straight into a fresh session for the seeded routine/day.
     // (Tapping through Home's "empezar entrenamiento" card is the fuller path;

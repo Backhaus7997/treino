@@ -40,13 +40,32 @@ export { notifyOnFollow } from "./notifications/notify-friendship";
 export { notifyOnReaction } from "./notifications/notify-reaction";
 export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
+export { maintainSessionFeedbackCounters } from "./notifications/maintain-session-feedback-counters";
+export { notifyOnSessionFinished } from "./notifications/notify-session-finished";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
+// Tope de costo de los videos de ejercicio custom. Son DOS triggers y no uno:
+// el de finalize cuenta y borra lo que se colo por la carrera, y el de delete
+// devuelve el cupo cuando el usuario borra un video suyo. Sin el segundo, el
+// contador solo sube y el tope se vuelve permanente.
+export {
+  maintainCustomExerciseVideoQuotaOnFinalize,
+  maintainCustomExerciseVideoQuotaOnDelete,
+} from "./storage/custom-exercise-video-quota";
+// Tope de costo de la media de chat. Mismo par de triggers y por el mismo
+// motivo que arriba, pero el eje es BYTES TOTALES y no cantidad: el chat es un
+// flujo continuo y no una biblioteca. El porqué largo está en el encabezado de
+// `chat-media-quota.ts`.
+export {
+  maintainChatMediaQuotaOnFinalize,
+  maintainChatMediaQuotaOnDelete,
+} from "./storage/chat-media-quota";
 export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
 export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
+export { propagateGymNameToProfiles } from "./gyms/propagate-gym-name";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // generateDuePayments (auto-created mensual/semanal pending Payment docs) was
@@ -66,6 +85,20 @@ export { notifyMonthlyReport } from "./notifications/notify-monthly-report";
 // en Secret Manager de PRODUCCIÓN, #826) y que el dominio del remitente esté
 // verificado por DNS en Resend, o cada envío devuelve 403.
 export { sendQueuedMail } from "./mail/send-queued-mail";
+// Baja de los correos promocionales (Decreto 1558/01, Anexo I, art. 27, párr. 3):
+// el link del pie de cada correo comercial. Callable PÚBLICA, sin sesión y sin
+// App Check, que llama la página de la landing con el token del link (un HMAC
+// con BAJA_PROMOCIONALES_KEY) y apaga `notificationPrefs.novedades_plan.email`
+// de la cuenta que firma el token — nunca de una que venga en el request.
+// Diseño: openspec/changes/baja-de-correos-promocionales/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826) y publica un endpoint sin autenticar. OK
+// humano primero, y el secreto ANTES: con `defineSecret`, mergear sin él
+// bloquea todo deploy de functions («Cloud Secret Manager has no latest
+// version»). También lo necesita `sendQueuedMail`, que firma el link al enviar.
+// El orden completo está en el §10 del diseño. Con filtro siempre:
+// `--only functions:bajaDeCorreosPromocionales`.
+export { bajaDeCorreosPromocionales } from "./mail/baja-de-promocionales";
 // Email de auth por Resend. `requestPasswordReset` es un endpoint SIN
 // autenticar que escribe en Firestore; se despliega recien ahora porque
 // `send.gettreino.com` ya esta verificado en Resend y el secret cargado — antes
@@ -101,6 +134,14 @@ export { sendQueuedMail } from "./mail/send-queued-mail";
 // un `--only functions` sin filtros PODA del set desplegado toda funcion
 // ausente de este archivo.
 export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
+
+// El código de 6 dígitos que confirma el mail. Obligatorio para todos —también
+// Google y Apple—, y el mail que lo lleva es el que explica que los pagos van
+// por mail. Ver el encabezado de `auth/codigo-de-verificacion.ts`.
+export {
+  solicitarCodigoDeVerificacion,
+  verificarCodigoDeMail,
+} from "./auth/codigo-de-verificacion";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
 // Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
 // accurate for display after client-side pause/terminate/decline/cancel —
@@ -115,24 +156,293 @@ export { acceptTrainerLink } from "./subscriptions/accept-trainer-link";
 // so pause 2 / accept 1 / resume 2 lands over the limit unseen. Both
 // weight-raising transitions have to live behind the gate.
 export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
+// #637 (secuela): la marca de pre-consulta sólo se estampaba al CREAR el chat,
+// y `firestore.rules` la tiene pineada como inmutable. Un chat social que ya
+// existía entre el alumno y el PF dejaba al alumno sin poder escribirle NUNCA
+// MÁS. El Admin SDK no pasa por rules, así que valida los mismos tres hechos
+// que `chatCreateOk` y estampa — sin relajar el pin del cliente.
+export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:
 // el limite que cae solo por el paso del tiempo (cancelled + currentPeriodEnd
 // vencido no escribe un solo documento).
 export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptions/entitlement-triggers";
-// SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
-// GCP project treino-dev sits under org code-assurance.com, whose
-// Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
-// Cloud Function. Gym place resolution moved client-side
-// (ResolveGymPlaceService,
-// lib/features/gyms/data/resolve_gym_place_service.dart). Restore this
-// export + redeploy if the org later allows public functions — see
-// functions/src/places-search.ts header comment.
-// export { resolveGymPlace } from "./places-search";
+// limite-ejercicios-pf.md, PR1: mantiene `users/{uid}.customExerciseUsage.count`
+// al dia cuando un PF crea o borra un ejercicio propio. El tope lo prende o
+// apaga TRAINER_EXERCISE_LIMITS_ENABLED (trainer-plan-limits.ts), ENCENDIDO
+// desde el 2026-09-25 — ver el encabezado de ese modulo antes de tocarlo.
+export { maintainCustomExerciseCount } from "./subscriptions/custom-exercise-count";
+// limite-plantillas-pf.md, PR1: mantiene `users/{uid}.templateUsage.count` al
+// dia cuando cambia el conjunto de plantillas que cuentan para un PF (crear,
+// borrar, archivar, restaurar). Dispara con toda escritura de `routines` y
+// sale en la guarda sin leer nada — ver el encabezado de template-count.ts.
+// Interruptor TRAINER_TEMPLATE_LIMITS_ENABLED (trainer-plan-limits.ts),
+// ENCENDIDO desde el 2026-09-25 — ver el encabezado de ese modulo antes de
+// tocarlo.
+export { maintainTemplateCount } from "./subscriptions/template-count";
+// Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
+// el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
+// PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen
+// queries. Hacen falta LOS TRES: los dos triggers ven suscripcion y vinculo al
+// instante, y el barrido hace el backfill de los alumnos que ya existian (a
+// esos no los ve ningun trigger porque no escriben nada).
+//
+// El interruptor ATHLETE_PAYWALL_ENFORCEMENT_ENABLED esta PRENDIDO desde el
+// 2026-10-02. Las RUTINAS PROPIAS fuera de tope las cubre `noCreceLaForma` en
+// las reglas, y las PLANTILLAS PAGAS no tienen excepcion: sin plan pago quedan
+// con candado, tambien para quien ya venia entrenando una. Ver el encabezado
+// del modulo y la lista de `athlete_entitlement.dart`.
+export {
+  syncAthletePaywallOnUser,
+  syncAthletePaywallOnTrainerLink,
+  sweepAthletePaywall,
+} from "./subscriptions/athlete-paywall-enforced";
+
+// El mail al alumno que choco un tope del plan free. Dos caminos:
+// `sendFreeLimitMailOnHit` lo encola AL TOQUE, apenas la app anota el tope en
+// `users/{uid}`; `sweepFreeLimitMail` (05:00 ART, media hora despues del
+// barrido de arriba) queda como red por si el trigger fallo.
+//
+// Es el unico canal posible: bajo 3.1.3(f) la app no puede decir donde se
+// paga. Ver el encabezado de `free-limit-mail.ts`.
+export {
+  sendFreeLimitMailOnHit,
+  sweepFreeLimitMail,
+} from "./subscriptions/free-limit-mail";
+// El mail al PF que choco un tope de su plan (ejercicios propios,
+// plantillas —limite-ejercicios-pf.md y limite-plantillas-pf.md, PR4— o
+// alumnos, paywall Fase 7). Dos caminos, igual que el par de arriba:
+// `sendTrainerLimitMailOnHit` lo encola AL TOQUE, apenas el cliente (o, para
+// alumnos, el servidor) anota `trainerLimitHitAt` en `users/{uid}`;
+// `sweepTrainerLimitMail` (05:30 ART, media hora despues del barrido de
+// arriba y una hora despues del de las 04:00 que recalcula
+// `planLimits`/`customExerciseUsage` con `sweepEntitlements`) queda como red
+// si el trigger fallo — ver el encabezado de `trainer-limit-mail.ts`,
+// seccion "DOS CAMINOS".
+export {
+  sendTrainerLimitMailOnHit,
+  sweepTrainerLimitMail,
+} from "./subscriptions/trainer-limit-mail";
+// Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
+// (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
+//
+// SE DESPLIEGA EN dryRun. La senal de actividad sale de los metadatos de
+// Firebase Auth, que YA TIENEN HISTORIA, asi que la primera corrida ve de una
+// todo el backlog de cuentas que ya pasaron los 24 meses. Encenderlo sin mirar
+// ese numero antes es mandar ese numero de mails de golpe. Ver
+// RETENTION_SWEEP_DRY_RUN en el modulo.
+export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
+// Completa los borrados de cuenta que terminaron `partial` (#1353): 06:00 ART,
+// hasta 5 intentos, despues `failed` + log de error. Ver el modulo.
+export { retryPartialDeletions } from "./retention/retry-partial-deletions";
+// La resolución de lugares de gimnasio vive en el cliente
+// (ResolveGymPlaceService, lib/features/gyms/data/resolve_gym_place_service.dart).
+// La Cloud Function `resolveGymPlace` (functions/src/places-search.ts) se
+// ELIMINÓ: no se podía deployar (Domain-Restricted-Sharing de la org) y
+// persistía el nombre y la dirección de Google, que la política de Places
+// (#1338) no permite guardar. No la restaures.
+// Refresco diario de coordenadas de Google Places (#1338). Necesita el secret
+// PLACES_API_KEY ANTES del deploy: defineSecret resuelve todos los secretos.
+export { refreshPlacesCoords } from "./places/refresh-places-coords";
 
 // Companion de Apple Watch (change watch-standalone-client, fase F1): entrega
 // al reloj una credencial PROPIA y renovable. Necesaria porque
 // `User.refreshToken` de firebase_auth es vacio en nativo, asi que el telefono
 // no puede compartir la suya.
 export { mintWatchCredential } from "./mint-watch-credential";
+
+// Paywall del entrenador — el checkout de Mercado Pago. Es el UNICO punto de
+// la app que abre un cobro. NO escribe `subscription`: crear el preapproval lo
+// deja `pending` en MP hasta que el PF carga su medio de pago, y el tier lo
+// escribe el reconciliador cuando MP diga `authorized`. Ver el encabezado de
+// `subscriptions/mp/create-preapproval.ts`.
+//
+// Requiere el secreto MP_ACCESS_TOKEN:
+//   firebase functions:secrets:set MP_ACCESS_TOKEN --project prod
+export { createPreapproval } from "./subscriptions/mp/create-preapproval";
+
+// Paywall del ALUMNO — su checkout de Mercado Pago, y el precio que la landing
+// muestra.
+//
+// Espejo del de arriba, y el mismo contrato: el monto NO viene del cliente, el
+// uid sale del token, la URL de retorno la arma el servidor. Tampoco escribe
+// derecho: eso lo hace el reconciliador cuando MP confirme.
+//
+// Dos diferencias con el del PF, las dos deliberadas:
+//   - El gate es `role === "athlete"`, y ademas rechaza al alumno VINCULADO: su
+//     PF ya paga por ese cupo y cobrarle seria cobrar dos veces lo mismo.
+//   - `getAthletePricing` NO exige auth. Es una de las DOS lecturas publicas
+//     del repo (la otra es `getTrainerPricing`, mas abajo), porque la pagina de
+//     precios tiene que decir cuanto sale antes de que alguien se loguee.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN.
+export {
+  createAthletePreapproval,
+  getAthletePricing,
+} from "./subscriptions/mp/create-athlete-preapproval";
+
+// La otra lectura publica: precio y topes de los planes del ENTRENADOR, para la
+// pagina de entrenadores de la landing. Mismo contrato que `getAthletePricing`
+// (sin auth, sin App Check, sin body) y mismo motivo: un precio escrito a mano
+// en otro repo se desincroniza de `TIER_PRICES_ARS` y terminamos mostrando uno
+// y cobrando otro. Es seguro dejarlo publico porque devuelve constantes de
+// `tier-config.ts` que se van a publicar igual: no lee Firestore, no hay PII ni
+// secretos, no escribe nada. Ver `subscriptions/trainer-pricing.ts`.
+export { getTrainerPricing } from "./subscriptions/trainer-pricing";
+
+// El alta de un alumno desde la WEB. La landing no toca Firestore y no deberia:
+// crear una cuenta en TREINO es un dual-write atomico a `users/{uid}` y a
+// `userPublicProfiles/{uid}`, y hacer solo el primero deja al atleta VARADO en
+// el onboarding la primera vez que abre la app — bug conocido, documentado en
+// `user_repository.dart:101-114`.
+//
+// Idempotente: se llama despues de todo login, no solo del alta, y asi cubre
+// tambien a la cuenta vieja que nunca tuvo doc publico.
+export { ensureAthleteProfile } from "./profile/ensure-athlete-profile";
+
+// Paywall del entrenador — el reconciliador. Es lo que hace que pagar
+// SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
+// entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para
+// que el barrido decida bloqueos sobre datos de hoy y no de ayer.
+export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
+
+// Paywall del entrenador — la acreditacion EN EL ACTO. El barrido de arriba
+// tarda hasta 24 horas, y esas son 24 horas de "pague y no paso nada" para el
+// PF que acaba de comprar. Este callable reconcilia SOLO los planes del que
+// llama, cuando vuelve del checkout de Mercado Pago.
+//
+// No reemplaza al barrido: es latencia, no correccion. El barrido sigue siendo
+// lo que agarra al que paga y cierra la pestaña. Ver el encabezado de
+// `subscriptions/mp/reconcile-my-checkout.ts`.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN que los dos de arriba.
+export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
+
+// La BAJA, para los dos productos. Hasta que existio, el repo no tenia ningun
+// control de baja — y `docs/legal/terminos-suscripcion.md` §7 promete,
+// publicado, que se puede dar de baja «en línea, sin llamar ni escribir a
+// nadie». La Res. 424/2020 obliga a que sea por el mismo medio de contratacion.
+//
+// No escribe el derecho: le pide la baja a MP y despues llama al reconciliador,
+// que sigue siendo el unico escritor. Asi el usuario conserva el acceso hasta el
+// fin del periodo que ya pago, sin que este archivo tenga que saber cuando es.
+//
+// ⚠️ Cancelar es TERMINAL en MP: un preapproval cancelado no se reactiva.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN.
+export { cancelMySubscription } from "./subscriptions/mp/cancel-my-subscription";
+
+// Botón de Baja de Servicio AUTOMÁTICO (Disp. 954/2025 art. 4), con
+// verificación de identidad por mail (Disp. 3/2026). Dos callables PÚBLICOS,
+// sin sesión y sin App Check, que llama la landing: el primero manda un link de
+// un solo uso al buzón de la cuenta, el segundo lo canjea y ejecuta la MISMA
+// baja que `cancelMySubscription`, con el uid del token y nunca del request.
+// Diseño: openspec/changes/baja-por-mail/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826) y publica dos endpoints sin autenticar,
+// uno de los cuales CANCELA en Mercado Pago (irreversible). OK humano primero,
+// y las reglas antes que las funciones (`mp_bajas_por_mail` cerrada).
+export {
+  solicitarBajaPorMail,
+  confirmarBajaPorMail,
+} from "./subscriptions/mp/baja-por-mail";
+
+// Botón de Arrepentimiento VERIFICADO por mail (Ley 24.240 art. 34, Disp.
+// 954/2025). NO es la baja: éste devuelve la plata, y sólo dentro de los 10
+// días corridos, con la fecha de contratación de NUESTRO registro con Mercado
+// Pago. Dentro de plazo corta la suscripción y avisa al equipo, que devuelve el
+// pago a mano; en el límite no cancela nada y lo decide una persona; fuera de
+// plazo avisa que venció. Dos callables PÚBLICOS, como los de la baja.
+// Diseño: openspec/changes/arrepentimiento-por-mail/design.md.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826). `confirmar` CANCELA en Mercado Pago
+// (irreversible). OK humano primero.
+export {
+  solicitarArrepentimientoPorMail,
+  confirmarArrepentimientoPorMail,
+} from "./subscriptions/mp/arrepentimiento-por-mail";
+
+// Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
+// endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
+// un trigger de Firestore, esto lo puede POSTear cualquiera.
+//
+// Lo que lo hace seguro no es la firma —que puede no existir, ver el
+// encabezado— sino que del evento se usa UN solo dato, el id, y la verdad se le
+// pregunta a MP con nuestro token.
+//
+// Requiere DOS secretos. El de firma puede quedar vacio si MP no da uno para
+// aplicaciones de Suscripciones, pero tiene que EXISTIR o el deploy falla:
+//   firebase functions:secrets:set MP_WEBHOOK_SECRET --project prod
+export { mpWebhook } from "./subscriptions/mp/webhook";
+
+// El webhook de RevenueCat acreditaba la suscripcion del ALUMNO y ya no
+// existe: el alumno paga por Mercado Pago desde `gettreino.com`, o sea por el
+// `mpWebhook` de arriba. Se borro entero —nunca proceso una compra real— junto
+// con el SDK del binario. Si algun dia hay que volver, esta en git.
+//
+// ⚠️ Quedan HUERFANOS en Secret Manager: `RC_API_KEY` y `RC_WEBHOOK_SECRET`.
+// Ya no los declara nadie, asi que no rompen ningun deploy, pero conviene
+// borrarlos — un secreto vivo sin consumidor es superficie de ataque gratis.
+
+// Un UUID v4 por usuario, que HOY NO SE USA PARA NADA. Es un seguro: el dia
+// que se le hable directo a las tiendas hace falta un token propio para saber
+// a quien acreditarle una compra —Google no manda ningun identificador de
+// usuario y Apple consulta por transactionId— y `appAccountToken` TIENE que
+// ser un UUID, cosa que el uid de Firebase no es.
+//
+// Su valor es retroactivo: el dia que haga falta se necesita para todo el que
+// YA compro. Por eso se emite desde hoy. Ver el encabezado del archivo.
+export { ensureStoreAccountToken } from "./subscriptions/store-account-token";
+
+// Moderación (change `moderacion-reporte-y-bloqueo`): bloquear borra las
+// aristas de follow en las dos direcciones, así que el tier `followers` de
+// `posts` queda protegido por la regla de lectura que YA EXISTE
+// (`followAccepted`) sin tocar `posts/{postId} allow read` — eso hubiera
+// roto el feed entero (una regla de `list` rechaza la query COMPLETA si un
+// solo doc del resultado no pasa). Ver el encabezado de
+// `moderation/remove-follows-on-block.ts`.
+export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
+
+// Cuarentena de terminos vetados. El filtro del cliente
+// (`lib/core/moderation/`) es el que satisface la Guideline 1.2 de App Review
+// —el contenido no llega a postearse— pero se saltea con el SDK directo. Estos
+// siete triggers son la capa que no se puede evadir.
+//
+// `onDocumentWritten` y no `onDocumentCreated`: editar un post cambia su
+// texto, y un trigger solo-create deja abierta la puerta de crear algo limpio
+// y editarlo. Ver el encabezado de `moderation/quarantine-vetted-content.ts`.
+//
+// `quarantineRoutine` cubre `routines/{routineId}` (name, split, summary,
+// days[].name, days[].slots[].notes) y `quarantineTrainerProfileName` ya
+// cuarentena `trainerBio` ademas del `displayName` — no tienen export propio
+// distinto porque no son triggers nuevos, son el mismo `trainerPublicProfiles`
+// de siempre con un campo mas.
+export {
+  quarantineChatMessage,
+  quarantineDisplayNameOnWrite,
+  quarantineGym,
+  quarantinePost,
+  quarantinePublicProfileName,
+  quarantineReview,
+  quarantineRoutine,
+  quarantineTrainerProfileName,
+} from "./moderation/quarantine-vetted-content";
+
+// Cola de revision de reportes. `docs/legal/normas-de-comunidad.md:123` dice,
+// publicado, que revisamos todo reporte dentro de las 24 horas — y no habia
+// donde verlos. Eso no era una feature que faltaba: era una afirmacion falsa
+// en un documento que el usuario acepta.
+//
+// Los tres arrancan con `assertModerator`. No es defensa en profundidad: es la
+// UNICA defensa, porque del otro lado hay Admin SDK y las rules no participan.
+export {
+  listPendingReports,
+  markReportViewed,
+  moderationStats,
+  resolveReport,
+} from "./moderation/report-review";
+
+// El aviso es lo que hace verdadera la promesa: sin el, la cola existe y nadie
+// la mira. Ver el encabezado de `moderation/notify-report-created.ts`.
+export { notifyReportCreated } from "./moderation/notify-report-created";

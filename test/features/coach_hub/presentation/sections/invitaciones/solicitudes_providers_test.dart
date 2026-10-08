@@ -24,7 +24,7 @@ TrainerLink _link({required String id, required TrainerLinkStatus status}) =>
     );
 
 void main() {
-  group('SCENARIO-SP-01 — matchesSolicitudTab (ADR-F4-02, tabla 4x3)', () {
+  group('SCENARIO-SP-01 — matchesSolicitudTab (ADR-F4-02, tabla 4x2)', () {
     // status x tab -> match esperado.
     final cases = <(TrainerLinkStatus, SolicitudTab, bool)>[
       // Pendientes: solo status==pending.
@@ -37,11 +37,6 @@ void main() {
       (TrainerLinkStatus.active, SolicitudTab.aceptadas, true),
       (TrainerLinkStatus.paused, SolicitudTab.aceptadas, true),
       (TrainerLinkStatus.terminated, SolicitudTab.aceptadas, false),
-      // Rechazadas: solo status==terminated.
-      (TrainerLinkStatus.pending, SolicitudTab.rechazadas, false),
-      (TrainerLinkStatus.active, SolicitudTab.rechazadas, false),
-      (TrainerLinkStatus.paused, SolicitudTab.rechazadas, false),
-      (TrainerLinkStatus.terminated, SolicitudTab.rechazadas, true),
     ];
 
     for (final (status, tab, expected) in cases) {
@@ -50,6 +45,29 @@ void main() {
         expect(matchesSolicitudTab(link, tab), expected);
       });
     }
+  });
+
+  group('SCENARIO-SP-04 — terminated no cae en ningún tab', () {
+    // El tab Rechazadas se sacó junto con la persistencia del rechazo. Los
+    // `terminated` que SIGUEN existiendo (vínculos reales terminados, con
+    // acceptedAt != null) no tienen que reaparecer en otro tab por accidente.
+    test('ningún SolicitudTab matchea status==terminated', () {
+      final link = _link(id: 'term', status: TrainerLinkStatus.terminated);
+      for (final tab in SolicitudTab.values) {
+        expect(
+          matchesSolicitudTab(link, tab),
+          isFalse,
+          reason: '$tab no debería matchear un vínculo terminado',
+        );
+      }
+    });
+
+    test('los tabs son exactamente pendientes y aceptadas', () {
+      expect(
+        SolicitudTab.values,
+        orderedEquals([SolicitudTab.pendientes, SolicitudTab.aceptadas]),
+      );
+    });
   });
 
   group('SCENARIO-SP-02 — solicitudTabProvider default', () {

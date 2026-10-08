@@ -17,6 +17,7 @@
  *   - active  → active, share MISSING            → REPAIR  ← the lost grant
  *   - active  → paused / terminated              → revoke
  *   - delete (after undefined)                   → revoke
+ *   - delete de un `terminated` NUNCA aceptado   → INERT   ← el purge
  *   - before AND after undefined                 → skipped
  *   - share owned by a different trainer         → never removed
  *
@@ -39,6 +40,32 @@ jest.mock("firebase-admin", () => {
   return { firestore, app: jest.fn(), initializeApp: jest.fn() };
 });
 
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 /**
  * The logger is mocked because ONE assertion genuinely needs it: the two exits
  * below the `get()` ("share is already ours" / "share is another trainer's")
@@ -50,9 +77,10 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { syncSessionShareHandler } from "../sync-session-share";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 /** Log assertions are per-test; without this they would see previous tests' calls. */
 beforeEach(() => {
@@ -64,7 +92,7 @@ const TRAINER_A = "trainer-A";
 const TRAINER_B = "trainer-B";
 const ATHLETE = "athlete-X";
 
-const APP = {} as admin.app.App;
+const APP = {} as App;
 
 type LinkData = Record<string, unknown>;
 
@@ -97,7 +125,7 @@ interface FakeStore {
 }
 
 /**
- * Installs an in-memory Firestore behind `admin.firestore(app)`.
+ * Installs an in-memory Firestore behind `dobleNamespaced().firestore(app)`.
  * `seed` maps athleteId → trainerId for pre-existing share docs.
  */
 function installFirestore(seed: Record<string, string> = {}): FakeStore {
@@ -137,7 +165,7 @@ function installFirestore(seed: Record<string, string> = {}): FakeStore {
     },
   };
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return { docs, ops };
 }
 
@@ -318,6 +346,55 @@ describe("status leaves active → share revoked", () => {
     const store = installFirestore({ [ATHLETE]: TRAINER_A });
 
     await syncSessionShareHandler(APP, link("active"), undefined);
+
+    expect(store.docs.has(ATHLETE)).toBe(false);
+    expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);
+  });
+
+  it("is INERT on delete of a terminated link that was never accepted", async () => {
+    // El purge (purge-rejected-link.ts) borra exactamente estos docs: rechazos
+    // y cancelaciones, `terminated` con `acceptedAt` nunca estampado.
+    //
+    // ESTO ES LO QUE PASARÍA SIN LA GUARDA, y es un robo de datos: el share que
+    // hay en el store es del vínculo VIVO del MISMO par, y como el trainerId
+    // coincide, el chequeo de propiedad de más abajo lo deja pasar y lo borra.
+    // El PF pierde sessions, setLogs y measurements del alumno hasta la próxima
+    // escritura sobre el vínculo vivo.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(
+      APP,
+      link("terminated", TRAINER_A, { acceptedAt: null }),
+      undefined,
+    );
+
+    expect(shareOwner(store)).toBe(TRAINER_A);
+    // Ni siquiera lee: sale antes del `get()`.
+    expect(store.ops).toEqual([]);
+  });
+
+  it("is INERT on delete of a terminated link with acceptedAt absent (not null)", async () => {
+    // Un doc viejo puede no traer la clave. `!= null` cubre los dos.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(APP, link("terminated"), undefined);
+
+    expect(shareOwner(store)).toBe(TRAINER_A);
+    expect(store.ops).toEqual([]);
+  });
+
+  it("STILL revokes on delete of a terminated link that WAS accepted", async () => {
+    // La guarda es del ancho del purge y ni un doc más: un vínculo real
+    // terminado que alguien borra a mano sí tiene un share propio que soltar.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(
+      APP,
+      link("terminated", TRAINER_A, {
+        acceptedAt: { __fakeTimestampMs: 1_700_000_000_000 },
+      }),
+      undefined,
+    );
 
     expect(store.docs.has(ATHLETE)).toBe(false);
     expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);

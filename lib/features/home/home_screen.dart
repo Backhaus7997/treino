@@ -10,11 +10,18 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
+import '../coach/application/trainer_link_providers.dart';
+import '../gyms/presentation/gym_name_prompt_card.dart';
+import '../coach/domain/trainer_link.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
+import '../notifications/presentation/widgets/notification_bell.dart';
 import '../onboarding/presentation/onboarding_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
+import '../profile/presentation/legacy_privacy_notice_banner.dart';
+import '../profile/presentation/trainer_location_consent_sheet.dart'
+    show TrainerLocationConsentGate;
 import '../workout/application/assigned_routine_providers.dart';
 import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
@@ -31,6 +38,7 @@ import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
 import 'widgets/home_header.dart';
+import '../coach/presentation/widgets/invite_gate.dart';
 
 /// Role-aware home screen.
 ///
@@ -66,6 +74,25 @@ class HomeScreen extends ConsumerWidget {
         // sequencing (tour first, prompt second) is enforced by
         // `onboardingBlocksProvider`, not by Stack order.
         const OnboardingGate(),
+        // Invitación de un PF pendiente de aplicar (#alta de alumnos). También
+        // SizedBox.shrink(). Va después del tour por legibilidad: no compiten
+        // —el tour corre una vez por superficie y la invitación sólo existe si
+        // alguien abrió un link— y ninguno bloquea al otro.
+        const InviteGate(),
+        // Trainer location-publication consent prompt
+        // (consentimiento-legal-versionado, R7). Also SizedBox.shrink() —
+        // waits on `onboardingBlocksProvider` internally so it never stacks
+        // with the welcome tour or the push-permission prompt on the same
+        // frame.
+        const TrainerLocationConsentGate(),
+        // Aviso de política actualizada para el atleta legacy
+        // (consentimiento-legal-versionado, R4). Único de este Stack que sí
+        // pinta algo: los otros cuatro son prompts que colapsan a
+        // SizedBox.shrink(). Este también colapsa cuando no corresponde, y
+        // cuando corresponde se ancla abajo sin capturar los taps de la app
+        // — a diferencia de ellos, no interrumpe nada. Va último para quedar
+        // por encima en el Stack.
+        const LegacyPrivacyNoticeBanner(),
       ],
     );
   }
@@ -102,12 +129,14 @@ class _AthleteHome extends ConsumerWidget {
     final Widget headerOrSkeleton = profileAsync.when(
       data: (profile) => HomeHeader(
         profile: profile,
+        accion: const NotificationBell(),
         onAvatarTap: profile == null
             ? null
             : () => context.push('/home/profile/${profile.uid}'),
       ),
       loading: () => const _HomeHeaderSkeleton(),
-      error: (_, __) => const HomeHeader(profile: null),
+      error: (_, __) =>
+          const HomeHeader(profile: null, accion: NotificationBell()),
     );
 
     // Gate the hero "Empezar" card behind real routine data so a brand-new
@@ -121,6 +150,25 @@ class _AthleteHome extends ConsumerWidget {
         ? false
         : _isEmptyData(ref.watch(userCreatedRoutinesProvider(uid))) &&
             _isEmptyData(ref.watch(assignedRoutinesProvider(uid)));
+
+    // El tercer camino ("Buscar entrenador") sólo se ofrece cuando el servidor
+    // CONFIRMÓ que el atleta no tiene PF activo — mismo criterio que
+    // `_isEmptyData`, del otro lado del dato.
+    //
+    // Se mira ACÁ y no adentro de `_AthleteFirstRunCard` a propósito: así la
+    // suscripción arranca en el mismo frame que las dos consultas de rutinas,
+    // y como la card no se monta hasta que ESAS confirman contra el servidor,
+    // para cuando aparece el vínculo ya resolvió. Mirándolo adentro de la card
+    // la consulta recién empezaría al montarse, y el primer arranque —el caso
+    // más común de esta card— mostraría dos caminos y saltaría a tres.
+    //
+    // Con `select` y no watcheando el `AsyncValue` entero: de todo el vínculo
+    // acá sólo se usan tres estados, y sin el select cualquier re-emisión del
+    // stream —un cambio de `status`, un `updatedAt`— rebuildea _AthleteHome
+    // entera sin que se dibuje nada distinto.
+    final estadoDelVinculo = ref.watch(
+      currentAthleteLinkProvider.select(_estadoDelVinculo),
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -149,10 +197,13 @@ class _AthleteHome extends ConsumerWidget {
               child: headerOrSkeleton,
             ),
             const SizedBox(height: 20),
+            // Colapsa (espaciado incluido) salvo que el gym vinculado esté
+            // sin nombre por la migración de Places (#1338).
+            const GymNamePromptCard(),
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
               child: hasNoRoutine
-                  ? const _AthleteFirstRunCard()
+                  ? _AthleteFirstRunCard(estadoDelVinculo: estadoDelVinculo)
                   : const EmpezarEntrenamientoCard(),
             ),
             const SizedBox(height: 12),
@@ -181,9 +232,59 @@ class _AthleteHome extends ConsumerWidget {
 bool _isEmptyData(AsyncValue<List<Object?>> async) =>
     async.valueOrNull?.isEmpty ?? false;
 
+/// Lo que la card de primer arranque sabe sobre el vínculo del atleta con un
+/// PF. Son TRES estados y no dos, y la diferencia no es teórica.
+///
+/// La primera versión de esto era un `bool showFindTrainer`, y colapsaba
+/// [sinConfirmar] contra [conPf]: bajo incertidumbre ocultaba el CTA —bien— y
+/// **además** mostraba el body que dice "Ya tenés entrenador" —mal—. Para un
+/// atleta SIN PF con la caché fría o un error de permisos, la tarjeta le
+/// afirmaba en la cara algo que nadie confirmó. Es exactamente la advertencia
+/// falsa de AGENTS.md §11.1, cometida por el mismo cambio que vino a sacar
+/// otra. Lo encontró Codex en el PR #1124.
+///
+/// Ocultar un botón y afirmar un hecho son decisiones distintas y necesitan
+/// estados distintos.
+enum _EstadoDelVinculo {
+  /// El servidor confirmó que tiene PF activo.
+  conPf,
+
+  /// El servidor confirmó que NO tiene PF. Es lo único que habilita a ofrecer
+  /// "Buscar entrenador" y a enumerar los tres caminos.
+  sinPf,
+
+  /// Todavía no se sabe: cargando, error, o un error que retuvo un valor
+  /// previo. Se ocultan los botones que dependen del vínculo y el copy no
+  /// afirma nada sobre él.
+  sinConfirmar,
+}
+
+/// Traduce el `AsyncValue` del vínculo a uno de los tres estados.
+///
+/// **No sirve `valueOrNull`**, que es el idioma del resto del archivo: el dato
+/// de este provider ya es `TrainerLink?`, así que `valueOrNull` da `null`
+/// tanto para "todavía no sé" como para "confirmado que no hay", y colapsa
+/// justo la distinción que decide qué se dibuja.
+///
+/// **Tampoco alcanza `hasValue` solo.** Riverpod retiene el último valor al
+/// entrar en error (`AsyncError.copyWithPrevious`), así que después de un
+/// `AsyncData(null)` seguido de una falla del stream, `hasValue` sigue en true
+/// y `value` sigue en null — y el estado se leería como "confirmado que no
+/// hay" cuando en realidad el vínculo dejó de estar confirmado. Por eso
+/// `hasError` e `isLoading` se miran PRIMERO. (Codex, PR #1124.)
+_EstadoDelVinculo _estadoDelVinculo(AsyncValue<TrainerLink?> async) {
+  if (async.isLoading || async.hasError || !async.hasValue) {
+    return _EstadoDelVinculo.sinConfirmar;
+  }
+  return async.value == null
+      ? _EstadoDelVinculo.sinPf
+      : _EstadoDelVinculo.conPf;
+}
+
 /// First-run empty state shown on Home when the athlete has no self-created
 /// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
-/// card with an honest onboarding surface and three CTAs (finding 5, #636).
+/// card with an honest onboarding surface and up to three CTAs (finding 5,
+/// #636) — el tercero depende de si ya tiene PF, ver [showFindTrainer].
 ///
 /// ## Los tres caminos y su orden (#636)
 ///
@@ -206,10 +307,41 @@ bool _isEmptyData(AsyncValue<List<Object?>> async) =>
 ///    verdad, y ahí PLANES va primero. Ahí es donde la hipótesis del issue
 ///    se puede aplicar sin romper el punto 1.
 ///
-/// El body de l10n enumera los tres caminos EN ESTE MISMO ORDEN. Si alguien
+/// El body de l10n enumera los caminos EN ESTE MISMO ORDEN. Si alguien
 /// reordena los botones, tiene que reescribir `homeAthleteFirstRunBody`.
+///
+/// ## El tercer camino es condicional
+///
+/// Un atleta que YA tiene PF activo pero todavía no recibió su plan cae igual
+/// en esta card —la condición de arriba mira rutinas, no vínculo— y ofrecerle
+/// "Buscar entrenador" es decirle que busque lo que ya tiene.
+///
+/// **Y el body cambia con el botón**, porque sacar un botón sin tocar el texto
+/// deja la card prometiendo tres caminos y mostrando dos — el desfasaje que el
+/// dartdoc de arriba venía avisando.
+///
+/// De ahí los TRES bodies, uno por cada [_EstadoDelVinculo]:
+///
+/// | estado | botones | body |
+/// |---|---|---|
+/// | [_EstadoDelVinculo.sinPf] | 3 | enumera los tres caminos |
+/// | [_EstadoDelVinculo.conPf] | 2 | "Ya tenés entrenador…" |
+/// | [_EstadoDelVinculo.sinConfirmar] | 2 | **neutro**: no dice nada del PF |
+///
+/// El tercero existe porque la primera versión usaba un `bool` y bajo
+/// incertidumbre mostraba el body de "ya tenés entrenador" a alguien que capaz
+/// no tiene ninguno. Ocultar un botón y afirmar un hecho son decisiones
+/// distintas — ver [_EstadoDelVinculo].
 class _AthleteFirstRunCard extends StatelessWidget {
-  const _AthleteFirstRunCard();
+  const _AthleteFirstRunCard({required this.estadoDelVinculo});
+
+  /// Lo que se sabe del vínculo con un PF. Ver [_estadoDelVinculo].
+  final _EstadoDelVinculo estadoDelVinculo;
+
+  /// El tercer camino sólo se ofrece con confirmación del servidor de que NO
+  /// hay PF. Bajo incertidumbre no se ofrece: ver [_EstadoDelVinculo].
+  bool get _ofreceBuscarEntrenador =>
+      estadoDelVinculo == _EstadoDelVinculo.sinPf;
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +368,18 @@ class _AthleteFirstRunCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.homeAthleteFirstRunBody,
+              // Atado al MISMO estado que dibuja los botones, y no a una copia
+              // del criterio: si divergen, la card miente sobre sí misma.
+              switch (estadoDelVinculo) {
+                _EstadoDelVinculo.sinPf => l10n.homeAthleteFirstRunBody,
+                _EstadoDelVinculo.conPf =>
+                  l10n.homeAthleteFirstRunBodyWithTrainer,
+                // Sin confirmar: se enumeran los dos caminos que SÍ se
+                // dibujan y no se dice una palabra sobre el entrenador,
+                // porque no se sabe si tiene.
+                _EstadoDelVinculo.sinConfirmar =>
+                  l10n.homeAthleteFirstRunBodyNeutral,
+              },
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: palette.textMuted,
               ),
@@ -263,14 +406,18 @@ class _AthleteFirstRunCard extends StatelessWidget {
               icon: TreinoIcon.dumbbell,
               onPressed: () => context.go('/workout?tab=plantillas'),
             ),
-            const SizedBox(height: 10),
             // Secondary CTA: route to the Coach tab where athletes browse and
-            // request a trainer.
-            _FirstRunSecondaryCta(
-              label: l10n.homeAthleteFirstRunFindTrainerCta,
-              icon: TreinoIcon.search,
-              onPressed: () => context.go('/coach'),
-            ),
+            // request a trainer. Se omite —con su separador— cuando el atleta
+            // ya tiene PF activo O cuando no se pudo confirmar: ver el dartdoc
+            // de la clase.
+            if (_ofreceBuscarEntrenador) ...[
+              const SizedBox(height: 10),
+              _FirstRunSecondaryCta(
+                label: l10n.homeAthleteFirstRunFindTrainerCta,
+                icon: TreinoIcon.search,
+                onPressed: () => context.go('/coach'),
+              ),
+            ],
           ],
         ),
       ),

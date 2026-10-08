@@ -10,7 +10,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         SetOptions,
         Timestamp;
 
+import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/network_timeouts.dart';
 import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
@@ -22,15 +24,65 @@ import '../domain/set_log.dart';
 import '../application/session_duration.dart';
 import '../domain/set_log_identity.dart';
 
+/// Una serie ya escrita LOCALMENTE, con la confirmación del servidor aparte.
+///
+/// Existe porque en Firestore esas son DOS cosas distintas y el código las
+/// trataba como una sola. La escritura se aplica al cache del teléfono de
+/// inmediato —y `.snapshots()` emite por compensación de latencia—, pero el
+/// future de `set()` **no completa hasta que el servidor confirma**. Sin red no
+/// completa nunca.
+///
+/// Mientras `addSetLog` devolvía un `Future<SetLog>` pelado, el único que
+/// tenía el id era ese future, así que quien lo necesitaba quedaba obligado a
+/// esperar al servidor para seguir. Eso es lo que colgaba a `logSet` sin
+/// conexión y le dejaba el guard anti doble-tap trabado en `true`.
+///
+/// El tipo ahora dice la verdad: [setLog] está disponible sin red, y
+/// [acknowledged] es una promesa aparte que el que la quiera espera y el que
+/// no, no. Un `await` de más sobre [acknowledged] vuelve a colgar el camino:
+/// es deliberado que haya que escribirlo.
+class LoggedSet {
+  const LoggedSet({required this.setLog, required this.acknowledged});
+
+  /// La serie con su id definitivo. Se resuelve sin tocar la red: `doc()`
+  /// genera el id en el cliente.
+  final SetLog setLog;
+
+  /// Completa cuando el servidor confirmó la escritura.
+  ///
+  /// **Sin red no completa nunca** — no falla, queda pendiente y Firestore la
+  /// sincroniza cuando vuelve. Falla sólo ante un error real (permisos, por
+  /// ejemplo). No la esperes en el camino crítico.
+  final Future<void> acknowledged;
+}
+
 class SessionRepository {
   SessionRepository({
     required FirebaseFirestore firestore,
     UserPublicProfileRepository? publicProfileRepository,
+    NonFatalReporter? nonFatalReporter,
+    Duration? watchAdoptionReadTimeout,
   })  : _firestore = firestore,
-        _publicProfileRepository = publicProfileRepository;
+        _publicProfileRepository = publicProfileRepository,
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal,
+        _watchAdoptionReadTimeout =
+            watchAdoptionReadTimeout ?? kWatchAdoptionReadTimeout;
 
   final FirebaseFirestore _firestore;
+
+  /// Cota de la lectura de adopción de [addSetLog]. Inyectable para que los
+  /// tests puedan bajarla: un test que espera segundos reales no se corre, y
+  /// uno que no se corre no protege nada.
+  final Duration _watchAdoptionReadTimeout;
   final UserPublicProfileRepository? _publicProfileRepository;
+
+  /// Cómo se reporta un error que [finish] decide NO propagar.
+  ///
+  /// Inyectable y opcional por la misma razón que `followerCountResolver`
+  /// (ADR-WRS-13): el default es el reporter real y los tests pasan un fake
+  /// para assertear que el error viajó, en vez de tener que inicializar
+  /// Firebase.
+  final NonFatalReporter _reportNonFatal;
 
   /// Upper bound on how many recent sessions [finish] reads back when
   /// recomputing the public `workoutsCount` / `racha` counters. Caps the read
@@ -82,6 +134,29 @@ class SessionRepository {
   ///
   /// El teléfono sigue esperando por defecto: ahí un fallo de escritura tiene
   /// que poder propagarse, y la pantalla puede mostrarlo.
+  ///
+  /// ## [onServerRejected] — el rechazo que antes moría en un log
+  ///
+  /// Con [waitForServer] en `false` este método no puede propagar un fallo por
+  /// el `Future` que devuelve: para cuando el servidor contesta, el llamador ya
+  /// siguió de largo y el reloj ya abrió la pantalla de entreno. Antes eso se
+  /// resolvía mandando el error a `developer.log` y nada más, y ahí se
+  /// escondía una diferencia que importa muchísimo:
+  ///
+  ///   • **Sin red**, el `Future` de `set()` no falla — queda PENDIENTE, y
+  ///     Firestore reintenta solo cuando vuelve la conexión. Ese caso no tiene
+  ///     que molestar a nadie: es el modo normal de un reloj.
+  ///   • **Rechazado por reglas**, el `Future` SÍ falla, y falla para siempre.
+  ///     Reintentar no lo va a arreglar. El atleta está entrenando contra una
+  ///     sesión que no existe en el servidor y que no va a existir nunca.
+  ///
+  /// El log trataba los dos igual. [onServerRejected] es el canal para el
+  /// segundo: se invoca sólo cuando el servidor RECHAZA, para que la pantalla
+  /// pueda decirlo mientras el entreno todavía no arrancó de verdad. Si se
+  /// omite, el comportamiento es el de antes.
+  ///
+  /// No se invoca en el camino con [waitForServer] en `true`: ahí el error
+  /// viaja por el `Future` y el llamador ya lo tiene.
   Future<Session> create({
     required String uid,
     required String routineId,
@@ -90,6 +165,7 @@ class SessionRepository {
     int dayNumber = 1,
     int weekNumber = 0,
     bool waitForServer = true,
+    void Function(Object error)? onServerRejected,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -111,13 +187,19 @@ class SessionRepository {
     } else {
       // La escritura ya se aplicó al caché al llamar a `set`. Lo que se saltea
       // es la confirmación del servidor, que Firestore reintenta solo.
+      //
+      // El `catchError` NO se dispara por falta de red: sin conexión el
+      // `Future` queda pendiente y Firestore reintenta cuando vuelve. Lo que
+      // llega acá es un rechazo REAL del servidor —típicamente `permission-
+      // denied`— y ése no se arregla reintentando nunca.
       unawaited(
-        escritura.catchError(
-          (Object e) => developer.log(
-            'create: la sesión no llegó al servidor todavía — $e',
+        escritura.catchError((Object e) {
+          developer.log(
+            'create: el servidor rechazó la sesión — $e',
             name: 'SessionRepository',
-          ),
-        ),
+          );
+          onServerRejected?.call(e);
+        }),
       );
     }
     return session;
@@ -133,19 +215,44 @@ class SessionRepository {
     required int durationMin,
     bool wasFullyCompleted = false,
     required int weeklyTarget,
+    bool waitForServer = true,
+    void Function(Object error)? onServerRejected,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
     // on Session.finishedAt expects a Firestore Timestamp on read. Without
     // this conversion, listByUid()/getActive() would fail to deserialize
     // sessions finished against production Firestore.
-    await _sessions(uid).doc(sessionId).update({
+    final escritura = _sessions(uid).doc(sessionId).update({
       'status': SessionStatusX(SessionStatus.finished).toJson(),
       'finishedAt': Timestamp.fromDate(finishedAt.toUtc()),
       'totalVolumeKg': totalVolumeKg,
       'durationMin': durationMin,
       'wasFullyCompleted': wasFullyCompleted,
     });
+    if (waitForServer) {
+      await escritura;
+    } else {
+      // Mismo contrato que `create`: la escritura ya se aplicó al caché, lo
+      // que se saltea es la confirmación. Sin red el future queda PENDIENTE
+      // —no falla— y Firestore lo reintenta solo; lo que llega al catchError
+      // es un rechazo REAL del servidor.
+      //
+      // Sin esto, terminar un entreno sin conexión no se colgaba solamente:
+      // `finishSession` pone `_finalized = true` ANTES del await, así que el
+      // `finally` y el `catch` que lo resetean tampoco corrían. La sesión
+      // quedaba con el guard trabado, marcar/editar/borrar series pasaban a
+      // ser no-ops silenciosos y el cronómetro seguía corriendo.
+      unawaited(
+        escritura.catchError((Object e) {
+          developer.log(
+            'finish: el servidor rechazó el cierre de la sesión — $e',
+            name: 'SessionRepository',
+          );
+          onServerRejected?.call(e);
+        }),
+      );
+    }
 
     // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
     // Executes after the primary session update. Reads a BOUNDED window of the
@@ -175,6 +282,64 @@ class SessionRepository {
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
+    // Los contadores se recalculan DESPUÉS de que el servidor confirmó, y ése
+    // es todo el truco.
+    //
+    // El recálculo lee las sesiones recientes del atleta. Hacerlo sin
+    // confirmación lo dejaría leyendo el CACHÉ, que puede estar incompleto
+    // —instalación nueva, historial sin sincronizar— y escribir un
+    // `workoutsCount` derivado de ahí le PISA al perfil público un valor
+    // correcto con uno más chico.
+    //
+    // ⚠️ La primera versión de esto los SALTEABA cuando `waitForServer` era
+    // false, con el argumento de que «el contador queda viejo hasta el próximo
+    // cierre con conexión, que lo recalcula entero». Era falso y grave:
+    // `waitForServer: false` no significa «estoy sin red», significa «no me
+    // bloquees». El teléfono lo pasa SIEMPRE, así que ese próximo cierre no
+    // existía y los contadores dejaban de escribirse para siempre.
+    //
+    // El daño no habría sido un número viejo: `effectiveRachaSemanas` hace
+    // decay EN LECTURA contra `rachaSemanasUpdatedAt`, el sello que estampa
+    // `updateCounters`. Sin sello nuevo, a las dos semanas todo atleta que
+    // cierre desde el teléfono aparece con racha 0 en su perfil y en el board
+    // del gimnasio, entrenando todos los días. Y el servidor no lo salva:
+    // `workoutsCount`/`rachaSemanas` no se tocan en `functions/src/`.
+    //
+    // Colgarlo del ACK resuelve las dos cosas: no se lee de un caché frío, y
+    // se recalcula siempre — apenas vuelve la red.
+    if (waitForServer) {
+      await _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget);
+    } else {
+      unawaited(
+        escritura
+            .then((_) =>
+                _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget))
+            // El `then` no corre si la escritura fue rechazada, y está bien:
+            // sin sesión escrita no hay contador que actualizar. El rechazo ya
+            // viaja por `onServerRejected`.
+            //
+            // Tampoco corre si el atleta MATA la app antes de que vuelva la
+            // red: Firestore replica la escritura al reabrir, pero este
+            // callback ya no existe. Se auto-cura y por eso no se defiende
+            // más: `_recalcularContadoresPublicos` recalcula la ventana
+            // entera, no incrementa, así que el próximo cierre con ACK repara
+            // el salteado. Queda dicho porque es justo el tipo de supuesto que
+            // hizo caer la versión anterior de este bloque.
+            .catchError((Object _) {}),
+      );
+    }
+  }
+
+  /// Recalcula `workoutsCount`/`rachaSemanas` del perfil público.
+  ///
+  /// Best-effort (ADR-WRS-10): romperle el cierre de sesión al atleta por un
+  /// contador es la prioridad invertida. Pero best-effort NO es «que no se
+  /// entere nadie» — un fallo sale como non-fatal.
+  Future<void> _recalcularContadoresPublicos(
+    String uid,
+    UserPublicProfileRepository pubRepo,
+    int weeklyTarget,
+  ) async {
     try {
       final completedList = await listRecentCompletedByUid(uid);
       final racha = weeklyStreakOf(
@@ -200,13 +365,33 @@ class SessionRepository {
 
       await pubRepo.updateCounters(uid, counters);
     } catch (e, st) {
-      developer.log(
-        'SessionRepository.finish: failed to update public profile counters '
-        'for $uid',
-        error: e,
-        stackTrace: st,
-      );
-      // DO NOT rethrow — public stats are best-effort
+      // DO NOT rethrow — public stats are best-effort (ADR-WRS-10): romperle
+      // el cierre de sesión al atleta por un contador es la prioridad
+      // invertida.
+      //
+      // Pero best-effort NO es "que no se entere nadie". Hasta la etapa 6 de
+      // Fase 6 esto sólo escribía a `developer.log`, que en el teléfono de un
+      // usuario real no va a ninguna parte: si el write fallaba SIEMPRE —una
+      // regla mal escrita, un campo que dejó de validar— el perfil público
+      // quedaba con números viejos y no había forma de enterarse. Ahora sale
+      // como non-fatal a Crashlytics.
+      //
+      // El try/catch de adentro no es paranoia: sin él, un reporter que tira
+      // —uno inyectado en un test, o el real si algún día deja de tragarse lo
+      // suyo— hace que la excepción salga por ACÁ y rompa `finish()`. Sería
+      // reintroducir el fallo que este catch existe para evitar, por la
+      // puerta de la telemetría. Mismo error que documenta `boundedWrite` en
+      // `firestore_write.dart`: acotar un write sin guardar es una regresión.
+      try {
+        await _reportNonFatal(
+          e,
+          st,
+          reason: 'SessionRepository.finish: failed to update public profile '
+              'counters for $uid',
+        );
+      } catch (_) {
+        // Telemetría rota no es un entrenamiento roto.
+      }
     }
   }
 
@@ -437,6 +622,19 @@ class SessionRepository {
             'status': SessionStatusX(SessionStatus.finished).toJson(),
             'finishedAt': cerradaEn,
             'wasFullyCompleted': false,
+            // MARCA DE ORIGEN, y no es cosmética: `notifyOnSessionFinished`
+            // dispara sobre la transición `finishedAt: null → no-null`, que es
+            // exactamente lo que este barrido escribe. Sin la marca, cerrar una
+            // colgada le avisa al PF que el alumno "terminó su entrenamiento",
+            // que es falso.
+            //
+            // No alcanza con mirar el tiempo transcurrido: cuando la más nueva
+            // sigue viva (`vencio == false`), acá se cierran las duplicadas
+            // SIN importar su edad — dos sesiones abiertas con minutos de
+            // diferencia, una del reloj y otra del teléfono, caen por este
+            // camino a los minutos de empezar. El dato tiene que ser explícito,
+            // no deducido.
+            'closedBySweep': true,
           });
         }
       } catch (e, st) {
@@ -496,7 +694,7 @@ class SessionRepository {
   /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
   /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
   /// (HANDOFF §4.3). Solo ADOPTA el id del reloj cuando el reloj llegó primero.
-  Future<SetLog> addSetLog({
+  Future<LoggedSet> addSetLog({
     required String uid,
     required String sessionId,
     required SetLog setLog,
@@ -506,8 +704,63 @@ class SessionRepository {
       setNumber: setLog.setNumber,
     );
     final watchRef = _setLogs(uid, sessionId).doc(watchDocId);
-    final watchSnap = await watchRef.get();
-    final watchData = watchSnap.data();
+
+    // Esta lectura es una OPTIMIZACIÓN, no un requisito: sirve para adoptar el
+    // documento del reloj cuando llegó primero. Si no se puede hacer, la serie
+    // tiene que escribirse igual.
+    //
+    // Sin red el resultado depende del cache. Cuando el documento del reloj no
+    // está cacheado, esta lectura puede terminar en error en vez de en un
+    // snapshot vacío — y sin este catch, ese error salía por `addSetLog`, lo
+    // agarraba el `catch` de `logSet`, y la serie NO se escribía. O sea que
+    // separar la confirmación del servidor no alcanzaba: entrenar sin conexión
+    // seguía roto, ahora por la LECTURA en vez de por la escritura.
+    // Lo señaló Codex en la review del PR.
+    //
+    // Un fallo acá se trata como "el reloj no escribió nada": es el mismo
+    // camino que un documento ausente, y es el que ya corría antes de que el
+    // reloj existiera. El riesgo que queda —crear un documento propio mientras
+    // el del reloj existe pero no se pudo leer— es el duplicado que esta
+    // lectura evita cuando funciona, y es estrictamente mejor que perder la
+    // serie que el atleta acaba de marcar.
+    // La cota NO es redundante con el `catch`: cubren dos fallas distintas.
+    // El `catch` agarra la lectura que TIRA; la cota agarra la que no devuelve
+    // ni tira, que es el caso que este repo midió en el simulador el
+    // 2026-08-12 y documentó en `network_timeouts.dart`. Sin ella, una conexión
+    // a medias deja `logSet` esperando, su guard trabado, y vuelve el bug
+    // entero: no se puede marcar nada sin conexión.
+    DocumentSnapshot<Map<String, dynamic>>? watchSnap;
+    try {
+      watchSnap = await watchRef.get().timeout(_watchAdoptionReadTimeout);
+    } catch (e, st) {
+      watchSnap = null;
+      // Saltear la adopción NO es gratis, y por eso no se traga en silencio.
+      //
+      // Sin adoptar, el teléfono crea su propio documento sobre una serie que
+      // el reloj tal vez ya escribió. Ese duplicado es INVISIBLE en el
+      // teléfono —`_dedupedLogs` lo filtra del estado local— pero el servidor
+      // lo cuenta: `functions/src/ranking-aggregate.ts` relee `setLogs` y suma
+      // los dos. Es el daño que esta lectura existe para evitar: 24 documentos
+      // de más y 11.450 kg fantasma, medidos el 2026-08-11.
+      //
+      // Se reportan los dos casos, con razones distintas, porque preguntan
+      // cosas distintas: el timeout dice "¿la cota está bien elegida?" —hoy 2
+      // segundos, decididos sin datos de campo— y el error dice "¿se rompió
+      // algo?" (un permission-denied acá sería una regresión de reglas).
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: e is TimeoutException
+            ? 'SessionRepository.addSetLog: la lectura de adopción del reloj '
+                'superó ${_watchAdoptionReadTimeout.inMilliseconds} ms. La '
+                'serie se escribe igual, con el riesgo de duplicar la del '
+                'reloj si había una.'
+            : 'SessionRepository.addSetLog: falló la lectura de adopción del '
+                'reloj. La serie se escribe igual, con el riesgo de duplicar '
+                'la del reloj si había una.',
+      ).catchError((_) {}));
+    }
+    final watchData = watchSnap?.data();
 
     // La identidad se decide por los CAMPOS, nunca por el path. Un documento
     // puede quedar en una ruta que ya no lo describe: `removeSet` renumera las
@@ -521,7 +774,8 @@ class SessionRepository {
     // desde el teléfono —la renumeración dejó `peso-muerto__3` conteniendo la
     // serie 2— y al cargar una serie 3 nueva el teléfono creó su propio
     // documento. Confiando en la ruta, esa serie 2 se habría destruido.
-    final holdsThisSet = watchSnap.exists &&
+    final holdsThisSet = watchSnap != null &&
+        watchSnap.exists &&
         watchData != null &&
         setLogDocHoldsSet(
           docExerciseId: watchData['exerciseId'],
@@ -537,14 +791,20 @@ class SessionRepository {
       // devuelve es el del reloj, para que un `updateSet`/`removeSet` posterior
       // apunte al documento que existe y no a uno inventado.
       final adopted = setLog.copyWith(id: watchDocId);
-      await watchRef.set(adopted.toJson());
-      return adopted;
+      // Sin `await`: el id ya lo tenemos y la serie tiene que poder seguir su
+      // camino sin red. La confirmación viaja aparte, en `acknowledged`.
+      return LoggedSet(
+        setLog: adopted,
+        acknowledged: watchRef.set(adopted.toJson()),
+      );
     }
 
     final ref = _setLogs(uid, sessionId).doc();
     final withId = setLog.copyWith(id: ref.id);
-    await ref.set(withId.toJson());
-    return withId;
+    return LoggedSet(
+      setLog: withId,
+      acknowledged: ref.set(withId.toJson()),
+    );
   }
 
   // ─── addSetLogFromWatch ─────────────────────────────────────────────────
@@ -848,14 +1108,44 @@ class SessionRepository {
     required String sessionId,
   }) {
     if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
+    // Estado derivado del PROPIO stream, no un booleano que la capa de
+    // aplicación sincroniza contra un hecho remoto — eso ya falló dos veces
+    // acá (`_creacionRechazada`, `_sesionConfirmada`).
+    //
+    // La closure guarda estado POR SUSCRIPCIÓN, y está bien porque
+    // `watchSessionFinished` arma un stream nuevo en cada llamada. Si alguien
+    // lo convierte en un broadcast compartido, esto se rompe.
+    var existioDeVerdad = false;
     return _sessions(uid).doc(sessionId).snapshots().map((snap) {
-      if (!snap.exists) return true;
-      final data = snap.data();
-      // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
-      // con null), así que preguntar por la presencia de la clave no alcanza:
-      // hay que mirar el valor. Es la misma trampa que rompió el lado del
-      // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
-      return data != null && data['finishedAt'] != null;
+      if (snap.exists) {
+        // Existencia CONFIRMADA: el documento está Y no hay una escritura
+        // local pendiente inventándolo. `hasPendingWrites` es el dato que
+        // contesta la pregunta de verdad —«¿esta sesión llegó a existir en el
+        // servidor?»— en vez de un proxy cercano.
+        if (!snap.metadata.hasPendingWrites && !snap.metadata.isFromCache) {
+          existioDeVerdad = true;
+        }
+        final data = snap.data();
+        // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
+        // con null), así que preguntar por la presencia de la clave no alcanza:
+        // hay que mirar el valor. Es la misma trampa que rompió el lado del
+        // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
+        return data != null && data['finishedAt'] != null;
+      }
+
+      // Una desaparición sólo significa «terminada» si antes estuvo DE VERDAD,
+      // y si es el SERVIDOR el que dice que ya no está.
+      //
+      // Hacen falta las dos condiciones, y cada una tapa un agujero distinto:
+      //
+      // • Sin `isFromCache`: una sesión sin ACKear —entreno empezado sin red—
+      //   se leía como terminada.
+      // • Sin `existioDeVerdad`: un create RECHAZADO por el servidor produce
+      //   una ausencia que TAMBIÉN viene del servidor (el SDK revierte la
+      //   mutación y empuja el snapshot). Indistinguible de «se cerró» mirando
+      //   sólo la procedencia — y es justo el caso que le mostraba al atleta
+      //   «terminaste el entreno desde la muñeca» sobre un rechazo de paywall.
+      return existioDeVerdad && !snap.metadata.isFromCache;
     });
   }
 

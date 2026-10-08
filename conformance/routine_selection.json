@@ -5,77 +5,124 @@
   "inputs": {
     "activeRoutineId": "Marcador explicito del perfil. null o vacio = sin marcador.",
     "assignedIds": "Rutinas asignadas por un PF, ordenadas por createdAt descendente (mas nueva primero).",
-    "selfCreatedIds": "Rutinas creadas por el propio atleta, mismo orden."
+    "selfCreatedIds": "Rutinas creadas por el propio atleta, mismo orden.",
+    "catalogIds": "Plantillas del sistema (source == 'system') que el atleta puede estar SIGUIENDO sin haberlas copiado. Solo participan del tier 0: una plantilla del catalogo nunca se auto-activa, hay que elegirla. Campo OPCIONAL: ausente significa lista vacia."
   },
   "cases": [
     {
       "name": "sin rutinas de ningun tipo",
-      "given": { "activeRoutineId": null, "assignedIds": [], "selfCreatedIds": [] },
-      "expect": { "routineId": null }
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": [],
+        "selfCreatedIds": []
+      },
+      "expect": {
+        "routineId": null
+      }
     },
     {
       "name": "el marcador explicito gana sobre una asignada mas nueva",
       "why": "Tier 0. Si el atleta marco una rutina, esa manda aunque el PF le haya asignado otra despues.",
       "given": {
         "activeRoutineId": "r-vieja",
-        "assignedIds": ["r-nueva", "r-vieja"],
+        "assignedIds": [
+          "r-nueva",
+          "r-vieja"
+        ],
         "selfCreatedIds": []
       },
-      "expect": { "routineId": "r-vieja" }
+      "expect": {
+        "routineId": "r-vieja"
+      }
     },
     {
       "name": "el marcador tambien se busca entre las auto-creadas",
       "why": "Tier 0 resuelve contra la lista UNIFICADA, no solo contra las del PF.",
       "given": {
         "activeRoutineId": "mia-2",
-        "assignedIds": ["del-pf"],
-        "selfCreatedIds": ["mia-1", "mia-2"]
+        "assignedIds": [
+          "del-pf"
+        ],
+        "selfCreatedIds": [
+          "mia-1",
+          "mia-2"
+        ]
       },
-      "expect": { "routineId": "mia-2" }
+      "expect": {
+        "routineId": "mia-2"
+      }
     },
     {
       "name": "marcador obsoleto: NO devuelve null, sigue la cadena",
       "why": "Una rutina archivada o borrada deja el marcador apuntando a la nada. Devolver null ahi dejaria al atleta sin entreno teniendo un plan del PF perfectamente valido.",
       "given": {
         "activeRoutineId": "borrada",
-        "assignedIds": ["del-pf"],
+        "assignedIds": [
+          "del-pf"
+        ],
         "selfCreatedIds": []
       },
-      "expect": { "routineId": "del-pf" }
+      "expect": {
+        "routineId": "del-pf"
+      }
     },
     {
       "name": "sin marcador: gana el plan del PF",
       "given": {
         "activeRoutineId": null,
-        "assignedIds": ["del-pf"],
-        "selfCreatedIds": ["mia-1"]
+        "assignedIds": [
+          "del-pf"
+        ],
+        "selfCreatedIds": [
+          "mia-1"
+        ]
       },
-      "expect": { "routineId": "del-pf" }
+      "expect": {
+        "routineId": "del-pf"
+      }
     },
     {
       "name": "varias asignadas sin marcador: gana la mas nueva",
       "why": "El repositorio las entrega ordenadas por createdAt descendente, asi que es la primera.",
       "given": {
         "activeRoutineId": null,
-        "assignedIds": ["nueva", "media", "vieja"],
+        "assignedIds": [
+          "nueva",
+          "media",
+          "vieja"
+        ],
         "selfCreatedIds": []
       },
-      "expect": { "routineId": "nueva" }
+      "expect": {
+        "routineId": "nueva"
+      }
     },
     {
       "name": "marcador vacio se trata igual que ausente",
       "given": {
         "activeRoutineId": "",
-        "assignedIds": ["del-pf"],
+        "assignedIds": [
+          "del-pf"
+        ],
         "selfCreatedIds": []
       },
-      "expect": { "routineId": "del-pf" }
+      "expect": {
+        "routineId": "del-pf"
+      }
     },
     {
       "name": "una sola auto-creada se auto-activa",
       "why": "Tier 2: no hace falta marcador cuando no hay nada que desambiguar.",
-      "given": { "activeRoutineId": null, "assignedIds": [], "selfCreatedIds": ["unica"] },
-      "expect": { "routineId": "unica" }
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": [],
+        "selfCreatedIds": [
+          "unica"
+        ]
+      },
+      "expect": {
+        "routineId": "unica"
+      }
     },
     {
       "name": "varias auto-creadas sin marcador: null, no se adivina",
@@ -83,9 +130,15 @@
       "given": {
         "activeRoutineId": null,
         "assignedIds": [],
-        "selfCreatedIds": ["mia-1", "mia-2", "mia-3"]
+        "selfCreatedIds": [
+          "mia-1",
+          "mia-2",
+          "mia-3"
+        ]
       },
-      "expect": { "routineId": null }
+      "expect": {
+        "routineId": null
+      }
     },
     {
       "name": "varias auto-creadas con marcador obsoleto: null",
@@ -93,9 +146,111 @@
       "given": {
         "activeRoutineId": "borrada",
         "assignedIds": [],
-        "selfCreatedIds": ["mia-1", "mia-2"]
+        "selfCreatedIds": [
+          "mia-1",
+          "mia-2"
+        ]
       },
-      "expect": { "routineId": null }
+      "expect": {
+        "routineId": null
+      }
+    },
+    {
+      "name": "el marcador resuelve contra una plantilla del catalogo",
+      "why": "Seguir una plantilla del sistema sin copiarla. Antes este id caia como obsoleto y el atleta veia el CTA vacio teniendo una plantilla elegida.",
+      "given": {
+        "activeRoutineId": "ppl-beginner",
+        "assignedIds": [],
+        "selfCreatedIds": [],
+        "catalogIds": [
+          "ppl-beginner",
+          "full-body-3day"
+        ]
+      },
+      "expect": {
+        "routineId": "ppl-beginner"
+      }
+    },
+    {
+      "name": "el marcador de catalogo gana sobre un plan del PF",
+      "why": "Tier 0 manda sobre tier 1, igual que con cualquier otro marcador: si el atleta eligio seguir una plantilla, esa manda aunque tenga un plan asignado.",
+      "given": {
+        "activeRoutineId": "ppl-beginner",
+        "assignedIds": [
+          "del-pf"
+        ],
+        "selfCreatedIds": [],
+        "catalogIds": [
+          "ppl-beginner"
+        ]
+      },
+      "expect": {
+        "routineId": "ppl-beginner"
+      }
+    },
+    {
+      "name": "una plantilla del catalogo NO se auto-activa sin marcador",
+      "why": "El catalogo no tiene tier propio. Auto-activar una del monton seria elegir por el atleta entre siete opciones que no pidio.",
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": [],
+        "selfCreatedIds": [],
+        "catalogIds": [
+          "ppl-beginner",
+          "full-body-3day"
+        ]
+      },
+      "expect": {
+        "routineId": null
+      }
+    },
+    {
+      "name": "una sola auto-creada gana sobre el catalogo sin marcador",
+      "why": "Tier 2 sigue intacto: el catalogo no compite con las rutinas propias del atleta.",
+      "given": {
+        "activeRoutineId": null,
+        "assignedIds": [],
+        "selfCreatedIds": [
+          "mia-1"
+        ],
+        "catalogIds": [
+          "ppl-beginner"
+        ]
+      },
+      "expect": {
+        "routineId": "mia-1"
+      }
+    },
+    {
+      "name": "marcador de catalogo obsoleto: sigue la cadena",
+      "why": "Una plantilla que se saco del catalogo deja el marcador apuntando a la nada. Mismo criterio que con una rutina borrada: no devuelve null teniendo un plan valido.",
+      "given": {
+        "activeRoutineId": "plantilla-retirada",
+        "assignedIds": [
+          "del-pf"
+        ],
+        "selfCreatedIds": [],
+        "catalogIds": [
+          "ppl-beginner"
+        ]
+      },
+      "expect": {
+        "routineId": "del-pf"
+      }
+    },
+    {
+      "name": "sin catalogIds el comportamiento no cambia",
+      "why": "El llamador pasa lista vacia cuando ya sabe que no hace falta resolverla. Este caso pinea que esa optimizacion no altera el resultado.",
+      "given": {
+        "activeRoutineId": "mia-1",
+        "assignedIds": [],
+        "selfCreatedIds": [
+          "mia-1"
+        ]
+      },
+      "expect": {
+        "routineId": "mia-1"
+      }
     }
   ]
 }

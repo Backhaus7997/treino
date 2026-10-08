@@ -8,20 +8,31 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/coach_hub/application/coach_hub_session_resolving_provider.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
+import 'package:treino/features/coach_hub/presentation/shell/coach_hub_resolving_view.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
+import 'package:treino/features/coach_hub/presentation/shell/mobile_facturacion_shell.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Monta el `CoachHubScaffold` dentro de un `ShellRoute`, con el `child`
 /// provisto por la ruta activa (como en producción, ADR-CHW-008). `prefs`
 /// siembra `shared_preferences` (eg. estado colapsado guardado).
+///
+/// [sessionResolving] fija `coachHubSessionResolvingProvider` — el scaffold
+/// sólo lo consulta en un teléfono, donde iría el `MobileBanner`. Se fija con
+/// un override y no con la cadena real de auth para que el test diga
+/// exactamente qué estado ve el scaffold.
 Future<void> _pumpScaffold(
   WidgetTester tester, {
   Map<String, Object> prefs = const {},
+  bool mobileFacturacionAllowed = false,
+  bool sessionResolving = false,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -30,8 +41,12 @@ Future<void> _pumpScaffold(
     initialLocation: '/dashboard',
     routes: [
       ShellRoute(
-        pageBuilder: (ctx, state, child) =>
-            NoTransitionPage(child: CoachHubScaffold(child: child)),
+        pageBuilder: (ctx, state, child) => NoTransitionPage(
+          child: CoachHubScaffold(
+            mobileFacturacionAllowed: mobileFacturacionAllowed,
+            child: child,
+          ),
+        ),
         routes: [
           GoRoute(
             path: '/dashboard',
@@ -48,11 +63,14 @@ Future<void> _pumpScaffold(
         sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
         userProfileProvider
             .overrideWith((ref) => Stream<UserProfile?>.value(null)),
+        coachHubSessionResolvingProvider.overrideWithValue(sessionResolving),
       ],
       child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
     ),
   );
-  await tester.pumpAndSettle();
+  // La vista de carga tiene un indicador que anima para siempre:
+  // `pumpAndSettle` no vuelve. Un `pump` alcanza para montar el árbol.
+  await (sessionResolving ? tester.pump() : tester.pumpAndSettle());
 }
 
 /// Setea el viewport lógico (devicePixelRatio 1.0) y lo resetea en teardown.
@@ -120,6 +138,81 @@ void main() {
       expect(find.byType(CoachHubTopBar), findsNothing);
     });
 
+    testWidgets(
+        'ancho 600 (mobile) + mobileFacturacionAllowed → '
+        'MobileFacturacionShell, sin MobileBanner ni sidebar', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, mobileFacturacionAllowed: true);
+
+      expect(find.byType(MobileFacturacionShell), findsOneWidget);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+      expect(find.byType(CoachHubTopBar), findsNothing);
+      expect(find.text('CONTENT_SLOT'), findsOneWidget);
+    });
+
+    // El bug: mientras el router espera la sesión se queda en `/dashboard`, y
+    // en un teléfono eso dibujaba «Coach Hub en escritorio» un momento antes de
+    // mandar al PF a la pantalla de planes.
+    testWidgets(
+        'ancho 600 (mobile) + sesión resolviéndose → vista de carga, NO '
+        'MobileBanner', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, sessionResolving: true);
+
+      expect(find.byType(CoachHubResolvingView), findsOneWidget);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.text('Coach Hub en escritorio'), findsNothing);
+      expect(find.byType(CoachHubSidebar), findsNothing);
+      expect(find.byType(CoachHubTopBar), findsNothing);
+      // La sección no se monta mientras no se sabe quién entró.
+      expect(find.text('CONTENT_SLOT'), findsNothing);
+    });
+
+    testWidgets(
+        'ancho 600 (mobile) + sesión resuelta → MobileBanner, sin vista de '
+        'carga', (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(tester, sessionResolving: false);
+
+      expect(find.byType(MobileBanner), findsOneWidget);
+      expect(find.byType(CoachHubResolvingView), findsNothing);
+    });
+
+    testWidgets(
+        'ancho 600 (mobile) + facturación + sesión resolviéndose → '
+        'MobileFacturacionShell: la excepción de facturación no se toca',
+        (tester) async {
+      _setWidth(tester, 600);
+      await _pumpScaffold(
+        tester,
+        mobileFacturacionAllowed: true,
+        sessionResolving: true,
+      );
+
+      expect(find.byType(MobileFacturacionShell), findsOneWidget);
+      expect(find.byType(CoachHubResolvingView), findsNothing);
+      expect(find.byType(MobileBanner), findsNothing);
+      expect(find.text('CONTENT_SLOT'), findsOneWidget);
+    });
+
+    // Escritorio no cambia: la vista de carga es sólo para el teléfono.
+    for (final width in [900.0, 1400.0]) {
+      testWidgets(
+          'ancho ${width.toInt()} (${width < 1280 ? 'compact' : 'desktop'}) + '
+          'sesión resolviéndose → shell normal, sin vista de carga',
+          (tester) async {
+        _setWidth(tester, width);
+        await _pumpScaffold(tester, sessionResolving: true);
+
+        expect(find.byType(CoachHubSidebar), findsOneWidget);
+        expect(find.byType(CoachHubTopBar), findsOneWidget);
+        expect(find.text('CONTENT_SLOT'), findsOneWidget);
+        expect(find.byType(CoachHubResolvingView), findsNothing);
+        expect(find.byType(MobileBanner), findsNothing);
+      });
+    }
+
     testWidgets('ancho 900 (compact, banda tablet 768–1023) → sidebar a 72 px',
         (tester) async {
       _setWidth(tester, 900);
@@ -138,7 +231,7 @@ void main() {
 
       expect(find.byType(CoachHubSidebar), findsOneWidget);
       expect(_sidebarWidth(tester), 72); // forzado pese a provider=false
-      final toggle = tester.widget<IconButton>(
+      final toggle = tester.widget<TreinoIconButton>(
         find.byKey(const Key('sidebar_toggle_button')),
       );
       expect(toggle.onPressed, isNull);
@@ -212,5 +305,42 @@ void main() {
       // expandido — el override de compact es solo local (ADR-CHW-004).
       expect(container.read(sidebarCollapsedProvider), isFalse);
     });
+  });
+
+  // El guard de producción del bug de semántica del shell.
+  //
+  // `ModalBarrier` (que todo `ModalRoute` siembra en el Overlay de su
+  // `Navigator`) es un `BlockSemantics`, y esa bandera sube por cada
+  // `RenderObject` que no sea semantic boundary hasta el `Row` del shell,
+  // donde borra a todos los hermanos anteriores. Sin
+  // `NavigatorSemanticsBoundary` el árbol de semántica del Coach Hub tenía 6
+  // nodos y un solo label —el del contenido—: ni el sidebar ni la top bar
+  // existían para un lector de pantalla.
+  //
+  // Va acá y no en `coach_hub_sidebar_test.dart` a propósito: aquel monta un
+  // `Row` propio, así que sólo puede probar el sidebar. Éste monta el
+  // `CoachHubScaffold` real.
+  testWidgets(
+      'el Navigator de la sección no borra la semántica del sidebar ni de la '
+      'top bar', (tester) async {
+    final handle = tester.ensureSemantics();
+    await _pumpScaffold(tester);
+
+    // 800 px → viewport compact → sidebar forzado colapsado, que es justo el
+    // estado donde el label de semántica es el ÚNICO nombre del ítem.
+    expect(_sidebarWidth(tester), 72);
+
+    expect(
+      find.bySemanticsLabel('Dashboard'),
+      findsOneWidget,
+      reason: 'el ítem del sidebar no llega al árbol de semántica',
+    );
+    expect(
+      find.bySemanticsLabel('DASHBOARD'),
+      findsOneWidget,
+      reason: 'el título de la top bar no llega al árbol de semántica',
+    );
+
+    handle.dispose();
   });
 }

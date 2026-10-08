@@ -9,7 +9,7 @@ import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../chat/application/chat_providers.dart';
 import '../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
-import '../profile/application/user_providers.dart';
+import 'application/limite_de_alumnos_provider.dart';
 import '../profile/application/user_public_profile_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
@@ -188,6 +188,48 @@ class _AlumnosTab extends ConsumerWidget {
 /// «2 DE 2 · PLAN FREE». El punto es que el PF VEA VENIR el tope: hasta ahora
 /// se enteraba del límite recién cuando el gate le rebotaba un alta, y ahí ya
 /// era tarde (el alumno quedó afuera y hay que explicárselo).
+///
+/// El tope sale de [limiteDeAlumnosProvider]: el que el servidor HACE CUMPLIR
+/// (`planLimits.athletes`, publicado por `syncTrainerEntitlements`), y no una
+/// reconstrucción en Dart. Eso cubre lo que el cliente no veía: `pending` y
+/// `paused` valen Free para el servidor, y el piso prepago (`conPisoPrepago` en
+/// `functions/src/subscriptions/effective-limit.ts`) puede sostener un plan que
+/// la suscripción ya no tiene. Un PF `paused` con Plan 2 en el doc ve «DE 2 ·
+/// PLAN FREE», y uno con un piso de Plan 3 ve «ALUMNOS · PLAN 3»: el nombre
+/// del plan se deduce del número publicado, para que los dos digan lo mismo.
+/// Si el número no coincide con ningún plan de la tabla, el medidor muestra el
+/// tope y no nombra ninguno.
+///
+/// Mientras no haya un tope publicado que usar (clave ausente: el PF nunca
+/// pasó por un sync, o su doc está degradado; o el doc todavía carga, la
+/// lectura falló, o lo publicado no se entiende) el provider cae al cálculo
+/// de siempre con [VigenciaDelPlan]. Una baja con el
+/// período pagado ya vencido es Free para el servidor, pero nadie reescribe
+/// `subscription` al vencer: leído a secas, el medidor le decía «3 DE 7 ·
+/// PLAN 1» a un PF cuyo tope ya era el de Free. En ese camino siguen valiendo
+/// las dos limitaciones de antes: `pending` y `paused` se muestran con el tier
+/// del doc, y el piso prepago no se ve (el medidor puede decir un tope menor
+/// que el real). Son parte de «Qué espeja y qué NO» en [VigenciaDelPlan], y
+/// desaparecen en cuanto el servidor publica `athletes`.
+///
+/// El tab puede seguir montado cuando cambia el tope por reloj (vence la baja
+/// o el piso): el perfil no emite en ese borde y `AppClock` se lee, no avisa.
+/// El provider espera hasta ese instante (`athletesHasta` del servidor, o
+/// [VigenciaDelPlan.proximoCambio] en el fallback) y recalcula solo, y el
+/// medidor cambia sin esperar un rebuild: como máximo un minuto después del
+/// borde (o de volver del segundo plano, porque el timer no corre con el
+/// proceso suspendido).
+///
+/// Dos límites de lo publicado. El servidor anuncia SÓLO el primer cambio por
+/// reloj (`proximoCambioDeLimite`): tras un segundo borde (un plan cancelado
+/// que vence y, más tarde, un piso prepago que termina) el medidor conserva
+/// `athletesDespues` hasta el próximo sync o el barrido de las 04:00. Y con la
+/// clave presente, un cambio de plan llega al medidor con la latencia de la CF
+/// de sincronización, no al instante.
+///
+/// Este medidor viaja en el binario móvil: dice el estado de la cuenta y nada
+/// más. Al lado de un «3 DE 2», un «subí de plan» sería un llamado a comprar,
+/// y 3.1.3(f) no lo permite.
 class _PlanQuotaHeader extends ConsumerWidget {
   const _PlanQuotaHeader({required this.links});
 
@@ -197,16 +239,9 @@ class _PlanQuotaHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final sub = ref.watch(userProfileProvider).valueOrNull?.subscription;
-    // Sin `subscription` en el doc → Free: un PF sin suscripción es Free por
-    // definición (no hay backfill).
-    final tier = sub?.tier ?? SubscriptionTier.free;
-    // El TIER decide si hay tope, NO el `weightLimit` denormalizado. Si el CF
-    // dejó un weightLimit viejo en un doc que ya es plan3, leerlo de ahí
-    // volvería a meter un denominador en el plan ilimitado. `isUnlimited` sale
-    // de kTierWeightLimits, la fuente de verdad client-side.
-    final limit =
-        tier.isUnlimited ? null : (sub?.weightLimit ?? tier.weightLimit);
+    // `null` en `limit` = SIN TOPE, y en `tier` = «ningún plan de la tabla dice
+    // este número». Son DOS preguntas distintas: no se deduce una de la otra.
+    final (tope: limit, :tier) = ref.watch(limiteDeAlumnosProvider);
 
     // Carga PONDERADA: activo 1.0, pausado 0.5. Por eso el contador puede dar
     // 1.5 y no es un error de redondeo.
@@ -219,9 +254,9 @@ class _PlanQuotaHeader extends ConsumerWidget {
     // acá renderiza el string "null" — ya pasó en producción. El singular sale
     // solo en el 1 exacto: 0.5 y 1.5 van en plural, como en castellano.
     final label = limit == null
-        ? '${formatWeightedLoad(load)} ${load == 1 ? 'ALUMNO' : 'ALUMNOS'} '
-            '· ${_tierLabel(tier)}'
-        : '${formatWeightedLoad(load)} DE $limit · ${_tierLabel(tier)}';
+        ? '${formatWeightedLoad(load)} ${load == 1 ? 'ALUMNO' : 'ALUMNOS'}'
+            '${_sufijoDeTier(tier)}'
+        : '${formatWeightedLoad(load)} DE $limit${_sufijoDeTier(tier)}';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -251,6 +286,11 @@ class _PlanQuotaHeader extends ConsumerWidget {
     );
   }
 }
+
+/// « · PLAN X» al final del medidor, o nada si no hay un plan que diga lo
+/// mismo que el número (ver [LimiteDeAlumnos]).
+String _sufijoDeTier(SubscriptionTier? tier) =>
+    tier == null ? '' : ' · ${_tierLabel(tier)}';
 
 /// Nombre del tier dentro del medidor — UPPERCASE, es un eyebrow.
 String _tierLabel(SubscriptionTier tier) => switch (tier) {
@@ -422,6 +462,9 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                               reason: error.reason == 'subscription-inactive'
                                   ? PlanLimitReason.subscriptionInactive
                                   : PlanLimitReason.planLimit,
+                              subscriptionStatus: ref.read(
+                                currentTrainerSubscriptionStatusProvider,
+                              ),
                             );
                             return;
                           }

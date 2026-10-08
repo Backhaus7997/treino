@@ -1,3 +1,6 @@
+// ignore_for_file: invalid_annotation_target — @JsonKey sobre un parámetro
+// de factory freezed. json_serializable SÍ lo lee (se ve en post.g.dart);
+// el analizador no sabe que freezed lo reenvía. Mismo caso que session.dart.
 // ignore: unused_import — Timestamp is used by the generated post.g.dart part
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -29,6 +32,19 @@ class Post with _$Post {
     required RoutineTag? routineTag,
     required PostPrivacy privacy,
     @TimestampConverter() required DateTime createdAt,
+    // Contrato de una sola dirección: el cliente lo LEE, nunca lo escribe.
+    // `reactionCounts` lo mantiene en exclusiva la Cloud Function con el Admin
+    // SDK, y el `allow create` de `posts` no lo lista en su `hasOnly` — con la
+    // key presente, TODO create de post era PERMISSION_DENIED.
+    //
+    // `includeToJson: false` no toca `fromJson`: la lectura sigue poblando el
+    // campo desde lo que escribió la función. Abrir la key en el `hasOnly`
+    // habría sido el fix tentador y equivocado: dejaría que cualquiera se
+    // plante 999 reacciones en su propio post
+    // (`functions/src/__tests__/reaction-rules.test.ts`).
+    //
+    // Lo custodia `test/conformance/post_wire_shape_parity_test.dart`.
+    @JsonKey(includeToJson: false)
     @ReactionCountsConverter()
     @Default(<ReactionType, int>{})
     Map<ReactionType, int> reactionCounts,

@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/onboarding/domain/onboarding_module.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 /// Pure domain tests — no widget tree, no providers, no Firestore. The
 /// versioning algebra is where an off-by-one would hide, so it is verified in
 /// isolation and in milliseconds.
@@ -94,6 +96,30 @@ void main() {
         isFalse,
       );
     });
+
+    test('re-shows every feature deck that sumó slides del editor', () {
+      // Los TRES cambiaron: el teléfono pasó de 6 a 9 slides y la web de 3 a
+      // 7. Quien había cerrado la versión anterior tiene que volver a verlo —
+      // es el único mecanismo que hay para que se entere de lo nuevo.
+      const athlete = OnboardingSurface.customExerciseAthleteMobile;
+      const trainer = OnboardingSurface.customExerciseTrainerMobile;
+      const web = OnboardingSurface.customExerciseTrainerWeb;
+
+      expect(athlete.shouldShow({athlete.wireKey: 2}), isTrue);
+      expect(trainer.shouldShow({trainer.wireKey: 2}), isTrue);
+      expect(web.shouldShow({web.wireKey: 1}), isTrue);
+    });
+
+    test('does NOT re-show a deck already seen at its current version', () {
+      for (final s in [
+        OnboardingSurface.customExerciseAthleteMobile,
+        OnboardingSurface.customExerciseTrainerMobile,
+        OnboardingSurface.customExerciseTrainerWeb,
+      ]) {
+        expect(s.shouldShow({s.wireKey: s.currentVersion}), isFalse,
+            reason: '$s se re-mostraría en loop');
+      }
+    });
   });
 
   group('markedIn', () {
@@ -121,5 +147,17 @@ void main() {
         expect(surface.shouldShow(surface.markedIn(const {})), isFalse);
       }
     });
+  });
+
+  test('allSurfacesSeen suppresses every surface at its current version', () {
+    final seen = allSurfacesSeen();
+
+    for (final surface in OnboardingSurface.values) {
+      expect(
+        surface.shouldShow(seen),
+        isFalse,
+        reason: '${surface.name} was not marked at its current version',
+      );
+    }
   });
 }

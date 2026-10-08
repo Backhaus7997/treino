@@ -7,6 +7,8 @@
 // Estos tests son de widget aislado; el cableado con la tabla de series lo
 // cubren `routine_editor_kg_steppers_test.dart` y
 // `routine_editor_column_fill_test.dart`.
+import 'dart:ui' show SemanticsAction;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -21,6 +23,7 @@ FocusedSetCell _celda({
   bool puedeBajar = true,
   void Function(double)? onStep,
   VoidCallback? onFill,
+  VoidCallback? onNext,
   String subir = 'Sumar 2.5 kilos al peso',
   String bajar = 'Restar 2.5 kilos al peso',
 }) =>
@@ -34,6 +37,7 @@ FocusedSetCell _celda({
       stepIncreaseLabel: subir,
       stepDecreaseLabel: bajar,
       onFillColumn: onFill,
+      onNext: onNext,
     );
 
 Future<void> _montar(WidgetTester tester, Widget hijo) async {
@@ -51,6 +55,7 @@ Future<void> _montar(WidgetTester tester, Widget hijo) async {
 
 Finder get _mas => find.byKey(const Key('accessory_step_plus'));
 Finder get _menos => find.byKey(const Key('accessory_step_minus'));
+Finder get _sig => find.byKey(const Key('accessory_next'));
 Finder get _replicar => find.byKey(const Key('accessory_fill_column'));
 
 void main() {
@@ -122,10 +127,70 @@ void main() {
       handle.dispose();
     });
 
+    testWidgets('un lector de pantalla puede activarlos (acción tap)',
+        (tester) async {
+      // Regresión: `excludeSemantics: true` descarta la acción de tap del
+      // GestureDetector hijo; el Semantics tiene que declarar su propio onTap.
+      final handle = tester.ensureSemantics();
+      final saltos = <double>[];
+      await _montar(
+        tester,
+        KeyboardAccessoryBar(cell: _celda(onStep: saltos.add)),
+      );
+
+      for (final f in [_mas, _menos]) {
+        final nodo = tester.getSemantics(f);
+        expect(nodo.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+        tester.semantics.performAction(
+          find.semantics.byLabel(nodo.label),
+          SemanticsAction.tap,
+        );
+      }
+      expect(saltos, [2.5, -2.5]);
+      handle.dispose();
+    });
+
+    testWidgets('el stepper inerte no expone la acción tap', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montar(
+        tester,
+        KeyboardAccessoryBar(cell: _celda(puedeBajar: false)),
+      );
+      expect(
+        tester
+            .getSemantics(_menos)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isFalse,
+      );
+      handle.dispose();
+    });
+
     testWidgets('los dos miden 44 de alto', (tester) async {
       await _montar(tester, KeyboardAccessoryBar(cell: _celda()));
       expect(tester.getSize(_mas).height, 44);
       expect(tester.getSize(_menos).height, 44);
+    });
+  });
+
+  group('SIG.', () {
+    testWidgets('un lector de pantalla puede activarlo (acción tap)',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      var toques = 0;
+      await _montar(
+        tester,
+        KeyboardAccessoryBar(cell: _celda(onNext: () => toques++)),
+      );
+
+      final nodo = tester.getSemantics(_sig);
+      expect(nodo.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      tester.semantics.performAction(
+        find.semantics.byLabel(nodo.label),
+        SemanticsAction.tap,
+      );
+      expect(toques, 1);
+      handle.dispose();
     });
   });
 

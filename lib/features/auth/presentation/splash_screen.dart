@@ -9,7 +9,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../application/auth_providers.dart';
-import 'widgets/treino_logo.dart';
+import '../../../core/widgets/treino_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});

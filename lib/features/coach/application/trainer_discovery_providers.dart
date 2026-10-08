@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../../core/utils/location_precision.dart';
 import '../data/trainer_public_profile_repository.dart';
 import '../domain/discovery_filters.dart';
 import '../domain/trainer_location.dart';
@@ -104,9 +105,17 @@ class AthleteLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
   bool get isInitial =>
       state is AsyncData && state.value == null && !_isPermissionDenied;
 
+  /// El usuario sigue sin ubicación (el permiso está denegado de forma
+  /// permanente y eligió no pasar por Ajustes). Mismo estado que un permiso
+  /// rechazado: la pantalla queda usable, sin filtros de distancia.
+  void continueWithoutLocation() {
+    _isPermissionDenied = true;
+    state = const AsyncData(null);
+  }
+
   /// Requests OS permission then acquires position.
   ///
-  /// Call this AFTER the rationale sheet was accepted by the user.
+  /// Call this AFTER `presentLocationPermissionFlow` returned `true`.
   Future<void> requestPermission() async {
     state = const AsyncLoading();
     _isPermissionDenied = false;
@@ -118,7 +127,8 @@ class AthleteLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         state = const AsyncData(null);
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
       state = AsyncData(pos);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -341,8 +351,13 @@ final trainerDiscoveryProvider =
 /// Sino, si `trainerLatitude/Longitude/Geohash` legacy están seteados →
 /// devuelve un `TrainerLocation` sintético de tipo `custom`.
 /// Sino → lista vacía.
+///
+/// Solo devuelve lugares con coordenadas vigentes (`isPublishable`): uno
+/// `stale` o sin lat/lng nunca entra a mapa, distancia ni etiqueta.
 List<TrainerLocation> effectiveLocationsOf(TrainerPublicProfile t) {
-  if (t.trainerLocations.isNotEmpty) return t.trainerLocations;
+  if (t.trainerLocations.isNotEmpty) {
+    return t.trainerLocations.where((l) => l.isPublishable).toList();
+  }
   if (t.trainerLatitude != null &&
       t.trainerLongitude != null &&
       t.trainerGeohash != null) {
@@ -367,7 +382,7 @@ double? nearestDistanceKm(TrainerPublicProfile t, Position pos) {
   if (locations.isEmpty) return null;
   double? best;
   for (final loc in locations) {
-    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat!, loc.lng!);
     if (best == null || km < best) best = km;
   }
   return best;
@@ -381,7 +396,7 @@ TrainerLocation? nearestLocationOf(TrainerPublicProfile t, Position pos) {
   TrainerLocation? best;
   double? bestKm;
   for (final loc in locations) {
-    final km = haversineKm(pos.latitude, pos.longitude, loc.lat, loc.lng);
+    final km = haversineKm(pos.latitude, pos.longitude, loc.lat!, loc.lng!);
     if (bestKm == null || km < bestKm) {
       bestKm = km;
       best = loc;

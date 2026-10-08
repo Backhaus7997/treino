@@ -1,0 +1,558 @@
+/**
+ * mp-client.test.ts — el cliente HTTP de Mercado Pago.
+ * LOCAL, sin emulador y SIN RED: el `fetch` entra por parametro.
+ */
+
+import {
+  MAX_FREE_TRIAL_DAYS,
+  MpApiError,
+  createMpClient,
+} from "../subscriptions/mp/client";
+
+/** Un `fetch` de mentira que devuelve lo que le digas y anota como lo llamaron. */
+function fakeFetch(
+  respuesta: { status: number; body?: unknown; texto?: string } | Error,
+): { fn: typeof fetch; llamadas: { url: string; init?: RequestInit }[] } {
+  const llamadas: { url: string; init?: RequestInit }[] = [];
+  const fn = (async (url: string, init?: RequestInit) => {
+    llamadas.push({ url, init });
+    if (respuesta instanceof Error) throw respuesta;
+    return {
+      ok: respuesta.status >= 200 && respuesta.status < 300,
+      status: respuesta.status,
+      json: async () => respuesta.body,
+      text: async () => respuesta.texto ?? "",
+    };
+  }) as unknown as typeof fetch;
+  return { fn, llamadas };
+}
+
+/**
+ * Corre la llamada y devuelve el `MpApiError` que tiro. Existe porque
+ * `promesa.catch(e => e as MpApiError)` da la UNION con el tipo resuelto, y
+ * ahi `retryable` no existe para TypeScript.
+ */
+async function errorDe(fn: () => Promise<unknown>): Promise<MpApiError> {
+  try {
+    await fn();
+  } catch (e) {
+    return e as MpApiError;
+  }
+  throw new Error("se esperaba un MpApiError y la llamada resolvio bien");
+}
+
+describe("createMpClient — el camino feliz", () => {
+  it("pega al endpoint correcto con el token en el header", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 200,
+      body: { id: "2c93", status: "authorized" },
+    });
+
+    await createMpClient("TEST-token-123", fn).getPreapproval("2c93");
+
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval/2c93");
+    expect(llamadas[0].init?.method).toBe("GET");
+    expect(
+      (llamadas[0].init?.headers as Record<string, string>).Authorization,
+    ).toBe("Bearer TEST-token-123");
+  });
+
+  it("devuelve el JSON tal cual, sin interpretarlo", async () => {
+    // El cliente NO traduce estados: eso es de `map-status.ts`. Si algun dia
+    // este test empieza a esperar un estado ya mapeado, alguien mezcló dos
+    // capas que estan separadas a proposito.
+    const { fn } = fakeFetch({
+      status: 200,
+      body: { status: "authorized", external_reference: "uid-42" },
+    });
+
+    const r = await createMpClient("t", fn).getPreapproval("x");
+
+    expect(r.status).toBe("authorized");
+    expect(r.external_reference).toBe("uid-42");
+  });
+
+  it("escapa el id en la URL", async () => {
+    // Un id con `/` o `?` sin escapar cambia la ruta del request.
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await createMpClient("t", fn).getPreapproval("a/b?c=1");
+
+    expect(llamadas[0].url).toBe(
+      "https://api.mercadopago.com/preapproval/a%2Fb%3Fc%3D1",
+    );
+  });
+
+  it("manda un AbortSignal: una llamada colgada se lleva la function entera", async () => {
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await createMpClient("t", fn).getPreapproval("x");
+
+    expect(llamadas[0].init?.signal).toBeDefined();
+  });
+});
+
+describe("createMpClient — los errores, y cuáles conviene reintentar", () => {
+  it("un token vacío falla al construir, no en la primera llamada", () => {
+    // El síntoma útil es "no arranca", no "todo devuelve 401 y nadie sabe por
+    // qué". Un token vacío en producción es un secreto mal cargado.
+    expect(() => createMpClient("")).toThrow(/MP_ACCESS_TOKEN/);
+  });
+
+  it("un id vacío no sale a la red", async () => {
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await expect(
+      createMpClient("t", fn).getPreapproval(""),
+    ).rejects.toThrow(MpApiError);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("un fallo de red da status 0 y ES reintentable", async () => {
+    const { fn } = fakeFetch(new Error("ECONNRESET"));
+
+    const err = await errorDe(() => createMpClient("t", fn).getPreapproval("x"));
+
+    expect(err).toBeInstanceOf(MpApiError);
+    expect(err.status).toBe(0);
+    expect(err.retryable).toBe(true);
+  });
+
+  // La tabla es la parte que importa: reintentar lo que no se arregla solo es
+  // ruido, y no reintentar lo que sí se arregla es perder un cobro.
+  const casos: [number, boolean, string][] = [
+    [401, false, "token vencido o mal cargado — reintentar no lo arregla"],
+    [403, false, "sin permisos — idem"],
+    [404, false, "el preapproval no existe — sería ruido para siempre"],
+    [429, true, "rate limit — se arregla esperando"],
+    [500, true, "MP se cayó"],
+    [503, true, "MP no disponible"],
+  ];
+
+  for (const [status, retryable, porque] of casos) {
+    it(`HTTP ${status} → retryable=${retryable} (${porque})`, async () => {
+      const { fn } = fakeFetch({ status, texto: "detalle de MP" });
+
+      const err = await errorDe(() => createMpClient("t", fn).getPreapproval("x"));
+
+      expect(err).toBeInstanceOf(MpApiError);
+      expect(err.status).toBe(status);
+      expect(err.retryable).toBe(retryable);
+    });
+  }
+
+  it("el body del error viaja recortado — esto va a Cloud Logging", async () => {
+    const { fn } = fakeFetch({ status: 500, texto: "x".repeat(2000) });
+
+    const err = await errorDe(() => createMpClient("t", fn).getPreapproval("x"));
+
+    expect(err.body).toHaveLength(500);
+  });
+
+  it("una respuesta 200 que no es JSON falla en vez de devolver basura", async () => {
+    // Un 200 con HTML —una página de error de un proxy, por ejemplo— no puede
+    // terminar escribiéndose como si fuera una suscripción.
+    const { fn } = fakeFetch({ status: 200, body: null });
+
+    await expect(
+      createMpClient("t", fn).getPreapproval("x"),
+    ).rejects.toThrow(/no es un objeto JSON/);
+  });
+});
+
+describe("createMpClient — searchPreapprovalsByPlan y una respuesta sin `results`", () => {
+  it("por defecto la lee como lista vacia: el barrido no se cae por MP", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { paging: {} } });
+
+    await expect(
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1"),
+    ).resolves.toEqual([]);
+  });
+
+  it("en modo estricto FALLA: vacio no puede salir de una respuesta rota", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { results: "no-es-array" } });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1", { estricto: true }),
+    );
+    expect(err).toBeInstanceOf(MpApiError);
+    expect(err.message).toMatch(/results/);
+  });
+
+  it("en modo estricto una lista vacia REAL sigue siendo vacia", async () => {
+    const { fn } = fakeFetch({ status: 200, body: { results: [] } });
+
+    await expect(
+      createMpClient("t", fn).searchPreapprovalsByPlan("p1", { estricto: true }),
+    ).resolves.toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createPreapproval — el POST que abre la suscripcion.
+//
+// Lo que se cuida acá es la FORMA del request: MP rechaza con un 400 opaco y
+// depurar eso contra la red es caro. Y las validaciones que fallan ANTES de
+// salir, porque un monto en 0 no es un error de MP, es un bug nuestro.
+// ---------------------------------------------------------------------------
+
+const ALTA = {
+  reason: "TREINO — plan2 (mensual)",
+  externalReference: "uid-42",
+  backUrl: "https://app.gettreino.com/ajustes",
+  transactionAmount: 22000,
+  frequencyMonths: 1,
+};
+
+describe("createMpClient — createPreapprovalPlan", () => {
+  it("hace POST a /preapproval_plan con el token", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("TEST-token", fn).createPreapprovalPlan(ALTA);
+
+    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval_plan");
+    expect(llamadas[0].init?.method).toBe("POST");
+    expect(
+      (llamadas[0].init?.headers as Record<string, string>).Authorization,
+    ).toBe("Bearer TEST-token");
+  });
+
+  it("manda el cuerpo con la forma que MP espera", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body).toMatchObject({
+      reason: "TREINO — plan2 (mensual)",
+      external_reference: "uid-42",
+      back_url: "https://app.gettreino.com/ajustes",
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: 22000,
+        currency_id: "ARS",
+      },
+    });
+  });
+
+  it("el anual son 12 MESES, no un `frequency_type: years`", async () => {
+    // "months" esta en los tipos del SDK oficial; "years" no aparece.
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "x", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan({
+      ...ALTA,
+      transactionAmount: 220000,
+      frequencyMonths: 12,
+    });
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body.auto_recurring.frequency).toBe(12);
+    expect(body.auto_recurring.frequency_type).toBe("months");
+  });
+
+  it("cobra en PESOS — un currency_id equivocado le cobra otra moneda al PF", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "x", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
+
+    expect(JSON.parse(llamadas[0].init?.body as string).auto_recurring.currency_id)
+      .toBe("ARS");
+  });
+
+  it("devuelve el preapproval tal cual, sin interpretarlo", async () => {
+    const { fn } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x", status: "pending" },
+    });
+
+    const r = await createMpClient("t", fn).createPreapprovalPlan(ALTA);
+
+    expect(r.id).toBe("2c93");
+    expect(r.init_point).toBe("https://mp/x");
+    expect(r.status).toBe("pending");
+  });
+
+  // ── La prueba de dias: el PF que vuelve a suscribirse con dias ya pagos ──
+
+  it("freeTrialDays agrega `free_trial` en DIAS, adentro de auto_recurring", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan({
+      ...ALTA,
+      freeTrialDays: 17,
+    });
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body.auto_recurring.free_trial).toEqual({
+      frequency: 17,
+      frequency_type: "days",
+    });
+    // Lo demas del cobro no se mueve: la prueba difiere el primer cobro, no
+    // cambia cuanto ni cada cuanto se cobra.
+    expect(body.auto_recurring).toMatchObject({
+      frequency: 1,
+      frequency_type: "months",
+      transaction_amount: 22000,
+      currency_id: "ARS",
+    });
+  });
+
+  it("sin freeTrialDays el cuerpo es EXACTAMENTE el de siempre", async () => {
+    // Es lo que protege a todos los checkouts normales (y al del alumno): el
+    // request que sale a MP no cambia ni en una clave.
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
+
+    expect(llamadas[0].init?.body).toBe(JSON.stringify({
+      reason: ALTA.reason,
+      external_reference: ALTA.externalReference,
+      back_url: ALTA.backUrl,
+      auto_recurring: {
+        frequency: ALTA.frequencyMonths,
+        frequency_type: "months",
+        transaction_amount: ALTA.transactionAmount,
+        currency_id: "ARS",
+      },
+    }));
+    expect(llamadas[0].init?.body).not.toContain("free_trial");
+  });
+
+  it("freeTrialDays explicitamente `undefined` tambien es ausente", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapprovalPlan({
+      ...ALTA,
+      freeTrialDays: undefined,
+    });
+
+    expect(llamadas[0].init?.body).not.toContain("free_trial");
+  });
+
+  it("acepta los dos bordes: 1 dia y el maximo", async () => {
+    for (const dias of [1, MAX_FREE_TRIAL_DAYS]) {
+      const { fn, llamadas } = fakeFetch({
+        status: 201,
+        body: { id: "x", init_point: "https://mp/x" },
+      });
+
+      await createMpClient("t", fn).createPreapprovalPlan({
+        ...ALTA,
+        freeTrialDays: dias,
+      });
+
+      expect(
+        JSON.parse(llamadas[0].init?.body as string).auto_recurring.free_trial
+          .frequency,
+      ).toBe(dias);
+    }
+  });
+
+  const pruebaInvalida: [string, unknown][] = [
+    ["cero", 0],
+    ["negativo", -3],
+    ["fraccionario", 1.5],
+    ["NaN", Number.NaN],
+    ["infinito", Number.POSITIVE_INFINITY],
+    ["pasado del maximo", MAX_FREE_TRIAL_DAYS + 1],
+    ["un string numerico", "7"],
+    ["null", null],
+  ];
+
+  for (const [caso, valor] of pruebaInvalida) {
+    it(`freeTrialDays ${caso} falla SIN salir a la red`, async () => {
+      // Un monto de prueba mal calculado es un cobro adelantado o un cobro
+      // doble: se descubre ACA, no por la reaccion de MP o del PF.
+      const { fn, llamadas } = fakeFetch({ status: 201, body: { id: "x" } });
+
+      await expect(
+        createMpClient("t", fn).createPreapprovalPlan({
+          ...ALTA,
+          freeTrialDays: valor,
+        } as never),
+      ).rejects.toThrow(/freeTrialDays/);
+      expect(llamadas).toHaveLength(0);
+    });
+  }
+
+  // Estas cuatro fallan sin tocar la red: son bugs nuestros, y descubrirlos
+  // por un 400 de MP los disfraza de problema de ellos.
+  const invalidas: [string, Record<string, unknown>, RegExp][] = [
+    ["externalReference vacio", { externalReference: "" }, /externalReference/],
+    ["monto en 0", { transactionAmount: 0 }, /transactionAmount/],
+    ["monto negativo", { transactionAmount: -1 }, /transactionAmount/],
+    ["monto NaN", { transactionAmount: Number.NaN }, /transactionAmount/],
+    ["frecuencia en 0", { frequencyMonths: 0 }, /frequencyMonths/],
+    ["frecuencia fraccionaria", { frequencyMonths: 1.5 }, /frequencyMonths/],
+  ];
+
+  for (const [caso, patch, patron] of invalidas) {
+    it(`${caso} falla SIN salir a la red`, async () => {
+      const { fn, llamadas } = fakeFetch({ status: 201, body: { id: "x" } });
+
+      await expect(
+        createMpClient("t", fn).createPreapprovalPlan({ ...ALTA, ...patch } as never),
+      ).rejects.toThrow(patron);
+      expect(llamadas).toHaveLength(0);
+    });
+  }
+
+  it("un 400 de MP viaja con su body recortado para poder depurarlo", async () => {
+    const { fn } = fakeFetch({ status: 400, texto: "y".repeat(2000) });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).createPreapprovalPlan(ALTA));
+
+    expect(err.status).toBe(400);
+    // Un 400 es nuestro request mal armado: reintentarlo no lo arregla.
+    expect(err.retryable).toBe(false);
+    expect(err.body).toHaveLength(500);
+  });
+
+  it("un 500 al crear SI es reintentable", async () => {
+    const { fn } = fakeFetch({ status: 500, texto: "boom" });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).createPreapprovalPlan(ALTA));
+
+    expect(err.retryable).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cancelPreapproval — la baja, que es lo unico que frena un cobro recurrente.
+//
+// Existe por el COBRO DOBLE: hasta que aparecio, el cliente sabia abrir cobros y
+// leerlos pero no cerrarlos, asi que un PF que cambiaba de plan quedaba con dos
+// suscripciones autorizadas en MP y le cobraban las dos.
+//
+// Lo que se cuida acá es la FORMA exacta del request. La ortografia del status y
+// el hecho de que no viaje ningun otro campo no son detalles: un `canceled` de
+// una sola ele da un 400 que nadie mira y el cobro doble sigue vivo, y un campo
+// de mas reescribiria el cobro de alguien en el mismo request que lo da de baja.
+// ---------------------------------------------------------------------------
+
+describe("createMpClient — cancelPreapproval", () => {
+  it("hace PUT a /preapproval/{id} con el token", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 200,
+      body: { id: "2c93", status: "cancelled" },
+    });
+
+    await createMpClient("TEST-token", fn).cancelPreapproval("2c93");
+
+    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval/2c93");
+    expect(llamadas[0].init?.method).toBe("PUT");
+    expect(
+      (llamadas[0].init?.headers as Record<string, string>).Authorization,
+    ).toBe("Bearer TEST-token");
+  });
+
+  it("manda `cancelled` con DOS eles — la doc de MP se contradice con su SDK", async () => {
+    // La guia en prosa de MP dice `canceled` con una; el SDK oficial documenta
+    // el campo del REQUEST con dos, y la API real devuelve dos. Gana el
+    // vocabulario del sistema por sobre la guia traducida. El detalle completo,
+    // con las tres fuentes y sus fechas, está en el encabezado de `client.ts`.
+    //
+    // Si este test se pone en rojo porque alguien "corrigió la ortografía", lo
+    // que se rompió es la baja: MP contesta 400 y el PF sigue pagando dos veces.
+    const { fn, llamadas } = fakeFetch({ status: 200, body: { id: "x" } });
+
+    await createMpClient("t", fn).cancelPreapproval("x");
+
+    expect(JSON.parse(llamadas[0].init?.body as string).status).toBe("cancelled");
+  });
+
+  it("manda SOLO status — cualquier otro campo reescribiría el cobro", async () => {
+    // `PUT /preapproval/{id}` es el endpoint de ACTUALIZACION: el mismo body
+    // acepta `auto_recurring`, `back_url`, `reason` y los tokens de tarjeta.
+    // Mandar de más en la baja es cambiarle el monto a alguien sin querer.
+    const { fn, llamadas } = fakeFetch({ status: 200, body: { id: "x" } });
+
+    await createMpClient("t", fn).cancelPreapproval("x");
+
+    expect(Object.keys(JSON.parse(llamadas[0].init?.body as string)))
+      .toEqual(["status"]);
+  });
+
+  it("escapa el id en la URL", async () => {
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await createMpClient("t", fn).cancelPreapproval("a/b?c=1");
+
+    expect(llamadas[0].url).toBe(
+      "https://api.mercadopago.com/preapproval/a%2Fb%3Fc%3D1",
+    );
+  });
+
+  it("un id vacío no sale a la red", async () => {
+    // Pesa el doble acá: `PUT /preapproval/` sin id no es la baja de nada, es
+    // otra ruta. Un id vacío no daría un 404 limpio sino un resultado
+    // inesperado sobre un endpoint que no quisimos tocar.
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await expect(
+      createMpClient("t", fn).cancelPreapproval(""),
+    ).rejects.toThrow(MpApiError);
+    expect(llamadas).toHaveLength(0);
+  });
+
+  it("manda un AbortSignal, igual que las demás", async () => {
+    const { fn, llamadas } = fakeFetch({ status: 200, body: {} });
+
+    await createMpClient("t", fn).cancelPreapproval("x");
+
+    expect(llamadas[0].init?.signal).toBeDefined();
+  });
+
+  const bajasFallidas: [number, boolean, string][] = [
+    [400, false, "el valor de status no le gustó — reintentar no lo arregla"],
+    [404, false, "la suscripción no existe"],
+    [429, true, "rate limit — el reconciliador lo reintenta mañana"],
+    [500, true, "MP se cayó"],
+  ];
+
+  for (const [status, retryable, porque] of bajasFallidas) {
+    it(`una baja con HTTP ${status} → retryable=${retryable} (${porque})`, async () => {
+      const { fn } = fakeFetch({ status, texto: "detalle de MP" });
+
+      const err = await errorDe(() =>
+        createMpClient("t", fn).cancelPreapproval("x"));
+
+      expect(err.status).toBe(status);
+      expect(err.retryable).toBe(retryable);
+    });
+  }
+
+  it("el body del error viaja recortado — es lo único que explica un 400", async () => {
+    const { fn } = fakeFetch({ status: 400, texto: "z".repeat(2000) });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).cancelPreapproval("x"));
+
+    expect(err.body).toHaveLength(500);
+  });
+});

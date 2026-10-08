@@ -9,8 +9,8 @@
  *   - ART rendering of dates, times and amounts
  */
 
-import { renderMail } from "../mail/templates";
-import { MailKind } from "../mail/types";
+import { renderMail, trainerEntry, trainerWebCheckout } from "../mail/templates";
+import { MailKind, MailParams } from "../mail/types";
 import {
   artDateKey,
   formatArs,
@@ -20,21 +20,52 @@ import {
   toDate,
 } from "../mail/format";
 
-const ALL_KINDS: MailKind[] = [
-  "password-reset",
-  "federated-signin-hint",
-  "email-verification",
-  "appointment-confirmed",
-  "appointment-series-created",
-  "appointment-cancelled",
-  "appointment-series-cancelled",
-  "link-requested",
-  "link-accepted",
-  "payment-overdue",
-  "discomfort-reported",
-  "subscription-grace",
-  "subscription-downgraded",
-];
+/**
+ * Todos los `MailKind`, y el COMPILADOR se asegura de que sean todos.
+ *
+ * Antes era un `MailKind[]` escrito a mano, y se quedó en 13 mientras la unión
+ * crecía a 19. Los seis nuevos —los dos comerciales entre ellos— tienen tests
+ * en su propio módulo, pero nunca pasaron por los chequeos que este archivo le
+ * aplica a todos los kinds. Así salió a una casilla real el de
+ * `free-limit-reached` sin una sola tilde.
+ *
+ * Un `Record<MailKind, true>` no compila si falta una clave, así que el kind
+ * número 20 entra acá el mismo día que entra a la unión.
+ */
+const KINDS: Record<MailKind, true> = {
+  "password-reset": true,
+  "federated-signin-hint": true,
+  "email-verification": true,
+  "email-code-athlete": true,
+  "email-code-trainer": true,
+  "appointment-confirmed": true,
+  "appointment-series-created": true,
+  "appointment-cancelled": true,
+  "appointment-series-cancelled": true,
+  "link-requested": true,
+  "link-accepted": true,
+  "payment-overdue": true,
+  "discomfort-reported": true,
+  "moderation-report-created": true,
+  "moderation-user-warned": true,
+  "subscription-grace": true,
+  "subscription-downgraded": true,
+  "limit-reached": true,
+  "athlete-coverage-lost": true,
+  "free-limit-reached": true,
+  "exercise-limit-reached": true,
+  "template-limit-reached": true,
+  "student-limit-reached": true,
+  "inactive-account-notice": true,
+  "service-cancel-confirm": true,
+  "service-cancel-done": true,
+  "plan-change-cancelled": true,
+  "withdrawal-confirm": true,
+  "withdrawal-received": true,
+  "withdrawal-expired": true,
+  "withdrawal-team-notice": true,
+};
+const ALL_KINDS = Object.keys(KINDS) as MailKind[];
 
 /**
  * El href del BOTON del CTA.
@@ -100,6 +131,31 @@ describe("renderMail: escapes user-controlled values", () => {
     expect(out.html).not.toContain("<script>");
     expect(out.html).toContain("&lt;&lt;a&gt;script&gt;");
     expect(out.text).toContain("<<a>script>");
+  });
+});
+
+describe("plan-change-cancelled", () => {
+  const kind = "plan-change-cancelled" as MailKind;
+
+  it("explica que el cambio no se aplicó y que el plan actual sigue", () => {
+    const out = renderMail(kind, { cobroDuplicado: "0" });
+
+    expect(out.subject).toBe("Tu cambio de plan no se aplicó");
+    expect(out.text).toContain(
+      "Tu cambio de plan no se aplicó porque tu plan actual ya se había renovado.",
+    );
+    expect(out.text).toContain(
+      "Seguís con tu plan actual; podés volver a cambiarlo cuando quieras.",
+    );
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it("si ambos cobraron, dice honestamente que el reintegro se revisa a mano", () => {
+    const out = renderMail(kind, { cobroDuplicado: "1" });
+
+    expect(out.text).toContain("Mercado Pago ya te había cobrado el plan nuevo");
+    expect(out.text).toContain("el equipo de TREINO lo revisa y te escribe para devolvértelo");
+    expect(out.text).not.toContain("automát");
   });
 });
 
@@ -204,16 +260,53 @@ describe("destino del CTA", () => {
   // `password-reset` y `email-verification` quedan afuera A PROPOSITO: su CTA
   // no es un destino nuestro, es el `actionLink` de un solo uso que minta el
   // Admin SDK y que apunta al action handler de Firebase.
+  //
+  // `moderation-report-created` tambien queda afuera, y tambien a proposito: no
+  // dibuja boton hasta que exista la ruta de la cola (ver su `case`). El test
+  // de abajo verifica que siga sin boton, asi la excepcion no esconde nada.
+  //
+  // `service-cancel-confirm` lleva su link de un solo uso en `actionLink`, igual
+  // que los de auth, y `service-cancel-done` no tiene botón: después de una
+  // baja no hay nada que hacer (ver sus `case`).
+  //
+  // Los cuatro del arrepentimiento: `withdrawal-confirm` lleva su link de un solo
+  // uso en `actionLink`; `withdrawal-received` no tiene botón (no hay nada que
+  // hacer) y `withdrawal-team-notice` va al equipo, sin pantalla nuestra a la
+  // que mandarlo; `withdrawal-expired` manda a la BAJA, en la landing, que es
+  // lo único que la persona puede hacer después de que venció el plazo.
+  //
+  // Los dos del código de verificación (`email-code-*`) mandan a donde se
+  // paga, que no es la app: el del alumno al checkout de la landing y el del
+  // entrenador al Coach Hub web (`trainerWebCheckout`). Sus destinos se
+  // verifican uno por uno en «código de verificación del mail».
   it("todo CTA que no sea un action link vive bajo /abrir", () => {
-    const conActionLink = ["password-reset", "email-verification"];
-    const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
+    const conActionLink = [
+      "password-reset", "email-verification", "service-cancel-confirm",
+      "withdrawal-confirm",
+    ];
+    const sinBoton = [
+      "moderation-report-created", "service-cancel-done",
+      "plan-change-cancelled",
+      "withdrawal-received", "withdrawal-team-notice",
+    ];
+    const aLaLanding = ["withdrawal-expired"];
+    const alCobroWeb = ["email-code-athlete", "email-code-trainer"];
+    const resto = ALL_KINDS.filter(
+      (k) =>
+        !conActionLink.includes(k) && !sinBoton.includes(k) &&
+        !aLaLanding.includes(k) && !alCobroWeb.includes(k),
+    );
 
-    expect(resto).toHaveLength(11);
+    expect(resto).toHaveLength(19);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
       expect(href).toMatch(/^https:\/\/app\.gettreino\.com\/abrir\/(alumno|profe)$/);
     }
+  });
+
+  it("el aviso de moderación sigue sin botón mientras no exista la cola", () => {
+    expect(ctaHref(renderMail("moderation-report-created", {}).html)).toBe("");
   });
 
   // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
@@ -228,6 +321,45 @@ describe("destino del CTA", () => {
       const out = renderMail(kind, { actionLink: "https://x.test/?oobCode=1" });
       expect(out.html).not.toContain("treino.app");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trainerWebCheckout — los mails de plata del PF NO van por el App Link
+//
+// `/abrir/profe` abre la app en un teléfono, y la app no vende. Estos mails
+// tienen que ir directo al Coach Hub web.
+// ---------------------------------------------------------------------------
+describe("plantilla student-limit-reached", () => {
+  // El mismo mail sale cuando se rechaza ACEPTAR una solicitud y cuando se
+  // rechaza REANUDAR un vínculo pausado: en el segundo caso el alumno no es
+  // nuevo, así que el texto no puede decir que lo es (hallazgo de Codex sobre
+  // #1267).
+  it("habla de activar el vínculo, no de un alumno nuevo", () => {
+    const out = renderMail("student-limit-reached", { limit: 2, ctaUrl: "https://app.gettreino.com/?to=facturacion" });
+
+    expect(out.html).toContain("activar ese vínculo");
+    expect(out.html).not.toMatch(/alumno nuevo/i);
+    expect(out.text).not.toMatch(/alumno nuevo/i);
+  });
+});
+
+describe("trainerWebCheckout", () => {
+  it("es exactamente la URL del Coach Hub con el destino de facturación", () => {
+    expect(trainerWebCheckout()).toBe("https://app.gettreino.com/?to=facturacion");
+  });
+
+  it("no pasa por el App Link", () => {
+    expect(trainerWebCheckout()).not.toContain("/abrir/");
+  });
+
+  // Guard de compilación: si alguien saca el `Exclude` de `trainerEntry` y
+  // vuelve a habilitar `{ to: "facturacion" }` ahí, ts-jest deja de compilar
+  // este archivo (TS2578, directiva sin usar). Lo protege jest, no el `tsc`
+  // del build: `tsconfig.json` excluye `src/__tests__`.
+  it("trainerEntry ya no acepta el destino de facturación", () => {
+    // @ts-expect-error — "facturacion" está excluido: ese destino va por trainerWebCheckout().
+    expect(() => trainerEntry({ to: "facturacion" })).not.toThrow();
   });
 });
 
@@ -691,5 +823,924 @@ describe("mails del paywall del PF", () => {
 
       expect(ctaHref(html)).toBe("https://app.gettreino.com/abrir/profe");
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Botón de Baja de Servicio — los dos mails de `baja-por-mail.ts`
+// ---------------------------------------------------------------------------
+describe("mails de la baja por mail", () => {
+  const LINK =
+    "https://gettreino.com/es/baja-de-servicio/confirmar#t=" + "A".repeat(43);
+  const CODE = "BAJA-2026-0A1B2C";
+
+  describe("service-cancel-confirm", () => {
+    it("pone el código en el asunto y en el cuerpo", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.subject).toBe(`Confirmá la baja de tu suscripción — código ${CODE}`);
+      expect(out.text).toContain(CODE);
+    });
+
+    it("sin código el asunto no queda colgando", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK });
+
+      expect(out.subject).toBe("Confirmá la baja de tu suscripción");
+      expect(out.subject).not.toContain("código");
+      expect(out.text).not.toContain("Código");
+    });
+
+    it("el botón CONFIRMAR BAJA lleva al link, con el token en el fragmento", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.html).toContain("CONFIRMAR BAJA");
+      expect(ctaHref(out.html)).toBe(LINK);
+      // Quien lee en texto plano también tiene que poder confirmar.
+      expect(out.text).toContain(LINK);
+    });
+
+    // `sendQueuedMail` borra `actionLink` al enviar. Re-renderizado sin él, el
+    // mail no puede ofrecer un botón muerto.
+    it("sin link no dibuja botón", () => {
+      const out = renderMail("service-cancel-confirm", { code: CODE });
+
+      expect(ctaHref(out.html)).toBe("");
+      expect(out.html).not.toContain("CONFIRMAR BAJA");
+    });
+
+    it("dice que vence en 72 horas y que si no lo pediste no se cancela nada", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK });
+
+      expect(out.text).toContain("72 horas");
+      expect(out.text).toContain("Si no lo pediste vos, ignorá este mail");
+      expect(out.text).toContain("no se cancela nada");
+    });
+
+    // Lo pudo pedir cualquiera tipeando el correo: el mail no le cuenta nada a
+    // quien no sea el dueño, y tampoco repite la dirección.
+    it("no nombra a la persona ni repite el correo", () => {
+      const out = renderMail("service-cancel-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.text.replace(LINK, "")).not.toContain("@");
+    });
+  });
+
+  describe("service-cancel-done", () => {
+    // 2026-10-10T02:00Z es todavía el 9 de octubre en Buenos Aires.
+    const ISO = "2026-10-10T02:00:00.000Z";
+
+    it("pone el código en el asunto", () => {
+      const out = renderMail("service-cancel-done", { code: CODE, accesoHastaIso: ISO });
+
+      expect(out.subject).toBe(`Tu baja quedó hecha — código ${CODE}`);
+    });
+
+    it("sin código el asunto no queda colgando", () => {
+      expect(renderMail("service-cancel-done", {}).subject).toBe("Tu baja quedó hecha");
+    });
+
+    it("la fecha de acceso sale en hora de Argentina", () => {
+      const out = renderMail("service-cancel-done", { code: CODE, accesoHastaIso: ISO });
+
+      expect(out.text).toContain("Conservás el acceso hasta el 09/10/2026");
+      expect(out.text).not.toContain("10/10/2026");
+    });
+
+    // Una fecha inventada es peor que ninguna (AGENTS.md §11.1).
+    it("sin fecha, o con una ilegible, omite la frase entera", () => {
+      for (const params of [{}, { accesoHastaIso: "mañana" }] as MailParams[]) {
+        const out = renderMail("service-cancel-done", params);
+
+        expect(out.text).not.toContain("Conservás el acceso");
+        expect(out.text).not.toContain("NaN");
+        expect(out.text).not.toContain("Invalid");
+      }
+    });
+
+    // Espejo de terminos-suscripcion.md §7.
+    it("dice lo que promete el §7 de los términos", () => {
+      const out = renderMail("service-cancel-done", { accesoHastaIso: ISO });
+
+      expect(out.text).toContain("no se te vuelve a cobrar");
+      expect(out.text).toContain("No se reembolsa el período en curso");
+      expect(out.text).toContain("No se borra nada");
+    });
+
+    it("no tiene botón", () => {
+      expect(ctaHref(renderMail("service-cancel-done", { accesoHastaIso: ISO }).html))
+        .toBe("");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tildes — el copy es castellano rioplatense, con voseo
+// ---------------------------------------------------------------------------
+describe("tildes", () => {
+  /**
+   * Palabras que en el copy de la casa —castellano rioplatense, con voseo—
+   * están mal escritas sin tilde.
+   *
+   * Los comentarios de este repo se escriben sin tildes por costumbre, y ese
+   * hábito se filtró una vez al texto que lee el usuario: el mail de
+   * `free-limit-reached` salió con "podes", "aca", "limite" y "cuantas". Es el
+   * mail que le pide que pague.
+   *
+   * Dos tienen un homógrafo correcto, raro en un mail: "limite" (que el plan
+   * te limite) y "ultima" (del verbo ultimar). Si alguna vez hace falta uno,
+   * reformulá la frase o sacá la palabra de acá con el motivo al lado. Quedan
+   * afuera a propósito "que" y "cuantas": sin tilde son correctas todo el
+   * tiempo, en su otra función.
+   */
+  const SIN_TILDE = [
+    "podes", "tenes", "queres", "sabes", "aca", "alla", "ahi",
+    "limite", "limites", "sesion", "suscripcion", "contrasena",
+    "ultimo", "ultima", "proximo", "proxima", "dias", "tambien", "despues",
+  ];
+
+  it.each(ALL_KINDS)("%s no tiene palabras sin su tilde", (kind) => {
+    const { subject, text } = renderMail(kind, {
+      trainerName: "Jose",
+      athleteName: "Marta",
+      otherName: "Jose",
+      dateLabel: "martes 26 de agosto",
+      timeLabel: "19:00",
+      amountLabel: "$ 25.000",
+      dueLabel: "26/08/2026",
+      // Con el bloque de pagos del mail del código: es el copy más largo.
+      showPlans: "1",
+    }, kind.startsWith("email-code") ?
+      { bajaDePromocionales: "https://gettreino.com/es/correos-promocionales/baja#t=x" } :
+      {});
+    // Las URLs quedan afuera: `/suscripcion/checkout` es una ruta, no copy.
+    const copy = `${subject}\n${text}`.replace(/https?:\/\/\S+/g, "");
+    const palabras = copy.toLowerCase().match(/[a-zñáéíóúü]+/g) ?? [];
+
+    expect(palabras.filter((p) => SIN_TILDE.includes(p))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Botón de Arrepentimiento
+//
+// NO es la baja: la baja conserva el acceso y no devuelve plata; el
+// arrepentimiento devuelve todo, y sólo dentro de los 10 días. Los textos lo
+// tienen que dejar clarísimo, y ninguno puede prometer un plazo de devolución
+// que los términos (§6) no prometen.
+// ---------------------------------------------------------------------------
+describe("Botón de Arrepentimiento", () => {
+  const LINK = "https://gettreino.com/es/arrepentimiento/confirmar#t=abc";
+  const CODE = "ARR-2026-0A1B2C";
+  // 00:00 del 24/09/2026 en Argentina.
+  const ULTIMO_DIA = "2026-09-24T03:00:00.000Z";
+
+  describe("withdrawal-confirm", () => {
+    it("lleva el código en el asunto y el link en el botón", () => {
+      const out = renderMail("withdrawal-confirm", { actionLink: LINK, code: CODE });
+
+      expect(out.subject).toBe(`Confirmá tu arrepentimiento — código ${CODE}`);
+      expect(ctaHref(out.html)).toBe(LINK);
+      expect(out.html).toContain("CONFIRMAR ARREPENTIMIENTO");
+    });
+
+    it("sin link no dibuja un botón muerto", () => {
+      const out = renderMail("withdrawal-confirm", { code: CODE });
+
+      expect(out.html).not.toContain("CONFIRMAR ARREPENTIMIENTO");
+      expect(out.html).not.toContain("href=\"\"");
+    });
+
+    it("dice que la confirmación es un click y que el link vence", () => {
+      // Los escáneres de correo pre-abren los links: el copy dice «tocá el botón».
+      const { text } = renderMail("withdrawal-confirm", { actionLink: LINK });
+
+      expect(text).toContain("tocá el botón");
+      expect(text).toContain("72 horas");
+      expect(text).toContain("una sola vez");
+    });
+
+    it("no se confunde con la baja", () => {
+      const { text } = renderMail("withdrawal-confirm", { actionLink: LINK, code: CODE });
+
+      expect(text).not.toMatch(/dar de baja|tu baja/i);
+    });
+  });
+
+  describe("withdrawal-received", () => {
+    it("dentro de plazo: se devuelve lo pagado y no se cobra más", () => {
+      const { text, subject } = renderMail("withdrawal-received", { code: CODE });
+
+      expect(subject).toBe(`Recibimos tu arrepentimiento — código ${CODE}`);
+      expect(text).toContain("dentro del plazo de 10 días");
+      expect(text).toContain("no se te vuelve a cobrar");
+      expect(text).toContain("Te devolvemos lo pagado por el mismo medio de pago");
+      // Se devuelve TODO, así que no queda acceso gratis hasta fin de período.
+      expect(text).toContain("Los beneficios del plan pago terminan ahora");
+    });
+
+    it("⚠️ no promete un plazo de devolución que los términos no prometen", () => {
+      // §6 dice «a continuación te devolvemos el dinero». Un «en 48 horas»
+      // escrito acá sería una promesa nueva, y la cumple una persona a mano.
+      const { text } = renderMail("withdrawal-received", { code: CODE });
+      const sin10Dias = text.replace("10 días", "");
+
+      expect(sin10Dias).not.toMatch(/\b\d+\s*(horas?|hs|d[ií]as?)\b/i);
+    });
+
+    it("⚠️ en revisión NO dice que se canceló ni que se devuelve", () => {
+      // Es la franja donde un feriado pudo correr el plazo: no se tocó nada, y
+      // el texto no puede decir lo contrario.
+      const { text, subject } = renderMail("withdrawal-received", {
+        code: CODE, revision: "1",
+      });
+
+      expect(subject).toBe(`Estamos revisando tu arrepentimiento — código ${CODE}`);
+      expect(text).toContain("Todavía no cancelamos nada");
+      expect(text).not.toMatch(/devolvemos|dada de baja|no se te vuelve a cobrar/i);
+    });
+
+    it("no tiene botón: no hay nada que la persona tenga que hacer", () => {
+      expect(ctaHref(renderMail("withdrawal-received", { code: CODE }).html)).toBe("");
+    });
+  });
+
+  describe("withdrawal-expired", () => {
+    it("dice cuándo venció, en hora de Argentina", () => {
+      const { text } = renderMail("withdrawal-expired", {
+        code: CODE, ultimoDiaIso: ULTIMO_DIA,
+      });
+
+      expect(text).toContain("venció el 24/09/2026");
+    });
+
+    it("sin fecha no inventa una", () => {
+      const { text } = renderMail("withdrawal-expired", { code: CODE });
+
+      expect(text).toContain("ya venció");
+      expect(text).not.toMatch(/venció el/);
+    });
+
+    it("dice que no se devuelve y le muestra lo que SÍ puede hacer: la baja", () => {
+      // Espejo de terminos-suscripcion.md §7.
+      const out = renderMail("withdrawal-expired", { code: CODE, ultimoDiaIso: ULTIMO_DIA });
+
+      expect(out.text).toContain("no podemos devolver lo pagado");
+      expect(out.text).toContain("conservás el acceso hasta el final del período que ya pagaste");
+      expect(ctaHref(out.html)).toBe("https://gettreino.com/es/baja-de-servicio");
+    });
+  });
+
+  describe("withdrawal-team-notice", () => {
+    const DATOS = {
+      estado: "dentro",
+      code: CODE,
+      email: "ana@example.com",
+      uid: "u1",
+      contratoIso: "2026-09-20T15:00:00.000Z",
+      diasTranscurridos: 4,
+      ultimoDiaIso: ULTIMO_DIA,
+      monto: 3500,
+      cobros: 1,
+      suscripciones: "sub1, sub2",
+      canceladas: 1,
+    };
+
+    it("dentro de plazo: dice que hay que DEVOLVER y trae todo para hacerlo", () => {
+      const { subject, text } = renderMail("withdrawal-team-notice", DATOS);
+
+      expect(subject).toBe(`Devolver pago: arrepentimiento ${CODE} dentro de plazo`);
+      expect(text).toContain("Falta devolver el pago");
+      expect(text).toContain("ana@example.com");
+      expect(text).toContain("sub1, sub2");
+      expect(text).toContain("3.500");
+      expect(text).toContain("20/09/2026");
+    });
+
+    it("en el límite: dice REVISAR y que NO se canceló nada", () => {
+      const { subject, text } = renderMail("withdrawal-team-notice", {
+        ...DATOS, estado: "a-revisar", canceladas: 0,
+      });
+
+      expect(subject).toMatch(/^REVISAR arrepentimiento/);
+      expect(text).toContain("No se canceló nada");
+      expect(text).not.toContain("Falta devolver el pago");
+    });
+
+    it("dentro de plazo dice que el acceso se cortó; en el límite, que sigue igual", () => {
+      expect(renderMail("withdrawal-team-notice", DATOS).text)
+        .toContain("Acceso al plan pago: cortado en el acto");
+      expect(renderMail("withdrawal-team-notice", { ...DATOS, estado: "a-revisar" }).text)
+        .toContain("Acceso al plan pago: sigue igual");
+    });
+
+    it("advierte el resto prepago de un plan anterior, y sólo cuando existe", () => {
+      const con = renderMail("withdrawal-team-notice", {
+        ...DATOS, pisoTier: "plan3", pisoHastaIso: "2026-10-20T15:00:00.000Z",
+      }).text;
+      expect(con).toContain("conserva el resto prepago de un plan anterior (plan3 hasta el 20/10/2026)");
+      expect(con).toContain("quitalo a mano");
+
+      expect(renderMail("withdrawal-team-notice", DATOS).text).not.toContain("resto prepago");
+    });
+
+    it("un dato que falta se dice, no se inventa ni se deja en blanco", () => {
+      const { text } = renderMail("withdrawal-team-notice", { estado: "dentro" });
+
+      expect(text).toContain("Contratación (según Mercado Pago): sin dato");
+    });
+
+    it("escapa el mail de la cuenta: es texto libre de un tercero", () => {
+      const { html } = renderMail("withdrawal-team-notice", {
+        ...DATOS, email: "<img src=x onerror=alert(1)>@x.com",
+      });
+
+      expect(html).not.toContain("<img src=x");
+      expect(html).toContain("&lt;img");
+    });
+
+    it("no tiene botón", () => {
+      expect(ctaHref(renderMail("withdrawal-team-notice", DATOS).html)).toBe("");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Código de verificación del mail (`auth/codigo-de-verificacion.ts`)
+//
+// Es el mail que tiene que abrir TODO el que entra a la app, y el único lugar
+// donde se le puede decir que los pagos van por mail: la app no puede.
+// ---------------------------------------------------------------------------
+describe("código de verificación del mail", () => {
+  const CODIGO = "048213";
+  /** El bloque de pagos solo va con el pie de baja: sin esta URL no hay bloque. */
+  const CON_PIE = { bajaDePromocionales: "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi" };
+  const AMBOS = ["email-code-athlete", "email-code-trainer"] as const;
+
+  it.each(AMBOS)("%s sin los planes lleva el código en el asunto y como titular", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO });
+
+    expect(out.subject).toContain(CODIGO);
+    // El titular es la primera línea del texto plano.
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).toContain("vence en 15 minutos");
+  });
+
+  it.each(AMBOS)("%s con los planes dice que los planes y los pagos van por mail", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.text).toMatch(/los planes y los pagos van por mail/);
+    // La etiqueta del botón vive en el HTML; el texto plano lleva la URL.
+    expect(out.html).toContain("VER LOS PLANES");
+  });
+
+  // CON los planes el orden se invierte (ver el `case` en `templates.ts`): con
+  // el código en el asunto nadie abre el mail, y lo que vino a decir no existe.
+  it.each(AMBOS)("⚠️ %s con los planes NO lleva el código en el asunto: hay que abrirlo", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.subject).toBe("Tu código para entrar a TREINO");
+    expect(out.subject).not.toContain(CODIGO);
+  });
+
+  it.each(AMBOS)("⚠️ %s con los planes: el aviso es el preheader, y el código no se asoma", (kind) => {
+    // El preheader es lo que se lee en la bandeja y en la notificación, antes de
+    // abrir: ahí tiene que estar el aviso, no el código.
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+    const preheader = out.html.match(/opacity:0;">([^&<]*)/)?.[1] ?? "";
+
+    expect(preheader).toMatch(/^En TREINO, los planes y los pagos van por /);
+    expect(preheader).toContain("todo te llega por acá");
+    expect(preheader).not.toContain(CODIGO);
+  });
+
+  it.each(AMBOS)("⚠️ %s con los planes: el código va DESPUÉS de los planes, y en grande", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+    const ultimoPlan = kind === "email-code-trainer" ? "Plan 3 ·" : "TREINO Pro ·";
+
+    expect(out.text.indexOf(ultimoPlan)).toBeGreaterThan(-1);
+    expect(out.text.indexOf(CODIGO)).toBeGreaterThan(out.text.indexOf(ultimoPlan));
+    // Después de los planes tiene que encontrarse de un vistazo.
+    expect(out.html).toMatch(new RegExp(`font-size:30px[^>]*>${CODIGO}</strong>`));
+  });
+
+  it("el del PF lista los cuatro planes, con cupo y precio", () => {
+    const { text } = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(text).toContain("Free · 2 alumnos");
+    expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
+    expect(text).toMatch(/Plan 2 · 15 alumnos · \$\s?22\.000 por mes/);
+    expect(text).toMatch(/Plan 3 · alumnos sin límite · \$\s?39\.000 por mes/);
+  });
+
+  it("el del alumno lista el gratis y TREINO Pro, con su precio", () => {
+    const { text } = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(text).toContain("Gratis · el que tenés hoy.");
+    expect(text).toMatch(/TREINO Pro · \$\s?3\.500 por mes o \$\s?35\.000 por año\./);
+    // El alumno no ve los planes del PF.
+    expect(text).not.toContain("Plan 1");
+  });
+
+  // Que los números de arriba coincidan con la config de HOY no prueba que el
+  // mail los saque de ahí: un precio escrito a mano también pasaría. Con la
+  // config cambiada, el mail tiene que cambiar.
+  it("⚠️ los planes salen de tier-config y athlete-plan-config, no de números a mano", () => {
+    let pf = "";
+    let alumno = "";
+    jest.isolateModules(() => {
+      jest.doMock("../subscriptions/tier-config", () => ({
+        ...jest.requireActual("../subscriptions/tier-config"),
+        TIER_WEIGHT_LIMITS: { free: 3, plan1: 8, plan2: 16, plan3: null },
+        TIER_PRICES_ARS: {
+          plan1: { monthly: 11111, annual: 1 },
+          plan2: { monthly: 22222, annual: 1 },
+          plan3: { monthly: 33333, annual: 1 },
+        },
+      }));
+      jest.doMock("../subscriptions/athlete-plan-config", () => ({
+        ATHLETE_PRICES_ARS: { monthly: 4444, annual: 44440 },
+      }));
+      // `require` y no `import`: `isolateModules` es sincrónico (ver
+      // `mp-precio-colision.test.ts`).
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { renderMail: render } = require("../mail/templates");
+      pf = render("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE).text;
+      alumno = render("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE).text;
+    });
+    jest.dontMock("../subscriptions/tier-config");
+    jest.dontMock("../subscriptions/athlete-plan-config");
+
+    expect(pf).toContain("Free · 3 alumnos");
+    expect(pf).toContain(`Plan 1 · 8 alumnos · ${formatArs(11111)} por mes`);
+    expect(pf).toContain(`Plan 3 · alumnos sin límite · ${formatArs(33333)} por mes`);
+    expect(alumno).toContain(`TREINO Pro · ${formatArs(4444)} por mes o ${formatArs(44440)} por año.`);
+  });
+
+  it("el del alumno manda al checkout de gettreino.com", () => {
+    const out = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.text).toContain("https://gettreino.com/es/suscripcion/checkout");
+  });
+
+  it("el del entrenador manda a los planes del Coach Hub web, no a la app", () => {
+    // La app no vende: un PF que toca el botón en el teléfono tiene que caer en
+    // la web, donde se contrata. Ver `trainerWebCheckout`.
+    const out = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.text).toContain("https://app.gettreino.com/?to=facturacion");
+    expect(out.text).not.toContain("/suscripcion/checkout");
+  });
+
+  // `muestraPlanes`: quien apagó lo comercial, o no tiene nada que pagar.
+  it.each(AMBOS)("%s con showPlans \"0\" es solo el código: sin pagos ni botón", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "0" });
+
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).toContain("vence en 15 minutos");
+    expect(out.text).not.toMatch(/pago|plan|Pro\b/i);
+    expect(out.html).not.toContain("VER LOS PLANES");
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it.each(AMBOS)("%s sin showPlans tampoco lleva el bloque: ante la duda, nada comercial", (kind) => {
+    expect(renderMail(kind, { codigo: CODIGO }).html).not.toContain("VER LOS PLANES");
+  });
+
+  // Al enviar, `sendQueuedMail` pasa `comercial: false` a quien se opuso a
+  // `novedades_plan` (el mail sale con `bloqueComercial`).
+  it.each(AMBOS)("%s con showPlans \"1\" pero comercial: false es solo el código", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, { comercial: false });
+
+    expect(out.text.split("\n")[0]).toBe(CODIGO);
+    expect(out.text).not.toMatch(/pago|plan|Pro\b/i);
+    expect(out.html).not.toContain("VER LOS PLANES");
+    expect(ctaHref(out.html)).toBe("");
+  });
+
+  it.each(AMBOS)("%s con el bloque lleva también el link de baja", (kind) => {
+    const out = renderMail(kind, { codigo: CODIGO, showPlans: "1" }, CON_PIE);
+
+    expect(out.html).toContain("VER LOS PLANES");
+    expect(out.html).toContain(`<a href="${CON_PIE.bajaDePromocionales}"`);
+    expect(out.text).toContain(CON_PIE.bajaDePromocionales);
+  });
+
+  it.each(AMBOS)("%s sin la URL de baja no lleva el bloque: nunca publicidad sin pie", (kind) => {
+    // Un doc sin `bloqueComercial` (encolado antes del deploy, reencolado a
+    // mano) o un envío sin la clave de baja.
+    expect(renderMail(kind, { codigo: CODIGO, showPlans: "1" }).html).not.toContain("VER LOS PLANES");
+  });
+
+  it.each(AMBOS)("%s sin código no rompe ni dice «undefined»", (kind) => {
+    const out = renderMail(kind, {});
+
+    expect(out.subject).not.toContain("undefined");
+    expect(out.text).not.toContain("undefined");
+    expect(out.text.split("\n")[0]).toBe("Confirmá tu mail");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pie de baja de los correos promocionales
+//
+// Decreto 1558/01, Anexo I, art. 27, párrafo 3: en toda comunicación con fines
+// de publicidad hay que indicar «en forma expresa y destacada» cómo pedir el
+// retiro. `sendQueuedMail` decide al enviar y le pasa la URL a `renderMail`;
+// estos tests miran qué hace la plantilla con ella.
+// ---------------------------------------------------------------------------
+describe("pie de baja de los correos promocionales", () => {
+  const BAJA = "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi";
+  const MUTED_GRIS = "#9BA8A1";
+  const BONE_BLANCO = "#FFFFFF";
+
+  /**
+   * Transcripciones EXACTAS de `design.md` §2. Se copian acá a propósito, y no
+   * se importan de `templates.ts`: un test que lee la constante que prueba
+   * pasaría igual con la transcripción retocada.
+   */
+  const LEY_25326 =
+    "Ley 25.326, art. 27, inc. 3: \"El titular podrá en cualquier momento " +
+    "solicitar el retiro o bloqueo de su nombre de los bancos de datos a los que " +
+    "se refiere el presente artículo.\"";
+  const DECRETO_1558 =
+    "Decreto 1558/01, Anexo I, art. 27, párrafo 3: \"En toda comunicación con " +
+    "fines de publicidad que se realice por correo, teléfono, correo electrónico, " +
+    "Internet u otro medio a distancia a conocer, se deberá indicar, en forma " +
+    "expresa y destacada, la posibilidad del titular del dato de solicitar el " +
+    "retiro o bloqueo, total o parcial, de su nombre de la base de datos. A pedido " +
+    "del interesado, se deberá informar el nombre del responsable o usuario del " +
+    "banco de datos que proveyó la información.\"";
+  const RESPONSABLE = "Responsable: BACKHAUSTIN S.A.S. — CUIT 30-71929587-4";
+  const AVISO =
+    "Recibís este correo promocional porque tenés una cuenta en TREINO. " +
+    "Si no querés recibir más, ";
+  const LINK_TEXTO = "dejá de recibir correos promocionales";
+
+  /** `esc()` escribe `&quot;`; el lector ve la comilla. Se compara lo que se VE. */
+  const visible = (html: string) => html.replace(/&quot;/g, "\"");
+
+  const PARAMS: MailParams = {
+    trainerName: "Jose",
+    athleteName: "Marta",
+    otherName: "Jose",
+    dateLabel: "martes 26 de agosto",
+    timeLabel: "19:00",
+    amountLabel: "$ 25.000",
+    dueLabel: "26/08/2026",
+    limit: 2,
+    blockedCount: 3,
+  };
+
+  describe("sin la opción, el mail sale como salía en origin/main", () => {
+    /**
+     * El pie de `origin/main` (`templates.ts`, `layout()`), COPIADO como literal:
+     * el `<div>` con «Recibís este mail porque tenés una cuenta en TREINO.» y el
+     * link a gettreino.com, más el cierre del documento. Comparar `renderMail`
+     * contra `renderMail` sólo prueba que la función es determinista; esto es lo
+     * que prueba que el pie de hoy no cambió. Si el pie común cambia a propósito,
+     * este literal se cambia a propósito, en el mismo commit.
+     */
+    const PIE_DE_ORIGIN_MAIN =
+      "<div style=\"max-width:520px;padding:20px 8px;font-size:12px;" +
+      "line-height:1.6;color:#9BA8A1;font-family:Arial,Helvetica,sans-serif;\">" +
+      "Recibís este mail porque tenés una cuenta en TREINO.<br>" +
+      "<a href=\"https://gettreino.com\" style=\"color:#9BA8A1;\">gettreino.com</a>" +
+      "</div>";
+    const CIERRE_DEL_DOCUMENTO = "</td></tr></table></body></html>";
+
+    it.each(ALL_KINDS)("%s: el HTML termina en el pie de origin/main, byte a byte", (kind) => {
+      const { html } = renderMail(kind, PARAMS);
+
+      expect(html.endsWith(PIE_DE_ORIGIN_MAIN + CIERRE_DEL_DOCUMENTO)).toBe(true);
+    });
+
+    it.each(["appointment-confirmed", "password-reset", "limit-reached"] as const)(
+      "%s: el pie no cambia ni pasando opciones que no lo piden",
+      (kind) => {
+        // `{}` y `{comercial: true}` no piden pie de baja.
+        for (const opciones of [undefined, {}, { comercial: true }]) {
+          const { html } = renderMail(kind, PARAMS, opciones);
+
+          expect(html.endsWith(PIE_DE_ORIGIN_MAIN + CIERRE_DEL_DOCUMENTO)).toBe(true);
+        }
+      },
+    );
+
+    it.each(ALL_KINDS)("%s: el texto plano no tiene pie ni separador", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS);
+
+      // Hoy el text/plain no tiene pie; sin la opción tiene que seguir así.
+      expect(text.split("\n")).not.toContain("--");
+      for (const huella of ["promocional", "Ley 25.326", "Decreto 1558", "BACKHAUSTIN"]) {
+        expect(html).not.toContain(huella);
+        expect(text).not.toContain(huella);
+      }
+    });
+
+    it.each(ALL_KINDS)("%s: `{}` y `{comercial: true}` son los defaults", (kind) => {
+      // No dice «como antes» (eso lo dicen los de arriba): dice que las opciones
+      // por default equivalen a no pasarlas.
+      const sinOpciones = renderMail(kind, PARAMS);
+
+      expect(renderMail(kind, PARAMS, {})).toEqual(sinOpciones);
+      expect(renderMail(kind, PARAMS, { comercial: true })).toEqual(sinOpciones);
+    });
+  });
+
+  describe("con la opción", () => {
+    it.each(ALL_KINDS)("%s: lleva el link en el HTML y la URL completa en el texto", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(html).toContain(`<a href="${BAJA}"`);
+      expect(html).toContain(`>${LINK_TEXTO}</a>`);
+      expect(text).toContain(BAJA);
+    });
+
+    it.each(ALL_KINDS)("%s: transcribe los dos textos y nombra al responsable", (kind) => {
+      const { html, text } = renderMail(kind, PARAMS, { bajaDePromocionales: BAJA });
+
+      for (const literal of [LEY_25326, DECRETO_1558, RESPONSABLE]) {
+        expect(text).toContain(literal);
+        expect(visible(html)).toContain(literal);
+      }
+    });
+
+    it("el aviso dice «promocional» y reemplaza al «Recibís este mail» del pie común", () => {
+      const { html, text } = renderMail("link-requested", PARAMS, {
+        bajaDePromocionales: BAJA,
+      });
+
+      expect(visible(html)).toContain(AVISO);
+      expect(text).toContain(`${AVISO}${LINK_TEXTO}:\n${BAJA}`);
+      // Dos frases casi iguales una abajo de la otra serían ruido.
+      expect(html).not.toContain("Recibís este mail porque");
+    });
+
+    it("conserva el link de marca a la landing", () => {
+      const { html } = renderMail("link-requested", PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(html).toContain(">gettreino.com</a>");
+    });
+
+    it("el texto plano lleva el pie DESPUÉS del botón y el cuerpo", () => {
+      // Hoy el text/plain no tiene pie: sin esto, quien lee en texto no tendría
+      // el mecanismo, que la norma pide en toda comunicación de publicidad.
+      const { text } = renderMail("limit-reached", { ...PARAMS, ctaUrl: "https://app.gettreino.com/x" }, {
+        bajaDePromocionales: BAJA,
+      });
+
+      const ordenados = [
+        text.indexOf("Llegaste al tope"),
+        text.indexOf("https://app.gettreino.com/x"),
+        text.indexOf(BAJA),
+        text.indexOf("Ley 25.326"),
+        text.indexOf("Decreto 1558"),
+        text.indexOf("Responsable:"),
+      ];
+      expect(ordenados.every((i) => i >= 0)).toBe(true);
+      expect([...ordenados].sort((a, b) => a - b)).toEqual(ordenados);
+    });
+
+    it("el aviso está DESTACADO: color del cuerpo y letra más grande que el pie chico", () => {
+      const { html } = renderMail("link-requested", PARAMS, { bajaDePromocionales: BAJA });
+
+      // El <div> que contiene el link de baja.
+      const divDelAviso = html.match(/<div style="([^"]*)">Recibís este correo promocional/);
+      expect(divDelAviso).not.toBeNull();
+      const estilo = divDelAviso![1];
+      expect(estilo).toContain(`color:${BONE_BLANCO}`);
+      expect(estilo).not.toContain(MUTED_GRIS);
+      expect(estilo).toContain("font-size:14px");
+
+      // Y las transcripciones van en el gris chico del pie.
+      const divDeLasNormas = html.match(/<div style="([^"]*)">Ley 25\.326/);
+      expect(divDeLasNormas).not.toBeNull();
+      expect(divDeLasNormas![1]).toContain(`color:${MUTED_GRIS}`);
+      expect(divDeLasNormas![1]).toContain("font-size:12px");
+    });
+
+    it("escapa la URL: no puede romper el atributo ni abrir un tag", () => {
+      const hostil = "https://x.test/?a=1&b=\"><script>alert(1)</script>";
+      const { html, text } = renderMail("link-requested", PARAMS, {
+        bajaDePromocionales: hostil,
+      });
+
+      expect(html).not.toContain("<script>");
+      expect(html).toContain("&lt;script&gt;");
+      expect(html).toContain("a=1&amp;b=&quot;&gt;");
+      // En text/plain no hay nada que escapar: va tal cual.
+      expect(text).toContain(hostil);
+    });
+
+    it("no filtra «undefined» ni «null»", () => {
+      const { html, text } = renderMail("link-requested", {}, { bajaDePromocionales: BAJA });
+
+      expect(`${html} ${text}`).not.toMatch(/undefined|null|NaN/);
+    });
+
+    it("la opción agrega el pie y no toca el cuerpo ni el asunto", () => {
+      const sin = renderMail("appointment-confirmed", PARAMS);
+      const con = renderMail("appointment-confirmed", PARAMS, { bajaDePromocionales: BAJA });
+
+      expect(con.subject).toBe(sin.subject);
+      expect(con.text.startsWith(sin.text)).toBe(true);
+    });
+  });
+
+  describe("limit-reached con `comercial: false`", () => {
+    const CTA = "https://app.gettreino.com/?to=facturacion";
+    const render = (opciones?: Parameters<typeof renderMail>[2]) =>
+      renderMail("limit-reached", { limit: 2, blockedCount: 3, ctaUrl: CTA }, opciones);
+
+    it("omite la línea de venta", () => {
+      const { html, text } = render({ comercial: false });
+
+      expect(text).not.toContain("planes más grandes");
+      expect(text).not.toContain("Si querés seguir sumando");
+      expect(html).not.toContain("planes más grandes");
+    });
+
+    it("omite el botón VER LOS PLANES, y su URL en el texto plano", () => {
+      const { html, text } = render({ comercial: false });
+
+      expect(html).not.toContain("VER LOS PLANES");
+      expect(ctaHref(html)).toBe("");
+      // Con el botón fuera, la URL del CTA tampoco puede quedar en el texto.
+      expect(text).not.toContain(CTA);
+      expect(html).not.toContain(CTA);
+    });
+
+    it("CONSERVA lo operativo: el tope, los bloqueados y que no pierden nada", () => {
+      const { text } = render({ comercial: false });
+
+      expect(text).toContain("2 alumnos");
+      expect(text).toContain("3 alumnos quedaron en solo lectura");
+      expect(text).toContain("Tus alumnos no pierden nada");
+    });
+
+    it("sin opciones (o con `comercial: true`) sigue llevando el bloque entero", () => {
+      for (const { html, text } of [render(), render({ comercial: true })]) {
+        expect(text).toContain("Si querés seguir sumando, estos planes tienen más lugar:");
+        expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
+        expect(html).toContain("VER LOS PLANES");
+        expect(ctaHref(html)).toBe(CTA);
+        expect(text).toContain(CTA);
+      }
+    });
+
+    it("con `comercial: false` tampoco quedan los planes", () => {
+      expect(render({ comercial: false }).text).not.toMatch(/Plan \d/);
+    });
+
+    it("es independiente del pie de baja", () => {
+      // Sin bloque comercial y con pie: combinación que `sendQueuedMail` no
+      // produce hoy, pero la plantilla no tiene por qué asumir que no existe.
+      const { html, text } = render({ comercial: false, bajaDePromocionales: BAJA });
+
+      expect(text).not.toContain("planes más grandes");
+      expect(text).toContain(BAJA);
+      expect(html).toContain(`<a href="${BAJA}"`);
+    });
+
+    it.each(ALL_KINDS.filter((k) => k !== "limit-reached"))(
+      "%s: ignora `comercial: false` (no tiene bloque que omitir)",
+      (kind) => {
+        expect(renderMail(kind, PARAMS, { comercial: false })).toEqual(
+          renderMail(kind, PARAMS),
+        );
+      },
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// «Publicidad: » en el asunto de los correos comerciales
+//
+// Disposición DNPDP 4/2009, art. 2: la publicidad directa no requerida ni
+// consentida previamente lleva «en su encabezado el término único
+// 'publicidad'». Decisión del titular del 2026-10-02: la base de los correos
+// con `prefKey: "novedades_plan"` es el interés legítimo (opt-out), así que
+// rige. Los dos mixtos —operativos con un bloque de venta— quedan SIN prefijo:
+// consulta legal abierta (`design.md` §9).
+// ---------------------------------------------------------------------------
+describe("«Publicidad: » en el asunto de los correos comerciales", () => {
+  const PREFIJO = "Publicidad: ";
+  const BAJA = "https://gettreino.com/es/correos-promocionales/baja#t=v1.abc.def.ghi";
+
+  /**
+   * Los cinco, ESCRITOS ACÁ con el asunto de antes del prefijo. No se importan
+   * de `types.ts` ni de `templates.ts` a propósito: un test que lee la lista que
+   * prueba pasaría igual con la lista vacía.
+   */
+  const COMERCIALES: ReadonlyArray<{ kind: MailKind; asuntoDeAntes: string }> = [
+    { kind: "athlete-coverage-lost", asuntoDeAntes: "Tu lugar en TREINO ya no está cubierto" },
+    { kind: "free-limit-reached", asuntoDeAntes: "Lo que querías hacer está en TREINO Pro" },
+    {
+      kind: "exercise-limit-reached",
+      asuntoDeAntes: "Llegaste al tope de ejercicios propios de tu plan",
+    },
+    {
+      kind: "template-limit-reached",
+      asuntoDeAntes: "Llegaste al tope de plantillas de tu plan",
+    },
+    { kind: "student-limit-reached", asuntoDeAntes: "Llegaste al tope de alumnos de tu plan" },
+  ];
+  const KINDS_COMERCIALES = COMERCIALES.map((c) => c.kind);
+
+  const PARAMS: MailParams = {
+    tope: "routineCount",
+    limit: 2,
+    ctaUrl: "https://gettreino.com/es/suscripcion/checkout",
+  };
+
+  // Con y sin pie de baja: el mail real sale con él, y la transcripción del
+  // Decreto 1558/01 dice «publicidad» en el cuerpo. El asunto no puede depender
+  // de eso.
+  const CON_Y_SIN_PIE = [
+    { nombre: "sin pie de baja", opciones: {} },
+    { nombre: "con pie de baja", opciones: { bajaDePromocionales: BAJA } },
+  ] as const;
+
+  describe.each(CON_Y_SIN_PIE)("$nombre", ({ opciones }) => {
+    it.each(COMERCIALES)("$kind: el asunto empieza con «Publicidad: »", ({ kind }) => {
+      expect(renderMail(kind, PARAMS, opciones).subject.startsWith(PREFIJO)).toBe(true);
+    });
+
+    it.each(COMERCIALES)(
+      "$kind: después del prefijo, el asunto es el de antes",
+      ({ kind, asuntoDeAntes }) => {
+        expect(renderMail(kind, PARAMS, opciones).subject).toBe(`${PREFIJO}${asuntoDeAntes}`);
+      },
+    );
+
+    // El término va en el ASUNTO. Si se colara al cuerpo el mail diría
+    // «Publicidad:» dos veces y el titular dejaría de ser el titular.
+    it.each(COMERCIALES)("$kind: el cuerpo y el texto plano NO llevan el prefijo", ({ kind }) => {
+      const out = renderMail(kind, PARAMS, opciones);
+
+      expect(out.html).not.toContain("Publicidad:");
+      expect(out.text).not.toContain("Publicidad:");
+    });
+  });
+
+  it("el prefijo es lo único que cambia del asunto: el resto no se toca", () => {
+    for (const { kind, asuntoDeAntes } of COMERCIALES) {
+      const asunto = renderMail(kind, PARAMS).subject;
+
+      expect(asunto.slice(PREFIJO.length)).toBe(asuntoDeAntes);
+      expect(asunto.match(/Publicidad/g)).toHaveLength(1);
+    }
+  });
+
+  // Los restantes: transaccionales, operativos y los dos mixtos. Se renderizan
+  // con el bloque comercial y con el pie de baja puestos, que es la peor
+  // condición para que el prefijo se cuele. `ALL_KINDS` sale de un
+  // `Record<MailKind, true>`: un kind nuevo entra acá el día que entra a la
+  // unión, y si es comercial este test lo marca hasta que se sume a la lista.
+  const RESTO = ALL_KINDS.filter((k) => !KINDS_COMERCIALES.includes(k));
+
+  it("el resto son todos los demás: ni uno menos", () => {
+    expect(RESTO).toHaveLength(ALL_KINDS.length - COMERCIALES.length);
+    expect(RESTO).toContain("limit-reached");
+    expect(RESTO).toContain("email-code-athlete");
+    expect(RESTO).toContain("email-code-trainer");
+  });
+
+  describe.each(CON_Y_SIN_PIE)("⚠️ NINGÚN otro kind lleva «publicidad» en el asunto, $nombre", ({ opciones }) => {
+    it.each(RESTO)("%s", (kind) => {
+      const { subject } = renderMail(kind, { ...PARAMS, codigo: "048213", showPlans: "1" }, opciones);
+
+      expect(subject).not.toMatch(/publicidad/i);
+    });
+  });
+
+  describe("los dos mixtos (operativos con bloque de venta) NO llevan el prefijo", () => {
+    // Pendiente de consulta legal: ver el comentario de `KINDS_DE_PUBLICIDAD`.
+    // Cada caso exige además que el bloque comercial ESTÉ en el mail: sin eso el
+    // test pasaría igual con un mail que ya no tiene nada de venta.
+    it("limit-reached, con su bloque de venta y el pie de baja", () => {
+      const out = renderMail(
+        "limit-reached",
+        { limit: 2, blockedCount: 3, ctaUrl: PARAMS.ctaUrl },
+        { bajaDePromocionales: BAJA },
+      );
+
+      expect(out.html).toContain("VER LOS PLANES");
+      expect(out.subject).not.toMatch(/publicidad/i);
+      expect(out.subject).toBe("Llegaste al tope de alumnos de tu cuenta");
+    });
+
+    it.each(["email-code-athlete", "email-code-trainer"] as const)(
+      "%s, con el bloque de pagos y el pie de baja",
+      (kind) => {
+        const out = renderMail(kind, { codigo: "048213", showPlans: "1" }, { bajaDePromocionales: BAJA });
+
+        expect(out.html).toContain("VER LOS PLANES");
+        expect(out.subject).not.toMatch(/publicidad/i);
+        // Con los planes, el asunto no lleva el código: ver «código de
+        // verificación del mail».
+        expect(out.subject).toBe("Tu código para entrar a TREINO");
+      },
+    );
   });
 });

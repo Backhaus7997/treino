@@ -14,6 +14,24 @@ class WearStrings {
   /// Acción para saltear lo que queda de descanso. Igual que en watchOS.
   static const restSkip = 'Saltar';
 
+  /// Por qué no se puede empezar una plantilla del catálogo pago.
+  ///
+  /// Corto porque la pantalla es un reloj: entra en dos renglones y no obliga
+  /// a scrollear. Nombra el TELÉFONO a propósito — el checkout no existe en el
+  /// reloj y no va a existir, así que mandarlo a "ver el plan" acá sería
+  /// prometerle una salida que esta pantalla no tiene.
+  static const plantillaPaga =
+      'Esta plantilla es del plan pago.\nMirala en el teléfono.';
+
+  /// El servidor rechazó la sesión: no es falta de red y reintentar no sirve.
+  ///
+  /// Distinto de «no se pudo empezar el entreno», que cubre el fallo genérico.
+  /// Acá el servidor CONTESTÓ y dijo que no, así que el atleta tiene que saber
+  /// que lo que haga no se va a guardar — antes de hacer una hora de trabajo
+  /// contra una sesión que no existe.
+  static const sesionRechazada =
+      'El entreno no se pudo guardar.\nRevisalo en el teléfono.';
+
   /// Unidad de ritmo cardíaco. Coincide con la del reloj de Apple
   /// (`WorkoutView.swift`), para que el atleta lea lo mismo en los dos.
   static const bpmUnit = 'lpm';

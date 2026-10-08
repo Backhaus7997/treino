@@ -197,6 +197,57 @@ class TrainerLinkRepository {
     return links.where((l) => statuses.contains(l.status)).toList();
   }
 
+  // ─── watchForAthlete ────────────────────────────────────────────────────
+  //
+  // Espejo de [watchForTrainer] para el lado del atleta, y la razón por la que
+  // existe es que [listForAthlete] no alcanza.
+  //
+  // Un `.get()` servido desde la caché local fría no devuelve un error:
+  // devuelve una lista VACÍA. Quien pregunta no tiene forma de distinguir "no
+  // tenés vínculo" de "todavía no sé", y como el `.get()` es una sola
+  // resolución, esa confusión queda pegada hasta que el usuario sale de la
+  // pantalla y vuelve. El lado del PF nunca lo vio porque siempre fue stream:
+  // le llega una segunda snapshot y se repara solo.
+
+  Stream<List<TrainerLink>> watchForAthlete(
+    String athleteId, {
+    Set<TrainerLinkStatus>? statuses,
+  }) {
+    final query = _links
+        .where('athleteId', isEqualTo: athleteId)
+        .orderBy('requestedAt', descending: true);
+    return query
+        .snapshots()
+        .map((snap) {
+          final links =
+              snap.docs.map(_fromDoc).whereType<TrainerLink>().toList();
+          final filtrados = statuses == null
+              ? links
+              : links.where((l) => statuses.contains(l.status)).toList();
+          return (filtrados, snap.metadata.isFromCache);
+        })
+        // Misma guarda que `user_repository.dart`,
+        // `athlete_entitlement_provider.dart` y `blocked_athletes_providers.dart`:
+        // un resultado VACÍO servido desde la caché no es "no hay vínculos", es
+        // "todavía no sé", y lo descartamos esperando al servidor.
+        //
+        // La guarda va DESPUÉS del filtro por estado, no antes, y la diferencia
+        // no es cosmética. Una snapshot con documentos NO prueba que el estado
+        // pedido esté ausente: la caché puede tener un vínculo `terminated`
+        // viejo mientras el `active` nuevo —creado desde el dispositivo del
+        // PF— existe sólo en el servidor. Con la guarda antes del filtro, esa
+        // snapshot pasaba por "tiene datos", el filtro la dejaba vacía, y el
+        // provider publicaba `null` sin confirmación del servidor. O sea, el
+        // bug original entrando por otra puerta.
+        //
+        // (La versión anterior de este comentario afirmaba que un filtro vacío
+        // sobre datos reales "ya es un hecho y no una ignorancia". Es falso
+        // cuando la caché está incompleta, que es exactamente el caso que
+        // importa. Lo encontró Codex en el PR #1109.)
+        .where((par) => par.$1.isNotEmpty || !par.$2)
+        .map((par) => par.$1);
+  }
+
   // ─── watchForTrainer ────────────────────────────────────────────────────
   //
   // Real-time stream para que el dashboard del PF refleje requests y

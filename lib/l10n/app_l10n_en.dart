@@ -25,6 +25,14 @@ class AppL10nEn extends AppL10n {
       'Create your own routine, explore ready-made plans, or find a trainer to guide you.';
 
   @override
+  String get homeAthleteFirstRunBodyWithTrainer =>
+      'You already have a trainer. In the meantime, create your own routine or explore ready-made plans.';
+
+  @override
+  String get homeAthleteFirstRunBodyNeutral =>
+      'Create your own routine or explore ready-made plans.';
+
+  @override
   String get homeAthleteFirstRunCreateCta => 'CREATE ROUTINE';
 
   @override
@@ -340,16 +348,66 @@ class AppL10nEn extends AppL10n {
   String get coachCtaProximamente => '';
 
   @override
-  String get coachLocationSheetTitle => '';
+  String get coachLocationSheetTitle => 'YOUR LOCATION';
 
   @override
-  String get coachLocationSheetBody => '';
+  String get coachLocationSheetBody =>
+      'TREINO uses your location to show you trainers near you. Your location is not visible to other users.';
 
   @override
-  String get coachLocationSheetAccept => '';
+  String get coachLocationSheetContinue => 'CONTINUE';
 
   @override
-  String get coachLocationSheetDeny => '';
+  String get coachLocationSettingsNoticeTitle => 'LOCATION IS OFF';
+
+  @override
+  String get coachLocationSettingsNoticeBody =>
+      'Turn on location in Settings to see trainers near you. You can also continue without it and browse Online trainers.';
+
+  @override
+  String get coachLocationSettingsNoticeOpenSettings => 'OPEN SETTINGS';
+
+  @override
+  String get coachLocationSettingsNoticeContinueWithout =>
+      'Continue without location';
+
+  @override
+  String get coachLocationServicesOffTitle => 'LOCATION SERVICES ARE OFF';
+
+  @override
+  String get coachLocationServicesOffBody =>
+      'Turn on Location Services in Settings to see trainers near you. You can also continue without it and browse Online trainers.';
+
+  @override
+  String get coachLocationSheetBodyGyms =>
+      'TREINO uses your location to show you gyms near you. Your location is not visible to other users.';
+
+  @override
+  String get coachLocationSheetBodyDetect =>
+      'TREINO uses your location once to detect where you train.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyGyms =>
+      'Turn on location in Settings to see gyms near you. Meanwhile you can search for yours by name.';
+
+  @override
+  String get coachLocationSettingsNoticeBodyDetect =>
+      'Turn on location in Settings to detect your location. You can also pick a gym from the list.';
+
+  @override
+  String get coachLocationServicesOffBodyGyms =>
+      'Turn on Location Services in Settings to see gyms near you. Meanwhile you can search for yours by name.';
+
+  @override
+  String get coachLocationServicesOffBodyDetect =>
+      'Turn on Location Services in Settings to detect your location. You can also pick a gym from the list.';
+
+  @override
+  String get profileLocationPermissionNeeded => 'We need location permission.';
+
+  @override
+  String get profileLocationDetectFailed =>
+      'We couldn\'t detect your location.';
 
   @override
   String get coachMiPlanTitle => '';
@@ -421,7 +479,69 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => '';
+  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
+
+  @override
+  String get athleteFilesButtonLabel => 'MY FILES';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Choose one';
+
+  @override
+  String get athleteNutritionEmptyGroup =>
+      'Your coach has not added options here yet.';
+
+  @override
+  String get athleteNutritionAllHint => 'Include all';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Your trainer hasn\'t added your nutrition plan yet.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'We couldn\'t load your nutrition plan.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'You need an active trainer link to view your nutrition plan.';
+
+  @override
+  String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
+
+  @override
+  String get trainerAcceptsInquiriesTitle => 'Accept inquiries';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'We couldn\'t confirm your trainer link.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Retry';
+
+  @override
+  String get athleteSessionMissing =>
+      'Your session ended. Please sign in again.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MY FILES';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Your trainer hasn\'t shared any files with you yet.';
+
+  @override
+  String get athleteFilesLoadError => 'We couldn\'t load your files.';
 
   @override
   String get agendaScreenTitle => '';
@@ -782,6 +902,15 @@ class AppL10nEn extends AppL10n {
   String get workoutHistorialHeading => '';
 
   @override
+  String get coachSessionHistoryInProgress => '';
+
+  @override
+  String get coachSessionHistoryIncomplete => '';
+
+  @override
+  String get coachSessionHistoryEmpty => '';
+
+  @override
   String get workoutHistorialEmptyMessage => '';
 
   @override
@@ -1109,6 +1238,10 @@ class AppL10nEn extends AppL10n {
       '. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.';
 
   @override
+  String get eliminarCuentaSheetSubscriptionNote =>
+      'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.';
+
+  @override
   String get eliminarCuentaSheetDeleteCta => 'ELIMINAR';
 
   @override
@@ -1421,6 +1554,10 @@ class AppL10nEn extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String get profileSetupGymSelectError =>
+      'We couldn\'t load that gym. Try again or pick «OTRO GYM / SIN GYM».';
+
+  @override
   String get reAuthPasswordLabel => 'Contraseña';
 
   @override
@@ -1446,6 +1583,51 @@ class AppL10nEn extends AppL10n {
   @override
   String get profileEditTrainerValidationLocation =>
       'Agregá al menos una ubicación o activá clases virtuales.';
+
+  @override
+  String get trainerLocationConsentSheetTitle => 'PUBLISH YOUR LOCATION';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Athletes will be able to see where you train and how far it is from them. You can turn this off anytime from your professional profile.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACCEPT';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'TURN OFF PUBLISHING';
+
+  @override
+  String get profileEditTrainerConsentConfirmTitle => 'Publish this location?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Saving will make this location visible to athletes, with its pin on the map and the distance to them. You can turn it off anytime.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLISH';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCEL';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible to athletes';
+
+  @override
+  String get profileEditTrainerNotPublished => 'Not published';
+
+  @override
+  String get legacyPrivacyNoticeTitle => 'We updated our Privacy Policy';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'We clarified how we handle your location. Nothing changed about what we collect from you.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'READ THE POLICY';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Dismiss';
 
   @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
@@ -1945,6 +2127,12 @@ class AppL10nEn extends AppL10n {
       'Replicate this value down the column';
 
   @override
+  String get routineEditorNextCellLabel => 'NEXT';
+
+  @override
+  String get routineEditorNextCellA11y => 'Go to the next cell';
+
+  @override
   String routineEditorAccessoryContext(
       String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
@@ -2271,6 +2459,144 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t sign you out. Please try again.';
 
   @override
+  String get coachHubOnboardingAgeTitle => 'WHEN WERE YOU BORN?';
+
+  @override
+  String get coachHubOnboardingAgeBody =>
+      'We need your date of birth to activate your trainer account. You must be 13 or older.';
+
+  @override
+  String get coachHubOnboardingAgeLabel => 'DATE OF BIRTH';
+
+  @override
+  String get coachHubOnboardingIdentityTitle => 'WHAT\'S YOUR NAME?';
+
+  @override
+  String get coachHubOnboardingIdentityBody =>
+      'This is the name your clients will see.';
+
+  @override
+  String get coachHubOnboardingFirstNameLabel => 'FIRST NAME';
+
+  @override
+  String get coachHubOnboardingLastNameLabel => 'LAST NAME';
+
+  @override
+  String get coachHubOnboardingFirstNameRequired => 'Enter your first name';
+
+  @override
+  String get coachHubOnboardingLastNameRequired => 'Enter your last name';
+
+  @override
+  String get coachHubOnboardingPfTitle => 'YOUR PROFESSIONAL PROFILE';
+
+  @override
+  String get coachHubOnboardingPfBody =>
+      'This is what students see when they look for you. You can change it any time.';
+
+  @override
+  String get coachHubOnboardingPfBioLabel => 'BIO';
+
+  @override
+  String get coachHubOnboardingPfSpecialtyLabel => 'SPECIALTY';
+
+  @override
+  String get coachHubOnboardingPfRateLabel => 'MONTHLY RATE (ARS)';
+
+  @override
+  String get coachHubOnboardingPfModalityLabel => 'MODALITY';
+
+  @override
+  String get coachHubOnboardingPfOnlineSwitch => 'I teach online';
+
+  @override
+  String get coachHubOnboardingPfModalityRequired =>
+      'Turn on online classes or add a training place.';
+
+  @override
+  String get coachHubOnboardingPfLocationsLabel => 'TRAINING PLACES';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchLabel => 'SEARCH A PLACE';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchHint => 'Address or place name';
+
+  @override
+  String get coachHubOnboardingPfLocationSearchButton => 'Search';
+
+  @override
+  String get coachHubOnboardingPfLocationEmpty =>
+      'We couldn\'t find that place. Try the full address.';
+
+  @override
+  String get coachHubOnboardingPfLocationDuplicate =>
+      'That place is already in your list.';
+
+  @override
+  String get coachHubOnboardingPfLocationNetworkError =>
+      'We couldn\'t search for the place. Check your connection and try again.';
+
+  @override
+  String get coachHubOnboardingPfLocationConfigError =>
+      'Place search is not available right now. If you teach online, you can still finish.';
+
+  @override
+  String get coachHubOnboardingPfLocationRetry => 'Retry';
+
+  @override
+  String get coachHubOnboardingPfLocationFound =>
+      'We found the place. Name it the way your clients will see it.';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelLabel => 'PLACE NAME';
+
+  @override
+  String get coachHubOnboardingPfLocationLabelHint =>
+      'E.g. My studio, Sarmiento Park';
+
+  @override
+  String get coachHubOnboardingPfLocationAddButton => 'Add place';
+
+  @override
+  String get coachHubOnboardingPfLocationRemove => 'Remove place';
+
+  @override
+  String get coachHubOnboardingPfLocationGymFallback => 'Gym';
+
+  @override
+  String get coachHubOnboardingPfFinish => 'Finish';
+
+  @override
+  String get coachHubOnboardingContinue => 'Continue';
+
+  @override
+  String get coachHubOnboardingSaveError =>
+      'We couldn\'t save your details. Please try again.';
+
+  @override
+  String get coachHubNotAllowedTitle => 'TRAINERS ONLY';
+
+  @override
+  String get coachHubNotAllowedBody =>
+      'The Coach Hub is only for trainers. Download the TREINO app from the App Store or Play Store and sign in there.';
+
+  @override
+  String get coachHubNotAllowedContactPrompt =>
+      'Want to become a trainer? Get in touch with the team.';
+
+  @override
+  String get coachHubNotAllowedContactCta => 'Contact the team';
+
+  @override
+  String get coachHubNotAllowedMailSubject =>
+      'I want to be a trainer on TREINO';
+
+  @override
+  String get coachHubNotAllowedContactFallback =>
+      'We couldn\'t open your email app. Write to us at the address above.';
+
+  @override
   String get coachHubLoginPrompt =>
       'Sign in with the same account you use on the mobile app.';
 
@@ -2466,7 +2792,7 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosSearchHint => 'Search by name…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'All';
+  String get coachHubAlumnosFilterAll => 'Current';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Active';
@@ -2518,10 +2844,10 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Overdue';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Blocked';
+  String get coachHubAlumnosStatusBlocked => 'No access';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Blocked';
+  String get coachHubAlumnosFilterBloqueados => 'No access';
 
   @override
   String get coachHubAlumnosBlockedHint =>
@@ -2575,11 +2901,11 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load the note.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Private files';
+  String get coachHubAlumnoDetailArchivosTitle => 'Athlete files';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs and photos you upload about this athlete. Only you can see them.';
+      'PDFs and photos you upload about this athlete. Choose which ones you share.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'UPLOAD FILE';
@@ -2620,6 +2946,23 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'We couldn\'t delete the file.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'SHARED';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVATE';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip => 'Share with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Stop sharing with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'We couldn\'t change who can see the file.';
 
   @override
   String get feedLoadError => 'We couldn\'t load your feed. Please try again.';
@@ -2747,6 +3090,10 @@ class AppL10nEn extends AppL10n {
   String get gymNearbyShowMore => 'Show more';
 
   @override
+  String get gymSearchConfigError =>
+      'Gym search isn\'t available in this version of the app.';
+
+  @override
   String get gymNearbyLoadError => 'We couldn\'t load nearby gyms.';
 
   @override
@@ -2815,6 +3162,21 @@ class AppL10nEn extends AppL10n {
   @override
   String get chatMediaUploadFailed =>
       'We couldn\'t upload the file. Please try again.';
+
+  @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'You\'ve reached the $maxMb MB limit for chat photos and videos.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'The file is $fileMb MB and the maximum is $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'The file is $fileMb MB and you have $remainingMb MB left.';
+  }
 
   @override
   String get chatMediaPreviewPhoto => '📷 Photo';
@@ -2982,6 +3344,15 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get profileRoutinesActiveChip => '';
+
+  @override
+  String get profileSectionLegal => 'Legal';
+
+  @override
+  String get legalDocumentsTitle => 'Legal documents';
+
+  @override
+  String get legalDocumentsSubtitle => 'Terms, privacy and more';
 
   @override
   String get appearanceTitle => 'Appearance';
@@ -3565,7 +3936,7 @@ class AppL10nEn extends AppL10n {
   String get postPrivacyNoGymHint => 'Join a gym to post here';
 
   @override
-  String get suggestedUsersTitle => 'PEOPLE FROM YOUR GYM';
+  String get suggestedUsersTitle => 'SUGGESTED FOR YOU';
 
   @override
   String get suggestedUserAnonymous => 'Anonymous';
@@ -4070,6 +4441,14 @@ class AppL10nEn extends AppL10n {
   String get exerciseFeedbackNoteTagDiscomfort => 'DISCOMFORT';
 
   @override
+  String get workoutHistorialTopeAlcanzado =>
+      'There may be older workouts that don\'t fit in this list.';
+
+  @override
+  String get dashboardActividadTopeAlcanzado =>
+      'There may be more activity that doesn\'t fit in this list.';
+
+  @override
   String exerciseFeedbackNoteSetTag(int setNumber) {
     return 'SET $setNumber';
   }
@@ -4204,4 +4583,605 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
+
+  @override
+  String get paywallFreePlanLimitTitle => '';
+
+  @override
+  String paywallFreePlanLimitDaysBody(int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitWeeksBody => '';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return '';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitUpgrade => '';
+
+  @override
+  String get paywallFreePlanLimitDismiss => '';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody => '';
+
+  @override
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return '';
+  }
+
+  @override
+  String get workoutPlantillasPremiumChip => '';
+
+  @override
+  String get progressionPeriodLast3Months => '';
+
+  @override
+  String get progressionPeriodLast1Year => '';
+
+  @override
+  String get workoutRoutineFollow => '';
+
+  @override
+  String get workoutRoutineFollowing => '';
+
+  @override
+  String get workoutRoutineFollowSuccess => '';
+
+  @override
+  String get workoutRoutineFollowError => '';
+
+  @override
+  String get paywallFreePlanLimitRoutineCountBody => '';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody => '';
+
+  @override
+  String get paywallFreePlanLimitProName => '';
+
+  @override
+  String get paywallFreePlanLimitProTagline => '';
+
+  @override
+  String paywallFreePlanLimitProBenefitDays(int max) {
+    return '';
+  }
+
+  @override
+  String paywallFreePlanLimitProBenefitWeeks(int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitTemplates => '';
+
+  @override
+  String get paywallFreePlanLimitProBenefitCustomize => '';
+
+  @override
+  String paywallFreePlanLimitProBenefitRoutines(int max) {
+    return '';
+  }
+
+  @override
+  String get paywallFreePlanLimitProBenefitCharts => '';
+
+  @override
+  String get paywallFreePlanLimitProMatchTag => '';
+
+  @override
+  String get paywallAlumnoTitulo => '';
+
+  @override
+  String get paywallAlumnoBajada => '';
+
+  @override
+  String get paywallAlumnoPlanMensual => '';
+
+  @override
+  String get paywallAlumnoPlanAnual => '';
+
+  @override
+  String get paywallAlumnoAhorro => '';
+
+  @override
+  String get paywallAlumnoBeneficio1 => '';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '';
+
+  @override
+  String get paywallAlumnoBeneficio3 => '';
+
+  @override
+  String get paywallAlumnoBeneficio4 => '';
+
+  @override
+  String get paywallAlumnoImpuestos => '';
+
+  @override
+  String get paywallAlumnoCta => '';
+
+  @override
+  String get paywallAlumnoRestaurar => '';
+
+  @override
+  String get paywallAlumnoSinPlanes => '';
+
+  @override
+  String get paywallAlumnoReintentar => '';
+
+  @override
+  String get paywallAlumnoListo => '';
+
+  @override
+  String get paywallAlumnoPendiente => '';
+
+  @override
+  String get paywallAlumnoErrorCompra => '';
+
+  @override
+  String get paywallAlumnoSinRestaurar => '';
+
+  @override
+  String get moderationMenuA11y => 'More options';
+
+  @override
+  String get moderationReportAction => 'Report';
+
+  @override
+  String get moderationBlockAction => 'Block';
+
+  @override
+  String get moderationReportSheetTitle => 'Why are you reporting this?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Harassment';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Sexual content';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violence or self-harm';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Dangerous health advice';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Impersonation';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Third-party data';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Intellectual property';
+
+  @override
+  String get moderationReportReasonOther => 'Other';
+
+  @override
+  String get moderationReportDetailHint => 'Tell us more (optional)';
+
+  @override
+  String get moderationReportSubmit => 'SUBMIT REPORT';
+
+  @override
+  String get moderationReportCancel => 'CANCEL';
+
+  @override
+  String get moderationReportSuccess => 'Thanks, we\'ll review it.';
+
+  @override
+  String get moderationReportError =>
+      'We couldn\'t send the report. Try again.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'They won\'t be able to message you, follow you, or react to your posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOCK';
+
+  @override
+  String get moderationBlockDismiss => 'CANCEL';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'You blocked $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'We couldn\'t block them. Try again.';
+
+  @override
+  String get moderationBlockedMessage =>
+      'That text can\'t be posted because it breaks the Community Guidelines. Please review it and try again.';
+
+  @override
+  String get privacyTitle => 'Privacy';
+
+  @override
+  String get privacyAnalyticsTitle => 'Usage analytics';
+
+  @override
+  String get privacyAnalyticsSubtitle =>
+      'Helps us understand which parts of the app get used.';
+
+  @override
+  String get privacyAnalyticsExplainer =>
+      'If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.';
+
+  @override
+  String get privacyAnalyticsCrashNote =>
+      'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
+
+  @override
+  String get privacyEntryTitle => 'Analytics and emails';
+
+  @override
+  String get privacyPromoEmailsTitle => 'Promotional emails';
+
+  @override
+  String get privacyPromoEmailsSubtitle =>
+      'Turn it off and we\'ll stop sending them. Account notices still reach you.';
+
+  @override
+  String get privacyPromoEmailsSaveError =>
+      'We couldn\'t save the change. Try again.';
+
+  @override
+  String customExerciseCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString of $limitString custom exercises';
+  }
+
+  @override
+  String templateCounter(int count, int limit) {
+    final intl.NumberFormat countNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String countString = countNumberFormat.format(count);
+    final intl.NumberFormat limitNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
+    final String limitString = limitNumberFormat.format(limit);
+
+    return '$countString of $limitString templates';
+  }
+
+  @override
+  String get planLimitVerPlanesMovil => 'VIEW PLANS';
+
+  @override
+  String get planLimitEntendido => 'Got it';
+
+  @override
+  String get planLimitPorMes => '/month';
+
+  @override
+  String get planLimitPlanAMedidaTitulo => 'CUSTOM PLAN';
+
+  @override
+  String get planLimitContactanos => 'CONTACT US';
+
+  @override
+  String get planLimitAlumnosTituloTope => 'YOU REACHED YOUR PLAN LIMIT';
+
+  @override
+  String get planLimitAlumnosTituloInactiva => 'YOUR SUBSCRIPTION IS SUSPENDED';
+
+  @override
+  String get planLimitAlumnosTituloBaja => 'YOUR SUBSCRIPTION IS CANCELLED';
+
+  @override
+  String get planLimitAlumnosCuerpoInactivaExplicacion =>
+      'While your subscription isn\'t up to date, your account works with the Free plan limit. No student is removed.';
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilLimitado(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit students',
+      one: '1 student',
+    );
+    return 'Your $plan plan includes $_temp0.';
+  }
+
+  @override
+  String planLimitAlumnosCuerpoTopeMovilIlimitado(String plan) {
+    return 'Your $plan plan includes unlimited students.';
+  }
+
+  @override
+  String get planLimitAlumnosPlanAMedidaCuerpo =>
+      'You\'re on the largest plan. For more than 15 students, we\'re preparing a custom plan for you.';
+
+  @override
+  String get planLimitAlumnosPlanAMedidaSnack =>
+      'Soon you\'ll be able to have more than 15 students.';
+
+  @override
+  String planLimitReactivateTituloMovil(String plan) {
+    return 'YOUR PLAN: $plan';
+  }
+
+  @override
+  String planLimitReactivateCuerpoMovil(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count students',
+      one: '1 student',
+    );
+    return 'It isn\'t active. Meanwhile, your account has the Free plan limit: $_temp0.';
+  }
+
+  @override
+  String get planLimitVerEstadoMovil => 'VIEW STATUS';
+
+  @override
+  String planLimitReactivateEstadoMovil(String estado) {
+    return 'Status: $estado';
+  }
+
+  @override
+  String get planLimitEstadoActiva => 'active';
+
+  @override
+  String get planLimitEstadoPendiente => 'payment pending';
+
+  @override
+  String get planLimitEstadoGracia => 'payment past due';
+
+  @override
+  String get planLimitEstadoPausada => 'paused';
+
+  @override
+  String get planLimitEstadoCancelada => 'cancelled';
+
+  @override
+  String planLimitAlumnosBeneficioLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit students',
+      one: '1 student',
+    );
+    return 'Up to $_temp0';
+  }
+
+  @override
+  String get planLimitAlumnosBeneficioIlimitado => 'Unlimited students';
+
+  @override
+  String get planLimitSuscripcionPausadaMovil => 'Your subscription is paused.';
+
+  @override
+  String get planLimitSuscripcionBajaMovil => 'Your subscription is cancelled.';
+
+  @override
+  String get planLimitTrainerTituloEjercicios => 'CUSTOM EXERCISE LIMIT';
+
+  @override
+  String get planLimitTrainerTituloPlantillas => 'TEMPLATE LIMIT';
+
+  @override
+  String planLimitTrainerPasadoTopeEjercicios(
+      int count, int limit, int toDelete) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count custom exercises',
+      one: '1 custom exercise',
+    );
+    return 'You have $_temp0 and your plan includes $limit. You keep them all; to create a new one, delete $toDelete.';
+  }
+
+  @override
+  String planLimitTrainerPasadoTopePlantillas(
+      int count, int limit, int toArchive) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count templates',
+      one: '1 template',
+    );
+    return 'You have $_temp0 and your plan includes $limit. You keep them all; to create a new one, archive $toArchive.';
+  }
+
+  @override
+  String planLimitTrainerInactivaEjercicios(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit custom exercises',
+      one: '1 custom exercise',
+    );
+    return 'Your $plan subscription isn\'t active. Meanwhile, your $planEfectivo plan includes $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerInactivaPlantillas(
+      String plan, String planEfectivo, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit templates',
+      one: '1 template',
+    );
+    return 'Your $plan subscription isn\'t active. Meanwhile, your $planEfectivo plan includes $_temp0.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit custom exercises',
+      one: '1 custom exercise',
+    );
+    return 'Your $plan plan includes $_temp0. You can edit or delete the ones you already have.';
+  }
+
+  @override
+  String planLimitTrainerTopeEjerciciosGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit custom exercises',
+      one: '1 custom exercise',
+    );
+    return 'Your plan includes $_temp0. You can edit or delete the ones you already have.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasConTier(String plan, int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit templates',
+      one: '1 template',
+    );
+    return 'Your $plan plan includes $_temp0. You can edit or archive the ones you already have.';
+  }
+
+  @override
+  String planLimitTrainerTopePlantillasGenerico(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit templates',
+      one: '1 template',
+    );
+    return 'Your plan includes $_temp0. You can edit or archive the ones you already have.';
+  }
+
+  @override
+  String planLimitTrainerBeneficioEjerciciosLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit custom exercises',
+      one: '1 custom exercise',
+    );
+    return 'Up to $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioEjerciciosIlimitado =>
+      'Unlimited custom exercises';
+
+  @override
+  String planLimitTrainerBeneficioPlantillasLimitado(int limit) {
+    String _temp0 = intl.Intl.pluralLogic(
+      limit,
+      locale: localeName,
+      other: '$limit templates',
+      one: '1 template',
+    );
+    return 'Up to $_temp0';
+  }
+
+  @override
+  String get planLimitTrainerBeneficioPlantillasIlimitado =>
+      'Unlimited templates';
+
+  @override
+  String get planLimitTrainerPlanAMedidaCuerpo =>
+      'You\'re on the largest plan. We\'re preparing a custom plan for you.';
+
+  @override
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count athletes will be unlinked. We\'ll let them know.',
+      one: '1 athlete will be unlinked. We\'ll let them know.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get eliminarCuentaSheetErrorSubscriptionCancel =>
+      'We couldn\'t cancel your subscription, so your account was not deleted. Please try again in a few minutes.';
+
+  @override
+  String get eliminarCuentaSheetErrorNotAllowed =>
+      'We couldn\'t delete your account from the app. Contact us and we\'ll sort it out.';
+
+  @override
+  String get eliminarCuentaWebReauthTitle => 'Confirm your identity';
+
+  @override
+  String get eliminarCuentaWebReauthPasswordBody =>
+      'For your security, enter your password to confirm it\'s you.';
+
+  @override
+  String get eliminarCuentaWebReauthCta => 'CONFIRM';
+
+  @override
+  String eliminarCuentaWebPopupHint(String provider) {
+    return 'To confirm it\'s you, a $provider window will open.';
+  }
+
+  @override
+  String get gymNameDialogTitle => 'Name your gym';
+
+  @override
+  String get gymNameDialogBody => 'Type the name you want other people to see.';
+
+  @override
+  String get gymNameDialogHint => 'Gym name';
+
+  @override
+  String get gymNameDialogConfirm => 'SAVE';
+
+  @override
+  String get gymNamePromptTitle => 'Your gym needs a name';
+
+  @override
+  String get gymNamePromptBody =>
+      'Help us out: what is it called? Everyone who trains there will see it.';
+
+  @override
+  String get gymNamePromptCta => 'NAME IT';
+
+  @override
+  String get gymNamePromptDismiss => 'Not now';
+
+  @override
+  String gymNamePromptRaceMessage(String name) {
+    return 'Someone already named it: $name.';
+  }
+
+  @override
+  String get coachHubOnboardingPfLocationStaleHint =>
+      'This place is no longer available. Pick this place again so people can find you.';
 }

@@ -16,19 +16,44 @@ jest.mock("../subscriptions/promote-link", () => ({
   syncTrainerLoad: jest.fn(),
 }));
 
+jest.mock("../subscriptions/trainer-limit-mail", () => ({
+  ...jest.requireActual("../subscriptions/trainer-limit-mail"),
+  registrarTopeDeAlumnos: jest.fn(async () => undefined),
+}));
+
 jest.mock("firebase-admin", () => ({
   app: jest.fn(() => ({})),
   initializeApp: jest.fn(() => ({})),
 }));
 
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
 import { syncTrainerLoad } from "../subscriptions/promote-link";
+import { registrarTopeDeAlumnos } from "../subscriptions/trainer-limit-mail";
 import { runAcceptTrainerLink } from "../subscriptions/accept-trainer-link";
 
 const mockSync = syncTrainerLoad as jest.MockedFunction<typeof syncTrainerLoad>;
+const mockRegistrar = registrarTopeDeAlumnos as jest.MockedFunction<
+  typeof registrarTopeDeAlumnos
+>;
 
 describe("runAcceptTrainerLink", () => {
   beforeEach(() => {
     mockSync.mockReset();
+    mockRegistrar.mockReset();
+    mockRegistrar.mockResolvedValue(undefined);
   });
 
   it("delegates to syncTrainerLoad with expectedFromStatus 'pending'", async () => {
@@ -96,5 +121,121 @@ describe("runAcceptTrainerLink", () => {
       runAcceptTrainerLink({} as never, "trainer-1", ""),
     ).rejects.toMatchObject({ code: "invalid-argument" });
     expect(mockSync).not.toHaveBeenCalled();
+  });
+
+  // ── El tope de alumnos: la anotación server-side ────────────────────────
+  describe("anotación del tope de alumnos", () => {
+    const denialTope = (reason: "plan-limit" | "subscription-inactive") =>
+      new HttpsError("resource-exhausted", "Weighted-load limit reached.", {
+        reason,
+        tier: "plan1",
+        limit: 7,
+        currentLoad: 7,
+        projectedLoad: 8,
+      });
+
+    it("⚠️ un rebote por tope (plan-limit) anota students + trainerLimitHitAt", async () => {
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).toHaveBeenCalledTimes(1);
+      expect(mockRegistrar).toHaveBeenCalledWith(
+        expect.anything(),
+        "trainer-1",
+        expect.any(Number),
+        expect.any(Number),
+        "L1",
+      );
+    });
+
+    it("⚠️ el incremento es projectedLoad - currentLoad de los details (pending → active)", async () => {
+      // denialTope("plan-limit"): currentLoad 7, projectedLoad 8 → incremento 1.
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).toHaveBeenCalledWith(
+        expect.anything(),
+        "trainer-1",
+        expect.any(Number),
+        1,
+        "L1",
+      );
+    });
+
+    // ── Hallazgo de Codex sobre #1267 (P2 de esta ronda) ──
+    it("⚠️ guarda el linkId del vínculo que se intentó activar, no cualquier otro", async () => {
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "otro-link-99"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).toHaveBeenCalledWith(
+        expect.anything(),
+        "trainer-1",
+        expect.any(Number),
+        expect.any(Number),
+        "otro-link-99",
+      );
+    });
+
+    it("⚠️ un rebote por subscription-inactive NO anota — no es un tope, es cobro atrasado", async () => {
+      // Hallazgo de Codex sobre #1267 (P1). Hasta acá este test se llamaba
+      // "también anota" y esperaba `toHaveBeenCalledTimes(1)` — ESE era el
+      // bug: un PF con un plan pago pero la suscripción `pending`/`paused`/
+      // vencida (`subscription-inactive`, D-2 en `promote-link.ts`) quedaba
+      // anotado como si hubiera chocado el tope de alumnos, y
+      // `sendTrainerLimitMailOnHit` le mandaba el mail de upsell — "VER LOS
+      // PLANES" a quien ya pagó uno. Ver `esTopeDeAlumnos`.
+      mockSync.mockRejectedValue(denialTope("subscription-inactive"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).not.toHaveBeenCalled();
+    });
+
+    it("⚠️ un rechazo por otro motivo (wrong-status) NO anota", async () => {
+      mockSync.mockRejectedValue(
+        new HttpsError("failed-precondition", "wrong-status"),
+      );
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "failed-precondition" });
+
+      expect(mockRegistrar).not.toHaveBeenCalled();
+    });
+
+    it("⚠️ un resource-exhausted SIN el reason del tope (otra causa) NO anota", async () => {
+      mockSync.mockRejectedValue(
+        new HttpsError("resource-exhausted", "Quota exceeded."),
+      );
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({ code: "resource-exhausted" });
+
+      expect(mockRegistrar).not.toHaveBeenCalled();
+    });
+
+    it("⚠️ si la anotación falla, el callable igual tira el error original", async () => {
+      mockSync.mockRejectedValue(denialTope("plan-limit"));
+      mockRegistrar.mockRejectedValueOnce(new Error("firestore se cayó"));
+
+      await expect(
+        runAcceptTrainerLink({} as never, "trainer-1", "L1"),
+      ).rejects.toMatchObject({
+        code: "resource-exhausted",
+        details: { reason: "plan-limit" },
+      });
+    });
   });
 });

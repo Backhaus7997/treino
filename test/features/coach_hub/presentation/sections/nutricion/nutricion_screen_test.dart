@@ -26,6 +26,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerId = 'trainer-1';
 
@@ -88,8 +89,12 @@ Future<void> _pump(
       ),
       GoRoute(
         path: '/alumnos/:id',
-        builder: (_, state) =>
-            Scaffold(body: Text('DETALLE ${state.pathParameters['id']}')),
+        // El doble nombra la PESTANA: sin eso, un test de navegacion pasa
+        // igual aunque la ficha abra en Resumen, que era medio bug reportado.
+        builder: (_, state) => Scaffold(
+          body: Text('DETALLE ${state.pathParameters['id']} '
+              'TAB=${state.uri.queryParameters['tab'] ?? 'ninguna'}'),
+        ),
       ),
     ],
   );
@@ -198,7 +203,9 @@ void main() {
       await tester.tap(find.text('Ana García'));
       await tester.pumpAndSettle();
 
-      expect(find.text('DETALLE a1'), findsOneWidget);
+      // El doble del detalle ahora nombra la pestana: entrar desde Nutricion
+      // abre en PLAN, no en Resumen.
+      expect(find.text('DETALLE a1 TAB=plan'), findsOneWidget);
     });
   });
 
@@ -227,7 +234,7 @@ void main() {
       expect(find.byKey(const Key('nutricion_error')), findsOneWidget);
       expect(find.text('No pudimos cargar tus alumnos.'), findsOneWidget);
 
-      final retryButton = find.widgetWithText(TextButton, 'Reintentar');
+      final retryButton = find.widgetWithText(TreinoButton, 'Reintentar');
       expect(retryButton, findsOneWidget);
 
       // Retry invalida el provider y re-suscribe al mismo stream fallido —
@@ -251,7 +258,7 @@ void main() {
       );
       expect(find.text('Todavía no tenés alumnos.'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Ir a Alumnos'));
+      await tester.tap(find.widgetWithText(TreinoButton, 'Ir a Alumnos'));
       await tester.pumpAndSettle();
 
       expect(find.text('ALUMNOS'), findsOneWidget);
@@ -325,6 +332,37 @@ void main() {
         find.byKey(const ValueKey('nutricion_data_conPlan')),
         findsOneWidget,
       );
+    });
+
+    testWidgets('tocar un alumno abre su ficha EN PLAN y deja volver acá',
+        (tester) async {
+      // Las dos mitades del mismo reporte: «si entro a un alumno, que me mande
+      // directamente al apartado para cargarle plan nutricional, derecho, y si
+      // vuelvo atras me manda a la lista de alumnos, no de nutricion».
+      //
+      // Era una sola linea: `context.go(...)`. `go` REEMPLAZA la entrada de
+      // historial, asi que para el router el PF estaba en Alumnos y la flecha
+      // lo devolvia ahi; y sin decir la pestana, caia en Resumen.
+      await _pump(
+        tester,
+        links: [_link('a1')],
+        profiles: [_prof('a1', 'Ana García')],
+        plans: {'a1': _plan('a1')},
+      );
+      await tester.tap(find.text('Ana García'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('DETALLE a1 TAB=plan'), findsOneWidget);
+
+      // Y se puede VOLVER, que es la otra mitad: con `go` no habia a donde.
+      final ctx = tester.element(find.text('DETALLE a1 TAB=plan'));
+      expect(GoRouter.of(ctx).canPop(), isTrue,
+          reason: 'con `go` el historial se reemplaza y no hay a donde volver');
+      GoRouter.of(ctx).pop();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana García'), findsOneWidget,
+          reason: 'la flecha vuelve a Nutricion, no a Alumnos');
     });
 
     testWidgets('dark y light: smoke sin crash en data/empty/error',

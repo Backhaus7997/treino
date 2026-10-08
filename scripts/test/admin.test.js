@@ -37,24 +37,41 @@ const credencialDe = (clientEmail, projectId) => ({
   private_key: '-----BEGIN PRIVATE KEY-----FALSA-----END PRIVATE KEY-----',
 });
 
-/** Un `firebase-admin` de mentira que anota con qué lo llamaron. */
-function adminFalso() {
+/**
+ * Las cuatro funciones de `firebase-admin/app` que `lib/admin.js` usa, de
+ * mentira, anotando con qué las llamaron.
+ *
+ * CAMBIÓ DE FORMA junto con `lib/admin.js`, en el mismo commit, y eso no es
+ * casualidad: el drift entre este doble y el SDK real es exactamente lo que dejó
+ * pasar el bug original —dependabot subió `firebase-admin` a v14 dos veces
+ * (`cac2d6fa` y `de77562a`/#901) y la suite siguió verde, porque el doble tenía
+ * la API que el doble decidía tener—. Antes fingía el módulo namespaced
+ * (`apps`, `credential.cert`); ahora finge los subpaths modulares.
+ *
+ * El nombre del campo `registro` y su forma NO cambian: es lo que asertan los
+ * ~20 tests de este archivo, y esas aserciones son sobre la CONDUCTA de
+ * `inicializarAdmin` —qué credencial certificó, con qué opciones inicializó—,
+ * que es justo lo que este PR no toca.
+ */
+function sdkFalso() {
   const registro = { apps: [], opciones: null, certificados: [] };
   return {
     registro,
-    get apps() {
+    getApps() {
       return registro.apps;
     },
-    credential: {
-      cert(cred) {
-        registro.certificados.push(cred);
-        return { __cert: cred };
-      },
+    getApp() {
+      return registro.apps[0];
+    },
+    cert(cred) {
+      registro.certificados.push(cred);
+      return { __cert: cred };
     },
     initializeApp(opciones) {
       registro.opciones = opciones;
-      registro.apps.push({});
-      return {};
+      const app = {};
+      registro.apps.push(app);
+      return app;
     },
   };
 }
@@ -70,10 +87,10 @@ const explota = (que) => () => assert.fail(`no se debía tocar ${que}`);
 // ── Emulador: sin credencial, sin filesystem ───────────────────────────────
 
 test('contra el emulador no se mira el filesystem ni se pide credencial', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
 
   const { contexto } = inicializarAdmin({
-    admin,
+    sdk,
     env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080' },
     consola: consolaFalsa(),
     // Si el camino del emulador tocara cualquiera de estos, el test explota.
@@ -84,8 +101,8 @@ test('contra el emulador no se mira el filesystem ni se pide credencial', () => 
   });
 
   assert.strictEqual(contexto.modo, 'emulador');
-  assert.deepStrictEqual(admin.registro.opciones, { projectId: 'treino-dev' });
-  assert.deepStrictEqual(admin.registro.certificados, []);
+  assert.deepStrictEqual(sdk.registro.opciones, { projectId: 'treino-dev' });
+  assert.deepStrictEqual(sdk.registro.certificados, []);
 });
 
 test('contra el emulador, una ruta adentro del repo se rechaza IGUAL', () => {
@@ -93,14 +110,14 @@ test('contra el emulador, una ruta adentro del repo se rechaza IGUAL', () => {
   // y Auth de Admin siguen yendo a la nube. Con la clave leída desde adentro
   // del repo eso es un camino real a producción disfrazado de "corriendo
   // local". Es el único caso que el modo emulador sigue frenando.
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const consola = consolaFalsa();
   const dentro = '/algun/repo/scripts/sa-key.json';
 
   assert.throws(
     () =>
       inicializarAdmin({
-        admin,
+        sdk,
         env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080', [VAR_RUTA]: dentro },
         consola,
         salir: () => {},
@@ -110,7 +127,7 @@ test('contra el emulador, una ruta adentro del repo se rechaza IGUAL', () => {
     ErrorDeCredencial,
   );
 
-  assert.strictEqual(admin.registro.apps.length, 0);
+  assert.strictEqual(sdk.registro.apps.length, 0);
   assert.match(consola.lineas.join('\n'), /árbol de git/);
 });
 
@@ -118,24 +135,24 @@ test('contra el emulador, una variable vieja o rota NO frena nada', () => {
   // Lo contrario del test de arriba, y es igual de importante: romper el
   // desarrollo local por una variable que quedó apuntando a un archivo que ya
   // no existe sería cobrarle a todo el mundo un riesgo que no existe.
-  const admin = adminFalso();
+  const sdk = sdkFalso();
 
   inicializarAdmin({
-    admin,
+    sdk,
     env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080', [VAR_RUTA]: '/se/borro/hace/meses.json' },
     consola: consolaFalsa(),
     existeEntrada: () => false,
     home: HOME,
   });
 
-  assert.strictEqual(admin.registro.apps.length, 1);
+  assert.strictEqual(sdk.registro.apps.length, 1);
 });
 
 test('el emulador respeta las opciones extra (storageBucket) y el projectId forzado', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
 
   inicializarAdmin({
-    admin,
+    sdk,
     projectId: 'otro-proyecto',
     extra: { storageBucket: 'un.bucket' },
     env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080' },
@@ -143,7 +160,7 @@ test('el emulador respeta las opciones extra (storageBucket) y el projectId forz
     home: HOME,
   });
 
-  assert.deepStrictEqual(admin.registro.opciones, {
+  assert.deepStrictEqual(sdk.registro.opciones, {
     projectId: 'otro-proyecto',
     storageBucket: 'un.bucket',
   });
@@ -152,12 +169,12 @@ test('el emulador respeta las opciones extra (storageBucket) y el projectId forz
 // ── Credencial: se resuelve ANTES de inicializar ───────────────────────────
 
 test('con credencial válida inicializa con cert() y el project id de la identidad', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const cred = credencialDe('firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com', 'treino-dev');
   const env = { [VAR_RUTA]: FUERA };
 
   const { contexto } = inicializarAdmin({
-    admin,
+    sdk,
     env,
     consola: consolaFalsa(),
     existeEntrada: (p) => p === FUERA,
@@ -168,8 +185,8 @@ test('con credencial válida inicializa con cert() y el project id de la identid
 
   assert.strictEqual(contexto.modo, 'credencial');
   assert.strictEqual(contexto.produccion, true);
-  assert.deepStrictEqual(admin.registro.certificados, [cred]);
-  assert.strictEqual(admin.registro.opciones.projectId, 'treino-dev');
+  assert.deepStrictEqual(sdk.registro.certificados, [cred]);
+  assert.strictEqual(sdk.registro.opciones.projectId, 'treino-dev');
   assert.strictEqual(proyectoDe(contexto), 'treino-dev');
 });
 
@@ -177,12 +194,12 @@ test('la ruta validada queda en GOOGLE_APPLICATION_CREDENTIALS — no queda un A
   // Éste es el punto que hace que cablear sirva para los scripts que usaban
   // ADC: el resolutor corre primero y le IMPONE la ruta al ambiente, en vez de
   // dejar que la librería resuelva por su cuenta.
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const cred = credencialDe('sa@ajeno.iam.gserviceaccount.com', 'ajeno');
   const env = { [VAR_RUTA]: FUERA };
 
   inicializarAdmin({
-    admin,
+    sdk,
     env,
     consola: consolaFalsa(),
     existeEntrada: (p) => p === FUERA,
@@ -195,14 +212,14 @@ test('la ruta validada queda en GOOGLE_APPLICATION_CREDENTIALS — no queda un A
 });
 
 test('sin variable: imprime la migración, sale con 1 y NO inicializa nada', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const consola = consolaFalsa();
   const salidas = [];
 
   assert.throws(
     () =>
       inicializarAdmin({
-        admin,
+        sdk,
         env: {},
         consola,
         salir: (c) => salidas.push(c),
@@ -213,19 +230,19 @@ test('sin variable: imprime la migración, sale con 1 y NO inicializa nada', () 
   );
 
   assert.deepStrictEqual(salidas, [1]);
-  assert.strictEqual(admin.registro.apps.length, 0, 'no se puede haber inicializado nada');
+  assert.strictEqual(sdk.registro.apps.length, 0, 'no se puede haber inicializado nada');
   assert.match(consola.lineas.join('\n'), /mv scripts\/sa-key\.json/);
 });
 
 test('una ruta adentro del repo se rechaza antes de inicializar', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const consola = consolaFalsa();
   const dentro = '/algun/repo/scripts/sa-key.json';
 
   assert.throws(
     () =>
       inicializarAdmin({
-        admin,
+        sdk,
         env: { [VAR_RUTA]: dentro },
         consola,
         salir: () => {},
@@ -235,17 +252,17 @@ test('una ruta adentro del repo se rechaza antes de inicializar', () => {
     ErrorDeCredencial,
   );
 
-  assert.strictEqual(admin.registro.apps.length, 0);
+  assert.strictEqual(sdk.registro.apps.length, 0);
   assert.match(consola.lineas.join('\n'), /árbol de git/);
 });
 
 test('los avisos de permisos se muestran, pero no frenan', () => {
-  const admin = adminFalso();
+  const sdk = sdkFalso();
   const consola = consolaFalsa();
   const cred = credencialDe('sa@ajeno.iam.gserviceaccount.com', 'ajeno');
 
   inicializarAdmin({
-    admin,
+    sdk,
     env: { [VAR_RUTA]: FUERA },
     consola,
     existeEntrada: (p) => p === FUERA,
@@ -254,7 +271,7 @@ test('los avisos de permisos se muestran, pero no frenan', () => {
     home: HOME,
   });
 
-  assert.strictEqual(admin.registro.apps.length, 1, 'un aviso no frena');
+  assert.strictEqual(sdk.registro.apps.length, 1, 'un aviso no frena');
   assert.match(consola.lineas.join('\n'), /chmod 600/);
 });
 
@@ -263,11 +280,11 @@ test('los avisos de permisos se muestran, pero no frenan', () => {
 test('si ya hay una app, no reinicializa ni vuelve a resolver credencial', () => {
   // `seed_workout_catalog.js` se requiere desde `seed_emulator_full.js`, que ya
   // inicializó. Un segundo `initializeApp` explotaría.
-  const admin = adminFalso();
-  admin.registro.apps.push({});
+  const sdk = sdkFalso();
+  sdk.registro.apps.push({});
 
   const { contexto } = inicializarAdmin({
-    admin,
+    sdk,
     env: {},
     consola: consolaFalsa(),
     existeEntrada: explota('existsSync'),
@@ -275,5 +292,5 @@ test('si ya hay una app, no reinicializa ni vuelve a resolver credencial', () =>
   });
 
   assert.strictEqual(contexto, null);
-  assert.strictEqual(admin.registro.opciones, null, 'no se llamó a initializeApp');
+  assert.strictEqual(sdk.registro.opciones, null, 'no se llamó a initializeApp');
 });

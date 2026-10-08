@@ -110,18 +110,20 @@
  * #628.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -137,11 +139,11 @@ type FeedbackData = Record<string, unknown>;
  * @param messaging    - Instancia de messaging opcional, para inyección en tests.
  */
 export async function notifyOnExerciseFeedbackHandler(
-  app: admin.app.App,
+  app: App,
   athleteUid: string,
   sessionId: string,
   feedbackData: FeedbackData,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   const kind = feedbackData.kind as string | undefined;
 
@@ -170,7 +172,7 @@ export async function notifyOnExerciseFeedbackHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Destinatario CANDIDATO: el PF que el grant dice. Candidato y no destinatario
   // a secas — este doc es client-writable y el alumno lo apunta a quien quiera
@@ -242,11 +244,21 @@ export async function notifyOnExerciseFeedbackHandler(
   // propósito — ver el header de este archivo.
   const body = `${athleteName} reportó una molestia en ${exerciseName}`; // i18n: #628
 
-  // No existe today una ruta para una sesión puntual del lado del coach
-  // (routine_detail_screen.dart y session_detail_sheet.dart ya navegan a
-  // este mismo path para que el PF vea a SU alumno); el PF entra a la ficha
-  // del alumno y ahí tiene el historial de sesiones con este reporte adentro.
-  const deepLink = `/coach/athlete/${athleteUid}`;
+  // A la SESIÓN donde se reportó la molestia. Hasta que existió
+  // `/coach/athlete/:athleteId/session/:sessionId` esto apuntaba a la ficha
+  // entera del alumno, y el PF que tocaba un aviso de dolor caía en una
+  // pantalla larga donde tenía que ir a buscar el entrenamiento a mano — un
+  // aviso cuyo destino no mostraba lo que el aviso decía.
+  //
+  // `sessionId` ya viajaba en `data` (abajo) desde antes: lo que faltaba era
+  // el destino, no el dato.
+  //
+  // Ojo: este push sale al CREARSE el reporte, así que la sesión puede estar
+  // EN CURSO. La pantalla lo aguanta —no lee `finishedAt`— y muestra las
+  // series ya cargadas con el reporte pegado. `durationMin` y `totalVolumeKg`
+  // van en 0 hasta que se cierre la sesión, que es la decisión deliberada de
+  // `session_repository.dart` (un 0 honesto antes que un valor inventado).
+  const deepLink = `/coach/athlete/${athleteUid}/session/${sessionId}`;
 
   await sendFcm(
     app,
@@ -279,7 +291,14 @@ export async function notifyOnExerciseFeedbackHandler(
     // El destinatario es el PF, asi que el CTA va a SU entrada. El default del
     // template es la del atleta, que aca dejaria al profe mirando la pantalla
     // equivocada. Mismo patron que `link-requested`.
-    params: { athleteName, ctaUrl: APP_ENTRY_TRAINER },
+    //
+    // `to: "alumno"` con el uid del ATLETA (no del PF, que ya es `trainerId`
+    // arriba): manda directo al perfil de quien reporto la molestia, no a un
+    // listado generico de alumnos que el profe tendria que volver a filtrar.
+    params: {
+      athleteName,
+      ctaUrl: trainerEntry({ to: "alumno", athleteId: athleteUid }),
+    },
     // Sin `prefKey` A PROPOSITO: es transaccional. Ver el header.
   }).catch((error: unknown) => {
     logger.warn("notifyOnExerciseFeedback: mail enqueue failed", {
@@ -308,6 +327,6 @@ export const notifyOnExerciseFeedback = onDocumentCreated(
     }
 
     const { uid: athleteUid, sessionId } = event.params;
-    await notifyOnExerciseFeedbackHandler(getApp(), athleteUid, sessionId, feedbackData);
+    await notifyOnExerciseFeedbackHandler(ensureApp(), athleteUid, sessionId, feedbackData);
   },
 );

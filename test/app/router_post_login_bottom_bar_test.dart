@@ -43,6 +43,15 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import '../helpers/mail_test_helpers.dart';
+
+/// Fecha de nacimiento de un adulto.
+///
+/// Todo test que monte el router REAL con un usuario logueado la necesita:
+/// `authRedirect` tiene un gate de edad mínima que manda a `/birth-date`
+/// cuando `bornAt` falta o no llega al piso, así que un perfil "completo" sin
+/// este campo nunca llega a la pantalla que el test quiere medir.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
 
 class _MockUser extends Mock implements User {}
 
@@ -59,6 +68,8 @@ UserProfile _profile() => UserProfile(
       uid: 'uid-test',
       email: 'test@test.com',
       displayName: 'Test User',
+      bornAt: _adultBornAt,
+      emailVerification: mailConfirmadoPara(UserRole.athlete, 'test@test.com'),
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),

@@ -24,7 +24,8 @@
  *     UserRepository._trainerPublicFields (same contract as ADR-RV-005).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -32,11 +33,11 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -75,10 +76,10 @@ export function athleteCountFromLinks(
  * by test suites.
  */
 export async function recomputeAthleteCount(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   try {
     // 1. Query ALL links for this trainer; the pure helper filters `active`.
@@ -108,8 +109,14 @@ export async function recomputeAthleteCount(
       return;
     }
 
-    // 3. Merge the aggregate field — never overwrite identity fields.
-    await profileRef.set({ athleteCount }, { merge: true });
+    // 3. Update ONLY the aggregate field — never overwrite identity fields.
+    //    `update()`, NOT `set(merge)` (#1333): the exists-check above is not
+    //    transactional, so a trigger that read the profile before the account
+    //    deletion cascade removed it (`deleteUserDocs`) would otherwise write
+    //    after and RE-CREATE `trainerPublicProfiles/{uid}` as a ghost doc with
+    //    just `athleteCount`. `update()` fails with NOT_FOUND instead, which
+    //    the catch below logs and swallows.
+    await profileRef.update({ athleteCount });
 
     logger.info(`linkAggregate: updated trainerPublicProfiles/${trainerId}`, {
       trainerId,
@@ -117,6 +124,16 @@ export async function recomputeAthleteCount(
     });
   } catch (err) {
     // Catch all → log + no rethrow (mirrors reviewAggregate).
+    // NOT_FOUND (gRPC 5) de `update()` es el desenlace ESPERADO de la carrera
+    // con el cascade de borrado de cuenta (#1333): `warn`, no `error`.
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 5 || code === "not-found") {
+      logger.warn(
+        `linkAggregate: trainerPublicProfiles/${trainerId} disappeared before the write — skipping`,
+        { trainerId },
+      );
+      return;
+    }
     logger.error(
       `linkAggregate: error recomputing for trainerId=${trainerId}`,
       { trainerId, err },
@@ -149,6 +166,6 @@ export const linkAggregate = onDocumentWritten(
       return;
     }
 
-    await recomputeAthleteCount(getApp(), trainerId);
+    await recomputeAthleteCount(ensureApp(), trainerId);
   },
 );

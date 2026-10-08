@@ -35,7 +35,7 @@ void main() {
     testWidgets('renders without overflow at large text scale', (tester) async {
       await tester.pumpWidget(_wrap(
         const ProfileSetupHeader(
-          currentStep: 3,
+          currentStep: 4,
           title: 'PESO Y ALTURA',
         ),
         textScale: 2.0,

@@ -72,6 +72,7 @@ class SidebarItem {
     required this.iconBuilder,
     required this.group,
     this.badgeProvider,
+    this.visibleProvider,
   });
 
   /// Identificador estable en kebab-case (eg. `dashboard`, `alumnos`).
@@ -92,4 +93,19 @@ class SidebarItem {
   /// Provider opcional del contador de badge. En W1 todos los items pasan
   /// `null`; el wiring real llega en fases posteriores.
   final ProviderListenable<int?>? badgeProvider;
+
+  /// Provider opcional de visibilidad. `null` = siempre visible, que es lo que
+  /// pasa con casi todos los items.
+  ///
+  /// Existe para la cola de moderacion, que solo tiene que aparecerle a quien
+  /// tiene el claim `moderator`. Va como campo del descriptor y no como un `if`
+  /// adentro del sidebar por el mismo motivo que `badgeProvider`: cada seccion
+  /// declara lo suyo en `sections/<seccion>/routes.dart`, y el shell no tiene
+  /// que conocer a ninguna en particular (ADR-CHW-002).
+  ///
+  /// OJO: esconder el item NO es el control de acceso. La ruta sigue existiendo
+  /// y se puede escribir a mano en la barra del navegador. Lo que protege de
+  /// verdad es `assertModerator` del otro lado de los callables, donde hay
+  /// Admin SDK y las rules no participan. Esto es UI, no seguridad.
+  final ProviderListenable<bool>? visibleProvider;
 }

@@ -1,16 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/utils/deep_link_destination.dart';
 import '../core/widgets/treino_bottom_bar.dart';
 import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
+import '../features/auth/application/email_gate_providers.dart';
+import '../features/auth/domain/mail_verificado.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/profile_unavailable_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/splash_screen.dart';
+import '../features/auth/presentation/verify_mail_screen.dart';
 import '../features/auth/presentation/welcome_screen.dart';
 import '../features/chat/application/chat_providers.dart'
     show unreadFromCoachProvider, unreadFromFriendsProvider;
@@ -19,8 +25,12 @@ import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/coach/application/trainer_link_providers.dart';
 import '../features/coach/presentation/athlete_agenda_screen.dart';
+import '../features/coach/presentation/athlete_files_screen.dart';
+import '../features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
+import '../features/coach/presentation/trainer_dashboard_tab.dart'
+    show RecentActivityScreen;
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -62,6 +72,8 @@ import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
 import '../features/profile/presentation/appearance_screen.dart';
+import '../features/profile/presentation/privacy_screen.dart';
+import '../features/profile/presentation/legal_index_screen.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
 import '../features/profile/presentation/profile_edit_trainer_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
@@ -70,10 +82,15 @@ import '../features/profile/presentation/profile_routines_screen.dart';
 // route was removed as part of the PR#4 pivot. Settings surface deferred until
 // real settings content exists (notifications/theme/language).
 import '../features/profile/profile_screen.dart';
+import '../features/profile_setup/presentation/birth_date_gate_screen.dart';
+import '../features/profile_setup/domain/profile_setup_validators.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 import 'theme/app_motion.dart';
+import '../features/coach/application/pending_invite_providers.dart';
+import '../features/coach/domain/invite_capture.dart';
+import '../l10n/app_l10n.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
 
@@ -87,6 +104,22 @@ final GlobalKey<NavigatorState> _shellNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'ShellNav');
 
 /// Routes that are public (no redirect when anonymous).
+/// Gate de edad mínima para cuentas preexistentes. Ver [BirthDateGateScreen].
+///
+/// Deliberadamente NO cuelga de `/profile-setup`: `isProfileSetup` se calcula
+/// con `startsWith`, así que un `/profile-setup/...` entraría al bloque
+/// "onboarding-completo" de abajo y rebotaría a `/home` en el mismo frame.
+/// Tampoco cuelga de `/profile`, que vive dentro del shell de 5 tabs y dejaría
+/// la barra inferior a mano para saltearse el gate.
+const _birthDateRoute = '/birth-date';
+
+/// Gate del mail confirmado con código. Ver [VerifyMailScreen].
+///
+/// Top-level por lo mismo que [_birthDateRoute]: colgado de `/profile-setup`
+/// rebotaría a `/home` en el mismo frame, y colgado de `/profile` dejaría la
+/// barra inferior a mano para saltearlo.
+const _verifyMailRoute = '/verificar-mail';
+
 const _publicRoutes = {
   '/splash',
   '/welcome',
@@ -170,6 +203,112 @@ String? authRedirect(
       return '/profile-setup';
     }
 
+    // Gate de edad mínima (bornAt) — cuentas que YA existían cuando se
+    // introdujo el requisito y nunca declararon su fecha de nacimiento.
+    //
+    // Va como rama PROPIA y NO sumando `bornAt == null` al chequeo de
+    // displayName de arriba. Ese atajo produce un LOOP DE REDIRECT INFINITO
+    // para toda la base de usuarios existente el día del deploy: una cuenta
+    // vieja tiene displayName cargado, así que el bloque "onboarding-completo"
+    // de más abajo la saca de /profile-setup en cuanto entra, /home la vuelve a
+    // mandar, y así. El bloque de abajo no se puede borrar — existe para
+    // resolver una carrera contra el stream del perfil (ver su comentario).
+    //
+    // El otro motivo para una pantalla propia: el paso 1 de ProfileSetup
+    // verifica que el username esté libre, y el de una cuenta vieja está
+    // tomado POR ELLA MISMA.
+    //
+    // Fires ANTES del gate de trainer-incompleto: es un requisito legal, y el
+    // onboarding comercial del PF puede esperar un minuto más. Self-skip con
+    // startsWith, mismo idiom que el gate de abajo, para no auto-rebotarse.
+    // Dispara si la fecha FALTA **o si no llega al piso**, y lo segundo no es
+    // hipotético: `bornAt` existía como campo opcional editable desde el perfil
+    // desde antes de este requisito, así que puede haber cuentas con una fecha
+    // de menor de 16 ya persistida. Sin mirar el validador, esas cuentas pasan
+    // el gate y se comen un permission-denied opaco en su PRIMERA escritura —
+    // las rules validan el piso en TODO update, no sólo en el create.
+    //
+    // ENTRADA Y SALIDA, escritas juntas y contra la MISMA condicion. La
+    // primera version tenia solo la entrada, con self-skip, y ninguna salida:
+    // al guardar la fecha la rama dejaba de disparar, pero `/birth-date` no es
+    // ruta publica, asi que el redirect `/public -> /home` tampoco la
+    // alcanzaba. `authRedirect` devolvia null y el usuario se quedaba mirando
+    // el gate con el dato YA persistido — cerrar sesion y volver a entrar lo
+    // "arreglaba" porque esa cadena arranca en /splash y nunca pasa por aca.
+    //
+    // Es el mismo par que `/profile-unavailable` resuelve unas lineas mas
+    // arriba, donde la salida SI esta escrita. Un gate al que se entra por una
+    // condicion tiene que salir por la negacion de esa misma condicion, o la
+    // salida se desincroniza de la entrada.
+    final bornAtNoSirve =
+        ProfileSetupValidators.validateBornAt(profile.bornAt) != null;
+    final enElGateDeEdad = location.startsWith(_birthDateRoute);
+
+    if (!isPublic && bornAtNoSirve && !enElGateDeEdad) {
+      return _birthDateRoute;
+    }
+    // La salida mira el validador y no solo "hay algo en bornAt": sin eso
+    // sacaria al usuario del gate con una fecha que el gate existe para
+    // rechazar.
+    //
+    // Y exige que la escritura este CONFIRMADA POR EL SERVIDOR. Firestore
+    // aplica el update en el cache antes del ack, asi que el stream emite el
+    // `bornAt` optimista de inmediato: sin este chequeo el usuario sale del
+    // gate con un dato que todavia puede volver atras, y si el servidor lo
+    // rechaza vuelve al gate SIN EXPLICACION, con la pantalla que podia
+    // mostrarle el error ya desmontada.
+    //
+    // Mientras la escritura viaja, el boton sigue en "guardando" —`_save`
+    // espera el ack— asi que el usuario ve que algo esta pasando en vez de
+    // quedarse mirando una pantalla quieta.
+    final escrituraPendiente =
+        read(userProfileHasPendingWritesProvider).valueOrNull ?? false;
+    if (enElGateDeEdad && !bornAtNoSirve && !escrituraPendiente) {
+      return '/home';
+    }
+    // Y mientras el gate de edad no deja salir, nadie más lo saca. Sin esto,
+    // cualquier gate de abajo que dispare desde `/birth-date` arma un rebote
+    // infinito: él manda a su pantalla, y desde ahí el de edad devuelve acá.
+    // Ya pasaba con el del PF incompleto y una fecha inválida; con el del mail,
+    // que dispara para TODAS las cuentas, pasaría el día del deploy.
+    if (enElGateDeEdad) return null;
+
+    // Gate del mail confirmado con código (`VerifyMailScreen`). Para TODAS las
+    // cuentas —también Google y Apple, que traen `emailVerified` en true y por
+    // eso no sirve—: `emailVerification` lo escribe solo la Cloud Function
+    // `verificarCodigoDeMail` cuando el código coincide.
+    //
+    // INTERRUPTOR en el servidor: solo corre si `app_config/email_gate` tiene
+    // `{enabled: true}` (`emailGateEnabledProvider`). Falla ABIERTO: sin
+    // documento, en `false`, cargando, o si el stream falla en cualquier momento
+    // (el provider convierte el error en `false`), el gate no existe, porque el
+    // código es un canal de comunicación y no un control de acceso. Si Resend se
+    // queda sin cuota, el equipo lo apaga desde la consola de Firestore, sin
+    // deploy ni build. Apagado también SACA de la pantalla a quien esté parado
+    // en ella: es la misma condición para entrar y para salir (más abajo).
+    //
+    // POR ROL y contra el mail de Auth de hoy (`correoVerificadoParaElRol`): la
+    // entrada que cuenta es la del rol actual. Un alumno ya verificado que el
+    // equipo promueve a entrenador vuelve a esta pantalla, porque el mail que le
+    // llega es el del entrenador.
+    //
+    // Después del de edad (requisito legal, va primero) y antes del
+    // onboarding del PF, que puede esperar un minuto más.
+    //
+    // ENTRADA Y SALIDA contra la MISMA condición, y quedarse mientras no se
+    // pueda salir — el par que el gate de edad aprendió por las malas (ver su
+    // comentario). La salida no necesita esperar escrituras pendientes: el
+    // campo lo escribe el servidor, así que nunca hay un valor optimista.
+    final gateOn = read(emailGateEnabledProvider).valueOrNull ?? false;
+    final mailSinConfirmar =
+        gateOn && !correoVerificadoParaElRol(profile, user.email);
+    final enElGateDelMail = location.startsWith(_verifyMailRoute);
+    if (!isPublic && mailSinConfirmar && !enElGateDelMail) {
+      return _verifyMailRoute;
+    }
+    if (enElGateDelMail && !mailSinConfirmar) return '/home';
+    if (enElGateDelMail) return null;
+
     // ADR-TPO-003: trainer-incomplete onboarding gate.
     // Fires AFTER displayName check and BEFORE the public-route → /home redirect.
     // !isPublic guard ensures public routes (login, register, etc.) remain
@@ -210,6 +349,42 @@ String? authRedirect(
   return null;
 }
 
+/// A dónde manda `/abrir/profe` en mobile, según el destino fino que trae el
+/// mail — pura y testeable, igual que [authRedirect].
+///
+/// `to=agenda` mapea al mismo lugar que el default de siempre (sin `to`), y
+/// eso queda repetido a propósito: hace explícito que son el MISMO destino
+/// por dos caminos, no una coincidencia que se rompe si alguno cambia solo.
+///
+/// `to=solicitudes` cae en `/coach` a secas: las solicitudes pendientes viven
+/// en un bottom sheet que abre la campanita del header (#393), no en una
+/// pantalla con ruta propia. No hay más lejos a dónde apuntar en mobile hoy.
+///
+/// DEUDA CONOCIDA, encontrada en revisión adversarial: `authRedirect` (el
+/// gate de auth de mobile) NO chequea `profile.role` antes de dejar pasar a
+/// `/coach/athlete/:id` — a diferencia de `coachHubRedirect`, que manda a
+/// cualquier no-trainer a `/not-allowed` ANTES de aplicar el destino fino.
+/// Un link de `discomfort-reported` (el único de los 5 mails con
+/// `to=alumno`) reenviado a, o abierto por, una cuenta que no es ese
+/// trainer llega igual a esa pantalla. El impacto real es acotado —las
+/// reglas de Firestore degradan cada sección con permission-denied, y el
+/// perfil público ya es legible por cualquier autenticado— pero es una
+/// asimetría real entre los dos routers que valdría la pena cerrar con un
+/// gate de rol en `authRedirect`, no en este switch puntual.
+String mobileTrainerEntryPath(DeepLinkDestination? dest) => switch (dest?.to) {
+      DeepLinkTo.facturacion => '/facturacion/planes',
+      DeepLinkTo.agenda => '/coach?tab=agenda',
+      DeepLinkTo.solicitudes => '/coach',
+      DeepLinkTo.alumno => '/coach/athlete/${dest!.athleteId}',
+      // Una invitación es para el ALUMNO, y esta función resuelve la entrada
+      // del ENTRENADOR. Un PF que abre el link que él mismo generó —probando
+      // que anda, o porque se lo reenviaron— cae en su agenda, igual que si
+      // hubiera abierto la app sin link. Mandarlo a una pantalla de
+      // vinculación sería ofrecerle vincularse consigo mismo.
+      DeepLinkTo.invitacion => '/coach?tab=agenda',
+      null => '/coach?tab=agenda',
+    };
+
 GoRouter buildRouter({
   required Listenable refreshListenable,
   required T Function<T>(ProviderListenable<T>) read,
@@ -217,7 +392,34 @@ GoRouter buildRouter({
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: refreshListenable,
-    redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
+    redirect: (ctx, state) {
+      // La captura va ANTES del gate de auth y no adentro de la ruta
+      // `/abrir/alumno`: con la sesión cerrada, `authRedirect` gana y manda a
+      // `/welcome`, así que el redirect de esa ruta nunca llega a correr y la
+      // invitación se perdía justo en el caso que más la necesita —el alumno
+      // que todavía no tiene cuenta—.
+      //
+      // `authRedirect` queda intacta: sigue siendo la función pura y testeada
+      // que era. Esto es un efecto de al lado, no una condición suya.
+      final invitacion = trainerIdDeInvitacion(state.uri);
+      if (invitacion != null) {
+        // Sin await porque un redirect es síncrono. Que la escritura a disco
+        // no haya terminado NO importa: `guardar` deja la invitación en
+        // memoria antes de tocar el disco, y de ahí la lee el gate.
+        //
+        // El comentario anterior decía «la escritura termina mucho antes de
+        // que haya sesión para consumirla — hay un login de por medio». Eso
+        // vale sólo si NO hay sesión. Con el alumno ya logueado —el caso más
+        // común— no hay login de por medio: hay milisegundos, y el gate leía
+        // el disco antes de que la escritura terminara. El vínculo no se creaba
+        // y no había error en ninguna parte.
+        // El store puede no existir todavía (prefs sin resolver). Perder la
+        // captura es mejor que tumbar la navegación por una invitación.
+        final store = read(pendingInviteStoreProvider);
+        if (store != null) unawaited(store.guardar(invitacion));
+      }
+      return authRedirect(read, state.matchedLocation);
+    },
     // QA-NAV-002: una ruta desconocida o un deep-link malformado cae acá en vez
     // de en la pantalla de error roja default de go_router.
     errorBuilder: (context, state) => const NotFoundScreen(),
@@ -242,7 +444,10 @@ GoRouter buildRouter({
       ),
       GoRoute(
         path: '/abrir/profe',
-        redirect: (_, __) => '/coach?tab=agenda',
+        redirect: (_, state) =>
+            mobileTrainerEntryPath(DeepLinkDestination.fromQuery(
+          state.uri.queryParameters,
+        )),
       ),
 
       // Entry routes — full screen, NO bottom bar
@@ -272,6 +477,22 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
+      ),
+
+      // Gate de edad mínima para cuentas preexistentes. Fullscreen, sin
+      // bottom bar — igual que /profile-setup, y por el mismo motivo: es un
+      // gate, no una pantalla a la que se navega.
+      GoRoute(
+        path: _birthDateRoute,
+        pageBuilder: (_, __) => _noAnim(const BirthDateGateScreen()),
+      ),
+
+      // Gate del mail confirmado con código. Fullscreen, sin bottom bar, por el
+      // mismo motivo que /birth-date: es un gate, no una pantalla a la que se
+      // navega.
+      GoRoute(
+        path: _verifyMailRoute,
+        pageBuilder: (_, __) => _noAnim(const VerifyMailScreen()),
       ),
 
       // Estado degradado "autenticado pero sin perfil accesible" (#544).
@@ -460,6 +681,20 @@ GoRouter buildRouter({
       ),
 
       GoRoute(
+        // ─── «Actividad reciente» completa, para el PF ─────────────────────
+        // El destino del «Ver todo» del dashboard. El dashboard corta el feed
+        // en 5 filas para no comerse la pantalla; acá se ve la ventana entera
+        // de 7 días.
+        //
+        // TOP-LEVEL (fuera del ShellRoute) como sus hermanas de `/coach/...`:
+        // empujar una ruta in-shell desde una out-of-shell rebuildea la rama
+        // del shell y aterriza en blanco (#399, #410).
+        path: '/coach/actividad',
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, const RecentActivityScreen()),
+      ),
+
+      GoRoute(
         // Athlete detail (coach) — full-screen, MENSAJE/CREAR PLAN sit at the
         // bottom with no nav bar. Bare Column (no Scaffold) → wrap in _immersive.
         path: '/coach/athlete/:athleteId',
@@ -485,6 +720,55 @@ GoRouter buildRouter({
             coachAthleteId: athleteId,
           ));
         },
+      ),
+      GoRoute(
+        // ─── Historial de entrenamientos del alumno, para el PF ────────────
+        // Saca el historial de adentro de la ficha larga y le da su lugar,
+        // igual que `/workout/historial` del lado del alumno — y monta LA MISMA
+        // pantalla, en modo PF.
+        //
+        // Se declara ANTES que `/session/:sessionId` por la misma razón que
+        // `/workout/historial` va antes que su detalle: el literal tiene que
+        // ganarle al parámetro.
+        //
+        // La diferencia que importa con la sección que reemplaza: acá entran
+        // las sesiones EN CURSO y las INCOMPLETAS. Hoy no aparecen en ninguna
+        // superficie del PF, así que una molestia reportada en una sesión
+        // abandonada genera un aviso cuyo registro no se puede encontrar.
+        path: '/coach/athlete/:athleteId/historial',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionHistoryScreen(
+            coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        // ─── Detalle de UNA sesión del alumno, para el PF ──────────────────
+        // Hasta acá no existía ninguna ruta que llevara a una SESIÓN: el push
+        // de molestia (`notifyOnExerciseFeedback`) y «Actividad reciente» del
+        // dashboard caían los dos en `/coach/athlete/:id`, la ficha entera del
+        // alumno, y el PF tenía que ir a buscar a mano el entrenamiento del
+        // que le hablaba el aviso. Un aviso cuyo destino no muestra lo que el
+        // aviso dice.
+        //
+        // TOP-LEVEL (fuera del ShellRoute) como su origen `/coach/athlete/:id`
+        // y sus hermanas de plan/ejercicio: empujar una ruta in-shell desde una
+        // out-of-shell rebuildea la rama del shell y aterriza en blanco
+        // (#399, #410).
+        //
+        // `_report` —Cupertino nativo + fade— es la misma transición que
+        // `/workout/historial/:sessionId`, que monta ESTA misma pantalla del
+        // lado del alumno. El destino es el mismo informe; sólo cambia quién
+        // mira.
+        path: '/coach/athlete/:athleteId/session/:sessionId',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionDetailScreen(
+            sessionId: state.pathParameters['sessionId']!,
+            coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
       ),
       GoRoute(
         // Exercise detail reached from a coach's read-only plan detail. Like
@@ -715,10 +999,6 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
               GoRoute(
-                path: 'notifications',
-                builder: (_, __) => _withBg(const NotificationHistoryScreen()),
-              ),
-              GoRoute(
                 // Friend-requests inbox reached from the feed header bell.
                 // Mirror of /profile/friend-requests: _ShellScaffold derives
                 // the highlighted tab from the location's path prefix, so the
@@ -738,6 +1018,22 @@ GoRouter buildRouter({
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
             routes: [
+              // Centro de notificaciones. Vive bajo /home y no bajo /feed
+              // porque la campana se movió a la pantalla principal: el
+              // `_ShellScaffold` deriva la pestaña resaltada del prefijo del
+              // path, así que registrarla acá mantiene INICIO marcado y el
+              // `pop` vuelve a /home (mismo patrón que `profile/:uid`).
+              //
+              // El `?tab=` lo escriben las Cloud Functions en su `deepLink`
+              // (ver `kTabSolicitudes`). Un valor desconocido cae en «Todas».
+              GoRoute(
+                path: 'notifications',
+                builder: (_, state) => _withBg(
+                  NotificationHistoryScreen(
+                    initialTab: state.uri.queryParameters['tab'],
+                  ),
+                ),
+              ),
               GoRoute(
                 // Public profile reached from the HomeHeader avatar. Mirror
                 // of /feed/profile/:uid: _ShellScaffold derives the
@@ -774,7 +1070,23 @@ GoRouter buildRouter({
               // nav bar — see the top-level GoRoutes above.
               GoRoute(
                 path: 'agenda',
-                builder: (_, __) => _withBg(const _AthleteAgendaRouteHost()),
+                builder: (_, state) => _withBg(
+                  _AthleteAgendaRouteHost(
+                    pistaDeTrainerId: state.uri.queryParameters['trainerId'],
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: 'nutricion',
+                builder: (_, state) => _withBg(
+                  _AthleteNutritionPlanRouteHost(
+                    pistaDeTrainerId: state.uri.queryParameters['trainerId'],
+                  ),
+                ),
+              ),
+              GoRoute(
+                path: 'archivos',
+                builder: (_, __) => _withBg(const _AthleteFilesRouteHost()),
               ),
               GoRoute(
                 path: 'availability-editor',
@@ -832,6 +1144,21 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
+              ),
+              // Controles de privacidad: el interruptor de analítica (por
+              // dispositivo) y el de correos promocionales (por cuenta). Existen
+              // porque la Política promete poder revocar el consentimiento
+              // «en cualquier momento» y no había dónde.
+              GoRoute(
+                path: 'settings/privacidad',
+                builder: (_, __) => _withBg(const PrivacyScreen()),
+              ),
+              // Índice de documentos legales. Hasta acá los legales sólo se
+              // alcanzaban desde el registro y el login, así que con la cuenta
+              // ya creada nadie podía releer lo que había aceptado.
+              GoRoute(
+                path: 'settings/legales',
+                builder: (_, __) => _withBg(const LegalIndexScreen()),
               ),
               GoRoute(
                 // Trainer availability editor reached from TrainerProfileView's
@@ -1068,7 +1395,11 @@ class _VolumeByGroupRouteHost extends ConsumerWidget {
 /// "Necesitás un vínculo activo con un PF". Ahora un trainer aterriza en su
 /// propia agenda (misma vista que /coach?tab=agenda).
 class _AthleteAgendaRouteHost extends ConsumerWidget {
-  const _AthleteAgendaRouteHost();
+  const _AthleteAgendaRouteHost({this.pistaDeTrainerId});
+
+  /// El `trainerId` que vino en la URL, si vino. Es una PISTA, no una
+  /// autorización — ver [_montarConPista].
+  final String? pistaDeTrainerId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1085,36 +1416,190 @@ class _AthleteAgendaRouteHost extends ConsumerWidget {
     }
 
     final athleteId = ref.watch(currentUidProvider) ?? '';
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    // Falta el UID, no el vínculo. Son dos causas distintas: antes las dos
+    // caían en el mismo `if` y mostraban el mismo cartel.
+    if (athleteId.isEmpty) {
+      return const _GateDeVinculo(faltaLaSesion: true);
+    }
 
-    return linkAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    return _montarConPista(
+      ref,
+      pista: pistaDeTrainerId,
+      montar: (trainerId) => AthleteAgendaScreen(
+        trainerId: trainerId,
+        athleteId: athleteId,
       ),
-      error: (err, _) => Scaffold(
-        body: Center(child: Text('Error: $err')),
-      ),
-      data: (link) {
-        final trainerId = link?.trainerId ?? '';
-        if (trainerId.isEmpty || athleteId.isEmpty) {
-          return const Scaffold(
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Necesitás un vínculo activo con un PF para ver su agenda.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          );
-        }
-        return AthleteAgendaScreen(
-          trainerId: trainerId,
-          athleteId: athleteId,
-        );
-      },
     );
+  }
+}
+
+/// Resuelve el vínculo activo y el uid del alumno para abrir su plan.
+class _AthleteNutritionPlanRouteHost extends ConsumerWidget {
+  const _AthleteNutritionPlanRouteHost({this.pistaDeTrainerId});
+
+  /// Ver [_AthleteAgendaRouteHost.pistaDeTrainerId].
+  final String? pistaDeTrainerId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    if (athleteId.isEmpty) {
+      return const _GateDeVinculo(faltaLaSesion: true);
+    }
+
+    return _montarConPista(
+      ref,
+      pista: pistaDeTrainerId,
+      montar: (trainerId) => AthleteNutritionPlanScreen(
+        trainerId: trainerId,
+        athleteId: athleteId,
+      ),
+    );
+  }
+}
+
+/// Resuelve el vínculo y monta la pantalla, o muestra el gate.
+///
+/// ## Por qué la `pista` no alcanza sola
+///
+/// La vista que dibuja los botones de AGENDA / NUTRICIÓN sólo los dibuja
+/// porque YA sabe que el vínculo está activo (`athlete_coach_view.dart`), y
+/// después navegaba acá tirando ese dato: la ruta lo volvía a preguntar desde
+/// cero, con otro provider y otra query, y cuando esa segunda pregunta salía
+/// mal el gate mentía. Pasar el `trainerId` por la URL arregla eso y además
+/// hace la navegación idempotente y deep-linkeable.
+///
+/// Pero la URL la escribe cualquiera. Si el `trainerId` de la query fuera la
+/// respuesta final, `/coach/agenda?trainerId=<el-que-sea>` montaría la
+/// pantalla de un PF con el que no hay vínculo, salteando el gate entero. Por
+/// eso la pista sólo sirve para NO MOSTRAR EL SPINNER mientras el provider
+/// resuelve: apenas resuelve, manda el provider. Las reglas de Firestore son
+/// la barrera de verdad, pero un gate que se saltea con un query param es
+/// exactamente la advertencia falsa que AGENTS.md §11.1 prohíbe.
+Widget _montarConPista(
+  WidgetRef ref, {
+  required String? pista,
+  required Widget Function(String trainerId) montar,
+}) {
+  final linkAsync = ref.watch(currentAthleteLinkProvider);
+  return linkAsync.when(
+    loading: () => (pista != null && pista.isNotEmpty)
+        ? montar(pista)
+        : const _EsperandoVinculo(),
+    // Un error resolviendo el vínculo es "no pudimos averiguarlo", NO "no
+    // tenés vínculo": mismo copy que el plazo vencido. Antes acá se pintaba
+    // `'Error: $err'` con el stack de Firestore en pantalla.
+    error: (_, __) => const _GateDeVinculo(sinConfirmar: true),
+    data: (link) {
+      final trainerId = link?.trainerId ?? '';
+      if (trainerId.isEmpty) return const _GateDeVinculo();
+      return montar(trainerId);
+    },
+  );
+}
+
+/// El cartel de las rutas de alumno que exigen un vínculo activo.
+///
+/// Antes cada pantalla tenía el suyo: agenda con el texto hardcodeado en
+/// español y sin l10n, nutrición con su propia key, y ninguna con salida —
+/// un `Center` con un `Text`, sin reintentar, sin `RefreshIndicator`, sin
+/// `ref.invalidate`. El usuario quedaba contra una pared.
+/// Spinner con plazo. Pasada la espera, admite que no pudo confirmar.
+///
+/// Los providers se quedan en `AsyncLoading` mientras el servidor no conteste,
+/// y eso es lo correcto: un `AsyncData(null)` tiene que significar "el servidor
+/// dijo que no tenés vínculo" y nada más. Pero un spinner eterno es la misma
+/// pared contra la que chocaba el usuario antes, con otra cara — así que el
+/// plazo y la salida van acá, en la UI, y no adentro del provider corrompiendo
+/// el dato para todos los demás consumidores.
+class _EsperandoVinculo extends StatefulWidget {
+  const _EsperandoVinculo();
+
+  @override
+  State<_EsperandoVinculo> createState() => _EsperandoVinculoState();
+}
+
+class _EsperandoVinculoState extends State<_EsperandoVinculo> {
+  bool _seAgoto = false;
+  Timer? _plazo;
+
+  @override
+  void initState() {
+    super.initState();
+    _plazo = Timer(kEsperaDelServidorDeVinculo, () {
+      if (mounted) setState(() => _seAgoto = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _plazo?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _seAgoto
+      ? const _GateDeVinculo(sinConfirmar: true)
+      : const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
+
+class _GateDeVinculo extends ConsumerWidget {
+  const _GateDeVinculo({
+    this.faltaLaSesion = false,
+    this.sinConfirmar = false,
+  });
+
+  /// `true` cuando lo que falta es el uid y no el vínculo.
+  final bool faltaLaSesion;
+
+  /// `true` cuando el servidor no contestó a tiempo. Es una causa DISTINTA de
+  /// "no tenés vínculo", y mezclarlas es justo el bug que este gate existe para
+  /// no repetir.
+  final bool sinConfirmar;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                faltaLaSesion
+                    ? l10n.athleteSessionMissing
+                    : sinConfirmar
+                        ? l10n.athleteLinkUnconfirmed
+                        : l10n.athleteLinkRequired,
+                textAlign: TextAlign.center,
+              ),
+              // Reintentar sólo aplica al vínculo: si no hay sesión, volver a
+              // preguntar por el vínculo no arregla nada.
+              if (!faltaLaSesion) ...[
+                const SizedBox(height: 18),
+                TextButton(
+                  onPressed: () => ref.invalidate(currentAthleteLinkProvider),
+                  child: Text(l10n.athleteLinkRequiredRetry),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El alumno ve todos sus archivos compartidos, sin scope por entrenador.
+class _AthleteFilesRouteHost extends ConsumerWidget {
+  const _AthleteFilesRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    return AthleteFilesScreen(athleteId: athleteId);
   }
 }
 

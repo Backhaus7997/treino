@@ -62,7 +62,7 @@ ProviderContainer _container({
 }) {
   final container = ProviderContainer(
     overrides: [
-      currentAthleteLinkProvider.overrideWith((ref) async => link),
+      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
       athletePaymentsProvider.overrideWith((ref) => Stream.value(payments)),
       // miCuotaProvider no longer reads either of these — they're overridden
       // here purely to prove the tests below are unaffected by them.

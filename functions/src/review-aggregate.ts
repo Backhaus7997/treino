@@ -15,7 +15,8 @@
  * REQ-RV-CF-001..006. Fase 6 Etapa 7.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -23,11 +24,11 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -97,10 +98,10 @@ export function aggregateFromReviews(
  * by test suites.
  */
 export async function recomputeAggregate(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   try {
     // 1. Query all reviews for this trainer.
@@ -133,8 +134,14 @@ export async function recomputeAggregate(
       return;
     }
 
-    // 3. Merge aggregate fields — never overwrite identity fields.
-    await profileRef.set(update, { merge: true });
+    // 3. Update ONLY the aggregate fields — never overwrite identity fields.
+    //    `update()`, NOT `set(merge)` (#1333): the exists-check above is not
+    //    transactional, so a trigger that read the profile before the account
+    //    deletion cascade removed it (`deleteUserDocs`) would otherwise write
+    //    after and RE-CREATE `trainerPublicProfiles/{uid}` as a ghost doc with
+    //    just the aggregate. `update()` fails with NOT_FOUND instead, which
+    //    the catch below logs and swallows (REQ-RV-CF-006).
+    await profileRef.update(update);
 
     logger.info(
       `reviewAggregate: updated trainerPublicProfiles/${trainerId}`,
@@ -142,6 +149,16 @@ export async function recomputeAggregate(
     );
   } catch (err) {
     // REQ-RV-CF-006: catch all → log + no rethrow
+    // NOT_FOUND (gRPC 5) de `update()` es el desenlace ESPERADO de la carrera
+    // con el cascade de borrado de cuenta (#1333): `warn`, no `error`.
+    const code = (err as { code?: unknown } | null)?.code;
+    if (code === 5 || code === "not-found") {
+      logger.warn(
+        `reviewAggregate: trainerPublicProfiles/${trainerId} disappeared before the write — skipping`,
+        { trainerId },
+      );
+      return;
+    }
     logger.error(
       `reviewAggregate: error recomputing for trainerId=${trainerId}`,
       { trainerId, err },
@@ -173,6 +190,6 @@ export const reviewAggregate = onDocumentWritten(
       return;
     }
 
-    await recomputeAggregate(getApp(), trainerId);
+    await recomputeAggregate(ensureApp(), trainerId);
   },
 );

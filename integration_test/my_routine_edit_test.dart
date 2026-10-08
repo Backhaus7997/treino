@@ -27,12 +27,19 @@ import 'package:integration_test/integration_test.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import 'support/e2e_helpers.dart';
+import 'support/seed_ids.dart';
 
-// TODO(seed): credentials of the seeded athlete.
-const String kSeedEmail = 'e2e.athlete@treino.test';
-const String kSeedPassword = 'Treino1234';
+// Credenciales: `support/seed_ids.dart`, generado desde el seed. Acá decía
+// `e2e.athlete@treino.test`, que no corresponde a ningún usuario sembrado.
 
 // TODO(seed): id of a personal routine owned by the seeded athlete.
+//
+// SIGUE SIN LLENAR a propósito, y no es un olvido: el seed no siembra ninguna
+// rutina de la que el alumno sea DUEÑO. Las dos con contenido son
+// `trainer-assigned` y la tercera es una plantilla `system`. Poner acá
+// `kAssignedRoutineId` haría que esta suite abriera el editor sobre una rutina
+// que el alumno no puede editar, y el rojo hablaría de permisos en vez de
+// decir que falta el fixture. Ver la nota en `support/seed_ids.dart`.
 const String kRoutineId = 'REPLACE_WITH_SEEDED_SELF_ROUTINE_ID';
 
 void main() {
@@ -45,7 +52,7 @@ void main() {
     await ensureSignedOut(tester);
     await pumpTreinoApp(tester);
 
-    await signInViaUi(tester, email: kSeedEmail, password: kSeedPassword);
+    await signInViaUi(tester, email: kMartin.email, password: kSeedPassword);
 
     // Deep-link into the editor in EDIT mode by passing the existing id as
     // `extra` (the route maps a non-null String extra → SelfCreating(existingRoutineId)).

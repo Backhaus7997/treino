@@ -14,6 +14,29 @@ import '../../profile/application/user_providers.dart';
 @visibleForTesting
 final permissionGateAttemptedProvider = StateProvider<bool>((ref) => false);
 
+/// `true` mientras el prompt del SISTEMA OPERATIVO está en pantalla.
+///
+/// Distinto de [permissionGateAttemptedProvider], que se pone en `true` ANTES
+/// del `await` —para cerrar la ventana de re-entrada del propio gate— y por lo
+/// tanto no sirve para que OTRO gate sepa si el alert todavía está arriba.
+/// Cualquier gate de `/home` que vaya a mostrar algo modal tiene que esperar
+/// [permissionPromptSettledProvider], no el flag de "ya intenté".
+@visibleForTesting
+final permissionPromptInFlightProvider = StateProvider<bool>((ref) => false);
+
+/// El prompt de permisos ya terminó: se intentó Y no quedó ninguno en pantalla.
+///
+/// #627 se arregló haciendo que este gate esperara a `onboardingBlocksProvider`.
+/// Ese provider mide el tour de onboarding y NADA más, así que no dice nada
+/// sobre los otros prompts de `/home`. Dos gates hermanos que sólo miran esa
+/// condición encolan su `addPostFrameCallback` en el MISMO frame y el segundo
+/// aparece debajo del alert del SO — el mismo patrón del #627, con otro par de
+/// widgets.
+final permissionPromptSettledProvider = Provider<bool>((ref) {
+  return ref.watch(permissionGateAttemptedProvider) &&
+      !ref.watch(permissionPromptInFlightProvider);
+});
+
 /// Invisible widget that requests notification permission exactly once per
 /// app session, and only after the user has completed profile setup.
 ///
@@ -63,6 +86,10 @@ class _PermissionGateState extends ConsumerState<PermissionGate> {
   }
 
   Future<void> _requestPermission() async {
+    // Se levanta ANTES del await y se baja en el `finally`: es la ventana en
+    // la que el alert del SO está efectivamente en pantalla, y es lo que los
+    // otros gates de /home tienen que respetar.
+    ref.read(permissionPromptInFlightProvider.notifier).state = true;
     try {
       final fcm = ref.read(fcmServiceProvider);
       final settings = await fcm.requestPermission();
@@ -86,6 +113,13 @@ class _PermissionGateState extends ConsumerState<PermissionGate> {
       // Swallow errors (e.g. platform exceptions) — denial is graceful.
       // i18n: Fase 6 Etapa 2
       debugPrint('[fcm] requestPermission error: $e');
+    } finally {
+      // En el finally y no al final del try: si `requestPermission` tira, el
+      // alert ya no está, y dejar el flag arriba colgaría a los otros gates
+      // para toda la sesión.
+      if (ref.context.mounted) {
+        ref.read(permissionPromptInFlightProvider.notifier).state = false;
+      }
     }
   }
 }

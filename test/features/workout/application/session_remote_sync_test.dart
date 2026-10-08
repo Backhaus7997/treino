@@ -116,11 +116,44 @@ void main() {
       expect(await future.timeout(const Duration(seconds: 5)), isTrue);
     });
 
-    test('una sesion que no existe cuenta como terminada', () async {
-      // Seguir mostrando el player sobre un doc borrado es peor que cerrarlo.
+    test('una sesion BORRADA cuenta como terminada', () async {
+      // La intención original de este test no cambió: seguir mostrando el
+      // player sobre un doc borrado es peor que cerrarlo.
+      //
+      // Lo que cambió es CÓMO se expresa. Antes decía «una sesión que no
+      // existe» y usaba un id que nunca se había escrito, conflacionando dos
+      // casos que resultaron ser distintos: «existió y la borraron» —esto— y
+      // «nunca existió», que es un create RECHAZADO por el servidor. Leer el
+      // segundo como «terminada» le decía al atleta que había cerrado el
+      // entreno desde la muñeca sobre un rechazo de paywall.
+      //
+      // Ahora hace falta la historia completa: existir primero, desaparecer
+      // después.
+      await writeSession();
+      final stream = repo.watchSessionFinished(uid: uid, sessionId: sessionId);
+      final future = stream.firstWhere((finished) => finished);
+
+      await firestore
+          .collection('users')
+          .doc(uid)
+          .collection('sessions')
+          .doc(sessionId)
+          .delete();
+
+      expect(await future.timeout(const Duration(seconds: 5)), isTrue);
+    });
+
+    test('una sesion que NUNCA existio no cuenta como terminada', () async {
+      // El complemento del de arriba, y el caso que el PR de entrenar sin
+      // conexión vino a arreglar: un create rechazado por el servidor deja
+      // una ausencia igual de real que la de un borrado, pero no significa
+      // que nadie haya cerrado nada.
       expect(
         await repo.watchSessionFinished(uid: uid, sessionId: 'no-existe').first,
-        isTrue,
+        isFalse,
+        reason: 'sin haber existido en el servidor, su ausencia no dice nada. '
+            'El detalle del predicado se prueba en '
+            'session_repository_finished_source_test.dart.',
       );
     });
   });

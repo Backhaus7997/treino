@@ -7,7 +7,7 @@
 // repository that captures setNote calls without hitting Firestore.
 //
 // Covered:
-//   - loading state → CircularProgressIndicator
+//   - loading state → CoachHubSkeleton (shimmer del kit)
 //   - error state → localized error text
 //   - empty note → save disabled until first keystroke
 //   - typing + save → repository receives the buffered content
@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/data/athlete_note_repository.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -43,6 +44,10 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -83,6 +88,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -98,10 +106,14 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => noteStream),
+      followUpEntriesProvider(
+        (trainerId: _trainerUid, athleteId: _athleteUid),
+      ).overrideWith((ref) => const Stream.empty()),
       if (repo != null) athleteNoteRepositoryProvider.overrideWithValue(repo),
     ];
 
@@ -128,22 +140,13 @@ void _useDesktopViewport(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-/// Selects the "Notas privadas" tab by title. Wraps `pumpAndSettle` in a
-/// try/catch because the loading-state test uses a stream that never emits,
-/// so pumpAndSettle would time out — swallow the timeout, we've already
-/// pumped enough frames for the tab body to lay out.
+/// Selecciona Privado › Notas con el helper compartido de la ficha.
 Future<void> _selectNotasTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {
-    // Stream never resolves — the frames we've already pumped are enough.
-  }
-  await tester.tap(find.text('Notas privadas'));
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {
-    // Same rationale — tab body is laid out already.
-  }
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Privado',
+    subview: 'Notas',
+  );
 }
 
 void main() {
@@ -155,7 +158,7 @@ void main() {
     )));
     await _selectNotasTab(tester);
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CoachHubSkeleton), findsOneWidget);
   });
 
   testWidgets('error state shows localized error copy', (tester) async {
@@ -179,9 +182,9 @@ void main() {
     )));
     await _selectNotasTab(tester);
 
-    final saveBtn = find.widgetWithText(ElevatedButton, 'GUARDAR');
+    final saveBtn = find.widgetWithText(TreinoButton, 'GUARDAR');
     expect(saveBtn, findsOneWidget);
-    final button = tester.widget<ElevatedButton>(saveBtn);
+    final button = tester.widget<TreinoButton>(saveBtn);
     expect(button.onPressed, isNull,
         reason: 'empty tab + empty buffer → nothing to save');
   });
@@ -206,8 +209,8 @@ void main() {
     await tester.enterText(tf, 'Lesión de rodilla, evitar sentadilla profunda');
     await tester.pump();
 
-    final saveBtn = find.widgetWithText(ElevatedButton, 'GUARDAR');
-    final button = tester.widget<ElevatedButton>(saveBtn);
+    final saveBtn = find.widgetWithText(TreinoButton, 'GUARDAR');
+    final button = tester.widget<TreinoButton>(saveBtn);
     expect(button.onPressed, isNotNull,
         reason: 'buffer diverges from saved → save must enable');
 
@@ -254,6 +257,9 @@ void main() {
     const otherAthleteUid = 'a2';
     final overrides = <Override>[
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([
             _link(),
             TrainerLink(
@@ -285,7 +291,8 @@ void main() {
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => Stream.value(AthleteNote(

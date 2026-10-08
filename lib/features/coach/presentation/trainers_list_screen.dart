@@ -11,12 +11,13 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/treino_segmented_pill.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
+import '../application/location_permission_gateway.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../onboarding/application/onboarding_providers.dart';
-import 'widgets/location_permission_rationale_sheet.dart';
+import 'widgets/location_permission_flow.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_compact_filter_row.dart';
 import 'widgets/trainer_list_tile.dart';
@@ -64,12 +65,22 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
     _rationaleShown = true;
-    final accepted = await LocationPermissionRationaleSheet.show(context);
+    // Guideline 5.1.1(iv): el primer pedido va con el CONTINUAR previo, en
+    // contexto (se abrió «Encontrá tu coach»). Si el SO ya no puede preguntar
+    // (denegado de forma permanente, servicios apagados) NO se muestra el
+    // aviso de Ajustes al abrir: eso sería insistir en cada apertura. Se sigue
+    // sin ubicación, y el aviso queda para una acción del usuario (chip
+    // «Distancia»).
+    final outcome = await presentLocationPermissionFlow(
+      context,
+      ref.read(locationPermissionGatewayProvider),
+      interactive: false,
+    );
     if (!mounted) return;
-    if (accepted == true) {
+    if (outcome.proceed) {
       await notifier.requestPermission();
     } else {
-      notifier.setDeniedForTest();
+      notifier.continueWithoutLocation();
     }
   }
 

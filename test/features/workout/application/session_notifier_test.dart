@@ -190,6 +190,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
 
       final container = ProviderContainer(
@@ -236,6 +238,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -254,6 +258,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).called(1);
     });
 
@@ -270,6 +276,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -297,6 +305,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -345,6 +355,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           ));
     });
 
@@ -466,6 +478,8 @@ void main() {
             finishedAt: any(named: 'finishedAt'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
           )).thenAnswer((_) async {});
@@ -494,6 +508,8 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: 40,
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).called(1);
     });
   });
@@ -519,6 +535,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: r);
@@ -533,7 +551,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
@@ -551,7 +569,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
@@ -583,7 +601,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) =
           await setupFresh(repo: repo, routine: routine);
@@ -605,7 +623,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -614,6 +632,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -643,7 +663,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -674,7 +695,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -708,6 +730,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -717,6 +741,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -738,6 +764,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).captured;
       expect(captured.first, isFalse);
     });
@@ -752,6 +780,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -761,6 +791,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -782,6 +814,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).called(1);
     });
 
@@ -797,6 +831,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -806,6 +842,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
       when(() => repo.listByUid('u1', limit: any(named: 'limit')))
           .thenAnswer((_) async => <Session>[]);
@@ -851,12 +889,14 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -865,6 +905,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -886,6 +928,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).captured;
       expect(captured.first, isTrue);
     });
@@ -900,6 +944,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
 
       final routine = makeRoutine();
@@ -938,12 +984,14 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -952,6 +1000,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {});
       // sessionsByUidProvider's fetch — counted to prove the invalidation
       // forces a re-fetch.
@@ -999,6 +1049,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -1022,6 +1074,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: captureAny(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).captured;
       return captured.last as int;
     }
@@ -1087,6 +1141,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1129,6 +1185,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1195,6 +1253,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => sessionWeek1);
 
       when(() => repo.addSetLog(
@@ -1202,7 +1262,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1248,6 +1309,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1290,13 +1353,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1357,13 +1423,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1420,13 +1489,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1485,13 +1557,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.deleteSetLog(
             uid: any(named: 'uid'),
@@ -1570,13 +1645,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.deleteSetLog(
             uid: any(named: 'uid'),
@@ -1672,13 +1750,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1730,13 +1811,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.updateSetLog(
             uid: any(named: 'uid'),
@@ -1819,13 +1903,16 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       // First deleteSetLog call fails; the retry's call succeeds.
@@ -1914,7 +2001,7 @@ void main() {
         controller.add([nueva]);
         // Deja correr el listener del stream ANTES de que logSet siga.
         await Future<void>.delayed(Duration.zero);
-        return nueva;
+        return makeLoggedSet(setLog: nueva);
       });
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1969,6 +2056,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -2010,8 +2099,8 @@ void main() {
                 sessionId: any(named: 'sessionId'),
                 setLog: any(named: 'setLog'),
               ))
-          .thenAnswer(
-              (i) async => i.namedArguments[const Symbol('setLog')] as SetLog);
+          .thenAnswer((i) async => makeLoggedSet(
+              setLog: i.namedArguments[const Symbol('setLog')] as SetLog));
 
       final booted = await boot(repo: repo);
       final notifier =

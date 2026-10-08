@@ -9,6 +9,9 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../data/chat_media_upload_service.dart';
 import '../data/chat_media_upload_service_web.dart';
+import '../../coach_hub/application/cf_providers.dart'
+    show cloudFunctionsProvider;
+import '../data/chat_inquiry_promotion_service.dart';
 import '../data/chat_repository.dart';
 import '../domain/chat.dart';
 import '../domain/message.dart';
@@ -34,6 +37,16 @@ bool chatHasUnread(Chat c, String uid) {
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(firestore: ref.watch(firestoreProvider)),
+);
+
+/// Ver [ChatInquiryPromotionService]: la marca de pre-consulta sobre un chat
+/// que ya existe la estampa el servidor, porque `kind` está pineado inmutable
+/// en las rules y el cliente no la puede agregar.
+final chatInquiryPromotionServiceProvider =
+    Provider<ChatInquiryPromotionService>(
+  (ref) => ChatInquiryPromotionService(
+    functions: ref.watch(cloudFunctionsProvider),
+  ),
 );
 
 /// Resolves the platform-appropriate media upload service.

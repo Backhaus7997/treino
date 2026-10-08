@@ -23,6 +23,17 @@ export type MailKind =
   // de contraseña. No lleva `actionLink`: no hay contraseña que restablecer.
   | "federated-signin-hint"
   | "email-verification"
+  // El código de 6 dígitos que confirma el mail (`auth/codigo-de-verificacion.ts`).
+  // Obligatorio para TODOS, también Google y Apple. Con `showPlans: "1"` (y si no
+  // se opuso a lo comercial), además del código le dice al usuario que los
+  // pagos y sus confirmaciones van por mail, con un botón a los planes: es lo
+  // que la app NO puede decir (3.1.3(f)).
+  // Uno por rol porque el plan y el lugar donde se paga no son los mismos. Sin
+  // `prefKey`: sin este mail no se puede entrar a la app. Cuando lleva el bloque
+  // de pagos sale con `bloqueComercial`, así que la oposición a
+  // `novedades_plan` saca el bloque al enviar, no el mail.
+  | "email-code-athlete"
+  | "email-code-trainer"
   | "appointment-confirmed"
   | "appointment-series-created"
   | "appointment-cancelled"
@@ -34,6 +45,22 @@ export type MailKind =
   // le duele MIENTRAS entrena, y si el PF no tiene la app abierta se entera
   // tarde. Destinatario: el PF. Sin `prefKey` a proposito — ver `templates.ts`.
   | "discomfort-reported"
+  // Aviso interno al buzon del equipo cuando entra un reporte. NO va a un
+  // usuario: viaja con `toAddress` en vez de `toUid` (como `withdrawal-team-notice`).
+  // Sin el, la cola de revision existe pero nadie la mira, y las 24 horas que
+  // promete `docs/legal/normas-de-comunidad.md:123` siguen siendo mentira.
+  | "moderation-report-created"
+  // Aviso al usuario reportado cuando un moderador resuelve el reporte con
+  // "advertido". `resolveReport` guardaba solo la etiqueta y no avisaba a
+  // nadie — esto es lo que la hace real.
+  //
+  // NO lleva el contenido reportado, ni el motivo textual del denunciante,
+  // ni nada que lo identifique — mismo criterio que
+  // `notify-report-created.ts:9-17`. Sin `prefKey`, como sus hermanos legales
+  // (`moderation-report-created`, `payment-overdue`): no es una notificacion
+  // de producto que se pueda apagar, es que se reviso contenido de la cuenta
+  // y se tomo una medida.
+  | "moderation-user-warned"
   // ── Suscripcion del PF a TREINO ─────────────────────────────────────────
   //
   // OJO — NO CONFUNDIR CON `payment-overdue`. Ese va al ATLETA y es sobre la
@@ -41,9 +68,13 @@ export type MailKind =
   // lo que EL le paga a TREINO. Son dos sistemas de plata distintos que en
   // castellano se dicen casi igual.
   //
-  // Son los dos unicos mails del paywall, y los produce `subscription-mail.ts`.
-  // El criterio de por que existen ESTOS dos y no otros vive alla; en una linea:
-  // el mail existe para llegar cuando el PF NO esta mirando la app.
+  // Los produce `subscription-mail.ts`, y el criterio de por que existen ESTOS
+  // y no otros vive alla; en una linea: el mail existe para llegar cuando el PF
+  // NO esta mirando la app.
+  //
+  // NO son los unicos del paywall. El tercero es `limit-reached`, mas abajo:
+  // va por otro disparador porque su destinatario no tiene `subscription` que
+  // pueda transicionar.
   //
   // Se cobro mal y hay ventana para arreglarlo. `grace` conserva el limite
   // pagado, asi que NO se bloquea a nadie y NO rebota ninguna escritura: no
@@ -51,7 +82,214 @@ export type MailKind =
   | "subscription-grace"
   // El limite efectivo BAJO y ya hay consecuencia. Cubre pausa, cancelacion
   // vencida y bajada de tier — el disparador es el limite, no el status.
-  | "subscription-downgraded";
+  | "subscription-downgraded"
+  // ── El PF que NUNCA pago y choco el cupo del plan Free ──────────────────
+  //
+  // El TERCERO del paywall, y el unico que no habla de una suscripcion que
+  // existe: el destinatario no tiene `subscription` en su documento. Por eso
+  // NO puede decir "regularizá" ni "poné al dia" — no hay nada atrasado. Dice
+  // que llego al tope y que hay planes mas grandes.
+  //
+  // POR QUE ES UN MAIL Y NO UN CARTEL. Porque el cartel ya no se puede poner.
+  // El 2026-09-15 (PR #1141) la app movil dejo de nombrar donde se paga, bajo
+  // la Guideline 3.1.3(f) de Apple: un cartel que dice donde se paga YA es un
+  // "call to action for purchase outside of the app", tappable o no. Lo que
+  // Apple SI permite, y textual, es "send communications outside of the app to
+  // their user base about purchasing methods other than in-app purchase".
+  //
+  // O sea que este mail no es un canal mas: **es el unico canal legal que le
+  // queda al PF que entro por el telefono**. Si se saca, ese funnel no tiene
+  // por donde salir.
+  //
+  // Los otros dos del paywall no lo cubren: los dos disparan por TRANSICION de
+  // `subscription`, y el que nunca pago no transiciona nada.
+  //
+  // Sin `prefKey`, igual que sus dos hermanos: es la respuesta a algo que el PF
+  // acaba de intentar hacer, no una novedad de producto. Pero SÍ lleva
+  // `bloqueComercial`: el aviso de que sus alumnos quedaron en solo lectura le
+  // llega siempre, y lo que se puede apagar es el párrafo de venta.
+  | "limit-reached"
+  // ── El ALUMNO que se quedo sin cobertura ────────────────────────────────
+  //
+  // El equivalente de `limit-reached` para el otro rol, y por la misma razon
+  // de fondo: la app no puede decirle donde se paga, asi que el mail es el
+  // unico canal. Vale la misma cita textual de Apple de arriba.
+  //
+  // Lo produce `athlete-prospect-mail.ts`. Dispara cuando
+  // `athletePaywallEnforced` PASA a `true` —el profe lo dio de baja, o su
+  // propia suscripcion vencio— y nunca desde el barrido: ver alla por que esa
+  // distincion es la diferencia entre un mail y mandarselo a la base entera.
+  //
+  // ⚠️ CON `prefKey`, y es el UNICO de los cuatro del paywall que lo lleva.
+  // Los otros tres son transaccionales: le avisan a alguien que ya paga que
+  // algo paso con su plata. Este le OFRECE un producto a alguien que no lo
+  // compro, o sea que es una comunicacion comercial — y
+  // `docs/legal/politica-de-privacidad.md` promete que para esas «la oposicion
+  // es ABSOLUTA». Sin interruptor, esa linea seria mentira.
+  | "athlete-coverage-lost"
+  // ── El ALUMNO que choco un tope del plan free ───────────────────────────
+  //
+  // El hermano del de arriba, y el de mayor INTENCION de los cinco: aquel le
+  // escribe al que PERDIO cobertura, este al que esta chocando contra una
+  // pared MIENTRAS intenta hacer algo. Quiso una cuarta rutina, o una
+  // plantilla paga, y la app le dijo que no.
+  //
+  // Lo produce `free-limit-mail.ts`, leyendo la anotacion que deja
+  // `showFreePlanLimitSheet`. La HOJA no cambia ni una palabra: lo que se
+  // anota es invisible, y un dato que el usuario no ve no es un llamado a
+  // comprar. Un \«te mandamos un mail\» impreso ahi si lo seria.
+  //
+  // Comparte `prefKey` con `athlete-coverage-lost` a proposito: son
+  // comunicacion comercial sobre lo mismo, y apagar uno y seguir recibiendo el
+  // otro seria no haber apagado nada.
+  | "free-limit-reached"
+  // ── El PF que choco el tope de ejercicios propios de su plan ────────────
+  //
+  // limite-ejercicios-pf.md, PR4. El equivalente de `limit-reached` (alumnos)
+  // pero para la OTRA cuota del PF: `planLimits.customExercises` /
+  // `customExerciseUsage.count`, que ya escribe PR1 y ya lee la regla de PR2
+  // en `firestore.rules`.
+  //
+  // Lo produce `trainer-limit-mail.ts`, leyendo `trainerLimitHitKind` /
+  // `trainerLimitHitAt`, que anota el CLIENTE (`registrarTopeDelPlanPf`, el
+  // tramo siguiente) cuando un create de `users/{uid}/customExercises`
+  // rebota contra `customExerciseQuotaOk`.
+  //
+  // POR QUE ES UN MAIL: el movil solo informa el ESTADO, sin boton ni "pasa a
+  // un plan" (E8 del plan, mismo criterio que sostiene `plan_limit_paywall.dart`
+  // desde el #1141) — asi que para quien entro por el telefono este mail es el
+  // UNICO canal que dice donde se paga.
+  //
+  // CON `prefKey`: ofrecerle un plan mas grande a quien ya es cliente es
+  // comunicacion comercial, igual razonamiento que `athlete-coverage-lost` y
+  // `free-limit-reached` (los otros dos que SI lo llevan).
+  | "exercise-limit-reached"
+  // ── El PF que choco el tope de plantillas de su plan ─────────────────────
+  //
+  // limite-plantillas-pf.md, PR4. El mismo molde que `exercise-limit-reached`
+  // pero para la OTRA cuota nueva del PF: `planLimits.templates` /
+  // `templateUsage.count`, que ya escribe PR1 y ya lee la regla de PR2 en
+  // `firestore.rules` (`templateQuotaOk`).
+  //
+  // Lo produce el MISMO `trainer-limit-mail.ts`, generalizado por
+  // `trainerLimitHitKind` (`CAMPOS_POR_KIND`): cuando ese campo vale
+  // `"templates"`, decide sobre estos dos campos en vez de los de ejercicios.
+  //
+  // POR QUE ES UN MAIL y CON `prefKey`: mismo razonamiento que
+  // `exercise-limit-reached` — el movil solo informa el ESTADO, y ofrecerle
+  // un plan mas grande a quien ya es cliente es comunicacion comercial.
+  //
+  // ENFRIAMIENTO PROPIO. Antes (#1258) compartia el enfriamiento de 14 dias
+  // con `exercise-limit-reached` — un PF que chocaba los dos topes recibia
+  // un solo mail. Se separó (#1267): cada tope manda su propio aviso cada 14
+  // dias, sin que uno silencie al otro. `trainerLimitMailAt` es ahora un mapa
+  // por `kind`; ver `trainer-limit-mail.ts`.
+  | "template-limit-reached"
+  // ── El PF que choco el tope de alumnos de su plan ───────────────────────
+  //
+  // limite-alumnos-pf (paywall Fase 7). El tercer hermano de
+  // `exercise-limit-reached`/`template-limit-reached`, pero con un disparador
+  // distinto: acá NO hay cliente que anote `trainerLimitHitKind` — el tope de
+  // alumnos se decide 100% en el servidor, dentro de `syncTrainerLoad`
+  // (`promote-link.ts`), al aceptar o reanudar un vínculo. Cuando esa
+  // transaccion rebota con `resource-exhausted`, `acceptTrainerLink` /
+  // `resumeTrainerLink` anotan el tope en su `catch` (`registrarTopeDeAlumnos`,
+  // `trainer-limit-mail.ts`) para que este mail tenga algo que disparar.
+  //
+  // POR QUE ES UN MAIL: mismo motivo que sus dos hermanos — el movil solo
+  // informa el ESTADO, sin boton ni "pasa a un plan" (E8 del plan), asi que
+  // para quien entro por el telefono este mail es el UNICO canal que dice
+  // donde se paga.
+  //
+  // CON `prefKey`: comunicacion comercial, mismo criterio que sus hermanos.
+  //
+  // ENFRIAMIENTO PROPIO, no compartido con los otros dos — ver el comentario
+  // de `template-limit-reached` para el porque.
+  | "student-limit-reached"
+  // ── Baja automatica por inactividad ─────────────────────────────────────
+  //
+  // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el
+  // UNICO canal posible: el destinatario es, por definicion, alguien que no
+  // abre la app. Un aviso in-app no llegaria nunca.
+  //
+  // Sin `prefKey`, como `payment-overdue` y `discomfort-reported`: es un aviso
+  // legal sobre la vida de la cuenta, no una notificacion de producto. Que se
+  // pueda apagar desde preferencias significaria borrar cuentas sin aviso.
+  | "inactive-account-notice"
+  // ── Botón de Baja de Servicio, verificado por mail ──────────────────────
+  //
+  // Los produce `subscriptions/mp/baja-por-mail.ts`. Van a ALUMNOS y a PFs por
+  // igual: la baja no conoce el producto.
+  //
+  // El primero lleva el link de un solo uso en `actionLink` —y no en un param
+  // propio— porque es el nombre que `sendQueuedMail` ya BORRA del documento
+  // apenas envía: el token no queda vivo en la cola. El segundo confirma que
+  // la baja quedó hecha, con la fecha hasta la que conserva el acceso.
+  //
+  // Sin `prefKey` los dos: son la respuesta a un trámite legal que la persona
+  // acaba de iniciar (Disp. 954/2025 art. 4 y 5), no algo que se pueda apagar.
+  | "service-cancel-confirm"
+  | "service-cancel-done"
+  // El cambio de plan del alumno se cancelo para evitar un cobro doble porque
+  // el plan anterior ya se habia renovado. Sin preferencias: es el resultado
+  // operativo de una accion que la persona acaba de hacer, no publicidad.
+  | "plan-change-cancelled"
+  // ── Botón de Arrepentimiento (Ley 24.240 art. 34, Disp. 954/2025) ───────
+  //
+  // Los produce `subscriptions/mp/arrepentimiento-por-mail.ts`. NO es la baja:
+  // acá se devuelve la plata, y sólo dentro de los 10 días corridos.
+  //
+  //  - `withdrawal-confirm`: el link de un solo uso, en `actionLink` (mismo
+  //    motivo que `service-cancel-confirm`: es el nombre que `sendQueuedMail`
+  //    borra de la cola al enviar).
+  //  - `withdrawal-received`: al usuario, dentro de plazo (o, con
+  //    `revision: "1"`, en el límite: se revisa a mano y no se canceló nada).
+  //  - `withdrawal-expired`: al usuario, cuando venció el plazo.
+  //  - `withdrawal-team-notice`: al BUZÓN DEL EQUIPO, con `toAddress`. Es el
+  //    aviso de que hay una devolución para hacer a mano.
+  //
+  // Sin `prefKey` los cuatro: son la respuesta a un trámite legal que la persona
+  // acaba de iniciar, no algo que se pueda apagar.
+  | "withdrawal-confirm"
+  | "withdrawal-received"
+  | "withdrawal-expired"
+  | "withdrawal-team-notice";
+
+/**
+ * Los cinco kinds PURAMENTE comerciales: los que se encolan con
+ * `prefKey: "novedades_plan"` (`ATHLETE_PROSPECT_PREF_KEY` y
+ * `TRAINER_LIMIT_PREF_KEY`). `renderMail` les antepone «Publicidad: » al asunto.
+ *
+ * POR QUÉ. El 2026-10-02 el titular decidió que la base legal de estos correos
+ * es el INTERÉS LEGÍTIMO con oposición absoluta (opt-out), y no el
+ * consentimiento: así es como ya funciona el producto —el envío sale salvo
+ * oposición, con el link de baja en el pie—. Y entonces rige la Disposición
+ * DNPDP 4/2009, art. 2: «cuando se efectúen envíos de comunicaciones de
+ * publicidad directa no requeridas o consentidas previamente por el titular
+ * del dato personal, deberá advertirse en forma destacada que se trata de una
+ * publicidad. En caso de realizarse dicha comunicación a través de un correo
+ * electrónico deberá insertarse en su encabezado el término único
+ * 'publicidad'.» Decisión y alternativas: `openspec/changes/
+ * baja-de-correos-promocionales/design.md` §9.
+ *
+ * LOS DOS MIXTOS NO ESTÁN ACÁ, a propósito: `limit-reached` y `email-code-*`
+ * (con `bloqueComercial`) son avisos OPERATIVOS que llevan un bloque de venta
+ * adentro. Rotularlos «Publicidad: » le mentiría a quien recibe el código de
+ * verificación o el aviso de que sus alumnos quedaron en solo lectura. Si el
+ * art. 2 alcanza al bloque comercial de un mail operativo es una CONSULTA LEGAL
+ * ABIERTA; hasta que se resuelva, esos dos salen sin el prefijo.
+ *
+ * Un kind comercial nuevo (uno que se encole con ese `prefKey`) se agrega acá
+ * el mismo día: sin entrar a esta lista, sale a la bandeja sin la advertencia
+ * que la norma pide. Los tests de los tres productores lo verifican.
+ */
+export const KINDS_DE_PUBLICIDAD: readonly MailKind[] = [
+  "athlete-coverage-lost",
+  "free-limit-reached",
+  "exercise-limit-reached",
+  "template-limit-reached",
+  "student-limit-reached",
+];
 
 /**
  * Per-kind template parameters.
@@ -66,21 +304,70 @@ export type MailParams = Record<string, string | number>;
 /** Lifecycle of a queued mail. Terminal states are `sent` and `failed`. */
 export type MailStatus = "pending" | "sent" | "failed";
 
+/**
+ * Cómo se frena un mail por oposición. **`prefKey` y `bloqueComercial` son
+ * EXCLUYENTES**, y el tipo lo impone: juntos, el gate de `prefKey` frenaría el
+ * mail ENTERO y se comería justo el aviso operativo que `bloqueComercial` existe
+ * para dejar pasar. Si llegan los dos igual (un documento que no pasó por el
+ * tipo), `sendQueuedMail` hace ganar a `bloqueComercial` y avisa con `warn`.
+ */
+export type MailOptOut =
+  | {
+    /**
+     * Optional `notificationPrefs` key. When present, the consumer skips the
+     * send if the user turned the email channel off for that key. Transactional
+     * mail (payment overdue, session confirmed) leaves this undefined — it is
+     * service-critical and not subject to opt-out.
+     */
+    prefKey?: string;
+    bloqueComercial?: never;
+  }
+  | {
+    prefKey?: never;
+    /**
+     * Para el mail OPERATIVO que lleva un bloque comercial adentro (hoy
+     * `limit-reached`: «N alumnos quedaron en solo lectura» + «hay planes más
+     * grandes»; y `email-code-*`: el código + los planes). No se puede frenar
+     * entero con `prefKey`: quien se opuso a lo
+     * comercial igual tiene que enterarse de lo operativo. Lo que se frena es el
+     * BLOQUE.
+     *
+     * Al enviar, `sendQueuedMail` lee esa preferencia —con la misma regla que
+     * `prefKey`, sólo `false` explícito frena— y:
+     *   - apagada → renderiza sin las líneas ni el CTA de venta, y sin pie de
+     *     baja;
+     *   - prendida o ausente → el mail completo, CON el pie de baja.
+     *
+     * Es un literal y no un `string`: el link de baja sólo existe para las
+     * preferencias de la allowlist de `baja-de-promocionales.ts`. Se evalúa al
+     * enviar, no al encolar, por la misma razón que `prefKey`.
+     */
+    bloqueComercial?: "novedades_plan";
+  };
+
 /** Shape of a `mail_queue/{dedupeKey}` document. */
-export interface MailQueueDoc {
+export type MailQueueDoc = MailQueueDocBase & MailOptOut;
+
+interface MailQueueDocBase {
   /** Recipient uid. The address is resolved from Auth at send time. */
   toUid: string;
+  /**
+   * Direccion literal, para los mails que NO van a un usuario.
+   *
+   * Hoy la usan dos, los dos avisos internos al buzon del equipo: el reporte
+   * nuevo (`moderation-report-created`) y el arrepentimiento con devolucion
+   * pendiente (`withdrawal-team-notice`).
+   * Cuando esta presente, el consumidor la usa tal cual y NO resuelve por uid
+   * ni consulta `notificationPrefs` — un buzon de equipo no tiene preferencias
+   * de notificacion que consultar, y `resolveAddress` sobre un uid que no
+   * existe fallaria con "no email address for uid" sobre un mail que sí tiene
+   * destino.
+   */
+  toAddress?: string;
   /** Selects the template. */
   kind: MailKind;
   /** Template parameters. */
   params: MailParams;
-  /**
-   * Optional `notificationPrefs` key. When present, the consumer skips the
-   * send if the user turned the email channel off for that key. Transactional
-   * mail (payment overdue, session confirmed) leaves this undefined — it is
-   * service-critical and not subject to opt-out.
-   */
-  prefKey?: string;
   status: MailStatus;
   /** Incremented on every send attempt, successful or not. */
   attempts: number;

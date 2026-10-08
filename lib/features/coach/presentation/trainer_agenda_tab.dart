@@ -6,6 +6,8 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/app_clock.dart';
+import '../domain/wall_clock.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -39,7 +41,7 @@ class TrainerAgendaTab extends ConsumerStatefulWidget {
 }
 
 class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
-  DateTime _focusedDay = DateTime.now();
+  DateTime _focusedDay = nowWall();
   DateTime? _selectedDay;
 
   // Default to the compact WEEK view so the day timeline below gets most of
@@ -54,7 +56,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   void initState() {
     super.initState();
     // QA-COA-007: ventana rodante sin el clamp de enero roto (helper compartido).
-    final window = rollingAppointmentWindow(DateTime.now().toUtc());
+    final window = rollingAppointmentWindow(AppClock.now().toUtc());
     _rangeFrom = window.from;
     _rangeTo = window.to;
   }
@@ -62,7 +64,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final selectedDay = _selectedDay ?? DateTime.now();
+    final selectedDay = _selectedDay ?? nowWall();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -183,9 +185,10 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
 
 // ── Calendar widget ───────────────────────────────────────────────────────────
 
-/// Whether [day] is strictly before today (date-level, local TZ).
+/// Whether [day] is strictly before today (date-level, in the startsAt
+/// wall-clock frame — ADR-7).
 bool _isDayPast(DateTime day) {
-  final now = DateTime.now();
+  final now = nowWall();
   final today = DateTime(now.year, now.month, now.day);
   return DateTime(day.year, day.month, day.day).isBefore(today);
 }
@@ -243,9 +246,16 @@ class _TrainerCalendar extends ConsumerWidget {
         bookedDays.contains(DateTime(day.year, day.month, day.day));
 
     return TableCalendar<dynamic>(
+      // Without it table_calendar formats the month and weekdays in en_US.
+      // Date symbols come from GlobalMaterialLocalizations ('es'; intl falls
+      // back to it for 'es_AR').
+      locale: AppL10n.of(context).localeName,
       firstDay: DateTime.utc(2026, 1, 1),
       lastDay: DateTime.utc(2027, 12, 31),
       focusedDay: focusedDay,
+      // "Today" in the same frame as the dots and the timeline (startsAt,
+      // ADR-7); table_calendar's default reads the raw clock on its own.
+      currentDay: nowWall(),
       selectedDayPredicate: (d) =>
           selectedDay != null && isSameDay(selectedDay, d),
       onDaySelected: onDaySelected,

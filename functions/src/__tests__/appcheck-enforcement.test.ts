@@ -82,6 +82,83 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
       "antes de volver a poner el flag.",
   },
+  "chat/promote-chat-to-inquiry:promoteChatToInquiry": {
+    // `debt` y no `decided`: a diferencia de los tres del Coach Hub web, acá
+    // NO hay un impedimento de plataforma. La app del alumno activa App Check
+    // (main.dart, dentro del `!kIsWeb`). Lo unico que falta es que la
+    // atestacion funcione, y eso queremos revertirlo.
+    permanence: "debt",
+    reason:
+      "La llama SOLO la app mobile del alumno (TrainerInquiryCta vive en " +
+      "trainer_public_profile_screen, fuera del arbol del target web), asi que " +
+      "por plataforma el flag corresponderia. No va porque la atestacion de " +
+      "esta app no funciona: la medicion ancha del #961 (24 dias, 6 callables, " +
+      "159 verificaciones) encontro acceptTrainerLink y requestPasswordReset " +
+      "en CERO validas y mintWatchCredential en 53%. Con el flag, CONSULTAR no " +
+      "fallaria a veces: fallaria casi siempre — la historia de deleteAccount " +
+      "(#811) otra vez. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el chatId se DERIVA de ese uid y del trainerId (no " +
+      "se acepta del cliente), el unico campo que escribe es kind:'inquiry' " +
+      "sobre un chat que ya existe y del que el llamador es miembro, y exige " +
+      "los MISMOS tres hechos que chatCreateOk valida al crear. O sea que un " +
+      "llamador autenticado solo puede llegar al estado al que ya habria " +
+      "llegado abriendo la consulta por la via normal. " +
+      "Ver promote-chat-to-inquiry.ts.",
+    exitCondition:
+      "El mismo del resto del inventario: que el cliente emita atestacion " +
+      "valida. Como este callable es mobile-only, no depende del App Check del " +
+      "Coach Hub web — le alcanza con que iOS y Android atestiguen. Contar " +
+      "sobre jsonPayload.verifications.app con el filtro ANCHO del #961 (no el " +
+      "angosto del §4.8.2, que mide un callable y un dia) y pedir cero INVALID " +
+      "por plataforma antes de poner el flag.",
+  },
+  // Los tres de la cola de moderacion. Mismo impedimento de PLATAFORMA que
+  // acceptTrainerLink: los llama el Coach Hub web, que no activa App Check
+  // (`main_coach_hub.dart` no tiene una sola referencia a FirebaseAppCheck, y
+  // `main.dart` lo saltea con `if (!kIsWeb)`).
+  //
+  // `decided` y no `debt` por eso: no es que la atestacion no funcione todavia,
+  // es que en la superficie donde se usan no existe. Una deuda sin condicion de
+  // salida posible es una decision disfrazada.
+  //
+  // Lo que los protege es el claim `moderator` de Firebase Auth, que se otorga
+  // a mano con `scripts/grant_moderator.js` y que ningun usuario puede darse a
+  // si mismo. El flag de App Check, ademas, no agregaria nada contra el riesgo
+  // real aca: no es un bot anonimo, es una cuenta autenticada sin el claim — y
+  // contra eso el guard es `assertModerator`, no la atestacion del dispositivo.
+  "moderation/report-review:markReportViewed": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
+  "moderation/report-review:listPendingReports": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
+  "moderation/report-review:resolveReport": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
+  "moderation/report-review:moderationStats": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
   "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
@@ -99,6 +176,233 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "Coach Hub web. Gatear solo accept no alcanza —pause baja el peso de 1.0 " +
       "a 0.5— asi que las dos transiciones que suben peso van juntas, con o sin " +
       "atestacion. Ver resume-trainer-link.ts:77.",
+  },
+  "subscriptions/mp/create-preapproval:createPreapproval": {
+    // `debt` y no `decided`, a diferencia de los dos de arriba, y la diferencia
+    // NO es el motivo —es el mismo: el Coach Hub web no activa App Check y este
+    // callable se llama SOLO desde ahi— sino si lo queremos revertir. En un
+    // endpoint que abre un cobro, si.
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink: lo llama el Coach Hub " +
+      "web, que no activa App Check, asi que con el flag puesto ningun PF " +
+      "podria contratar. Pero es el unico callable del repo que inicia un " +
+      "COBRO, y por eso vale mas para un atacante que los otros dos. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el tier y el ciclo son enums cerrados, el monto sale " +
+      "de TIER_PRICES_ARS, y la URL de retorno es una constante. El mail ya no " +
+      "entra en la cuenta: desde que el checkout va contra un PLAN, no se lee " +
+      "de ningun lado — MP le pregunta al pagador quien es. Ver " +
+      "create-preapproval.ts:329. Un atacante autenticado solo puede abrir " +
+      "checkouts a nombre PROPIO, y la ventana de idempotencia de " +
+      "mp_checkouts/{uid} los limita a uno por par (tier, ciclo) cada 30 " +
+      "minutos — seis en total. Ver create-preapproval.ts:263.",
+    exitCondition:
+      "Cuando el Coach Hub web active App Check (ReCaptcha v3 + site key en " +
+      "consola), poner el flag ACA PRIMERO, antes que en acceptTrainerLink y " +
+      "resumeTrainerLink: es el de mayor valor para un atacante de los que hoy " +
+      "salen sin atestacion. (Decia `addAlias` y estaba mal: addAlias es el " +
+      "unico callable del repo que YA tiene enforceAppCheck: true, " +
+      "add-alias.ts:148.)",
+  },
+  "subscriptions/mp/cancel-my-subscription:cancelMySubscription": {
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que reconcileMyCheckout: lo llaman el Coach " +
+      "Hub web y la landing, que no activan App Check. Con el flag puesto, " +
+      "nadie podria darse de baja — y eso no es una degradacion cualquiera: la " +
+      "Res. 424/2020 obliga a que la baja sea por el mismo medio de " +
+      "contratacion, y terminos-suscripcion.md §7 la promete publicada. " +
+      "`debt` y NO `decided`, a diferencia de reconcileMyCheckout, y la " +
+      "diferencia es real: aquel solo PREGUNTA por el estado de un cobro, este " +
+      "lo FRENA, y en Mercado Pago frenar es irreversible — un preapproval " +
+      "cancelado no se reactiva. " +
+      "La cerradura es que NO HAY BODY: la entrada es el uid del token y nada " +
+      "mas. Un atacante autenticado solo puede darse de baja a SI MISMO, que " +
+      "es algo que ya puede hacer. El daño techo es quemarnos cuota de MP con " +
+      "un bucle, y de eso se ocupa el cooldown de mp_cancelaciones/{uid}.",
+    exitCondition:
+      "Junto con reconcileMyCheckout y createPreapproval, cuando el Coach Hub " +
+      "web active App Check. Va DESPUES de createPreapproval en la cola: aquel " +
+      "abre un cobro a nombre propio, este solo cierra uno propio.",
+  },
+  "subscriptions/mp/baja-por-mail:solicitarBajaPorMail": {
+    permanence: "decided",
+    reason:
+      "Es el Botón de Baja de Servicio de la Disp. 954/2025 art. 4, que PROHIBE " +
+      "exigir registración previa: no puede pedir sesión, y lo llama el " +
+      "servidor de la landing, que no tiene Firebase ni App Check. Aunque el " +
+      "cliente movil atestara, este flag no aplicaria nunca. La cerradura es " +
+      "otra: solo puede mandarle un mail al DUEÑO del buzón de una cuenta que " +
+      "paga, con throttle de una ventana de 10 minutos por cuenta, y contesta " +
+      "siempre {status:\"ok\"} (anti-enumeracion, mismo contrato que " +
+      "requestPasswordReset). Ver baja-por-mail.ts, bloque de los onCall.",
+  },
+  "subscriptions/mp/baja-por-mail:confirmarBajaPorMail": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de confirmacion de la landing, en el NAVEGADOR y sin " +
+      "sesion por mandato de la 954/2025; la landing no tiene Firebase ni App " +
+      "Check. A diferencia de solicitarBajaPorMail (server a server, donde el " +
+      "flag no aplica nunca) aca SI podria atestarse con reCAPTCHA, por eso es " +
+      "`debt` y no `decided`. " +
+      "Este SI cancela en Mercado Pago (irreversible), y lo que lo cierra es " +
+      "que la unica entrada es un token de 256 bits que solo llego al buzón de " +
+      "la cuenta, de un solo uso (reclamo en transaccion), con vencimiento de " +
+      "72 h, guardado como SHA-256. El uid sale del documento del token, " +
+      "nunca del request. Ver baja-por-mail.ts.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca. Medir antes que la pagina de confirmacion atesta en los " +
+      "navegadores reales: un flag que rompe el boton de baja deja a la " +
+      "persona sin el tramite que la norma obliga a ofrecer.",
+  },
+  "subscriptions/mp/arrepentimiento-por-mail:solicitarArrepentimientoPorMail": {
+    permanence: "decided",
+    reason:
+      "Es el Botón de Arrepentimiento de la Ley 24.240 art. 34 y la Disp. " +
+      "954/2025, que PROHIBE exigir registración previa: no puede pedir sesión, " +
+      "y lo llama el servidor de la landing, que no tiene Firebase ni App " +
+      "Check. La cerradura es otra: solo puede mandarle un mail al DUEÑO del " +
+      "buzón de una cuenta que paga, con throttle de una ventana de 10 " +
+      "minutos por cuenta, y contesta siempre {status:\"ok\"} (anti-" +
+      "enumeracion). Mismo contrato que solicitarBajaPorMail. Ver " +
+      "arrepentimiento-por-mail.ts, bloque de los onCall.",
+  },
+  "subscriptions/mp/arrepentimiento-por-mail:confirmarArrepentimientoPorMail": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de confirmacion de la landing, en el NAVEGADOR y sin " +
+      "sesion por mandato de la norma; la landing no tiene Firebase ni App " +
+      "Check. Aca SI podria atestarse con reCAPTCHA, por eso es `debt` y no " +
+      "`decided`. Este CANCELA en Mercado Pago dentro de plazo (irreversible), " +
+      "y lo que lo cierra es que la unica entrada es un token de 256 bits que " +
+      "solo llego al buzón de la cuenta, de un solo uso (reclamo en " +
+      "transaccion), con vencimiento de 72 h, guardado como SHA-256, en una " +
+      "coleccion PROPIA (un token de baja no sirve aca). El uid sale del " +
+      "documento del token, nunca del request. Y la devolucion de la plata es " +
+      "manual: este endpoint no mueve dinero.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca junto con confirmarBajaPorMail. Medir antes que la pagina de " +
+      "confirmacion atesta en los navegadores reales: un flag que rompe el " +
+      "boton deja a la persona sin un derecho irrenunciable.",
+  },
+  "mail/baja-de-promocionales:bajaDeCorreosPromocionales": {
+    permanence: "debt",
+    reason:
+      "Lo llama la pagina de baja de la landing, en el NAVEGADOR y sin sesion: " +
+      "el Decreto 1558/01 (Anexo I, art. 27, parrafo 3) pide el mecanismo de " +
+      "retiro en toda comunicacion de publicidad, sin registracion previa, y la " +
+      "landing no tiene Firebase ni App Check. Aca SI podria atestarse con " +
+      "reCAPTCHA, por eso es `debt` y no `decided`. " +
+      "Lo que la cierra: la unica entrada es un token firmado con HMAC-SHA256 " +
+      "(secreto propio, BAJA_PROMOCIONALES_KEY) que solo llego al buzon de la " +
+      "cuenta; el uid sale del token y nunca del request; la forma se chequea " +
+      "antes de calcular nada; y lo unico que habilita es APAGAR el canal de " +
+      "mail de una preferencia de una lista cerrada (novedades_plan) de esa " +
+      "cuenta — nunca encenderlo, nunca otro campo, nunca otro uid, y nunca " +
+      "crea el documento. " +
+      "Lo que NO la cierra: el token no vence (tiene que servir en el mail de " +
+      "hace meses), asi que uno valido que se filtre o se reenvie se puede " +
+      "REPRODUCIR sin limite. Cada llamada cuesta una LECTURA de users/{uid}; " +
+      "si la preferencia ya estaba apagada no escribe, asi que no dispara los " +
+      "triggers de `users`. maxInstances: 5 limita la concurrencia, NO el total " +
+      "de llamadas. Ver baja-de-promocionales.ts.",
+    exitCondition:
+      "Si la landing activa App Check web (reCAPTCHA v3/Enterprise), poner el " +
+      "flag aca junto con confirmarBajaPorMail. Medir antes que la pagina de " +
+      "baja atesta en los navegadores reales: un flag que rompe el link deja a " +
+      "la persona sin el mecanismo que la norma obliga a ofrecer.",
+  },
+  "profile/ensure-athlete-profile:ensureAthleteProfile": {
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que el resto del flujo web: lo llama la " +
+      "landing publica, que no tiene App Check porque no tiene Firebase. Con " +
+      "el flag puesto, nadie podria darse de alta desde la web. " +
+      "La cerradura es que NO HAY BODY: el uid y el mail salen del token. Un " +
+      "atacante autenticado solo puede crear SU PROPIO documento, que es algo " +
+      "que ya puede hacer desde el cliente movil — y con menos, porque acá el " +
+      "`role` esta escrito literal como `athlete` y no se puede influir. " +
+      "Es idempotente y no acepta parametros, asi que llamarlo N veces escribe " +
+      "lo mismo que llamarlo una.",
+    exitCondition:
+      "Junto con el resto del flujo web, cuando la landing inicialice App " +
+      "Check. Va PRIMERO de la cola web: es el unico que se llama en TODO " +
+      "login, asi que es el que mas trafico legitimo produce y el que mejor " +
+      "mide si la atestacion funciona antes de tocar los que cobran.",
+  },
+  "subscriptions/mp/create-athlete-preapproval:createAthletePreapproval": {
+    permanence: "debt",
+    reason:
+      "El gemelo de createPreapproval para el ALUMNO, y hereda su motivo de " +
+      "plataforma con un agravante: no lo llama el Coach Hub sino la landing " +
+      "publica (gettreino.com, repo treino-app), que hoy no tiene App Check " +
+      "porque no tiene Firebase en absoluto. Con el flag puesto, ningun alumno " +
+      "podria contratar. " +
+      "La superficie de abuso queda acotada por diseño, igual que la del PF: " +
+      "el uid sale del token, el ciclo es un enum cerrado, el monto sale de " +
+      "ATHLETE_PRICES_ARS, y la URL de retorno la arma el servidor desde una " +
+      "lista blanca de locales — un valor fuera de la lista cae al default en " +
+      "vez de convertirse en un destino. Un atacante autenticado solo puede " +
+      "abrir checkouts a nombre PROPIO, y la ventana de mp_checkouts/{uid} los " +
+      "limita a uno por ciclo cada 30 minutos: dos en total, contra los seis " +
+      "del PF. " +
+      "Y tiene un gate que el del PF no tiene: rechaza al alumno VINCULADO, " +
+      "cuyo entrenador ya paga por el.",
+    exitCondition:
+      "Cuando la landing inicialice App Check (ReCaptcha v3 con su propio " +
+      "appId, NO el del Coach Hub — App Check se configura por app y reusarlo " +
+      "obligaria a prenderlo en los dos). Medir primero en modo monitoring " +
+      "sobre jsonPayload.verifications.app en Cloud Logging hasta ver CERO " +
+      "INVALID, y recien ahi poner el flag. Ponerlo antes convierte el " +
+      "checkout en un error permanente que no agarra ningun test, porque vive " +
+      "en la capa de transporte — es literalmente lo que paso con " +
+      "deleteAccount y mintWatchCredential.",
+  },
+  "subscriptions/mp/create-athlete-preapproval:getAthletePricing": {
+    permanence: "decided",
+    reason:
+      "No se atesta a proposito, y no es deuda: es la UNICA lectura publica " +
+      "del repo. La pagina de precios tiene que poder decir cuanto sale ANTES " +
+      "de que el alumno se loguee; pedirle cuenta para ver un precio es " +
+      "exactamente la friccion que el canal web viene a sacar. " +
+      "No hay nada que proteger: devuelve dos numeros que se van a publicar en " +
+      "la landing, no escribe nada, no lee datos de nadie y no acepta body. El " +
+      "costo de un abuso es una invocacion de Cloud Functions, que es lo mismo " +
+      "que cuesta cargar la pagina que lo llama.",
+  },
+  "subscriptions/trainer-pricing:getTrainerPricing": {
+    permanence: "decided",
+    reason:
+      "No se atesta a proposito, y no es deuda: es la segunda lectura publica " +
+      "del repo, gemela de getAthletePricing. La pagina de entrenadores de la " +
+      "landing tiene que poder decir cuanto sale ANTES de que nadie se loguee, " +
+      "y la landing no tiene App Check. " +
+      "No hay nada que proteger: devuelve constantes de tier-config.ts (precios " +
+      "y topes) que se van a publicar igual, no lee Firestore, no escribe nada, " +
+      "no contiene PII ni secretos y no acepta body. El costo de un abuso es " +
+      "una invocacion de Cloud Functions.",
+  },
+  "subscriptions/mp/reconcile-my-checkout:reconcileMyCheckout": {
+    // `decided` y no `debt`, a diferencia de createPreapproval, y la diferencia
+    // es real: aquel ABRE un cobro, este solo pregunta por el estado de uno que
+    // ya existe. No hay nada que un atacante autenticado pueda mover desde acá.
+    permanence: "decided",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink y createPreapproval: " +
+      "lo llama el Coach Hub web, que no activa App Check, asi que con el flag " +
+      "puesto ningun PF veria acreditado su pago al volver de Mercado Pago. " +
+      "La superficie es la mas chica de todos los callables del repo: NO HAY " +
+      "BODY. La entrada es el uid del token y nada mas — el planId no viaja, " +
+      "sale de consultar mp_plans filtrado por ese uid, asi que no se puede " +
+      "pedir la reconciliacion de un plan ajeno ni enumerar quien compro que. " +
+      "Y no escribe nada que el llamador elija: lo que se escribe es lo que " +
+      "MP conteste por GET con nuestro token. Lo unico que un atacante " +
+      "autenticado puede hacer es preguntar por sus propios planes, y para eso " +
+      "esta el cooldown de RECONCILE_COOLDOWN_MS, que corta ANTES de la llamada " +
+      "a MP. Ver reconcile-my-checkout.ts.",
   },
   "auth/request-auth-email:requestPasswordReset": {
     permanence: "debt",
@@ -120,6 +424,26 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "jsonPayload.verifications.app y pedir cero INVALID por plataforma. " +
       "OJO: si vuelve el flag y Android sigue fallando, el sintoma es un " +
       "reseteo que no llega nunca, sin error visible en ningun lado.",
+  },
+  "auth/codigo-de-verificacion:solicitarCodigoDeVerificacion": {
+    permanence: "debt",
+    reason:
+      "El codigo de verificacion es OBLIGATORIO para entrar a la app. Con el " +
+      "flag, el Android que hoy no atesta no podria pedirlo y quedaria afuera " +
+      "para siempre. Exige request.auth y opera solo sobre el uid del token; " +
+      "el cooldown de 60 s acota los mails por cuenta.",
+    exitCondition:
+      "El mismo que requestEmailVerification: cero INVALID por plataforma en " +
+      "jsonPayload.verifications.app. Restaurar junto con verificarCodigoDeMail.",
+  },
+  "auth/codigo-de-verificacion:verificarCodigoDeMail": {
+    permanence: "debt",
+    reason:
+      "Hermano de solicitarCodigoDeVerificacion: gatear uno solo deja a la " +
+      "persona con un codigo en la mano que no puede canjear. Exige " +
+      "request.auth, solo marca el uid del token y tiene 5 intentos por codigo.",
+    exitCondition:
+      "El mismo que solicitarCodigoDeVerificacion. Restaurar los dos a la vez.",
   },
   "auth/request-auth-email:requestEmailVerification": {
     permanence: "debt",
@@ -161,11 +485,30 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "bajaDeCorreosPromocionales",
+  "cancelMySubscription",
+  "confirmarArrepentimientoPorMail",
+  "confirmarBajaPorMail",
+  "createAthletePreapproval",
+  "createPreapproval",
   "deleteAccount",
+  "ensureAthleteProfile",
+  "getAthletePricing",
+  "getTrainerPricing",
+  "listPendingReports",
+  "markReportViewed",
   "mintWatchCredential",
+  "moderationStats",
+  "promoteChatToInquiry",
+  "reconcileMyCheckout",
   "requestEmailVerification",
   "requestPasswordReset",
+  "resolveReport",
   "resumeTrainerLink",
+  "solicitarArrepentimientoPorMail",
+  "solicitarBajaPorMail",
+  "solicitarCodigoDeVerificacion",
+  "verificarCodigoDeMail",
 ] as const;
 
 const describeCallable = (c: DeployedCallable) =>
@@ -262,6 +605,36 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
     },
     { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
     {
+      module: "moderation/report-review",
+      symbol: "listPendingReports",
+      as: "listPendingReports",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "markReportViewed",
+      as: "markReportViewed",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "resolveReport",
+      as: "resolveReport",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "moderationStats",
+      as: "moderationStats",
+      attested: false,
+    },
+    {
+      module: "chat/promote-chat-to-inquiry",
+      symbol: "promoteChatToInquiry",
+      as: "promoteChatToInquiry",
+      attested: false,
+    },
+    {
       module: "subscriptions/accept-trainer-link",
       symbol: "acceptTrainerLink",
       as: "acceptTrainerLink",
@@ -271,6 +644,72 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/resume-trainer-link",
       symbol: "resumeTrainerLink",
       as: "resumeTrainerLink",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-preapproval",
+      symbol: "createPreapproval",
+      as: "createPreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-athlete-preapproval",
+      symbol: "createAthletePreapproval",
+      as: "createAthletePreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/cancel-my-subscription",
+      symbol: "cancelMySubscription",
+      as: "cancelMySubscription",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/baja-por-mail",
+      symbol: "solicitarBajaPorMail",
+      as: "solicitarBajaPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/arrepentimiento-por-mail",
+      symbol: "solicitarArrepentimientoPorMail",
+      as: "solicitarArrepentimientoPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/arrepentimiento-por-mail",
+      symbol: "confirmarArrepentimientoPorMail",
+      as: "confirmarArrepentimientoPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/baja-por-mail",
+      symbol: "confirmarBajaPorMail",
+      as: "confirmarBajaPorMail",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-athlete-preapproval",
+      symbol: "getAthletePricing",
+      as: "getAthletePricing",
+      attested: false,
+    },
+    {
+      module: "subscriptions/trainer-pricing",
+      symbol: "getTrainerPricing",
+      as: "getTrainerPricing",
+      attested: false,
+    },
+    {
+      module: "profile/ensure-athlete-profile",
+      symbol: "ensureAthleteProfile",
+      as: "ensureAthleteProfile",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/reconcile-my-checkout",
+      symbol: "reconcileMyCheckout",
+      as: "reconcileMyCheckout",
       attested: false,
     },
     { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
@@ -284,6 +723,24 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "auth/request-auth-email",
       symbol: "requestEmailVerification",
       as: "requestEmailVerification",
+      attested: false,
+    },
+    {
+      module: "auth/codigo-de-verificacion",
+      symbol: "solicitarCodigoDeVerificacion",
+      as: "solicitarCodigoDeVerificacion",
+      attested: false,
+    },
+    {
+      module: "auth/codigo-de-verificacion",
+      symbol: "verificarCodigoDeMail",
+      as: "verificarCodigoDeMail",
+      attested: false,
+    },
+    {
+      module: "mail/baja-de-promocionales",
+      symbol: "bajaDeCorreosPromocionales",
+      as: "bajaDeCorreosPromocionales",
       attested: false,
     },
   ];

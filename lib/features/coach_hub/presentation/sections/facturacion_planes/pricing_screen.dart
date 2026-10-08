@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -9,6 +8,11 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'acreditacion_al_volver.dart';
+import 'plan_checkout.dart';
+import 'plan_copy.dart';
+import 'package:treino/features/coach/domain/plan_vigencia.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
 ///
@@ -21,6 +25,89 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 /// cualquier ventana útil del Coach Hub, así que los ~48px de corrimiento no
 /// mueven a nadie de layout.
 const double _kNarrowBreakpoint = 820;
+
+/// Lo que la app móvil dice EN LUGAR del botón de compra, y la línea que lo
+/// explica al pie. Los dos strings viven acá, juntos, por una razón que no es
+/// de estilo.
+///
+/// ─── DECISIÓN DE PRODUCTO PENDIENTE, no un detalle de copy ───
+///
+/// El guard de [resolvePlanCheckout] cierra 3.1.3(c): no se vende adentro de la
+/// app. Pero la guideline de al lado, 3.1.1, prohíbe además «buttons, external
+/// links, or other calls to action that direct customers to purchasing
+/// mechanisms other than in-app purchase». Un texto que le dice al PF dónde
+/// comprar afuera es una call to action aunque no sea un link — y acá aparece
+/// junto a los cuatro precios en ARS.
+///
+/// Las dos salidas cuestan plata y ninguna es obviamente mejor:
+///   - decirlo (hoy): riesgo de rechazo en review por 3.1.1. Recuperable: es
+///     este archivo, dos constantes.
+///   - callarlo (Netflix, Spotify): sin riesgo de 3.1.1, pero el PF que entró
+///     por el APK queda en un callejón sin salida y ese es el 100% del funnel
+///     de $12.000-$39.000 por mes.
+///
+/// No la decide un refactor. Lo único que corresponde antes de mandar a review
+/// es que la decisión sea barata: son estas dos constantes y nada más. Si la
+/// respuesta es «callarlo», [_WhereToSubscribeNote] y la rama
+/// [PlanCheckoutOnWebOnly] del CTA se quedan sin texto y listo.
+///
+/// Lo que NO se puede hacer en ninguno de los dos casos es convertirlo en un
+/// link, un botón o un deep link: eso es 3.1.1 sin discusión posible.
+/// ⚠️ **DECIDIDO EL 2026-09-15: callarlo.** El dartdoc de arriba dejaba las dos
+/// salidas abiertas; ésta es la que se tomó, y las dos constantes quedaron
+/// vacías como el propio texto anticipaba («se quedan sin texto y listo»).
+///
+/// El motivo no es 3.1.1 —eso ya lo cerraba el guard de superficie— sino
+/// **3.1.3(f)**, que ampara este binario sólo *«provided there is no purchasing
+/// inside the app, **or calls to action for purchase outside of the app**»*. Un
+/// call to action no necesita ser un link: alcanza con nombrar dónde se paga.
+///
+/// Y el amparo se cae solo el día que el ALUMNO compre por IAP: ahí la app deja
+/// de ser una «free app» y 3.1.3(f) no le aplica más, por su propio texto. Ese
+/// es el deadline, y está declarado en
+/// `test/features/paywall/anti_steering_movil_test.dart`.
+///
+/// ⚠️ **NO se gatea por plataforma, y se verificó por qué.** La tentación es
+/// dejar el texto en Android —3.1.3 es de Apple— pero el programa de
+/// *external content links* de Google Play es **sólo para usuarios de Estados
+/// Unidos**. Argentina no entra, así que «en Android está permitido» no es una
+/// suposición segura y no se construyó sobre ella.
+///
+/// ⚠️ **LO QUE ESTO CUESTA, para que nadie lo descubra por accidente**: el PF
+/// que entró por el teléfono queda sin saber dónde pagar, y el dartdoc de
+/// arriba lo cuantifica en el 100% del funnel de $12.000-$39.000 por mes.
+/// Recuperarlo no puede ser otro cartel acá — tiene que salir **por fuera de la
+/// app** (un mail al PF con la suscripción vencida), que es lo único que Apple
+/// no gobierna. Eso todavía no existe.
+///
+/// ⚠️ **ACTUALIZACIÓN 2026-09-29: la CAJA también se sacó, no sólo el texto.**
+/// Vaciar estas constantes el 2026-09-15 dejó el widget que las dibuja
+/// (`_PlanCtaButton`, `_WhereToSubscribeNote`) parado igual: una pill con
+/// borde y sin letra en el slot del CTA, y un renglón vacío al pie de la
+/// pantalla. Nadie viola 3.1.1/3.1.3(f) por eso —no hay texto que sea un call
+/// to action—, pero es ruido visual que no dice nada y ocupa un lugar que
+/// antes tenía sentido. Ahora, cuando la constante que corresponde está vacía,
+/// esos dos widgets no dibujan nada (`SizedBox.shrink()`) en vez de la caja
+/// hueca.
+const String _kSubscribeElsewhereShort = ''; // i18n: Fase W3
+
+/// Ver [_kSubscribeElsewhereShort] — misma decisión, mismo motivo.
+const String _kSubscribeElsewhereLong = ''; // i18n: Fase W3
+
+/// El pie legal de la pantalla, en las dos superficies.
+///
+/// Decía «Renovación automática. Podés cancelar cuando quieras desde
+/// Facturación» y era FALSO en las DOS: la app móvil no tiene ninguna pantalla
+/// de Facturación (`router.dart` no registra `/ajustes`, y por eso
+/// `plan_limit_paywall` cae al aviso) y el tab web es de sólo lectura — no hay
+/// un control de baja en todo el repo. Prometer cancelación fácil es
+/// exactamente el tipo de claim que un revisor de tienda va a ir a buscar.
+///
+/// TODO(producto): volver a prometer la baja cuando exista el control que la
+/// haga verdad. Mientras tanto, sólo se afirma lo que la pantalla cumple.
+const String _kRenewalNote =
+    'La suscripción se renueva automáticamente según el ciclo '
+    'que elijas.'; // i18n: Fase W3
 
 /// Host de `/facturacion/planes` en la app MÓVIL.
 ///
@@ -51,14 +138,19 @@ class PricingRouteScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: TreinoIconButton(
+          // Keyed para que el guard de superficie de la pricing page pueda
+          // EXCLUIRLA de su barrido: volver es un tap legítimo, y desde que
+          // este botón es del kit entra en `find.byType(TreinoTappable)`.
+          key: const Key('pricing_back_button'),
+          icon: TreinoIcon.back,
+          tooltip: 'Volver', // i18n: Fase W3
+          color: palette.textPrimary,
           // Al paywall se llega con `push` desde "VER PLANES", así que casi
           // siempre hay a dónde volver. El fallback cubre el deep-link directo
           // a la URL, donde `pop` no tiene destino y dejaría al PF encerrado.
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/coach'),
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          tooltip: 'Volver', // i18n: Fase W3
         ),
       ),
       body: const SafeArea(top: false, child: PricingScreen()),
@@ -80,9 +172,13 @@ class PricingRouteScreen extends StatelessWidget {
 /// [PricingRouteScreen] en móvil.
 ///
 /// Se abre desde "CAMBIAR PLAN" en Facturación y desde el CTA "VER PLANES" del
-/// modal de límite. El botón "ELEGIR PLAN" está MOCKEADO en este PR (aviso
-/// "próximamente") — el flujo real de Mercado Pago se cablea cuando la cuenta
-/// MP esté lista. Precios de [kTierPricesArs].
+/// modal de límite. Precios de [kTierPricesArs].
+///
+/// El punto de compra NO está en todas las superficies: lo decide
+/// [resolvePlanCheckout] y sólo el Coach Hub web lo tiene. En la app móvil esta
+/// pantalla informa —planes, precios, cupo propio— y en lugar del CTA muestra
+/// dónde se contrata. Ver [plan_checkout.dart] para el porqué (3.1.3(c) /
+/// Play Billing) y para por qué es un tipo sellado y no un `if`.
 class PricingScreen extends ConsumerStatefulWidget {
   const PricingScreen({super.key});
 
@@ -96,9 +192,24 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final currentTier =
-        ref.watch(userProfileProvider).valueOrNull?.subscription?.tier ??
-            SubscriptionTier.free;
+
+    // El plan «actual» NO es siempre el tier del doc: una suscripción dada de
+    // baja conserva el tier pago sólo mientras le queden días pagos, y después
+    // es Free. Se resuelve UNA vez acá y baja a las tarjetas ya decidido —ver
+    // [VigenciaDelPlan]—; ninguna tarjeta mira el estado ni el reloj.
+    final vigencia = VigenciaDelPlan.de(
+      ref.watch(userProfileProvider).valueOrNull?.subscription,
+    );
+
+    // La superficie de compra se resuelve UNA vez, acá arriba, y baja por
+    // parámetro hasta el CTA. No se vuelve a preguntar adentro de las tarjetas:
+    // dos llamadas son dos lugares donde algún día una puede quedar vieja.
+    //
+    // Va FUERA del LayoutBuilder a propósito. La superficie NO es el ancho: una
+    // tablet Android en 900pt entra por [_WideBody] y sigue sin poder vender,
+    // igual que el teléfono. Si esto viviera adentro del builder invitaría a
+    // mezclar las dos decisiones, que es exactamente el bug caro.
+    final checkout = resolvePlanCheckout();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -107,15 +218,17 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
         if (constraints.maxWidth < _kNarrowBreakpoint) {
           return _NarrowBody(
             annual: _annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
+            checkout: checkout,
             onCycleChanged: onCycleChanged,
           );
         }
         return _WideBody(
           annual: _annual,
-          currentTier: currentTier,
+          vigencia: vigencia,
           palette: palette,
+          checkout: checkout,
           onCycleChanged: onCycleChanged,
         );
       },
@@ -130,14 +243,21 @@ class _PricingScreenState extends ConsumerState<PricingScreen> {
 class _WideBody extends StatelessWidget {
   const _WideBody({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
+    required this.checkout,
     required this.onCycleChanged,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
+
+  /// Ancho NO implica web: una tablet Android de 900pt llega hasta acá. Por eso
+  /// el layout no decide nada de la compra, sólo transporta lo que ya decidió
+  /// [resolvePlanCheckout].
+  final PlanCheckout checkout;
+
   final ValueChanged<bool> onCycleChanged;
 
   @override
@@ -146,9 +266,16 @@ class _WideBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
       child: Column(
         children: [
+          // Sólo donde se puede comprar. Preguntar por el estado de un pago en
+          // una superficie que no vende no tiene sentido, y montarlo igual lo
+          // pondria en el arbol de los tests que fijan que la rama movil no
+          // ofrece nada. El widget decide solo si tiene algo que decir.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             'PLANES Y PRECIOS', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 40,
               fontWeight: FontWeight.w800,
@@ -172,15 +299,21 @@ class _WideBody extends StatelessWidget {
           const SizedBox(height: 40),
           _PlanCards(
             annual: annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
+            checkout: checkout,
             narrow: false,
           ),
           const SizedBox(height: 24),
+          _WhereToSubscribeNote(
+            checkout: checkout,
+            palette: palette,
+            fontSize: AppTextSize.caption,
+          ),
           Text(
-            'Renovación automática. Podés cancelar cuando quieras '
-            'desde Facturación.', // i18n: Fase W3
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
+            _kRenewalNote,
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
             textAlign: TextAlign.center,
           ),
         ],
@@ -208,9 +341,10 @@ class _CycleToggle extends StatelessWidget {
       children: [
         Text(
           '¡Ahorrá 2 meses con el anual!', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.accent,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.4,
           ),
@@ -261,9 +395,10 @@ class _CycleOption extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: selected ? palette.textPrimary : palette.textMuted,
-              fontSize: 20,
+              fontSize: AppTextSize.titleLarge,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
             ),
@@ -295,14 +430,16 @@ class _CycleOption extends StatelessWidget {
 class _NarrowBody extends StatelessWidget {
   const _NarrowBody({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
+    required this.checkout,
     required this.onCycleChanged,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
+  final PlanCheckout checkout;
   final ValueChanged<bool> onCycleChanged;
 
   @override
@@ -313,12 +450,17 @@ class _NarrowBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
       child: Column(
         children: [
+          // Angosto NO es movil: una ventana de navegador chica llega acá y SI
+          // puede comprar. La condicion es la superficie, nunca el ancho.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             // Dos líneas a propósito (artboard D). En una sola, "PLANES Y
             // PRECIOS" en Barlow Condensed 30 cruza la pantalla como una tira
             // fina y deja de leerse como título.
             'PLANES Y\nPRECIOS', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 30,
               fontWeight: FontWeight.w800,
@@ -349,14 +491,19 @@ class _NarrowBody extends StatelessWidget {
           const SizedBox(height: 20),
           _PlanCards(
             annual: annual,
-            currentTier: currentTier,
+            vigencia: vigencia,
             palette: palette,
+            checkout: checkout,
             narrow: true,
           ),
           const SizedBox(height: 20),
+          _WhereToSubscribeNote(
+            checkout: checkout,
+            palette: palette,
+            fontSize: 11.5,
+          ),
           Text(
-            'Renovación automática. Podés cancelar cuando quieras '
-            'desde Facturación.', // i18n: Fase W3
+            _kRenewalNote,
             style: TextStyle(color: palette.textMuted, fontSize: 11.5),
             textAlign: TextAlign.center,
           ),
@@ -472,9 +619,10 @@ class _NarrowCycleOption extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: selected ? palette.bg : palette.textMuted,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2, // 0.1em
           ),
@@ -492,19 +640,27 @@ class _NarrowCycleOption extends StatelessWidget {
 class _PlanCards extends StatelessWidget {
   const _PlanCards({
     required this.annual,
-    required this.currentTier,
+    required this.vigencia,
     required this.palette,
+    required this.checkout,
     required this.narrow,
   });
 
   final bool annual;
-  final SubscriptionTier currentTier;
+  final VigenciaDelPlan vigencia;
   final AppPalette palette;
+  final PlanCheckout checkout;
   final bool narrow;
 
   @override
   Widget build(BuildContext context) {
     const recommended = SubscriptionTier.plan1;
+
+    // «Actual» es el tier EFECTIVO, no el del doc: una baja con el período ya
+    // vencido es Free. Y los días pagos de una baja viajan SÓLO a la tarjeta del
+    // plan actual —es la única en la que tiene sentido «volver a contratar»—,
+    // así que ninguna otra puede dibujar la fecha por error.
+    final tierActual = vigencia.tierEfectivo;
 
     // Se ITERA sobre el enum a proposito, y para los DOS layouts. Antes las
     // tarjetas estaban escritas a mano (free, plan1, plan2), asi que agregar un
@@ -517,16 +673,24 @@ class _PlanCards extends StatelessWidget {
             ? _NarrowPlanCard(
                 tier: tier,
                 annual: annual,
-                isCurrent: currentTier == tier,
+                isCurrent: tierActual == tier,
+                pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
+                primerCobroDiferible:
+                    tierActual == tier && vigencia.primerCobroDiferible,
                 recommended: tier == recommended,
                 palette: palette,
+                checkout: checkout,
               )
             : _PlanCard(
                 tier: tier,
                 annual: annual,
-                isCurrent: currentTier == tier,
+                isCurrent: tierActual == tier,
+                pagadoHasta: tierActual == tier ? vigencia.pagadoHasta : null,
+                primerCobroDiferible:
+                    tierActual == tier && vigencia.primerCobroDiferible,
                 recommended: tier == recommended,
                 palette: palette,
+                checkout: checkout,
               ),
     };
 
@@ -596,6 +760,46 @@ String _tierName(SubscriptionTier tier) => switch (tier) {
       // nunca interpolando el limite.
       SubscriptionTier.plan3 => ('+15', 'alumnos'), // i18n: Fase W3
     };
+
+/// (numeroEjercicios, labelEjercicios) para el bloque de features de
+/// [_PlanCard] (layout ANCHO), junto a [_tierStudents] — mismo patrón, mismo
+/// motivo de NO reusar `ejerciciosTexto` de `plan_copy.dart` ahí: esa tarjeta
+/// necesita el número y el label SEPARADOS para su tipografía (número grande
+/// + label chico), y `ejerciciosTexto` arma una oración de un solo tirón. Ver
+/// el dartdoc de [tierName] sobre por qué esta pantalla no unifica sus
+/// variantes de copy con las de otras superficies.
+///
+/// [_NarrowPlanCard] (layout angosto) NO usa esta función: ahí el renglón es
+/// una sola línea de texto, así que llama a `ejerciciosTexto(tier)`
+/// directo.
+///
+/// A diferencia de alumnos (que muestra un RANGO — "3-7"), acá se muestra el
+/// tope EXACTO del tier (docs/limite-ejercicios-pf.md §0: 20/60/120), porque
+/// es el número que la tarjeta está VENDIENDO. `customExerciseLimit` es
+/// `null` para Plan 3 — nunca se interpola a mano.
+(String, String) _tierExercises(SubscriptionTier tier) {
+  final limit = tier.customExerciseLimit;
+  return limit == null
+      ? ('Sin límite', 'ejercicios propios') // i18n: Fase W3
+      : ('$limit', 'ejercicios propios'); // i18n: Fase W3
+}
+
+/// (numeroPlantillas, labelPlantillas) para el bloque de features de
+/// [_PlanCard], mismo patrón y mismo motivo que [_tierExercises]: el número y
+/// el label van separados para la tipografía de la tarjeta, y
+/// `plantillasTexto` de `plan_copy.dart` arma una oración de un tirón.
+///
+/// [_NarrowPlanCard] NO usa esta función: llama a `plantillasTexto(tier)`
+/// directo, igual que hace con `ejerciciosTexto`.
+///
+/// docs/limite-plantillas-pf.md §3 PR5. `templateLimit` es `null` para todo
+/// lo que no sea Free — nunca se interpola a mano.
+(String, String) _tierTemplates(SubscriptionTier tier) {
+  final limit = tier.templateLimit;
+  return limit == null
+      ? ('Sin límite', 'plantillas') // i18n: Fase W3
+      : ('$limit', 'plantillas'); // i18n: Fase W3
+}
 
 /// Formatea un monto ARS con separador de miles (12.000).
 String _formatArs(int amount) {
@@ -673,7 +877,8 @@ class _AnnualOfferRow extends StatelessWidget {
       children: [
         Text(
           listText,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.textMuted,
             fontSize: compact ? 14 : 20,
             fontWeight: FontWeight.w600,
@@ -698,7 +903,8 @@ class _AnnualOfferRow extends StatelessWidget {
           ),
           child: Text(
             pctText,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               // Ink invariante: `palette.bg` sobre accent da 1.57:1 en el tema
               // claro (AGENTS.md §2). Nunca `palette.bg` acá.
               color: TreinoButtonTokens.foreground(context),
@@ -748,15 +954,25 @@ class _PlanCard extends StatelessWidget {
     required this.tier,
     required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
     required this.palette,
+    required this.checkout,
   });
 
   final SubscriptionTier tier;
   final bool annual;
   final bool isCurrent;
+
+  /// Ver [_PlanCtaButton.pagadoHasta].
+  final DateTime? pagadoHasta;
+
+  /// Ver [_PlanCtaButton.primerCobroDiferible].
+  final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
+  final PlanCheckout checkout;
 
   @override
   Widget build(BuildContext context) {
@@ -764,6 +980,8 @@ class _PlanCard extends StatelessWidget {
     final amount = price == null ? 0 : (annual ? price.annual : price.monthly);
     final cycleLabel = annual ? 'POR AÑO' : 'POR MES'; // i18n: Fase W3
     final (studentsNum, studentsLabel) = _tierStudents(tier);
+    final (exercisesNum, exercisesLabel) = _tierExercises(tier);
+    final (templatesNum, templatesLabel) = _tierTemplates(tier);
 
     final card = Container(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -789,7 +1007,8 @@ class _PlanCard extends StatelessWidget {
         children: [
           Text(
             _tierName(tier),
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: recommended ? palette.accent : palette.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -817,16 +1036,18 @@ class _PlanCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8, right: 2),
                   child: Text(
                     '\$',
-                    style: GoogleFonts.barlowCondensed(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlowCondensed,
                       color: palette.textPrimary,
-                      fontSize: 24,
+                      fontSize: AppTextSize.heading,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 Text(
                   _formatArs(amount),
-                  style: GoogleFonts.barlowCondensed(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlowCondensed,
                     color: palette.textPrimary,
                     fontSize: 52,
                     fontWeight: FontWeight.w800,
@@ -840,9 +1061,10 @@ class _PlanCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             price == null ? 'SIEMPRE GRATIS' : cycleLabel, // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textMuted,
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.8,
             ),
@@ -858,25 +1080,82 @@ class _PlanCard extends StatelessWidget {
             children: [
               Text(
                 studentsNum,
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: recommended ? palette.accent : palette.textPrimary,
-                  fontSize: 18,
+                  fontSize: AppTextSize.title,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 studentsLabel,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.body),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          // Ejercicios propios — feature SECUNDARIA respecto de alumnos: por
+          // eso va en tipografía más chica y siempre en textPrimary (nunca
+          // accent), aunque la tarjeta sea la recomendada.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                exercisesNum,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
+                  color: palette.textPrimary,
+                  fontSize: AppTextSize.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.hairline),
+              Text(
+                exercisesLabel,
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.caption),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          // Plantillas — misma jerarquía secundaria que ejercicios propios.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                templatesNum,
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
+                  color: palette.textPrimary,
+                  fontSize: AppTextSize.body,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.hairline),
+              Text(
+                templatesLabel,
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.caption),
               ),
             ],
           ),
           const SizedBox(height: 24),
           _PlanCtaButton(
+            key: ValueKey('plan_cta_${tier.name}'),
+            tier: tier,
+            annual: annual,
             isCurrent: isCurrent,
+            pagadoHasta: pagadoHasta,
+            primerCobroDiferible: primerCobroDiferible,
             recommended: recommended,
-            isFree: price == null,
             palette: palette,
+            checkout: checkout,
           ),
         ],
       ),
@@ -894,7 +1173,7 @@ class _PlanCard extends StatelessWidget {
           top: 0,
           child: _PopularBadge(
             palette: palette,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             letterSpacing: 0.8,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
           ),
@@ -916,15 +1195,25 @@ class _NarrowPlanCard extends StatelessWidget {
     required this.tier,
     required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
     required this.palette,
+    required this.checkout,
   });
 
   final SubscriptionTier tier;
   final bool annual;
   final bool isCurrent;
+
+  /// Ver [_PlanCtaButton.pagadoHasta].
+  final DateTime? pagadoHasta;
+
+  /// Ver [_PlanCtaButton.primerCobroDiferible].
+  final bool primerCobroDiferible;
   final bool recommended;
   final AppPalette palette;
+  final PlanCheckout checkout;
 
   @override
   Widget build(BuildContext context) {
@@ -969,7 +1258,8 @@ class _NarrowPlanCard extends StatelessWidget {
                   children: [
                     Text(
                       _tierName(tier),
-                      style: GoogleFonts.barlowCondensed(
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
                         color:
                             recommended ? palette.accent : palette.textPrimary,
                         fontSize: 19,
@@ -996,16 +1286,18 @@ class _NarrowPlanCard extends StatelessWidget {
                         children: [
                           Text(
                             '\$',
-                            style: GoogleFonts.barlowCondensed(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlowCondensed,
                               color: palette.textPrimary,
-                              fontSize: 16,
+                              fontSize: AppTextSize.bodyLarge,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(width: 2),
                           Text(
                             _formatArs(amount),
-                            style: GoogleFonts.barlowCondensed(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlowCondensed,
                               color: palette.textPrimary,
                               fontSize: 36,
                               fontWeight: FontWeight.w800,
@@ -1025,7 +1317,8 @@ class _NarrowPlanCard extends StatelessWidget {
                       price == null
                           ? 'SIEMPRE GRATIS'
                           : cycleLabel, // i18n: Fase W3
-                      style: GoogleFonts.barlowCondensed(
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
                         color: palette.textMuted,
                         fontSize: 9.5,
                         fontWeight: FontWeight.w700,
@@ -1044,12 +1337,40 @@ class _NarrowPlanCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.s8),
+          // Ejercicios propios — a todo el ancho: no entra junto a
+          // `_StudentsBox` sin re-diseñar la fila, y es una feature
+          // SECUNDARIA frente a alumnos, así que una línea chica alcanza.
+          //
+          // Acá SÍ va `ejerciciosTexto` de `plan_copy.dart` (a diferencia de
+          // la tarjeta ancha, que necesita el número separado del label para
+          // su tipografía): este renglón es UNA sola oración, y
+          // `ejerciciosTexto` ya arma «$limit ejercicios propios» / «ejercicios
+          // propios sin límite» sin nunca interpolar el `null` de Plan 3.
+          Text(
+            ejerciciosTexto(tier), // i18n: Fase W3
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          // Plantillas — mismo criterio que ejercicios propios arriba: una
+          // sola oración, `plantillasTexto` de `plan_copy.dart`.
+          Text(
+            plantillasTexto(tier), // i18n: Fase W3
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
+          ),
           const SizedBox(height: 18),
           _PlanCtaButton(
+            key: ValueKey('plan_cta_${tier.name}'),
+            tier: tier,
+            annual: annual,
             isCurrent: isCurrent,
+            pagadoHasta: pagadoHasta,
+            primerCobroDiferible: primerCobroDiferible,
             recommended: recommended,
-            isFree: price == null,
             palette: palette,
+            checkout: checkout,
             minHeight: 46,
           ),
         ],
@@ -1109,7 +1430,8 @@ class _StudentsBox extends StatelessWidget {
         children: [
           Text(
             number,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: recommended ? palette.accent : palette.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -1151,7 +1473,8 @@ class _PopularBadge extends StatelessWidget {
       ),
       child: Text(
         'MÁS POPULAR', // i18n: Fase W3
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           color: TreinoButtonTokens.foreground(context),
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
@@ -1162,19 +1485,50 @@ class _PopularBadge extends StatelessWidget {
   }
 }
 
+/// El pie de la tarjeta. Cuatro estados que NO son el mismo con un flag:
+/// "tu plan actual", "gratis", y —según la superficie— comprar o decir dónde se
+/// compra. El cuarto es el plan actual DADO DE BAJA con días todavía pagos, y
+/// sólo existe donde se puede cobrar: ahí "tu plan actual" deja de ser un
+/// cartel y pasa a ser «volver a contratar».
 class _PlanCtaButton extends StatelessWidget {
   const _PlanCtaButton({
+    super.key,
+    required this.tier,
+    required this.annual,
     required this.isCurrent,
+    required this.pagadoHasta,
+    required this.primerCobroDiferible,
     required this.recommended,
-    required this.isFree,
     required this.palette,
+    required this.checkout,
     this.minHeight = 0,
   });
 
+  final SubscriptionTier tier;
+
+  /// Ciclo elegido en el toggle. No cambia lo que se dibuja, pero es dato del
+  /// checkout: sin él [PlanCheckoutAvailable.start] no sabe qué está cobrando.
+  final bool annual;
+
   final bool isCurrent;
+
+  /// Hasta cuándo le dura al PF lo que ya pagó. Sólo llega no-nulo en la tarjeta
+  /// del plan ACTUAL y sólo si lo dio de baja y todavía le quedan días (ver
+  /// [VigenciaDelPlan.pagadoHasta]); en cualquier otro caso es `null` y la
+  /// tarjeta se comporta como siempre.
+  final DateTime? pagadoHasta;
+
+  /// Si falta al menos un día para [pagadoHasta], que es el único borde de la
+  /// decisión de diferir el primer cobro que se ve desde el cliente (ver
+  /// [VigenciaDelPlan.primerCobroDiferible]). Decide si se dibuja la nota del
+  /// primer cobro; el botón de volver a contratar no depende de esto.
+  final bool primerCobroDiferible;
   final bool recommended;
-  final bool isFree;
   final AppPalette palette;
+
+  /// Quién puede cobrar en ESTA superficie. Llega desde `PricingScreen.build`;
+  /// esta clase no lo resuelve ni lo re-pregunta.
+  final PlanCheckout checkout;
 
   /// Altura MÍNIMA (no fija): el artboard móvil pide 46, pero con textScale
   /// alto el label crece y el botón tiene que poder crecer con él.
@@ -1183,71 +1537,259 @@ class _PlanCtaButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isCurrent) {
-      return Container(
-        width: double.infinity,
-        constraints: BoxConstraints(minHeight: minHeight),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(AppRadius.full),
-        ),
-        child: Text(
-          'TU PLAN ACTUAL', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textMuted,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.6,
+      final hasta = pagadoHasta;
+
+      // Sin días pagos que re-contratar —el plan no está dado de baja— el
+      // actual es un cartel, como siempre. Free también: no hay nada que
+      // cobrar, así que «volver a contratar» un plan sin precio sería
+      // pedirle al servidor un checkout que no existe.
+      if (hasta == null || kTierPricesArs[tier] == null) return _planActual();
+
+      // `switch` sobre el sellado, igual que más abajo, y por el mismo motivo:
+      // una tercera superficie DEJA DE COMPILAR hasta que alguien decida qué
+      // dice acá.
+      //
+      // Todo el texto nuevo de la baja (el botón y la nota) cuelga de
+      // [PlanCheckoutAvailable] y de nada más. La app móvil muestra lo de
+      // siempre: «TU PLAN ACTUAL», sin botón y sin una palabra sobre volver a
+      // pagar. Bajo 3.1.3(f) invitar a re-contratar es un call to action de
+      // compra aunque no nombre ningún canal ni sea tappable:
+      // `avisos_de_tope_movil_sin_llamado_a_comprar_test.dart` cuenta
+      // «contratá» y «reactivalo» entre ellos. Ver también
+      // `_kSubscribeElsewhereShort`.
+      return switch (checkout) {
+        PlanCheckoutOnWebOnly() => _planActual(),
+        final PlanCheckoutAvailable disponible => Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // El MISMO punto de compra que «ELEGIR PLAN»: llama a `start` con
+              // este tier y el ciclo del toggle, sin un camino de cobro paralelo.
+              _botonDeCompra(
+                context,
+                disponible,
+                'VOLVER A CONTRATAR', // i18n: Fase W3
+              ),
+              // La nota del primer cobro es CONDICIONAL («Si ya pagaste…»)
+              // y se esconde con menos de un día por delante, por el mismo
+              // motivo: si el primer cobro se difiere lo decide el SERVIDOR,
+              // no esta pantalla. `decidirDiferimiento`, en
+              // functions/src/subscriptions/mp/diferir-primer-cobro.ts,
+              // difiere sólo si la baja está pedida, el tier es el mismo,
+              // falta al menos `MIN_DIFERIMIENTO_MS` (un día) y MP muestra un
+              // cobro real que respalde esos días. Las tres primeras se ven
+              // desde acá; la última no, y la fecha final es la MENOR entre
+              // nuestro fin y lo que cubre ese cobro. Por eso el texto no
+              // afirma un pago que nadie verificó: deja el «si» en manos del
+              // servidor.
+              //
+              // Con menos de un día NO se difiere (`queda-menos-de-un-dia`):
+              // se cobra en el acto y la nota sería falsa con seguridad, así
+              // que no se dibuja. El botón queda, porque volver a contratar
+              // sigue siendo válido; lo que se calla es sólo lo que no se
+              // cumple. Se evalúa al construir, sin timer: ver
+              // [VigenciaDelPlan].
+              //
+              // Y nombra a Mercado Pago a propósito. Para diferir el cobro
+              // el servidor crea el plan con `auto_recurring.free_trial`
+              // (`freeTrialDays`, en functions/src/subscriptions/mp/client.ts)
+              // y el checkout de MP rinde esa prueba como «¡Tenés N días
+              // gratis!». No hay un campo que cambie ese texto —`free_trial`
+              // sólo lleva frecuencia y tipo—, así que no se puede corregir
+              // en origen. Un PF que lo lee sin contexto cree que el plan
+              // nuevo no le cuesta nada, cuando esos días son los que ya
+              // pagó. Esta nota es donde se lo puede encuadrar antes de que
+              // llegue a esa pantalla, y por eso dice qué va a mostrar MP.
+              if (primerCobroDiferible) ...[
+                const SizedBox(height: AppSpacing.s8),
+                Text(
+                  'Si ya pagaste, se te cobrará al finalizar tu período '
+                  'actual: ${fechaDiaMesArg(hasta)}. Mercado Pago lo muestra '
+                  'como días gratis.', // i18n: Fase W3
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: palette.textMuted,
+                    fontSize: AppTextSize.caption,
+                  ),
+                ),
+              ],
+            ],
+          ),
+      };
+    }
+
+    // FREE no pasa por el guard: no es una venta apagada, es que no hay nada
+    // que cobrar. Se ve igual en las dos superficies.
+    if (kTierPricesArs[tier] == null) {
+      return Opacity(
+        opacity: 0.5,
+        child: _CtaBox(
+          minHeight: minHeight,
+          borderColor: palette.border,
+          child: _ctaLabel(
+            'GRATIS', // i18n: Fase W3
+            palette.textPrimary,
           ),
         ),
       );
     }
 
-    final enabled = !isFree;
-    final filled = recommended;
-
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: TreinoTappable(
-        onTap: enabled ? () => _showComingSoon(context) : null,
-        child: Container(
-          width: double.infinity,
-          constraints: BoxConstraints(minHeight: minHeight),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: filled ? palette.accent : Colors.transparent,
-            border: Border.all(
-              color: filled ? palette.accent : palette.border,
-            ),
-            borderRadius: BorderRadius.circular(AppRadius.full),
-          ),
-          child: Text(
-            isFree ? 'GRATIS' : 'ELEGIR PLAN', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
-              color: filled
-                  ? TreinoButtonTokens.foreground(context)
-                  : palette.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-            ),
+    // `switch` sobre el sellado, no un `if`: si mañana aparece una tercera
+    // superficie (in-app purchase de verdad, por ejemplo) esto DEJA DE
+    // COMPILAR hasta que alguien decida qué muestra la tarjeta ahí.
+    return switch (checkout) {
+      // Sin `TreinoTappable`, sin `onTap`, sin ruta: no hay a dónde tocar.
+      //
+      // Eso NO es una observación decorativa y NO lo garantiza el tipo: colgar
+      // acá un `TreinoTappable` con un `showDialog` de checkout —o un
+      // `launchUrl` a la pasarela— compila, no toca `start`, no rompe el
+      // sellado, y es un punto de venta adentro de la app. Lo que lo ataja es
+      // el test «el cartel de la app NO es tappable» del group «guard de
+      // superficie»: si envolvés esto, se pone rojo.
+      // Desde el 2026-09-29 esto ya NO dibuja la caja cuando la constante
+      // está vacía: con `_kSubscribeElsewhereShort` en `''` la pill era un
+      // borde sin texto — ruido visual que no decía nada, en vez de "acá no
+      // hay nada que tocar". Si el día de mañana la decisión de producto se
+      // da vuelta y la constante vuelve a llevar texto, la caja reaparece
+      // sola. Ver el dartdoc de la constante para la decisión completa.
+      PlanCheckoutOnWebOnly() when _kSubscribeElsewhereShort.isEmpty =>
+        const SizedBox.shrink(),
+      PlanCheckoutOnWebOnly() => _CtaBox(
+          minHeight: minHeight,
+          borderColor: palette.border,
+          child: _ctaLabel(
+            _kSubscribeElsewhereShort,
+            palette.textMuted,
           ),
         ),
-      ),
-    );
+      final PlanCheckoutAvailable disponible => _botonDeCompra(
+          context,
+          disponible,
+          'ELEGIR PLAN', // i18n: Fase W3
+        ),
+    };
   }
 
-  void _showComingSoon(BuildContext context) {
-    // MOCK: el flujo real de Mercado Pago se cablea cuando la cuenta esté
-    // lista (createPreapproval → checkout). Por ahora, aviso honesto.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'El pago con Mercado Pago se habilita muy pronto.', // i18n: Fase W3
+  /// El cartel del plan actual: caja con borde, sin `TreinoTappable` ni ruta.
+  Widget _planActual() => _CtaBox(
+        minHeight: minHeight,
+        borderColor: palette.border,
+        child: _ctaLabel(
+          'TU PLAN ACTUAL', // i18n: Fase W3
+          palette.textMuted,
         ),
-      ),
-    );
-  }
+      );
+
+  /// El botón que arranca el checkout. «ELEGIR PLAN» y «VOLVER A CONTRATAR»
+  /// son el MISMO punto de compra con otra etiqueta: comparten acá la llamada a
+  /// [PlanCheckoutAvailable.start] y el estilo, para que no haya un segundo
+  /// camino de cobro que se desincronice del primero. Sólo se puede llamar con
+  /// la capacidad [PlanCheckoutAvailable] en la mano.
+  Widget _botonDeCompra(
+    BuildContext context,
+    PlanCheckoutAvailable disponible,
+    String etiqueta,
+  ) =>
+      TreinoTappable(
+        onTap: () => disponible.start(context, tier: tier, annual: annual),
+        child: _CtaBox(
+          minHeight: minHeight,
+          fillColor: recommended ? palette.accent : null,
+          borderColor: recommended ? palette.accent : palette.border,
+          child: _ctaLabel(
+            etiqueta,
+            recommended
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textPrimary,
+          ),
+        ),
+      );
+
+  Widget _ctaLabel(String label, Color color) => Text(
+        label,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
+          color: color,
+          fontSize: AppTextSize.bodyDense,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.6,
+        ),
+      );
+}
+
+/// La caja del pie de tarjeta. Existe para que los estados compartan geometría
+/// exacta: en la grilla 2x2 las cuatro tarjetas viven en el mismo
+/// `IntrinsicHeight`, así que si el cartel de "se contrata en la web" midiera
+/// distinto que el botón, cambiar de superficie descalzaría la fila entera.
+class _CtaBox extends StatelessWidget {
+  const _CtaBox({
+    required this.minHeight,
+    required this.borderColor,
+    required this.child,
+    this.fillColor,
+  });
+
+  final double minHeight;
+  final Color borderColor;
+  final Color? fillColor;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        constraints: BoxConstraints(minHeight: minHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: fillColor ?? Colors.transparent,
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: child,
+      );
+}
+
+/// La línea que cierra la pantalla cuando esta superficie no cobra.
+///
+/// El cartel de cada tarjeta dice DÓNDE; esto lo explica UNA vez y completo,
+/// para que el PF no se quede con la sensación de que le falta algo: ve los
+/// cuatro planes, los precios y su cupo — lo único que no hace acá es pagar.
+///
+/// No dice "próximamente" (sería falso: en la web ya se contrata) ni nombra a
+/// Apple. Y no es un link: en la app no puede haber navegación a la compra.
+class _WhereToSubscribeNote extends StatelessWidget {
+  const _WhereToSubscribeNote({
+    required this.checkout,
+    required this.palette,
+    required this.fontSize,
+  });
+
+  final PlanCheckout checkout;
+  final AppPalette palette;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) => switch (checkout) {
+        PlanCheckoutAvailable() => const SizedBox.shrink(),
+        // `_kSubscribeElsewhereLong` está vacía desde el 2026-09-15 (3.1.3f).
+        // Sin este chequeo, un `Text('')` igual reserva la altura de una
+        // línea más los 12px de `padding.bottom` — un hueco vacío al pie de
+        // la pantalla que no dice nada, mismo problema que tenía la pill del
+        // CTA (ver `_PlanCtaButton`).
+        PlanCheckoutOnWebOnly() when _kSubscribeElsewhereLong.isEmpty =>
+          const SizedBox.shrink(),
+        PlanCheckoutOnWebOnly() => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              _kSubscribeElsewhereLong,
+              style: TextStyle(
+                color: palette.textMuted,
+                fontSize: fontSize,
+                height: 1.35,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+      };
 }

@@ -15,8 +15,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 /// Matriz tipo-de-aviso × canal (Email/Push/WhatsApp). Persiste en
 /// `users/{uid}.notificationPrefs` vía `userRepository.update` (save-on-toggle,
 /// optimista: el stream de Firestore refleja el cambio al instante).
-/// Honesto: las prefs se GUARDAN; la entrega real (CFs que las respeten +
-/// canales email/whatsapp) es follow-up de `functions/`.
+/// Push respeta las cinco filas y email las filas con envío real. WhatsApp no
+/// existe como canal todavía, por eso sus controles están deshabilitados.
 class NotificacionesTab extends ConsumerWidget {
   const NotificacionesTab({super.key});
 
@@ -78,10 +78,13 @@ class _NotifBody extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           // Honestidad de scope: ver el estado por canal en
-          // notificaciones_prefs.dart. Email ya entrega en las filas de
-          // kEmailBackedTypes; WhatsApp todavía no entrega en ninguna.
-          'El email ya se envía en las filas donde está disponible. '
-          'WhatsApp se activa próximamente.', // i18n: Fase W3
+          // notificaciones_prefs.dart. Push entrega en las cinco filas; email
+          // sólo en las de kEmailBackedTypes, y por eso el resto arranca
+          // apagado. La columna de WhatsApp se sacó: prometía un canal que no
+          // existe (ver el docstring de NotifChannel).
+          'El push llega a la app en tu teléfono. El email, a la casilla con '
+          'la que iniciás sesión, y sólo en las filas donde está '
+          'disponible.', // i18n: Fase W3
           style: TextStyle(
             color: palette.textMuted,
             fontSize: 12,
@@ -134,7 +137,10 @@ class _NotifSkeleton extends StatelessWidget {
                 Row(
                   children: [
                     const Expanded(child: SizedBox()),
-                    for (var i = 0; i < 3; i++)
+                    // Derivado de NotifChannel: el 3 hardcodeado sobrevivió a
+                    // que la matriz pasara a dos columnas y el skeleton quedó
+                    // prometiendo una que ya no está.
+                    for (var i = 0; i < NotifChannel.values.length; i++)
                       Padding(
                         padding: const EdgeInsets.only(left: 12),
                         child: _bar(palette, width: 48, height: 10),
@@ -150,7 +156,7 @@ class _NotifSkeleton extends StatelessWidget {
                     child: Row(
                       children: [
                         Expanded(child: _bar(palette, width: 170)),
-                        for (var c = 0; c < 3; c++)
+                        for (var c = 0; c < NotifChannel.values.length; c++)
                           Padding(
                             padding: const EdgeInsets.only(left: 12),
                             child: _bar(palette, width: 18, height: 18),
@@ -372,6 +378,9 @@ class _ToggleCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    // Toda celda de la matriz entrega de verdad. La rama de celda
+    // deshabilitada existió sólo para WhatsApp, que ya no es una columna: un
+    // control muerto no se disimula, se saca.
     return SizedBox(
       width: colW,
       child: Center(

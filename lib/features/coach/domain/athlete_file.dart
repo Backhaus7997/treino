@@ -18,14 +18,15 @@ enum AthleteFileKind {
   other,
 }
 
-/// Private per-athlete file uploaded by the trainer (PDF o imagen).
+/// Archivo por alumno que sube el PF (PDF o imagen).
 ///
 /// Stored in Firestore at `athlete_files/{id}` con `id = {trainerId}_{athleteId}_{timestamp}`.
 /// El archivo binario vive en Firebase Storage en
 /// `athleteFiles/{trainerId}_{athleteId}/{timestamp}.{ext}`.
 ///
-/// Trainer-only en Firestore rules + Storage rules — el alumno NO ve estos
-/// archivos en ningún surface. Es una carpeta privada del PF por alumno.
+/// Los archivos ya subidos quedan privados por default. Las nuevas cargas del
+/// repositorio se crean compartidas por default y el PF decide la visibilidad
+/// con [sharedWithAthlete].
 @freezed
 class AthleteFile with _$AthleteFile {
   const factory AthleteFile({
@@ -39,6 +40,7 @@ class AthleteFile with _$AthleteFile {
     required String storagePath,
     required String downloadUrl,
     @TimestampConverter() required DateTime uploadedAt,
+    @Default(false) bool sharedWithAthlete,
   }) = _AthleteFile;
 
   factory AthleteFile.fromJson(Map<String, Object?> json) =>

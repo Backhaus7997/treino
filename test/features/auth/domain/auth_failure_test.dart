@@ -66,6 +66,18 @@ void main() {
   });
 
   group('AuthFailure.userMessage', () {
+    test('subscriptionCancelFailed y deletionNotAllowed tienen copy propio',
+        () {
+      expect(
+        const AuthFailure.subscriptionCancelFailed().userMessage,
+        contains('suscripción'),
+      );
+      expect(
+        const AuthFailure.deletionNotAllowed().userMessage,
+        isNot(const AuthFailure.deletionFailed().userMessage),
+      );
+    });
+
     test('invalidEmail returns Spanish message', () {
       expect(
         const AuthFailure.invalidEmail().userMessage,
@@ -135,8 +147,49 @@ void main() {
       expect(
         const AuthFailure.accountExistsWithDifferentCredential().userMessage,
         equals(
-            'Ya existe una cuenta con ese email usando otro método de inicio'),
+          'Ya tenés una cuenta con ese email. Entrá con el método que usaste '
+          'al registrarte',
+        ),
       );
+    });
+
+    test('SCENARIO-012: popupBlocked returns the popup-blocked copy', () {
+      expect(
+        const AuthFailure.popupBlocked().userMessage,
+        equals(
+          'Tu navegador bloqueó la ventana. Permití ventanas emergentes y '
+          'probá de nuevo',
+        ),
+      );
+    });
+
+    test('SCENARIO-014: providerUnavailable returns the unavailable copy', () {
+      expect(
+        const AuthFailure.providerUnavailable().userMessage,
+        equals(
+          'Este método no está disponible. Entrá con email o escribinos al '
+          'equipo',
+        ),
+      );
+    });
+
+    test('SCENARIO-027F: fromFirebase invalid-credential stays wrongPassword',
+        () {
+      expect(
+        AuthFailure.fromFirebase(
+            FirebaseAuthException(code: 'invalid-credential')),
+        const AuthFailure.wrongPassword(),
+      );
+    });
+
+    test(
+        'SCENARIO-028: fromFirebase operation-not-allowed is NOT '
+        'providerUnavailable', () {
+      final f = AuthFailure.fromFirebase(
+        FirebaseAuthException(code: 'operation-not-allowed'),
+      );
+      expect(f, isNot(const AuthFailure.providerUnavailable()));
+      expect(f, const AuthFailure.unknown('operation-not-allowed'));
     });
 
     test('unknown returns Spanish message', () {
@@ -173,6 +226,9 @@ void main() {
         const AuthFailure.accountExistsWithDifferentCredential(),
         const AuthFailure.unknown('x'),
         const AuthFailure.profileCreateFailed(),
+        const AuthFailure.popupBlocked(),
+        const AuthFailure.providerUnavailable(),
+        const AuthFailure.accountMismatch(),
       ];
       for (final f in failures) {
         expect(f.userMessage, isNotEmpty, reason: '$f.userMessage was empty');
@@ -208,6 +264,15 @@ void main() {
         FirebaseAuthException(code: 'requires-recent-login'),
       );
       expect(failure, const AuthFailure.requiresRecentLogin());
+    });
+
+    test('fromFirebase maps user-mismatch to accountMismatch con copy claro',
+        () {
+      final failure = AuthFailure.fromFirebase(
+        FirebaseAuthException(code: 'user-mismatch'),
+      );
+      expect(failure, const AuthFailure.accountMismatch());
+      expect(failure.userMessage, contains('misma cuenta'));
     });
   });
 }

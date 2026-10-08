@@ -34,6 +34,7 @@ const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
 const { inicializarAdmin } = require('./lib/admin');
+const { getStorage } = require('firebase-admin/storage');
 
 // #838 — se llena en main() con el bucket resuelto. Era una constante con el
 // bucket de producción adentro; ahora el `let` es a propósito: nadie puede
@@ -78,11 +79,11 @@ async function main() {
     // la credencial: es el MISMO objeto del que sale la etiqueta que se
     // imprime, así que no puede haber un proyecto en pantalla y otro en el
     // write. Que es exactamente el bug que #838 vino a cerrar.
-    const { admin } = inicializarAdmin({
+    const { app } = inicializarAdmin({
       projectId: destino.projectId,
       extra: { storageBucket: BUCKET },
     });
-    bucket = admin.storage().bucket();
+    bucket = getStorage(app).bucket();
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'exvid-'));

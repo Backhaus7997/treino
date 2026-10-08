@@ -11,13 +11,16 @@ import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
+import 'package:treino/features/chat/presentation/chat_image_bubble.dart';
 import 'package:treino/features/chat/presentation/chat_screen.dart';
+import 'package:treino/features/chat/presentation/chat_video_bubble.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/domain/follow_status.dart';
 
@@ -71,6 +74,19 @@ Message _msg({
       senderId: senderId,
       text: text,
       createdAt: at ?? DateTime.utc(2026, 5, 21, 11, 0),
+    );
+
+Message _mediaMsg({
+  required String senderId,
+  required MediaType mediaType,
+}) =>
+    Message(
+      id: 'md1',
+      senderId: senderId,
+      text: '',
+      mediaUrl: 'https://firebasestorage.googleapis.com/x',
+      mediaType: mediaType,
+      createdAt: DateTime.utc(2026, 5, 21, 11, 0),
     );
 
 /// Siembra la arista ENTRANTE `follows/{otro}_{yo}` aceptada.
@@ -348,6 +364,7 @@ void main() {
     Future<FakeFirebaseFirestore> seed({
       Follow? incomingEdge,
       String? linkId,
+      bool inquiry = false,
     }) async {
       final fake = FakeFirebaseFirestore();
       await fake.collection('chats').doc('aaa_bbb').set({
@@ -355,6 +372,7 @@ void main() {
         'members': ['aaa', 'bbb'],
         'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
         if (linkId != null) 'linkId': linkId,
+        if (inquiry) 'kind': 'inquiry',
       });
       if (incomingEdge != null) {
         await fake
@@ -450,6 +468,218 @@ void main() {
 
       expect(composerEnabled(tester), isTrue);
       expect(find.textContaining('tiene que seguirte'), findsNothing);
+    });
+
+    // EL QUE PROTEGE LA PRE-CONSULTA.
+    //
+    // `senderMayPost` escapa por TRES ramas: `'linkId' in chat`,
+    // `chat.get('kind','') == 'inquiry'` y `followAccepted`. La pantalla sólo
+    // miraba dos. O sea que la app era MÁS ESTRICTA QUE EL SERVIDOR: le tapaba
+    // el composer a alguien a quien Firestore le habría aceptado el mensaje.
+    //
+    // El caso es el que motiva la feature: alguien que quiere consultarle algo
+    // a un entrenador ANTES de pedirle el vínculo. Si no puede escribir, la
+    // pre-consulta no existe.
+    testWidgets('chat de pre-consulta con CERO aristas → HABILITADO',
+        (tester) async {
+      await pump(tester, await seed(inquiry: true));
+
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
+    });
+
+    // EL FRAME QUE NINGÚN TEST MIRABA.
+    //
+    // Todos los de arriba pasan por `pump()`, que termina en `pumpAndSettle`:
+    // observan el estado YA RESUELTO. El bug vivía en el anterior. Con los dos
+    // streams en `AsyncLoading`, `valueOrNull` daba null en los tres términos
+    // del OR y `canWrite` quedaba en false: composer gris y el cartel de "esta
+    // persona tiene que seguirte" en CADA apertura de chat, diciendo un motivo
+    // que ni siquiera se había evaluado.
+    //
+    // Y no es cold start: `chatByIdProvider` y `followEdgeProvider` son
+    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los destruye
+    // y volver a entrar arranca de cero.
+    //
+    // Sin el `!gateResuelto`, este test falla: composer deshabilitado y aviso
+    // presente. Verificado rompiéndolo a propósito.
+    testWidgets('mientras los dos streams cargan → HABILITADO y sin aviso',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          firestoreProvider.overrideWithValue(await seed()),
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value(const <Message>[]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+          // Streams que no emiten nunca: los dos providers quedan en
+          // AsyncLoading, que es el estado de cada entrada al chat.
+          chatByIdProvider('aaa_bbb').overrideWith((_) => const Stream.empty()),
+          followEdgeProvider(Follow.edgeId('bbb', 'aaa'))
+              .overrideWith((_) => const Stream.empty()),
+        ],
+      ));
+      // pump() a secas, NO pumpAndSettle: el punto es mirar el frame de carga.
+      await tester.pump();
+
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // moderacion-reporte-y-bloqueo — la burbuja de texto no tenía NINGÚN gesto.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('ChatScreen — burbuja: reportar por long-press', () {
+    testWidgets('long-press en un mensaje AJENO abre el sheet de reporte',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _msg(id: 'm1', senderId: 'bbb', text: 'mensaje ajeno'),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('mensaje ajeno'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Por qué lo reportás?'), findsOneWidget);
+    });
+
+    testWidgets('long-press en un mensaje PROPIO no abre nada', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _msg(id: 'm1', senderId: 'aaa', text: 'mensaje propio'),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('mensaje propio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Por qué lo reportás?'), findsNothing);
+    });
+  });
+
+  // Las burbujas de media retornaban ANTES del wrapper de long-press, así que
+  // una foto o un video AJENO no tenía forma de reportarse — el contenido de
+  // más riesgo del chat y lo primero que mira la Guideline 1.2.
+  //
+  // Acá se assertea el CABLEADO (`onLongPress` presente o en null) en vez de
+  // disparar el gesto y esperar el sheet: las dos burbujas muestran un spinner
+  // mientras carga la media, así que `pumpAndSettle` no termina nunca en esta
+  // pantalla. Que el gesto dispare el callback lo cubren
+  // `chat_image_bubble_test.dart` y `chat_video_bubble_test.dart`.
+  group('ChatScreen — burbujas de media: reportar por long-press', () {
+    testWidgets('foto AJENA queda reportable', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _mediaMsg(senderId: 'bbb', mediaType: MediaType.image),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pump();
+
+      final bubble =
+          tester.widget<ChatImageBubble>(find.byType(ChatImageBubble));
+      expect(bubble.onLongPress, isNotNull);
+    });
+
+    testWidgets('foto PROPIA no queda reportable', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _mediaMsg(senderId: 'aaa', mediaType: MediaType.image),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pump();
+
+      final bubble =
+          tester.widget<ChatImageBubble>(find.byType(ChatImageBubble));
+      expect(bubble.onLongPress, isNull);
+    });
+
+    testWidgets('video AJENO queda reportable', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _mediaMsg(senderId: 'bbb', mediaType: MediaType.video),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pump();
+
+      final bubble =
+          tester.widget<ChatVideoBubble>(find.byType(ChatVideoBubble));
+      expect(bubble.onLongPress, isNotNull);
+    });
+
+    testWidgets('video PROPIO no queda reportable', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _mediaMsg(senderId: 'aaa', mediaType: MediaType.video),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pump();
+
+      final bubble =
+          tester.widget<ChatVideoBubble>(find.byType(ChatVideoBubble));
+      expect(bubble.onLongPress, isNull);
     });
   });
 }

@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Manifiesto de privacidad del target Runner.
+
+  ─── Qué declara y qué NO ───────────────────────────────────────────────────
+
+  Declara lo que recolecta el CÓDIGO DE LA APP. El engine de Flutter y cada
+  plugin (Firebase, geolocator, image_picker…) traen su propio manifiesto
+  adentro de su framework, y App Store Connect los agrega todos al validar el
+  build. Duplicar acá lo que declara un plugin no suma: confunde.
+
+  ─── Por qué NSPrivacyAccessedAPITypes está vacío ────────────────────────────
+
+  Las "required reason APIs" hay que declararlas cuando las llama TU binario.
+  El código nativo del Runner —AppDelegate, SceneDelegate, WatchLauncher— no
+  toca ninguna: verificado con
+      rg 'UserDefaults|FileManager|systemUptime|statfs|activeProcessorCount' ios/Runner/
+  que devuelve cero. `shared_preferences` sí usa UserDefaults, y lo declara en
+  SU manifiesto.
+
+  Si algún día agregás código nativo que las toque, va acá. Un array vacío es
+  una declaración válida — no es lo mismo que no tener manifiesto.
+
+  ─── ⚠️ Esto necesita tu confirmación antes de publicar ──────────────────────
+
+  Cada entrada de abajo salió de auditar el repo, no de un formulario que
+  alguien completó. Una declaración que no matchea lo que hace el binario es
+  causa de BAJA, no de corrección. Repasalas una por una.
+
+  ─── Sobre PreciseLocation ───────────────────────────────────────────────────
+
+  Se declara, y el motivo es UNO: el entrenador que carga dónde trabaja
+  (`kTrainerLocationSettings` = `LocationAccuracy.best`). Esa ubicación se
+  guarda y se publica en su perfil — es la feature de discovery, no un exceso.
+
+  El atleta ya NO pide precisión máxima: pasó a `kAthleteLocationSettings`
+  (`high`: 10 m en iOS, 0-100 m en Android), calzado con los 100 m que es lo
+  más fino que la UI muestra. Y sus coordenadas crudas no salen del teléfono:
+  el bias que va a Google Places es el centro de una celda geohash5 (~4,9 km).
+
+  Aun así la declaración sigue siendo `PreciseLocation`, porque basta un uso
+  preciso para que lo sea, y el del PF lo es. Declarar `CoarseLocation` acá
+  sería falso.
+
+  Una versión anterior de este archivo decía que el código y la Política de
+  Privacidad se contradecían sobre esto —el código pedía máxima y el texto
+  decía "aproximada"—. Se resolvió por los dos lados: el código bajó donde
+  correspondía y el texto ahora describe los dos roles por separado
+  (`legal_content.dart`, sección "4. Ubicación").
+-->
+<plist version="1.0">
+<dict>
+	<!-- Sin tracking cross-app: no hay SDK de ads ni de atribución en
+	     pubspec.yaml, y el Info.plist no pide ATT. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array>
+		<!-- Cuenta: email + nombre. firebase_auth, google_sign_in,
+		     sign_in_with_apple. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeName</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- uid de Firebase. Va también a Analytics: los eventos mandan
+		     `athlete_id`, `trainer_id` y `sender_id` como parámetros
+		     (`analytics_service.dart`). Eso es identificador de usuario
+		     viajando a analítica, aunque no se llame `setUserId`. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeUserID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+
+		<!-- Token de FCM (firebase_messaging), para mandar los avisos. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Ver el aviso de arriba: el código pide precisión máxima. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Sesiones, series, pesos, rachas, mediciones. El corazón del
+		     producto. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeFitness</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Avatar, fotos y videos del chat, imágenes de progreso.
+		     image_picker + firebase_storage. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Mensajes de chat, notas por ejercicio, nombres de rutina. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+
+		<!-- Eventos de uso: `routine_started`, `screen_view`,
+		     `appointment_created`… firebase_analytics. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeProductInteraction</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+			</array>
+		</dict>
+
+		<!-- Crashlytics. No se llama a `setUserIdentifier`, así que no queda
+		     atado a la identidad. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

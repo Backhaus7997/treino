@@ -37,6 +37,32 @@ jest.mock("firebase-admin", () => {
   return { firestore, app: () => ({}) };
 });
 
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa Timestamp/FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 /**
  * El wrapper se prueba DIRECTO: el doble de `onDocumentWritten` devuelve el
  * handler que recibe, asi que `linkLoadReconcile` ES esa funcion y se la puede
@@ -60,7 +86,7 @@ jest.mock("firebase-functions", () => ({
   },
 }));
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import {
   createFakeFirestore,
   FakeCollectionName,
@@ -76,6 +102,7 @@ import {
   linkLoadReconcileHandler,
 } from "../subscriptions/link-load-reconcile";
 import { subscriptionChanged } from "../subscriptions/entitlement-triggers";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 /** Una escritura observada, en orden. Es lo que hace contables los saltos. */
 interface RecordedWrite {
@@ -116,7 +143,7 @@ function installRecording(seed: Partial<FakeFirestoreState>): {
       return fn(recorder as unknown as FakeTransaction);
     });
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return { state, writes };
 }
 
@@ -124,7 +151,7 @@ function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   return installRecording(seed).state;
 }
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 const ts = (ms: number) => ({ __fakeTimestampMs: ms, toMillis: () => ms });
 
@@ -235,7 +262,7 @@ describe("linkLoadReconcileHandler", () => {
   });
 
   it("never rethrows on unexpected errors (error-safe, mirrors link-aggregate.ts)", async () => {
-    (admin.firestore as unknown as jest.Mock).mockImplementation(() => {
+    (dobleNamespaced().firestore as unknown as jest.Mock).mockImplementation(() => {
       throw new Error("boom");
     });
 

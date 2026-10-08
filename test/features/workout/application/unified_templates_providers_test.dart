@@ -72,7 +72,7 @@ void main() {
   }) =>
       [
         routinesProvider.overrideWith((ref) async => catalog),
-        currentAthleteLinkProvider.overrideWith((ref) async => link),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
         if (link != null)
           userPublicProfileProvider(link.trainerId).overrideWith(
             (ref) => Stream.value(profile),
@@ -149,7 +149,7 @@ void main() {
           routinesProvider.overrideWith(
             (ref) async => throw Exception('network'),
           ),
-          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         ],
       );
       addTearDown(container.dispose);

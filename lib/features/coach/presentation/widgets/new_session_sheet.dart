@@ -6,6 +6,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/analytics/analytics_service.dart';
+import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -663,14 +665,32 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       final note = _noteController.text.trim();
 
-      await ref.read(appointmentRepositoryProvider).createByTrainer(
-            trainerId: trainerId,
-            athleteId: athleteId,
-            athleteDisplayName: athleteDisplayName,
-            startsAt: startsAt,
-            durationMin: dur,
-            noteBefore: note.isEmpty ? null : note,
-          );
+      // El servicio se lee ANTES del await. Después, si el sheet ya se cerró,
+      // el `ref` de este ConsumerState puede estar disposeado y `ref.read`
+      // tira — justo en el camino que este evento quiere cubrir.
+      final analytics = ref.read(analyticsServiceProvider);
+
+      final appt =
+          await ref.read(appointmentRepositoryProvider).createByTrainer(
+                trainerId: trainerId,
+                athleteId: athleteId,
+                athleteDisplayName: athleteDisplayName,
+                startsAt: startsAt,
+                durationMin: dur,
+                noteBefore: note.isEmpty ? null : note,
+              );
+
+      // Antes del guard de `mounted`: la cita YA existe en Firestore. Que el
+      // sheet se haya cerrado no la des-crea, y saltear el evento por eso
+      // subreportaría justo los casos donde el PF cierra rápido.
+      fireAndForget(
+        analytics.logAppointmentCreated(
+          appointmentId: appt.id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+        ),
+        reason: 'analytics: appointment_created (sesión suelta) falló',
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -775,6 +795,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       final note = _noteController.text.trim();
 
+      // Mismo motivo que en `_submitSingle`: leer el servicio antes del await.
+      final analytics = ref.read(analyticsServiceProvider);
+
       final count = await ref
           .read(appointmentRepositoryProvider)
           .createRecurringByTrainer(
@@ -789,6 +812,19 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
             untilDate: untilDate,
             noteBefore: note.isEmpty ? null : note,
           );
+
+      // Sólo si se creó algo: con `count == 0` todas las ocurrencias caían en
+      // el pasado y no hay ninguna cita nueva que reportar.
+      if (count > 0) {
+        fireAndForget(
+          analytics.logAppointmentCreated(
+            trainerId: trainerId,
+            athleteId: athleteId,
+            occurrences: count,
+          ),
+          reason: 'analytics: appointment_created (serie) falló',
+        );
+      }
 
       if (!mounted) return;
 
@@ -895,7 +931,7 @@ class _Pill extends StatelessWidget {
         child: TreinoTappable(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: AppMotion.fast,
+            duration: AppMotion.resolve(context, AppMotion.fast),
             curve: AppMotion.emphasized,
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
@@ -969,7 +1005,7 @@ class _WeekdayChips extends StatelessWidget {
               height: 44,
               child: Center(
                 child: AnimatedContainer(
-                  duration: AppMotion.fast,
+                  duration: AppMotion.resolve(context, AppMotion.fast),
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(

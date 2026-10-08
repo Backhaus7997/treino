@@ -37,13 +37,14 @@ import '../../app_palette.dart';
 /// tema claro. Lo tiene, y arranca en `ThemeMode.system`. Todo par de tokens
 /// donde `accent` sea fondo se mide en LAS DOS paletas.
 ///
-/// ALCANCE: se migraron las cuatro copias mobile. La quinta —`_Tabs` en
-/// `alumno_detail_screen.dart`, Coach Hub web— sigue con `labelColor:
-/// palette.bg` y alto 38, o sea que TODAVÍA arrastra las dos fallas de arriba.
-/// Y no es sólo dark: `coach_hub_app.dart` también resuelve `AppTheme.light()`
-/// contra `ThemeMode.system`. Quedó afuera a propósito, no por olvido: ese
-/// archivo está bajo el rediseño `kit v2` que se está mergeando. Migrarla es un
-/// PR aparte y es lo que cierra #646 del todo.
+/// ALCANCE: las cinco copias están migradas. La quinta —la ficha de alumno del
+/// Coach Hub web— ya usa [TreinoSegmentedPill], así que ninguna arrastra el
+/// `labelColor: palette.bg` ni el alto 38 originales.
+///
+/// (Este párrafo decía que la quinta "TODAVÍA" los arrastraba mucho después de
+/// que dejara de ser cierto. Un aviso que sobrevive a su causa manda a revisar
+/// un problema que no existe, y peor, sugiere que #646 sigue abierto cuando no
+/// lo está — el patrón de `AGENTS.md` §11.1.)
 ///
 /// Uso:
 /// ```dart
@@ -236,7 +237,7 @@ class TreinoSegmentedPillTokens {
       // 12% de opacidad sobre el acento.
       pressedOverlay: p.textPrimary.withValues(alpha: 0.12),
       // 20% de opacidad sobre el acento.
-      focusOverlay: p.textPrimary.withValues(alpha: 0.20),
+      focusOverlay: p.textPrimary.withValues(alpha: 0.2),
     );
   }
 }

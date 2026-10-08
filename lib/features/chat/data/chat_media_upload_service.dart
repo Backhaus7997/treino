@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../paywall/domain/athlete_entitlement.dart'
+    show kMaxChatImageBytes, kMaxChatVideoBytes;
 import '../domain/media_type.dart';
 
 /// Uploads chat media (photos and videos) to Firebase Storage under
@@ -26,8 +28,22 @@ import '../domain/media_type.dart';
 abstract class ChatMediaUploadService {
   const ChatMediaUploadService();
 
-  static const int _maxImageBytes = 15 * 1024 * 1024; // 15 MB
-  static const int _maxVideoBytes = 100 * 1024 * 1024; // 100 MB
+  /// Los topes ESTRUCTURALES por archivo — el techo del producto, no el del
+  /// paywall.
+  ///
+  /// Se importan de `athlete_entitlement.dart` en vez de duplicarse acá: son
+  /// los mismos números que `storage.rules` aplica del otro lado, y una copia
+  /// más es una copia más que se puede desincronizar.
+  ///
+  /// **El video bajó de 100 MB a 50** (#chat-media-quota): 100 era 11x el p90
+  /// real del bucket, un techo decorativo. Ver [kMaxChatVideoBytes].
+  ///
+  /// ⚠️ Acá NO vive el tope FREE (25 MB por video) ni el de bytes totales. Este
+  /// guard es estructural y no tiene contexto de usuario: la UX del paywall la
+  /// hace `ChatScreen._onAttach`, que sí puede leer los providers. Client-side
+  /// es UX; server-side es la ley.
+  static const int _maxImageBytes = kMaxChatImageBytes;
+  static const int _maxVideoBytes = kMaxChatVideoBytes;
 
   // ─── Public upload API ──────────────────────────────────────────────────
 

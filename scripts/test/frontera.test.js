@@ -155,9 +155,59 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 45 scripts que inicializan Firebase pasan por la frontera', () => {
-  // 44 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
+test('los 52 scripts que inicializan Firebase pasan por la frontera', () => {
+  // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
+  //
+  // El 46 es `cleanup_rejected_links.js`: borra las solicitudes rechazadas que
+  // ya están en `trainer_links`. Entra por `lib/admin` y además imprime el
+  // proyecto resuelto en la primera línea, que es lo que AGENTS.md §11.1 le
+  // reclama a los scripts destructivos.
+  //
+  // El 47 es `backfill_session_feedback_counts.js`: llena `feedbackCounts` en
+  // las sesiones anteriores al agregado. Entra por `lib/admin`, imprime el
+  // proyecto y el modo en la primera línea, y es DRY-RUN POR DEFECTO — escribe
+  // sólo con `--write`. Va más cerrado que el resto de los backfill a
+  // propósito: toca el doc de sesión de todos los usuarios y lo que escribe es
+  // una afirmación sobre salud.
+  //
+  // El 48 es `grant_moderator.js`: otorga y revoca el claim `moderator` de
+  // Firebase Auth. Entra por `lib/admin` y no toca Firestore — sólo Auth. Es un
+  // script y no un callable a propósito: un callable que otorga el permiso de
+  // moderar ES el permiso de moderar, porque quien pueda invocarlo se lo otorga
+  // a sí mismo.
+  //
+  // El 49 es `verify_athlete_checkout.js`: prueba el checkout del alumno contra
+  // el SANDBOX de Mercado Pago. Entra por `lib/admin`, y es el único de la lista
+  // con DOS guardas propias que lo vuelven emulator-only por construcción:
+  // aborta si faltan `FIREBASE_AUTH_EMULATOR_HOST` / `FIRESTORE_EMULATOR_HOST`,
+  // y aborta si el `MP_ACCESS_TOKEN` de `functions/.secret.local` no empieza con
+  // `TEST-`. Con el de producción abriría un `preapproval_plan` REAL en la
+  // cuenta que factura.
+  //
+  // El 50 es `medir_ejercicios_propios.js` (limite-ejercicios-pf.md, PR 0):
+  // mide cuantos ejercicios propios tiene hoy cada PF, para confirmar antes de
+  // encender el tope que nadie actual queda pasado. Entra por `lib/admin`,
+  // imprime el proyecto resuelto en la primera línea, y es de SOLO LECTURA —
+  // no emite un solo write, en ningún proyecto — pero igual trae el guard
+  // `--allow-prod` porque asi lo pide el plan y porque decide una migración de
+  // producto real.
+  //
+  // El 51 es `audit_forged_trainer_links.js`: busca vínculos cuyo `trainerId`
+  // no tenga rol de entrenador — el residuo de que el `create` de
+  // `trainer_links` no validaba ese rol (firestore.rules ~1368, cerrado en el
+  // mismo PR). Entra por `lib/admin`, imprime el banner de producción ANTES de
+  // inicializar y el proyecto resuelto después, y es DRY-RUN POR DEFECTO:
+  // borra sólo con `--apply`, y `--apply --dry-run` NO borra. Va con la misma
+  // cautela que `cleanup_rejected_links.js` porque borra de la misma colección,
+  // y además deja intacto el grupo AMBIGUO —sin doc de usuario o sin `role`—
+  // en vez de tratarlo como forjado: un PF legacy sin el campo existe, y
+  // borrarle el vínculo le corta el servicio a él y a su alumno.
+  //
+  // El 52 es `migrate_places_compliance.js` (#1338): limpia los nombres y
+  // direcciones de Google que ya estaban guardados. Entra por `lib/admin`,
+  // imprime el proyecto y el modo antes de operar, y es DRY-RUN POR DEFECTO:
+  // escribe sólo con `--apply`, y `--apply --dry-run` NO escribe.
   //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
@@ -165,7 +215,7 @@ test('los 45 scripts que inicializan Firebase pasan por la frontera', () => {
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    45,
+    52,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

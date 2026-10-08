@@ -3,7 +3,12 @@
 // Fans out over active links and reads each athlete's finished sessions in the
 // recent ART window via finishedInWindowByUidProvider. Access is gated by
 // session_shares at the rules layer, so non-sharing athletes surface as
-// permission-denied and are skipped. The feed is newest-first, capped at 8.
+// permission-denied and are skipped. The feed is newest-first, capped at
+// [kRecentActivityMaxEntries].
+//
+// Ese tope es de DATOS. Cuántas filas se VEN en el dashboard lo decide
+// [kRecentActivityPreviewCount] del lado del widget, y se testea allá. Hasta
+// este cambio eran el mismo número (8) haciendo las dos cosas.
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
@@ -139,9 +144,11 @@ void main() {
       expect(entries.map((e) => e.athleteId), ['a1']);
     });
 
-    test('caps the feed at 8 entries (newest kept)', () async {
+    test('caps the feed at kRecentActivityMaxEntries (newest kept)', () async {
+      const extra = 4;
+      const total = kRecentActivityMaxEntries + extra;
       final many = [
-        for (int i = 0; i < 12; i++)
+        for (int i = 0; i < total; i++)
           _session('s$i',
               finishedAt: DateTime.utc(2026, 6, 1).add(Duration(hours: i))),
       ];
@@ -153,8 +160,8 @@ void main() {
 
       final entries = await _read(container);
 
-      expect(entries.length, 8);
-      expect(entries.first.session.id, 's11'); // latest
+      expect(entries.length, kRecentActivityMaxEntries);
+      expect(entries.first.session.id, 's${total - 1}'); // latest
     });
 
     test('no active links → empty', () async {

@@ -1,10 +1,12 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../auth/application/auth_providers.dart'
+    show authStateChangesProvider, firebaseAuthProvider;
+import '../../gyms/application/places_providers.dart'
+    show resolveGymPlaceServiceProvider;
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/application/user_providers.dart';
@@ -13,6 +15,8 @@ import '../../profile/domain/gender.dart';
 import '../domain/profile_setup_draft.dart';
 import '../domain/profile_setup_validators.dart';
 import 'profile_setup_providers.dart' show avatarUploadServiceProvider;
+import 'terms_consent_provider.dart';
+import 'terms_stamp.dart';
 
 /// Estado de la verificación async de disponibilidad del username (handle
 /// público) en step 1. El handle se persiste como `displayName` y se renderiza
@@ -35,7 +39,7 @@ enum UsernameAvailability {
   error,
 }
 
-/// Estado in-memory del flow: el draft del usuario + el step actual (0..3) +
+/// Estado in-memory del flow: el draft del usuario + el step actual (0..4) +
 /// flags de submit (loading / error).
 class ProfileSetupState {
   const ProfileSetupState({
@@ -46,6 +50,7 @@ class ProfileSetupState {
     this.usernameAvailability = UsernameAvailability.unknown,
     this.termsAccepted = false,
     this.avatarUploadFailed = false,
+    this.pendingGymName,
   });
 
   final ProfileSetupDraft draft;
@@ -57,8 +62,8 @@ class ProfileSetupState {
   final UsernameAvailability usernameAvailability;
 
   /// Checkbox de Términos y Privacidad del último step. Solo se muestra (y
-  /// solo importa) para cuentas OAuth nuevas — ver `needsTermsConsent` en
-  /// [submit] (QA-AUTH-001, issue #434).
+  /// solo importa) para cuentas sin consentimiento registrado — ver
+  /// [termsConsentRequiredProvider] (QA-AUTH-001, issue #434).
   final bool termsAccepted;
 
   /// QA-PRO-106 (issue #430): el upload del avatar durante [submit] es
@@ -66,6 +71,15 @@ class ProfileSetupState {
   /// flag queda prendido para que la UI avise en vez de tragarse la pérdida
   /// del avatar elegido. Se resetea al inicio de cada submit (reintentos).
   final bool avatarUploadFailed;
+
+  /// Nombre que el usuario le puso a un gym NUEVO (Places, #1338) y que todavía
+  /// no se escribió: el doc compartido `gyms/{draft.gymId}` se crea en
+  /// [ProfileSetupNotifier.submit], junto con el resto del alta. Escribirlo al
+  /// elegir el gym dejaba el nombre de alguien que después elegía otro gym o
+  /// abandonaba el alta, en un catálogo que lee todo el mundo. Sólo tiene
+  /// sentido junto a `draft.gymId`; [ProfileSetupNotifier.updateGymId] lo
+  /// reemplaza en cada selección.
+  final String? pendingGymName;
 
   ProfileSetupState copyWith({
     ProfileSetupDraft? draft,
@@ -76,6 +90,8 @@ class ProfileSetupState {
     UsernameAvailability? usernameAvailability,
     bool? termsAccepted,
     bool? avatarUploadFailed,
+    String? pendingGymName,
+    bool clearPendingGymName = false,
   }) =>
       ProfileSetupState(
         draft: draft ?? this.draft,
@@ -86,9 +102,15 @@ class ProfileSetupState {
         usernameAvailability: usernameAvailability ?? this.usernameAvailability,
         termsAccepted: termsAccepted ?? this.termsAccepted,
         avatarUploadFailed: avatarUploadFailed ?? this.avatarUploadFailed,
+        pendingGymName: clearPendingGymName
+            ? null
+            : (pendingGymName ?? this.pendingGymName),
       );
 
-  static const total = 4;
+  /// Cantidad de steps del flow. FUENTE ÚNICA — `ProfileSetupHeader` lee de
+  /// acá. Mientras el número vivió duplicado en los dos archivos, agregar un
+  /// paso y tocar uno solo dejaba el indicador diciendo "PASO 5 DE 4".
+  static const total = 5;
 
   // Step 1 sólo deja avanzar con username de formato válido Y verificado como
   // disponible — `displayName` es el handle público y tiene que ser único.
@@ -100,6 +122,7 @@ class ProfileSetupState {
         1 => draft.isStep2Valid,
         2 => draft.isStep3Valid,
         3 => draft.isStep4Valid,
+        4 => draft.isStep5Valid,
         _ => false,
       };
 
@@ -118,6 +141,28 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
 
   @override
   ProfileSetupState build() {
+    // El alta es de UNA cuenta. El provider es de raíz, y hasta ahora sólo lo
+    // reiniciaba el flujo de «eliminar cuenta»: el estado sobrevivía a
+    // «Cancelar cuenta» y a «Cerrar sesión». Si alguien tildaba los Términos,
+    // cancelaba y otra persona se registraba en la misma sesión de la app, la
+    // segunda veía el checkbox YA tildado, y su EMPEZAR estampaba un
+    // consentimiento que nunca dio. Con él viajaba el borrador de la primera:
+    // usuario, fecha de nacimiento, gimnasio. Ahora, cuando la cuenta cambia,
+    // el alta arranca de cero. Un refresh del token re-emite el mismo uid y
+    // no toca nada.
+    //
+    // Es `listen` y no `watch` a propósito: `antes == null` es «auth todavía
+    // cargando» (o nadie logueado), y eso NO es otra cuenta. Con `watch`, el
+    // paso de cargando a logueado reiniciaba el borrador recién empezado.
+    ref.listen<String?>(
+      authStateChangesProvider.select((user) => user.valueOrNull?.uid),
+      (antes, ahora) {
+        if (antes != null && antes != ahora) ref.invalidateSelf();
+      },
+    );
+    // Y una verificación de username en vuelo de la cuenta anterior no puede
+    // escribir en el estado de la nueva.
+    _usernameCheckToken++;
     ref.onDispose(() => _usernameDebounce?.cancel());
     return const ProfileSetupState(
       draft: ProfileSetupDraft(),
@@ -198,8 +243,20 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         draft: state.draft.copyWith(avatarLocalPath: value),
       );
 
-  void updateGymId(String? value) =>
-      state = state.copyWith(draft: state.draft.copyWith(gymId: value));
+  /// Fecha de nacimiento (step 2). Llega ya normalizada a fecha-only UTC desde
+  /// el picker — ver `Step2BornAt._pick`.
+  void updateBornAt(DateTime value) =>
+      state = state.copyWith(draft: state.draft.copyWith(bornAt: value));
+
+  /// Fija el gym del draft. [pendingName] es el nombre de un gym nuevo que se
+  /// escribe en el submit; cada selección lo REEMPLAZA (sin [pendingName] lo
+  /// borra), así que nombrar el gym A y elegir después el B descarta el de A.
+  void updateGymId(String? value, {String? pendingName}) =>
+      state = state.copyWith(
+        draft: state.draft.copyWith(gymId: value),
+        pendingGymName: pendingName,
+        clearPendingGymName: pendingName == null,
+      );
 
   void updateExperienceLevel(ExperienceLevel value) => state = state.copyWith(
         draft: state.draft.copyWith(experienceLevel: value),
@@ -215,7 +272,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       state = state.copyWith(draft: state.draft.copyWith(heightCm: value));
 
   /// Checkbox de Términos y Privacidad del último step (solo relevante para
-  /// cuentas OAuth nuevas — QA-AUTH-001, issue #434).
+  /// cuentas sin consentimiento registrado — QA-AUTH-001, issue #434).
   void updateTermsAccepted(bool value) =>
       state = state.copyWith(termsAccepted: value);
 
@@ -277,23 +334,44 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
       final draft = state.draft;
       final handle = draft.username?.trim() ?? '';
 
-      // QA-AUTH-001 (issue #434): OAuth sign-ins (Google/Apple) never pass
-      // through Register's Terms checkbox — they land here with NO
-      // `users/{uid}` doc yet (that is exactly what marks them as new: the
-      // router only sends a user to ProfileSetup once, and an existing email
-      // account's doc was already created by signUpWithEmail with
-      // termsAcceptedAt set). So `needsTermsConsent` is true only for those
-      // brand-new accounts; email accounts skip this gate entirely because
-      // their profile already exists. Checked ANTES del createIfAbsent de
-      // abajo — un self-heal (sesión restaurada sin doc) también cuenta como
-      // "sin evidencia de consentimiento" y debe re-pedirlo.
-      final needsTermsConsent =
-          ref.read(userProfileProvider).valueOrNull == null;
+      // QA-AUTH-001 (issue #434): la pregunta es si hay EVIDENCIA de
+      // consentimiento, no si existe el perfil — ver
+      // [termsConsentRequiredProvider], que explica por qué la versión
+      // anterior («sin perfil = OAuth nuevo») dejaba sin consentimiento a las
+      // altas con Google/Apple cuyo doc sí se creaba en el login.
+      //
+      // Si lo observado dice que HAY consentimiento, se confía: lo estampó el
+      // registro por email. Si dice que falta, o todavía no se sabe, se
+      // confirma contra el SERVIDOR antes de decidir, porque de esto depende
+      // una escritura de evidencia. La caché local puede tener una versión
+      // vieja del doc sin `termsAcceptedAt`, y estampar sobre ella pisaría la
+      // evidencia original con un timestamp posterior (hallazgo de Codex en
+      // #1228). Sin conexión, el submit falla: es preferible a registrar
+      // consentimiento sobre un dato que no se pudo confirmar.
+      final repo = ref.read(userRepositoryProvider);
+      final yaHayEvidencia = ref.read(termsConsentRequiredProvider) == false;
+      final needsTermsConsent = await needsTermsStamp(
+        observedHasEvidence: yaHayEvidencia,
+        acceptedAtFromServer: () async =>
+            (await repo.getFromServer(uid))?.termsAcceptedAt,
+      );
       if (needsTermsConsent && !state.termsAccepted) {
         // Mismo patrón que 'username-taken': cortamos el spinner acá y
         // dejamos que el catch de abajo setee submitError con esta excepción.
         state = state.copyWith(isSubmitting: false);
         throw StateError('terms-not-accepted');
+      }
+
+      // Revalidación del gate de edad en el submit, misma red de seguridad que
+      // la unicidad del username de acá abajo y por el mismo motivo: el
+      // validador del paso 2 pudo haber pasado hace diez minutos, y el draft se
+      // puede editar volviendo atrás con VOLVER. Salvo que lo que se cuela acá
+      // no es un handle repetido sino un menor de la edad mínima.
+      //
+      // Va ANTES del check de unicidad para fallar sin pagar el viaje a la red.
+      if (ProfileSetupValidators.validateBornAt(draft.bornAt) != null) {
+        state = state.copyWith(isSubmitting: false);
+        throw StateError('born-at-invalid');
       }
 
       // Revalidación de unicidad en el último submit (red de seguridad sobre el
@@ -315,13 +393,32 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         throw StateError('username-taken');
       }
 
-      final repo = ref.read(userRepositoryProvider);
       // Self-heal: garantiza que users/{uid} + userPublicProfiles/{uid} existan
       // antes del update parcial (ver doc de submit). Idempotente.
       await repo.createIfAbsent(uid: uid, email: user.email ?? '');
 
+      // Gym nuevo nombrado en el paso 3 (#1338): recién ahora se crea el doc
+      // compartido, y ANTES del update — que lee `gyms/{gymId}` para el
+      // dual-write de `gymName`. Si el usuario eligió otro gym o abandonó, el
+      // nombre pendiente ya se descartó y acá no se escribe nada.
+      final pendingGymName = state.pendingGymName;
+      final gymId = draft.gymId;
+      if (pendingGymName != null && gymId != null && gymId != kNoGymId) {
+        await ref.read(resolveGymPlaceServiceProvider).call(
+              placeId: gymId,
+              name: pendingGymName,
+              // Si entre medio el gym pasó a existir sin nombre, la regla sólo
+              // deja nombrarlo a quien ya está vinculado.
+              beforeNaming: () => repo.update(uid, {'gymId': gymId}),
+            );
+      }
+
       final partial = <String, Object?>{
         'displayName': handle,
+        // DateTime crudo: Firestore lo convierte a Timestamp al escribir y el
+        // modelo lo lee de vuelta con @TimestampConverter. Misma forma que usa
+        // el editor de perfil.
+        'bornAt': draft.bornAt,
         'gymId': draft.gymId == kNoGymId ? null : draft.gymId,
         'experienceLevel': draft.experienceLevel?.toJson(),
         'gender': draft.gender?.toJson(),
@@ -330,8 +427,9 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
         // Email accounts already carry the original signup consent — NEVER
         // overwrite that evidence with a later ProfileSetup timestamp.
-        if (needsTermsConsent)
-          'termsAcceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+        // consentimiento-legal-versionado (R3): mismo checkbox, misma
+        // escritura — estampa las 2 versiones vigentes junto al timestamp.
+        if (needsTermsConsent) ...termsStampFields(),
       };
       await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);

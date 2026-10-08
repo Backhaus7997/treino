@@ -1,0 +1,453 @@
+<!-- treino-legal
+slug: suscripcion
+title: Términos de Suscripción
+dart: kSubscriptionSections
+-->
+
+# Términos de Suscripción de TREINO
+
+**Última actualización:** <!-- fecha:auto -->
+**Versión:** 1.1
+
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> Complementa los [Términos y Condiciones](./terminos-y-condiciones.md). Para
+> entrenadores rigen además los [Términos para Entrenadores](./contrato-entrenador.md).
+>
+> **Qué falta mirar:** si entrenar con la app cuenta como «efectivamente
+> utilizado o consumido el servicio» a los fines del art. 3 inc. b) de la
+> Disposición 954/2025, y si esa exención recorta además el derecho de fondo del
+> art. 34. La política de 10 días no depende de la respuesta —el contrato los
+> promete igual, y un contrato puede dar más que la ley— pero el sustento sí.
+> Desde el 2026-09-25 el plazo es el piso legal y no uno más largo: ver
+> [ESTADO.md](./ESTADO.md), «Por qué 10 días».
+
+<!-- publish:start -->
+
+## 1. Qué se paga y qué no
+
+**Entrenar en TREINO es gratis.** Registrar tus entrenamientos, seguir tu
+progreso, participar del feed y vincularte con un entrenador no tienen costo, y
+no van a tenerlo.
+
+**Si entrenás con un profe, no pagás nada. Nunca.** Tu entrenador ya paga por tu
+lugar: mientras el vínculo esté activo, tenés todas las funciones sin límite y
+sin que se te cobre.
+
+**Si entrenás por tu cuenta**, hay un plan opcional —TREINO Pro— que amplía lo
+que podés armarte: rutinas más largas, periodización y todo tu historial. El
+plan gratuito sigue existiendo y sigue alcanzando para entrenar.
+
+**Los entrenadores** requieren una suscripción para atender alumnos, tener
+ejercicios propios o tener plantillas por encima de los límites del plan
+gratuito.
+
+Los pagos entre un alumno y su entrenador **no pasan por TREINO** y no están
+alcanzados por este documento. Ver la sección 7 de los Términos y Condiciones.
+
+## 2. Planes y precios
+
+Precios en pesos argentinos, **con impuestos incluidos**. En los dos casos el
+plan anual equivale a diez meses.
+
+### 2.1 Planes para entrenadores
+
+| Plan | Alumnos | Ejercicios propios | Plantillas | Por mes | Por año |
+|---|---|---|---|---|---|
+| Gratuito | 2 | 20 | 3 | — | — |
+| Plan 1 | 7 | 60 | Sin límite | $12.000 | $120.000 |
+| Plan 2 | 15 | 120 | Sin límite | $22.000 | $220.000 |
+| Plan 3 | Sin límite | Sin límite | Sin límite | $39.000 | $390.000 |
+
+Un alumno **pausado ocupa media plaza** y uno activo una entera. El detalle está
+en la sección 8.2 de los Términos para Entrenadores.
+
+Los ejercicios propios son los que creás en tu biblioteca. **Los del catálogo de
+TREINO no cuentan** y los usás sin límite. El detalle está en la sección 8.2.bis
+de los Términos para Entrenadores.
+
+Las plantillas cuentan mientras no las archives, estén publicadas o no.
+**Asignarle una plantilla a un alumno no cuenta.** El detalle está en la sección
+8.2.ter de los Términos para Entrenadores.
+
+### 2.2 Plan para alumnos que entrenan por su cuenta
+
+| Plan | Por mes | Por año |
+|---|---|---|
+| Gratuito | — | — |
+| TREINO Pro | $3.500 | $35.000 |
+
+**Este plan es sólo para quien entrena sin entrenador.** Si estás vinculado a un
+profe no te corresponde y no vas a poder contratarlo: tu entrenador ya paga por
+vos.
+
+## 3. Cómo se cobra
+
+**El cobro depende de DÓNDE contrataste**, no de quién sos. Las condiciones de
+baja y reembolso cambian con eso, y conviene tenerlo claro desde el principio.
+
+| | Contratado en la web | Contratado desde la app |
+|---|---|---|
+| Quién procesa | Mercado Pago | App Store / Google Play |
+| Quién gestiona la baja | **TREINO** | La tienda |
+| Quién gestiona el reembolso | **TREINO** | La tienda |
+| Derecho de arrepentimiento | **10 días, lo aplicamos nosotros** | Según la política de la tienda |
+
+Hoy **los dos planes se contratan en la web**: el del entrenador en el Coach Hub
+(`app.gettreino.com`) y el del alumno en `gettreino.com`. La columna de la
+derecha existe por si alguna vez ofrecemos la contratación dentro de la
+aplicación; si tu suscripción no se contrató ahí, no te aplica.
+
+### 3.1 Si contratás en la web
+
+Es el caso de los dos planes: el entrenador desde el Coach Hub
+(`app.gettreino.com`) y el alumno desde `gettreino.com`.
+
+El pago lo procesa **Mercado Pago**, que captura el medio de pago y liquida los
+fondos a la cuenta bancaria de BACKHAUSTIN S.A.S.
+
+**TREINO no almacena los datos completos de tu tarjeta.** Quedan en poder del
+procesador, que es responsable de su propio tratamiento.
+
+Las secciones 6 y 7 —arrepentimiento y baja— **te aplican directamente**, y las
+gestionamos nosotros.
+
+### 3.2 Si contratás desde la aplicación
+
+Si alguna vez ofrecemos la contratación dentro de la app, el pago lo procesa
+**App Store o Google Play** según tu dispositivo, y TREINO no interviene en el
+cobro ni accede a tu medio de pago en ningún momento.
+
+Eso significa que **la baja y el reembolso los gestiona la tienda**, con sus
+propias políticas y plazos. Ver la sección 8.
+
+En los dos casos, antes de confirmar vas a ver el **precio final**, la moneda,
+qué incluye el plan, cada cuánto se renueva y cómo darlo de baja.
+
+## 4. Período de prueba
+
+Los planes pagos pueden ofrecerse con un **período de prueba gratuito**. Durante
+ese período no se cobra nada.
+
+**Si das de baja antes de que termine, no se te cobra.** Si no lo hacés, al
+finalizar comienza el primer período pago, con aviso previo.
+
+## 5. Renovación automática
+
+Las suscripciones **se renuevan automáticamente** al final de cada período —
+mensual o anual, según el plan que hayas elegido— salvo que las des de baja
+antes.
+
+Te avisamos antes de cada renovación y antes de cualquier cambio de precio. Si
+el precio cambia, podés dar de baja sin penalidad antes de que entre en
+vigencia.
+
+## 6. Tu derecho a arrepentirte
+
+**Si contrataste en la web** —el Coach Hub si sos entrenador, `gettreino.com` si
+sos alumno— tenés **10 días corridos desde la contratación para arrepentirte y
+recuperar todo lo pagado**, sin dar explicaciones y sin costo alguno. Si el
+último día del plazo cae en un día inhábil, el plazo se extiende hasta el
+primer día hábil siguiente.
+
+Cuando confirmás el arrepentimiento dentro de ese plazo, **los beneficios del
+plan pago terminan en ese momento** y se te devuelve todo lo pagado. Es la
+diferencia con la baja (sección 7), que conserva el acceso hasta el final del
+período ya pagado.
+
+Es el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos
+planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.
+
+El plazo es el que fija la ley argentina —diez días corridos, art. 34 de la Ley
+24.240 y art. 1110 del Código Civil y Comercial de la Nación— y rige **para los
+dos planes, sin excepciones**.
+
+### Cómo ejercerlo
+
+Desde el **Botón de Arrepentimiento**, disponible en el pie de la página principal de
+gettreino.com — la dirección es **gettreino.com/es/arrepentimiento**. **No necesitás tener la sesión iniciada ni hacer ningún trámite
+previo.**
+
+Dentro de las **24 horas** te enviamos por el mismo medio un **código de
+identificación** de tu pedido, y a continuación te devolvemos el dinero por el
+mismo medio de pago.
+
+Este derecho es **irrenunciable**: nada de lo que digan estos términos puede
+quitártelo.
+
+### Si contrataste desde la aplicación
+
+Si tu suscripción se contrató por App Store o Google Play, **el reembolso lo
+gestiona la tienda** y no podemos procesarlo nosotros. Ver la sección 8. Eso no
+afecta los derechos que la normativa de tu país te reconozca.
+
+## 7. Baja fuera del plazo de arrepentimiento
+
+Pasado el plazo de arrepentimiento **podés dar de baja cuando quieras**, en
+línea, sin llamar
+ni escribir a nadie.
+
+**Dónde:** si sos entrenador, en el Coach Hub, en Facturación. Si sos alumno, en
+`gettreino.com`, en la sección de tu suscripción. Es el mismo medio por el que
+contrataste, como corresponde.
+
+Al hacerlo:
+
+- **Conservás el acceso hasta el final del período que ya pagaste.** No es un
+  gesto: está construido así. La baja no te corta nada en el acto.
+- **No se reembolsa el período en curso.**
+- No se te vuelve a cobrar.
+- **No se borra nada.** Tus rutinas, tu historial y tus datos siguen donde
+  están. Si volvés, está todo.
+
+Una aclaración que conviene tener antes de apretar el botón: **dar de baja es
+definitivo para esa suscripción.** No se reactiva —nuestro procesador de pagos
+no lo permite— así que volver significa contratar de nuevo. Lo que ya pagaste no
+se pierde: el acceso corre hasta la fecha que te indicamos al darte de baja.
+
+## 8. Suscripciones contratadas por App Store o Google Play
+
+> Hoy **ningún plan se contrata dentro de la aplicación**: los dos van por la
+> web. Esta sección aplica sólo si en algún momento ofrecimos esa vía y vos
+> contrataste por ahí. Si no es tu caso, saltala.
+
+Si tu suscripción se contrató desde la aplicación móvil, **la baja y el
+reembolso los gestiona la tienda** conforme a sus propias políticas, y no
+podemos procesarlos nosotros ni negarnos a ellos.
+
+**Para darte de baja** entrá a los ajustes de suscripciones de tu dispositivo:
+
+- **iPhone o iPad:** Ajustes → tu nombre → Suscripciones
+- **Android:** Google Play → Pagos y suscripciones → Suscripciones
+
+**Para pedir un reembolso**, se solicita a la tienda. Cada una tiene su propio
+plazo y su propio criterio.
+
+Te indicamos esta ruta desde la aplicación en el momento de la baja. Si tenés un
+problema que la tienda no resuelve, escribinos igual a treino@gettreino.com y
+vemos qué podemos hacer.
+
+## 9. Si no pagás
+
+**Si sos entrenador**, tu plan pasa al límite del plan gratuito y algunos de tus
+vínculos con alumnos quedan bloqueados.
+
+*Tus alumnos no pierden nada:* conservan sus rutinas, su historial, sus datos y
+su chat. Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
+
+*Tus ejercicios propios y tus plantillas tampoco se borran:* si tenés más de los
+que incluye el plan gratuito, los conservás y los seguís usando, pero no vas a
+poder crear nuevos, ni recuperar plantillas archivadas, hasta quedar por debajo
+del límite de tu plan.
+
+**Si sos alumno**, volvés al plan gratuito: las rutinas que tengas armadas
+quedan como están y podés seguir entrenándolas, pero no vas a poder hacerlas
+más largas mientras el plan no esté al día.
+
+**En los dos casos, un cobro rechazado no te corta nada en el acto.** Mercado
+Pago reintenta durante unos días, y durante esa ventana conservás todo lo de tu
+plan — es cuando conviene actualizar la tarjeta, no después.
+
+Y en los dos casos: **no se borra nada, nunca.**
+
+## 10. Facturación
+
+Emitimos el comprobante que corresponda según la normativa aplicable. Los
+registros de pago entre vos y tus alumnos que lleva la aplicación **no son
+comprobantes fiscales**.
+
+## 11. Contacto
+
+**BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
+Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), Argentina
+treino@gettreino.com
+
+<!-- publish:end -->
+
+---
+
+# Anexo — Implementación (no se publica)
+
+## A. Lo que hay que construir
+
+| # | Qué | Dónde | Bloquea |
+|---|---|---|---|
+| 1 | **Botón de Arrepentimiento** en la home, sin login | ✅ `gettreino.com/es/arrepentimiento` | **Sí, si se cobra** |
+| 2 | Formulario de arrepentimiento | ✅ publicado | **Sí** |
+| 3 | **Correo automático con código dentro de 24 h** | ✅ verificado de punta a punta desde los formularios reales el 2026-09-22 | **Sí** |
+| 4 | Baja en línea — el callable | ✅ `cancelMySubscription` (#1174) | **Sí** |
+| 5 | Baja en línea — la pantalla del PF | ✅ Coach Hub web (#1186) | **Sí** |
+| 6 | Baja en línea — la pantalla del alumno | ✅ `gettreino.com/es/suscripcion/baja` (`treino-app#11`) | **Sí, para cobrarle al alumno** |
+| 7 | Aviso previo a renovación y a cambio de precio o de límites | Backend — **no existe**; hoy se avisa a mano | Sí |
+| 8 | Pantalla de precio final antes de confirmar | Las dos webs | Sí |
+
+Especificación completa del sitio en [`spec-web-legal.md`](./spec-web-legal.md).
+
+**El reembolso se opera a mano** desde el panel de la pasarela. La norma exige un
+proceso, no un sistema automatizado, y con el volumen esperado alcanza.
+
+⚠️ Los ítems 3 a 6 ya no bloquean (actualizado el 2026-09-24): el correo con
+código se verificó de punta a punta, y el callable de baja existe junto con las
+dos pantallas que lo llaman.
+
+⚠️ **El ítem 7 importa para cualquier cambio de límites.** El contrato del
+entrenador (§12) promete avisar con antelación cualquier cambio de límites de
+plan, y no hay aviso automático. El límite de ejercicios propios no lo necesitó
+porque se publicó antes del primer entrenador real (2026-09-24: todas las
+cuentas de entrenador eran de prueba). El límite de plantillas tampoco, por lo
+mismo (2026-09-25: el titular confirmó que todas las cuentas de entrenador
+siguen siendo de prueba). El próximo cambio sí, salvo que se vuelva a confirmar
+lo mismo **ese día**: esta condición no se hereda de una fecha a otra.
+
+## B. Lo que todavía no está resuelto
+
+**El encuadre cambió el 2026-09-17: el alumno pasa a pagar por la web.**
+
+| | Entrenador | Alumno |
+|---|---|---|
+| Cobra en | Coach Hub web (Mercado Pago) | `gettreino.com` (Mercado Pago) |
+| Comisión | 6,53% al instante / 3,52% a 18 días | la misma |
+| Baja y reembolso | TREINO | TREINO |
+| Arrepentimiento | 10 días, reembolso total | **igual** |
+
+Lo que se gana está medido: por IAP, de cada USD 1 de lista el alumno pagaba
+~ARS 2.318 y a TREINO le llegaban ~ARS 1.282 — el 55% de lo que el alumno gasta.
+Por Mercado Pago llega el ~92%, y el alumno paga la mitad.
+
+### ⚠️ El riesgo que esto abre, y hay que decirlo
+
+La versión anterior de este anexo decía que la Guideline 3.1.3(f) de Apple exime
+del in-app purchase a una *«free app acting as a stand-alone companion to a paid
+web based tool»*, y que el Coach Hub **es** esa herramienta web paga. Eso sigue
+siendo cierto para el entrenador.
+
+Para el alumno **es más débil**, y conviene que esté escrito acá y no sólo en un
+plan: los ejemplos que da Apple en el texto de la guideline son VoIP, Cloud
+Storage, Email Services y Web Hosting — servicios que se *usan* en la web. Una
+página que sólo cobra no es una herramienta.
+
+**Y hay una segunda guideline que este anexo no miraba** (agregado el
+2026-09-24, texto verificado ese día en developer.apple.com). La 3.1.3(b),
+*Multiplatform Services*, permite dar acceso adentro de la app a suscripciones
+compradas en la web *«provided those items are also available as in-app
+purchases within the app»*. Como el IAP se desarmó (#1201, #1206), el alumno no
+puede apoyarse en 3.1.3(b): depende sólo de 3.1.3(f), que es la débil.
+
+Eso **no bloquea construir el cobro**, porque el paywall del alumno está apagado
+y el riesgo sólo se materializa el día que se encienda y se someta iOS. Pero es
+una decisión de producto pendiente, no un detalle de implementación.
+
+Dato verificado el 2026-09-17: **Argentina no está en ningún programa de billing
+alternativo** — ni en el External Purchase Link Entitlement de Apple (UE/EEA y
+Corea del Sur) ni en el User Choice Billing de Google. No hay atajo.
+
+**Revisión legal — cerrada el 2026-09-21.** Las tres preguntas que estaban acá,
+contestadas. Ninguna necesitó abogado, y lo que sí lo necesita quedó marcado
+como tal en vez de resuelto a ojo.
+
+**(a) El art. 1116 del Código Civil y Comercial no alcanza a TREINO.** Sus tres
+excepciones al derecho de revocar son productos a medida o no devolvibles,
+ficheros suministrados por vía electrónica descargables para **uso permanente**,
+y prensa periódica. Una suscripción con acceso continuo no es ninguna: no hay
+fichero entregado para uso permanente, el acceso termina con la suscripción.
+
+La segunda mitad —la renuncia expresa a cambio de ejecución inmediata que admite
+el régimen europeo— **sale de alcance** con el lanzamiento acotado a la
+Argentina (2026-09-17).
+
+Ojo con una vuelta de tuerca que apareció después: el **art. 3 inciso a) de la
+Disposición 954/2025** remite a este mismo art. 1116 «excepto pacto en
+contrario», así que el análisis no es una rama independiente — la disposición lo
+incorpora por referencia. Detalle en
+[spec-web-legal.md §3.6](./spec-web-legal.md).
+
+**(b) Un solo mercado.** Con el alcance acotado, «cada mercado donde se cobre»
+es uno. El tratamiento fiscal pasa a ser tema del contador, junto con las
+cuentas de tienda a nombre personal.
+
+**(c) El mismo plazo para los dos tickets**, con reembolso operado a mano.
+**Decisión del titular, 2026-09-21:** 14 días, cuatro más que el piso legal.
+**Cambiada por el titular el 2026-09-25: 10 días corridos, el piso legal** (art.
+34 de la Ley 24.240; art. 1110 del CCyC, que además corre el vencimiento al día
+hábil siguiente si cae en un día inhábil). Historia y motivo en
+[ESTADO.md](./ESTADO.md). El resguardo para el ticket bajo no es una cláusula
+distinta: es que el reembolso manual sostenga el volumen. El día que no lo
+sostenga, se automatiza.
+
+**Lo que SÍ sigue siendo pregunta de abogado**, y no se contesta acá: si
+entrenar con la app cuenta como «efectivamente utilizado o consumido el
+servicio» a los fines del **art. 3 inciso b)** de la 954/2025, y si esa exención
+—que lo es de la obligación del botón— recorta además el derecho de fondo del
+art. 34. Va al dictamen con el texto citado. La decisión de arriba no depende de
+la respuesta: los 10 días están prometidos en el contrato, y si la exención
+alcanzara a TREINO el contrato seguiría dando más que la ley.
+
+## C. Estado del código
+
+**Implementado y en main (2026-09-17):**
+
+El cobro del alumno por Mercado Pago está completo del lado del servidor. Diez
+PRs: #1167, #1168, #1169, #1170, #1171, #1172, #1173, #1174, #1176, #1177.
+
+| Callable | Qué hace |
+|---|---|
+| `getAthletePricing` | el precio, sin auth — la página de precios lo muestra antes del login |
+| `ensureAthleteProfile` | el alta desde la web, con el dual-write atómico |
+| `createAthletePreapproval` | abre el checkout y devuelve el `init_point` |
+| `reconcileMyCheckout` | acredita al volver del pago |
+| `cancelMySubscription` | **la baja, para los dos productos** |
+
+Más el cobro del entrenador por Mercado Pago, los límites por plan y el paywall
+(`functions/src/subscriptions/`), que ya estaban.
+
+**Lo que faltaba para publicar el cobro, cerrado** (actualizado el 2026-09-24):
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Correo automático con código dentro de 24 h | ✅ verificado de punta a punta el 2026-09-22 |
+| 2 | Pantalla de baja del PF | ✅ Coach Hub web (#1186) |
+| 3 | Pantalla de precios, checkout, retorno y baja del alumno | ✅ `treino-app#10`, `#11` y `#12` |
+| 4 | Login en la landing | ✅ `treino-app#6` (Firebase) y `#7` (`/entrar`) |
+
+El cobro del alumno sigue **apagado** detrás de tres interruptores (landing,
+servidor y cliente). La lista de lo que falta para encenderlo vive en
+`lib/features/paywall/domain/athlete_entitlement.dart`, y no en este documento.
+
+**Límite de ejercicios propios del entrenador** (agregado el 2026-09-24): el
+texto de §1, §2.1 y §9 ya lo describe. Plan de implementación en
+`docs/limite-ejercicios-pf.md`. El texto se publicó **antes** que el código, a
+propósito: no había entrenadores reales todavía, y con el interruptor apagado el
+texto describía un límite más estricto que el que se aplicaba. Lo que no podía
+pasar es que se diera de alta el primer entrenador real sin los límites
+encendidos. ✅ **Encendido desde el 2026-09-29** (#1244): desde entonces el
+texto y el código de `main` dicen lo mismo. Hubo un primer encendido el
+2026-09-25 que un deploy desde `main` revirtió ese mismo día; el detalle está en
+el Estado de `docs/limite-ejercicios-pf.md`.
+
+**Límite de plantillas del entrenador** (agregado el 2026-09-25): el texto de
+§1, §2.1 y §9 ya lo describe, y el detalle está en §8.2.ter de los Términos para
+Entrenadores. Plan de implementación en `docs/limite-plantillas-pf.md` (al
+escribir esto vivía en la rama `docs/limite-plantillas-pf`, sin mergear). Mismo
+criterio que ejercicios: el texto salió **antes** que el código, con el
+interruptor `TRAINER_TEMPLATE_LIMITS_ENABLED` apagado, así que describía un
+límite más estricto que el que se aplicaba. Y la misma condición: el límite
+tenía que estar encendido antes de dar de alta al primer entrenador real.
+✅ **Encendido desde el 2026-09-25** (#1258): desde entonces el texto y el
+código de `main` dicen lo mismo.
+
+⚠️ **Lo que decía este anexo y ya no vale:** *«Para el alumno no hace falta nada
+de eso: la tienda gestiona baja y reembolso.»* Con el cobro por web, la baja y el
+reembolso del alumno los gestionamos **nosotros**, con el mismo plazo y el mismo
+alcance que los del entrenador.
+
+✅ **El cobro por IAP se desarmó el 2026-09-21**: el SDK salió del binario en el
+#1201 y el backend en el #1206, sin que hubiera pasado nunca una sola compra por
+RevenueCat. Con eso, lo que declara `store/privacy/privacy-labels.md` («sin
+compras in-app») pasó a ser cierto.
+
+Especificación del sitio en [`spec-web-legal.md`](./spec-web-legal.md).

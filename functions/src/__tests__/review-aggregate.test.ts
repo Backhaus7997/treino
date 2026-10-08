@@ -17,29 +17,31 @@
  * REQ-RV-CF-001..006. Fase 6 Etapa 7.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentReference, Timestamp, getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "review-aggregate-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { recomputeAggregate } from "../review-aggregate";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const COL_REVIEWS = "reviews";
 const COL_TRAINER_PROFILES = "trainerPublicProfiles";
@@ -51,8 +53,8 @@ type ReviewData = {
   trainerId: string;
   rating: number;
   comment?: string;
-  createdAt: admin.firestore.Timestamp;
-  updatedAt: admin.firestore.Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };
 
 function buildReview(
@@ -62,7 +64,7 @@ function buildReview(
   rating: number,
   comment?: string,
 ): ReviewData {
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   return {
     id: `${linkId}_${athleteId}`,
     linkId,
@@ -310,8 +312,8 @@ describe("SCENARIO-REV-002: dedupe by athleteId (relink manipulation)", () => {
     const older = buildReview("link1", "athlete1", trainerId, 5);
     const newer = buildReview("link2", "athlete1", trainerId, 1);
     // Unambiguous ordering: newer.updatedAt strictly after older.
-    older.updatedAt = admin.firestore.Timestamp.fromMillis(1_000);
-    newer.updatedAt = admin.firestore.Timestamp.fromMillis(2_000);
+    older.updatedAt = Timestamp.fromMillis(1_000);
+    newer.updatedAt = Timestamp.fromMillis(2_000);
     await seedReview(older);
     await seedReview(newer);
 
@@ -336,5 +338,75 @@ describe("SCENARIO-REV-002: dedupe by athleteId (relink manipulation)", () => {
     // Two distinct opinions: athlete1 (deduped) + athlete2. (4 + 2) / 2 = 3.
     expect(agg!.reviewCount).toBe(2);
     expect(agg!.averageRating).toBeCloseTo(3, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1333 / SC-PSD-22 — sin resurreccion fantasma durante el borrado del PF.
+// ---------------------------------------------------------------------------
+describe("SC-PSD-22: a profile deleted between the exists-check and the write is not resurrected", () => {
+  const trainerId = "psd-revagg-trainer";
+  const reviewId = "psd-revagg-link_psd-revagg-ath";
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await db().collection(COL_TRAINER_PROFILES).doc(trainerId).delete().catch(() => undefined);
+    await db().collection(COL_REVIEWS).doc(reviewId).delete().catch(() => undefined);
+  });
+
+  it("does not recreate trainerPublicProfiles/{uid} and does not throw", async () => {
+    await seedTrainerProfile(trainerId);
+    await db().collection(COL_REVIEWS).doc(reviewId).set(
+      buildReview("psd-revagg-link", "psd-revagg-ath", trainerId, 5, "ok"),
+    );
+
+    // Simula `deleteUserDocs` corriendo justo despues de la lectura del trigger.
+    const realGet = DocumentReference.prototype.get;
+    jest.spyOn(DocumentReference.prototype, "get").mockImplementation(async function (this: DocumentReference) {
+      const snap = await realGet.call(this);
+      if (this.path === `${COL_TRAINER_PROFILES}/${trainerId}`) await this.delete();
+      return snap;
+    });
+
+    await expect(recomputeAggregate(testApp, trainerId)).resolves.toBeUndefined();
+
+    jest.restoreAllMocks();
+    expect((await db().collection(COL_TRAINER_PROFILES).doc(trainerId).get()).exists).toBe(false);
+  });
+
+  it("the NOT_FOUND race logs at warn, not error; other failures still log at error", async () => {
+    await seedTrainerProfile(trainerId);
+    await db().collection(COL_REVIEWS).doc(reviewId).set(
+      buildReview("psd-revagg-link", "psd-revagg-ath", trainerId, 5, "ok"),
+    );
+    const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    const realGet = DocumentReference.prototype.get;
+    const getSpy = jest.spyOn(DocumentReference.prototype, "get").mockImplementation(
+      async function (this: DocumentReference) {
+        const snap = await realGet.call(this);
+        if (this.path === `${COL_TRAINER_PROFILES}/${trainerId}`) await this.delete();
+        return snap;
+      },
+    );
+
+    await recomputeAggregate(testApp, trainerId);
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("disappeared"),
+      expect.objectContaining({ trainerId }),
+    );
+
+    // Control: un fallo que NO es NOT_FOUND sigue yendo a error.
+    getSpy.mockRestore();
+    warnSpy.mockClear();
+    await seedTrainerProfile(trainerId);
+    jest.spyOn(DocumentReference.prototype, "update").mockRejectedValue(
+      Object.assign(new Error("boom"), { code: 14 }),
+    );
+    await recomputeAggregate(testApp, trainerId);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });

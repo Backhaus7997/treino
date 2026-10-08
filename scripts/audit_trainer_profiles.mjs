@@ -29,6 +29,7 @@
 // `lib/admin.js` es CommonJS: se importa el módulo entero y se desestructura,
 // que es lo que funciona igual en todas las versiones de Node.
 import frontera from "./lib/admin.js";
+import { getFirestore } from "firebase-admin/firestore";
 
 const { inicializarAdmin } = frontera;
 
@@ -44,9 +45,9 @@ const projectId = projectArg ? projectArg.split("=")[1] : undefined;
 // Quién las exige ahora es la frontera (#834), que además chequea de dónde
 // salen: una ruta adentro de un árbol de git se rechaza. El guard propio que
 // vivía acá sólo miraba que la variable existiera.
-const { admin } = inicializarAdmin(projectId ? { projectId } : {});
+const { app } = inicializarAdmin(projectId ? { projectId } : {});
 
-const db = admin.firestore();
+const db = getFirestore(app);
 
 const profiles = await db.collection("trainerPublicProfiles").get();
 console.log(`trainerPublicProfiles vivos: ${profiles.size}`);

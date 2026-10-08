@@ -10,7 +10,7 @@
  *   SCENARIO-551 — CF returns structured success response (REQ-ACCDEL-CF-014)
  *
  * SCENARIOS added (PR#2 — T21):
- *   SCENARIO-535 — Trainer role rejected (REQ-ACCDEL-CF-003)
+ *   SCENARIO-535 — Trainer role rejected (REQ-ACCDEL-CF-003) — INVERTED by #1333
  *   SCENARIO-547 (final) — Audit log includes cascadeResults (REQ-ACCDEL-CF-011)
  *   SCENARIO-548 — Audit log status partial when a cascade step errors (REQ-ACCDEL-CF-011)
  *   SCENARIO-550 — Idempotent re-run completes cleanly (REQ-ACCDEL-CF-013)
@@ -20,7 +20,9 @@
  * wrapper guard checks) directly against the emulator-backed named app.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 // Point Admin SDK to emulators — must be set before any firebase-admin import
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -53,14 +55,14 @@ const projectConfig = {
   storageBucket: "treino-dev.appspot.com",
 };
 
-let smokeApp: admin.app.App;
+let smokeApp: App;
 
 beforeAll(() => {
-  smokeApp = admin.initializeApp(projectConfig, "smoke-test");
+  smokeApp = initializeApp(projectConfig, "smoke-test");
 });
 
 afterAll(async () => {
-  await smokeApp.delete();
+  await deleteApp(smokeApp);
 });
 
 // Wrap the callable handler for guard-layer tests
@@ -72,9 +74,8 @@ async function createTestUser(
   uid: string,
   role: "athlete" | "trainer" = "athlete"
 ): Promise<void> {
-  await admin.auth(smokeApp).createUser({ uid, email: `${uid}@test.com` });
-  await admin
-    .firestore(smokeApp)
+  await getAuth(smokeApp).createUser({ uid, email: `${uid}@test.com` });
+  await getFirestore(smokeApp)
     .collection("users")
     .doc(uid)
     .set({ uid, role, email: `${uid}@test.com` });
@@ -82,30 +83,26 @@ async function createTestUser(
 
 async function cleanupUser(uid: string): Promise<void> {
   await Promise.all([
-    admin.auth(smokeApp).deleteUser(uid).catch(() => undefined),
-    admin
-      .firestore(smokeApp)
-      .recursiveDelete(admin.firestore(smokeApp).collection("users").doc(uid))
+    getAuth(smokeApp).deleteUser(uid).catch(() => undefined),
+    getFirestore(smokeApp)
+      .recursiveDelete(getFirestore(smokeApp).collection("users").doc(uid))
       .catch(() => undefined),
-    admin
-      .firestore(smokeApp)
+    getFirestore(smokeApp)
       .collection("audit_log")
       .doc(uid)
       .delete()
       .catch(() => undefined),
-    admin
-      .firestore(smokeApp)
+    getFirestore(smokeApp)
       .collection("userPublicProfiles")
       .doc(uid)
       .delete()
       .catch(() => undefined),
-    admin
-      .firestore(smokeApp)
+    getFirestore(smokeApp)
       .collection("follows")
       .where("members", "array-contains", uid)
       .get()
       .then((qs) => {
-        const b = admin.firestore(smokeApp).batch();
+        const b = getFirestore(smokeApp).batch();
         qs.docs.forEach((d) => b.delete(d.ref));
         return b.commit();
       })
@@ -127,12 +124,17 @@ function makeCallableRequest(
     } as any,
     rawRequest: {} as CallableRequest["rawRequest"],
     instanceIdToken: undefined,
+    // Campo REQUERIDO desde firebase-functions v7: dice si el cliente acepta
+    // una respuesta por streaming. `false` es lo correcto acá —`deleteAccount`
+    // devuelve un objeto y nada más— y es lo que manda un cliente que no pidió
+    // streaming, o sea el caso que estos tests simulan.
+    acceptsStreaming: false,
     app: undefined,
   };
 }
 
 async function seedFullAthleteData(uid: string): Promise<void> {
-  const db = admin.firestore(smokeApp);
+  const db = getFirestore(smokeApp);
   await createTestUser(uid);
 
   const batch = db.batch();
@@ -175,7 +177,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-future-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    startsAt: admin.firestore.Timestamp.fromDate(
+    startsAt: Timestamp.fromDate(
       new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",
@@ -184,7 +186,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
   batch.set(db.collection("appointments").doc(`appt-past-${uid}`), {
     athleteId: uid,
     trainerId: "trainer-xyz",
-    startsAt: admin.firestore.Timestamp.fromDate(
+    startsAt: Timestamp.fromDate(
       new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     ),
     status: "confirmed",
@@ -193,7 +195,7 @@ async function seedFullAthleteData(uid: string): Promise<void> {
 }
 
 async function cleanupFullAthleteData(uid: string): Promise<void> {
-  const db = admin.firestore(smokeApp);
+  const db = getFirestore(smokeApp);
   await Promise.all([
     cleanupUser(uid),
     db.collection("posts").doc(`post-${uid}`).delete().catch(() => undefined),
@@ -225,6 +227,7 @@ describe("callable guard: unauthenticated", () => {
       rawRequest: {} as CallableRequest["rawRequest"],
       instanceIdToken: undefined,
       app: undefined,
+      acceptsStreaming: false,
     };
     await expect(wrappedHandler(req)).rejects.toMatchObject({
       code: "unauthenticated",
@@ -267,28 +270,34 @@ describe("SCENARIO-533: core logic callable by authenticated athlete", () => {
   });
 });
 
-describe("SCENARIO-535: trainer role rejected", () => {
+// #1333: SCENARIO-535 used to REQUIRE the rejection of a trainer. The owner
+// reversed it (Apple 5.1.1(v) needs in-app deletion for every account type):
+// a trainer now deletes the account like anyone else. The trainer cascade
+// itself is covered in delete-account-trainer.test.ts.
+describe("SCENARIO-535 (inverted, #1333): trainer role is NOT rejected", () => {
   const uid = "smoke-trainer-535";
 
   beforeEach(() => createTestUser(uid, "trainer"));
   afterEach(() => cleanupUser(uid));
 
-  it("SCENARIO-535: throws permission-denied for trainer role", async () => {
-    await expect(runDeleteAccount(smokeApp, uid, "password")).rejects.toMatchObject({
-      code: "permission-denied",
-    });
+  it("SC-PSD-01: resolves with success instead of permission-denied", async () => {
+    const result = (await runDeleteAccount(
+      smokeApp,
+      uid,
+      "password"
+    )) as DeleteAccountResponse;
+    expect(result.status).toBe("success");
+    expect(result.errors).toEqual([]);
   });
 
-  it("SCENARIO-535: no data is modified when trainer is rejected", async () => {
-    await runDeleteAccount(smokeApp, uid, "password").catch(() => undefined);
+  it("SC-PSD-01: the trainer's user doc and Auth user are gone", async () => {
+    await runDeleteAccount(smokeApp, uid, "password");
 
-    // Trainer's user doc should still exist
-    const snap = await admin
-      .firestore(smokeApp)
-      .collection("users")
-      .doc(uid)
-      .get();
-    expect(snap.exists).toBe(true);
+    const snap = await getFirestore(smokeApp).collection("users").doc(uid).get();
+    expect(snap.exists).toBe(false);
+    await expect(getAuth(smokeApp).getUser(uid)).rejects.toMatchObject({
+      code: "auth/user-not-found",
+    });
   });
 });
 
@@ -317,7 +326,7 @@ describe("SCENARIO-551, 549, 547: success path", () => {
 
     await runDeleteAccount(smokeApp, uid, "password");
 
-    await expect(admin.auth(smokeApp).getUser(uid)).rejects.toMatchObject({
+    await expect(getAuth(smokeApp).getUser(uid)).rejects.toMatchObject({
       code: "auth/user-not-found",
     });
   });
@@ -328,8 +337,7 @@ describe("SCENARIO-551, 549, 547: success path", () => {
 
     await runDeleteAccount(smokeApp, uid, "password");
 
-    const snap = await admin
-      .firestore(smokeApp)
+    const snap = await getFirestore(smokeApp)
       .collection("audit_log")
       .doc(uid)
       .get();
@@ -438,8 +446,7 @@ describe("SCENARIO-548: audit log partial status when a cascade step errors", ()
     expect(result.deletedCollections).not.toContain("storage");
 
     // The audit_log/{uid} doc mirrors the response shape.
-    const auditDoc = await admin
-      .firestore(smokeApp)
+    const auditDoc = await getFirestore(smokeApp)
       .collection("audit_log")
       .doc(uid)
       .get();

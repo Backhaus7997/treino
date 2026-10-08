@@ -24,6 +24,27 @@ class FakeAnalyticsService implements AnalyticsService {
   /// necesita assertear los parámetros además del nombre.
   final List<({String name, Map<String, Object?> params})> calls = [];
 
+  /// Aplica la MISMA restricción que `firebase_analytics`: un valor de
+  /// parámetro sólo puede ser `String` o `num`
+  /// (`_assertParameterTypesAreCorrect`, 11.6.0).
+  ///
+  /// Sin esto el fake es más permisivo que la plataforma, y ahí el test verde
+  /// deja de significar algo: un `bool` pasaba por acá y en el device rompía
+  /// el evento entero. Pasó con `appointment_created` — lo agarró un review
+  /// bot, no la suite. Un doble que no modela la restricción que importa es
+  /// un doble que miente.
+  void _registrar(String name, Map<String, Object?> params) {
+    for (final e in params.entries) {
+      assert(
+        e.value is String || e.value is num,
+        "firebase_analytics sólo acepta String o num: el parámetro "
+        "'${e.key}' del evento '$name' es ${e.value.runtimeType}",
+      );
+    }
+    events.add(name);
+    calls.add((name: name, params: params));
+  }
+
   @override
   Future<void> logRoutineStarted({
     required String routineId,
@@ -55,6 +76,48 @@ class FakeAnalyticsService implements AnalyticsService {
       }
     ));
   }
+
+  @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) async {
+    _registrar('routine_created', {
+      'source': source.wireName,
+      'days_count': daysCount,
+      'weeks_count': weeksCount,
+    });
+  }
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) async {
+    _registrar('routine_day_added', {
+      'source': source.wireName,
+      'days_count': daysCount,
+    });
+  }
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  }) async {
+    _registrar('routine_week_added', {
+      'source': source.wireName,
+      'weeks_count': weeksCount,
+    });
+  }
+
+  /// Los params de cada evento con nombre [name], en orden. Para los tres
+  /// eventos de forma de rutina los tests assertean sobre `source` y los
+  /// contadores, no solo sobre el nombre: un `routine_day_added` sin
+  /// `days_count` no responde ninguna pregunta.
+  List<Map<String, Object?>> paramsOf(String name) =>
+      calls.where((c) => c.name == name).map((c) => c.params).toList();
 
   @override
   Future<void> logPlanAssigned({
@@ -111,19 +174,18 @@ class FakeAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) async {
-    events.add('appointment_created');
-    calls.add((
-      name: 'appointment_created',
-      params: {
-        'appointment_id': appointmentId,
-        'trainer_id': trainerId,
-        'athlete_id': athleteId,
-      }
-    ));
+    _registrar('appointment_created', {
+      if (appointmentId != null) 'appointment_id': appointmentId,
+      'trainer_id': trainerId,
+      'athlete_id': athleteId,
+      'occurrences': occurrences,
+      'booking_type': occurrences > 1 ? 'series' : 'single',
+    });
   }
 
   @override
@@ -162,4 +224,39 @@ class FakeAnalyticsService implements AnalyticsService {
           (c) => c.name == 'sub_tab_viewed' && c.params['surface'] == surface)
       .map((c) => c.params['tab']! as String)
       .toList();
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  }) async {
+    events.add(kPaywallWriteDeniedEvent);
+    calls.add((
+      name: kPaywallWriteDeniedEvent,
+      params: {
+        'trainer_id': trainerId,
+        'athlete_id': athleteId,
+        'collection': collection,
+        'operation': operation,
+        'surface': surface,
+        'athlete_entitlement': athleteEntitlement,
+      }
+    ));
+  }
+
+  /// Los params del ÚLTIMO `paywall_write_denied`, o null si no hubo ninguno.
+  ///
+  /// Este evento es la única señal server-visible del enforcement, así que los
+  /// tests assertean sobre los CAMPOS y no solo sobre el nombre: un evento que
+  /// llega sin `trainer_id` no sirve para nada el día del incidente, y un
+  /// `expect(events, contains('paywall_write_denied'))` pasaría igual.
+  Map<String, Object?>? get lastPaywallWriteDenied {
+    final matches =
+        calls.where((c) => c.name == kPaywallWriteDeniedEvent).toList();
+    return matches.isEmpty ? null : matches.last.params;
+  }
 }

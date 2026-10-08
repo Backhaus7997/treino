@@ -4,8 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:treino/features/auth/data/apple_sign_in_gateway.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -46,9 +49,13 @@ final _fakeProfile = UserProfile(
   updatedAt: DateTime.utc(2026, 5, 11),
 );
 
+class _MockAppleSignInGateway extends Mock implements AppleSignInGateway {}
+
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeAuthCredential());
+    registerFallbackValue(GoogleAuthProvider());
+    registerFallbackValue(<AppleIDAuthorizationScopes>[]);
   });
 
   late MockFirebaseAuth fbAuth;
@@ -59,6 +66,9 @@ void main() {
   late MockUserRepository mockRepo;
   late MockGoogleSignIn googleSignIn;
   late AuthService sut;
+
+  /// `reason` de cada non-fatal que reportó el servicio.
+  late List<String> reportados;
 
   setUp(() {
     fbAuth = MockFirebaseAuth();
@@ -75,11 +85,15 @@ void main() {
     // Default stubs so existing tests that don't care about repo still work.
     // termsAcceptedAt must be matched too — signUpWithEmail always passes it
     // now (QA-AUTH-001, issue #434), so a stub without it would not match.
+    // acceptedTermsVersion/acceptedPrivacyVersion too, in the same call
+    // (consentimiento-legal-versionado, R3).
     when(
       () => mockRepo.getOrCreate(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
         termsAcceptedAt: any(named: 'termsAcceptedAt'),
+        acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+        acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
     when(
@@ -89,10 +103,11 @@ void main() {
       ),
     ).thenAnswer((_) async {});
 
-    // El mail de verificacion ya no sale por `user.sendEmailVerification()`:
-    // sale por el callable `requestEmailVerification`, que lo encola en el
-    // outbox y lo manda por Resend. El doble tiene que existir aca porque
-    // signUpWithEmail lo llama en el camino feliz.
+    // El mail de verificacion con link sale por el callable
+    // `requestEmailVerification` (outbox + Resend), no por
+    // `user.sendEmailVerification()`. El alta ya NO lo manda —lo reemplaza el
+    // codigo de `VerifyMailScreen`—, pero el doble lo sigue usando el grupo de
+    // `sendEmailVerification` de mas abajo.
     functions = MockFirebaseFunctions();
     callable = MockHttpsCallable();
     when(() => functions.httpsCallable(any())).thenReturn(callable);
@@ -101,11 +116,14 @@ void main() {
     // El callable exige auth; despues del alta el usuario YA esta firmado.
     when(() => fbAuth.currentUser).thenReturn(user);
 
+    reportados = <String>[];
     sut = AuthService(
       firebaseAuth: fbAuth,
       userRepository: mockRepo,
       functions: functions,
       googleSignIn: googleSignIn,
+      nonFatalReporter: (error, stack, {required reason}) async =>
+          reportados.add(reason),
     );
   });
 
@@ -114,7 +132,7 @@ void main() {
   // ---------------------------------------------------------------------------
   group('AuthService.signUpWithEmail', () {
     test(
-        'scenario 1.2 — returns User on success and calls sendEmailVerification',
+        'scenario 1.2 — returns User on success and does NOT send the link mail',
         () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
@@ -129,8 +147,8 @@ void main() {
       );
 
       expect(result, user);
-      verify(() => functions.httpsCallable('requestEmailVerification'))
-          .called(1);
+      // El codigo de 6 digitos de la pantalla obligatoria reemplaza al link.
+      verifyNever(() => functions.httpsCallable('requestEmailVerification'));
     });
 
     test('D03 — signUp never calls updateDisplayName (deferred to Etapa 6)',
@@ -164,7 +182,7 @@ void main() {
 
     // T29: SCENARIO-020 — happy path call order (no displayName work)
     test(
-        'SCENARIO-020: signup happy path calls sendEmailVerification and getOrCreate; never updateDisplayName',
+        'SCENARIO-020: signup happy path calls getOrCreate, sends no link mail, never updateDisplayName',
         () async {
       when(
         () => fbAuth.createUserWithEmailAndPassword(
@@ -176,15 +194,17 @@ void main() {
       await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
       verifyNever(() => user.updateDisplayName(any()));
-      verify(() => functions.httpsCallable('requestEmailVerification'))
-          .called(1);
-      // Y nunca por el camino viejo, que mandaba el mail de Firebase.
+      // Ningun mail con link: ni por el callable ni por el camino viejo de
+      // Firebase. Lo reemplaza el codigo de la pantalla obligatoria.
+      verifyNever(() => functions.httpsCallable('requestEmailVerification'));
       verifyNever(() => user.sendEmailVerification());
       verify(
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).called(1);
     });
@@ -210,9 +230,38 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: captureAny(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).captured;
       expect(captured.single, isA<DateTime>());
+    });
+
+    // consentimiento-legal-versionado (R3): la propia consulta del Register
+    // también es la aceptación de la versión vigente — signUpWithEmail debe
+    // estampar ambas versiones en la MISMA llamada que termsAcceptedAt.
+    test(
+        'consentimiento-legal-versionado: signUpWithEmail passes '
+        'kTermsVersion/kPrivacyVersion to getOrCreate', () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+
+      await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      final captured = verify(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: captureAny(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: captureAny(named: 'acceptedPrivacyVersion'),
+        ),
+      ).captured;
+      expect(captured, equals([kTermsVersion, kPrivacyVersion]));
     });
 
     // T30: SCENARIO-021 — rollback: getOrCreate throws → user.delete() called
@@ -231,6 +280,8 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).thenThrow(Exception('firestore down'));
 
@@ -249,11 +300,16 @@ void main() {
               networkError: (_) => false,
               signInCancelled: (_) => false,
               accountExistsWithDifferentCredential: (_) => false,
+              popupBlocked: (_) => false,
+              providerUnavailable: (_) => false,
+              accountMismatch: (_) => false,
               unknown: (_) => false,
               profileCreateFailed: (_) => true,
               requiresRecentLogin: (_) => false,
               reAuthFailed: (_) => false,
               deletionFailed: (_) => false,
+              deletionNotAllowed: (_) => false,
+              subscriptionCancelFailed: (_) => false,
             ),
             'is profileCreateFailed',
             isTrue,
@@ -280,6 +336,8 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).thenThrow(Exception('firestore down'));
 
@@ -299,11 +357,16 @@ void main() {
               networkError: (_) => false,
               signInCancelled: (_) => false,
               accountExistsWithDifferentCredential: (_) => false,
+              popupBlocked: (_) => false,
+              providerUnavailable: (_) => false,
+              accountMismatch: (_) => false,
               unknown: (_) => false,
               profileCreateFailed: (_) => true,
               requiresRecentLogin: (_) => false,
               reAuthFailed: (_) => false,
               deletionFailed: (_) => false,
+              deletionNotAllowed: (_) => false,
+              subscriptionCancelFailed: (_) => false,
             ),
             'is profileCreateFailed',
             isTrue,
@@ -451,6 +514,9 @@ void main() {
         password: 'Pass1234',
       );
       expect(result, user);
+      // Best-effort, pero no mudo: ese catch vacío escondió por qué las
+      // cuentas llegaban al alta sin `users/{uid}`.
+      expect(reportados.single, contains('signInWithEmail'));
     });
 
     // signIn backfill no longer synthesizes a displayName from the email
@@ -727,6 +793,8 @@ void main() {
           email: 'a@b.c',
         ),
       ).called(1);
+      // Control del test de abajo: si el create anda, no se reporta nada.
+      expect(reportados, isEmpty);
     });
 
     test('signInWithGoogle: createIfAbsent throwing does NOT fail the sign-in',
@@ -745,7 +813,247 @@ void main() {
       final result = await sut.signInWithGoogle();
 
       expect(result, user);
+      expect(reportados.single, contains('signInWithGoogle'));
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // signInWithApple
+  // ---------------------------------------------------------------------------
+  group('AuthService.signInWithApple', () {
+    // El camino de una de las cuentas que en producción llegaron al alta sin
+    // `users/{uid}` (22/09): el create del login falló y nadie se enteró.
+    test('createIfAbsent tirando no rompe el login, pero se reporta', () async {
+      final apple = _MockAppleSignInGateway();
+      when(
+        () => apple.getAppleIDCredential(
+          scopes: any(named: 'scopes'),
+          nonce: any(named: 'nonce'),
+        ),
+      ).thenAnswer(
+        (_) async => const AuthorizationCredentialAppleID(
+          userIdentifier: 'apple-user',
+          givenName: null,
+          familyName: null,
+          authorizationCode: 'auth-code',
+          email: null,
+          identityToken: 'id-token',
+          state: null,
+        ),
+      );
+      when(() => fbAuth.signInWithCredential(any()))
+          .thenAnswer((_) async => cred);
+      when(
+        () => mockRepo.createIfAbsent(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+        ),
+      ).thenThrow(Exception('Firestore down'));
+      final conApple = AuthService(
+        firebaseAuth: fbAuth,
+        userRepository: mockRepo,
+        functions: functions,
+        googleSignIn: googleSignIn,
+        appleGateway: apple,
+        nonFatalReporter: (error, stack, {required reason}) async =>
+            reportados.add(reason),
+      );
+
+      final result = await conApple.signInWithApple();
+
+      expect(result, user);
+      expect(reportados.single, contains('signInWithApple'));
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // signInWithGooglePopup / signInWithApplePopup (web — Coach Hub)
+  // ---------------------------------------------------------------------------
+  group('AuthService popup (web)', () {
+    final caminos = <String, Future<User> Function(AuthService)>{
+      'signInWithGooglePopup': (s) => s.signInWithGooglePopup(),
+      'signInWithApplePopup': (s) => s.signInWithApplePopup(),
+    };
+
+    setUp(() {
+      when(() => fbAuth.signInWithPopup(any())).thenAnswer((_) async => cred);
+    });
+
+    test(
+        'SCENARIO-001: Google usa GoogleAuthProvider con select_account y '
+        'nunca signInWithCredential', () async {
+      await sut.signInWithGooglePopup();
+
+      final provider =
+          verify(() => fbAuth.signInWithPopup(captureAny())).captured.single;
+      expect(provider, isA<GoogleAuthProvider>());
+      expect(
+        (provider as GoogleAuthProvider).parameters,
+        {'prompt': 'select_account'},
+      );
+      verifyNever(() => fbAuth.signInWithCredential(any()));
+    });
+
+    test(
+        'SCENARIO-002: Apple usa OAuthProvider apple.com con scopes '
+        'email y name y nunca signInWithCredential', () async {
+      await sut.signInWithApplePopup();
+
+      final provider =
+          verify(() => fbAuth.signInWithPopup(captureAny())).captured.single;
+      expect(provider, isA<OAuthProvider>());
+      expect((provider as OAuthProvider).providerId, 'apple.com');
+      expect(provider.scopes, ['email', 'name']);
+      verifyNever(() => fbAuth.signInWithCredential(any()));
+    });
+
+    for (final entry in caminos.entries) {
+      final camino = entry.key;
+      final entrar = entry.value;
+
+      group(camino, () {
+        test(
+            'invariante de activación: signInWithPopup se invoca de forma '
+            'síncrona, sin ningún await previo', () async {
+          final future = entrar(sut);
+          // Antes de cualquier await/pump: si el camino cede el control al
+          // event loop antes del popup, esto falla.
+          verify(() => fbAuth.signInWithPopup(any())).called(1);
+          await future;
+        });
+
+        test(
+            'SCENARIO-005: éxito ⇒ createIfAbsent una vez y devuelve el '
+            'usuario', () async {
+          final result = await entrar(sut);
+
+          expect(result, user);
+          verify(
+            () => mockRepo.createIfAbsent(uid: 'uid-test', email: 'a@b.c'),
+          ).called(1);
+          expect(reportados, isEmpty);
+        });
+
+        test('createIfAbsent con email nulo escribe cadena vacía', () async {
+          when(() => user.email).thenReturn(null);
+
+          await entrar(sut);
+
+          verify(() => mockRepo.createIfAbsent(uid: 'uid-test', email: ''))
+              .called(1);
+        });
+
+        test(
+            'SCENARIO-006: createIfAbsent tirando no rompe el login y se '
+            'reporta', () async {
+          when(
+            () => mockRepo.createIfAbsent(
+              uid: any(named: 'uid'),
+              email: any(named: 'email'),
+            ),
+          ).thenThrow(Exception('Firestore down'));
+
+          final result = await entrar(sut);
+
+          expect(result, user);
+          expect(
+            reportados.single,
+            'AuthService.$camino: createIfAbsent falló después del login',
+          );
+        });
+
+        for (final code in const [
+          'popup-closed-by-user', // SCENARIO-009
+          'cancelled-popup-request', // SCENARIO-010
+          'user-cancelled', // SCENARIO-026
+        ]) {
+          test(
+              'cancelación ($code) ⇒ signInCancelled, sin alta y sin '
+              'reporte', () async {
+            when(() => fbAuth.signInWithPopup(any()))
+                .thenThrow(FirebaseAuthException(code: code));
+
+            await expectLater(
+              entrar(sut),
+              throwsA(const AuthFailure.signInCancelled()),
+            );
+            verifyNever(
+              () => mockRepo.createIfAbsent(
+                uid: any(named: 'uid'),
+                email: any(named: 'email'),
+              ),
+            );
+            expect(reportados, isEmpty);
+          });
+        }
+
+        test('popup-blocked ⇒ popupBlocked, sin reporte', () async {
+          when(() => fbAuth.signInWithPopup(any()))
+              .thenThrow(FirebaseAuthException(code: 'popup-blocked'));
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.popupBlocked()),
+          );
+          expect(reportados, isEmpty);
+        });
+
+        test('account-exists-with-different-credential ⇒ sin reporte',
+            () async {
+          when(() => fbAuth.signInWithPopup(any())).thenThrow(
+            FirebaseAuthException(
+              code: 'account-exists-with-different-credential',
+            ),
+          );
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.accountExistsWithDifferentCredential()),
+          );
+          expect(reportados, isEmpty);
+        });
+
+        for (final code in const [
+          'unauthorized-domain', // SCENARIO-014
+          'operation-not-allowed',
+          'invalid-credential', // SCENARIO-027
+        ]) {
+          test('config rota ($code) ⇒ providerUnavailable + non-fatal',
+              () async {
+            when(() => fbAuth.signInWithPopup(any()))
+                .thenThrow(FirebaseAuthException(code: code));
+
+            await expectLater(
+              entrar(sut),
+              throwsA(const AuthFailure.providerUnavailable()),
+            );
+            expect(
+              reportados.single,
+              'AuthService.$camino: proveedor no disponible ($code)',
+            );
+            verifyNever(
+              () => mockRepo.createIfAbsent(
+                uid: any(named: 'uid'),
+                email: any(named: 'email'),
+              ),
+            );
+          });
+        }
+
+        test('SCENARIO-028: code desconocido ⇒ fallback fromFirebase',
+            () async {
+          when(() => fbAuth.signInWithPopup(any())).thenThrow(
+            FirebaseAuthException(code: 'network-request-failed'),
+          );
+
+          await expectLater(
+            entrar(sut),
+            throwsA(const AuthFailure.networkError()),
+          );
+          expect(reportados, isEmpty);
+        });
+      });
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -775,45 +1083,142 @@ void main() {
   // cancelOnboarding — hard-cancel an in-progress signup from ProfileSetup
   // ---------------------------------------------------------------------------
   group('AuthService.cancelOnboarding', () {
-    test('deletes Firestore profile + Firebase Auth user on happy path',
-        () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenAnswer((_) async {});
-      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+    // Un doble propio para `deleteAccount`: el `callable` del setUp lo
+    // comparten los mails, y con uno solo no se podría decir cuál corrió.
+    late MockHttpsCallable deleteCallable;
+    late MockCallableResult respuesta;
 
+    void responde(
+      List<String> deletedCollections, {
+      List<String> errors = const [],
+    }) =>
+        when(() => respuesta.data).thenReturn(<String, dynamic>{
+          'status': errors.isEmpty ? 'success' : 'partial',
+          'deletedCollections': deletedCollections,
+          'errors': errors,
+        });
+
+    setUp(() {
+      deleteCallable = MockHttpsCallable();
+      respuesta = MockCallableResult();
+      when(() => functions.httpsCallable('deleteAccount'))
+          .thenReturn(deleteCallable);
+      when(() => deleteCallable.call<Map<String, dynamic>>(any()))
+          .thenAnswer((_) async => respuesta);
+      responde(['users', 'userPublicProfiles', 'users-auth']);
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => fbAuth.signOut()).thenAnswer((_) async {});
+      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      // Por default la cuenta sigue viva para Auth.
+      when(() => user.reload()).thenAnswer((_) async {});
+    });
+
+    test(
+        'borra por deleteAccount (la cascada completa, con Auth al final del '
+        'servidor) y recién después cierra la sesión local', () async {
       await sut.cancelOnboarding();
 
-      verify(() => mockRepo.delete('uid-test')).called(1);
-      verify(() => user.delete()).called(1);
+      verifyInOrder([
+        () => deleteCallable.call<Map<String, dynamic>>({'uid': 'uid-test'}),
+        () => fbAuth.signOut(),
+      ]);
       verify(() => googleSignIn.signOut()).called(1);
+      // Auth lo borra el servidor. El `user.delete()` del cliente además tiraba
+      // `requires-recent-login` pasados 5 minutos del login.
+      verifyNever(() => user.delete());
     });
 
-    test('continues to delete Auth user even if Firestore delete throws',
+    test(
+        'si el callable falla NO sigue: ni borra Auth ni cierra la sesión, y '
+        'tira AuthFailure para que la persona reintente', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'si el callable falla pero Auth confirma que la cuenta ya no existe (la '
+        'respuesta se perdió con la cascada hecha), la baja salió: cierra la '
+        'sesión y completa', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'timeout', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-not-found'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
+    });
+
+    test(
+        'si el callable falla y no hay forma de confirmar (reload sin red), la '
+        'cuenta se trata como viva: tira y no cierra la sesión', () async {
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'sin red', code: 'unavailable'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'network-request-failed'),
+      );
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'user-token-expired no confirma la baja (sale también con la cuenta '
+        'viva, p. ej. por un cambio de contraseña): tira y no cierra la sesión',
         () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenThrow(Exception('firestore down'));
-      when(() => user.delete()).thenAnswer((_) async {});
-      when(() => googleSignIn.signOut()).thenAnswer((_) async {});
+      when(() => deleteCallable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(message: 'boom', code: 'internal'),
+      );
+      when(() => user.reload()).thenThrow(
+        FirebaseAuthException(code: 'user-token-expired'),
+      );
 
-      await sut.cancelOnboarding();
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
 
-      verify(() => mockRepo.delete('uid-test')).called(1);
-      verify(() => user.delete()).called(1);
+      verifyNever(() => fbAuth.signOut());
     });
 
-    test('throws AuthFailure when Firebase Auth delete fails', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenThrow(
-        FirebaseAuthException(code: 'requires-recent-login'),
+    test(
+        'con la cuenta ya borrada, un signOut que falla no tira: se reporta y '
+        'la cancelación completa', () async {
+      when(() => fbAuth.signOut()).thenThrow(
+        FirebaseAuthException(code: 'internal-error'),
       );
 
-      await expectLater(
-        sut.cancelOnboarding(),
-        throwsA(isA<AuthFailure>()),
-      );
-      verify(() => user.delete()).called(1);
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      expect(reportados, [contains('AuthService.cancelOnboarding')]);
+    });
+
+    test(
+        'si el servidor no llegó a borrar Auth (partial sin users-auth), la '
+        'cuenta sigue viva: tira AuthFailure y no cierra la sesión', () async {
+      responde(['users', 'userPublicProfiles'], errors: ['auth: boom']);
+
+      await expectLater(sut.cancelOnboarding(), throwsA(isA<AuthFailure>()));
+
+      verifyNever(() => user.delete());
+      verifyNever(() => fbAuth.signOut());
+    });
+
+    test(
+        'un partial CON users-auth es una cuenta que ya no existe: cierra la '
+        'sesión igual, como Ajustes', () async {
+      responde(['users-auth'], errors: ['posts: boom']);
+
+      await expectLater(sut.cancelOnboarding(), completes);
+
+      verify(() => fbAuth.signOut()).called(1);
     });
 
     test('is a no-op when there is no current user', () async {
@@ -821,14 +1226,11 @@ void main() {
 
       await expectLater(sut.cancelOnboarding(), completes);
 
-      verifyNever(() => mockRepo.delete(any()));
-      verifyNever(() => user.delete());
+      verifyNever(() => deleteCallable.call<Map<String, dynamic>>(any()));
+      verifyNever(() => fbAuth.signOut());
     });
 
     test('swallows Google signOut failures (best-effort cleanup)', () async {
-      when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => mockRepo.delete(any())).thenAnswer((_) async {});
-      when(() => user.delete()).thenAnswer((_) async {});
       when(() => googleSignIn.signOut()).thenThrow(Exception('google down'));
 
       // Should NOT propagate the Google signOut error.

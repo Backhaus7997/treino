@@ -204,8 +204,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['a', 'b', 'c']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['a', 'b', 'c']);
+    expect(
+        saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7]);
   });
 
   testWidgets('soltar junto al borde sólo reordena y no une', (tester) async {
@@ -234,8 +236,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['c', 'a', 'b']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [null, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['c', 'a', 'b']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [null, 7, 7]);
   });
 
   testWidgets('arrastrar una superserie nunca activa un destino de unión',
@@ -254,7 +258,8 @@ void main() {
       () => tester.getCenter(find.byKey(const Key('slot_drag_handle_2'))),
     );
     expect(
-      tester.widgetList<SupersetBlock>(find.byType(SupersetBlock))
+      tester
+          .widgetList<SupersetBlock>(find.byType(SupersetBlock))
           .every((block) => !block.resaltadoParaUnir),
       isTrue,
     );
@@ -262,8 +267,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['c', 'a', 'b']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [null, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['c', 'a', 'b']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [null, 7, 7]);
   });
 
   testWidgets('la unión compacta el grupo aunque haya un slot oculto en medio',
@@ -292,12 +299,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['a', 'b', 'c', 'd']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7, null]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['a', 'b', 'c', 'd']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [7, 7, 7, null]);
   });
 
-  testWidgets(
-      'soltar en la zona central SIN cruzar el punto medio también une',
+  testWidgets('soltar en la zona central SIN cruzar el punto medio también une',
       (tester) async {
     // El caso que el test del centro exacto no toca. Flutter llama `onReorder`
     // SÓLO si el índice cambió: `SliverReorderableListState._dropCompleted`
@@ -595,12 +603,95 @@ void main() {
     await tester.pumpAndSettle();
 
     // Y al soltar el timer se frena: si quedara vivo seguiría scrolleando sola.
-    final alSoltar = tester.state<ScrollableState>(vertical.first).position.pixels;
+    final alSoltar =
+        tester.state<ScrollableState>(vertical.first).position.pixels;
     await tester.pump(const Duration(milliseconds: 300));
     expect(
       tester.state<ScrollableState>(vertical.first).position.pixels,
       alSoltar,
       reason: 'soltar tiene que frenar el auto-scroll',
+    );
+  });
+
+  testWidgets('el bloque no queda con un hueco fantasma después de unir',
+      (tester) async {
+    await _pump(
+      tester,
+      _routine('fantasma', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c'),
+      ]),
+    );
+
+    final superset = find.byType(SupersetBlock);
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_2')),
+      () => tester.getCenter(superset),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    // El bloque anuncia N y tiene que DIBUJAR N.
+    //
+    // ⚠ ESTE TEST NO REPRODUCE EL BUG DEL HUECO FANTASMA. Está medido: pasa
+    // igual con el fix revertido. `pumpAndSettle` corre la animación de drop
+    // hasta el final y reconstruye, así que el hueco que en device queda
+    // permanente acá se limpia solo. Un widget test no mira la pantalla a
+    // mitad de un gesto.
+    //
+    // Se deja igual porque el invariante vale por sí mismo —lo que el
+    // encabezado cuenta tiene que ser lo que se dibuja— y porque cubre las
+    // formas de romperlo que SÍ sobreviven a un settle. El hueco fantasma sólo
+    // se puede verificar en device.
+    final bloque = tester.widget<SupersetBlock>(superset);
+    final cardsAdentro = find.descendant(
+      of: superset,
+      matching: find.byType(ExerciseCard),
+    );
+    expect(
+      cardsAdentro.evaluate().length,
+      bloque.count,
+      reason: 'el encabezado dice ${bloque.count} y se dibujan '
+          '${cardsAdentro.evaluate().length}',
+    );
+  });
+
+  testWidgets('el bloque no queda con un hueco fantasma después de sacar',
+      (tester) async {
+    await _pump(
+      tester,
+      _routine('fantasma-out', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', group: 7),
+        _slot('d'),
+      ]),
+    );
+
+    final rect = tester.getRect(find.byType(SupersetBlock));
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_0')),
+      () => Offset(rect.center.dx, rect.bottom + 80),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    final superset = find.byType(SupersetBlock);
+    // El grupo se disolvió: nada que medir.
+    if (superset.evaluate().isEmpty) {
+      return;
+    }
+    final bloque = tester.widget<SupersetBlock>(superset);
+    expect(
+      find
+          .descendant(of: superset, matching: find.byType(ExerciseCard))
+          .evaluate()
+          .length,
+      bloque.count,
+      reason: 'sacar tampoco puede dejar un hueco',
     );
   });
 }

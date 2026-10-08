@@ -61,7 +61,7 @@ List<Override> baseOverrides({
 }) =>
     [
       currentAthleteLinkProvider
-          .overrideWith((ref) async => linked ? link() : null),
+          .overrideWith((ref) => Stream.value(linked ? link() : null)),
       routinesProvider.overrideWith((ref) async => catalog),
       publishedTemplatesProvider.overrideWith((ref) async => published),
       if (linked) ...[
@@ -162,7 +162,7 @@ void main() {
   test('a failing community query leaves the catalog intact', () async {
     final container = ProviderContainer(
       overrides: [
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         routinesProvider.overrideWith((ref) async => [system('sys-1')]),
         publishedTemplatesProvider
             .overrideWith((ref) async => throw Exception('boom')),

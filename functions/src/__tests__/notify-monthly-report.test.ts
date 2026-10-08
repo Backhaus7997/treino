@@ -23,12 +23,48 @@ jest.mock("firebase-admin", () => {
   };
 });
 
+jest.mock("firebase-admin/messaging", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).messaging());
+
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa Timestamp/FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 jest.mock("../notifications/send-fcm", () => ({
   sendFcm: jest.fn(async () => ({ successCount: 1, failureCount: 0 })),
 }));
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { Timestamp } from "firebase-admin/firestore";
 import { sendFcm } from "../notifications/send-fcm";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   notifyMonthlyReportHandler,
   reportedMonthFor,
@@ -75,7 +111,7 @@ function installFirestore(
     .map((session, index) => ({
       __index: index,
       data: () => ({
-        startedAt: admin.firestore.Timestamp.fromDate(session.startedAt),
+        startedAt: Timestamp.fromDate(session.startedAt),
         status: session.status ?? "finished",
         wasFullyCompleted: session.wasFullyCompleted ?? true,
       }),
@@ -86,7 +122,7 @@ function installFirestore(
     }));
 
   const DELETE = (
-    admin.firestore as unknown as { __DELETE?: symbol; FieldValue: { __DELETE: symbol } }
+    dobleNamespaced().firestore as unknown as { __DELETE?: symbol; FieldValue: { __DELETE: symbol } }
   ).FieldValue.__DELETE;
 
   function applyUpdate(uid: string, update: Record<string, unknown>): void {
@@ -162,11 +198,11 @@ function installFirestore(
     ),
   };
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
-const app = {} as admin.app.App;
-const messaging = {} as admin.messaging.Messaging;
+const app = {} as App;
+const messaging = {} as Messaging;
 const mockedSendFcm = sendFcm as jest.MockedFunction<typeof sendFcm>;
 
 beforeEach(() => {

@@ -196,6 +196,7 @@ class LinkStateCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final pubAsync = ref.watch(userPublicProfileProvider(link.trainerId));
     final hasUnread = ref.watch(hasUnreadFromProvider(link.trainerId));
 
@@ -241,7 +242,49 @@ class LinkStateCard extends ConsumerWidget {
                 const SizedBox(height: 14),
                 _ShareInfo(palette: palette),
                 const SizedBox(height: 12),
-                _AgendaButton(trainerId: link.trainerId),
+                // Orden por importancia, no por historia. El plan nutricional
+                // es lo que el alumno viene a buscar, así que va primero y es
+                // el más destacado de los tres.
+                //
+                // La agenda queda última a propósito: hoy su único dato propio
+                // son las reuniones del alumno; el calendario con los días
+                // ocupados del PF es contexto, no una acción.
+                _AccesoDelAlumno(
+                  // Relleno por decisión de producto del maintainer, sobre la
+                  // alternativa que proponía el design system.
+                  //
+                  // El contrato de `TreinoButtonTokens` dice que el CTA
+                  // relleno es UNO por pantalla, y acá «MENSAJE» ya es otro:
+                  // son dos verdes compitiendo. Se elige igual porque el plan
+                  // nutricional es lo que el alumno viene a buscar y se lo
+                  // quiere con ese peso. Queda escrito para que el próximo que
+                  // lea la regla no crea que es un descuido.
+                  variante: TreinoButtonVariant.primary,
+                  icono: TreinoIcon.sidebarNutricion,
+                  etiqueta: l10n.athleteNutritionPlanButtonLabel,
+                  onPressed: () => context.push(
+                    '/coach/nutricion?trainerId=${Uri.encodeComponent(link.trainerId)}',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.file,
+                  etiqueta: l10n.athleteFilesButtonLabel,
+                  onPressed: () => context.push('/coach/archivos'),
+                ),
+                const SizedBox(height: 12),
+                _AccesoDelAlumno(
+                  variante: TreinoButtonVariant.secondaryAccent,
+                  icono: TreinoIcon.tabWorkout,
+                  etiqueta: l10n.agendaButtonLabel,
+                  // El trainerId viaja por la ruta para que el host NO tenga
+                  // que volver a preguntar lo que esta pantalla ya sabe: estos
+                  // accesos sólo se dibujan si el vínculo está activo.
+                  onPressed: () => context.push(
+                    '/coach/agenda?trainerId=${Uri.encodeComponent(link.trainerId)}',
+                  ),
+                ),
                 const SizedBox(height: 16),
                 _CuotaSection(link: link),
               ],
@@ -612,34 +655,71 @@ class _ActionRow extends ConsumerWidget {
   }
 }
 
-// ── Agenda button — only shown when link is active ────────────────────────────
+// ── Accesos del alumno a lo que su PF le dejó ────────────────────────────────
 
-class _AgendaButton extends StatelessWidget {
-  const _AgendaButton({required this.trainerId});
-  final String trainerId;
+/// Los tres accesos de la card del PF, con su nivel de jerarquía.
+///
+/// ## Por qué UN widget y no tres
+///
+/// Eran tres `OutlinedButton` con el mismo estilo copiado, y por eso no había
+/// jerarquía: cambiar el peso de uno pedía acordarse de no tocar los otros
+/// dos. Con el nivel como parámetro, la jerarquía se lee de un vistazo en el
+/// call site y no puede divergir sola.
+///
+/// ## Por qué ninguno es `primary`
+///
+/// El CTA relleno es **uno por pantalla** (ver la grilla en
+/// `TreinoButtonTokens`), y en esta pantalla ya lo ocupa «MENSAJE»: escribirle
+/// al PF es la acción central de la relación. Un segundo botón relleno no
+/// destaca más, dilute a los dos.
+///
+/// Así que la jerarquía sale de BAJARLE el volumen al resto: el plan
+/// nutricional queda `secondaryAccent` (borde neutro, texto en acento) y los
+/// otros dos `secondary` (todo neutro).
+///
+/// Los colores salen de `TreinoButtonTokens` y no de la paleta a mano. No es
+/// ceremonia: el estilo anterior usaba `palette.accent` como texto, que sobre
+/// una card clara da 1,64:1 contra los 4,5 que exige WCAG AA. En oscuro
+/// `accent` y `accentText` son el MISMO color, así que la suite —que corre en
+/// oscuro— no lo veía.
+class _AccesoDelAlumno extends StatelessWidget {
+  const _AccesoDelAlumno({
+    required this.variante,
+    required this.icono,
+    required this.etiqueta,
+    required this.onPressed,
+  });
+
+  final TreinoButtonVariant variante;
+  final IconData icono;
+  final String etiqueta;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppL10n.of(context);
-    final palette = AppPalette.of(context);
+    final v = TreinoButtonTokens.of(context, variante);
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => context.push('/coach/agenda'),
+        onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          side: BorderSide(color: palette.accent, width: 1),
-          foregroundColor: palette.accent,
+          // `primary` trae fondo acento; las otras variantes lo traen
+          // transparente, así que el mismo widget sirve para relleno y para
+          // delineado sin ramificar.
+          backgroundColor: v.background,
+          side: BorderSide(color: v.borderColor, width: 1),
+          foregroundColor: v.foreground,
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
-        icon: Icon(TreinoIcon.tabWorkout, size: 18, color: palette.accent),
+        icon: Icon(icono, size: 18, color: v.foreground),
         label: Text(
-          l10n.agendaButtonLabel,
+          etiqueta,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             letterSpacing: 0.8,
           ),
         ),

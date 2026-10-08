@@ -53,6 +53,35 @@ código existente no protege de nada.
 El campo `why` no es decorativo: los casos raros (datos corruptos, valores
 fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 
+## Cómo agregar un fixture
+
+Son **cuatro** pasos, y el cuarto es el que se olvida.
+
+1. Escribí el `.json` con sus casos. Primero qué DEBERÍA pasar, no lo que la
+   implementación devuelve hoy (regla de oro, arriba).
+2. Escribí el test Dart en `test/conformance/<regla>_conformance_test.dart`.
+   Copiá el patrón de `routine_selection_conformance_test.dart`: trae dos
+   guards que valen oro —que el fixture apunte a la implementación que el test
+   ejercita, y que no esté vacío— y acumula todas las discrepancias antes de
+   fallar, en vez de esconderlas detrás de la primera.
+3. Implementá la regla en Swift.
+4. **Cableá el runner en `conformance/swift/main.swift`.** Las invocaciones
+   están al final del archivo, una línea por fixture, y **no hay
+   descubrimiento automático**: un `.json` que nadie invoque ahí simplemente no
+   se corre del lado Swift.
+
+Ese cuarto paso es el peligroso, porque olvidarlo no rompe nada: el lado Dart
+corre, CI queda verde, y el contrato queda **unilateral en silencio** — que es
+peor que no tener el fixture, porque hace creer que hay una red que no está.
+Lo cubre `test/conformance/fixture_coverage_test.dart`, que falla si un
+fixture no está invocado.
+
+Si el orden correcto te deja con el contrato escrito y una implementación
+todavía sin hacer —lo normal, porque el fixture va primero— declaralo en la
+allowlist `_pendientesDeSwift` de ese guard, con el motivo. La deuda
+consciente se documenta; no se esconde. Y el mismo guard falla si una entrada
+de la allowlist sobrevive a su motivo.
+
 ## Archivos
 
 | Archivo | Regla | Implementación Dart | Implementación Swift |
@@ -66,6 +95,7 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 | `set_log_write_target.json` | Dónde escribe un **reloj** una serie: adoptar la que ya está, o un id propio antes que pisar otra | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
 | `superset_order.json` | Qué celda (ejercicio + serie) toca AHORA dentro de una superserie | `lib/features/workout/domain/superset_order.dart` | `ios/TreinoWatch Watch App/SupersetOrder.swift` |
 | `duration_timer.json` | Cuánto falta de un ejercicio POR TIEMPO y si terminó — contra el reloj de pared | `lib/features/workout/domain/duration_timer.dart` | `ios/TreinoWatch Watch App/CountdownRules.swift` |
+| `catalog_gate.json` | Si el candado del catálogo pago frena ENTRENAR una plantilla | `lib/features/paywall/domain/catalog_gate.dart` | ⏳ **falta** — ver [docs/paywall-watchos-plan.md](../docs/paywall-watchos-plan.md) |
 
 ## La lección que costó cuatro bugs
 

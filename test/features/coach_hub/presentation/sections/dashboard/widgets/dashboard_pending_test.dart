@@ -35,6 +35,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../../../helpers/fake_analytics_service.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── Factories ────────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(TextButton), findsOneWidget);
+      expect(find.byType(TreinoButton), findsOneWidget);
     });
   });
 

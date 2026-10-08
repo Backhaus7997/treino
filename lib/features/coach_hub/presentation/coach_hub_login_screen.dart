@@ -1,17 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/primitives.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../../app/theme/tokens/components/treino_button_tokens.dart';
 import '../../auth/domain/auth_failure.dart';
+import '../../auth/presentation/legal/legal_content.dart';
+import '../../auth/presentation/widgets/terms_notice_text.dart';
+import '../../../core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_brand_logo.dart';
+
+/// Alto del wordmark sobre el título «COACH HUB» (32 px): 1,5× el título, para
+/// que la marca encabece y el nombre del producto no quede chico. El login
+/// móvil usa 56 sobre un titular de 28; acá el título es más grande.
+const double _kBrandLogoSize = 48;
 
 /// Login screen del Coach Hub web.
 ///
-/// Solo email/password — sin Google Sign-In (decisión #2 del propose,
-/// google_sign_in_web es scope aparte).
+/// Tres caminos de ingreso: email/password, Google y Apple. Google y Apple
+/// entran por popup de Firebase Auth (`signInWithPopup`), no por redirect:
+/// el Hub se sirve desde dos hosts y, según el análisis del change, el
+/// redirect sufre el particionado de storage de terceros mientras el popup
+/// funciona cross-origin. El popup exige que `signInWithPopup` se invoque
+/// sin ningún `await` previo al tap, o el navegador lo bloquea.
+///
+/// La pantalla NO decide a dónde se va después del ingreso: lo decide el
+/// router (`coachHubRedirect`) al cambiar el estado de auth.
+///
+/// Ver `openspec/changes/coach-hub-login-google-apple/`, que supera la
+/// decisión #2 de `coach-hub-bootstrap` (solo email/password).
 ///
 /// Layout: form centrado max-width 400px sobre fondo dark. Funciona ok
 /// en desktop y tablet — sin breakpoints responsivos en MVP (decisión #4).
@@ -23,12 +44,20 @@ class CoachHubLoginScreen extends ConsumerStatefulWidget {
       _CoachHubLoginScreenState();
 }
 
+/// Qué método de ingreso tiene una operación en curso.
+enum _Metodo { email, google, apple }
+
 class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  bool _submitting = false;
+  _Metodo? _enCurso;
   String? _error;
+
+  /// `true` cuando el error mostrado es `providerUnavailable`: el copy manda
+  /// a «escribinos al equipo» y el Hub no tiene otro canal que esta pantalla,
+  /// así que mostramos la dirección (REQ-CHW-AUTH-004).
+  bool _errorEsProveedorNoDisponible = false;
 
   @override
   void dispose() {
@@ -38,30 +67,61 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (_submitting) return;
+    if (_enCurso != null) return;
     if (!_formKey.currentState!.validate()) return;
+    await _ingresar(
+      _Metodo.email,
+      () => ref.read(authNotifierProvider.notifier).signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          ),
+    );
+  }
+
+  /// Google/Apple por popup. El navegador sólo concede la ventana si se abre
+  /// dentro del gesto del usuario: NO puede haber un `await` entre el tap y
+  /// la llamada al notifier. Por eso es un método síncrono que arranca la
+  /// llamada de inmediato.
+  void _entrarConGoogle() => _ingresar(
+        _Metodo.google,
+        () => ref.read(authNotifierProvider.notifier).signInWithGooglePopup(),
+      );
+
+  void _entrarConApple() => _ingresar(
+        _Metodo.apple,
+        () => ref.read(authNotifierProvider.notifier).signInWithApplePopup(),
+      );
+
+  /// Marca el método en curso, dispara [accion] (síncrono hasta su primer
+  /// await) y espera el resultado.
+  Future<void> _ingresar(_Metodo metodo, Future<void> Function() accion) async {
+    if (_enCurso != null) return;
     setState(() {
-      _submitting = true;
+      _enCurso = metodo;
       _error = null;
+      _errorEsProveedorNoDisponible = false;
     });
-    await ref.read(authNotifierProvider.notifier).signIn(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        );
+    await accion();
     // El notifier captura errores internamente (AsyncValue.guard) y los
     // pone en state. Después del await leemos el state actual: si hay
-    // error, lo mostramos; si no, el router redirige automáticamente al
-    // /dashboard o /not-allowed via el authStateChangesProvider.
+    // error, lo mostramos; si no (éxito o cancel del popup, que el notifier
+    // restaura en silencio), el router redirige solo al /dashboard o
+    // /not-allowed via el authStateChangesProvider.
     if (!mounted) return;
     final state = ref.read(authNotifierProvider);
     if (state.hasError) {
       final l10n = AppL10n.of(context);
       setState(() {
         _error = _humanizeError(state.error!, l10n);
-        _submitting = false;
+        _errorEsProveedorNoDisponible = state.error is AuthFailure &&
+            (state.error! as AuthFailure).maybeWhen(
+              providerUnavailable: () => true,
+              orElse: () => false,
+            );
+        _enCurso = null;
       });
     } else {
-      setState(() => _submitting = false);
+      setState(() => _enCurso = null);
     }
   }
 
@@ -101,16 +161,13 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                     Center(
                       child: Column(
                         children: [
-                          Text(
-                            'TREINO',
-                            style: GoogleFonts.barlowCondensed(
-                              color: palette.highlight,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
+                          // El wordmark oficial —el mismo de welcome, login y
+                          // register del móvil y del sidebar—, no la palabra
+                          // "TREINO" tipeada en Barlow Condensed. El color lo
+                          // resuelve por tema: esta pantalla se ve en claro u
+                          // oscuro según el sistema (ver [CoachHubBrandLogo]).
+                          const CoachHubBrandLogo(size: _kBrandLogoSize),
+                          const SizedBox(height: AppSpacing.s12),
                           Text(
                             'COACH HUB',
                             style: GoogleFonts.barlowCondensed(
@@ -179,33 +236,81 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                         textAlign: TextAlign.center,
                         style: TextStyle(color: palette.danger, fontSize: 13),
                       ),
+                      if (_errorEsProveedorNoDisponible) ...[
+                        const SizedBox(height: AppSpacing.s8),
+                        SelectableText(
+                          kLegalContactEmail,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: palette.accentText,
+                            fontSize: AppTextSize.caption,
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 18),
-                    ElevatedButton(
-                      onPressed: _submitting ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: _submitting
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : Text(
-                              l10n.coachHubLoginSubmit,
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 1.4,
-                              ),
+                    TreinoButton(
+                      label: l10n.coachHubLoginSubmit,
+                      expand: true,
+                      loading: _enCurso == _Metodo.email,
+                      onPressed: _enCurso == null ? _submit : null,
+                    ),
+                    const SizedBox(height: AppSpacing.s18),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: palette.border)),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.s12,
+                          ),
+                          child: Text(
+                            l10n.authLoginContinueWith,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: AppTextSize.caption,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                              color: palette.textMuted,
                             ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: palette.border)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.s14),
+                    // Google/Apple crean una cuenta TREINO como el registro:
+                    // el aviso va ANTES de los botones.
+                    const TermsNoticeText(),
+                    const SizedBox(height: AppSpacing.s14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TreinoButton(
+                            label: l10n.authGoogleLabel,
+                            icon: TreinoIcon.googleLogo,
+                            variant: TreinoButtonVariant.secondary,
+                            expand: true,
+                            loading: _enCurso == _Metodo.google,
+                            onPressed:
+                                _enCurso == null || _enCurso == _Metodo.google
+                                    ? _entrarConGoogle
+                                    : null,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s12),
+                        Expanded(
+                          child: TreinoButton(
+                            label: l10n.authAppleLabel,
+                            icon: TreinoIcon.appleLogo,
+                            variant: TreinoButtonVariant.secondary,
+                            expand: true,
+                            loading: _enCurso == _Metodo.apple,
+                            onPressed:
+                                _enCurso == null || _enCurso == _Metodo.apple
+                                    ? _entrarConApple
+                                    : null,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     Text(

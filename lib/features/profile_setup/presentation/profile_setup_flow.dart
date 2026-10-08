@@ -5,21 +5,24 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/presentation/widgets/terms_checkbox.dart';
-import '../../profile/application/user_providers.dart';
+import '../application/perfil_asegurado_provider.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
+import '../application/terms_consent_provider.dart';
 import 'steps/step_1_username_avatar.dart';
-import 'steps/step_2_gym.dart';
-import 'steps/step_3_experience_gender.dart';
-import 'steps/step_4_weight_height.dart';
+import 'steps/step_2_born_at.dart';
+import 'steps/step_3_gym.dart';
+import 'steps/step_4_experience_gender.dart';
+import 'steps/step_5_weight_height.dart';
 import 'widgets/profile_setup_footer.dart';
 import 'widgets/profile_setup_header.dart';
 
-/// Shell del flow ProfileSetup. Renderiza header + PageView con los 4 steps +
+/// Shell del flow ProfileSetup. Renderiza header + PageView con los 5 steps +
 /// footer con VOLVER + SIGUIENTE/EMPEZAR. El PageView se sincroniza con el
 /// `currentStep` del notifier.
 class ProfileSetupFlow extends ConsumerStatefulWidget {
@@ -32,10 +35,22 @@ class ProfileSetupFlow extends ConsumerStatefulWidget {
 class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   final _pageController = PageController();
 
+  /// Hay una cancelación de cuenta en curso. Entre confirmar y terminar puede
+  /// haber hasta 10 s de espera (el intento en vuelo) más la baja de la
+  /// cuenta; un segundo «Cancelar cuenta» en ese rato dispararía otra baja, y
+  /// si ésa fallaba, volvía a habilitar los reintentos con la primera todavía
+  /// en curso.
+  ///
+  /// Mientras dure, la pantalla tampoco deja avanzar: un submit en el medio de
+  /// la baja recrearía el perfil entre el barrido de los docs y el borrado de
+  /// la cuenta de Auth, y quedaría huérfano.
+  bool _cancelando = false;
+
   // No hardcoded `\n` — the header (maxLines: 2 + softWrap) wraps these for us,
   // so they stay correct under large OS text scaling and odd viewports (F4).
   static const List<String> _titles = [
     '¿CÓMO TE LLAMÁS?',
+    '¿CUÁNDO NACISTE?',
     '¿DÓNDE ENTRENÁS?',
     'NIVEL DE EXPERIENCIA',
     'PESO Y ALTURA',
@@ -55,11 +70,12 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       return;
     }
 
-    // QA-AUTH-001 (issue #434): cuentas OAuth nuevas (Google/Apple) nunca
-    // pasaron por el checkbox de Register. Mismo gate que register_screen —
-    // mostramos el snackbar y NO disparamos submit. Email ya tiene perfil
-    // (creado por signUpWithEmail) así que este gate no le aplica.
-    final needsTermsConsent = ref.read(userProfileProvider).valueOrNull == null;
+    // QA-AUTH-001 (issue #434): quien no tiene consentimiento registrado
+    // —las altas con Google/Apple nunca pasaron por el checkbox de Register—
+    // lo da acá. Mismo gate que register_screen: snackbar y NO se dispara el
+    // submit. Si todavía no se sabe (`null`), se pide: ver
+    // [termsConsentRequiredProvider].
+    final needsTermsConsent = ref.read(termsConsentRequiredProvider) ?? true;
     if (needsTermsConsent && !state.termsAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -95,11 +111,19 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
           ),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // El handle publico se persiste como `displayName`, asi que pasa por el
+      // filtro de terminos vetados (`UserRepository.update`). `profileSetupSaveError`
+      // invita a reintentar, y para un bloqueo eso es consejo falso: el mismo
+      // handle va a fallar siempre. Peor aca que en cualquier otra pantalla —
+      // es el onboarding, y el usuario todavia no entro a la app.
+      final copy = e is ModerationBlockedException
+          ? AppL10n.of(context).moderationBlockedMessage
+          : AppL10n.of(context).profileSetupSaveError;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppL10n.of(context).profileSetupSaveError),
+          content: Text(copy),
           duration: const Duration(seconds: 3),
         ),
       );
@@ -115,6 +139,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   /// navigates to /welcome. On failure shows a SnackBar and keeps the user
   /// on the current step.
   Future<void> _onCancel() async {
+    if (_cancelando) return;
     final palette = AppPalette.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -140,14 +165,26 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
       ),
     );
     if (confirmed != true) return;
-    if (!mounted) return;
+    if (!mounted || _cancelando) return;
+    setState(() => _cancelando = true);
 
+    // Frena los reintentos de `users/{uid}` ANTES de borrar la cuenta, y espera
+    // al que ya esté en vuelo: un doc escrito después del borrado quedaría
+    // huérfano, con el mail de alguien que pidió no tener cuenta. Ver
+    // [altaCanceladaProvider] e [IntentoDelPerfil].
+    final auth = ref.read(authNotifierProvider.notifier);
+    final intento = ref.read(intentoDelPerfilProvider);
+    ref.read(altaCanceladaProvider.notifier).state = true;
+    await intento.esperar();
     try {
-      await ref.read(authNotifierProvider.notifier).cancelOnboarding();
+      await auth.cancelOnboarding();
       if (!mounted) return;
       context.go('/welcome');
     } catch (_) {
       if (!mounted) return;
+      setState(() => _cancelando = false);
+      // La cuenta sigue viva: los reintentos vuelven a correr.
+      ref.read(altaCanceladaProvider.notifier).state = false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppL10n.of(context).profileSetupCancelAccountError),
@@ -170,16 +207,18 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
         if (!_pageController.hasClients) return;
         _pageController.animateToPage(
           next,
-          duration: AppMotion.slow,
+          duration: AppMotion.resolve(context, AppMotion.slow),
           curve: AppMotion.standard,
         );
       },
     );
 
     final state = ref.watch(profileSetupNotifierProvider);
-    // OAuth nuevo (sin perfil aún) — ver comentario de _onPrimary.
-    final needsTermsConsent =
-        ref.watch(userProfileProvider).valueOrNull == null;
+    // Sin consentimiento registrado, o todavía sin saberlo — ver _onPrimary.
+    final needsTermsConsent = ref.watch(termsConsentRequiredProvider) ?? true;
+    // Mientras dure el alta, reintenta crear `users/{uid}` si el login no lo
+    // dejó. El resultado no se usa: watchearlo es lo que lo mantiene vivo.
+    ref.watch(perfilAseguradoProvider);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -212,7 +251,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                           TreinoIcon.close,
                           color: palette.textPrimary,
                         ),
-                        onPressed: _onCancel,
+                        onPressed: _cancelando ? null : _onCancel,
                         tooltip: 'Cancelar creación de cuenta',
                       ),
                     ),
@@ -229,14 +268,16 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                       physics: const NeverScrollableScrollPhysics(),
                       children: const [
                         Step1UsernameAvatar(),
-                        Step2Gym(),
-                        Step3ExperienceGender(),
-                        Step4WeightHeight(),
+                        Step2BornAt(),
+                        Step3Gym(),
+                        Step4ExperienceGender(),
+                        Step5WeightHeight(),
                       ],
                     ),
                   ),
-                  // Terms checkbox — solo en el último step y solo para OAuth
-                  // nuevo (email ya aceptó en Register). QA-AUTH-001 (#434).
+                  // Terms checkbox — solo en el último step y solo sin
+                  // consentimiento registrado (email ya aceptó en Register).
+                  // QA-AUTH-001 (#434).
                   if (state.isLastStep && needsTermsConsent) ...[
                     const SizedBox(height: 12),
                     TermsCheckbox(
@@ -249,7 +290,8 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                   const SizedBox(height: 12),
                   ProfileSetupFooter(
                     onBack: state.currentStep == 0 ? null : _onBack,
-                    onPrimary: state.canGoNext ? _onPrimary : null,
+                    onPrimary:
+                        state.canGoNext && !_cancelando ? _onPrimary : null,
                     primaryLabel: state.isLastStep ? 'EMPEZAR' : null,
                     primaryLoading: state.isSubmitting,
                   ),

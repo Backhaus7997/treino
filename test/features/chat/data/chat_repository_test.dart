@@ -140,7 +140,18 @@ void main() {
       expect(chat.isInquiry, isFalse);
     });
 
-    test('asInquiry sobre un chat que YA existe no lo remarca', () async {
+    // El repositorio NO puede remarcar un chat existente, y eso es correcto:
+    // `kind` está pineado inmutable en `chats/update` (firestore.rules), así
+    // que una escritura de cliente se rebota. Este test fija ese límite.
+    //
+    // Lo que NO es correcto es dejarlo ahí: un chat social preexistente
+    // condenaba al alumno a no poder escribirle nunca más a ese PF. La marca
+    // la estampa el servidor — `promoteChatToInquiry`
+    // (`functions/src/chat/promote-chat-to-inquiry.ts`), que el CTA llama
+    // cuando `getOrCreate` devuelve un chat sin `kind` ni `linkId`. Ver
+    // `ChatInquiryPromotionService`.
+    test('asInquiry sobre un chat que YA existe no lo remarca desde el cliente',
+        () async {
       await repo.getOrCreate(selfId: uidA, otherId: uidB);
 
       await repo.getOrCreate(selfId: uidB, otherId: uidA, asInquiry: true);

@@ -840,15 +840,15 @@ void main() {
     expect(
       tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first,
       'Empuje',
-      reason: 'la cabecera del día se fue en la revisión del 31/08: el nombre vive sólo en la pestaña',
+      reason:
+          'la cabecera del día se fue en la revisión del 31/08: el nombre vive sólo en la pestaña',
     );
     // Y sigue siendo un modo de atleta: la plantilla trae split 'PPL', pero el
     // campo es trainer-only (ADR-RER-04).
     expect(find.byKey(const Key('editor_split_field')), findsNothing);
   });
 
-  testWidgets(
-      'la superserie de la plantilla se ve como un bloque, con A1 y A2',
+  testWidgets('la superserie de la plantilla se ve como un bloque, con A1 y A2',
       (tester) async {
     // #869: el bloque se pintaba con `highlight` al 4,7% y el usuario no veía
     // que dos ejercicios estaban agrupados. Acá se afirma lo que se ve, no el
@@ -864,7 +864,8 @@ void main() {
 
     expect(find.byType(SupersetBlock), findsOneWidget);
     expect(find.text('SUPERSERIE · 2 EJERCICIOS'), findsOneWidget,
-        reason: 'la plantilla trae Press de Banca y Press Militar en el grupo 1');
+        reason:
+            'la plantilla trae Press de Banca y Press Militar en el grupo 1');
 
     // El orden de ejecución es la información que el bloque agrega: sin los
     // badges, dos cards apiladas no dicen cuál va primero.
@@ -885,8 +886,7 @@ void main() {
     await desplazarHasta(tester, find.byType(DayActionButtons));
     expect(find.byType(DayActionButtons), findsOneWidget);
 
-    final ejercicio =
-        find.byKey(const Key('day_add_exercise_button'));
+    final ejercicio = find.byKey(const Key('day_add_exercise_button'));
     final superserie = find.byKey(const Key('add_superset_button'));
     expect(tester.getSize(ejercicio).height, 48);
     expect(tester.getSize(superserie).height, 48);

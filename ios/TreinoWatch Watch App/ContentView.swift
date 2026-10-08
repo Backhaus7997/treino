@@ -183,7 +183,17 @@ struct TodayPage: View {
 /// un vistazo entre series. El resto es contexto secundario.
 struct TodaysWorkoutView: View {
     @EnvironmentObject private var workoutCoordinator: WorkoutCoordinator
+    /// Hace falta para el gate del catálogo pago: de acá sale el cliente de
+    /// Firestore y el uid con los que se lee la conclusión del servidor.
+    @EnvironmentObject private var coordinator: CredentialCoordinator
     let workout: TodaysWorkout
+
+    /// El mensaje del gate, cuando la plantilla es del plan pago.
+    ///
+    /// Esta vista no tenía canal de error —no lo necesitaba— así que se agrega
+    /// el mínimo: un `String?` que se dibuja debajo del botón. Es el mismo
+    /// patrón que ya usa `RoutineListView` con su `errorMessage`.
+    @State private var bloqueo: String?
 
     var body: some View {
         VStack(spacing: 4) {
@@ -221,16 +231,62 @@ struct TodaysWorkoutView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 6)
             } else {
-                Button("Empezar") { workoutCoordinator.start(workout: workout) }
+                Button("Empezar") { empezar() }
                     .font(.caption)
                     .tint(.green)
                     .padding(.top, 6)
+
+                if let bloqueo {
+                    Text(bloqueo)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
 
                 DayExerciseList(exercises: workout.exercises)
                     .padding(.top, 10)
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    /// Arranca el entreno de hoy, pasando primero por el gate del catálogo.
+    ///
+    /// ─── Por qué el gate va acá y no adentro de `WorkoutCoordinator.start` ───
+    ///
+    /// Porque `start` es SINCRÓNICO a propósito: guarda la sesión local y
+    /// arranca, y recién después sincroniza en segundo plano —*"el atleta
+    /// empieza a entrenar YA, sin esperar a la red"*—. Meterle una lectura
+    /// adentro convertiría el tap en una espera de red, que es exactamente lo
+    /// que ese diseño evita.
+    ///
+    /// El gate vive en los dos puntos de arranque, que es lo que
+    /// `docs/paywall-watchos-plan.md` §3 pide, y la lógica está en UNA función
+    /// compartida (`CatalogGate.blocks`), no copiada.
+    ///
+    /// ─── Por qué el `catch` deja pasar ───
+    ///
+    /// Si no se puede ni conseguir el cliente de Firestore, no hay forma de
+    /// saber si corresponde gatear. Fallar cerrado le cortaría el entrenamiento
+    /// a alguien que paga por un parpadeo de red, y el servidor rebota igual la
+    /// escritura si no corresponde.
+    private func empezar() {
+        bloqueo = nil
+        Task {
+            do {
+                let (client, uid) = try await coordinator.firestoreClient()
+                if await CatalogGate.blocks(
+                    workout: workout, client: client, uid: uid
+                ) {
+                    bloqueo = CatalogGate.mensajeBloqueado
+                    return
+                }
+            } catch {
+                // Ver el dartdoc: sin datos no se gatea.
+            }
+            workoutCoordinator.start(workout: workout)
+        }
     }
 }
 

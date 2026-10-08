@@ -12,7 +12,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_dialog.dart';
+import 'package:treino/features/profile/application/account_deletion_notifier.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
@@ -36,12 +41,29 @@ UserProfile _trainer() => UserProfile(
       updatedAt: DateTime(2025, 1, 1),
     );
 
+class _FakeDeletionNotifier extends AccountDeletionNotifier {
+  int deletes = 0;
+
+  @override
+  Future<void> build() async {}
+
+  @override
+  Future<void> deleteAccount([BuildContext? context]) async => deletes++;
+}
+
+class _MockFirebaseAuth extends Mock implements FirebaseAuth {}
+
 Widget _harness({
   required Stream<UserProfile?> profileStream,
   UserRepository? repo,
+  AccountDeletionNotifier? notifier,
 }) =>
     ProviderScope(
       overrides: [
+        accountDeletionNotifierProvider
+            .overrideWith(() => notifier ?? _FakeDeletionNotifier()),
+        // Sin usuario: el diálogo lee el proveedor para el aviso del popup.
+        firebaseAuthProvider.overrideWithValue(_MockFirebaseAuth()),
         userProfileProvider.overrideWith((ref) => profileStream),
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream<List<TrainerLink>>.value(const [])),
@@ -51,6 +73,9 @@ Widget _harness({
       // en producción (_TabBody) — sin esto el contenido de Cuenta desborda
       // el viewport fijo de test (800x600).
       child: const MaterialApp(
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: Locale('es', 'AR'),
         home: Scaffold(body: SingleChildScrollView(child: CuentaTab())),
       ),
     );
@@ -132,14 +157,28 @@ void main() {
           text.contains('proximamente');
     }
 
-    testWidgets(
-        'tocar ELIMINAR CUENTA abre un TreinoDialog honesto (no ejecuta '
-        'nada)', (tester) async {
+    // Eliminar la cuenta NO devuelve plata: es la baja (Términos §7), no el
+    // arrepentimiento (§6). El texto viejo decia «emite los reembolsos
+    // correspondientes» y nadie los emitia.
+    testWidgets('la zona peligrosa no promete reembolsos y explica la baja',
+        (tester) async {
       final repo = _MockUserRepo();
-      when(() => repo.update(any(), any())).thenAnswer((_) async {});
-
       await tester.pumpWidget(
         _harness(profileStream: Stream.value(_trainer()), repo: repo),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('reembols'), findsNothing);
+      expect(find.textContaining('no devuelve el dinero'), findsOneWidget);
+      expect(find.textContaining('dá de baja tu plan desde Facturación'),
+          findsOneWidget);
+    });
+
+    testWidgets(
+        'tocar ELIMINAR CUENTA abre la confirmación real (ya no «Próximamente»)',
+        (tester) async {
+      await tester.pumpWidget(
+        _harness(profileStream: Stream.value(_trainer())),
       );
       await tester.pumpAndSettle();
 
@@ -147,19 +186,17 @@ void main() {
       await tester.tap(find.text('ELIMINAR CUENTA'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TreinoDialog), findsOneWidget);
-      expect(find.byWidgetPredicate(honestCopy), findsWidgets);
-      verifyNever(() => repo.update(any(), any()));
+      expect(find.byType(EliminarCuentaDialog), findsOneWidget);
+      expect(find.textContaining('Próximamente'), findsNothing);
+      expect(find.textContaining('se gestiona desde la app'), findsNothing);
+      expect(find.text('ELIMINAR'), findsOneWidget);
     });
 
-    testWidgets(
-        'el dialog de ELIMINAR CUENTA: Cancelar lo cierra sin mutar la '
-        'cuenta', (tester) async {
-      final repo = _MockUserRepo();
-      when(() => repo.update(any(), any())).thenAnswer((_) async {});
-
+    testWidgets('CANCELAR cierra el diálogo sin iniciar la baja',
+        (tester) async {
+      final notifier = _FakeDeletionNotifier();
       await tester.pumpWidget(
-        _harness(profileStream: Stream.value(_trainer()), repo: repo),
+        _harness(profileStream: Stream.value(_trainer()), notifier: notifier),
       );
       await tester.pumpAndSettle();
 
@@ -170,18 +207,15 @@ void main() {
       await tester.tap(find.byKey(const Key('dialog_secondary_button')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TreinoDialog), findsNothing);
-      verifyNever(() => repo.update(any(), any()));
+      expect(find.byType(EliminarCuentaDialog), findsNothing);
+      expect(notifier.deletes, 0);
     });
 
-    testWidgets(
-        'el dialog de ELIMINAR CUENTA: confirmar (Entendido) tampoco muta '
-        'la cuenta', (tester) async {
-      final repo = _MockUserRepo();
-      when(() => repo.update(any(), any())).thenAnswer((_) async {});
-
+    testWidgets('confirmar ELIMINAR en el diálogo inicia la baja',
+        (tester) async {
+      final notifier = _FakeDeletionNotifier();
       await tester.pumpWidget(
-        _harness(profileStream: Stream.value(_trainer()), repo: repo),
+        _harness(profileStream: Stream.value(_trainer()), notifier: notifier),
       );
       await tester.pumpAndSettle();
 
@@ -190,10 +224,9 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('dialog_primary_button')));
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      expect(find.byType(TreinoDialog), findsNothing);
-      verifyNever(() => repo.update(any(), any()));
+      expect(notifier.deletes, 1);
     });
 
     testWidgets('tocar PAUSAR CUENTA abre un TreinoDialog honesto',

@@ -22,6 +22,8 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/chat/application/chat_providers.dart'
     show totalUnreadCountProvider;
+import 'package:treino/features/coach/application/template_quota_provider.dart';
+import 'package:treino/features/coach/presentation/widgets/trainer_limit_notice.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_hero.dart';
@@ -30,6 +32,8 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/core/utils/deep_link_destination.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/invite_athlete_dialog.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
@@ -210,9 +214,8 @@ void main() {
       expect(find.textContaining('BUENAS, JOACO'), findsOneWidget);
     });
 
-    testWidgets(
-        'the 3 primary quick actions navigate to /alumnos, /template-editor, '
-        '/chat', (tester) async {
+    testWidgets('"+ Nuevo alumno" abre la invitación, no la lista',
+        (tester) async {
       await _pumpWithRouter(
         tester,
         const DashboardWelcomeCard(),
@@ -221,7 +224,24 @@ void main() {
 
       await tester.tap(find.byKey(const Key('quick_action_nuevo_alumno')));
       await tester.pumpAndSettle();
-      expect(find.text('page:/alumnos'), findsOneWidget);
+
+      // Antes navegaba a `/alumnos`: la lista de los que YA tenés, que es
+      // justo donde no está el que querés sumar. Ahora abre el link de
+      // invitación, y el link lleva a ESTE PF.
+      expect(find.byType(InviteAthleteDialog), findsOneWidget);
+      final link = tester
+          .widget<SelectableText>(
+            find.descendant(
+              of: find.byKey(const Key('invite_dialog_link')),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .data!;
+      expect(
+        DeepLinkDestination.fromQuery(Uri.parse(link).queryParameters)!
+            .trainerId,
+        'trainer-1',
+      );
     });
 
     // #569: antes iba a /biblioteca (el listado) en vez del editor.
@@ -235,6 +255,36 @@ void main() {
       await tester.tap(find.byKey(const Key('quick_action_crear_rutina')));
       await tester.pumpAndSettle();
       expect(find.text('page:/template-editor'), findsOneWidget);
+    });
+
+    // docs/limite-plantillas-pf.md PR3: gatear ANTES de abrir el editor —
+    // el PF en el tope no llega a armar una plantilla entera para recién
+    // enterarse al guardar.
+    testWidgets(
+        'crear rutina — PF en el tope de plantillas NO navega y muestra el '
+        'aviso', (tester) async {
+      // Seam de test: `kIsWeb` es una constante de compilación que bajo
+      // `flutter test` vale `false` siempre — sin esto el aviso saldría con
+      // la forma MÓVIL (sheet) en un test del Coach Hub (web).
+      debugTrainerLimitNoticeForm = TrainerLimitNoticeForm.dialog;
+      addTearDown(() => debugTrainerLimitNoticeForm = null);
+
+      await _pumpWithRouter(
+        tester,
+        const DashboardWelcomeCard(),
+        overrides: [
+          ..._welcomeOverrides(),
+          templateQuotaProvider.overrideWithValue(
+            const AsyncValue.data((limit: 3, count: 3)),
+          ),
+        ],
+      );
+
+      await tester.tap(find.byKey(const Key('quick_action_crear_rutina')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('page:/template-editor'), findsNothing);
+      expect(find.text('VER PLANES'), findsOneWidget);
     });
 
     // #569: '/mensajes' no existe en el router y tiraba 404.
@@ -338,7 +388,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
 
-      expect(find.text('page:/alumnos'), findsOneWidget,
+      expect(find.byType(InviteAthleteDialog), findsOneWidget,
           reason: 'Enter (teclado) debe activar el CTA igual que el tap');
 
       handle.dispose();

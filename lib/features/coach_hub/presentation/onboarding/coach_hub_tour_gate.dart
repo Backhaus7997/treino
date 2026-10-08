@@ -16,11 +16,13 @@ import 'coach_hub_card_copy.dart';
 /// [CoachHubScaffold]: si se montara antes, un browser angosto vería el tour
 /// encima del `MobileBanner`.
 ///
-/// No toca `coachHubRedirect`. En web no hay un momento "post-setup" — el PF
-/// llega ya completo desde mobile — así que el disparador natural es el montaje
-/// del shell, no una precondición de navegación. Y un gate de router sería peor
-/// que en mobile: la única ruta pública del Hub es `/login`, y el "Salir" vive
-/// en `CoachHubTopBar`, que una ruta top-level no renderiza.
+/// No toca `coachHubRedirect`. El PF incompleto no llega acá: el gate de
+/// `hubOnboardingStage` en `coachHubRedirect` lo manda a
+/// `kCoachHubOnboardingRoute` (fuera del shell) hasta que la etapa sea `done`.
+/// Como [CoachHubScaffold] solo se monta con el perfil completo, el disparador
+/// natural es el montaje del shell, no una precondición de navegación. Y un
+/// gate de router para el tour sería peor que en mobile: el "Salir" vive en
+/// `CoachHubTopBar`, que una ruta top-level no renderiza.
 ///
 /// Comparte con mobile el flag de Firestore, el controller y la vista del tour.
 /// Lo único propio es el copy, en español hardcodeado (constraint del Hub).

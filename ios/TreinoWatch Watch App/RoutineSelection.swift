@@ -19,20 +19,28 @@ import Foundation
 ///
 /// Prioridad:
 /// 0. Marcador explícito del perfil, buscado en la lista UNIFICADA: primero
-///    asignadas por PF, después auto-creadas. Un id obsoleto NO devuelve nil:
-///    cae al resto de la cadena.
+///    asignadas por PF, después auto-creadas, y por último las plantillas del
+///    catálogo que el atleta eligió seguir sin copiarlas. Un id obsoleto NO
+///    devuelve nil: cae al resto de la cadena.
 /// 1. Plan asignado por un PF (el más nuevo; llegan ordenados).
 /// 2. Una sola auto-creada: se auto-activa.
 /// 3. Varias auto-creadas sin marcador válido: nil, no se adivina.
+///
+/// `catalogIds` sólo participa del tier 0: una plantilla del catálogo nunca se
+/// auto-activa, hay que elegirla. El llamador puede pasar `[]` cuando ya sabe
+/// que no hace falta —marcador nulo, o que ya matcheó contra las otras dos
+/// listas— y ahorrarse la query; el resultado es el mismo.
 func resolveActiveRoutineId(
     activeRoutineId: String?,
     assignedIds: [String],
-    selfCreatedIds: [String]
+    selfCreatedIds: [String],
+    catalogIds: [String] = []
 ) -> String? {
     // Tier 0 — marcador explícito.
     if let marker = activeRoutineId, !marker.isEmpty {
         if assignedIds.contains(marker) { return marker }
         if selfCreatedIds.contains(marker) { return marker }
+        if catalogIds.contains(marker) { return marker }
         // Obsoleto: sigue la cadena.
     }
 

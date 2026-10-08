@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../domain/post.dart';
 import '../domain/post_privacy.dart';
 import '../domain/routine_tag.dart';
@@ -136,7 +137,20 @@ class CreatePostNotifier
   /// - viewer not authenticated
   /// - gym privacy selected but user has no gym
   /// - `PostRepository.create()` / `PostActionsNotifier.updatePost()` throws
-  Future<bool> submit() async {
+  /// [moderationMessage] es el texto que se muestra cuando el filtro de
+  /// términos vetados rechaza el post. Llega RESUELTO desde la pantalla y no se
+  /// resuelve acá a propósito.
+  ///
+  /// Este notifier era Dart puro. Leer `rootScaffoldMessengerKey` para sacar un
+  /// `BuildContext` y localizar acá adentro le mete una dependencia del binding
+  /// de Flutter a un método que casi nunca la necesita: 10 tests unitarios que
+  /// nunca disparan un bloqueo se caían con "Binding has not yet been
+  /// initialized". El copy de usuario se resuelve donde hay contexto.
+  ///
+  /// Es parámetro requerido y no opcional con default: un default en castellano
+  /// convierte "me olvidé de pasarlo" en "un usuario en inglés ve media pantalla
+  /// en español", que es un bug que nadie reporta.
+  Future<bool> submit({required String moderationMessage}) async {
     final current = state.valueOrNull;
     if (current == null || !current.canSubmit) return false;
 
@@ -148,8 +162,9 @@ class CreatePostNotifier
     // pasa a ser error. El link se cierra en el finally: recién ahí vuelve a
     // regir el autoDispose.
     final keepAlive = ref.keepAlive();
+
     try {
-      return await _runSubmit(current);
+      return await _runSubmit(current, moderationMessage);
     } finally {
       keepAlive.close();
     }
@@ -157,7 +172,12 @@ class CreatePostNotifier
 
   /// Cuerpo del envío. Separado de [submit] para que el manejo del ciclo de
   /// vida (el pin de arriba) no se mezcle con la lógica de publicación.
-  Future<bool> _runSubmit(CreatePostState current) async {
+  ///
+  /// [copyModeracion] llega resuelto desde la pantalla, via [submit].
+  Future<bool> _runSubmit(
+    CreatePostState current,
+    String copyModeracion,
+  ) async {
     // Mark as submitting immediately — prevents double-tap (SCENARIO-228)
     state = AsyncData(
       current.copyWith(isSubmitting: true, clearError: true),
@@ -201,6 +221,14 @@ class CreatePostNotifier
             );
         state = AsyncData(current.copyWith(isSubmitting: false));
         return true;
+      } on ModerationBlockedException catch (_) {
+        // Editar un post tambien pasa por el guard (`PostRepository.update`).
+        // Sin esta rama el usuario que edita para meter algo vetado ve
+        // "Intentá de nuevo", reintenta, y vuelve a fallar para siempre.
+        state = AsyncData(
+          current.copyWith(isSubmitting: false, errorMessage: copyModeracion),
+        );
+        return false;
       } catch (_) {
         state = AsyncData(
           current.copyWith(
@@ -233,6 +261,20 @@ class CreatePostNotifier
       // Reset state
       state = const AsyncData(CreatePostState());
       return true;
+    } on ModerationBlockedException catch (_) {
+      // El mensaje genérico de abajo dice "Intentá de nuevo", y para un
+      // bloqueo de moderación eso es CONSEJO FALSO: el mismo texto va a fallar
+      // siempre. El usuario reintenta, vuelve a fallar, y concluye que la app
+      // está rota en vez de que su texto no pasa.
+      //
+      // El copy sale de `moderationBlockedMessage` en l10n y no nombra el
+      // término que saltó, a propósito: decirlo convierte al filtro en un
+      // oráculo para encontrarle el borde.
+      //
+      state = AsyncData(
+        current.copyWith(isSubmitting: false, errorMessage: copyModeracion),
+      );
+      return false;
     } catch (_) {
       state = AsyncData(
         current.copyWith(

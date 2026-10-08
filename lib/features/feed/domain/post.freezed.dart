@@ -33,7 +33,20 @@ mixin _$Post {
   RoutineTag? get routineTag => throw _privateConstructorUsedError;
   PostPrivacy get privacy => throw _privateConstructorUsedError;
   @TimestampConverter()
-  DateTime get createdAt => throw _privateConstructorUsedError;
+  DateTime get createdAt =>
+      throw _privateConstructorUsedError; // Contrato de una sola dirección: el cliente lo LEE, nunca lo escribe.
+// `reactionCounts` lo mantiene en exclusiva la Cloud Function con el Admin
+// SDK, y el `allow create` de `posts` no lo lista en su `hasOnly` — con la
+// key presente, TODO create de post era PERMISSION_DENIED.
+//
+// `includeToJson: false` no toca `fromJson`: la lectura sigue poblando el
+// campo desde lo que escribió la función. Abrir la key en el `hasOnly`
+// habría sido el fix tentador y equivocado: dejaría que cualquiera se
+// plante 999 reacciones en su propio post
+// (`functions/src/__tests__/reaction-rules.test.ts`).
+//
+// Lo custodia `test/conformance/post_wire_shape_parity_test.dart`.
+  @JsonKey(includeToJson: false)
   @ReactionCountsConverter()
   Map<ReactionType, int> get reactionCounts =>
       throw _privateConstructorUsedError; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional
@@ -74,7 +87,9 @@ abstract class $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
-      @ReactionCountsConverter() Map<ReactionType, int> reactionCounts,
+      @JsonKey(includeToJson: false)
+      @ReactionCountsConverter()
+      Map<ReactionType, int> reactionCounts,
       WorkoutStats? workoutStats,
       String? photoUrl,
       WorkoutSnapshot? workoutSnapshot});
@@ -229,7 +244,9 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
       RoutineTag? routineTag,
       PostPrivacy privacy,
       @TimestampConverter() DateTime createdAt,
-      @ReactionCountsConverter() Map<ReactionType, int> reactionCounts,
+      @JsonKey(includeToJson: false)
+      @ReactionCountsConverter()
+      Map<ReactionType, int> reactionCounts,
       WorkoutStats? workoutStats,
       String? photoUrl,
       WorkoutSnapshot? workoutSnapshot});
@@ -338,6 +355,7 @@ class _$PostImpl implements _Post {
       required this.routineTag,
       required this.privacy,
       @TimestampConverter() required this.createdAt,
+      @JsonKey(includeToJson: false)
       @ReactionCountsConverter()
       final Map<ReactionType, int> reactionCounts = const <ReactionType, int>{},
       this.workoutStats,
@@ -372,9 +390,33 @@ class _$PostImpl implements _Post {
   @override
   @TimestampConverter()
   final DateTime createdAt;
+// Contrato de una sola dirección: el cliente lo LEE, nunca lo escribe.
+// `reactionCounts` lo mantiene en exclusiva la Cloud Function con el Admin
+// SDK, y el `allow create` de `posts` no lo lista en su `hasOnly` — con la
+// key presente, TODO create de post era PERMISSION_DENIED.
+//
+// `includeToJson: false` no toca `fromJson`: la lectura sigue poblando el
+// campo desde lo que escribió la función. Abrir la key en el `hasOnly`
+// habría sido el fix tentador y equivocado: dejaría que cualquiera se
+// plante 999 reacciones en su propio post
+// (`functions/src/__tests__/reaction-rules.test.ts`).
+//
+// Lo custodia `test/conformance/post_wire_shape_parity_test.dart`.
   final Map<ReactionType, int> _reactionCounts;
+// Contrato de una sola dirección: el cliente lo LEE, nunca lo escribe.
+// `reactionCounts` lo mantiene en exclusiva la Cloud Function con el Admin
+// SDK, y el `allow create` de `posts` no lo lista en su `hasOnly` — con la
+// key presente, TODO create de post era PERMISSION_DENIED.
+//
+// `includeToJson: false` no toca `fromJson`: la lectura sigue poblando el
+// campo desde lo que escribió la función. Abrir la key en el `hasOnly`
+// habría sido el fix tentador y equivocado: dejaría que cualquiera se
+// plante 999 reacciones en su propio post
+// (`functions/src/__tests__/reaction-rules.test.ts`).
+//
+// Lo custodia `test/conformance/post_wire_shape_parity_test.dart`.
   @override
-  @JsonKey()
+  @JsonKey(includeToJson: false)
   @ReactionCountsConverter()
   Map<ReactionType, int> get reactionCounts {
     if (_reactionCounts is EqualUnmodifiableMapView) return _reactionCounts;
@@ -479,7 +521,9 @@ abstract class _Post implements Post {
       required final RoutineTag? routineTag,
       required final PostPrivacy privacy,
       @TimestampConverter() required final DateTime createdAt,
-      @ReactionCountsConverter() final Map<ReactionType, int> reactionCounts,
+      @JsonKey(includeToJson: false)
+      @ReactionCountsConverter()
+      final Map<ReactionType, int> reactionCounts,
       final WorkoutStats? workoutStats,
       final String? photoUrl,
       final WorkoutSnapshot? workoutSnapshot}) = _$PostImpl;
@@ -508,8 +552,21 @@ abstract class _Post implements Post {
   PostPrivacy get privacy;
   @override
   @TimestampConverter()
-  DateTime get createdAt;
+  DateTime
+      get createdAt; // Contrato de una sola dirección: el cliente lo LEE, nunca lo escribe.
+// `reactionCounts` lo mantiene en exclusiva la Cloud Function con el Admin
+// SDK, y el `allow create` de `posts` no lo lista en su `hasOnly` — con la
+// key presente, TODO create de post era PERMISSION_DENIED.
+//
+// `includeToJson: false` no toca `fromJson`: la lectura sigue poblando el
+// campo desde lo que escribió la función. Abrir la key en el `hasOnly`
+// habría sido el fix tentador y equivocado: dejaría que cualquiera se
+// plante 999 reacciones en su propio post
+// (`functions/src/__tests__/reaction-rules.test.ts`).
+//
+// Lo custodia `test/conformance/post_wire_shape_parity_test.dart`.
   @override
+  @JsonKey(includeToJson: false)
   @ReactionCountsConverter()
   Map<ReactionType, int>
       get reactionCounts; // QA-FEED-364/389: workout metrics for the feed card's stats row. Optional

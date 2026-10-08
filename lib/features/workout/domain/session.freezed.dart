@@ -35,7 +35,43 @@ mixin _$Session {
   bool get wasFullyCompleted =>
       throw _privateConstructorUsedError; // Periodization (Model B): 0-based week of the plan this session belongs to.
 // @Default(0) keeps single-week sessions intact and retro-compatible.
-  int get weekNumber => throw _privateConstructorUsedError;
+  int get weekNumber =>
+      throw _privateConstructorUsedError; // Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
+// `maintainSessionFeedbackCounters` (functions/), recontando desde la
+// subcolección; las reglas rechazan que un cliente lo toque.
+//
+// Existe para que el historial del PF marque de un vistazo qué sesiones
+// traen una molestia o una nota. Sin esto la marca cuesta una lectura de
+// subcolección por fila.
+//
+// `@Default({})` y no `required`: las sesiones anteriores al agregado no
+// tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
+// vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
+// vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
+  @JsonKey(includeToJson: false)
+  @FeedbackCountsConverter()
+  Map<ExerciseFeedbackKind, int> get feedbackCounts =>
+      throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -63,7 +99,10 @@ abstract class $SessionCopyWith<$Res> {
       SessionStatus status,
       int dayNumber,
       bool wasFullyCompleted,
-      int weekNumber});
+      int weekNumber,
+      @JsonKey(includeToJson: false)
+      @FeedbackCountsConverter()
+      Map<ExerciseFeedbackKind, int> feedbackCounts});
 }
 
 /// @nodoc
@@ -93,6 +132,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? dayNumber = null,
     Object? wasFullyCompleted = null,
     Object? weekNumber = null,
+    Object? feedbackCounts = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -143,6 +183,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
           ? _value.weekNumber
           : weekNumber // ignore: cast_nullable_to_non_nullable
               as int,
+      feedbackCounts: null == feedbackCounts
+          ? _value.feedbackCounts
+          : feedbackCounts // ignore: cast_nullable_to_non_nullable
+              as Map<ExerciseFeedbackKind, int>,
     ) as $Val);
   }
 }
@@ -166,7 +210,10 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
       SessionStatus status,
       int dayNumber,
       bool wasFullyCompleted,
-      int weekNumber});
+      int weekNumber,
+      @JsonKey(includeToJson: false)
+      @FeedbackCountsConverter()
+      Map<ExerciseFeedbackKind, int> feedbackCounts});
 }
 
 /// @nodoc
@@ -194,6 +241,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? dayNumber = null,
     Object? wasFullyCompleted = null,
     Object? weekNumber = null,
+    Object? feedbackCounts = null,
   }) {
     return _then(_$SessionImpl(
       id: null == id
@@ -244,6 +292,10 @@ class __$$SessionImplCopyWithImpl<$Res>
           ? _value.weekNumber
           : weekNumber // ignore: cast_nullable_to_non_nullable
               as int,
+      feedbackCounts: null == feedbackCounts
+          ? _value._feedbackCounts
+          : feedbackCounts // ignore: cast_nullable_to_non_nullable
+              as Map<ExerciseFeedbackKind, int>,
     ));
   }
 }
@@ -263,7 +315,12 @@ class _$SessionImpl implements _Session {
       required this.status,
       this.dayNumber = 1,
       this.wasFullyCompleted = false,
-      this.weekNumber = 0});
+      this.weekNumber = 0,
+      @JsonKey(includeToJson: false)
+      @FeedbackCountsConverter()
+      final Map<ExerciseFeedbackKind, int> feedbackCounts =
+          const <ExerciseFeedbackKind, int>{}})
+      : _feedbackCounts = feedbackCounts;
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
       _$$SessionImplFromJson(json);
@@ -301,10 +358,83 @@ class _$SessionImpl implements _Session {
   @override
   @JsonKey()
   final int weekNumber;
+// Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
+// `maintainSessionFeedbackCounters` (functions/), recontando desde la
+// subcolección; las reglas rechazan que un cliente lo toque.
+//
+// Existe para que el historial del PF marque de un vistazo qué sesiones
+// traen una molestia o una nota. Sin esto la marca cuesta una lectura de
+// subcolección por fila.
+//
+// `@Default({})` y no `required`: las sesiones anteriores al agregado no
+// tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
+// vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
+// vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
+  final Map<ExerciseFeedbackKind, int> _feedbackCounts;
+// Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
+// `maintainSessionFeedbackCounters` (functions/), recontando desde la
+// subcolección; las reglas rechazan que un cliente lo toque.
+//
+// Existe para que el historial del PF marque de un vistazo qué sesiones
+// traen una molestia o una nota. Sin esto la marca cuesta una lectura de
+// subcolección por fila.
+//
+// `@Default({})` y no `required`: las sesiones anteriores al agregado no
+// tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
+// vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
+// vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
+  @override
+  @JsonKey(includeToJson: false)
+  @FeedbackCountsConverter()
+  Map<ExerciseFeedbackKind, int> get feedbackCounts {
+    if (_feedbackCounts is EqualUnmodifiableMapView) return _feedbackCounts;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(_feedbackCounts);
+  }
 
   @override
   String toString() {
-    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status, dayNumber: $dayNumber, wasFullyCompleted: $wasFullyCompleted, weekNumber: $weekNumber)';
+    return 'Session(id: $id, uid: $uid, routineId: $routineId, routineName: $routineName, startedAt: $startedAt, finishedAt: $finishedAt, totalVolumeKg: $totalVolumeKg, durationMin: $durationMin, status: $status, dayNumber: $dayNumber, wasFullyCompleted: $wasFullyCompleted, weekNumber: $weekNumber, feedbackCounts: $feedbackCounts)';
   }
 
   @override
@@ -332,7 +462,9 @@ class _$SessionImpl implements _Session {
             (identical(other.wasFullyCompleted, wasFullyCompleted) ||
                 other.wasFullyCompleted == wasFullyCompleted) &&
             (identical(other.weekNumber, weekNumber) ||
-                other.weekNumber == weekNumber));
+                other.weekNumber == weekNumber) &&
+            const DeepCollectionEquality()
+                .equals(other._feedbackCounts, _feedbackCounts));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -350,7 +482,8 @@ class _$SessionImpl implements _Session {
       status,
       dayNumber,
       wasFullyCompleted,
-      weekNumber);
+      weekNumber,
+      const DeepCollectionEquality().hash(_feedbackCounts));
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.
@@ -381,7 +514,10 @@ abstract class _Session implements Session {
       required final SessionStatus status,
       final int dayNumber,
       final bool wasFullyCompleted,
-      final int weekNumber}) = _$SessionImpl;
+      final int weekNumber,
+      @JsonKey(includeToJson: false)
+      @FeedbackCountsConverter()
+      final Map<ExerciseFeedbackKind, int> feedbackCounts}) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
 
@@ -412,7 +548,42 @@ abstract class _Session implements Session {
       get wasFullyCompleted; // Periodization (Model B): 0-based week of the plan this session belongs to.
 // @Default(0) keeps single-week sessions intact and retro-compatible.
   @override
-  int get weekNumber;
+  int get weekNumber; // Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
+// `maintainSessionFeedbackCounters` (functions/), recontando desde la
+// subcolección; las reglas rechazan que un cliente lo toque.
+//
+// Existe para que el historial del PF marque de un vistazo qué sesiones
+// traen una molestia o una nota. Sin esto la marca cuesta una lectura de
+// subcolección por fila.
+//
+// `@Default({})` y no `required`: las sesiones anteriores al agregado no
+// tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
+// vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
+// vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
+  @override
+  @JsonKey(includeToJson: false)
+  @FeedbackCountsConverter()
+  Map<ExerciseFeedbackKind, int> get feedbackCounts;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.

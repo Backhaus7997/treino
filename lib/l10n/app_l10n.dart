@@ -122,11 +122,23 @@ abstract class AppL10n {
   /// **'Arrancá tu entrenamiento'**
   String get homeAthleteFirstRunTitle;
 
-  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard.
+  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard. Shown ONLY when the athlete has no active trainer link — the two-path twin is homeAthleteFirstRunBodyWithTrainer.
   ///
   /// In es_AR, this message translates to:
   /// **'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.'**
   String get homeAthleteFirstRunBody;
+
+  /// Home first-run empty-state body for an athlete who ALREADY has an active trainer link but no plan yet. Names only the two paths whose buttons are drawn, in button order: create a routine, explore ready-made plans. Must not promise the third path — the 'find a trainer' CTA is hidden in this state. Deliberately says nothing about what the trainer is doing: an active link is confirmed, the trainer working on a plan is not.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya tenés entrenador. Mientras tanto, creá tu propia rutina o explorá planes ya armados.'**
+  String get homeAthleteFirstRunBodyWithTrainer;
+
+  /// Home first-run empty-state body used when the athlete's trainer link could NOT be confirmed (loading, error, or a retained error). Names ONLY the two paths whose buttons are drawn, in button order, and says NOTHING about whether the athlete has a trainer — claiming either way would be an unverified statement about the user (AGENTS.md 11.1). Sibling of homeAthleteFirstRunBody (three paths, no trainer) and homeAthleteFirstRunBodyWithTrainer (two paths, trainer confirmed).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Creá tu propia rutina o explorá planes ya armados.'**
+  String get homeAthleteFirstRunBodyNeutral;
 
   /// Home first-run primary CTA to create a routine (finding 6).
   ///
@@ -503,7 +515,7 @@ abstract class AppL10n {
   /// No description provided for @authTrainerInquiryDialogBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Para alta de entrenador, escribinos a equipo@treino.app'**
+  /// **'Para alta de entrenador, escribinos a treino@gettreino.com'**
   String get authTrainerInquiryDialogBody;
 
   /// No description provided for @authTrainerInquiryDialogClose.
@@ -707,7 +719,7 @@ abstract class AppL10n {
   /// No description provided for @coachLocationSheetTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Permitir ubicación'**
+  /// **'TU UBICACIÓN'**
   String get coachLocationSheetTitle;
 
   /// No description provided for @coachLocationSheetBody.
@@ -716,17 +728,95 @@ abstract class AppL10n {
   /// **'TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.'**
   String get coachLocationSheetBody;
 
-  /// No description provided for @coachLocationSheetAccept.
+  /// No description provided for @coachLocationSheetContinue.
   ///
   /// In es_AR, this message translates to:
-  /// **'ACEPTAR'**
-  String get coachLocationSheetAccept;
+  /// **'CONTINUAR'**
+  String get coachLocationSheetContinue;
 
-  /// No description provided for @coachLocationSheetDeny.
+  /// No description provided for @coachLocationSettingsNoticeTitle.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ahora no'**
-  String get coachLocationSheetDeny;
+  /// **'UBICACIÓN DESACTIVADA'**
+  String get coachLocationSettingsNoticeTitle;
+
+  /// No description provided for @coachLocationSettingsNoticeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
+  String get coachLocationSettingsNoticeBody;
+
+  /// No description provided for @coachLocationSettingsNoticeOpenSettings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ABRIR AJUSTES'**
+  String get coachLocationSettingsNoticeOpenSettings;
+
+  /// No description provided for @coachLocationSettingsNoticeContinueWithout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir sin ubicación'**
+  String get coachLocationSettingsNoticeContinueWithout;
+
+  /// No description provided for @coachLocationServicesOffTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SERVICIOS DE UBICACIÓN DESACTIVADOS'**
+  String get coachLocationServicesOffTitle;
+
+  /// No description provided for @coachLocationServicesOffBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para ver entrenadores cerca tuyo. Si preferís, seguí sin ubicación y explorá entrenadores Online.'**
+  String get coachLocationServicesOffBody;
+
+  /// No description provided for @coachLocationSheetBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO usa tu ubicación para mostrarte gimnasios cerca tuyo. Tu ubicación no es visible para otros usuarios.'**
+  String get coachLocationSheetBodyGyms;
+
+  /// No description provided for @coachLocationSheetBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO usa tu ubicación una sola vez para detectar el lugar donde entrenás.'**
+  String get coachLocationSheetBodyDetect;
+
+  /// No description provided for @coachLocationSettingsNoticeBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.'**
+  String get coachLocationSettingsNoticeBodyGyms;
+
+  /// No description provided for @coachLocationSettingsNoticeBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá la ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.'**
+  String get coachLocationSettingsNoticeBodyDetect;
+
+  /// No description provided for @coachLocationServicesOffBodyGyms.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para ver gimnasios cerca tuyo. Mientras tanto podés buscarlo por nombre.'**
+  String get coachLocationServicesOffBodyGyms;
+
+  /// No description provided for @coachLocationServicesOffBodyDetect.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá los Servicios de ubicación en Ajustes para detectar tu ubicación. También podés elegir un gimnasio de la lista.'**
+  String get coachLocationServicesOffBodyDetect;
+
+  /// No description provided for @profileLocationPermissionNeeded.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos permiso de ubicación.'**
+  String get profileLocationPermissionNeeded;
+
+  /// No description provided for @profileLocationDetectFailed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos detectar tu ubicación.'**
+  String get profileLocationDetectFailed;
 
   /// No description provided for @coachMiPlanTitle.
   ///
@@ -871,6 +961,114 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VER AGENDA DEL PF'**
   String get agendaButtonLabel;
+
+  /// Botón de la tab Coach que abre el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanButtonLabel;
+
+  /// Botón de la tab Coach que abre los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesButtonLabel;
+
+  /// Título de la pantalla read-only del plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanScreenTitle;
+
+  /// Indica que el alumno debe elegir una sola opción del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una'**
+  String get athleteNutritionChooseOneHint;
+
+  /// Se muestra cuando un grupo del plan nutricional no tiene ninguna opción cargada. Sin esto el grupo quedaba con el título y nada debajo, y se leía como un control esperando que el alumno eligiera algo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no cargó opciones acá.'**
+  String get athleteNutritionEmptyGroup;
+
+  /// Indica que el alumno debe incluir todas las opciones del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Va todo'**
+  String get athleteNutritionAllHint;
+
+  /// Estado vacío cuando el PF todavía no creó un plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no cargó tu plan nutricional.'**
+  String get athleteNutritionPlanEmpty;
+
+  /// Error al cargar el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu plan nutricional.'**
+  String get athleteNutritionPlanLoadError;
+
+  /// Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás un vínculo activo con un PF para ver tu plan nutricional.'**
+  String get athleteNutritionNeedsActiveLink;
+
+  /// Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos un vínculo activo con un PF.'**
+  String get athleteLinkRequired;
+
+  /// Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acepto consultas'**
+  String get trainerAcceptsInquiriesTitle;
+
+  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
+  String get trainerAcceptsInquiriesSubtitle;
+
+  /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos confirmar tu vínculo con tu PF.'**
+  String get athleteLinkUnconfirmed;
+
+  /// Botón del gate de vínculo: invalida el provider y vuelve a preguntar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get athleteLinkRequiredRetry;
+
+  /// Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu sesión se cerró. Volvé a entrar.'**
+  String get athleteSessionMissing;
+
+  /// Título de la pantalla de archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesScreenTitle;
+
+  /// Estado vacío cuando ningún PF compartió archivos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no compartió archivos con vos.'**
+  String get athleteFilesEmpty;
+
+  /// Error al cargar los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus archivos.'**
+  String get athleteFilesLoadError;
 
   /// No description provided for @agendaScreenTitle.
   ///
@@ -1538,6 +1736,24 @@ abstract class AppL10n {
   /// **'HISTORIAL'**
   String get workoutHistorialHeading;
 
+  /// Badge en el historial del PF para una sesión del alumno que todavía no terminó (finishedAt == null). El PF necesita distinguirla: un reporte de molestia puede llegarle mientras el entreno sigue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'En curso'**
+  String get coachSessionHistoryInProgress;
+
+  /// Badge en el historial del PF para una sesión terminada con wasFullyCompleted == false — incluidas las que el barrido de zombis cerró sola. Antes no se listaban en ningún lado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin completar'**
+  String get coachSessionHistoryIncomplete;
+
+  /// Estado vacío del historial de sesiones del alumno, visto por el PF. No lleva CTA: el PF no puede entrenar por él.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este alumno todavía no registró entrenamientos.'**
+  String get coachSessionHistoryEmpty;
+
   /// No description provided for @workoutHistorialEmptyMessage.
   ///
   /// In es_AR, this message translates to:
@@ -2138,6 +2354,12 @@ abstract class AppL10n {
   /// **'. Vamos a eliminar tu cuenta, tu perfil, tu historial de entrenamientos, tus posts y tu foto.'**
   String get eliminarCuentaSheetBodySuffix;
 
+  /// No description provided for @eliminarCuentaSheetSubscriptionNote.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si tenés una suscripción paga, se cancela y no se te vuelve a cobrar. No se devuelve el dinero del período en curso.'**
+  String get eliminarCuentaSheetSubscriptionNote;
+
   /// No description provided for @eliminarCuentaSheetDeleteCta.
   ///
   /// In es_AR, this message translates to:
@@ -2720,6 +2942,12 @@ abstract class AppL10n {
   /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
   String get profileSetupCancelAccountError;
 
+  /// SnackBar del paso de gimnasio del alta cuando no se pudo resolver el gimnasio tocado. Nombra la opcion tal cual se ve en pantalla (esta hardcodeada en GymSearchBox, sin traducir).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar ese gimnasio. Probá de nuevo o elegí «OTRO GYM / SIN GYM».'**
+  String get profileSetupGymSelectError;
+
   /// No description provided for @reAuthPasswordLabel.
   ///
   /// In es_AR, this message translates to:
@@ -2767,6 +2995,90 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Agregá al menos una ubicación o activá clases virtuales.'**
   String get profileEditTrainerValidationLocation;
+
+  /// No description provided for @trainerLocationConsentSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR TU UBICACIÓN'**
+  String get trainerLocationConsentSheetTitle;
+
+  /// No description provided for @trainerLocationConsentSheetBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.'**
+  String get trainerLocationConsentSheetBody;
+
+  /// No description provided for @trainerLocationConsentSheetAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACEPTAR'**
+  String get trainerLocationConsentSheetAccept;
+
+  /// No description provided for @trainerLocationConsentSheetRevoke.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APAGAR LA PUBLICACIÓN'**
+  String get trainerLocationConsentSheetRevoke;
+
+  /// No description provided for @profileEditTrainerConsentConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Publicar esta ubicación?'**
+  String get profileEditTrainerConsentConfirmTitle;
+
+  /// No description provided for @profileEditTrainerConsentConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.'**
+  String get profileEditTrainerConsentConfirmBody;
+
+  /// No description provided for @profileEditTrainerConsentConfirmAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get profileEditTrainerConsentConfirmAccept;
+
+  /// No description provided for @profileEditTrainerConsentConfirmCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get profileEditTrainerConsentConfirmCancel;
+
+  /// No description provided for @profileEditTrainerPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Visible para los atletas'**
+  String get profileEditTrainerPublished;
+
+  /// No description provided for @profileEditTrainerNotPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No publicada'**
+  String get profileEditTrainerNotPublished;
+
+  /// No description provided for @legacyPrivacyNoticeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actualizamos la Política de Privacidad'**
+  String get legacyPrivacyNoticeTitle;
+
+  /// No description provided for @legacyPrivacyNoticeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.'**
+  String get legacyPrivacyNoticeBody;
+
+  /// No description provided for @legacyPrivacyNoticeAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LEER LA POLÍTICA'**
+  String get legacyPrivacyNoticeAction;
+
+  /// No description provided for @legacyPrivacyNoticeDismiss.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar'**
+  String get legacyPrivacyNoticeDismiss;
 
   /// No description provided for @athleteDetailPlansSection.
   ///
@@ -3626,6 +3938,18 @@ abstract class AppL10n {
   /// **'Replicar este valor en toda la columna'**
   String get routineEditorFillColumnA11y;
 
+  /// Botón de la barra del teclado: salta a la celda siguiente (#910).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIG.'**
+  String get routineEditorNextCellLabel;
+
+  /// No description provided for @routineEditorNextCellA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ir a la celda siguiente'**
+  String get routineEditorNextCellA11y;
+
   /// Contexto debajo de los atajos: sobre qué celda actúan.
   ///
   /// In es_AR, this message translates to:
@@ -4184,6 +4508,252 @@ abstract class AppL10n {
   /// **'No pudimos cerrar sesión. Probá de nuevo.'**
   String get coachHubSignOutError;
 
+  /// Coach Hub onboarding, age step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNDO NACISTE?'**
+  String get coachHubOnboardingAgeTitle;
+
+  /// Coach Hub onboarding, age step explanation (minimum age 13).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitamos tu fecha de nacimiento para activar tu cuenta de entrenador. Tenés que tener 13 años o más.'**
+  String get coachHubOnboardingAgeBody;
+
+  /// Coach Hub onboarding, label above the date of birth field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'FECHA DE NACIMIENTO'**
+  String get coachHubOnboardingAgeLabel;
+
+  /// Coach Hub onboarding, identity step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE LLAMÁS?'**
+  String get coachHubOnboardingIdentityTitle;
+
+  /// Coach Hub onboarding, identity step explanation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este es el nombre con el que te van a ver tus alumnos.'**
+  String get coachHubOnboardingIdentityBody;
+
+  /// Coach Hub onboarding, first name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE'**
+  String get coachHubOnboardingFirstNameLabel;
+
+  /// Coach Hub onboarding, last name field label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APELLIDO'**
+  String get coachHubOnboardingLastNameLabel;
+
+  /// Coach Hub onboarding, inline error for an empty first name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu nombre'**
+  String get coachHubOnboardingFirstNameRequired;
+
+  /// Coach Hub onboarding, inline error for an empty last name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ingresá tu apellido'**
+  String get coachHubOnboardingLastNameRequired;
+
+  /// Coach Hub onboarding, professional profile step headline.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL PROFESIONAL'**
+  String get coachHubOnboardingPfTitle;
+
+  /// Coach Hub onboarding, professional profile step explanation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto es lo que ven los alumnos cuando te buscan. Lo podés cambiar cuando quieras.'**
+  String get coachHubOnboardingPfBody;
+
+  /// Coach Hub onboarding, label above the bio field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BIO'**
+  String get coachHubOnboardingPfBioLabel;
+
+  /// Coach Hub onboarding, label above the specialty chips.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESPECIALIDAD'**
+  String get coachHubOnboardingPfSpecialtyLabel;
+
+  /// Coach Hub onboarding, label above the monthly rate field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TARIFA MENSUAL (ARS)'**
+  String get coachHubOnboardingPfRateLabel;
+
+  /// Coach Hub onboarding, label of the modality block (online and in-person).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MODALIDAD'**
+  String get coachHubOnboardingPfModalityLabel;
+
+  /// Coach Hub onboarding, switch label for online coaching.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Doy clases online'**
+  String get coachHubOnboardingPfOnlineSwitch;
+
+  /// Coach Hub onboarding, hint shown while neither online nor a place is set.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Activá las clases online o sumá un lugar de entrenamiento.'**
+  String get coachHubOnboardingPfModalityRequired;
+
+  /// Coach Hub onboarding, label above the in-person places.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LUGARES DE ENTRENAMIENTO'**
+  String get coachHubOnboardingPfLocationsLabel;
+
+  /// Coach Hub onboarding, label above the place search field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BUSCAR UN LUGAR'**
+  String get coachHubOnboardingPfLocationSearchLabel;
+
+  /// Coach Hub onboarding, hint of the place search field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dirección o nombre del lugar'**
+  String get coachHubOnboardingPfLocationSearchHint;
+
+  /// Coach Hub onboarding, button that runs the place search.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar'**
+  String get coachHubOnboardingPfLocationSearchButton;
+
+  /// Coach Hub onboarding, place search returned no results.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos ese lugar. Probá con la dirección completa.'**
+  String get coachHubOnboardingPfLocationEmpty;
+
+  /// Coach Hub onboarding, the picked place is already in the trainer's locations.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese lugar ya está en tu lista.'**
+  String get coachHubOnboardingPfLocationDuplicate;
+
+  /// Coach Hub onboarding, place search failed (network or HTTP).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos buscar el lugar. Revisá tu conexión y probá de nuevo.'**
+  String get coachHubOnboardingPfLocationNetworkError;
+
+  /// Coach Hub onboarding, place search is misconfigured (missing key). Must never read as 'no results'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La búsqueda de lugares no está disponible en este momento. Si das clases online, podés finalizar igual.'**
+  String get coachHubOnboardingPfLocationConfigError;
+
+  /// Coach Hub onboarding, retry the place search.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get coachHubOnboardingPfLocationRetry;
+
+  /// Coach Hub onboarding, shown after the place search found a place; asks the trainer to name it.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Encontramos el lugar. Ponele el nombre con el que lo van a ver tus alumnos.'**
+  String get coachHubOnboardingPfLocationFound;
+
+  /// Coach Hub onboarding, label of the field where the trainer types the name of the place.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'NOMBRE DEL LUGAR'**
+  String get coachHubOnboardingPfLocationLabelLabel;
+
+  /// Coach Hub onboarding, hint of the place name field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Mi estudio, Parque Sarmiento'**
+  String get coachHubOnboardingPfLocationLabelHint;
+
+  /// Coach Hub onboarding, button that adds the found place with the typed name.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregar lugar'**
+  String get coachHubOnboardingPfLocationAddButton;
+
+  /// Coach Hub onboarding, tooltip of the remove-place button.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar lugar'**
+  String get coachHubOnboardingPfLocationRemove;
+
+  /// Coach Hub onboarding, label of a legacy gym-type location that has no custom label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gimnasio'**
+  String get coachHubOnboardingPfLocationGymFallback;
+
+  /// Coach Hub onboarding, final button of the professional profile step.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Finalizar'**
+  String get coachHubOnboardingPfFinish;
+
+  /// Coach Hub onboarding, continue button of the age and identity steps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Continuar'**
+  String get coachHubOnboardingContinue;
+
+  /// Coach Hub onboarding, inline error when saving a step fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tus datos. Probá de nuevo.'**
+  String get coachHubOnboardingSaveError;
+
+  /// Coach Hub not-allowed screen — headline shown to a signed-in user without the trainer role.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SOLO PARA ENTRENADORES'**
+  String get coachHubNotAllowedTitle;
+
+  /// Coach Hub not-allowed screen — explains the web is trainers-only and points to the mobile app. App Store and Play Store are named WITHOUT links (the app is not published yet).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El Coach Hub es solo para entrenadores. Descargá la app de TREINO desde App Store o Play Store e iniciá sesión ahí.'**
+  String get coachHubNotAllowedBody;
+
+  /// Coach Hub not-allowed screen — line above the contact button for people who want to become a trainer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Querés ser entrenador? Escribile al equipo.'**
+  String get coachHubNotAllowedContactPrompt;
+
+  /// Coach Hub not-allowed screen — label of the button that opens a mailto: to the team.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contactar al equipo'**
+  String get coachHubNotAllowedContactCta;
+
+  /// Coach Hub not-allowed screen — subject of the mailto: draft. Contains spaces on purpose; encoded as %20.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quiero ser entrenador en TREINO'**
+  String get coachHubNotAllowedMailSubject;
+
+  /// Coach Hub not-allowed screen — inline message when the mailto: cannot be opened; points to the visible address.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir tu correo. Escribinos a la dirección de arriba.'**
+  String get coachHubNotAllowedContactFallback;
+
   /// Coach Hub web login screen — subtitle guiding the trainer to reuse their mobile account.
   ///
   /// In es_AR, this message translates to:
@@ -4526,10 +5096,10 @@ abstract class AppL10n {
   /// **'Buscar por nombre…'**
   String get coachHubAlumnosSearchHint;
 
-  /// Coach Hub web alumnos section — 'All' filter chip label.
+  /// Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todos'**
+  /// **'Vigentes'**
   String get coachHubAlumnosFilterAll;
 
   /// Coach Hub web alumnos section — 'Active' filter chip label. Lowercase spelling to match filter chip vs the dashboard's uppercase filter.
@@ -4631,13 +5201,13 @@ abstract class AppL10n {
   /// Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed.
   ///
   /// In es_AR, this message translates to:
-  /// **'Bloqueado'**
+  /// **'Sin acceso'**
   String get coachHubAlumnosStatusBlocked;
 
   /// Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit.
   ///
   /// In es_AR, this message translates to:
-  /// **'Bloqueados'**
+  /// **'Sin acceso'**
   String get coachHubAlumnosFilterBloqueados;
 
   /// Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription.
@@ -4727,13 +5297,13 @@ abstract class AppL10n {
   /// Coach Hub web alumno detail — title of the Archivos tab body.
   ///
   /// In es_AR, this message translates to:
-  /// **'Archivos privados'**
+  /// **'Archivos del alumno'**
   String get coachHubAlumnoDetailArchivosTitle;
 
-  /// Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does.
+  /// Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno.
   ///
   /// In es_AR, this message translates to:
-  /// **'PDFs y fotos que subís sobre este alumno. Solo vos los ves.'**
+  /// **'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.'**
   String get coachHubAlumnoDetailArchivosSubtitle;
 
   /// Coach Hub web alumno detail — primary CTA to open the file picker.
@@ -4801,6 +5371,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar el archivo.'**
   String get coachHubAlumnoDetailArchivosDeleteError;
+
+  /// Estado visible de un archivo compartido con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIDO'**
+  String get coachHubAlumnoDetailArchivosSharedLabel;
+
+  /// Estado visible de un archivo que el alumno no puede ver.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRIVADO'**
+  String get coachHubAlumnoDetailArchivosPrivateLabel;
+
+  /// Tooltip para habilitar el acceso del alumno a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosShareTooltip;
+
+  /// Tooltip para quitarle al alumno el acceso a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar de compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosUnshareTooltip;
+
+  /// Snackbar cuando falla el cambio de visibilidad de un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cambiar quién ve el archivo.'**
+  String get coachHubAlumnoDetailArchivosShareError;
 
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
@@ -4898,7 +5498,7 @@ abstract class AppL10n {
   /// **'Post publicado.'**
   String get feedPostPublishedSuccess;
 
-  /// Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts.
+  /// Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear).
   ///
   /// In es_AR, this message translates to:
   /// **'Opciones del post'**
@@ -5023,6 +5623,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Ver más'**
   String get gymNearbyShowMore;
+
+  /// Places client key missing at build time (no --dart-define=PLACES_CLIENT_KEY). Config error, NOT a network failure: must never read as 'no results' and must never offer retry — retrying cannot supply the key.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La búsqueda de gyms no está disponible en esta versión de la app.'**
+  String get gymSearchConfigError;
 
   /// gym-selection-v2: nearbyGymsProvider fetch-error state. Paired with coachRetryLabel for the retry CTA.
   ///
@@ -5149,6 +5755,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos subir el archivo. Probá de nuevo.'**
   String get chatMediaUploadFailed;
+
+  /// Shown when the athlete's total chat media quota is exhausted, before opening the picker (#chat-media-quota). The MB figure is interpolated from kFreeMaxChatMediaBytes / kMaxChatMediaBytes — never hardcode it in the string.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Llegaste al tope de {maxMb} MB en fotos y videos de chat.'**
+  String chatMediaQuotaFull(String maxMb);
+
+  /// Shown after picking a file that exceeds the per-file cap (#chat-media-quota).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa {fileMb} MB y el máximo es {maxMb} MB.'**
+  String chatMediaFileTooLarge(String fileMb, String maxMb);
+
+  /// Shown after picking a file that fits the per-file cap but would cross the total byte quota (#chat-media-quota).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa {fileMb} MB y te quedan {remainingMb} MB de cupo.'**
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb);
 
   /// No description provided for @chatMediaPreviewPhoto.
   ///
@@ -5419,6 +6043,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'ACTIVA'**
   String get profileRoutinesActiveChip;
+
+  /// Header of the Legal section group in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Legales'**
+  String get profileSectionLegal;
+
+  /// Title of the legal documents index screen and its tile in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Documentos legales'**
+  String get legalDocumentsTitle;
+
+  /// Subtitle under the legal documents tile in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Términos, privacidad y más'**
+  String get legalDocumentsSubtitle;
 
   /// Title of the Appearance settings screen and the tile label in the profile settings list.
   ///
@@ -6387,10 +7029,10 @@ abstract class AppL10n {
   /// **'Asociate a un gym para postear acá'**
   String get postPrivacyNoGymHint;
 
-  /// Section heading for same-gym people suggested below the empty Friends feed.
+  /// Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym.
   ///
   /// In es_AR, this message translates to:
-  /// **'PERSONAS DE TU GYM'**
+  /// **'SUGERENCIAS PARA VOS'**
   String get suggestedUsersTitle;
 
   /// Fallback display name for a suggested public profile without a name.
@@ -7233,6 +7875,18 @@ abstract class AppL10n {
   /// **'MOLESTIA'**
   String get exerciseFeedbackNoteTagDiscomfort;
 
+  /// Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). NO asertivo a proposito: llegar al tope no PRUEBA que haya mas atras (con exactamente 365 sesiones la condicion se cumple y no hay nada mas), y el numero de filas visibles puede ser menor porque el modo alumno filtra las incompletas. Sin el aviso la lista corta en silencio, con un aviso asertivo miente; esto informa sin afirmar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede haber entrenamientos más viejos que no entran en esta lista.'**
+  String get workoutHistorialTopeAlcanzado;
+
+  /// Pie de la pantalla completa de Actividad reciente cuando el feed llego al tope de datos (kRecentActivityMaxEntries). El Ver todo del dashboard lleva ahi, y sin esto mostraria las 50 mas nuevas como si fueran todas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede haber más actividad que no entra en esta lista.'**
+  String get dashboardActividadTopeAlcanzado;
+
   /// Serie a la que quedó anclado el reporte, al lado del tag.
   ///
   /// In es_AR, this message translates to:
@@ -7418,6 +8072,844 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Unir con el de abajo'**
   String get routineEditorSlotMenuMergeDown;
+
+  /// Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto es parte del plan pago'**
+  String get paywallFreePlanLimitTitle;
+
+  /// Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.'**
+  String paywallFreePlanLimitDaysBody(int max);
+
+  /// Cuerpo para el tope de SEMANAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.'**
+  String get paywallFreePlanLimitWeeksBody;
+
+  /// Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max);
+
+  /// El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max);
+
+  /// CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el plan pago'**
+  String get paywallFreePlanLimitUpgrade;
+
+  /// No description provided for @paywallFreePlanLimitDismiss.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entendido'**
+  String get paywallFreePlanLimitDismiss;
+
+  /// Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.'**
+  String get paywallFreePlanLimitTemplateBody;
+
+  /// Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.'**
+  String paywallFreePlanLimitCustomizeTemplateBody(int max);
+
+  /// Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN PAGO'**
+  String get workoutPlantillasPremiumChip;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'3 meses'**
+  String get progressionPeriodLast3Months;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'1 año'**
+  String get progressionPeriodLast1Year;
+
+  /// Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir esta plantilla'**
+  String get workoutRoutineFollow;
+
+  /// Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La estas siguiendo'**
+  String get workoutRoutineFollowing;
+
+  /// No description provided for @workoutRoutineFollowSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo, ahora seguís esta plantilla.'**
+  String get workoutRoutineFollowSuccess;
+
+  /// No description provided for @workoutRoutineFollowError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos marcarla. Probá de nuevo.'**
+  String get workoutRoutineFollowError;
+
+  /// Cuerpo de la hoja cuando el alumno free intenta guardar una rutina propia mas alla del tope. Aclara que seguir plantillas no consume cupo, porque desde #963 seguir no copia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.'**
+  String get paywallFreePlanLimitRoutineCountBody;
+
+  /// Cuerpo de la hoja cuando el alumno free toca un periodo de grafico del plan pago. Es el unico limite que no restringe lo que puede HACER sino hasta donde puede MIRAR lo que ya hizo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.'**
+  String get paywallFreePlanLimitChartHistoryBody;
+
+  /// Nombre del plan pago del alumno en la tarjeta de la hoja de limite. Es el mismo nombre que usan la landing y los terminos de suscripcion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO Pro'**
+  String get paywallFreePlanLimitProName;
+
+  /// Bajada de la tarjeta TREINO Pro. La tarjeta DESCRIBE el plan y nada mas: no dice donde se consigue, ni cuanto sale, ni que va a llegar algo por otro canal. Bajo la Guideline 3.1.3(f) cualquiera de esas tres cosas es un 'call to action for purchase outside of the app' y se lleva puesta la exencion del ENTRENADOR. Ver superficie_de_cobro_alumno_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todo lo que ya usás, sin los topes del plan gratis.'**
+  String get paywallFreePlanLimitProTagline;
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxRoutineDays: el numero no se escribe a mano en la cadena.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutinas de hasta {max} días'**
+  String paywallFreePlanLimitProBenefitDays(int max);
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxRoutineWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {max} semanas, con periodización'**
+  String paywallFreePlanLimitProBenefitWeeks(int max);
+
+  /// Beneficio de TREINO Pro. El plan gratis sigue solo las de nivel principiante (docs/paywall-alumno-suelto.md §4.1.1).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todas las plantillas del catálogo, de principiante a avanzado'**
+  String get paywallFreePlanLimitProBenefitTemplates;
+
+  /// Beneficio de TREINO Pro. Seguir una plantilla tal cual es gratis; copiarla para editarla es lo pago.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar cualquier plantilla del catálogo'**
+  String get paywallFreePlanLimitProBenefitCustomize;
+
+  /// Beneficio de TREINO Pro. {max} sale de kMaxOwnRoutines.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {max} rutinas propias'**
+  String paywallFreePlanLimitProBenefitRoutines(int max);
+
+  /// Beneficio de TREINO Pro. Los periodos son los nombres de los chips de los graficos, no un tope: por eso van escritos.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gráficos de 3 meses y 1 año'**
+  String get paywallFreePlanLimitProBenefitCharts;
+
+  /// Etiqueta sobre el beneficio de TREINO Pro que corresponde al tope que el alumno acaba de tocar. Ese beneficio va primero y resaltado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Lo que buscabas'**
+  String get paywallFreePlanLimitProMatchTag;
+
+  /// Titulo del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO Pro'**
+  String get paywallAlumnoTitulo;
+
+  /// Bajada del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Programá en serio: rutinas largas, periodización y todo tu historial.'**
+  String get paywallAlumnoBajada;
+
+  /// Nombre del plan mensual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensual'**
+  String get paywallAlumnoPlanMensual;
+
+  /// Nombre del plan anual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anual'**
+  String get paywallAlumnoPlanAnual;
+
+  /// Etiqueta del plan anual. NO dice un porcentaje: el descuento sale del precio de la tienda y un numero fijo se puede desincronizar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'2 meses gratis'**
+  String get paywallAlumnoAhorro;
+
+  /// Beneficio 1 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutinas de hasta 7 días'**
+  String get paywallAlumnoBeneficio1;
+
+  /// Beneficio 2 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'16 semanas con periodización'**
+  String get paywallAlumnoBeneficio2;
+
+  /// Beneficio 3 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gráficos de 3 meses y 1 año'**
+  String get paywallAlumnoBeneficio3;
+
+  /// Beneficio 4 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las plantillas premium del catálogo'**
+  String get paywallAlumnoBeneficio4;
+
+  /// Aviso de impuestos del paywall del alumno. VA SIN MONTO Y SIN TIPO DE CAMBIO a proposito: el importe final lo define el emisor de la tarjeta al liquidar, asi que no lo podemos saber, y publicar un numero que puede salir mal es 'promoting a false price' (guideline 2.3.1(a), cuya pena escrita es la baja de la app y la terminacion de la cuenta). Ademas Google exige que 'In-app pricing must match the pricing displayed in the user-facing Play billing interface'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.'**
+  String get paywallAlumnoImpuestos;
+
+  /// CTA del paywall del alumno. NO lleva el precio adentro: el boton dispara la hoja del sistema, que muestra el precio de la tienda, y que el boton prometa otro numero es el peor lugar posible para una discrepancia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suscribirme'**
+  String get paywallAlumnoCta;
+
+  /// Restaurar compras. Apple lo EXIGE para suscripciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restaurar compras'**
+  String get paywallAlumnoRestaurar;
+
+  /// Estado de error del paywall del alumno cuando la tienda no devuelve ningun plan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los planes. Probá de nuevo en un rato.'**
+  String get paywallAlumnoSinPlanes;
+
+  /// Boton de reintento del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get paywallAlumnoReintentar;
+
+  /// Resultado: la compra se acredito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Listo! Ya tenés TREINO Pro.'**
+  String get paywallAlumnoListo;
+
+  /// Resultado: pago diferido (Android) o Ask to Buy (iOS). NO es un error.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.'**
+  String get paywallAlumnoPendiente;
+
+  /// Resultado: la compra fallo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos completar la compra. No se te cobró nada.'**
+  String get paywallAlumnoErrorCompra;
+
+  /// Resultado de restaurar cuando no hay nada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos compras para restaurar en esta cuenta.'**
+  String get paywallAlumnoSinRestaurar;
+
+  /// Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más opciones'**
+  String get moderationMenuA11y;
+
+  /// Label of the Reportar item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reportar'**
+  String get moderationReportAction;
+
+  /// Label of the Bloquear item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloquear'**
+  String get moderationBlockAction;
+
+  /// Title of the report-reason bottom sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Por qué lo reportás?'**
+  String get moderationReportSheetTitle;
+
+  /// Report reason: harassment.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acoso'**
+  String get moderationReportReasonHarassment;
+
+  /// Report reason: sexual content.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contenido sexual'**
+  String get moderationReportReasonSexualContent;
+
+  /// Report reason: violence or self-harm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Violencia o autolesión'**
+  String get moderationReportReasonViolenceOrSelfHarm;
+
+  /// Report reason: dangerous health advice.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Consejo de salud peligroso'**
+  String get moderationReportReasonDangerousHealthAdvice;
+
+  /// Report reason: impersonation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suplantación de identidad'**
+  String get moderationReportReasonImpersonation;
+
+  /// Report reason: spam.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Spam'**
+  String get moderationReportReasonSpam;
+
+  /// Report reason: third-party data (sharing someone else's personal data without consent).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos de terceros'**
+  String get moderationReportReasonThirdPartyData;
+
+  /// Report reason: intellectual property infringement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Propiedad intelectual'**
+  String get moderationReportReasonIntellectualProperty;
+
+  /// Report reason: other / none of the above.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Otro'**
+  String get moderationReportReasonOther;
+
+  /// Hint text of the optional free-text detail field in the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contanos más (opcional)'**
+  String get moderationReportDetailHint;
+
+  /// Submit button of the report sheet. Disabled until a reason is selected.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR REPORTE'**
+  String get moderationReportSubmit;
+
+  /// Cancel/dismiss button of the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationReportCancel;
+
+  /// Success snackbar after submitting a report.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gracias, lo vamos a revisar.'**
+  String get moderationReportSuccess;
+
+  /// Error snackbar when submitting a report fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos enviar el reporte. Probá de nuevo.'**
+  String get moderationReportError;
+
+  /// Title of the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Bloquear a {name}?'**
+  String moderationBlockConfirmTitle(String name);
+
+  /// Body line of the block confirmation sheet, explaining what blocking does.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No va a poder escribirte, seguirte ni reaccionar a tus posts.'**
+  String get moderationBlockConfirmBody;
+
+  /// Button that confirms blocking.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BLOQUEAR'**
+  String get moderationBlockConfirmAction;
+
+  /// Button that dismisses the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationBlockDismiss;
+
+  /// Success snackbar after blocking someone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueaste a {name}.'**
+  String moderationBlockSuccess(String name);
+
+  /// Error snackbar when blocking fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos bloquear. Probá de nuevo.'**
+  String get moderationBlockError;
+
+  /// Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.'**
+  String get moderationBlockedMessage;
+
+  /// Titulo de la pantalla y de la seccion de privacidad en el perfil
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Privacidad'**
+  String get privacyTitle;
+
+  /// Titulo del interruptor de analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Analítica de uso'**
+  String get privacyAnalyticsTitle;
+
+  /// Subtitulo del interruptor de analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nos ayuda a entender qué partes de la app se usan.'**
+  String get privacyAnalyticsSubtitle;
+
+  /// Parrafo que explica que pasa al desactivar la analitica
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si la desactivás, TREINO deja de registrar cómo usás la app. No afecta tus entrenamientos, tus datos ni el funcionamiento de nada. Podés volver a activarla cuando quieras. Es una preferencia de ESTE dispositivo: si también entrás al Coach Hub, ahí se configura aparte.'**
+  String get privacyAnalyticsExplainer;
+
+  /// Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
+  String get privacyAnalyticsCrashNote;
+
+  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Analítica y correos'**
+  String get privacyEntryTitle;
+
+  /// Titulo del interruptor de correos promocionales en la pantalla de privacidad. Es una preferencia de la CUENTA, no del dispositivo. Sin 'plan', 'pago', 'suscripcion', 'precio', 'oferta', 'web' ni 'Pro': Guideline 3.1.3 de Apple, ver test/features/paywall/.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Correos promocionales'**
+  String get privacyPromoEmailsTitle;
+
+  /// Subtitulo del interruptor de correos promocionales. 'Los avisos de tu cuenta' es cierto: solo los mails con prefKey se frenan, los operativos siguen saliendo. Mismas palabras prohibidas que el titulo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si lo apagás, no te mandamos más. Los avisos de tu cuenta te siguen llegando.'**
+  String get privacyPromoEmailsSubtitle;
+
+  /// Snackbar cuando falla la escritura del interruptor de correos promocionales. El interruptor vuelve solo al valor real.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
+  String get privacyPromoEmailsSaveError;
+
+  /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} de {limit} ejercicios propios'**
+  String customExerciseCounter(int count, int limit);
+
+  /// Contador visible en la grilla de rutinas del Hub y en la seccion de plantillas del movil (docs/limite-plantillas-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count} de {limit} plantillas'**
+  String templateCounter(int count, int limit);
+
+  /// CTA principal de los TRES avisos de tope del PF (alumnos, ejercicios propios, plantillas) en su forma MÓVIL: navega a /facturacion/planes, la pantalla informativa de precios (no compra nada — Guideline 3.1.3(f)). La WEB (Coach Hub) sigue con el string hardcodeado 'VER PLANES' a propósito (i18n Fase W3): no lo unifiques con esta clave.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER PLANES'**
+  String get planLimitVerPlanesMovil;
+
+  /// Link de descarte de los TRES avisos de tope del PF en su forma MÓVIL. 'Entendido' y no 'Ahora no' porque no presupone ninguna oferta (decisión del dueño, 2026-09-29). La WEB sigue diciendo 'Ahora no', hardcodeado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entendido'**
+  String get planLimitEntendido;
+
+  /// Sufijo del precio en la tarjeta del siguiente plan de los avisos de tope (alumnos, ejercicios propios, plantillas), forma MÓVIL. Lleva la barra porque va pegado al monto ($12.000/mes). La WEB sigue con '/mes' hardcodeado (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'/mes'**
+  String get planLimitPorMes;
+
+  /// Título de la caja 'plan a medida' de los avisos de tope, forma MÓVIL: aparece cuando el PF ya está en el plan más grande y no hay siguiente tier. En producción no se alcanza (el servidor nunca bloquea a un PF sin tope), pero está localizada igual: un texto que puede renderizarse no puede quedar en castellano en la forma en inglés. La WEB lo tiene hardcodeado (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN A MEDIDA'**
+  String get planLimitPlanAMedidaTitulo;
+
+  /// CTA del aviso de ALUMNOS cuando no hay siguiente tier, forma MÓVIL. Misma nota de inalcanzable que planLimitPlanAMedidaTitulo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONTACTANOS'**
+  String get planLimitContactanos;
+
+  /// Título del aviso de tope de ALUMNOS (paywall de bloqueo del PF), forma MÓVIL. La WEB sigue con el string hardcodeado idéntico — misma copy, dos fuentes a propósito (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LLEGASTE AL LÍMITE DE TU PLAN'**
+  String get planLimitAlumnosTituloTope;
+
+  /// Título del aviso de ALUMNOS cuando la suscripción del PF no está activa (PlanLimitReason.subscriptionInactive), forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA'**
+  String get planLimitAlumnosTituloInactiva;
+
+  /// Título del aviso de ALUMNOS con la suscripción inactiva cuando el status es cancelled (una baja, no una suspensión), forma MÓVIL. La caja de abajo dice «Estado: cancelada»: con el título de suspendida el modal se contradecía.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU SUSCRIPCIÓN ESTÁ DADA DE BAJA'**
+  String get planLimitAlumnosTituloBaja;
+
+  /// Primer párrafo del aviso de ALUMNOS con suscripción inactiva, forma MÓVIL — arriba de la caja TU PLAN/Estado. Copy todavía placeholder de producto (ver TODO en plan_limit_paywall.dart), pero ya necesita su traducción en inglés.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mientras tu suscripción no esté al día, tu cuenta funciona con el límite del plan Free. Ningún alumno se elimina.'**
+  String get planLimitAlumnosCuerpoInactivaExplicacion;
+
+  /// Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier tiene cupo limitado. {plan} es el nombre del tier (tierName, no se traduce — ver plan_copy.dart).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 alumno} other{{limit} alumnos}}.'**
+  String planLimitAlumnosCuerpoTopeMovilLimitado(String plan, int limit);
+
+  /// Cuerpo del aviso de ALUMNOS en el tope, forma MÓVIL, cuando el tier (Plan 3) no tiene cupo. En la práctica inalcanzable — Plan 3 es ilimitado y el servidor nunca bloquea a un PF sin tope — se mantiene por completitud, mismo criterio que PLAN A MEDIDA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye alumnos sin límite.'**
+  String planLimitAlumnosCuerpoTopeMovilIlimitado(String plan);
+
+  /// Cuerpo de la caja 'plan a medida' del aviso de ALUMNOS, forma MÓVIL. Inalcanzable en producción (ver planLimitPlanAMedidaTitulo). Es el texto hardcodeado de siempre, sin cambios: supone que el plan más grande topea en 15 alumnos, y desde que Plan 3 es ilimitado (kTierWeightLimits) eso ya no es así — revisar con producto antes de que esta caja pueda mostrarse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estás en el plan más grande. Para más de 15 alumnos estamos preparando un plan a tu medida.'**
+  String get planLimitAlumnosPlanAMedidaCuerpo;
+
+  /// SnackBar que dispara CONTACTANOS en el aviso de ALUMNOS sin siguiente tier, forma MÓVIL (mock hasta que exista un canal de contacto). Inalcanzable en producción, misma nota que planLimitAlumnosPlanAMedidaCuerpo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Muy pronto vas a poder tener más de 15 alumnos.'**
+  String get planLimitAlumnosPlanAMedidaSnack;
+
+  /// Título de la caja de reactivación del aviso de ALUMNOS inactivo, forma MÓVIL. {plan} ya llega en mayúsculas (tierName(tier).toUpperCase()).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PLAN: {plan}'**
+  String planLimitReactivateTituloMovil(String plan);
+
+  /// Cuerpo de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — estado neutro, sin 'reactivá/regularizá/pagá' (Guideline 3.1.3(f)).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No está activa. Mientras tanto, tu cuenta tiene el límite del plan Free: {count, plural, =1{1 alumno} other{{count} alumnos}}.'**
+  String planLimitReactivateCuerpoMovil(int count);
+
+  /// CTA de la caja de reactivación del aviso de ALUMNOS, forma MÓVIL — describe lo que el botón hace (mostrar el SnackBar de estado), no lo que Apple prohíbe pedir. La WEB sigue diciendo 'REGULARIZAR', hardcodeado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER ESTADO'**
+  String get planLimitVerEstadoMovil;
+
+  /// Caption de estado dentro de la caja de reactivación, forma MÓVIL. {estado} sale de una de las cinco claves planLimitEstado*.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estado: {estado}'**
+  String planLimitReactivateEstadoMovil(String estado);
+
+  /// Nombre del SubscriptionStatus.active para la caption 'Estado: …' del aviso de ALUMNOS inactivo, forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'activa'**
+  String get planLimitEstadoActiva;
+
+  /// Nombre del SubscriptionStatus.pending, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'pendiente de pago'**
+  String get planLimitEstadoPendiente;
+
+  /// Nombre del SubscriptionStatus.grace (falló un cobro recurrente y Mercado Pago reintenta), misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'con pago pendiente'**
+  String get planLimitEstadoGracia;
+
+  /// Nombre del SubscriptionStatus.paused, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'pausada'**
+  String get planLimitEstadoPausada;
+
+  /// Nombre del SubscriptionStatus.cancelled, misma caption.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'cancelada'**
+  String get planLimitEstadoCancelada;
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier tiene cupo limitado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 alumno} other{{limit} alumnos}}'**
+  String planLimitAlumnosBeneficioLimitado(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de ALUMNOS, forma MÓVIL, cuando el siguiente tier no tiene tope.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alumnos sin límite'**
+  String get planLimitAlumnosBeneficioIlimitado;
+
+  /// SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva, forma MÓVIL (PlanCheckoutOnWebOnly — la única superficie de cobro en el móvil es informar el estado). Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción está pausada.'**
+  String get planLimitSuscripcionPausadaMovil;
+
+  /// SnackBar que dispara VER ESTADO en el aviso de ALUMNOS con la suscripción inactiva y status cancelled, forma MÓVIL. Hermano de planLimitSuscripcionPausadaMovil: informa el estado, sin llamado a comprar. Guard: avisos_de_tope_movil_sin_llamado_a_comprar_test.dart.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción está dada de baja.'**
+  String get planLimitSuscripcionBajaMovil;
+
+  /// Título del aviso de tope de EJERCICIOS PROPIOS del PF, forma MÓVIL. La WEB sigue con el string hardcodeado idéntico (i18n Fase W3).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TOPE DE EJERCICIOS PROPIOS'**
+  String get planLimitTrainerTituloEjercicios;
+
+  /// Título del aviso de tope de PLANTILLAS del PF, forma MÓVIL.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TOPE DE PLANTILLAS'**
+  String get planLimitTrainerTituloPlantillas;
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. {toDelete} = count - limit + 1 (siempre >= 2 acá, porque count > limit): por eso 'borrá {toDelete}' va sin plural.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {count, plural, =1{1 ejercicio propio} other{{count} ejercicios propios}} y tu plan incluye {limit}. Conservás todos; para crear uno nuevo, borrá {toDelete}.'**
+  String planLimitTrainerPasadoTopeEjercicios(
+      int count, int limit, int toDelete);
+
+  /// Cuerpo del aviso de PLANTILLAS cuando el PF bajó de plan y quedó por encima del tope (conservación), forma MÓVIL. Género femenino ('todas', 'una nueva', 'archivá') a diferencia de ejercicios. {toArchive} = count - limit + 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés {count, plural, =1{1 plantilla} other{{count} plantillas}} y tu plan incluye {limit}. Conservás todas; para crear una nueva, archivá {toArchive}.'**
+  String planLimitTrainerPasadoTopePlantillas(
+      int count, int limit, int toArchive);
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS cuando la suscripción está inactiva (lo decide resolveNoticeTier.inactive; la regla completa está en el dartdoc de esa función), forma MÓVIL. {plan} es el nominal, {planEfectivo} el que realmente aplica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}.'**
+  String planLimitTrainerInactivaEjercicios(
+      String plan, String planEfectivo, int limit);
+
+  /// Igual que planLimitTrainerInactivaEjercicios, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu suscripción a {plan} no está activa. Mientras tanto, tu plan {planEfectivo} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}.'**
+  String planLimitTrainerInactivaPlantillas(
+      String plan, String planEfectivo, int limit);
+
+  /// Cuerpo del aviso de EJERCICIOS PROPIOS en el tope, forma MÓVIL, cuando se pudo resolver un tier efectivo para nombrar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.'**
+  String planLimitTrainerTopeEjerciciosConTier(String plan, int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosConTier pero sin nombrar ningún tier — límite ajustado a mano sin match en la tabla, o propagación pendiente (AGENTS.md §11.1: no se afirma lo que no se sabe).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan incluye {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}. Podés editar o borrar los que ya tenés.'**
+  String planLimitTrainerTopeEjerciciosGenerico(int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosConTier, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan {plan} incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.'**
+  String planLimitTrainerTopePlantillasConTier(String plan, int limit);
+
+  /// Igual que planLimitTrainerTopeEjerciciosGenerico, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu plan incluye {limit, plural, =1{1 plantilla} other{{limit} plantillas}}. Podés editar o archivar las que ya tenés.'**
+  String planLimitTrainerTopePlantillasGenerico(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, con cupo limitado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 ejercicio propio} other{{limit} ejercicios propios}}'**
+  String planLimitTrainerBeneficioEjerciciosLimitado(int limit);
+
+  /// Beneficio del siguiente tier en la tarjeta de upsell del aviso de EJERCICIOS PROPIOS, forma MÓVIL, sin tope.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ejercicios propios sin límite'**
+  String get planLimitTrainerBeneficioEjerciciosIlimitado;
+
+  /// Igual que planLimitTrainerBeneficioEjerciciosLimitado, para PLANTILLAS. Con las tablas de hoy (sólo Free tiene tope de plantillas, y Free nunca es 'el siguiente') la rama no se alcanza; existe para cuando la tabla cambie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hasta {limit, plural, =1{1 plantilla} other{{limit} plantillas}}'**
+  String planLimitTrainerBeneficioPlantillasLimitado(int limit);
+
+  /// Igual que planLimitTrainerBeneficioEjerciciosIlimitado, para PLANTILLAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantillas sin límite'**
+  String get planLimitTrainerBeneficioPlantillasIlimitado;
+
+  /// Cuerpo de la caja 'plan a medida' de los avisos de EJERCICIOS PROPIOS y PLANTILLAS, forma MÓVIL. Inalcanzable con las tablas de hoy: para llegar acá el tier efectivo tendría que ser Plan 3, y Plan 3 no tiene un tope finito que resolveNoticeTier pueda matchear. Queda como red por si la tabla cambia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estás en el plan más grande. Estamos preparando un plan a tu medida.'**
+  String get planLimitTrainerPlanAMedidaCuerpo;
+
+  /// Aviso en la hoja de eliminar cuenta del entrenador: cuántos alumnos quedan desvinculados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Se va a desvincular 1 alumno. Le avisamos.} other{Se van a desvincular {count} alumnos. Les avisamos.}}'**
+  String eliminarCuentaSheetTrainerUnlinkNotice(int count);
+
+  /// No description provided for @eliminarCuentaSheetErrorSubscriptionCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cancelar tu suscripción, así que tu cuenta no se eliminó. Probá de nuevo en unos minutos.'**
+  String get eliminarCuentaSheetErrorSubscriptionCancel;
+
+  /// No description provided for @eliminarCuentaSheetErrorNotAllowed.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar tu cuenta desde la app. Escribinos y lo resolvemos.'**
+  String get eliminarCuentaSheetErrorNotAllowed;
+
+  /// No description provided for @eliminarCuentaWebReauthTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Confirmá tu identidad'**
+  String get eliminarCuentaWebReauthTitle;
+
+  /// No description provided for @eliminarCuentaWebReauthPasswordBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Por seguridad, ingresá tu contraseña para confirmar que sos vos.'**
+  String get eliminarCuentaWebReauthPasswordBody;
+
+  /// No description provided for @eliminarCuentaWebReauthCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONFIRMAR'**
+  String get eliminarCuentaWebReauthCta;
+
+  /// Aviso en el diálogo de eliminar cuenta del Coach Hub: la re-autenticación abre un popup del proveedor (Google o Apple).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Para confirmar que sos vos, se va a abrir una ventana de {provider}.'**
+  String eliminarCuentaWebPopupHint(String provider);
+
+  /// Title of the dialog asking the user to name the gym they just picked (the name is typed by the first user, never taken from Google).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ponele nombre a tu gimnasio'**
+  String get gymNameDialogTitle;
+
+  /// Body of the gym name dialog.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Escribí el nombre con el que querés que lo vean los demás.'**
+  String get gymNameDialogBody;
+
+  /// Hint of the gym name text field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nombre del gimnasio'**
+  String get gymNameDialogHint;
+
+  /// Confirm button of the gym name dialog. Cancel reuses commonCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR'**
+  String get gymNameDialogConfirm;
+
+  /// Título de la card de Inicio que pide nombrar el gimnasio vinculado cuando está marcado nameNeeded (migración de Places, #1338).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu gimnasio necesita un nombre'**
+  String get gymNamePromptTitle;
+
+  /// Cuerpo de la card que pide nombrar el gimnasio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.'**
+  String get gymNamePromptBody;
+
+  /// Botón de la card que abre el diálogo para nombrar el gimnasio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PONERLE NOMBRE'**
+  String get gymNamePromptCta;
+
+  /// Cierra la card de nombrar el gimnasio hasta la próxima sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ahora no'**
+  String get gymNamePromptDismiss;
+
+  /// Snackbar cuando otro usuario nombró el gimnasio antes que vos; muestra el nombre ganador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Alguien ya lo nombró: {name}.'**
+  String gymNamePromptRaceMessage(String name);
+
+  /// Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.'**
+  String get coachHubOnboardingPfLocationStaleHint;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

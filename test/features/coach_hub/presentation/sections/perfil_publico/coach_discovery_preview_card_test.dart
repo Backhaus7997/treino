@@ -22,6 +22,9 @@ import 'package:treino/features/coach/domain/trainer_specialty.dart';
 import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/widgets/coach_discovery_preview_card.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'dart:math' as math;
 
 const _trainerUid = 'trainer-1';
 
@@ -160,8 +163,8 @@ void main() {
         links: const [],
       );
 
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'Solicitar contacto'),
+      final button = tester.widget<TreinoButton>(
+        find.widgetWithText(TreinoButton, 'Solicitar contacto'),
       );
       expect(button.onPressed, isNull);
     });
@@ -188,21 +191,26 @@ void main() {
           theme: entry.key,
         );
 
-        final button = tester.widget<ElevatedButton>(
-          find.widgetWithText(ElevatedButton, 'Solicitar contacto'),
+        // El CTA de la preview está deshabilitado A PROPÓSITO (es una
+        // maqueta). Lo que WARNING-1 medía era que el texto siguiera
+        // LEGIBLE apagado, y eso ya no se resuelve con un
+        // `disabledForegroundColor` a mano en cada callsite: el componente
+        // apaga el botón ENTERO con la misma opacidad, así que el contraste
+        // entre el texto y su fondo se conserva por construcción.
+        final button = tester.widget<TreinoButton>(
+          find.widgetWithText(TreinoButton, 'Solicitar contacto'),
         );
-        final resolvedFg = button.style!.foregroundColor!.resolve(
-          {WidgetState.disabled},
-        );
+        expect(button.onPressed, isNull, reason: 'es una preview, no un CTA');
 
+        final ctx = tester.element(
+          find.widgetWithText(TreinoButton, 'Solicitar contacto'),
+        );
+        final visual = TreinoButtonTokens.of(ctx, TreinoButtonVariant.primary);
         expect(
-          resolvedFg,
-          entry.value.textMuted,
-          reason: 'disabledForegroundColor debe ser palette.textMuted '
-              '(mismo patrón que identidad_card.dart / '
-              'especialidad_precio_card.dart / cuenta_tab.dart), no '
-              'palette.bg.withValues(alpha:0.7) — WARNING-1 midió ratio '
-              '≈1.13:1 en light sobre la evidencia AFTER.',
+          _contraste(visual.foreground, visual.background),
+          greaterThanOrEqualTo(4.5),
+          reason: 'el label del CTA no se lee sobre su propio fondo '
+              '(${entry.key})',
         );
 
         await tester.pumpWidget(const SizedBox.shrink());
@@ -225,4 +233,18 @@ void main() {
       }
     });
   });
+}
+
+/// Contraste WCAG entre dos colores opacos.
+double _contraste(Color a, Color b) {
+  double lum(Color c) {
+    double canal(double v) => v <= 0.03928
+        ? v / 12.92
+        : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+    return 0.2126 * canal(c.r) + 0.7152 * canal(c.g) + 0.0722 * canal(c.b);
+  }
+
+  final la = lum(a), lb = lum(b);
+  final claro = la > lb ? la : lb, oscuro = la > lb ? lb : la;
+  return (claro + 0.05) / (oscuro + 0.05);
 }

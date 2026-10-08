@@ -30,7 +30,7 @@ class GenderChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.full),
         child: AnimatedContainer(
-          duration: AppMotion.fast,
+          duration: AppMotion.resolve(context, AppMotion.fast),
           curve: AppMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(

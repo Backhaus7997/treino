@@ -44,8 +44,6 @@ Map<String, dynamic> _$$PostImplToJson(_$PostImpl instance) =>
       'routineTag': instance.routineTag?.toJson(),
       'privacy': _$PostPrivacyEnumMap[instance.privacy]!,
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
-      'reactionCounts':
-          const ReactionCountsConverter().toJson(instance.reactionCounts),
       'workoutStats': instance.workoutStats?.toJson(),
       'photoUrl': instance.photoUrl,
       'workoutSnapshot': instance.workoutSnapshot?.toJson(),
