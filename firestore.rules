@@ -278,6 +278,49 @@ service cloud.firestore {
              || (data.bornAt is timestamp
                  && data.bornAt <= request.time - duration.value(4745, 'd'));
     }
+
+    // Un alta POR MAIL nace con el consentimiento puesto, o no nace.
+    //
+    // La carrera que esto corta, medida en producción (oct-2026): apenas
+    // `createUserWithEmailAndPassword` vuelve, el router manda a
+    // `/profile-setup` y `perfilAseguradoProvider` dispara su primer
+    // `createIfAbsent` (espera cero) MIENTRAS `signUpWithEmail` todavía está
+    // en su `getOrCreate`. Si gana el `createIfAbsent`, el doc nace SIN
+    // consentimiento y la escritura del registro —un `set` sin merge, con
+    // otro `createdAt`— llega como UPDATE: el pin de `createdAt` la rechaza,
+    // el registro borra la cuenta de Auth y la persona ve «Hubo un problema
+    // creando tu perfil». La variante silenciosa: el `createIfAbsent` aterriza
+    // antes de la LECTURA del `getOrCreate`, que ve el doc y no escribe nada,
+    // y la cuenta queda creada sin consentimiento y sin error.
+    //
+    // Con esto, para una cuenta con contraseña recién creada el create sin
+    // consentimiento se DENIEGA (el batch cae entero, el público incluido), y
+    // el único que puede crear el doc es el registro, que sí lo trae. El
+    // `createIfAbsent` perdedor no rompe nada: el reintento de los 3 s lee el
+    // doc del registro y corta.
+    //
+    // `email_verified` deja afuera a las cuentas que no son un registro en
+    // curso. Una cuenta con contraseña sólo lo tiene en true después del
+    // código de 6 dígitos (`codigoDeVerificacion` lo marca en Auth) o del
+    // link de verificación viejo, y ninguna de las dos cosas puede pasar en
+    // los milisegundos de la carrera. Sin esa salida, el backfill del login
+    // (`signInWithEmail` → `createIfAbsent`) quedaría denegado para siempre a
+    // una cuenta vieja sin doc, y el self-heal del submit también.
+    //
+    // Google, Apple y el token de los tests (`custom`) no se tocan: su
+    // consentimiento lo estampa el checkbox del alta, sobre un doc que el
+    // login crea vacío a propósito.
+    //
+    // `get` encadenado y no `request.auth.token.firebase.sign_in_provider`:
+    // un token sin el mapa `firebase` tira error de evaluación en vez de
+    // devolver false.
+    function altaPorMailTraeConsentimiento(data) {
+      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
+             || request.auth.token.get('email_verified', false) == true
+             || (data.get('termsAcceptedAt', null) is timestamp
+                 && data.get('acceptedTermsVersion', null) is int
+                 && data.get('acceptedPrivacyVersion', null) is int);
+    }
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -420,7 +463,9 @@ service cloud.firestore {
                     // que se use va a estar lleno de tokens viejos que nadie
                     // sabe quien escribio.
                     && request.resource.data.get('storeAccountToken', null) == null
-                    && bornAtOk(request.resource.data);
+                    && bornAtOk(request.resource.data)
+                    // Ver `altaPorMailTraeConsentimiento`, arriba.
+                    && altaPorMailTraeConsentimiento(request.resource.data);
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
