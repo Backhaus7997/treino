@@ -3861,7 +3861,7 @@
   "templatesOnboardingStep3Title": "¿Para qué querés entrenar?",
   "@templatesOnboardingStep3Title": {"description": "Paso 3. Pregunta por objetivo de entrenamiento."},
   "templatesOnboardingStep3Body": "Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.",
-  "templatesOnboardingStep3Label": "Objetivo",
+  "templatesOnboardingStep3Label": "Objetivos · podés elegir más de uno",
   "templatesOnboardingStep4Title": "Esto no es un examen",
   "@templatesOnboardingStep4Title": {"description": "Paso 4. Zonas a priorizar; opcional. El título baja la presión de la última pregunta. NO dice 'queda como filtro': nada de esto filtra la grilla."},
   "templatesOnboardingStep4Body": "Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.",

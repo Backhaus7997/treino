@@ -94,7 +94,7 @@ void main() {
           _routine('otro-objetivo', goals: const [RoutineGoal.sport]),
           _routine('matchea', goals: const [RoutineGoal.aesthetics]),
         ],
-        const TemplatePreferences(goal: RoutineGoal.aesthetics),
+        const TemplatePreferences(goals: [RoutineGoal.aesthetics]),
       );
 
       expect(ids.first, 'matchea');
@@ -110,7 +110,7 @@ void main() {
           _routine('no-declara'),
           _routine('matchea', goals: const [RoutineGoal.aesthetics]),
         ],
-        const TemplatePreferences(goal: RoutineGoal.aesthetics),
+        const TemplatePreferences(goals: [RoutineGoal.aesthetics]),
       );
       expect(ids, ['matchea', 'no-declara', 'otro-objetivo']);
     });
@@ -141,7 +141,7 @@ void main() {
         const TemplatePreferences(
           daysPerWeek: 2,
           minutesPerSession: 30,
-          goal: RoutineGoal.sport,
+          goals: [RoutineGoal.sport],
           priorityMuscleGroups: ['back'],
         ),
       );

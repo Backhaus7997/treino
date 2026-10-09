@@ -9,13 +9,14 @@ void main() {
       final prefs = TemplatePreferences.fromJson(const {
         'daysPerWeek': 3,
         'minutesPerSession': 45,
+        'goals': ['health', 'sport'],
         'goal': 'health',
         'priorityMuscleGroups': ['back', 'core'],
       });
 
       expect(prefs.daysPerWeek, 3);
       expect(prefs.minutesPerSession, 45);
-      expect(prefs.goal, RoutineGoal.health);
+      expect(prefs.goals, [RoutineGoal.health, RoutineGoal.sport]);
       expect(
         prefs.priorityGroups,
         [MuscleGroup.espalda, MuscleGroup.abdominales],
@@ -27,7 +28,7 @@ void main() {
 
       expect(prefs.daysPerWeek, isNull);
       expect(prefs.minutesPerSession, isNull);
-      expect(prefs.goal, isNull);
+      expect(prefs.goals, isEmpty);
       expect(prefs.priorityMuscleGroups, isEmpty);
       expect(prefs.isEmpty, isTrue);
     });
@@ -44,8 +45,35 @@ void main() {
         'goal': 'powerlifting_meet',
       });
 
-      expect(prefs.goal, isNull, reason: 'unknown ⇒ neutral, never a crash');
+      expect(prefs.goals, isEmpty, reason: 'unknown ⇒ neutral, never a crash');
       expect(prefs.daysPerWeek, 4, reason: 'the rest of the answers survive');
+    });
+
+    test('a legacy doc written by the 1.0 (only `goal`) reads as [goal]', () {
+      final prefs = TemplatePreferences.fromJson(const {'goal': 'health'});
+      expect(prefs.goals, [RoutineGoal.health]);
+      expect(prefs.isEmpty, isFalse);
+    });
+
+    test('an empty `goals` falls back to the legacy `goal`', () {
+      final prefs = TemplatePreferences.fromJson(const {
+        'goals': <String>[],
+        'goal': 'sport',
+      });
+      expect(prefs.goals, [RoutineGoal.sport]);
+    });
+
+    test('unknown values inside `goals` are dropped, the rest survive', () {
+      final prefs = TemplatePreferences.fromJson(const {
+        'goals': ['powerlifting_meet', 'aesthetics', 42],
+        'goal': 'powerlifting_meet',
+      });
+      expect(prefs.goals, [RoutineGoal.aesthetics]);
+    });
+
+    test('a malformed `goals` degrades to no preference, never a crash', () {
+      final prefs = TemplatePreferences.fromJson(const {'goals': 'health'});
+      expect(prefs.goals, isEmpty);
     });
 
     test('an unknown muscle group is dropped, not surfaced', () {
@@ -59,6 +87,36 @@ void main() {
         ['back', 'gills'],
         reason: 'the raw list is preserved so a newer build still reads it',
       );
+    });
+  });
+
+  group('TemplatePreferences — encoding (compat con la 1.0)', () {
+    test('writes `goals` AND mirrors the first one into `goal`', () {
+      final json = const TemplatePreferences(
+        daysPerWeek: 4,
+        goals: [RoutineGoal.aesthetics, RoutineGoal.health],
+      ).toJson();
+
+      expect(json['goals'], ['aesthetics', 'health']);
+      expect(json['goal'], 'aesthetics',
+          reason: 'la 1.0 sólo lee `goal`: tiene que seguir viendo algo');
+      expect(json['daysPerWeek'], 4);
+    });
+
+    test('no goals ⇒ `goal` is null, not a stale value', () {
+      final json = const TemplatePreferences(daysPerWeek: 3).toJson();
+      expect(json['goals'], isEmpty);
+      expect(json.containsKey('goal'), isTrue);
+      expect(json['goal'], isNull);
+    });
+
+    test('round-trips through toJson / fromJson', () {
+      const prefs = TemplatePreferences(
+        minutesPerSession: 60,
+        goals: [RoutineGoal.wellbeing, RoutineGoal.injuryPrevention],
+        priorityMuscleGroups: ['glutes'],
+      );
+      expect(TemplatePreferences.fromJson(prefs.toJson()), prefs);
     });
   });
 }

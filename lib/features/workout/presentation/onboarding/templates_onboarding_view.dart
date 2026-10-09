@@ -122,8 +122,7 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
         [if (seed.daysPerWeek != null) '${seed.daysPerWeek}']);
     put(TemplatesOnboardingDimension.minutes,
         [if (seed.minutesPerSession != null) '${seed.minutesPerSession}']);
-    put(TemplatesOnboardingDimension.goal,
-        [if (seed.goal != null) seed.goal!.wireKey]);
+    put(TemplatesOnboardingDimension.goal, seed.goals.map((g) => g.wireKey));
     put(TemplatesOnboardingDimension.zones, seed.priorityMuscleGroups);
   }
 
@@ -270,9 +269,12 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
     return TemplatePreferences(
       daysPerWeek: intAnswer(TemplatesOnboardingDimension.days),
       minutesPerSession: intAnswer(TemplatesOnboardingDimension.minutes),
-      goal: RoutineGoal.fromWireKey(
-        _answers[TemplatesOnboardingDimension.goal]?.firstOrNull,
-      ),
+      // En el orden en que se tocaron: el primero es el que se espeja en
+      // `goal` para la 1.0 (ver `TemplatePreferences.goals`).
+      goals: (_answers[TemplatesOnboardingDimension.goal] ?? <String>{})
+          .map(RoutineGoal.fromWireKey)
+          .whereType<RoutineGoal>()
+          .toList(growable: false),
       priorityMuscleGroups:
           (_answers[TemplatesOnboardingDimension.zones] ?? <String>{})
               .toList(growable: false),

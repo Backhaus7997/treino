@@ -132,7 +132,7 @@ void main() {
                 prefs: TemplatePreferences(
                   daysPerWeek: d,
                   minutesPerSession: m,
-                  goal: g,
+                  goals: [g],
                 ),
               );
               expect(exacta(grilla.first, d, m, g), isTrue,
@@ -159,7 +159,7 @@ void main() {
             prefs: TemplatePreferences(
               daysPerWeek: d,
               minutesPerSession: m,
-              goal: g,
+              goals: [g],
             ),
           ))
               .first
