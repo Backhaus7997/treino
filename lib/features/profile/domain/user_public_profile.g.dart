@@ -30,6 +30,9 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       bestSquatKg: json['bestSquatKg'] as num?,
       bestBenchKg: json['bestBenchKg'] as num?,
       bestDeadliftKg: json['bestDeadliftKg'] as num?,
+      squatRank: (json['squatRank'] as num?)?.toInt(),
+      benchRank: (json['benchRank'] as num?)?.toInt(),
+      deadliftRank: (json['deadliftRank'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$$UserPublicProfileImplToJson(
@@ -53,4 +56,7 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'bestSquatKg': instance.bestSquatKg,
       'bestBenchKg': instance.bestBenchKg,
       'bestDeadliftKg': instance.bestDeadliftKg,
+      'squatRank': instance.squatRank,
+      'benchRank': instance.benchRank,
+      'deadliftRank': instance.deadliftRank,
     };
