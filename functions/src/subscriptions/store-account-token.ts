@@ -99,8 +99,27 @@
 
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { randomUUID } from "node:crypto";
+
+/**
+ * El app de firebase-admin, inicializado si hace falta.
+ *
+ * `getFirestore()` SIN argumento busca el app por defecto y tira «The default
+ * Firebase app does not exist» si nadie lo inicializo. `index.ts` no llama a
+ * `initializeApp()`: cada modulo se lo asegura solo (mismo patron que
+ * `sync-shared-profile.ts` y el resto del repo). Este modulo no lo hacia, y en
+ * produccion fallaba en CADA invocacion desde el primer deploy. Los tests no
+ * lo veian porque inicializaban el app por defecto ellos mismos.
+ */
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
 
 /**
  * El campo. `users/{uid}.storeAccountToken`.
@@ -145,7 +164,7 @@ export const ensureStoreAccountToken = onDocumentWritten(
     const uid = event.params.uid;
     const token = randomUUID();
 
-    await getFirestore()
+    await getFirestore(ensureApp())
       .collection("users")
       .doc(uid)
       .set({ [STORE_ACCOUNT_TOKEN_FIELD]: token }, { merge: true });

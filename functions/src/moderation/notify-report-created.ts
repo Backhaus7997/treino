@@ -17,11 +17,30 @@
  * libre y puede citar lo que le dijeron.
  */
 
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
+
+/**
+ * El app de firebase-admin, inicializado si hace falta.
+ *
+ * `getFirestore()` SIN argumento busca el app por defecto y tira «The default
+ * Firebase app does not exist» si nadie lo inicializo. `index.ts` no llama a
+ * `initializeApp()`: cada modulo se lo asegura solo (mismo patron que
+ * `sync-shared-profile.ts` y el resto del repo). Este modulo no lo hacia, y en
+ * produccion fallaba en CADA invocacion desde el primer deploy. Los tests no
+ * lo veian porque inicializaban el app por defecto ellos mismos.
+ */
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
 
 const REGION = "southamerica-east1";
 
@@ -47,7 +66,7 @@ export const notifyReportCreated = onDocumentCreated(
     // Id derivado del reporte, no autogenerado: `reports` es append-only y su
     // id es deterministico, asi que un reintento del trigger —que Firestore
     // puede hacer, los triggers son at-least-once— no manda el mail dos veces.
-    await getFirestore()
+    await getFirestore(ensureApp())
       .collection(MAIL_QUEUE_COLLECTION)
       .doc(`moderation-report-created__${reportId}`)
       .create({

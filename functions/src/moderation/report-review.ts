@@ -1719,12 +1719,12 @@ export async function moderationStatsHandler(
 export const listPendingReports = onCall({ region: REGION }, async (req) => {
   assertModerator(req);
   const limit = typeof req.data?.limit === "number" ? req.data.limit : 50;
-  return listPendingReportsHandler(getFirestore(), limit);
+  return listPendingReportsHandler(getFirestore(ensureApp()), limit);
 });
 
 export const markReportViewed = onCall({ region: REGION }, async (req) => {
   assertModerator(req);
-  return markReportViewedHandler(getFirestore(), req.data?.reportId);
+  return markReportViewedHandler(getFirestore(ensureApp()), req.data?.reportId);
 });
 
 export const resolveReport = onCall({ region: REGION }, async (req) => {
@@ -1735,5 +1735,5 @@ export const resolveReport = onCall({ region: REGION }, async (req) => {
 
 export const moderationStats = onCall({ region: REGION }, async (req) => {
   assertModerator(req);
-  return moderationStatsHandler(getFirestore());
+  return moderationStatsHandler(getFirestore(ensureApp()));
 });
