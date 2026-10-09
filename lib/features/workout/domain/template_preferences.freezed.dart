@@ -45,10 +45,13 @@ mixin _$TemplatePreferences {
   ///     su respuesta al actualizar.
   ///   * ESCRIBIR: [toJson] manda `goals` Y `goal` = el primero elegido (o
   ///     null). La 1.0 sigue leyendo un valor con sentido.
-  ///   * Si la 1.0 vuelve a guardar, reemplaza el mapa entero sin `goals`
-  ///     (el controller manda el mapa completo, nunca un parcial) y la lectura
-  ///     de acá cae en el `goal` que ella escribió. No queda un `goals` viejo
-  ///     contradiciendo a lo último que eligió.
+  ///   * Si la 1.0 vuelve a guardar, escribe sólo `goal`. Ojo: NO reemplaza el
+  ///     mapa. `UserRepository.update` persiste con `set(..., merge: true)` y
+  ///     Firestore mergea los mapas anidados en profundidad, así que el
+  ///     `goals` viejo SOBREVIVE junto al `goal` nuevo. La lectura lo
+  ///     reconcilia con esta invariante: el cliente nuevo escribe SIEMPRE
+  ///     `goal == goals.first` (o null si no hay). Si no coinciden, alguien
+  ///     que sólo conoce `goal` editó después, y gana `goal` ([_readGoals]).
   ///
   /// [RoutineGoalListConverter] no es decoración: descarta los valores que no
   /// conoce en vez de tirar. Este modelo se decodifica como parte de
@@ -229,10 +232,13 @@ class _$TemplatePreferencesImpl extends _TemplatePreferences {
   ///     su respuesta al actualizar.
   ///   * ESCRIBIR: [toJson] manda `goals` Y `goal` = el primero elegido (o
   ///     null). La 1.0 sigue leyendo un valor con sentido.
-  ///   * Si la 1.0 vuelve a guardar, reemplaza el mapa entero sin `goals`
-  ///     (el controller manda el mapa completo, nunca un parcial) y la lectura
-  ///     de acá cae en el `goal` que ella escribió. No queda un `goals` viejo
-  ///     contradiciendo a lo último que eligió.
+  ///   * Si la 1.0 vuelve a guardar, escribe sólo `goal`. Ojo: NO reemplaza el
+  ///     mapa. `UserRepository.update` persiste con `set(..., merge: true)` y
+  ///     Firestore mergea los mapas anidados en profundidad, así que el
+  ///     `goals` viejo SOBREVIVE junto al `goal` nuevo. La lectura lo
+  ///     reconcilia con esta invariante: el cliente nuevo escribe SIEMPRE
+  ///     `goal == goals.first` (o null si no hay). Si no coinciden, alguien
+  ///     que sólo conoce `goal` editó después, y gana `goal` ([_readGoals]).
   ///
   /// [RoutineGoalListConverter] no es decoración: descarta los valores que no
   /// conoce en vez de tirar. Este modelo se decodifica como parte de
@@ -259,10 +265,13 @@ class _$TemplatePreferencesImpl extends _TemplatePreferences {
   ///     su respuesta al actualizar.
   ///   * ESCRIBIR: [toJson] manda `goals` Y `goal` = el primero elegido (o
   ///     null). La 1.0 sigue leyendo un valor con sentido.
-  ///   * Si la 1.0 vuelve a guardar, reemplaza el mapa entero sin `goals`
-  ///     (el controller manda el mapa completo, nunca un parcial) y la lectura
-  ///     de acá cae en el `goal` que ella escribió. No queda un `goals` viejo
-  ///     contradiciendo a lo último que eligió.
+  ///   * Si la 1.0 vuelve a guardar, escribe sólo `goal`. Ojo: NO reemplaza el
+  ///     mapa. `UserRepository.update` persiste con `set(..., merge: true)` y
+  ///     Firestore mergea los mapas anidados en profundidad, así que el
+  ///     `goals` viejo SOBREVIVE junto al `goal` nuevo. La lectura lo
+  ///     reconcilia con esta invariante: el cliente nuevo escribe SIEMPRE
+  ///     `goal == goals.first` (o null si no hay). Si no coinciden, alguien
+  ///     que sólo conoce `goal` editó después, y gana `goal` ([_readGoals]).
   ///
   /// [RoutineGoalListConverter] no es decoración: descarta los valores que no
   /// conoce en vez de tirar. Este modelo se decodifica como parte de
@@ -376,10 +385,13 @@ abstract class _TemplatePreferences extends TemplatePreferences {
   ///     su respuesta al actualizar.
   ///   * ESCRIBIR: [toJson] manda `goals` Y `goal` = el primero elegido (o
   ///     null). La 1.0 sigue leyendo un valor con sentido.
-  ///   * Si la 1.0 vuelve a guardar, reemplaza el mapa entero sin `goals`
-  ///     (el controller manda el mapa completo, nunca un parcial) y la lectura
-  ///     de acá cae en el `goal` que ella escribió. No queda un `goals` viejo
-  ///     contradiciendo a lo último que eligió.
+  ///   * Si la 1.0 vuelve a guardar, escribe sólo `goal`. Ojo: NO reemplaza el
+  ///     mapa. `UserRepository.update` persiste con `set(..., merge: true)` y
+  ///     Firestore mergea los mapas anidados en profundidad, así que el
+  ///     `goals` viejo SOBREVIVE junto al `goal` nuevo. La lectura lo
+  ///     reconcilia con esta invariante: el cliente nuevo escribe SIEMPRE
+  ///     `goal == goals.first` (o null si no hay). Si no coinciden, alguien
+  ///     que sólo conoce `goal` editó después, y gana `goal` ([_readGoals]).
   ///
   /// [RoutineGoalListConverter] no es decoración: descarta los valores que no
   /// conoce en vez de tirar. Este modelo se decodifica como parte de
