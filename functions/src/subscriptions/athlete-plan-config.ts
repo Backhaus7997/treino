@@ -92,3 +92,13 @@ export const ATHLETE_PRICES_ARS: Record<SubscriptionCycle, number> = {
 export function athleteAmountFor(cycle: SubscriptionCycle): number {
   return ATHLETE_PRICES_ARS[cycle];
 }
+
+/**
+ * Topes de rutina que TREINO Pro levanta en la app. Espejo a mano de
+ * `kMaxRoutineDays`, `kMaxRoutineWeeks` y `kMaxOwnRoutines`
+ * (`lib/features/paywall/domain/athlete_entitlement.dart`): el mail del código
+ * los nombra, y `athlete-pro-limites.test.ts` falla si Dart y TS se separan.
+ */
+export const ATHLETE_PRO_MAX_ROUTINE_DAYS = 7;
+export const ATHLETE_PRO_MAX_ROUTINE_WEEKS = 16;
+export const ATHLETE_PRO_MAX_OWN_ROUTINES = 10;
