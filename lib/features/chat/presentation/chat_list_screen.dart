@@ -30,11 +30,21 @@ class ChatListScreen extends ConsumerWidget {
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
     final currentUid = ref.watch(currentUidProvider);
 
-    // Si se llegó por un deep link (`go` desde una notificación o un push), el
-    // inbox es la única página del stack: no hay nada que popear, ni con la
-    // flecha ni con el back del sistema (en Android cerraría la app). Ahí
-    // volvemos al feed. `maybeOf` para no exigir un GoRouter en los tests que
-    // montan la pantalla suelta.
+    // Lo normal es que haya algo debajo: el header del Feed empuja la bandeja,
+    // y una notificación de chat arma Feed → Mensajes → chat
+    // (`abrirChatConStack`). Ahí todo es un `pop` nativo — flecha, swipe de iOS
+    // y back de Android hacen lo mismo.
+    //
+    // Esto es la red para cuando la bandeja quedó SOLA (un `go` directo a
+    // `/feed/messages`, o el fallback de `ChatScreen`): no hay nada que popear,
+    // y el back de Android cerraría la app. Ahí volvemos al feed.
+    //
+    // El `PopScope` sólo bloquea en ESE caso (`canPop == false`), y ahí no le
+    // quita nada al swipe de iOS: el gesto no existe sin una ruta debajo. Con
+    // la bandeja empujada, `canPop` es true y el gesto queda intacto.
+    //
+    // `maybeOf` para no exigir un GoRouter en los tests que montan la pantalla
+    // suelta.
     final router = GoRouter.maybeOf(context);
     final canPop = router?.canPop() ?? Navigator.of(context).canPop();
     void goBack() {

@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,8 @@ import 'package:go_router/go_router.dart';
 /// - null or empty → `context.go('/coach')`.
 /// - no leading `/` → log warning + `context.go('/coach')`.
 /// - valid path → `context.go(deepLink)`.
+/// - link de CHAT (`/coach/chat/...`) → arma el stack
+///   Feed → Mensajes → chat. Ver [abrirChatConStack].
 ///
 /// Callers MUST check `context.mounted` before calling this function.
 ///
@@ -26,8 +30,77 @@ void goDeepLink(BuildContext context, String? deepLink) {
     return;
   }
 
+  if (Uri.tryParse(deepLink)?.path.startsWith(kPrefijoDeepLinkDeChat) ??
+      false) {
+    abrirChatConStack(GoRouter.of(context), deepLink);
+    return;
+  }
+
   context.go(deepLink);
 }
+
+/// Feed: la base del stack que arma [abrirChatConStack].
+const kUbicacionFeed = '/feed';
+
+/// La bandeja de MENSAJES: lo que queda debajo de un chat abierto desde una
+/// notificación.
+const kUbicacionBandejaDeMensajes = '/feed/messages';
+
+/// Abre el chat de [deepLink] dejando DEBAJO la bandeja y el feed:
+/// `go('/feed')` → `push('/feed/messages')` → `push(deepLink)`.
+///
+/// ## Por qué no alcanza con `go(deepLink)`
+///
+/// El chat es una ruta top-level: un `go` lo deja SOLO en el navigator raíz.
+/// La flecha se las arreglaba con un fallback (`canPop() ? pop() : go(...)`),
+/// pero el swipe de volver de iOS sólo existe si hay una ruta debajo — y para
+/// que la bandeja tampoco cerrara la app con el back de Android, se le había
+/// puesto un `PopScope(canPop: false)`, que APAGA el gesto. Resultado: la
+/// flecha andaba y el swipe no hacía nada. Con el stack de verdad, flecha,
+/// swipe y back de Android hacen lo mismo porque es un `pop` nativo.
+///
+/// ## Por qué tres llamadas seguidas funcionan
+///
+/// `push` apila sobre `routerDelegate.currentConfiguration`. Si el `go` previo
+/// no se hubiera aplicado todavía, el push se apilaría sobre el stack VIEJO.
+/// Acá se aplica en el acto: los redirects del router son síncronos (el parser
+/// devuelve un `SynchronousFuture`) y no hay `onExit`, así que el `Router` deja
+/// la configuración nueva antes de que vuelva la llamada.
+///
+/// No se ASUME: después de cada paso se verifica que el router haya llegado. Si
+/// no llegó —un redirect de auth que manda a `/welcome`, o el día que alguien
+/// meta un redirect async— se cae al `go(deepLink)` de siempre, que deja que
+/// el redirect decida igual que antes de este cambio. Peor caso: el chat sin
+/// nada debajo, con la flecha de fallback de `ChatScreen`.
+///
+/// ## Arranque en frío (app cerrada, se abre por el push)
+///
+/// `app.dart` llama a esto en un post-frame, con `/splash` montado y la sesión
+/// todavía cargando. `authRedirect` devuelve `null` mientras carga, así que el
+/// stack se arma igual; el `go('/feed')` desmonta el splash y su `go('/home')`
+/// diferido no corre (chequea `mounted`). No hay doble navegación. Cuando la
+/// sesión resuelve, el `refreshListenable` re-evalúa el redirect sobre la base
+/// (`/feed`) y el stack queda; si no hay sesión, manda a `/welcome` como antes.
+///
+/// La supresión de avisos en primer plano no cambia: lee `state.uri`, que
+/// refleja la ruta del tope aunque haya llegado por `push`
+/// (ver [locationActualDe]).
+void abrirChatConStack(GoRouter router, String deepLink) {
+  router.go(kUbicacionFeed);
+  if (!_llegoA(router, kUbicacionFeed)) {
+    router.go(deepLink);
+    return;
+  }
+  unawaited(router.push<void>(kUbicacionBandejaDeMensajes));
+  if (!_llegoA(router, kUbicacionBandejaDeMensajes)) {
+    router.go(deepLink);
+    return;
+  }
+  unawaited(router.push<void>(deepLink));
+}
+
+bool _llegoA(GoRouter router, String path) =>
+    Uri.tryParse(locationActualDe(router) ?? '')?.path == path;
 
 /// Location concreta del router, o `null` si todavía no resolvió ninguna.
 ///

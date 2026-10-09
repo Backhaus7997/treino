@@ -93,5 +93,20 @@ void main() {
       expect(_loc(router), '/feed');
       expect(router.canPop(), isFalse);
     });
+
+    testWidgets(
+        'empujado, el PopScope no le apaga el swipe de iOS a la bandeja', (
+      tester,
+    ) async {
+      final router = _router('/feed');
+      await _pump(tester, router);
+      router.push('/feed/messages');
+      await tester.pumpAndSettle();
+
+      final ruta = ModalRoute.of(tester.element(find.byType(ChatListScreen)))!;
+      expect(ruta.popGestureEnabled, isTrue,
+          reason: 'con algo debajo, flecha, swipe y back tienen que ser un pop '
+              'nativo; un PopScope(canPop: false) acá apagaría el gesto');
+    });
   });
 }
