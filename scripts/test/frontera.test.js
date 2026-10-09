@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 53 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 54 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -214,6 +214,12 @@ test('los 53 scripts que inicializan Firebase pasan por la frontera', () => {
   // `lib/admin`, imprime el banner de producción ANTES de inicializar y el
   // proyecto resuelto antes de leer, y es DRY-RUN POR DEFECTO: escribe sólo con
   // `--apply`. Sólo toca tarjetas cuyo dueño tiene `role == 'trainer'`.
+  // El 54 es `set_trainer_discovery_visibility.js`: oculta (o vuelve a mostrar)
+  // una tarjeta de `trainerPublicProfiles` del directorio del alumno, vía el
+  // flag `hiddenFromDiscovery` que las rules sólo dejan escribir al admin.
+  // Entra por `lib/admin`, imprime el banner de producción ANTES de inicializar
+  // y el proyecto resuelto antes de escribir, y es DRY-RUN POR DEFECTO: escribe
+  // sólo con `--apply`.
   //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
@@ -221,7 +227,7 @@ test('los 53 scripts que inicializan Firebase pasan por la frontera', () => {
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    53,
+    54,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

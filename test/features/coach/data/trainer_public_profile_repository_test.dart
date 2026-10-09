@@ -313,6 +313,13 @@ void main() {
       expect(t!.hiddenFromDiscovery, isFalse);
     });
 
+    test('un valor no booleano se parsea como visible y no tira el listado',
+        () async {
+      await seedRaw('roto', {'hiddenFromDiscovery': 'si'});
+      final r = await repo.listByGeohashPrefix('s621h');
+      expect(r.map((t) => t.uid), unorderedEquals([...visibles, 'roto']));
+    });
+
     test('getById sigue devolviendo al oculto', () async {
       final t = await repo.getById('oculto');
       expect(t, isNotNull);

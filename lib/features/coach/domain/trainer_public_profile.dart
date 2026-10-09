@@ -68,12 +68,21 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     /// campo es visible. MUST NOT aparecer en
     /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
     /// Solo filtra los listados; el acceso por uid sigue andando.
-    @Default(false) bool hiddenFromDiscovery,
+    ///
+    /// Robusto a un valor no booleano (las rules lo impiden desde el cliente,
+    /// pero un doc escrito por admin podría traerlo): cualquier cosa distinta
+    /// de `true` cuenta como visible, para que un solo doc roto no tire todo
+    /// el listado.
+    @JsonKey(fromJson: _hiddenFromJson)
+    @Default(false)
+    bool hiddenFromDiscovery,
   }) = _TrainerPublicProfile;
 
   factory TrainerPublicProfile.fromJson(Map<String, Object?> json) =>
       _$TrainerPublicProfileFromJson(json);
 }
+
+bool _hiddenFromJson(Object? value) => value == true;
 
 TrainerSpecialty? _specialtyFromJson(Object? value) =>
     trainerSpecialtyFromString(value as String?);

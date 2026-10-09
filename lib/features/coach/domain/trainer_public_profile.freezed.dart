@@ -68,6 +68,12 @@ mixin _$TrainerPublicProfile {
   /// campo es visible. MUST NOT aparecer en
   /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
   /// Solo filtra los listados; el acceso por uid sigue andando.
+  ///
+  /// Robusto a un valor no booleano (las rules lo impiden desde el cliente,
+  /// pero un doc escrito por admin podría traerlo): cualquier cosa distinta
+  /// de `true` cuenta como visible, para que un solo doc roto no tire todo
+  /// el listado.
+  @JsonKey(fromJson: _hiddenFromJson)
   bool get hiddenFromDiscovery => throw _privateConstructorUsedError;
 
   /// Serializes this TrainerPublicProfile to a JSON map.
@@ -107,7 +113,7 @@ abstract class $TrainerPublicProfileCopyWith<$Res> {
       int reviewCount,
       int? trainerExperienceYears,
       int? athleteCount,
-      bool hiddenFromDiscovery});
+      @JsonKey(fromJson: _hiddenFromJson) bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -261,7 +267,7 @@ abstract class _$$TrainerPublicProfileImplCopyWith<$Res>
       int reviewCount,
       int? trainerExperienceYears,
       int? athleteCount,
-      bool hiddenFromDiscovery});
+      @JsonKey(fromJson: _hiddenFromJson) bool hiddenFromDiscovery});
 }
 
 /// @nodoc
@@ -407,7 +413,7 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
       this.reviewCount = 0,
       this.trainerExperienceYears,
       this.athleteCount,
-      this.hiddenFromDiscovery = false})
+      @JsonKey(fromJson: _hiddenFromJson) this.hiddenFromDiscovery = false})
       : _trainerLocations = trainerLocations,
         _trainerGeohashes = trainerGeohashes;
 
@@ -500,8 +506,13 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
   /// campo es visible. MUST NOT aparecer en
   /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
   /// Solo filtra los listados; el acceso por uid sigue andando.
+  ///
+  /// Robusto a un valor no booleano (las rules lo impiden desde el cliente,
+  /// pero un doc escrito por admin podría traerlo): cualquier cosa distinta
+  /// de `true` cuenta como visible, para que un solo doc roto no tire todo
+  /// el listado.
   @override
-  @JsonKey()
+  @JsonKey(fromJson: _hiddenFromJson)
   final bool hiddenFromDiscovery;
 
   @override
@@ -601,27 +612,28 @@ class _$TrainerPublicProfileImpl implements _TrainerPublicProfile {
 
 abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   const factory _TrainerPublicProfile(
-      {required final String uid,
-      final String? displayName,
-      final String? displayNameLowercase,
-      final String? avatarUrl,
-      final String? trainerBio,
-      @JsonKey(fromJson: _specialtyFromJson, toJson: _specialtyToJson)
-      final TrainerSpecialty? trainerSpecialty,
-      final String? trainerGeohash,
-      final double? trainerLatitude,
-      final double? trainerLongitude,
-      final int? trainerMonthlyRate,
-      final String? paymentAlias,
-      final List<TrainerLocation> trainerLocations,
-      final List<String> trainerGeohashes,
-      final bool trainerOffersOnline,
-      final bool acceptsInquiries,
-      final double? averageRating,
-      final int reviewCount,
-      final int? trainerExperienceYears,
-      final int? athleteCount,
-      final bool hiddenFromDiscovery}) = _$TrainerPublicProfileImpl;
+          {required final String uid,
+          final String? displayName,
+          final String? displayNameLowercase,
+          final String? avatarUrl,
+          final String? trainerBio,
+          @JsonKey(fromJson: _specialtyFromJson, toJson: _specialtyToJson)
+          final TrainerSpecialty? trainerSpecialty,
+          final String? trainerGeohash,
+          final double? trainerLatitude,
+          final double? trainerLongitude,
+          final int? trainerMonthlyRate,
+          final String? paymentAlias,
+          final List<TrainerLocation> trainerLocations,
+          final List<String> trainerGeohashes,
+          final bool trainerOffersOnline,
+          final bool acceptsInquiries,
+          final double? averageRating,
+          final int reviewCount,
+          final int? trainerExperienceYears,
+          final int? athleteCount,
+          @JsonKey(fromJson: _hiddenFromJson) final bool hiddenFromDiscovery}) =
+      _$TrainerPublicProfileImpl;
 
   factory _TrainerPublicProfile.fromJson(Map<String, dynamic> json) =
       _$TrainerPublicProfileImpl.fromJson;
@@ -691,7 +703,13 @@ abstract class _TrainerPublicProfile implements TrainerPublicProfile {
   /// campo es visible. MUST NOT aparecer en
   /// `UserRepository._trainerPublicFields`: el cliente no lo escribe nunca.
   /// Solo filtra los listados; el acceso por uid sigue andando.
+  ///
+  /// Robusto a un valor no booleano (las rules lo impiden desde el cliente,
+  /// pero un doc escrito por admin podría traerlo): cualquier cosa distinta
+  /// de `true` cuenta como visible, para que un solo doc roto no tire todo
+  /// el listado.
   @override
+  @JsonKey(fromJson: _hiddenFromJson)
   bool get hiddenFromDiscovery;
 
   /// Create a copy of TrainerPublicProfile
