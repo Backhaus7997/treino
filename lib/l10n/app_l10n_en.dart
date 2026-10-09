@@ -1554,6 +1554,26 @@ class AppL10nEn extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String get verifyMailWrongEmailAction => 'Me equivoqué de mail';
+
+  @override
+  String get verifyMailWrongEmailDialogTitle => '¿Te equivocaste de mail?';
+
+  @override
+  String get verifyMailWrongEmailDialogBody =>
+      'Vamos a borrar esta cuenta para que puedas registrarte de nuevo con el mail correcto. Vas a poder usar el mismo nombre.';
+
+  @override
+  String get verifyMailWrongEmailDialogConfirm => 'Borrar cuenta';
+
+  @override
+  String get verifyMailWrongEmailDialogBack => 'Volver';
+
+  @override
+  String get verifyMailWrongEmailError =>
+      'No pudimos borrar la cuenta. Probá de nuevo.';
+
+  @override
   String get profileSetupGymSelectError =>
       'We couldn\'t load that gym. Try again or pick «OTRO GYM / SIN GYM».';
 

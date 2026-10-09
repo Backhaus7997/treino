@@ -2942,6 +2942,42 @@ abstract class AppL10n {
   /// **'No pudimos cancelar la cuenta. Probá de nuevo.'**
   String get profileSetupCancelAccountError;
 
+  /// Acción secundaria de la pantalla del código de verificación: el usuario escribió mal su mail al registrarse y el código nunca le llega. Borra la cuenta recién creada para que pueda registrarse de nuevo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Me equivoqué de mail'**
+  String get verifyMailWrongEmailAction;
+
+  /// No description provided for @verifyMailWrongEmailDialogTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Te equivocaste de mail?'**
+  String get verifyMailWrongEmailDialogTitle;
+
+  /// No description provided for @verifyMailWrongEmailDialogBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Vamos a borrar esta cuenta para que puedas registrarte de nuevo con el mail correcto. Vas a poder usar el mismo nombre.'**
+  String get verifyMailWrongEmailDialogBody;
+
+  /// No description provided for @verifyMailWrongEmailDialogConfirm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Borrar cuenta'**
+  String get verifyMailWrongEmailDialogConfirm;
+
+  /// No description provided for @verifyMailWrongEmailDialogBack.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Volver'**
+  String get verifyMailWrongEmailDialogBack;
+
+  /// No description provided for @verifyMailWrongEmailError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos borrar la cuenta. Probá de nuevo.'**
+  String get verifyMailWrongEmailError;
+
   /// SnackBar del paso de gimnasio del alta cuando no se pudo resolver el gimnasio tocado. Nombra la opcion tal cual se ve en pantalla (esta hardcodeada en GymSearchBox, sin traducir).
   ///
   /// In es_AR, this message translates to:
