@@ -71,6 +71,48 @@ void main() {
       expect(prefs.goals, [RoutineGoal.aesthetics]);
     });
 
+    group('reconciliación con una edición de la 1.0 (merge profundo)', () {
+      test('goal == goals.first ⇒ vale goals', () {
+        final prefs = TemplatePreferences.fromJson(const {
+          'goals': ['health', 'aesthetics'],
+          'goal': 'health',
+        });
+        expect(prefs.goals, [RoutineGoal.health, RoutineGoal.aesthetics]);
+      });
+
+      test('goal distinto del primero ⇒ la 1.0 editó después, gana goal', () {
+        final prefs = TemplatePreferences.fromJson(const {
+          'goals': ['health', 'aesthetics'],
+          'goal': 'sport',
+        });
+        expect(prefs.goals, [RoutineGoal.sport]);
+      });
+
+      test('goal null con goals viejo ⇒ la 1.0 limpió, queda vacío', () {
+        final prefs = TemplatePreferences.fromJson(const {
+          'goals': ['health'],
+          'goal': null,
+        });
+        expect(prefs.goals, isEmpty);
+      });
+
+      test('goal desconocido con goals viejo ⇒ vacío, no resucita lo viejo',
+          () {
+        final prefs = TemplatePreferences.fromJson(const {
+          'goals': ['health', 'aesthetics'],
+          'goal': 'powerlifting_meet',
+        });
+        expect(prefs.goals, isEmpty);
+      });
+
+      test('sin clave goal, goals vale tal cual', () {
+        final prefs = TemplatePreferences.fromJson(const {
+          'goals': ['health', 'aesthetics'],
+        });
+        expect(prefs.goals, [RoutineGoal.health, RoutineGoal.aesthetics]);
+      });
+    });
+
     test('a malformed `goals` degrades to no preference, never a crash', () {
       final prefs = TemplatePreferences.fromJson(const {'goals': 'health'});
       expect(prefs.goals, isEmpty);

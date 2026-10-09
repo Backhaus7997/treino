@@ -53,10 +53,13 @@ class TemplatePreferences with _$TemplatePreferences {
     ///     su respuesta al actualizar.
     ///   * ESCRIBIR: [toJson] manda `goals` Y `goal` = el primero elegido (o
     ///     null). La 1.0 sigue leyendo un valor con sentido.
-    ///   * Si la 1.0 vuelve a guardar, reemplaza el mapa entero sin `goals`
-    ///     (el controller manda el mapa completo, nunca un parcial) y la lectura
-    ///     de acá cae en el `goal` que ella escribió. No queda un `goals` viejo
-    ///     contradiciendo a lo último que eligió.
+    ///   * Si la 1.0 vuelve a guardar, escribe sólo `goal`. Ojo: NO reemplaza el
+    ///     mapa. `UserRepository.update` persiste con `set(..., merge: true)` y
+    ///     Firestore mergea los mapas anidados en profundidad, así que el
+    ///     `goals` viejo SOBREVIVE junto al `goal` nuevo. La lectura lo
+    ///     reconcilia con esta invariante: el cliente nuevo escribe SIEMPRE
+    ///     `goal == goals.first` (o null si no hay). Si no coinciden, alguien
+    ///     que sólo conoce `goal` editó después, y gana `goal` ([_readGoals]).
     ///
     /// [RoutineGoalListConverter] no es decoración: descarta los valores que no
     /// conoce en vez de tirar. Este modelo se decodifica como parte de
@@ -114,16 +117,29 @@ class TemplatePreferences with _$TemplatePreferences {
       .toList(growable: false);
 }
 
-/// Lee `goals`, cayendo al `goal` legacy cuando falta o viene vacío.
+/// Lee `goals` reconciliándolo con el `goal` legacy.
+///
+/// Invariante del cliente nuevo: escribe `goal == goals.first` (null si vacío).
+///  * `goals` con datos y `goal` coincide con su primero (o la clave `goal`
+///    no existe) ⇒ vale `goals`.
+///  * `goals` con datos y `goal` difiere (incluido null o un valor que este
+///    build no conoce) ⇒ editó la 1.0 después: vale `goal` ⇒ `[goal]`, o `[]`
+///    si era null/desconocido (el converter descarta lo desconocido).
+///  * `goals` falta o vacío ⇒ `[goal]` si existe.
 ///
 /// Devuelve la forma CRUDA (lista de wire keys); el filtrado de lo desconocido
 /// lo hace [RoutineGoalListConverter] después. Un `goal` que no es `String` se
 /// ignora: mejor "sin objetivo" que un perfil que no carga.
 Object? _readGoals(Map<dynamic, dynamic> json, String key) {
   final goals = json[key];
-  if (goals is List && goals.isNotEmpty) return goals;
   final legacy = json['goal'];
-  if (legacy is String) return <String>[legacy];
+  final legacyKey = legacy is String ? legacy : null;
+  if (goals is List && goals.isNotEmpty) {
+    // Sin clave `goal` no hay edición legacy que reconciliar.
+    if (!json.containsKey('goal') || legacy == goals.first) return goals;
+    return legacyKey == null ? <String>[] : <String>[legacyKey];
+  }
+  if (legacyKey != null) return <String>[legacyKey];
   // Cualquier otra forma (un String suelto, un mapa) cae a vacío: el
   // generado hace `as List?` y tiraría.
   return goals is List ? goals : null;
