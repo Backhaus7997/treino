@@ -4388,6 +4388,102 @@ abstract class AppL10n {
   /// **'Foto de perfil de {name}'**
   String a11yAvatarLabel(String name);
 
+  /// Lift rank of an athlete who has data for a lift but has not reached the first rank yet. Shown in the 'Tu rango' strip of gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin rango'**
+  String get liftRankNone;
+
+  /// Lift rank 1 of 8 (squat, bench, deadlift) in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bronce'**
+  String get liftRankBronze;
+
+  /// Lift rank 2 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plata'**
+  String get liftRankSilver;
+
+  /// Lift rank 3 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Oro'**
+  String get liftRankGold;
+
+  /// Lift rank 4 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Platino'**
+  String get liftRankPlatinum;
+
+  /// Lift rank 5 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Diamante'**
+  String get liftRankDiamond;
+
+  /// Lift rank 6 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Campeón'**
+  String get liftRankChampion;
+
+  /// Lift rank 7 of 8 in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Titán'**
+  String get liftRankTitan;
+
+  /// Lift rank 8 of 8, the highest, in gym rankings.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Olímpico'**
+  String get liftRankOlympian;
+
+  /// Caption of the 'Tu rango' strip in the main-lift boards of gym rankings. The placeholder is the already-uppercased lift name (SENTADILLA, BANCA, PESO MUERTO).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RANGO · {lift}'**
+  String liftRankStripTitle(String lift);
+
+  /// Where the athlete stands on the rank ladder, e.g. 'Rango 3 de 8'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rango {rank} de {total}'**
+  String liftRankStripPosition(int rank, int total);
+
+  /// Hint in the 'Tu rango' strip for an athlete whose best lift is below the first rank.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no llegás a Bronce. Seguí sumando kilos.'**
+  String get liftRankStripBelowBronze;
+
+  /// Hint in the 'Tu rango' strip when the athlete never logged this lift.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Registrá este levantamiento en un entrenamiento para ver tu rango.'**
+  String get liftRankStripNoLift;
+
+  /// Tappable hint in the 'Tu rango' strip when the athlete has no body weight on their profile. The rank is scaled by body weight, so without it there is no rank. Opens the personal-data editor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá tu peso corporal para ver tu rango.'**
+  String get liftRankStripNoBodyWeight;
+
+  /// Hint in the 'Tu rango' strip when the athlete has a lift and a body weight but the server has not computed the rank yet. It is recomputed after every finished workout.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se calcula con tu próximo entrenamiento.'**
+  String get liftRankStripPending;
+
+  /// Semantics label for a leaderboard row of a main-lift board when the athlete has a lift rank. Same action as a11yRankingRowButton, plus the rank name: the badge is decorative, so the rank must be announced in text and never depend on color or drawing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el perfil de {name}, rango {rank}'**
+  String a11yRankingRowButtonWithRank(String name, String rank);
+
   /// Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.
   ///
   /// In es_AR, this message translates to:

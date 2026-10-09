@@ -2381,6 +2381,64 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get liftRankNone => 'Unranked';
+
+  @override
+  String get liftRankBronze => 'Bronze';
+
+  @override
+  String get liftRankSilver => 'Silver';
+
+  @override
+  String get liftRankGold => 'Gold';
+
+  @override
+  String get liftRankPlatinum => 'Platinum';
+
+  @override
+  String get liftRankDiamond => 'Diamond';
+
+  @override
+  String get liftRankChampion => 'Champion';
+
+  @override
+  String get liftRankTitan => 'Titan';
+
+  @override
+  String get liftRankOlympian => 'Olympian';
+
+  @override
+  String liftRankStripTitle(String lift) {
+    return 'YOUR RANK · $lift';
+  }
+
+  @override
+  String liftRankStripPosition(int rank, int total) {
+    return 'Rank $rank of $total';
+  }
+
+  @override
+  String get liftRankStripBelowBronze =>
+      'You haven\'t reached Bronze yet. Keep adding weight.';
+
+  @override
+  String get liftRankStripNoLift =>
+      'Log this lift in a workout to see your rank.';
+
+  @override
+  String get liftRankStripNoBodyWeight =>
+      'Add your body weight to see your rank.';
+
+  @override
+  String get liftRankStripPending =>
+      'It\'s calculated after your next workout.';
+
+  @override
+  String a11yRankingRowButtonWithRank(String name, String rank) {
+    return 'View $name\'s profile, rank $rank';
+  }
+
+  @override
   String a11yRankingRowButton(String name) {
     return 'View $name\'s profile';
   }

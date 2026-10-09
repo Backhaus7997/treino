@@ -2434,6 +2434,63 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get liftRankNone => 'Sin rango';
+
+  @override
+  String get liftRankBronze => 'Bronce';
+
+  @override
+  String get liftRankSilver => 'Plata';
+
+  @override
+  String get liftRankGold => 'Oro';
+
+  @override
+  String get liftRankPlatinum => 'Platino';
+
+  @override
+  String get liftRankDiamond => 'Diamante';
+
+  @override
+  String get liftRankChampion => 'Campeón';
+
+  @override
+  String get liftRankTitan => 'Titán';
+
+  @override
+  String get liftRankOlympian => 'Olímpico';
+
+  @override
+  String liftRankStripTitle(String lift) {
+    return 'TU RANGO · $lift';
+  }
+
+  @override
+  String liftRankStripPosition(int rank, int total) {
+    return 'Rango $rank de $total';
+  }
+
+  @override
+  String get liftRankStripBelowBronze =>
+      'Todavía no llegás a Bronce. Seguí sumando kilos.';
+
+  @override
+  String get liftRankStripNoLift =>
+      'Registrá este levantamiento en un entrenamiento para ver tu rango.';
+
+  @override
+  String get liftRankStripNoBodyWeight =>
+      'Cargá tu peso corporal para ver tu rango.';
+
+  @override
+  String get liftRankStripPending => 'Se calcula con tu próximo entrenamiento.';
+
+  @override
+  String a11yRankingRowButtonWithRank(String name, String rank) {
+    return 'Ver el perfil de $name, rango $rank';
+  }
+
+  @override
   String a11yRankingRowButton(String name) {
     return 'Ver el perfil de $name';
   }
@@ -7735,6 +7792,63 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String a11yAvatarLabel(String name) {
     return 'Foto de perfil de $name';
+  }
+
+  @override
+  String get liftRankNone => 'Sin rango';
+
+  @override
+  String get liftRankBronze => 'Bronce';
+
+  @override
+  String get liftRankSilver => 'Plata';
+
+  @override
+  String get liftRankGold => 'Oro';
+
+  @override
+  String get liftRankPlatinum => 'Platino';
+
+  @override
+  String get liftRankDiamond => 'Diamante';
+
+  @override
+  String get liftRankChampion => 'Campeón';
+
+  @override
+  String get liftRankTitan => 'Titán';
+
+  @override
+  String get liftRankOlympian => 'Olímpico';
+
+  @override
+  String liftRankStripTitle(String lift) {
+    return 'TU RANGO · $lift';
+  }
+
+  @override
+  String liftRankStripPosition(int rank, int total) {
+    return 'Rango $rank de $total';
+  }
+
+  @override
+  String get liftRankStripBelowBronze =>
+      'Todavía no llegás a Bronce. Seguí sumando kilos.';
+
+  @override
+  String get liftRankStripNoLift =>
+      'Registrá este levantamiento en un entrenamiento para ver tu rango.';
+
+  @override
+  String get liftRankStripNoBodyWeight =>
+      'Cargá tu peso corporal para ver tu rango.';
+
+  @override
+  String get liftRankStripPending => 'Se calcula con tu próximo entrenamiento.';
+
+  @override
+  String a11yRankingRowButtonWithRank(String name, String rank) {
+    return 'Ver el perfil de $name, rango $rank';
   }
 
   @override

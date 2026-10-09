@@ -299,6 +299,22 @@
       }
     }
   },
+  "liftRankNone": "Sin rango",
+  "liftRankBronze": "Bronce",
+  "liftRankSilver": "Plata",
+  "liftRankGold": "Oro",
+  "liftRankPlatinum": "Platino",
+  "liftRankDiamond": "Diamante",
+  "liftRankChampion": "Campeón",
+  "liftRankTitan": "Titán",
+  "liftRankOlympian": "Olímpico",
+  "liftRankStripTitle": "TU RANGO · {lift}",
+  "liftRankStripPosition": "Rango {rank} de {total}",
+  "liftRankStripBelowBronze": "Todavía no llegás a Bronce. Seguí sumando kilos.",
+  "liftRankStripNoLift": "Registrá este levantamiento en un entrenamiento para ver tu rango.",
+  "liftRankStripNoBodyWeight": "Cargá tu peso corporal para ver tu rango.",
+  "liftRankStripPending": "Se calcula con tu próximo entrenamiento.",
+  "a11yRankingRowButtonWithRank": "Ver el perfil de {name}, rango {rank}",
   "a11yRankingRowButton": "Ver el perfil de {name}",
   "@a11yRankingRowButton": {
     "description": "Semantics label for a leaderboard row in gym rankings. The row is a button that opens that athlete's public profile. Describes the ACTION, not the visuals — the row shows rank, name and metric, so reusing an avatar label would announce something the row is not.",
