@@ -408,7 +408,14 @@ class UserRepository {
     int? acceptedPrivacyVersion,
   }) async {
     final existing = await get(uid);
-    if (existing != null) return existing;
+    if (existing != null) {
+      return _conConsentimiento(
+        existing,
+        termsAcceptedAt: termsAcceptedAt,
+        acceptedTermsVersion: acceptedTermsVersion,
+        acceptedPrivacyVersion: acceptedPrivacyVersion,
+      );
+    }
     final now = DateTime.now().toUtc();
     final profile = UserProfile(
       uid: uid,
@@ -429,17 +436,72 @@ class UserRepository {
       _publicSubsetFromProfile(profile),
       SetOptions(merge: true),
     );
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (_) {
+      // Carrera con otro `createIfAbsent` de la misma cuenta
+      // (`perfilAseguradoProvider` arranca apenas existe la cuenta de Auth, en
+      // paralelo con el registro): si aterrizó entre la lectura de arriba y
+      // este commit, este `set` sin merge llega como UPDATE con otro
+      // `createdAt` y el pin de la regla lo rechaza. Eso no es un alta
+      // fallida: el doc existe, y lo único que le falta es el consentimiento.
+      // Sin doc, sí es un fallo, y se propaga tal cual.
+      final ganador = await get(uid);
+      if (ganador == null) rethrow;
+      return _conConsentimiento(
+        ganador,
+        termsAcceptedAt: termsAcceptedAt,
+        acceptedTermsVersion: acceptedTermsVersion,
+        acceptedPrivacyVersion: acceptedPrivacyVersion,
+      );
+    }
 
     return profile;
+  }
+
+  /// Estampa el consentimiento del registro sobre un doc que ya existía, si
+  /// le falta. El doc lo pudo crear un `createIfAbsent` que le ganó la carrera
+  /// al registro, con el `toJson()` de un perfil vacío: sin esto, la cuenta
+  /// quedaba creada SIN consentimiento aunque la persona tildó el checkbox.
+  ///
+  /// Nunca pisa evidencia previa: si el doc ya tiene `termsAcceptedAt`, se
+  /// devuelve como está.
+  Future<UserProfile> _conConsentimiento(
+    UserProfile existente, {
+    DateTime? termsAcceptedAt,
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
+  }) async {
+    if (termsAcceptedAt == null || existente.termsAcceptedAt != null) {
+      return existente;
+    }
+    await update(existente.uid, {
+      'termsAcceptedAt': Timestamp.fromDate(termsAcceptedAt.toUtc()),
+      'acceptedTermsVersion': acceptedTermsVersion,
+      'acceptedPrivacyVersion': acceptedPrivacyVersion,
+    });
+    return existente.copyWith(
+      termsAcceptedAt: termsAcceptedAt,
+      acceptedTermsVersion: acceptedTermsVersion,
+      acceptedPrivacyVersion: acceptedPrivacyVersion,
+    );
   }
 
   /// Best-effort backfill on sign-in. Creates the doc with `displayName: null`
   /// and atomically also creates/updates `userPublicProfiles/{uid}`.
   /// REQ-UPP-010.
+  ///
+  /// [termsAcceptedAt] y las versiones: sólo los pasa el self-heal del submit
+  /// del alta, cuando la persona tildó el checkbox en ese mismo submit. Una
+  /// cuenta con contraseña sin verificar no puede crear el doc sin
+  /// consentimiento (`altaPorMailTraeConsentimiento` en firestore.rules), así
+  /// que sin ellos ese self-heal quedaba denegado para siempre.
   Future<void> createIfAbsent({
     required String uid,
     required String email,
+    DateTime? termsAcceptedAt,
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
   }) async {
     final snap = await _users.doc(uid).get();
     if (snap.exists) return;
@@ -451,6 +513,9 @@ class UserRepository {
       role: UserRole.athlete,
       createdAt: now,
       updatedAt: now,
+      termsAcceptedAt: termsAcceptedAt,
+      acceptedTermsVersion: acceptedTermsVersion,
+      acceptedPrivacyVersion: acceptedPrivacyVersion,
     );
 
     final batch = _firestore.batch();

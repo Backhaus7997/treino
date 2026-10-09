@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -393,9 +394,25 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         throw StateError('username-taken');
       }
 
+      // Un solo sello para las dos escrituras de abajo: el consentimiento es
+      // UNO, el de este submit.
+      final sello = needsTermsConsent ? termsStampFields() : null;
+
       // Self-heal: garantiza que users/{uid} + userPublicProfiles/{uid} existan
       // antes del update parcial (ver doc de submit). Idempotente.
-      await repo.createIfAbsent(uid: uid, email: user.email ?? '');
+      //
+      // Lleva el consentimiento cuando este submit lo registra: una cuenta con
+      // contraseña sin verificar no puede crear el doc sin él
+      // (`altaPorMailTraeConsentimiento` en firestore.rules), y sin doc el
+      // update de abajo tampoco pasa.
+      await repo.createIfAbsent(
+        uid: uid,
+        email: user.email ?? '',
+        termsAcceptedAt:
+            (sello?['termsAcceptedAt'] as Timestamp?)?.toDate().toUtc(),
+        acceptedTermsVersion: sello?['acceptedTermsVersion'] as int?,
+        acceptedPrivacyVersion: sello?['acceptedPrivacyVersion'] as int?,
+      );
 
       // Gym nuevo nombrado en el paso 3 (#1338): recién ahora se crea el doc
       // compartido, y ANTES del update — que lee `gyms/{gymId}` para el
@@ -429,7 +446,7 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         // overwrite that evidence with a later ProfileSetup timestamp.
         // consentimiento-legal-versionado (R3): mismo checkbox, misma
         // escritura — estampa las 2 versiones vigentes junto al timestamp.
-        if (needsTermsConsent) ...termsStampFields(),
+        if (sello != null) ...sello,
       };
       await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);
