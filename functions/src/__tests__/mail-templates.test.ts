@@ -1226,10 +1226,10 @@ describe("código de verificación del mail", () => {
   it("el del PF lista los cuatro planes, con cupo y detalle, sin precio", () => {
     const { text } = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
-    expect(text).toContain("Free · 2 alumnos");
-    expect(text).toContain("Plan 1 · 7 alumnos · hasta 60 ejercicios propios · plantillas sin límite");
-    expect(text).toContain("Plan 2 · 15 alumnos · hasta 120 ejercicios propios · plantillas sin límite");
-    expect(text).toContain("Plan 3 · alumnos sin límite · ejercicios propios sin límite");
+    expect(text).toContain("Free · Gratis");
+    expect(text).toContain("Plan 1 · Hasta 7 alumnos · Ejercicios propios: 60 · Plantillas: Sin tope");
+    expect(text).toContain("Plan 2 · Hasta 15 alumnos · Ejercicios propios: 120 · Plantillas: Sin tope");
+    expect(text).toContain("Plan 3 · Alumnos sin tope · Ejercicios propios: Sin tope");
     expect(text).not.toMatch(/\$\s?\d/);
   });
 
@@ -1237,7 +1237,7 @@ describe("código de verificación del mail", () => {
     const { text } = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(text).toContain("Gratis · el que tenés hoy.");
-    expect(text).toContain("TREINO Pro · todo lo que ya usás, sin los topes del plan gratis:");
+    expect(text).toContain("TREINO Pro · sin los topes del plan gratis:");
     expect(text).toContain("hasta 10 rutinas propias");
     expect(text).not.toMatch(/\$\s?\d/);
     // El alumno no ve los planes del PF.
@@ -1273,9 +1273,8 @@ describe("código de verificación del mail", () => {
     jest.dontMock("../subscriptions/tier-config");
     jest.dontMock("../subscriptions/athlete-plan-config");
 
-    expect(pf).toContain("Free · 3 alumnos");
-    expect(pf).toContain("Free · 3 alumnos · hasta 21 ejercicios propios · hasta 4 plantillas");
-    expect(pf).toContain("Plan 1 · 8 alumnos · hasta 61 ejercicios propios · plantillas sin límite");
+    expect(pf).toContain("Free · Gratis · Hasta 3 alumnos activos · cada alumno pausado cuenta 0,5 · Ejercicios propios: 21 · Plantillas: 4");
+    expect(pf).toContain("Plan 1 · Hasta 8 alumnos · Ejercicios propios: 61 · Plantillas: Sin tope");
     expect(alumno).toContain("rutinas de hasta 5 días; hasta 12 semanas");
     expect(alumno).toContain("hasta 8 rutinas propias");
     expect(alumno).not.toMatch(/\$\s?\d/);

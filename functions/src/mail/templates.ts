@@ -513,8 +513,16 @@ function lineToText(line: Line): string {
 interface PlanCard {
   nombre: string;
   detalle: string;
-  /** Líneas extra bajo el detalle, una por beneficio. Solo las usa el mail del código. */
-  puntos?: string[];
+  /**
+   * Ficha al estilo de las cards de planes de la landing (/es/gym): el `detalle`
+   * va como héroe en mint y debajo las filas. Solo la usa el mail del código;
+   * los mails de tope siguen con el layout compacto de siempre.
+   */
+  ficha?: {
+    sub?: string;
+    filas: { label?: string; valor: string }[];
+    destacado?: boolean;
+  };
   precio?: { monto: string; periodo: string };
   linea: Line;
 }
@@ -535,8 +543,38 @@ type Block = Line | Planes;
  * en Promociones (ver `free-limit-reached`). Todo pasa por `esc()`, aunque hoy
  * los valores salgan de constantes nuestras.
  */
+function fichaToHtml(c: PlanCard & { ficha: NonNullable<PlanCard["ficha"]> }): string {
+  const { ficha } = c;
+  const borde = ficha.destacado ? `1.5px solid ${MINT}` : `1px solid ${PLAN_CARD_BORDE}`;
+  const filas = ficha.filas.map((f) => {
+    const contenido = f.label ?
+      `${esc(f.label)}: <strong style="color:${BONE};">${esc(f.valor)}</strong>` :
+      `<span style="color:${MINT};font-weight:700;">&#10003;</span>&nbsp; ${esc(f.valor)}`;
+    return `<div style="padding-top:8px;font-size:14px;line-height:1.45;color:${MUTED};">${contenido}</div>`;
+  });
+  return [
+    "<tr><td style=\"padding:0 0 12px 0;\">",
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
+    ` style="border-collapse:separate;background:${PLAN_CARD};border:${borde};`,
+    `border-radius:16px;font-family:${FONT};"><tr>`,
+    "<td valign=\"top\" style=\"padding:20px 22px;\">",
+    "<div style=\"font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;line-height:1.4;",
+    `color:${ficha.destacado ? MINT : BONE};">${esc(c.nombre)}</div>`,
+    "<div style=\"padding-top:8px;font-size:28px;font-weight:800;line-height:1.15;",
+    `color:${MINT};">${esc(comoTitulo(c.detalle))}</div>`,
+    ficha.sub ?
+      `<div style="padding-top:4px;font-size:13px;line-height:1.4;color:${MUTED};">${esc(ficha.sub)}</div>` :
+      "",
+    "<div style=\"padding-top:6px;\"></div>",
+    ...filas,
+    "</td></tr></table>",
+    "</td></tr>",
+  ].join("");
+}
+
 function planesToHtml(planes: Planes): string {
   const cards = planes.cards.map((c) => {
+    if (c.ficha) return fichaToHtml({ ...c, ficha: c.ficha });
     const precio = c.precio
       ? [
         "<td align=\"right\" valign=\"middle\" style=\"padding:14px 16px 14px 8px;white-space:nowrap;\">",
@@ -556,9 +594,6 @@ function planesToHtml(planes: Planes): string {
       `line-height:1.4;color:${MINT};">${esc(c.nombre)}</div>`,
       `<div style="padding-top:2px;font-size:16px;font-weight:700;line-height:1.35;color:${BONE};">`,
       `${esc(comoTitulo(c.detalle))}</div>`,
-      ...(c.puntos ?? []).map(
-        (p) => `<div style="padding-top:4px;font-size:14px;line-height:1.4;color:${MUTED};">${esc(p)}</div>`,
-      ),
       "</td>",
       precio,
       "</tr></table>",
@@ -675,8 +710,10 @@ function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
 }
 
 /**
- * Los planes del PF en el mail del código: una card por plan, SIN precio, con
- * lo que trae cada uno (cupo de alumnos, ejercicios propios y plantillas).
+ * Los planes del PF en el mail del código: una ficha por plan, SIN precio, con
+ * el mismo lenguaje que las cards de la landing (/es/gym): el cupo de alumnos
+ * como héroe y debajo ejercicios propios y plantillas. Plan 1 va destacado,
+ * como la «recomendada» de la pantalla de planes.
  *
  * Todo sale de `tier-config.ts`, en el orden de `TIER_LABELS` (de Free a
  * Plan 3). El precio no va: se ve en el checkout al que lleva VER LOS PLANES, y
@@ -688,18 +725,32 @@ function planesDelPf(): Block[] {
     new Planes(
       tiers.map((tier): PlanCard => {
         const nombre = TIER_LABELS[tier];
-        const detalle = cupoLabel(TIER_WEIGHT_LIMITS[tier]);
+        const alumnos = TIER_WEIGHT_LIMITS[tier];
         const ejercicios = TIER_CUSTOM_EXERCISE_LIMITS[tier];
         const plantillas = TIER_TEMPLATE_LIMITS[tier];
-        const puntos = [
-          ejercicios === null ? "Ejercicios propios sin límite" : `Hasta ${ejerciciosLabel(ejercicios)}`,
-          plantillas === null ? "Plantillas sin límite" : `Hasta ${plantillasLabel(plantillas)}`,
-        ]; // i18n: email comercial
+        const sinTope = (n: number | null): string => (n === null ? "Sin tope" : String(n)); // i18n: email comercial
+        const pausados = "Cada alumno pausado cuenta 0,5"; // i18n: email comercial
+        const detalle =
+          tier === "free" ? "Gratis" : alumnos === null ? "Alumnos sin tope" : `Hasta ${cupoLabel(alumnos)}`;
+        const sub =
+          tier === "free" && alumnos !== null ? `Hasta ${cupoLabel(alumnos)} activos · ${pausados.toLowerCase()}` :
+            alumnos === null ? undefined : pausados;
+        const filas = [
+          { label: "Ejercicios propios", valor: sinTope(ejercicios) },
+          { label: "Plantillas", valor: sinTope(plantillas) },
+        ];
+        const textoPlano = [
+          detalle,
+          ...(tier === "free" && sub ? [sub] : []),
+          ...filas.map((f) => `${f.label}: ${f.valor}`),
+        ];
         return {
           nombre,
           detalle,
-          puntos,
-          linea: [strong(nombre), ` · ${detalle} · ${puntos.map((p) => p.toLowerCase()).join(" · ")}`],
+          ficha: { sub, filas, destacado: tier === "plan1" },
+          // En el texto plano el cupo del Free no puede perderse: en el HTML es el
+          // sub del héroe «Gratis», y acá no hay héroe.
+          linea: [strong(nombre), ` · ${textoPlano.join(" · ")}`],
         };
       }),
     ),
@@ -707,15 +758,15 @@ function planesDelPf(): Block[] {
 }
 
 /**
- * Los planes del alumno en el mail del código: el gratis y TREINO Pro con lo
- * que trae, SIN precio (se ve en el checkout). Los topes de Pro salen de
- * `athlete-plan-config.ts`, que `athlete-pro-limites.test.ts` ata a los de la
- * app. Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así
- * que «el que tenés hoy» no miente.
+ * Los planes del alumno en el mail del código: el gratis y TREINO Pro (la
+ * destacada) con lo que trae, SIN precio (se ve en el checkout). Los topes de
+ * Pro salen de `athlete-plan-config.ts`, que `athlete-pro-limites.test.ts` ata
+ * a los de la app. Sólo lo recibe quien hoy está en el gratis (ver
+ * `muestraPlanes`), así que «el que tenés hoy» no miente.
  */
 function planesDelAlumno(): Block[] {
-  const detalle = "Todo lo que ya usás, sin los topes del plan gratis";
-  const puntos = [
+  const detalle = "Sin los topes del plan gratis";
+  const beneficios = [
     `Rutinas de hasta ${ATHLETE_PRO_MAX_ROUTINE_DAYS} días`,
     `Hasta ${ATHLETE_PRO_MAX_ROUTINE_WEEKS} semanas, con periodización`,
     "Todas las plantillas del catálogo, de principiante a avanzado",
@@ -729,8 +780,8 @@ function planesDelAlumno(): Block[] {
       {
         nombre: "TREINO Pro",
         detalle,
-        puntos,
-        linea: [strong("TREINO Pro"), ` · ${detalle.toLowerCase()}: ${puntos.map((p) => p.toLowerCase()).join("; ")}.`],
+        ficha: { sub: "Todo lo que ya usás.", filas: beneficios.map((valor) => ({ valor })), destacado: true },
+        linea: [strong("TREINO Pro"), ` · ${detalle.toLowerCase()}: ${beneficios.join("; ").toLowerCase()}.`],
       },
     ]),
   ];

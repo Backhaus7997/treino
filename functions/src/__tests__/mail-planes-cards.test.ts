@@ -31,8 +31,8 @@ function cards(html: string): Card[] {
     .split("background:#1D2321")
     .slice(1)
     .map((trozo) => {
-      const nombre = /color:#2CE5A2;">([^<]+)<\/div>/.exec(trozo);
-      const detalle = /padding-top:2px;[^"]*">([^<]+)<\/div>/.exec(trozo);
+      const nombre = /color:#(?:2CE5A2|FFFFFF);">([^<]+)<\/div>/.exec(trozo);
+      const detalle = /(?:padding-top:2px;|padding-top:8px;font-size:28px;)[^"]*">([^<]+)<\/div>/.exec(trozo);
       const precio = /<td align="right"[^>]*><div[^>]*>([^<]+)<\/div><div[^>]*>([^<]+)<\/div>/.exec(trozo);
       return {
         nombre: nombre ? nombre[1] : "",
@@ -47,10 +47,10 @@ describe("planes del PF en el mail del código", () => {
 
   it("una card por plan, de Free a Plan 3, con su cupo de alumnos y SIN precio", () => {
     expect(cards(html).map((c) => [c.nombre, c.detalle])).toEqual([
-      ["Free", "2 alumnos"],
-      ["Plan 1", "7 alumnos"],
-      ["Plan 2", "15 alumnos"],
-      ["Plan 3", "Alumnos sin límite"],
+      ["Free", "Gratis"],
+      ["Plan 1", "Hasta 7 alumnos"],
+      ["Plan 2", "Hasta 15 alumnos"],
+      ["Plan 3", "Alumnos sin tope"],
     ]);
   });
 
@@ -62,10 +62,15 @@ describe("planes del PF en el mail del código", () => {
   });
 
   it("cada card detalla ejercicios propios y plantillas", () => {
-    expect(html).toContain("Hasta 20 ejercicios propios");
-    expect(html).toContain("Hasta 3 plantillas");
-    expect(html).toContain("Ejercicios propios sin límite");
-    expect(html).toContain("Plantillas sin límite");
+    expect(html).toContain("Ejercicios propios: <strong style=\"color:#FFFFFF;\">20</strong>");
+    expect(html).toContain("Plantillas: <strong style=\"color:#FFFFFF;\">3</strong>");
+    expect(html).toContain("Plantillas: <strong style=\"color:#FFFFFF;\">Sin tope</strong>");
+    expect(html).toContain("Hasta 2 alumnos activos");
+  });
+
+  it("Plan 1 va destacada con borde mint, como la recomendada de la pantalla de planes", () => {
+    const trozos = html.split("background:#1D2321").slice(1);
+    expect(trozos.map((t) => t.includes("border:1.5px solid #2CE5A2"))).toEqual([false, true, false, false]);
   });
 
   it("en el HTML los planes ya no son párrafos", () => {
@@ -74,8 +79,8 @@ describe("planes del PF en el mail del código", () => {
   });
 
   it("el texto plano: una línea por plan, en minúscula dentro de la frase", () => {
-    expect(text).toContain("Free · 2 alumnos · hasta 20 ejercicios propios · hasta 3 plantillas");
-    expect(text).toContain("Plan 3 · alumnos sin límite · ejercicios propios sin límite · plantillas sin límite");
+    expect(text).toContain("Free · Gratis · Hasta 2 alumnos activos · cada alumno pausado cuenta 0,5 · Ejercicios propios: 20 · Plantillas: 3");
+    expect(text).toContain("Plan 3 · Alumnos sin tope · Ejercicios propios: Sin tope · Plantillas: Sin tope");
   });
 
   it("el código sigue después de los planes", () => {
@@ -91,11 +96,12 @@ describe("planes del alumno", () => {
     expect(cards(html)).toHaveLength(2);
     expect(gratis).toEqual({ nombre: "Gratis", detalle: "El que tenés hoy" });
     expect(pro.nombre).toBe("TREINO Pro");
-    expect(pro.detalle).toBe("Todo lo que ya usás, sin los topes del plan gratis");
+    expect(pro.detalle).toBe("Sin los topes del plan gratis");
     expect(pro.precio).toBeUndefined();
-    expect(html).toContain("Rutinas de hasta 7 días");
+    expect(html).toContain("&#10003;</span>&nbsp; Rutinas de hasta 7 días");
     expect(html).toContain("Hasta 16 semanas, con periodización");
     expect(html).toContain("Hasta 10 rutinas propias");
+    expect(html).toContain("border:1.5px solid #2CE5A2");
     expect(html).not.toMatch(/\$\s?\d/);
   });
 
