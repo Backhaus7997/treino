@@ -28,7 +28,8 @@
  * SEGURIDAD
  * ────────────────────────────────────────────────────────────────────────────
  * - Sólo toca tarjetas con `displayName` vacío/ausente Y con nombre no vacío
- *   en `users/{uid}`. Nunca pisa un nombre existente.
+ *   en `users/{uid}`, y sólo si ese usuario tiene `role == 'trainer'` (una
+ *   tarjeta forjada por un alumno se omite y se reporta). Nunca pisa un nombre existente.
  * - merge:true y sólo esas dos claves. Idempotente.
  * - No crea tarjetas: recorre las que ya existen.
  * ────────────────────────────────────────────────────────────────────────────
@@ -36,20 +37,33 @@
 
 'use strict';
 
-const { inicializarAdmin } = require('./lib/admin');
+const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { bannerDeProduccion } = require('./lib/firebase_projects');
+const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
 const { getFirestore } = require('firebase-admin/firestore');
-
-const { app } = inicializarAdmin();
-const db = getFirestore(app);
 
 const apply = process.argv.includes('--apply');
 
 async function main() {
+  // El cartel ANTES de inicializar nada (AGENTS.md §11.1): `treino-dev` es
+  // producción. Se calla sólo si Firestore está desviado al emulador.
+  const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
+    contraEmulador: contraEmuladorDe(['firestore']),
+  });
+  if (bannerProd) console.warn(bannerProd);
+
+  const { app, contexto } = inicializarAdmin();
+  const db = getFirestore(app);
+
+  // El proyecto RESUELTO (sale de la credencial realmente cargada) y el modo,
+  // antes de la primera lectura.
+  console.log(`PROYECTO: ${contexto ? proyectoDe(contexto) : '(app ya inicializada)'}`);
   console.log(apply ? 'MODO APPLY: escribe.' : 'DRY-RUN: no escribe (usá --apply).');
 
   const tarjetas = await db.collection('trainerPublicProfiles').get();
   let candidatas = 0;
   let sinNombreEnUsers = 0;
+  let noEntrenadores = 0;
   let escritas = 0;
 
   for (const tarjeta of tarjetas.docs) {
@@ -57,7 +71,14 @@ async function main() {
     if (typeof nombreActual === 'string' && nombreActual.trim() !== '') continue;
 
     const user = await db.collection('users').doc(tarjeta.id).get();
-    const nombre = user.exists ? user.get('displayName') : null;
+    // Sólo entrenadores: una tarjeta legacy forjada por un alumno no debe
+    // recibir nombre, porque con él reaparecería en `listAll()`.
+    if (!user.exists || user.get('role') !== 'trainer') {
+      noEntrenadores++;
+      console.log(`  ${tarjeta.id}: el dueño no es entrenador (role != 'trainer'), se omite`);
+      continue;
+    }
+    const nombre = user.get('displayName');
     if (typeof nombre !== 'string' || nombre.trim() === '') {
       sinNombreEnUsers++;
       console.log(`  ${tarjeta.id}: sin nombre tampoco en users/, se omite`);
@@ -78,7 +99,8 @@ async function main() {
 
   console.log(
     `Tarjetas: ${tarjetas.size}. A rellenar: ${candidatas}. ` +
-      `Sin nombre en users/: ${sinNombreEnUsers}. Escritas: ${escritas}.`,
+      `Sin nombre en users/: ${sinNombreEnUsers}. ` +
+      `Omitidas por no ser entrenador: ${noEntrenadores}. Escritas: ${escritas}.`,
   );
 }
 
