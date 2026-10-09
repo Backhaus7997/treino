@@ -3,7 +3,7 @@
 // PlacesTextSearchService talks to Places API (New) Text Search:
 //   POST https://places.googleapis.com/v1/places:searchText
 //   Headers: X-Goog-Api-Key, X-Goog-FieldMask, Content-Type: application/json
-//   Body: { textQuery, pageSize, locationBias?: { circle: { center, radius } } }
+//   Body: { textQuery, pageSize, includedType: gym, strictTypeFiltering, locationBias?: { circle: { center, radius } } }
 //   Response: places[].{id, displayName, formattedAddress}
 //
 // Mirrors places_nearby_search_service_test.dart's fake-http.Client pattern
@@ -109,6 +109,8 @@ void main() {
       final body = jsonDecode(captured.single as String) as Map;
       expect(body['textQuery'], 'qivox');
       expect(body['pageSize'], 20);
+      expect(body['includedType'], 'gym');
+      expect(body['strictTypeFiltering'], isTrue);
 
       final bias = body['locationBias'] as Map;
       final circle = bias['circle'] as Map;
@@ -137,6 +139,9 @@ void main() {
 
       final body = jsonDecode(captured.single as String) as Map;
       expect(body.containsKey('locationBias'), isFalse);
+      // El filtro de tipo se mantiene aunque no haya ubicación.
+      expect(body['includedType'], 'gym');
+      expect(body['strictTypeFiltering'], isTrue);
     });
 
     test('parses places[] into a GymSuggestion list', () async {
