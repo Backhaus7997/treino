@@ -407,8 +407,9 @@ void main() {
       });
 
       testWidgets(
-          'sin rango o con rango 0 no se dibuja nada, pero el hueco se reserva '
-          'y los nombres quedan alineados', (tester) async {
+          'sin dato o con rango 0 se dibuja la insignia vacía, sin decir el '
+          'rango, y los nombres quedan alineados', (tester) async {
+        final semantics = tester.ensureSemantics();
         await tester.pumpWidget(_buildScreen(
           overrides: baseOverrides(
             squat: [
@@ -434,13 +435,26 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('rankings_badge_u2')), findsOneWidget);
-        expect(find.byKey(const Key('rankings_badge_u3')), findsNothing);
-        expect(find.byKey(const Key('rankings_badge_u4')), findsNothing);
+        LiftRank rankOf(String uid) => tester
+            .widget<LiftRankBadge>(find.byKey(Key('rankings_badge_$uid')))
+            .rank;
+        expect(rankOf('u2'), LiftRank.olympian);
+        // Rango 0 (no llega a Bronce) y sin dato (sin peso corporal) se ven
+        // igual: el resto del gym no tiene por qué saber cuál de los dos es.
+        expect(rankOf('u3'), LiftRank.none);
+        expect(rankOf('u4'), LiftRank.none);
+
+        // La insignia vacía es decorativa: la etiqueta no anuncia "Sin rango".
+        for (final uid in ['u3', 'u4']) {
+          final label =
+              tester.getSemantics(find.byKey(Key('rankings_row_$uid'))).label;
+          expect(label, isNot(contains('rango')));
+        }
 
         final x = tester.getTopLeft(find.text('Lu')).dx;
         expect(tester.getTopLeft(find.text('Mati')).dx, x);
         expect(tester.getTopLeft(find.text('Nico')).dx, x);
+        semantics.dispose();
       });
 
       testWidgets('rachas y volumen no tienen insignia, ni hueco para ella',

@@ -806,20 +806,25 @@ class _LeaderboardRow extends StatelessWidget {
   final bool isMe;
   final AppPalette palette;
 
-  /// `true` en las pestañas de levantamientos: reserva un hueco para la
-  /// insignia en TODAS las filas, tengan rango o no, así los nombres no se
-  /// desalinean entre el que ya tiene rango y el que todavía no.
+  /// `true` en las pestañas de levantamientos: TODAS las filas llevan
+  /// insignia, tengan rango o no. Un hueco en blanco se leía como algo que
+  /// faltaba cargar, y además los nombres quedan alineados.
   final bool showLiftRankSlot;
 
-  /// Rango del atleta en este levantamiento. `null` = sin dato; `none` = tiene
-  /// datos pero no llega a Bronce. En ninguno de los dos casos se dibuja nada.
+  /// Rango del atleta en este levantamiento. `null` = sin dato (por ejemplo,
+  /// no cargó su peso corporal); `none` = tiene datos pero no llega a Bronce.
+  /// Los dos se dibujan con la insignia vacía de "sin rango": que le falte el
+  /// peso es un dato privado, y para el resto del gym es lo mismo, todavía no
+  /// tiene rango.
   final LiftRank? liftRank;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final displayName = profile.displayName ?? '—';
-    final badgeRank =
+    // Sólo un rango con nombre (Bronce…Olímpico) va en la etiqueta: "rango Sin
+    // rango" no le dice nada a un lector de pantalla.
+    final namedRank =
         liftRank != null && liftRank != LiftRank.none ? liftRank : null;
 
     return Semantics(
@@ -836,11 +841,11 @@ class _LeaderboardRow extends StatelessWidget {
       // tenga Oro no puede depender de verlo ni de distinguir el color.
       label: isMe
           ? l10n.a11yHomeAvatarButton
-          : badgeRank == null
+          : namedRank == null
               ? l10n.a11yRankingRowButton(displayName)
               : l10n.a11yRankingRowButtonWithRank(
                   displayName,
-                  badgeRank.label(l10n),
+                  namedRank.label(l10n),
                 ),
       child: TreinoTappable(
         // PublicProfileScreen already models `isSelf`: navigating for every
@@ -873,15 +878,9 @@ class _LeaderboardRow extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (showLiftRankSlot) ...[
-                SizedBox(
-                  width: LiftRankBadge.rowSize,
-                  height: LiftRankBadge.rowSize,
-                  child: badgeRank == null
-                      ? null
-                      : LiftRankBadge(
-                          key: Key('rankings_badge_${profile.uid}'),
-                          rank: badgeRank,
-                        ),
+                LiftRankBadge(
+                  key: Key('rankings_badge_${profile.uid}'),
+                  rank: liftRank ?? LiftRank.none,
                 ),
                 const SizedBox(width: 8),
               ],
