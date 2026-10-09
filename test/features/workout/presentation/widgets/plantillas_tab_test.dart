@@ -397,12 +397,14 @@ void main() {
         );
       }
 
-      // Scroll de ida y vuelta — sin overflow ni errores. `.first` porque el
-      // grid interno también scrollea: el de afuera es el de PlantillasTab.
+      // Scroll de ida y vuelta — sin overflow ni errores. `.first`: el
+      // scroll vertical de la pestaña es el más externo. Se busca el
+      // Scrollable y no el widget concreto (antes SingleChildScrollView,
+      // hoy CustomScrollView): atar el finder al tipo lo rompía al migrar.
       final scroller = find
           .descendant(
             of: find.byType(PlantillasTab),
-            matching: find.byType(SingleChildScrollView),
+            matching: find.byType(Scrollable),
           )
           .first;
       await tester.drag(scroller, const Offset(0, -600));
