@@ -154,9 +154,17 @@ const CASOS: Array<[string, unknown, unknown]> = [
   ["moderationStats", moderationStats, moderador],
 ];
 
-afterAll(async () => {
+/** Borra todo app de firebase-admin: cada handler arranca en frio. */
+async function limpiarApps(): Promise<void> {
   await Promise.all(getApps().map((app) => deleteApp(app)));
-});
+}
+
+// Sin esto, el primer caso que llama a `ensureApp()` deja el app por defecto
+// registrado y todos los siguientes corren con la inicializacion global que
+// este test dice excluir. Los modulos no cachean el App (getApp() en cada
+// llamada), asi que borrarlo entre casos es seguro.
+beforeEach(limpiarApps);
+afterAll(limpiarApps);
 
 describe("los triggers no dependen del app por defecto de otro modulo", () => {
   it("arranca SIN app inicializado (si no, el test no mide nada)", () => {
@@ -165,6 +173,7 @@ describe("los triggers no dependen del app por defecto de otro modulo", () => {
 
   it.each(CASOS)("%s llega a la base sin «default app does not exist»",
     async (_nombre, handler, evento) => {
+      expect(getApps()).toHaveLength(0);
       await expect((handler as Handler)(evento)).rejects.toThrow(CENTINELA);
     });
 });
@@ -177,7 +186,24 @@ describe("ningun getter de firebase-admin sin el app", () => {
     "getDatabase", "getRemoteConfig", "getInstallations", "getFunctions",
     "getEventarc", "getSecurityRules", "getProjectManagement",
   ];
-  const GETTER_SIN_APP = new RegExp(`\\b(${GETTERS.join("|")})\\(\\s*\\)`);
+  // `\s` incluye saltos de linea: `getFirestore(\n)` tambien cuenta.
+  const GETTER_SIN_APP = new RegExp(
+    `\\b(${GETTERS.join("|")})\\s*\\(\\s*\\)`, "g");
+
+  /**
+   * Hallazgos de un fuente. Se quitan los comentarios CONSERVANDO los saltos
+   * de linea (para que el numero de linea siga siendo el real) y se busca
+   * sobre el archivo entero, no linea por linea.
+   */
+  function hallazgosEn(fuente: string): Array<{ linea: number; texto: string }> {
+    const sinComentarios = fuente
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+      .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
+    return [...sinComentarios.matchAll(GETTER_SIN_APP)].map((m) => ({
+      linea: sinComentarios.slice(0, m.index).split("\n").length,
+      texto: m[0].replace(/\s+/g, " "),
+    }));
+  }
 
   function archivos(dir: string): string[] {
     const fs = jest.requireActual("fs") as typeof import("fs");
@@ -191,17 +217,29 @@ describe("ningun getter de firebase-admin sin el app", () => {
   it("no hay ninguno en src/", () => {
     const src = join(__dirname, "..");
     const hallazgos = archivos(src).flatMap((f) =>
-      readFileSync(f, "utf8")
-        .split("\n")
-        .map((linea, i) => ({ linea, i }))
-        // Los comentarios pueden NOMBRAR el getter vacio para explicarlo.
-        .filter(({ linea }) => !/^\s*(\*|\/\*|\/\/)/.test(linea))
-        .filter(({ linea }) => GETTER_SIN_APP.test(linea))
-        .map(({ linea, i }) => `${relative(src, f)}:${i + 1}: ${linea.trim()}`),
+      hallazgosEn(readFileSync(f, "utf8")).map(
+        ({ linea, texto }) => `${relative(src, f)}:${linea}: ${texto}`),
     );
     // Control: el escaneo tiene que haber visto archivos. Un glob roto da
     // cero hallazgos y sale verde sin haber mirado nada.
     expect(archivos(src).length).toBeGreaterThan(20);
     expect(hallazgos).toEqual([]);
+  });
+
+  // Control del escaneo mismo: si no detecta lo que dice detectar, el verde
+  // de arriba no prueba nada.
+  it("detecta getters vacios en una linea y en varias", () => {
+    expect(hallazgosEn("const db = getFirestore();")).toHaveLength(1);
+    expect(hallazgosEn("const db = getFirestore(\n);")).toHaveLength(1);
+    expect(hallazgosEn("const db = getAuth (\n  \n  )")).toHaveLength(1);
+    expect(hallazgosEn("x\ny\nconst db = getFirestore(\n);")[0].linea)
+      .toBe(3);
+  });
+
+  it("no marca getters con app ni los nombrados en comentarios", () => {
+    expect(hallazgosEn("getFirestore(app)")).toEqual([]);
+    expect(hallazgosEn("getFirestore(ensureApp())")).toEqual([]);
+    expect(hallazgosEn("// getFirestore()")).toEqual([]);
+    expect(hallazgosEn("/* getFirestore(\n) */")).toEqual([]);
   });
 });
