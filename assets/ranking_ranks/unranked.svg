@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120" width="120" height="120">
+  <!-- Generado por tool/build_lift_rank_badges.dart. No editar a mano: dart run tool/build_lift_rank_badges.dart -->
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" fill="none" stroke="#000" stroke-width="3" stroke-linejoin="round" stroke-dasharray="6 4"/>
+  <rect x="-27.5" y="-3" width="55" height="6" rx="1" fill="#000"/>
+  <path d="M25.7 -4h1.8v8h-1.8z M-27.5 -4h1.8v8h-1.8z" fill="#000"/>
+</svg>

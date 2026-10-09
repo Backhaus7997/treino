@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120" width="120" height="120">
+  <!-- Generado por tool/build_lift_rank_badges.dart. No editar a mano: dart run tool/build_lift_rank_badges.dart -->
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" transform="translate(0,2)" fill="#000" opacity=".2"/>
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" fill="#4455CF" stroke="#1F2A78" stroke-width="1.4" stroke-linejoin="round"/>
+  <polygon points="0,-41 35.5,-20.5 35.5,20.5 0,41 -35.5,20.5 -35.5,-20.5" fill="none" stroke="#CDD3FF" stroke-width=".7" opacity=".5"/>
+  <polygon points="0,-36 31.2,-18 31.2,18 0,36 -31.2,18 -31.2,-18" fill="#8392F7"/>
+  <path d="M-31.2 -18L0 -36L31.2 -18V0H-31.2z" fill="#fff" opacity=".1"/>
+  <path d="M-31.2 0H31.2V18L0 36L-31.2 18z" fill="#000" opacity=".08"/>
+  <path d="M0 -36L31.2 -18L0 0z M0 36L-31.2 18L0 0z" fill="#fff" opacity=".2"/>
+  <path d="M-31.2 -18L0 -36L0 0z M31.2 18L0 36L0 0z" fill="#000" opacity=".08"/>
+  <polyline points="-31.2,18 -31.2,-18 0,-36 31.2,-18" fill="none" stroke="#CDD3FF" stroke-width="1.6" stroke-linejoin="round" opacity=".7"/>
+  <polyline points="31.2,-18 31.2,18 0,36 -31.2,18" fill="none" stroke="#1F2A78" stroke-width="1.6" stroke-linejoin="round" opacity=".35"/>
+  <polygon points="0,-33 28.6,-16.5 28.6,16.5 0,33 -28.6,16.5 -28.6,-16.5" fill="none" stroke="#CDD3FF" stroke-width="1" opacity=".8"/>
+  <rect x="-27.5" y="-3" width="55" height="6" rx="1" fill="#CDD3FF" stroke="#1F2A78" stroke-width=".7"/>
+  <path d="M9.65 -20h2.91v40h-2.91z M12.86 -18.3h2.91v36.6h-2.91z M16.07 -16.6h2.91v33.2h-2.91z M19.28 -14.9h2.91v29.8h-2.91z M22.49 -13.2h2.91v26.4h-2.91z M-12.56 -20h2.91v40h-2.91z M-15.77 -18.3h2.91v36.6h-2.91z M-18.98 -16.6h2.91v33.2h-2.91z M-22.19 -14.9h2.91v29.8h-2.91z M-25.4 -13.2h2.91v26.4h-2.91z" fill="#1F2A78" stroke="#CDD3FF" stroke-width=".7" stroke-linejoin="round"/>
+  <path d="M25.7 -4h1.8v8h-1.8z M-27.5 -4h1.8v8h-1.8z" fill="#CDD3FF" stroke="#1F2A78" stroke-width=".6"/>
+  <path d="M-3 -1.8v3.6 M0 -1.8v3.6 M3 -1.8v3.6" stroke="#1F2A78" stroke-width=".6" opacity=".55"/>
+</svg>

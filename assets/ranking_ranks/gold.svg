@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120" width="120" height="120">
+  <!-- Generado por tool/build_lift_rank_badges.dart. No editar a mano: dart run tool/build_lift_rank_badges.dart -->
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" transform="translate(0,2)" fill="#000" opacity=".2"/>
+  <polygon points="0,-44 38.1,-22 38.1,22 0,44 -38.1,22 -38.1,-22" fill="#B7820F" stroke="#5E4005" stroke-width="1.4" stroke-linejoin="round"/>
+  <polygon points="0,-41 35.5,-20.5 35.5,20.5 0,41 -35.5,20.5 -35.5,-20.5" fill="none" stroke="#FFE98F" stroke-width=".7" opacity=".5"/>
+  <polygon points="0,-36 31.2,-18 31.2,18 0,36 -31.2,18 -31.2,-18" fill="#EDBB2C"/>
+  <path d="M-31.2 -18L0 -36L31.2 -18V0H-31.2z" fill="#fff" opacity=".1"/>
+  <path d="M-31.2 0H31.2V18L0 36L-31.2 18z" fill="#000" opacity=".08"/>
+  <polyline points="-31.2,18 -31.2,-18 0,-36 31.2,-18" fill="none" stroke="#FFE98F" stroke-width="1.6" stroke-linejoin="round" opacity=".7"/>
+  <polyline points="31.2,-18 31.2,18 0,36 -31.2,18" fill="none" stroke="#5E4005" stroke-width="1.6" stroke-linejoin="round" opacity=".35"/>
+  <g fill="#FFE98F" stroke="#5E4005" stroke-width=".6">
+    <circle cx="0" cy="-40.5" r="1.8"/>
+    <circle cx="35" cy="-20.25" r="1.8"/>
+    <circle cx="35" cy="20.25" r="1.8"/>
+    <circle cx="0" cy="40.5" r="1.8"/>
+    <circle cx="-35" cy="20.25" r="1.8"/>
+    <circle cx="-35" cy="-20.25" r="1.8"/>
+  </g>
+  <rect x="-27.5" y="-3" width="55" height="6" rx="1" fill="#FFE98F" stroke="#5E4005" stroke-width=".7"/>
+  <path d="M13.15 -20h3.88v40h-3.88z M17.33 -18.3h3.88v36.6h-3.88z M21.52 -16.6h3.88v33.2h-3.88z M-17.03 -20h3.88v40h-3.88z M-21.22 -18.3h3.88v36.6h-3.88z M-25.4 -16.6h3.88v33.2h-3.88z" fill="#5E4005" stroke="#FFE98F" stroke-width=".7" stroke-linejoin="round"/>
+  <path d="M25.7 -4h1.8v8h-1.8z M-27.5 -4h1.8v8h-1.8z" fill="#FFE98F" stroke="#5E4005" stroke-width=".6"/>
+  <path d="M-3 -1.8v3.6 M0 -1.8v3.6 M3 -1.8v3.6" stroke="#5E4005" stroke-width=".6" opacity=".55"/>
+</svg>
