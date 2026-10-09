@@ -13,6 +13,7 @@ import '../../profile/application/user_providers.dart';
 import '../domain/session.dart';
 import 'session_muscle_distribution.dart';
 import 'session_providers.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
   /// True mientras hay un [shareWorkout] en vuelo. NO se deriva de
@@ -64,7 +65,7 @@ class PostWorkoutNotifier extends AutoDisposeAsyncNotifier<void> {
         authorUid: authUser.uid,
         authorDisplayName: profile?.displayName ?? '',
         authorAvatarUrl: profile?.avatarUrl,
-        authorGymId: profile?.gymId,
+        authorGymId: hasRealGym(profile?.gymId) ? profile?.gymId : null,
         text: text,
         routineTag: RoutineTag(
           routineId: session.routineId,

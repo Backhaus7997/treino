@@ -10,6 +10,7 @@ import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../../gyms/application/gym_providers.dart';
 import '../../../gyms/domain/gym_display_name.dart';
 import '../../application/user_providers.dart';
+import '../../../gyms/domain/gym.dart' show hasRealGym;
 
 /// Displays the current user's avatar, display name, derived @handle, and
 /// optional gym chip.
@@ -130,9 +131,9 @@ class _CardBody extends StatelessWidget {
                             ),
                           ),
                         ],
-                        if (gymId != null) ...[
+                        if (hasRealGym(gymId)) ...[
                           const SizedBox(height: 6),
-                          _GymChip(gymId: gymId, palette: palette),
+                          _GymChip(gymId: gymId!, palette: palette),
                         ],
                       ],
                     ),

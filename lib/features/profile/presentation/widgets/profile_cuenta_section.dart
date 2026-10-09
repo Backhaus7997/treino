@@ -12,6 +12,7 @@ import '../../application/assigned_routines_providers.dart';
 import '../../application/user_providers.dart';
 import 'profile_section_group.dart';
 import 'profile_section_tile.dart';
+import '../../../gyms/domain/gym.dart' show hasRealGym;
 
 /// The "CUENTA" section of [ProfileScreen].
 ///
@@ -45,9 +46,9 @@ class ProfileCuentaSection extends ConsumerWidget {
         : null;
     // DETAIL context (self) — UserProfile has no denormalized gymName, so
     // resolve live via gymByIdProvider. gyms-foundation Phase 3.
-    final gymSubtitle = gymId == null
+    final gymSubtitle = !hasRealGym(gymId)
         ? l10n.profileCuentaNoGym
-        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId)).valueOrNull);
+        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId!)).valueOrNull);
 
     return ProfileSectionGroup(
       title: l10n.profileCuentaTitle,

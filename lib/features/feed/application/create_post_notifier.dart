@@ -11,6 +11,7 @@ import '../domain/routine_tag.dart';
 import 'feed_screen_providers.dart';
 import 'post_actions_notifier.dart';
 import 'post_providers.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 /// Maximum character count for a post (grapheme clusters).
 const int kMaxPostChars = 280;
@@ -199,7 +200,7 @@ class CreatePostNotifier
     final profile = await ref.read(userProfileProvider.future);
 
     // Gym gate (defense-in-depth — UI already disables the pill)
-    if (current.privacy == PostPrivacy.gym && (profile?.gymId == null)) {
+    if (current.privacy == PostPrivacy.gym && !hasRealGym(profile?.gymId)) {
       state = AsyncData(
         current.copyWith(
           isSubmitting: false,

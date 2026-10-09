@@ -48,6 +48,7 @@ import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
 import 'widgets/time_fit_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
 
@@ -1114,9 +1115,9 @@ class _AttendanceCard extends ConsumerWidget {
     final gymId = profileAsync.valueOrNull?.gymId;
     // DETAIL context (self) — UserProfile has no denormalized gymName, so
     // resolve live via gymByIdProvider. gyms-foundation Phase 3.
-    final gymName = gymId == null
+    final gymName = !hasRealGym(gymId)
         ? ''
-        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId)).valueOrNull);
+        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId!)).valueOrNull);
     final now = DateTime.now().toLocal();
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');

@@ -7,6 +7,7 @@ import '../domain/feed_segment.dart';
 import '../domain/post.dart';
 import 'follow_providers.dart';
 import 'post_providers.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 final feedSegmentProvider = StateProvider<FeedSegment>(
   (ref) => FeedSegment.amigos,
@@ -60,7 +61,7 @@ final myFollowingFeedProvider = FutureProvider<List<Post>>((ref) async {
 final myGymFeedPaginationKeyProvider = FutureProvider<String?>((ref) async {
   final profile = await ref.watch(userProfileProvider.future);
   final gymId = profile?.gymId;
-  return gymId == null ? null : gymFeedPaginationKey(gymId);
+  return hasRealGym(gymId) ? gymFeedPaginationKey(gymId!) : null;
 });
 
 /// Returns the gym-privacy feed for the current user's gym.

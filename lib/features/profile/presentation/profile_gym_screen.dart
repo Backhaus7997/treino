@@ -83,7 +83,9 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
           }
         }
       } else {
-        await ref.read(userRepositoryProvider).update(uid, {'gymId': gymId});
+        // "SIN GYM" se persiste como `null` (igual que el wizard): el
+        // sentinel es un valor de borrador, no un gym que se guarde.
+        await ref.read(userRepositoryProvider).update(uid, {'gymId': null});
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +167,9 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                   // hidden by construction when currentGymId is null/kNoGymId.
                   PinnedCurrentGym(currentGymId: currentGymId),
                   GymSearchBox(
-                    selectedGymId: _pendingGymId,
+                    // `null` en el perfil == SIN GYM (así lo guarda esta pantalla y el
+                    // wizard), así que se resalta aunque el borrador sea null.
+                    selectedGymId: _pendingGymId ?? kNoGymId,
                     onGymIdSelected: (gymId) =>
                         setState(() => _pendingGymId = gymId ?? kNoGymId),
                     // gym-selection-v2 AD-10: la lista de cercanos ocupa el

@@ -75,3 +75,14 @@ class Gym with _$Gym {
 /// Re-homed desde `profile_setup/domain/gym.dart` (ver ADR gyms-foundation
 /// Phase 1) — canonical location ahora vive junto al modelo real de gym.
 const String kNoGymId = 'no-gym';
+
+/// `true` si [gymId] apunta a un gym real del catálogo.
+///
+/// `null`, vacío y [kNoGymId] ("OTRO GYM / SIN GYM") son "sin gym". Es el
+/// ÚNICO criterio para habilitar todo lo que depende de pertenecer a un gym
+/// (privacidad MI GYM, feed del gym, posts con `authorGymId`): mirar sólo
+/// `gymId != null` trataba el sentinel como un gimnasio y metía a todos los
+/// "sin gym" en el mismo feed. Los usuarios viejos todavía tienen `'no-gym'`
+/// guardado en `users/{uid}.gymId`, por eso el chequeo es del lado cliente.
+bool hasRealGym(String? gymId) =>
+    gymId != null && gymId.isNotEmpty && gymId != kNoGymId;

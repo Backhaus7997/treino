@@ -15,6 +15,7 @@ import '../application/create_post_notifier.dart';
 import '../domain/post.dart';
 import 'routine_tag_picker_sheet.dart';
 import 'widgets/post_privacy_selector.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -214,7 +215,7 @@ class _CreatePostBodyState extends ConsumerState<_CreatePostBody> {
     final state = widget.state;
     final notifier = widget.notifier;
     final profileAsync = ref.watch(userProfileProvider);
-    final hasGym = profileAsync.valueOrNull?.gymId != null;
+    final hasGym = hasRealGym(profileAsync.valueOrNull?.gymId);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
