@@ -113,6 +113,28 @@ El lado web ya se hacía así (`kPlacesWebClientKey`, con
    — del orden de USD 32 cada 1000 llamadas.
 3. **Alerta de presupuesto.**
 
+### Mapa de Coach (CARTO): necesita la key
+
+El mapa de "Encontrá tu coach" usa los tiles de CARTO, que desde fines de agosto
+de 2026 exigen una API key. **NO va committeada**. Se pasa en build-time:
+
+```bash
+flutter run --dart-define=CARTO_API_KEY=<key>
+```
+
+Sin la key la app **anda igual**, pero cada tile del mapa sale con "API KEY
+REQUIRED" estampado. CARTO no devuelve error: una key mal copiada se ve igual
+que no mandar ninguna. Si ves la marca de agua, revisá la key antes que nada.
+
+> **La key va en el comando de build de release también**, junto con
+> `PLACES_CLIENT_KEY`. Sin ella, la app sale a producción con el mapa marcado.
+
+- La key se administra en dashboard.basemaps.carto.com (login por mail, sin
+  contraseña). Ahí se ve el uso del mes.
+- Plan comercial gratis hasta 1M de requests por mes. Arriba de eso es pago.
+- La key **no tiene restricciones a propósito**: la de "mobile apps" falla en
+  silencio si el request no manda lo que CARTO espera.
+
 ### iOS (simulador)
 ```bash
 open -a Simulator              # bootea un simulator si no hay

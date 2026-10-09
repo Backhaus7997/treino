@@ -15,6 +15,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../application/trainer_discovery_providers.dart';
 import '../../domain/trainer_location.dart';
 import '../../domain/trainer_public_profile.dart';
+import 'carto_tiles.dart';
 import 'trainers_map_bottom_sheet.dart';
 
 /// Map view de Discovery — embeddable dentro de `TrainersListScreen`
@@ -33,23 +34,6 @@ class TrainersMapView extends ConsumerStatefulWidget {
   /// Centro inicial del mapa — Córdoba Capital, zona Centro-Norte.
   static const _initialCenter = LatLng(-31.40, -64.18);
   static const _initialZoom = 13.0;
-
-  /// Tiles CartoDB "Voyager" — estilo colorido tipo Google Maps con
-  /// agua azul, parques verdes, calles beige/blanco. Reemplazó al
-  /// `dark_all` (calles imperceptibles sobre negro) y al intento de
-  /// Stadia Alidade Smooth Dark (requiere API key, devolvía tiles
-  /// negras en anonymous). Voyager es free, sin API key, y prioriza
-  /// identificación de zonas a primera vista.
-  ///
-  /// Trade-off: rompe la coherencia "dark mode" de la app, pero el
-  /// user explícitamente lo pidió porque el dark dificultaba reconocer
-  /// barrios y calles. Los markers mint/magenta de los PFs igual
-  /// destacan sobre el fondo claro.
-  ///
-  /// Atribución requerida (OSM + CARTO).
-  static const _tileUrl =
-      'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-  static const _tileSubdomains = ['a', 'b', 'c', 'd'];
 
   @override
   ConsumerState<TrainersMapView> createState() => _TrainersMapViewState();
@@ -174,8 +158,8 @@ class _TrainersMapViewState extends ConsumerState<TrainersMapView> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: TrainersMapView._tileUrl,
-                  subdomains: TrainersMapView._tileSubdomains,
+                  urlTemplate: cartoTileUrl(cartoApiKey),
+                  subdomains: cartoSubdomains,
                   userAgentPackageName: 'com.treino.app',
                   // CartoDB Voyager NO tiene tiles @2x retina disponibles
                   // — solicitar `.../{z}/{x}/{y}@2x.png` devuelve 400.
