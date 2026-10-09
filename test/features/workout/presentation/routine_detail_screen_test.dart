@@ -233,7 +233,7 @@ void main() {
         find.byKey(const Key('routine-hero-photo')),
       );
       expect((image.image as AssetImage).assetName,
-          'assets/routines/ppl-beginner.png');
+          'assets/routines/ppl-beginner.jpg');
     });
 
     testWidgets(
