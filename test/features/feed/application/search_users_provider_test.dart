@@ -2,6 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/feed/application/search_users_provider.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart'
+    show myBlockedUidsProvider;
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -33,6 +37,8 @@ ProviderContainer _makeContainer(MockUserPublicProfileRepository mockRepo) {
   return ProviderContainer(
     overrides: [
       userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
+      currentUidProvider.overrideWithValue('me'),
+      myBlockedUidsProvider.overrideWithValue(const ['bloqueado']),
     ],
   );
 }
@@ -47,6 +53,26 @@ void main() {
   // ---------------------------------------------------------------------------
   // SCENARIO-275: Provider delegates to repository
   // ---------------------------------------------------------------------------
+  group('searchUsersProvider — filtra lo que no se puede seguir', () {
+    test('excluye sin nombre, a mí mismo y bloqueados', () async {
+      when(() => mockRepo.searchByDisplayName('ma')).thenAnswer(
+        (_) async => [
+          _fakeProfile(uid: 'ok', displayName: 'Maria'),
+          _fakeProfile(uid: 'me', displayName: 'Martin'),
+          _fakeProfile(uid: 'bloqueado', displayName: 'Mario'),
+          _fakeProfile(uid: 'blanco', displayName: '   '),
+          const UserPublicProfile(uid: 'nulo'),
+        ],
+      );
+      final container = _makeContainer(mockRepo);
+      addTearDown(container.dispose);
+
+      final result = await container.read(searchUsersProvider('ma').future);
+
+      expect(result.map((p) => p.uid), ['ok']);
+    });
+  });
+
   group('searchUsersProvider — delegates to repository', () {
     test(
         'SCENARIO-275: query of 2+ chars calls '

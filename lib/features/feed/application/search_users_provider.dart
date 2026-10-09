@@ -1,7 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../moderation/application/moderation_providers.dart'
+    show myBlockedUidsProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_public_profile.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import 'suggested_users_providers.dart' show hasVisibleName;
 
 /// Minimum number of characters required to trigger a search query.
 /// Shared between the provider (defense-in-depth) and the screen (UX).
@@ -28,8 +33,20 @@ final searchUsersProvider =
   (ref, query) async {
     final trimmed = query.trim().toLowerCase();
     if (trimmed.length < kSearchMinChars) return const [];
-    return ref
+    final currentUid = ref.watch(currentUidProvider);
+    final blockedUids = ref.watch(myBlockedUidsProvider).toSet();
+    final results = await ref
         .read(userPublicProfileRepositoryProvider)
         .searchByDisplayName(trimmed);
+    // Buscar para descubrir/seguir: ni uno mismo, ni bloqueados, ni perfiles
+    // sin nombre (se filtra acá y no en el repo porque el repo es genérico).
+    return results
+        .where(
+          (p) =>
+              p.uid != currentUid &&
+              !blockedUids.contains(p.uid) &&
+              hasVisibleName(p),
+        )
+        .toList();
   },
 );

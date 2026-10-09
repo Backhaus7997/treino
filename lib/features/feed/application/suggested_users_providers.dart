@@ -8,6 +8,8 @@ import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/domain/user_public_profile.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../moderation/application/moderation_providers.dart'
+    show myBlockedUidsProvider;
 import 'follow_providers.dart' show followRepositoryProvider;
 
 /// Tope de valores que Firestore acepta en un `whereIn`.
@@ -39,6 +41,16 @@ List<UserPublicProfile> suggestedUsersAfterPost(
   final pageIndex = (postIndex + 1) ~/ _kSuggestedUsersPostCadence - 1;
   return suggestedUsersPage(candidates, pageIndex);
 }
+
+/// `true` si el perfil tiene un nombre que mostrar.
+///
+/// Un `userPublicProfiles` con `displayName` nulo, vacío o en blanco es una
+/// cuenta que nunca terminó el alta (o el resto de una borrada): la UI lo
+/// pinta como "ANÓNIMO" con un "?", y sugerirlo o encontrarlo en la búsqueda
+/// no sirve para seguir a nadie. Se filtra del lado del cliente porque la
+/// consulta es por gym y Firestore no puede pedir "campo no vacío" ahí.
+bool hasVisibleName(UserPublicProfile profile) =>
+    (profile.displayName ?? '').trim().isNotEmpty;
 
 /// Orden alfabético estable. El uid desempata para que dos personas con el
 /// mismo nombre no bailen de posición entre recargas.
@@ -83,6 +95,7 @@ final suggestedUsersProvider =
     }
 
     final firestore = ref.watch(firestoreProvider);
+    final blockedUids = ref.watch(myBlockedUidsProvider).toSet();
     final edges = await ref.watch(followRepositoryProvider).allOf(currentUid);
     final excludedUids = edges
         .expand((edge) => edge.members)
@@ -90,7 +103,10 @@ final suggestedUsersProvider =
         .toSet();
 
     bool isCandidate(UserPublicProfile p) =>
-        p.uid != currentUid && !excludedUids.contains(p.uid);
+        p.uid != currentUid &&
+        !excludedUids.contains(p.uid) &&
+        !blockedUids.contains(p.uid) &&
+        hasVisibleName(p);
 
     Future<List<UserPublicProfile>> profilesInGyms(List<String> ids) async {
       if (ids.isEmpty) return const [];
