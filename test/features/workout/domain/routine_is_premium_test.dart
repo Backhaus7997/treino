@@ -81,14 +81,17 @@ void main() {
       }
     });
 
-    test('quedan exactamente 3 gratis — el free tiene con qué entrenar', () {
+    test('quedan exactamente 15 gratis — el free tiene con qué entrenar', () {
       // Si esto baja a 0, el plan gratis se queda sin ningún programa que
       // seguir y el catálogo deja de ser una razón para instalar la app.
+      //
+      // Eran 3 hasta que el catálogo pasó de 7 a 50 (octubre de 2026): las
+      // 15 de principiante son gratis, el mismo corte por nivel de siempre.
       final gratis = templates
           .cast<Map<String, dynamic>>()
           .where((t) => t['isPremium'] == false)
           .toList();
-      expect(gratis, hasLength(3));
+      expect(gratis, hasLength(15));
       expect(
         gratis.map((t) => t['id']),
         containsAll(['ppl-beginner', 'full-body-3day', 'calistenia-beginner']),
