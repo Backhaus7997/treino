@@ -30,7 +30,12 @@ import {
   TIER_TEMPLATE_LIMITS,
   TIER_WEIGHT_LIMITS,
 } from "../subscriptions/tier-config";
-import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
+import {
+  ATHLETE_PRICES_ARS,
+  ATHLETE_PRO_MAX_OWN_ROUTINES,
+  ATHLETE_PRO_MAX_ROUTINE_DAYS,
+  ATHLETE_PRO_MAX_ROUTINE_WEEKS,
+} from "../subscriptions/athlete-plan-config";
 import { formatArs, formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
@@ -39,6 +44,10 @@ const INK_CARD = "#0F1513";
 const MINT = "#2CE5A2";
 const BONE = "#FFFFFF";
 const MUTED = "#9BA8A1";
+// Morado de la marca para los títulos grandes de las cards de planes: el magenta
+// de `AppColorPrimitives` (#C123E0) aclarado hasta 4,8:1 sobre `PLAN_CARD` (el
+// magenta puro da 3,5:1 y no alcanza para texto de 16 px).
+const MORADO = "#D457EC";
 
 // Las cards de planes (`planesToHtml`): `white06` (relleno) y `white10` (borde)
 // de AppColorPrimitives, compuestos sobre `INK_CARD`. El kit despega una
@@ -508,6 +517,24 @@ function lineToText(line: Line): string {
 interface PlanCard {
   nombre: string;
   detalle: string;
+  /** Color del `detalle` en el layout compacto; por defecto blanco. */
+  colorDetalle?: string;
+  /** Color del nombre en el layout compacto; por defecto mint. */
+  colorNombre?: string;
+  /**
+   * Ficha al estilo de las cards de planes de la landing (/es/gym): el `detalle`
+   * va como héroe en mint y debajo las filas. Solo la usa el mail del código;
+   * los mails de tope siguen con el layout compacto de siempre.
+   */
+  ficha?: {
+    sub?: string;
+    filas: { label?: string; valor: string }[];
+    destacado?: boolean;
+    /** Color del nombre del plan. Por defecto, mint. */
+    colorNombre?: string;
+    /** Color del héroe. Por defecto, morado. */
+    colorHero?: string;
+  };
   precio?: { monto: string; periodo: string };
   linea: Line;
 }
@@ -528,8 +555,39 @@ type Block = Line | Planes;
  * en Promociones (ver `free-limit-reached`). Todo pasa por `esc()`, aunque hoy
  * los valores salgan de constantes nuestras.
  */
+function fichaToHtml(c: PlanCard & { ficha: NonNullable<PlanCard["ficha"]> }): string {
+  const { ficha } = c;
+  const borde = ficha.destacado ? `1.5px solid ${MINT}` : `1px solid ${PLAN_CARD_BORDE}`;
+  const tilde = `<span style="color:${MINT};font-weight:700;">&#10003;</span>&nbsp; `;
+  const filas = ficha.filas.map((f) => {
+    const contenido = f.label ?
+      `${esc(f.label)}: <strong style="color:${BONE};">${esc(f.valor)}</strong>` :
+      esc(f.valor);
+    return `<div style="padding-top:8px;font-size:14px;line-height:1.45;color:${MUTED};">${tilde}${contenido}</div>`;
+  });
+  return [
+    "<tr><td style=\"padding:0 0 12px 0;\">",
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
+    ` style="border-collapse:separate;background:${PLAN_CARD};border:${borde};`,
+    `border-radius:16px;font-family:${FONT};"><tr>`,
+    "<td valign=\"top\" style=\"padding:20px 22px;\">",
+    "<div style=\"font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;line-height:1.4;",
+    `color:${ficha.colorNombre ?? MINT};">${esc(c.nombre)}</div>`,
+    "<div style=\"padding-top:8px;font-size:28px;font-weight:800;line-height:1.15;",
+    `color:${ficha.colorHero ?? MORADO};">${esc(comoTitulo(c.detalle))}</div>`,
+    ficha.sub ?
+      `<div style="padding-top:4px;font-size:13px;line-height:1.4;color:${MUTED};">${esc(ficha.sub)}</div>` :
+      "",
+    "<div style=\"padding-top:6px;\"></div>",
+    ...filas,
+    "</td></tr></table>",
+    "</td></tr>",
+  ].join("");
+}
+
 function planesToHtml(planes: Planes): string {
   const cards = planes.cards.map((c) => {
+    if (c.ficha) return fichaToHtml({ ...c, ficha: c.ficha });
     const precio = c.precio
       ? [
         "<td align=\"right\" valign=\"middle\" style=\"padding:14px 16px 14px 8px;white-space:nowrap;\">",
@@ -546,8 +604,8 @@ function planesToHtml(planes: Planes): string {
       `border-radius:12px;font-family:${FONT};"><tr>`,
       "<td valign=\"middle\" style=\"padding:14px 16px;\">",
       "<div style=\"font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;",
-      `line-height:1.4;color:${MINT};">${esc(c.nombre)}</div>`,
-      `<div style="padding-top:2px;font-size:16px;font-weight:700;line-height:1.35;color:${BONE};">`,
+      `line-height:1.4;color:${c.colorNombre ?? MINT};">${esc(c.nombre)}</div>`,
+      `<div style="padding-top:2px;font-size:16px;font-weight:700;line-height:1.35;color:${c.colorDetalle ?? BONE};">`,
       `${esc(comoTitulo(c.detalle))}</div>`,
       "</td>",
       precio,
@@ -665,33 +723,91 @@ function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
 }
 
 /**
- * Los planes del PF, una card por plan, con su cupo de alumnos.
+ * Los planes del PF en el mail del código: una ficha por plan, SIN precio, con
+ * el mismo lenguaje que las cards de la landing (/es/gym): el cupo de alumnos
+ * como héroe y debajo ejercicios propios y plantillas. Plan 1 va destacado,
+ * como la «recomendada» de la pantalla de planes.
  *
- * Nombres, cupos y precios salen de `tier-config.ts`, en el orden de
- * `TIER_LABELS` (de Free a Plan 3). El anual va en una línea aparte y sin
- * montos: cuatro precios dobles en el mail que trae un código son ruido, y el
- * detalle está a un toque, en VER LOS PLANES.
+ * Todo sale de `tier-config.ts`, en el orden de `TIER_LABELS` (de Free a
+ * Plan 3). El precio no va: se ve en el checkout al que lleva VER LOS PLANES, y
+ * un monto escrito acá es un monto más que mantener de memoria.
  */
 function planesDelPf(): Block[] {
   const tiers = Object.keys(TIER_LABELS) as SubscriptionTier[];
   return [
-    new Planes(tiers.map((tier) => cardDePlanPf(tier, cupoLabel(TIER_WEIGHT_LIMITS[tier])))),
-    ["Cada plan también se puede pagar por año."],
+    new Planes(
+      tiers.map((tier): PlanCard => {
+        const nombre = TIER_LABELS[tier];
+        const alumnos = TIER_WEIGHT_LIMITS[tier];
+        const ejercicios = TIER_CUSTOM_EXERCISE_LIMITS[tier];
+        const plantillas = TIER_TEMPLATE_LIMITS[tier];
+        const sinTope = (n: number | null): string => (n === null ? "Sin tope" : String(n)); // i18n: email comercial
+        const pausados = "Cada alumno pausado cuenta 0,5"; // i18n: email comercial
+        const detalle =
+          tier === "free" ? "Gratis" : alumnos === null ? "Alumnos sin tope" : `Hasta ${cupoLabel(alumnos)}`;
+        const sub =
+          tier === "free" && alumnos !== null ? `Hasta ${cupoLabel(alumnos)} activos · ${pausados.toLowerCase()}` :
+            alumnos === null ? undefined : pausados;
+        const filas = [
+          { label: "Ejercicios propios", valor: sinTope(ejercicios) },
+          { label: "Plantillas", valor: sinTope(plantillas) },
+        ];
+        const textoPlano = [
+          detalle,
+          ...(tier === "free" && sub ? [sub] : []),
+          ...filas.map((f) => `${f.label}: ${f.valor}`),
+        ];
+        return {
+          nombre,
+          detalle,
+          ficha: { sub, filas, destacado: tier === "plan1", colorNombre: MORADO, colorHero: MINT },
+          // En el texto plano el cupo del Free no puede perderse: en el HTML es el
+          // sub del héroe «Gratis», y acá no hay héroe.
+          linea: [strong(nombre), ` · ${textoPlano.join(" · ")}`],
+        };
+      }),
+    ),
   ];
 }
 
 /**
- * Los planes del alumno: el gratis y TREINO Pro con su precio, de
- * `athlete-plan-config.ts`. Sin lista de beneficios: el detalle vive en el
- * checkout, y cada beneficio escrito acá es una promesa más que mantener a mano.
- * Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así que
- * «el que tenés hoy» no miente.
+ * Los planes del alumno en el mail del código: el gratis y TREINO Pro (la
+ * destacada) con lo que trae, SIN precio (se ve en el checkout). Los topes de
+ * Pro salen de `athlete-plan-config.ts`, que `athlete-pro-limites.test.ts` ata
+ * a los de la app. Sólo lo recibe quien hoy está en el gratis (ver
+ * `muestraPlanes`), así que «el que tenés hoy» no miente.
  */
 function planesDelAlumno(): Block[] {
+  const detalle = "Sin los topes del plan gratis";
+  const beneficios = [
+    `Rutinas de hasta ${ATHLETE_PRO_MAX_ROUTINE_DAYS} días`,
+    `Hasta ${ATHLETE_PRO_MAX_ROUTINE_WEEKS} semanas, con periodización`,
+    "Todas las plantillas del catálogo, de principiante a avanzado",
+    "Personalizar cualquier plantilla del catálogo",
+    `Hasta ${ATHLETE_PRO_MAX_OWN_ROUTINES} rutinas propias`,
+    "Gráficos de 3 meses y 1 año",
+  ]; // i18n: email comercial
   return [
     new Planes([
-      { nombre: "Gratis", detalle: "El que tenés hoy", linea: [strong("Gratis"), " · el que tenés hoy."] },
-      cardDeTreinoPro(),
+      {
+        nombre: "Gratis",
+        detalle: "El que tenés hoy",
+        colorDetalle: MINT,
+        colorNombre: MORADO,
+        linea: [strong("Gratis"), " · el que tenés hoy."],
+      },
+      {
+        nombre: "TREINO Pro",
+        detalle,
+        ficha: {
+          sub: "Todo lo que ya usás.",
+          filas: beneficios.map((valor) => ({ valor })),
+          destacado: true,
+          colorNombre: MORADO,
+          colorHero: MINT,
+        },
+        linea: [strong("TREINO Pro"), ` · ${detalle.toLowerCase()}: ${beneficios.join("; ").toLowerCase()}.`],
+      },
     ]),
   ];
 }
