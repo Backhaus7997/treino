@@ -164,6 +164,34 @@ void main() {
           reason: 'un gesto horizontal no es scroll de lectura');
     });
 
+    testWidgets(
+      'el rebote del final en iOS no expande la barra (no corre el final)',
+      (tester) async {
+        // Reporte de device (EXPLORAR, iPhone 16): al llegar abajo el scroll
+        // se sentía trabado. BouncingScrollPhysics pasa de largo el final y
+        // vuelve solo; ese regreso llega como scroll hacia ARRIBA y expandía
+        // la barra. La barra expandida agranda `padding.bottom`, el final del
+        // scroll se corre en pleno rebote y la última fila queda pegada al
+        // vidrio.
+        await _pumpShell(tester, '/feed');
+
+        final scroller = find.byType(CustomScrollView).first;
+        await tester.drag(scroller, const Offset(0, -400));
+        await tester.pumpAndSettle();
+        expect(_collapsed(tester), isTrue);
+
+        // Hasta el final y bastante más allá: el overscroll y su regreso.
+        for (var i = 0; i < 6; i++) {
+          await tester.drag(scroller, const Offset(0, -3000));
+          await tester.pumpAndSettle();
+        }
+
+        expect(_collapsed(tester), isTrue,
+            reason: 'el regreso del rebote no es un gesto hacia arriba');
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
+
     testWidgets('cambiar de tab devuelve la barra entera', (tester) async {
       await _pumpShell(tester, '/feed');
 
