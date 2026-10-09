@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -357,8 +358,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
     // mientras el perfil carga. Ver `esAltaRecienCreada`.
     final altaReciente = esAltaRecienCreada(
       profile: ref.watch(userProfileProvider).valueOrNull,
-      creadaEn:
-          ref.watch(firebaseAuthProvider).currentUser?.metadata.creationTime,
+      creadaEn: _leerCreacionDeCuenta(ref.watch(firebaseAuthProvider)),
       // `DateTime.now` y no `_ahora()`: el reloj inyectado es el de la cuenta
       // regresiva, y los tests cuentan cuántas veces lo lee la pantalla.
       ahora: DateTime.now(),
@@ -492,5 +492,17 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
         ),
       ),
     );
+  }
+}
+
+/// Cuándo se creó la cuenta en Auth, o `null` si no se puede leer. Falla
+/// CERRADO: cualquier error al leer la metadata cuenta como «no es un alta
+/// reciente» y esconde «Me equivoqué de mail», en vez de tirar el build de la
+/// pantalla de verificación.
+DateTime? _leerCreacionDeCuenta(FirebaseAuth auth) {
+  try {
+    return auth.currentUser?.metadata.creationTime;
+  } catch (_) {
+    return null;
   }
 }
