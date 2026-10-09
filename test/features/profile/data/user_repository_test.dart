@@ -14,6 +14,8 @@ import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/domain/routine_goal.dart';
+import 'package:treino/features/workout/domain/template_preferences.dart';
 
 // ignore_for_file: avoid_dynamic_calls
 // Los dobles de watchHasPendingWrites mockean tipos selados de cloud_firestore
@@ -738,6 +740,30 @@ void main() {
 
       expect(requestedIncludeMetadata, isTrue);
       expect(values, [true, false]);
+    });
+  });
+
+  // update() persiste con merge:true y Firestore mergea mapas anidados en
+  // profundidad: una 1.0 que sólo escribe `goal` deja vivo el `goals` viejo.
+  group('templatePreferences: edición de la 1.0 sobre goals nuevos', () {
+    test('la 1.0 escribe sólo goal ⇒ la lectura devuelve ese goal', () async {
+      await seedDoc('u1');
+      await repo.update('u1', {
+        'templatePreferences': const TemplatePreferences(
+          goals: [RoutineGoal.health, RoutineGoal.aesthetics],
+        ).toJson(),
+      });
+      // Cliente 1.0: sólo conoce `goal`.
+      await repo.update('u1', {
+        'templatePreferences': {'goal': 'sport'},
+      });
+
+      final doc = await firestore.collection('users').doc('u1').get();
+      final raw = Map<String, Object?>.from(
+        doc.data()!['templatePreferences']! as Map,
+      );
+      expect(raw['goals'], isNotEmpty, reason: 'el merge conservó el viejo');
+      expect(TemplatePreferences.fromJson(raw).goals, [RoutineGoal.sport]);
     });
   });
 }

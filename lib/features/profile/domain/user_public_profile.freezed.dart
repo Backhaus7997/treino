@@ -127,6 +127,21 @@ mixin _$UserPublicProfile {
   /// window. Null when not opted in or no matching lift logged yet.
   num? get bestDeadliftKg => throw _privateConstructorUsedError;
 
+  /// Rango de levantamiento en sentadilla, banca y peso muerto: un entero de
+  /// 0 (sin rango) a 8 (Olímpico), o `null` cuando no hay forma honesta de
+  /// calcularlo (sin opt-in, sin ese lift registrado, sin peso corporal, o
+  /// todavía no corrió el recompute desde que existe el campo).
+  ///
+  /// Lo deriva SÓLO `functions/src/ranking-aggregate.ts` (la fórmula está en
+  /// `ranking-ranks.ts`) a partir de `best*Kg` y del peso corporal y el sexo
+  /// del doc PRIVADO; este doc público nunca guarda el peso. Es CF-write-only
+  /// en `firestore.rules`, igual que `best*Kg`. Se lee con
+  /// `LiftRank.fromValue`, que trata cualquier valor fuera de 0..8 como
+  /// "sin dato".
+  int? get squatRank => throw _privateConstructorUsedError;
+  int? get benchRank => throw _privateConstructorUsedError;
+  int? get deadliftRank => throw _privateConstructorUsedError;
+
   /// Serializes this UserPublicProfile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -161,7 +176,10 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       num lifetimeVolumeKg,
       num? bestSquatKg,
       num? bestBenchKg,
-      num? bestDeadliftKg});
+      num? bestDeadliftKg,
+      int? squatRank,
+      int? benchRank,
+      int? deadliftRank});
 }
 
 /// @nodoc
@@ -197,6 +215,9 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? bestSquatKg = freezed,
     Object? bestBenchKg = freezed,
     Object? bestDeadliftKg = freezed,
+    Object? squatRank = freezed,
+    Object? benchRank = freezed,
+    Object? deadliftRank = freezed,
   }) {
     return _then(_value.copyWith(
       uid: null == uid
@@ -271,6 +292,18 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
           ? _value.bestDeadliftKg
           : bestDeadliftKg // ignore: cast_nullable_to_non_nullable
               as num?,
+      squatRank: freezed == squatRank
+          ? _value.squatRank
+          : squatRank // ignore: cast_nullable_to_non_nullable
+              as int?,
+      benchRank: freezed == benchRank
+          ? _value.benchRank
+          : benchRank // ignore: cast_nullable_to_non_nullable
+              as int?,
+      deadliftRank: freezed == deadliftRank
+          ? _value.deadliftRank
+          : deadliftRank // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -301,7 +334,10 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       num lifetimeVolumeKg,
       num? bestSquatKg,
       num? bestBenchKg,
-      num? bestDeadliftKg});
+      num? bestDeadliftKg,
+      int? squatRank,
+      int? benchRank,
+      int? deadliftRank});
 }
 
 /// @nodoc
@@ -335,6 +371,9 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? bestSquatKg = freezed,
     Object? bestBenchKg = freezed,
     Object? bestDeadliftKg = freezed,
+    Object? squatRank = freezed,
+    Object? benchRank = freezed,
+    Object? deadliftRank = freezed,
   }) {
     return _then(_$UserPublicProfileImpl(
       uid: null == uid
@@ -409,6 +448,18 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
           ? _value.bestDeadliftKg
           : bestDeadliftKg // ignore: cast_nullable_to_non_nullable
               as num?,
+      squatRank: freezed == squatRank
+          ? _value.squatRank
+          : squatRank // ignore: cast_nullable_to_non_nullable
+              as int?,
+      benchRank: freezed == benchRank
+          ? _value.benchRank
+          : benchRank // ignore: cast_nullable_to_non_nullable
+              as int?,
+      deadliftRank: freezed == deadliftRank
+          ? _value.deadliftRank
+          : deadliftRank // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -434,7 +485,10 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.lifetimeVolumeKg = 0,
       this.bestSquatKg,
       this.bestBenchKg,
-      this.bestDeadliftKg});
+      this.bestDeadliftKg,
+      this.squatRank,
+      this.benchRank,
+      this.deadliftRank});
 
   factory _$UserPublicProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$UserPublicProfileImplFromJson(json);
@@ -568,9 +622,27 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   @override
   final num? bestDeadliftKg;
 
+  /// Rango de levantamiento en sentadilla, banca y peso muerto: un entero de
+  /// 0 (sin rango) a 8 (Olímpico), o `null` cuando no hay forma honesta de
+  /// calcularlo (sin opt-in, sin ese lift registrado, sin peso corporal, o
+  /// todavía no corrió el recompute desde que existe el campo).
+  ///
+  /// Lo deriva SÓLO `functions/src/ranking-aggregate.ts` (la fórmula está en
+  /// `ranking-ranks.ts`) a partir de `best*Kg` y del peso corporal y el sexo
+  /// del doc PRIVADO; este doc público nunca guarda el peso. Es CF-write-only
+  /// en `firestore.rules`, igual que `best*Kg`. Se lee con
+  /// `LiftRank.fromValue`, que trata cualquier valor fuera de 0..8 como
+  /// "sin dato".
+  @override
+  final int? squatRank;
+  @override
+  final int? benchRank;
+  @override
+  final int? deadliftRank;
+
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, rachaSemanas: $rachaSemanas, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, rachaSemanas: $rachaSemanas, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg, squatRank: $squatRank, benchRank: $benchRank, deadliftRank: $deadliftRank)';
   }
 
   @override
@@ -611,31 +683,41 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.bestBenchKg, bestBenchKg) ||
                 other.bestBenchKg == bestBenchKg) &&
             (identical(other.bestDeadliftKg, bestDeadliftKg) ||
-                other.bestDeadliftKg == bestDeadliftKg));
+                other.bestDeadliftKg == bestDeadliftKg) &&
+            (identical(other.squatRank, squatRank) ||
+                other.squatRank == squatRank) &&
+            (identical(other.benchRank, benchRank) ||
+                other.benchRank == benchRank) &&
+            (identical(other.deadliftRank, deadliftRank) ||
+                other.deadliftRank == deadliftRank));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      uid,
-      displayName,
-      displayNameLowercase,
-      avatarUrl,
-      gymId,
-      gymName,
-      workoutsCount,
-      racha,
-      rachaSemanas,
-      followersCount,
-      followingCount,
-      sharedTemplatesWithAthletes,
-      isProfilePublic,
-      rankingOptIn,
-      lifetimeVolumeKg,
-      bestSquatKg,
-      bestBenchKg,
-      bestDeadliftKg);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        uid,
+        displayName,
+        displayNameLowercase,
+        avatarUrl,
+        gymId,
+        gymName,
+        workoutsCount,
+        racha,
+        rachaSemanas,
+        followersCount,
+        followingCount,
+        sharedTemplatesWithAthletes,
+        isProfilePublic,
+        rankingOptIn,
+        lifetimeVolumeKg,
+        bestSquatKg,
+        bestBenchKg,
+        bestDeadliftKg,
+        squatRank,
+        benchRank,
+        deadliftRank
+      ]);
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.
@@ -673,7 +755,10 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final num lifetimeVolumeKg,
       final num? bestSquatKg,
       final num? bestBenchKg,
-      final num? bestDeadliftKg}) = _$UserPublicProfileImpl;
+      final num? bestDeadliftKg,
+      final int? squatRank,
+      final int? benchRank,
+      final int? deadliftRank}) = _$UserPublicProfileImpl;
 
   factory _UserPublicProfile.fromJson(Map<String, dynamic> json) =
       _$UserPublicProfileImpl.fromJson;
@@ -800,6 +885,24 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   /// window. Null when not opted in or no matching lift logged yet.
   @override
   num? get bestDeadliftKg;
+
+  /// Rango de levantamiento en sentadilla, banca y peso muerto: un entero de
+  /// 0 (sin rango) a 8 (Olímpico), o `null` cuando no hay forma honesta de
+  /// calcularlo (sin opt-in, sin ese lift registrado, sin peso corporal, o
+  /// todavía no corrió el recompute desde que existe el campo).
+  ///
+  /// Lo deriva SÓLO `functions/src/ranking-aggregate.ts` (la fórmula está en
+  /// `ranking-ranks.ts`) a partir de `best*Kg` y del peso corporal y el sexo
+  /// del doc PRIVADO; este doc público nunca guarda el peso. Es CF-write-only
+  /// en `firestore.rules`, igual que `best*Kg`. Se lee con
+  /// `LiftRank.fromValue`, que trata cualquier valor fuera de 0..8 como
+  /// "sin dato".
+  @override
+  int? get squatRank;
+  @override
+  int? get benchRank;
+  @override
+  int? get deadliftRank;
 
   /// Create a copy of UserPublicProfile
   /// with the given fields replaced by the non-null parameter values.

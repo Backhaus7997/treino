@@ -287,3 +287,72 @@ describe("athlete_notes — el doc id no puede responder si el PF tiene nota", (
     );
   });
 });
+
+// ── nutrition_plans / athlete_billing ───────────────────────────────────────
+//
+// Acá el disyunto `resource == null` se agrega por el motivo CONTRARIO al de
+// los bloques de arriba: sin él, leer un doc que todavía no existe devolvía
+// PERMISSION_DENIED (la rule desreferencia `resource.data`), y el alumno veía
+// un error con reintento inútil en vez del estado vacío ("el PF todavía no
+// creó tu plan"); el PF, "No pudimos cargar la config de cobro" en vez de
+// "Sin configurar". El doc id es `{trainerId}_{athleteId}`: el disyunto vale
+// SÓLO para esas dos partes, así que para un tercero los dos estados se ven
+// igual y no se reabre el oráculo.
+describe.each(["nutrition_plans", "athlete_billing"])(
+  "%s — doc inexistente legible sólo por las dos partes del doc id",
+  (col) => {
+    const TRAINER = A;
+    const ATHLETE = B;
+    const DOC_ID = `${TRAINER}_${ATHLETE}`;
+
+    const body = () => ({
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      amountArs: 1000,
+      title: "plan",
+      meals: [],
+    });
+
+    it("el PF SÍ resuelve el doc inexistente (snapshot vacío)", async () => {
+      await assertSucceeds(asUser(TRAINER).collection(col).doc(DOC_ID).get());
+    });
+
+    it("el alumno SÍ resuelve el doc inexistente (snapshot vacío)", async () => {
+      await assertSucceeds(asUser(ATHLETE).collection(col).doc(DOC_ID).get());
+    });
+
+    it("un tercero NO lo resuelve cuando NO existe (sin oráculo)", async () => {
+      await assertFails(asUser(OUTSIDER).collection(col).doc(DOC_ID).get());
+    });
+
+    it("un tercero NO lo lee cuando EXISTE (mismo resultado que arriba)", async () => {
+      await seed(col, DOC_ID, body());
+      await assertFails(asUser(OUTSIDER).collection(col).doc(DOC_ID).get());
+    });
+
+    it("el PF y el alumno SÍ leen el doc existente (sin cambios)", async () => {
+      await seed(col, DOC_ID, body());
+      await assertSucceeds(asUser(TRAINER).collection(col).doc(DOC_ID).get());
+      await assertSucceeds(asUser(ATHLETE).collection(col).doc(DOC_ID).get());
+    });
+
+    it("sin sesión NO lo lee", async () => {
+      await assertFails(
+        testEnv.unauthenticatedContext().firestore().collection(col).doc(DOC_ID).get(),
+      );
+    });
+
+    it("un id sin guión bajo no abre nada a un tercero", async () => {
+      await assertFails(asUser(OUTSIDER).collection(col).doc("singuion").get());
+    });
+
+    // El acote es de get: una query de un tercero por los campos del par sigue
+    // denegada (se evalúa el doc real, donde `resource != null`).
+    it("un tercero NO lista por trainerId", async () => {
+      await seed(col, DOC_ID, body());
+      await assertFails(
+        asUser(OUTSIDER).collection(col).where("trainerId", "==", TRAINER).get(),
+      );
+    });
+  },
+);

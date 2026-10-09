@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -278,6 +279,18 @@ void main() {
     testWidgets('SCENARIO-225: helper text shown when gymId is null',
         (tester) async {
       await tester.pumpWidget(_wrapWithRouter(gymId: null));
+      await _openCreatePost(tester);
+
+      expect(
+        find.text('Asociate a un gym para postear acá'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'SCENARIO-225: "SIN GYM" (kNoGymId) también muestra el aviso: no es un gym',
+        (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(gymId: kNoGymId));
       await _openCreatePost(tester);
 
       expect(

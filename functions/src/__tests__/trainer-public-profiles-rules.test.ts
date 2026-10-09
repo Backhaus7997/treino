@@ -172,3 +172,45 @@ describe("trainerPublicProfiles update — athleteCount pin (#388)", () => {
     );
   });
 });
+
+describe("trainerPublicProfiles — hiddenFromDiscovery es flag de admin", () => {
+  const col = () => ctxDb(TRAINER).collection(COL_PROFILES).doc(TRAINER);
+
+  it("DENIES the owner creating their card already hidden", async () => {
+    await assertFails(col().set({ uid: TRAINER, hiddenFromDiscovery: true }));
+  });
+
+  it("DENIES a non-boolean value at create time", async () => {
+    await assertFails(col().set({ uid: TRAINER, hiddenFromDiscovery: "si" }));
+  });
+
+  it("ALLOWS create with hiddenFromDiscovery false", async () => {
+    await assertSucceeds(col().set({ uid: TRAINER, hiddenFromDiscovery: false }));
+  });
+
+  it("ALLOWS create without hiddenFromDiscovery", async () => {
+    await assertSucceeds(col().set({ uid: TRAINER, trainerBio: "Bio" }));
+  });
+
+  it("DENIES the owner hiding themselves on update", async () => {
+    await seedProfile({ trainerBio: "x" });
+    await assertFails(col().update({ hiddenFromDiscovery: true }));
+  });
+
+  it("DENIES the owner un-hiding themselves on update", async () => {
+    await seedProfile({ hiddenFromDiscovery: true });
+    await assertFails(col().update({ hiddenFromDiscovery: false }));
+  });
+
+  it("ALLOWS updating other fields while the admin flag stays hidden", async () => {
+    await seedProfile({ hiddenFromDiscovery: true, trainerBio: "vieja" });
+    await assertSucceeds(
+      col().set({ trainerBio: "nueva" }, { merge: true }),
+    );
+  });
+
+  it("ALLOWS re-asserting the exact stored value", async () => {
+    await seedProfile({ hiddenFromDiscovery: true });
+    await assertSucceeds(col().update({ hiddenFromDiscovery: true }));
+  });
+});

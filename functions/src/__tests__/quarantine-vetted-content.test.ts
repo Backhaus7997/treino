@@ -60,12 +60,15 @@ beforeAll(() => {
   app = initializeApp({ projectId: "treino-dev" }, "quarantine-tests");
   db = getFirestore(app);
   // El wrapper real (`quarantineTrainerProfileName`, ver el describe "el
-  // wrapper real" mas abajo) hace `getFirestore()` SIN argumentos, que
-  // resuelve la app DEFAULT — no la nombrada de arriba. En produccion solo
-  // existe una app, asi que nunca importa; aca hace falta una segunda app
-  // (misma `projectId`, mismo emulador via las env vars de conexion) para
-  // que ese `getFirestore()` interno encuentre algo en vez de tirar "The
-  // default Firebase app does not exist".
+  // wrapper real" mas abajo) usa `getFirestore(ensureApp())`, que resuelve la
+  // app DEFAULT — no la nombrada de arriba. Se crea aca con la `projectId` de
+  // los tests para que `ensureApp()` la encuentre en vez de inicializar una
+  // sin projectId.
+  //
+  // OJO: este `initializeApp()` es exactamente lo que escondio el incidente.
+  // Antes el wrapper hacia `getFirestore()` vacio, en produccion NADIE crea el
+  // app por defecto, y fallaba en cada invocacion; aca pasaba porque este
+  // test lo creaba. Lo que lo cuida ahora es `admin-default-app.test.ts`.
   defaultApp = initializeApp({ projectId: "treino-dev" });
 });
 

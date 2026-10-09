@@ -111,7 +111,34 @@ class AuthService {
           acceptedTermsVersion: kTermsVersion,
           acceptedPrivacyVersion: kPrivacyVersion,
         );
-      } catch (firestoreError) {
+      } catch (firestoreError, stack) {
+        // El rollback borra la cuenta SÓLO si no hay doc. Antes la borraba
+        // siempre, y en producción (oct-2026) el fallo más común no era un
+        // alta fallida: el `createIfAbsent` de `perfilAseguradoProvider`, que
+        // corre en paralelo con esto, creaba el doc primero y esta escritura
+        // rebotaba contra el pin de `createdAt`. El rollback borraba una
+        // cuenta con doc —que quedaba huérfano— y la persona veía «Hubo un
+        // problema creando tu perfil» por un perfil que existía.
+        //
+        // Con doc, la cuenta sirve: se sigue, y si le faltara el
+        // consentimiento lo pide el checkbox del último paso del alta
+        // (`termsConsentRequiredProvider`). Sin poder confirmarlo, se borra
+        // como antes: una cuenta de Auth sin doc es la que no tiene arreglo.
+        bool hayDoc;
+        try {
+          hayDoc = await _userRepository.get(user.uid) != null;
+        } catch (_) {
+          hayDoc = false;
+        }
+        if (hayDoc) {
+          unawaited(_reportNonFatal(
+            firestoreError,
+            stack,
+            reason: 'AuthService.signUpWithEmail: getOrCreate falló con el '
+                'doc ya creado; la cuenta se conserva',
+          ));
+          return user;
+        }
         // Rollback: best-effort delete the orphan Auth user.
         try {
           await user.delete();

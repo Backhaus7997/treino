@@ -42,7 +42,8 @@ class PlacesTextSearchError implements Exception {
 /// Headers: `X-Goog-Api-Key`, `X-Goog-FieldMask` (required — no default
 /// field mask exists; omitting it errors the call), `Content-Type:
 /// application/json`.
-/// Body: `{textQuery, pageSize: 20, locationBias?: {circle: {center,
+/// Body: `{textQuery, pageSize: 20, includedType: 'gym',
+/// strictTypeFiltering: true, locationBias?: {circle: {center,
 /// radius}}}` — `locationBias` is OMITTED ENTIRELY (not null-valued) when no
 /// location is available, mirroring [PlacesAutocompleteService]'s exact
 /// all-or-nothing `locationBias` contract.
@@ -82,9 +83,14 @@ class PlacesTextSearchService {
   final http.Client _httpClient;
   final String _clientApiKey;
 
-  /// Runs a `searchText` search for [textQuery], restricted to `gym`-typed
-  /// places by query relevance, optionally biased toward
-  /// ([biasLatitude]/[biasLongitude]).
+  /// Runs a `searchText` search for [textQuery], restricted ESTRICTAMENTE a
+  /// lugares con el tipo `gym` (`includedType` + `strictTypeFiltering`),
+  /// optionally biased toward ([biasLatitude]/[biasLongitude]).
+  ///
+  /// Sin el filtro, "club" devolvía boliches, cafeterías y deliverys.
+  /// Tradeoff (2026-10-09): los gimnasios que Google no tipificó como `gym`
+  /// (p. ej. "K2 Gym - Crossfit", primaryType `point_of_interest`)
+  /// desaparecen; la pantalla ofrece "OTRO GYM / SIN GYM" para esos casos.
   ///
   /// [biasLatitude]/[biasLongitude]/[biasRadiusMeters] are all-or-nothing —
   /// mirrors [PlacesAutocompleteService.search]: a null latitude/longitude
@@ -110,6 +116,8 @@ class PlacesTextSearchService {
     final body = <String, Object?>{
       'textQuery': textQuery,
       'pageSize': pageSize,
+      'includedType': 'gym',
+      'strictTypeFiltering': true,
       if (biasLatitude != null && biasLongitude != null)
         'locationBias': {
           'circle': {

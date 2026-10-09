@@ -343,7 +343,7 @@ fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
 | `npm run …` | Runs | Blast radius |
 |---|---|---|
 | `seed:exercises` | `seed_workout_catalog.js` | `set()` over the whole `exercises` stock catalogue |
-| `seed:templates` | `seed_templates.js` | dry-run by default; with `--write`, `set()` over the 7 catalogue templates |
+| `seed:templates` | `seed_templates.js` | dry-run by default; with `--write`, `set()` over the 50 catalogue templates (overwrites every one, including the 7 originals) |
 | `seed:trainers` | `seed_trainer_profiles.js` | upserts 5 `users/{uid}` + `trainerPublicProfiles/{uid}` |
 | **`seed:trainers:clear`** | `seed_trainer_profiles.js --clear` | **`batch.delete()`** on those same 10 docs |
 | `promote:trainer` | `promote_user_to_trainer.js` | flips `users/{uid}.role`, bypassing the role-immutability rule |

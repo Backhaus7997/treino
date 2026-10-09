@@ -239,6 +239,32 @@ describe("posts tier gimnasio — sin cambios", () => {
   });
 });
 
+// El cliente guarda el sentinel `kNoGymId = 'no-gym'` en users/{uid}.gymId
+// para quien eligió "sin gimnasio". Si además llegó a un post como
+// `authorGymId`, dos personas SIN gimnasio matcheaban como "mismo gimnasio".
+describe("posts tier gimnasio — el sentinel 'no-gym' no es un gimnasio", () => {
+  const NO_GYM_READER = "no-gym-reader-uid";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await db.collection("users").doc(NO_GYM_READER).set({ uid: NO_GYM_READER, gymId: "no-gym" });
+      await db
+        .collection("posts")
+        .doc("p-no-gym")
+        .set({ authorUid: AUTHOR, privacy: "gym", authorGymId: "no-gym", text: "x" });
+    });
+  });
+
+  it("DENIEGA a otro usuario con gymId 'no-gym' leer un post con authorGymId 'no-gym'", async () => {
+    await assertFails(readPost(NO_GYM_READER, "p-no-gym"));
+  });
+
+  it("el autor SÍ lee su propio post aunque sea 'no-gym'", async () => {
+    await assertSucceeds(readPost(AUTHOR, "p-no-gym"));
+  });
+});
+
 // SCENARIO-813 — el gate de reacciones espeja exactamente el de posts. Si no
 // lo espejara, la reacción sería un canal lateral para confirmar la existencia
 // y el contenido de un post que no se puede leer.

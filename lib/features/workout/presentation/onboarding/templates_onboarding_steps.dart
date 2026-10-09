@@ -168,6 +168,9 @@ List<TemplatesOnboardingStep> templatesOnboardingSteps(AppL10n l10n) {
       cardLabel: l10n.templatesOnboardingStep3Label,
       title: l10n.templatesOnboardingStep3Title,
       body: l10n.templatesOnboardingStep3Body,
+      // Multi desde 2026-10-09 (pedido del owner): "salud y estética" es una
+      // respuesta legítima. Ver `TemplatePreferences.goals`.
+      multiSelect: true,
       options: [
         for (final goal in RoutineGoal.displayOrder)
           TemplatesOnboardingOption(

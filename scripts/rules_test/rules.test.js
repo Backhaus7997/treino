@@ -279,6 +279,123 @@ test('SCENARIO-270 inverse: owner can write their own public profile', async () 
 });
 
 // ---------------------------------------------------------------------------
+// SCENARIO-RANKS: rangos de levantamiento de userPublicProfiles
+// (squatRank / benchRank / deadliftRank, enteros 0..8 o null).
+//
+// Los escribe SÓLO la Cloud Function (Admin SDK, saltea las reglas) a partir de
+// best*Kg y del peso corporal del doc privado. Mismo trato que las 4 métricas
+// del ranking: CF-write-only, con la excepción de la transición de opt-out.
+// Y como `request.resource.data` es el doc mergeado, los tres tienen que estar
+// en el `hasOnly` de update: si no, un doc que YA tiene un rango escrito por la
+// CF no se puede volver a editar (RANKS-01). Por eso las reglas se despliegan
+// ANTES que la función.
+// ---------------------------------------------------------------------------
+async function seedRankedAthlete(uid, profile) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc(uid).set({
+      uid,
+      role: 'athlete',
+      gymId: null,
+    });
+    await ctx.firestore().collection('userPublicProfiles').doc(uid).set({
+      uid,
+      ...profile,
+    });
+  });
+}
+
+test('SCENARIO-RANKS-01: owner of a doc that already stores CF-written ranks can still edit it', async () => {
+  await seedRankedAthlete('u1', {
+    rankingOptIn: true,
+    squatRank: 5,
+    benchRank: 4,
+    deadliftRank: 3,
+  });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertSucceeds(ref.update({ displayName: 'Martin' }));
+  // Re-presentar el valor guardado no es una falsificación.
+  await assertSucceeds(ref.update({ benchRank: 4, displayName: 'Martin G' }));
+});
+
+test('SCENARIO-RANKS-02: owner cannot forge or seed a rank', async () => {
+  await seedRankedAthlete('u1', { rankingOptIn: true, benchRank: 2 });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertFails(ref.update({ benchRank: 8 }));
+  await assertFails(ref.update({ squatRank: 8 }));
+});
+
+test('SCENARIO-RANKS-03: a create cannot seed a rank, but may leave it null', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc('u1').set({
+      uid: 'u1',
+      role: 'athlete',
+      gymId: null,
+    });
+  });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertFails(ref.set({ uid: 'u1', benchRank: 8 }));
+  await assertSucceeds(
+    ref.set({ uid: 'u1', benchRank: null, squatRank: null, deadliftRank: null }),
+  );
+});
+
+test('SCENARIO-RANKS-04: opt-out may reset the ranks to null, and cannot launder a forged one', async () => {
+  await seedRankedAthlete('u1', {
+    rankingOptIn: true,
+    lifetimeVolumeKg: 3400,
+    bestSquatKg: 110,
+    squatRank: 5,
+    benchRank: 4,
+    deadliftRank: 3,
+  });
+
+  const ref = testEnv
+    .authenticatedContext('u1')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertFails(ref.update({ rankingOptIn: false, benchRank: 8 }));
+  await assertSucceeds(
+    ref.update({
+      rankingOptIn: false,
+      lifetimeVolumeKg: 0,
+      bestSquatKg: null,
+      bestBenchKg: null,
+      bestDeadliftKg: null,
+      squatRank: null,
+      benchRank: null,
+      deadliftRank: null,
+    }),
+  );
+});
+
+test('SCENARIO-RANKS-05: non-owner cannot write a rank on someone else\'s doc', async () => {
+  await seedRankedAthlete('u1', { rankingOptIn: true, benchRank: 2 });
+
+  const ref = testEnv
+    .authenticatedContext('u2')
+    .firestore()
+    .collection('userPublicProfiles')
+    .doc('u1');
+  await assertFails(ref.update({ benchRank: 8 }));
+});
+
+// ---------------------------------------------------------------------------
 // SCENARIO-271: reading a non-existent friendship doc returns empty
 // snapshot without permission-denied. Covers the friendships rule fix
 // (resource == null branch) discovered during user-public-profiles

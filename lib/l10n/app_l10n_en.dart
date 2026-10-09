@@ -1554,6 +1554,26 @@ class AppL10nEn extends AppL10n {
       'No pudimos cancelar la cuenta. Probá de nuevo.';
 
   @override
+  String get verifyMailWrongEmailAction => 'Me equivoqué de mail';
+
+  @override
+  String get verifyMailWrongEmailDialogTitle => '¿Te equivocaste de mail?';
+
+  @override
+  String get verifyMailWrongEmailDialogBody =>
+      'Vamos a borrar esta cuenta para que puedas registrarte de nuevo con el mail correcto. Vas a poder usar el mismo nombre.';
+
+  @override
+  String get verifyMailWrongEmailDialogConfirm => 'Borrar cuenta';
+
+  @override
+  String get verifyMailWrongEmailDialogBack => 'Volver';
+
+  @override
+  String get verifyMailWrongEmailError =>
+      'No pudimos borrar la cuenta. Probá de nuevo.';
+
+  @override
   String get profileSetupGymSelectError =>
       'We couldn\'t load that gym. Try again or pick «OTRO GYM / SIN GYM».';
 
@@ -2358,6 +2378,64 @@ class AppL10nEn extends AppL10n {
   @override
   String a11yAvatarLabel(String name) {
     return 'Profile photo of $name';
+  }
+
+  @override
+  String get liftRankNone => 'Unranked';
+
+  @override
+  String get liftRankBronze => 'Bronze';
+
+  @override
+  String get liftRankSilver => 'Silver';
+
+  @override
+  String get liftRankGold => 'Gold';
+
+  @override
+  String get liftRankPlatinum => 'Platinum';
+
+  @override
+  String get liftRankDiamond => 'Diamond';
+
+  @override
+  String get liftRankChampion => 'Champion';
+
+  @override
+  String get liftRankTitan => 'Titan';
+
+  @override
+  String get liftRankOlympian => 'Olympian';
+
+  @override
+  String liftRankStripTitle(String lift) {
+    return 'YOUR RANK · $lift';
+  }
+
+  @override
+  String liftRankStripPosition(int rank, int total) {
+    return 'Rank $rank of $total';
+  }
+
+  @override
+  String get liftRankStripBelowBronze =>
+      'You haven\'t reached Bronze yet. Keep adding weight.';
+
+  @override
+  String get liftRankStripNoLift =>
+      'Log this lift in a workout to see your rank.';
+
+  @override
+  String get liftRankStripNoBodyWeight =>
+      'Add your body weight to see your rank.';
+
+  @override
+  String get liftRankStripPending =>
+      'It\'s calculated after your next workout.';
+
+  @override
+  String a11yRankingRowButtonWithRank(String name, String rank) {
+    return 'View $name\'s profile, rank $rank';
   }
 
   @override
@@ -4288,7 +4366,7 @@ class AppL10nEn extends AppL10n {
       'Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.';
 
   @override
-  String get templatesOnboardingStep3Label => 'Goal';
+  String get templatesOnboardingStep3Label => 'Goals · pick one or more';
 
   @override
   String get templatesOnboardingStep4Title => 'This is not an exam';

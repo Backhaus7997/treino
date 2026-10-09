@@ -131,6 +131,21 @@ class UserPublicProfile with _$UserPublicProfile {
     /// (conventional + sumo, max of the two), max-merged over the recompute
     /// window. Null when not opted in or no matching lift logged yet.
     num? bestDeadliftKg,
+
+    /// Rango de levantamiento en sentadilla, banca y peso muerto: un entero de
+    /// 0 (sin rango) a 8 (Olímpico), o `null` cuando no hay forma honesta de
+    /// calcularlo (sin opt-in, sin ese lift registrado, sin peso corporal, o
+    /// todavía no corrió el recompute desde que existe el campo).
+    ///
+    /// Lo deriva SÓLO `functions/src/ranking-aggregate.ts` (la fórmula está en
+    /// `ranking-ranks.ts`) a partir de `best*Kg` y del peso corporal y el sexo
+    /// del doc PRIVADO; este doc público nunca guarda el peso. Es CF-write-only
+    /// en `firestore.rules`, igual que `best*Kg`. Se lee con
+    /// `LiftRank.fromValue`, que trata cualquier valor fuera de 0..8 como
+    /// "sin dato".
+    int? squatRank,
+    int? benchRank,
+    int? deadliftRank,
   }) = _UserPublicProfile;
 
   factory UserPublicProfile.fromJson(Map<String, Object?> json) =>

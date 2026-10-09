@@ -43,13 +43,40 @@ class PlantillasTab extends ConsumerStatefulWidget {
 }
 
 class _PlantillasTabState extends ConsumerState<PlantillasTab>
-    with AutomaticKeepAliveClientMixin<PlantillasTab> {
+    with
+        AutomaticKeepAliveClientMixin<PlantillasTab>,
+        SingleTickerProviderStateMixin<PlantillasTab> {
   @override
   bool get wantKeepAlive => true;
+
+  /// Entrada one-shot de la grilla: fade + slide de [AppMotion.slideMd] con el
+  /// delay `stagger(2)`, la misma que antes le daba un `TreinoFadeSlideIn`
+  /// envolviendo la grilla entera.
+  ///
+  /// Vive en el State de la pestaña y no en cada fila a propósito: las filas
+  /// ahora se arman a demanda (`SliverList.builder`), y una fila que sale del
+  /// `cacheExtent` se desmonta y vuelve a montarse al regresar. Con un
+  /// `TreinoFadeSlideIn` por fila, cada una re-animaría su entrada en cada
+  /// scroll (ver el dartdoc de ese widget). Con el progreso acá, la fila que
+  /// se re-monta lee un controller que ya terminó: opacidad 1, translate 0.
+  late final AnimationController _gridEntrance;
+  late final Animation<double> _gridProgress;
+  bool _entranceStarted = false;
 
   @override
   void initState() {
     super.initState();
+    final delay = AppMotion.stagger(2);
+    final total = delay + AppMotion.base;
+    _gridEntrance = AnimationController(vsync: this, duration: total);
+    _gridProgress = CurvedAnimation(
+      parent: _gridEntrance,
+      curve: Interval(
+        delay.inMicroseconds / total.inMicroseconds,
+        1,
+        curve: AppMotion.standard,
+      ),
+    );
     // The PLANTILLAS mini-onboarding (#635 PR#2), first entry only.
     //
     // From a post-frame callback because `initState` has no `Localizations`
@@ -69,6 +96,31 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Mismo criterio que TreinoFadeSlideIn: reduce-motion necesita MediaQuery,
+    // por eso se resuelve acá y no en initState.
+    if (!_entranceStarted) {
+      _entranceStarted = true;
+      if (AppMotion.reduceMotion(context)) {
+        _gridEntrance.value = 1;
+      } else {
+        _gridEntrance.forward();
+      }
+    } else if (AppMotion.reduceMotion(context) && !_gridEntrance.isCompleted) {
+      _gridEntrance
+        ..stop()
+        ..value = 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _gridEntrance.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final palette = AppPalette.of(context);
@@ -81,77 +133,113 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     final entriesAsync = ref.watch(rankedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      // SingleChildScrollView + Column (no ListView(children:)): un
-      // ListView, aunque construya sus widgets eager, sigue siendo un
-      // viewport — los Elements/State de los TreinoFadeSlideIn que salen
-      // del cacheExtent se desmontan y re-animan al volver a scrollear.
-      // Column dentro de SingleChildScrollView scrollea como una sola
-      // unidad, sin reciclar Elements por ítem (ver doc de
-      // TreinoFadeSlideIn).
-      child: SingleChildScrollView(
-        // + bottom inset: the floating bar overlays the body (extendBody),
-        // so the last item needs room to scroll out from behind it.
-        padding: EdgeInsets.fromLTRB(
-          0,
-          20,
-          0,
-          20 + MediaQuery.paddingOf(context).bottom,
-        ),
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TreinoFadeSlideIn(
-              delay: AppMotion.stagger(0),
-              child: const LevelFilterPills(),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            // Por qué la grilla está en ese orden, y cómo cambiarlo (#635 PR#3).
-            // Encima de la grilla y debajo de las pills de nivel: el nivel
-            // FILTRA (saca cosas), esto ORDENA (no saca nada), y verlos en ese
-            // orden es lo que hace legible la diferencia.
-            TreinoFadeSlideIn(
-              delay: AppMotion.stagger(1),
-              child: const TemplatesPreferencesBar(),
-            ),
-            const SizedBox(height: AppSpacing.s8),
-            TreinoFadeSlideIn(
-              delay: AppMotion.stagger(2),
-              child: entriesAsync.when(
-                data: (entries) {
-                  if (entries.isEmpty) {
-                    final l10n = AppL10n.of(context);
-                    final msg = filter == null
-                        ? l10n.workoutExploreEmptyAll
-                        : l10n.workoutExploreEmptyLevel;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        msg,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    );
-                  }
-                  return _TemplatesGrid(entries: entries);
-                },
-                loading: () => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  ),
-                ),
-                error: (_, __) => _CatalogErrorState(filter: filter),
+    Widget message(Widget child) => SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: child,
+          ),
+        );
+
+    final Widget content = entriesAsync.when(
+      data: (entries) {
+        if (entries.isEmpty) {
+          final l10n = AppL10n.of(context);
+          final msg = filter == null
+              ? l10n.workoutExploreEmptyAll
+              : l10n.workoutExploreEmptyLevel;
+          return message(
+            Text(
+              msg,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: palette.textMuted,
               ),
             ),
-          ],
-        ),
+          );
+        }
+        return _TemplatesSliverGrid(entries: entries, progress: _gridProgress);
+      },
+      loading: () => message(
+        Center(child: CircularProgressIndicator(color: palette.accent)),
+      ),
+      error: (_, __) => SliverToBoxAdapter(
+        child: _CatalogErrorState(filter: filter),
       ),
     );
+
+    // Un solo CustomScrollView con slivers, no SingleChildScrollView + Column.
+    //
+    // Con el Column, las 50 plantillas del catálogo (#1393) se construían, se
+    // medían y se pintaban TODAS, siempre, y cualquier rebuild de la pestaña
+    // las rehacía enteras. El más caro de esos rebuilds pasaba justo al
+    // scrollear: la barra flotante se compacta/expande animando su alto, el
+    // Scaffold del shell publica ese alto frame a frame en
+    // `MediaQuery.padding.bottom`, y esta pestaña leía `paddingOf` en su
+    // build — así que cada frame de la animación reconstruía las 50 cards
+    // (dos TextPainter por card) y relayouteaba la grilla completa.
+    //
+    // Ahora las filas se arman a demanda (SliverList.builder) con un
+    // RepaintBoundary por fila, y el inset de la barra lo lee SOLO el sliver
+    // final ([_ShellBottomInset]): la animación de la barra reconstruye un
+    // SizedBox, no la grilla.
+    //
+    // El encabezado va en un SliverToBoxAdapter: ese sliver no recicla su
+    // hijo al salir de pantalla, así que sus TreinoFadeSlideIn siguen siendo
+    // one-shot (ver el dartdoc de TreinoFadeSlideIn).
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(0),
+                  child: const LevelFilterPills(),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+                // Por qué la grilla está en ese orden, y cómo cambiarlo (#635
+                // PR#3). Encima de la grilla y debajo de las pills de nivel: el
+                // nivel FILTRA (saca cosas), esto ORDENA (no saca nada), y
+                // verlos en ese orden es lo que hace legible la diferencia.
+                TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(1),
+                  child: const TemplatesPreferencesBar(),
+                ),
+                const SizedBox(height: AppSpacing.s8),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: content,
+        ),
+        const _ShellBottomInset(),
+      ],
+    );
   }
+}
+
+/// Hueco final del scroll: 20 de aire + `MediaQuery.padding.bottom`.
+///
+/// Dentro del shell, ese `padding.bottom` YA es la caja entera de la barra
+/// flotante (margen + 8 + alto, ver el dartdoc de `TreinoBottomBar.minHeight`,
+/// #830): sumarle el alto de la barra duplicaría el hueco. Fuera del shell da
+/// el safe area a secas.
+///
+/// Es un widget aparte a propósito: es el ÚNICO lector de `paddingOf` en la
+/// pestaña. Ese valor cambia en cada frame mientras la barra se compacta o se
+/// expande, y leído en el build de la pestaña arrastraba la grilla entera a
+/// reconstruirse con él.
+class _ShellBottomInset extends StatelessWidget {
+  const _ShellBottomInset();
+
+  @override
+  Widget build(BuildContext context) => SliverToBoxAdapter(
+        child: SizedBox(height: 20 + MediaQuery.paddingOf(context).bottom),
+      );
 }
 
 /// Catalog error state. Coach and community templates are independent of the
@@ -213,95 +301,159 @@ class _CatalogErrorState extends ConsumerWidget {
   }
 }
 
-/// 2-up rows in a single-pass [Table] — same layout the old PlantillasSection
-/// used (no GridView: hard-coded cell heights overflowed; no per-row
-/// [IntrinsicHeight]: its dry-layout re-runs janked the scroll, #402). Equal
-/// row heights come from [RoutineCard.reserveTitleLines] making every card
-/// deterministic-height; the badge lives inside the card's fixed icon row, so
-/// coach cards measure exactly like catalog cards.
+/// Variante de una celda según su origen. Compartida por la grilla lazy y
+/// por la del estado de error.
+Widget _templateCell(
+  TemplateEntry entry, {
+  required bool catalogLocked,
+  required bool reserveTitleLines,
+}) =>
+    RoutineCard(
+      routine: entry.routine,
+      reserveTitleLines: reserveTitleLines,
+      // Coach templates always glow magenta to match their chip (coach
+      // ownership speaks highlight — same language as RutinasSection);
+      // catalog and community cards keep the hash-based alternation.
+      variant: entry.fromCoach || entry.routine.id.hashCode % 3 == 0
+          ? RoutineCardVariant.highlight
+          : RoutineCardVariant.accent,
+      badge: switch (entry.origin) {
+        TemplateOrigin.coach => CoachChip(routineId: entry.routine.id),
+        TemplateOrigin.community => CoachChip(
+            routineId: entry.routine.id,
+            variant: CoachChipVariant.communityTrainer,
+          ),
+        // El candado sólo aparece si esta plantilla está bloqueada para
+        // QUIEN MIRA: `isPremium` sola no alcanza. Un alumno con derecho
+        // ve el catálogo entero sin candados, y con el paywall apagado
+        // no lo ve nadie.
+        //
+        // La grilla habla del eje SEGUIR y de ninguno más — de ahí el
+        // cruce con `isPremium` y el uso de `catalogLockActiveProvider`.
+        // Que una de principiante aparezca SIN candado acá y con el botón
+        // de "Usar como base" bloqueado en el detalle NO es una
+        // discrepancia: seguirla es gratis y copiarla no. El detalle usa
+        // `customizeLockActiveProvider`, que es el otro eje. Antes de
+        // "arreglar" esta asimetría, leer el dartdoc de los dos providers.
+        TemplateOrigin.system => catalogLocked && entry.routine.isPremium
+            ? PremiumChip(routineId: entry.routine.id)
+            : null,
+      },
+    );
+
+/// Una fila de la grilla: dos celdas (o una, con texto grande) y 12 de
+/// separación debajo, salvo en la última fila.
+///
+/// Sin Table ni GridView: GridView con alturas fijas desbordaba, e
+/// IntrinsicHeight por fila re-corría su dry-layout y trababa el scroll
+/// (#402). Las dos celdas miden lo mismo porque [RoutineCard.reserveTitleLines]
+/// hace la altura de la card determinística; el badge vive dentro de la fila
+/// fija del ícono, así que las cards del coach miden igual que las del
+/// catálogo.
+Widget _templateRow(
+  List<TemplateEntry> entries,
+  int row, {
+  required bool singleColumn,
+  required bool catalogLocked,
+}) {
+  final perRow = singleColumn ? 1 : 2;
+  final first = row * perRow;
+  final lastRow = first + perRow >= entries.length;
+  Widget cell(int i) => _templateCell(
+        entries[i],
+        catalogLocked: catalogLocked,
+        reserveTitleLines: !singleColumn,
+      );
+
+  return Padding(
+    padding: EdgeInsets.only(bottom: lastRow ? 0 : 12),
+    child: singleColumn
+        ? cell(first)
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: cell(first)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: first + 1 < entries.length
+                    ? cell(first + 1)
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+  );
+}
+
+int _rowCount(int entries, {required bool singleColumn}) =>
+    singleColumn ? entries : (entries + 1) ~/ 2;
+
+/// La grilla de EXPLORAR como sliver: filas armadas a demanda.
+///
+/// Con 50 plantillas (#1393), sólo se construyen las filas visibles más el
+/// `cacheExtent`; el resto no existe hasta que el scroll llega. Cada fila
+/// lleva su RepaintBoundary (default de SliverList), así que scrollear no
+/// repinta las sombras con blur de las cards que no cambiaron.
+class _TemplatesSliverGrid extends ConsumerWidget {
+  const _TemplatesSliverGrid({required this.entries, required this.progress});
+
+  final List<TemplateEntry> entries;
+
+  /// Progreso de la entrada one-shot, del State de la pestaña.
+  final Animation<double> progress;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final singleColumn = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    // Una sola lectura para toda la grilla: si el catálogo pago está
+    // bloqueando a quien mira. Se cruza con el `isPremium` de cada plantilla.
+    final catalogLocked = ref.watch(catalogLockActiveProvider);
+    return SliverFadeTransition(
+      opacity: progress,
+      // Una animación de entrada es decoración: no decide qué existe para el
+      // lector de pantalla (mismo criterio que TreinoFadeSlideIn).
+      alwaysIncludeSemantics: true,
+      sliver: SliverList.builder(
+        itemCount: _rowCount(entries.length, singleColumn: singleColumn),
+        itemBuilder: (context, row) => AnimatedBuilder(
+          animation: progress,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, AppMotion.slideMd * (1 - progress.value)),
+            child: child,
+          ),
+          child: _templateRow(
+            entries,
+            row,
+            singleColumn: singleColumn,
+            catalogLocked: catalogLocked,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Grilla eager para el estado de error: ahí sólo sobreviven las plantillas
+/// del coach y de la comunidad, que son pocas, y van dentro de un Column.
 class _TemplatesGrid extends ConsumerWidget {
   const _TemplatesGrid({required this.entries});
 
   final List<TemplateEntry> entries;
 
-  Widget _gridCell(Widget cell, {required bool lastRow}) => Padding(
-        padding: EdgeInsets.only(bottom: lastRow ? 0 : 12),
-        child: cell,
-      );
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final useSingleColumn = MediaQuery.textScalerOf(context).scale(1) > 1.3;
-    // Una sola lectura para toda la grilla: si el catálogo pago está
-    // bloqueando a quien mira. Se cruza con el `isPremium` de cada plantilla.
+    final singleColumn = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final catalogLocked = ref.watch(catalogLockActiveProvider);
-    final cells = <Widget>[
-      for (final entry in entries)
-        RoutineCard(
-          routine: entry.routine,
-          // Coach templates always glow magenta to match their chip (coach
-          // ownership speaks highlight — same language as RutinasSection);
-          // catalog and community cards keep the hash-based alternation.
-          variant: entry.fromCoach || entry.routine.id.hashCode % 3 == 0
-              ? RoutineCardVariant.highlight
-              : RoutineCardVariant.accent,
-          reserveTitleLines: !useSingleColumn,
-          badge: switch (entry.origin) {
-            TemplateOrigin.coach => CoachChip(routineId: entry.routine.id),
-            TemplateOrigin.community => CoachChip(
-                routineId: entry.routine.id,
-                variant: CoachChipVariant.communityTrainer,
-              ),
-            // El candado sólo aparece si esta plantilla está bloqueada para
-            // QUIEN MIRA: `isPremium` sola no alcanza. Un alumno con derecho
-            // ve el catálogo entero sin candados, y con el paywall apagado
-            // no lo ve nadie.
-            //
-            // La grilla habla del eje SEGUIR y de ninguno más — de ahí el
-            // cruce con `isPremium` y el uso de `catalogLockActiveProvider`.
-            // Que una de principiante aparezca SIN candado acá y con el botón
-            // de "Usar como base" bloqueado en el detalle NO es una
-            // discrepancia: seguirla es gratis y copiarla no. El detalle usa
-            // `customizeLockActiveProvider`, que es el otro eje. Antes de
-            // "arreglar" esta asimetría, leer el dartdoc de los dos providers.
-            TemplateOrigin.system => catalogLocked && entry.routine.isPremium
-                ? PremiumChip(routineId: entry.routine.id)
-                : null,
-          },
-        ),
-    ];
-
-    if (useSingleColumn) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var index = 0; index < cells.length; index++)
-            _gridCell(cells[index], lastRow: index == cells.length - 1),
-        ],
-      );
-    }
-
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(),
-        1: FixedColumnWidth(12),
-        2: FlexColumnWidth(),
-      },
-      defaultVerticalAlignment: TableCellVerticalAlignment.top,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var row = 0; row < cells.length; row += 2)
-          TableRow(
-            children: [
-              _gridCell(cells[row], lastRow: row + 2 >= cells.length),
-              const SizedBox.shrink(),
-              if (row + 1 < cells.length)
-                _gridCell(
-                  cells[row + 1],
-                  lastRow: row + 2 >= cells.length,
-                )
-              else
-                const SizedBox.shrink(),
-            ],
+        for (var row = 0;
+            row < _rowCount(entries.length, singleColumn: singleColumn);
+            row++)
+          _templateRow(
+            entries,
+            row,
+            singleColumn: singleColumn,
+            catalogLocked: catalogLocked,
           ),
       ],
     );

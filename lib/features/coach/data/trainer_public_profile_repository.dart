@@ -36,6 +36,13 @@ class TrainerPublicProfileRepository {
   CollectionReference<Map<String, Object?>> get _col =>
       _firestore.collection('trainerPublicProfiles');
 
+  /// Saca los perfiles con `hiddenFromDiscovery == true` (cuentas internas, de
+  /// QA o de revisores de las tiendas). Es client-side a propósito: un
+  /// `where('hiddenFromDiscovery', isEqualTo: false)` excluiría los docs que
+  /// no tienen el campo (casi todos) y pediría un índice compuesto nuevo.
+  /// Se aplica a TODO listado que ve el alumno; [getById] no lo usa.
+  static bool _isVisible(TrainerPublicProfile t) => !t.hiddenFromDiscovery;
+
   /// Returns trainers whose `trainerGeohash` starts with [prefix5].
   ///
   /// Uses Firestore range query:
@@ -56,8 +63,10 @@ class TrainerPublicProfileRepository {
         .where('trainerGeohash', isLessThan: end)
         .get();
 
-    var results =
-        snap.docs.map((d) => TrainerPublicProfile.fromJson(d.data())).toList();
+    var results = snap.docs
+        .map((d) => TrainerPublicProfile.fromJson(d.data()))
+        .where(_isVisible)
+        .toList();
 
     if (specialty != null) {
       results = results.where((t) => t.trainerSpecialty == specialty).toList();
@@ -70,14 +79,19 @@ class TrainerPublicProfileRepository {
   ///
   /// If [specialty] is provided, the result is filtered client-side (D10).
   ///
+  /// Ojo: los ocultos se descartan DESPUÉS del `limit(50)`, así que si hay
+  /// ocultos entre los primeros 50 la lista puede traer menos de 50.
+  ///
   /// REQ-COACH-DISC-DATA-006.
   Future<List<TrainerPublicProfile>> listAll({
     TrainerSpecialty? specialty,
   }) async {
     final snap = await _col.orderBy('displayNameLowercase').limit(50).get();
 
-    var results =
-        snap.docs.map((d) => TrainerPublicProfile.fromJson(d.data())).toList();
+    var results = snap.docs
+        .map((d) => TrainerPublicProfile.fromJson(d.data()))
+        .where(_isVisible)
+        .toList();
 
     if (specialty != null) {
       results = results.where((t) => t.trainerSpecialty == specialty).toList();
@@ -87,6 +101,10 @@ class TrainerPublicProfileRepository {
   }
 
   /// Returns the [TrainerPublicProfile] for [uid], or `null` if no doc exists.
+  ///
+  /// NO filtra `hiddenFromDiscovery`: abrir un perfil por uid (link, chat, las
+  /// pantallas del propio PF, el flujo de los revisores) tiene que seguir
+  /// andando para una cuenta oculta.
   ///
   /// REQ-COACH-DISC-DATA-007.
   Future<TrainerPublicProfile?> getById(String uid) async {
@@ -116,6 +134,7 @@ class TrainerPublicProfileRepository {
     final byUid = <String, TrainerPublicProfile>{};
     for (final d in snap.docs) {
       final profile = TrainerPublicProfile.fromJson(d.data());
+      if (!_isVisible(profile)) continue;
       // Dedupe by uid — un PF con N ubicaciones cuyo geohashes solapan con
       // [geohashes] podría salir N veces; nos quedamos con la primera lectura
       // (todos los duplicates son el mismo doc).
@@ -137,8 +156,10 @@ class TrainerPublicProfileRepository {
     TrainerSpecialty? specialty,
   }) async {
     final snap = await _col.where('trainerOffersOnline', isEqualTo: true).get();
-    var results =
-        snap.docs.map((d) => TrainerPublicProfile.fromJson(d.data())).toList();
+    var results = snap.docs
+        .map((d) => TrainerPublicProfile.fromJson(d.data()))
+        .where(_isVisible)
+        .toList();
     if (specialty != null) {
       results = results.where((t) => t.trainerSpecialty == specialty).toList();
     }

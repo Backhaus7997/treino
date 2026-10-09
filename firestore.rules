@@ -278,6 +278,49 @@ service cloud.firestore {
              || (data.bornAt is timestamp
                  && data.bornAt <= request.time - duration.value(4745, 'd'));
     }
+
+    // Un alta POR MAIL nace con el consentimiento puesto, o no nace.
+    //
+    // La carrera que esto corta, medida en producción (oct-2026): apenas
+    // `createUserWithEmailAndPassword` vuelve, el router manda a
+    // `/profile-setup` y `perfilAseguradoProvider` dispara su primer
+    // `createIfAbsent` (espera cero) MIENTRAS `signUpWithEmail` todavía está
+    // en su `getOrCreate`. Si gana el `createIfAbsent`, el doc nace SIN
+    // consentimiento y la escritura del registro —un `set` sin merge, con
+    // otro `createdAt`— llega como UPDATE: el pin de `createdAt` la rechaza,
+    // el registro borra la cuenta de Auth y la persona ve «Hubo un problema
+    // creando tu perfil». La variante silenciosa: el `createIfAbsent` aterriza
+    // antes de la LECTURA del `getOrCreate`, que ve el doc y no escribe nada,
+    // y la cuenta queda creada sin consentimiento y sin error.
+    //
+    // Con esto, para una cuenta con contraseña recién creada el create sin
+    // consentimiento se DENIEGA (el batch cae entero, el público incluido), y
+    // el único que puede crear el doc es el registro, que sí lo trae. El
+    // `createIfAbsent` perdedor no rompe nada: el reintento de los 3 s lee el
+    // doc del registro y corta.
+    //
+    // `email_verified` deja afuera a las cuentas que no son un registro en
+    // curso. Una cuenta con contraseña sólo lo tiene en true después del
+    // código de 6 dígitos (`codigoDeVerificacion` lo marca en Auth) o del
+    // link de verificación viejo, y ninguna de las dos cosas puede pasar en
+    // los milisegundos de la carrera. Sin esa salida, el backfill del login
+    // (`signInWithEmail` → `createIfAbsent`) quedaría denegado para siempre a
+    // una cuenta vieja sin doc, y el self-heal del submit también.
+    //
+    // Google, Apple y el token de los tests (`custom`) no se tocan: su
+    // consentimiento lo estampa el checkbox del alta, sobre un doc que el
+    // login crea vacío a propósito.
+    //
+    // `get` encadenado y no `request.auth.token.firebase.sign_in_provider`:
+    // un token sin el mapa `firebase` tira error de evaluación en vez de
+    // devolver false.
+    function altaPorMailTraeConsentimiento(data) {
+      return request.auth.token.get('firebase', {}).get('sign_in_provider', '') != 'password'
+             || request.auth.token.get('email_verified', false) == true
+             || (data.get('termsAcceptedAt', null) is timestamp
+                 && data.get('acceptedTermsVersion', null) is int
+                 && data.get('acceptedPrivacyVersion', null) is int);
+    }
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -420,7 +463,9 @@ service cloud.firestore {
                     // que se use va a estar lleno de tokens viejos que nadie
                     // sabe quien escribio.
                     && request.resource.data.get('storeAccountToken', null) == null
-                    && bornAtOk(request.resource.data);
+                    && bornAtOk(request.resource.data)
+                    // Ver `altaPorMailTraeConsentimiento`, arriba.
+                    && altaPorMailTraeConsentimiento(request.resource.data);
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
@@ -1646,7 +1691,10 @@ service cloud.firestore {
         return followAccepted(request.auth.uid, authorUid);
       }
       function postSameGym(authorGymId) {
+        // 'no-gym' es el sentinel del cliente (kNoGymId), no un gym real: nunca
+        // debe matchear aunque el usuario tenga ese mismo valor guardado.
         return authorGymId != null
+            && authorGymId != 'no-gym'
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.gymId == authorGymId;
       }
 
@@ -1784,8 +1832,18 @@ service cloud.firestore {
     // gymId, gymName, workoutsCount, racha, rachaUpdatedAt, followersCount,
     // followingCount, sharedTemplatesWithAthletes, rankingOptIn,
     // isProfilePublic, lifetimeVolumeKg, bestSquatKg, bestBenchKg,
-    // bestDeadliftKg).
+    // bestDeadliftKg, squatRank, benchRank, deadliftRank).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
+    //
+    // squatRank / benchRank / deadliftRank (enteros 0..8, o null) son los
+    // rangos de levantamiento que la pestaña Rankings dibuja como insignia.
+    // Los deriva `functions/src/ranking-aggregate.ts` de best*Kg + el peso
+    // corporal del doc PRIVADO, y reciben el mismo trato que las 4 métricas:
+    // CF-write-only, con la misma excepción de opt-out. ⚠️ Sumarlos al
+    // `hasOnly` de update NO es opcional: la CF los escribe en el doc, y el
+    // `hasOnly` evalúa el documento COMPLETO, así que sin esto todo update del
+    // dueño falla con permission-denied. Por eso las reglas se despliegan ANTES
+    // que la función.
     //
     // rankings-integrity Phase 2 (PR#2) hardening — AD-3, AD-4, AD-6, AD-8:
     //   - Field allowlist via keys().hasOnly() (was previously unchecked).
@@ -1872,7 +1930,8 @@ service cloud.firestore {
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
-                         'bestDeadliftKg'
+                         'bestDeadliftKg',
+                         'squatRank', 'benchRank', 'deadliftRank'
                        ])
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
@@ -1901,6 +1960,14 @@ service cloud.firestore {
                         || request.resource.data.bestBenchKg == null)
                     && (!('bestDeadliftKg' in request.resource.data)
                         || request.resource.data.bestDeadliftKg == null)
+                    // Rangos de levantamiento: derivados por la CF, un create
+                    // no puede sembrar uno.
+                    && (!('squatRank' in request.resource.data)
+                        || request.resource.data.squatRank == null)
+                    && (!('benchRank' in request.resource.data)
+                        || request.resource.data.benchRank == null)
+                    && (!('deadliftRank' in request.resource.data)
+                        || request.resource.data.deadliftRank == null)
                     && (!('rankingOptIn' in request.resource.data)
                         || request.resource.data.rankingOptIn is bool);
 
@@ -1925,7 +1992,8 @@ service cloud.firestore {
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
-                         'bestDeadliftKg'
+                         'bestDeadliftKg',
+                         'squatRank', 'benchRank', 'deadliftRank'
                        ])
                     // Sello de frescura de `rachaSemanas` — timestamp cuando
                     // está presente. El disyunto `unchanged` es el del #849:
@@ -2012,6 +2080,30 @@ service cloud.firestore {
                         || (request.resource.data.get('rankingOptIn', true) == false
                             && resource.data.get('rankingOptIn', false) == true
                             && request.resource.data.bestDeadliftKg == null))
+                    // Rangos de levantamiento (squatRank / benchRank /
+                    // deadliftRank): mismo patrón que las métricas de arriba.
+                    // Los escribe SÓLO la CF (Admin SDK, saltea estas reglas);
+                    // el dueño puede re-presentar el valor guardado —el doc
+                    // mergeado lo trae en cada escritura parcial— o, en la
+                    // transición de opt-out, resetearlo al default fijo null.
+                    && (!('squatRank' in request.resource.data)
+                        || request.resource.data.squatRank
+                           == resource.data.get('squatRank', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.squatRank == null))
+                    && (!('benchRank' in request.resource.data)
+                        || request.resource.data.benchRank
+                           == resource.data.get('benchRank', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.benchRank == null))
+                    && (!('deadliftRank' in request.resource.data)
+                        || request.resource.data.deadliftRank
+                           == resource.data.get('deadliftRank', null)
+                        || (request.resource.data.get('rankingOptIn', true) == false
+                            && resource.data.get('rankingOptIn', false) == true
+                            && request.resource.data.deadliftRank == null))
                     // Type/Range Validation (AD-8): cotas de defensa en
                     // profundidad detrás del pin de arriba. Una escritura
                     // FRESCA ya fue rechazada por el pin salvo que iguale el
@@ -2098,7 +2190,26 @@ service cloud.firestore {
                         || unchanged(request.resource.data, resource.data, 'bestDeadliftKg')
                         || (request.resource.data.bestDeadliftKg is number
                             && request.resource.data.bestDeadliftKg >= 0
-                            && request.resource.data.bestDeadliftKg <= 1000));
+                            && request.resource.data.bestDeadliftKg <= 1000))
+                    // Rangos: entero 0..8 (0 = sin rango, 8 = Olímpico) o null.
+                    && (!('squatRank' in request.resource.data)
+                        || request.resource.data.squatRank == null
+                        || unchanged(request.resource.data, resource.data, 'squatRank')
+                        || (request.resource.data.squatRank is int
+                            && request.resource.data.squatRank >= 0
+                            && request.resource.data.squatRank <= 8))
+                    && (!('benchRank' in request.resource.data)
+                        || request.resource.data.benchRank == null
+                        || unchanged(request.resource.data, resource.data, 'benchRank')
+                        || (request.resource.data.benchRank is int
+                            && request.resource.data.benchRank >= 0
+                            && request.resource.data.benchRank <= 8))
+                    && (!('deadliftRank' in request.resource.data)
+                        || request.resource.data.deadliftRank == null
+                        || unchanged(request.resource.data, resource.data, 'deadliftRank')
+                        || (request.resource.data.deadliftRank is int
+                            && request.resource.data.deadliftRank >= 0
+                            && request.resource.data.deadliftRank <= 8));
 
       // Deletion denied — managed exclusively through WriteBatch from
       // server-side operations (backfill, account deletion Cloud Function).
@@ -2161,7 +2272,11 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == null
                     && request.resource.data.get('reviewCount', null) == null
-                    && request.resource.data.get('athleteCount', null) == null;
+                    && request.resource.data.get('athleteCount', null) == null
+                    // `hiddenFromDiscovery` lo fija sólo un admin (scripts/
+                    // set_trainer_discovery_visibility.js): un cliente no puede
+                    // crear su tarjeta ya oculta ni con un valor no booleano.
+                    && request.resource.data.get('hiddenFromDiscovery', false) == false;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -2183,7 +2298,11 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
                     && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
-                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
+                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null)
+                    // Flag de admin: el dueño no lo enciende ni lo apaga (si no,
+                    // un PF oculto se reaparece solo, o se oculta uno a sí mismo
+                    // con un valor que el modelo no espera).
+                    && request.resource.data.get('hiddenFromDiscovery', null) == resource.data.get('hiddenFromDiscovery', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
@@ -4345,8 +4464,21 @@ service cloud.firestore {
     // Per-athlete billing config set by the trainer (Pagos P1).
     // Doc id is deterministic: `${trainerId}_${athleteId}`.
     match /athlete_billing/{docId} {
+      // Si el doc NO existe, `resource == null` y `resource.data` revienta con
+      // PERMISSION_DENIED en vez de devolver un snapshot vacío (el PF veía
+      // "No pudimos cargar la config de cobro" en vez de "Sin configurar").
+      // El disyunto del doc inexistente está ACOTADO a las dos partes que el
+      // docId `${trainerId}_${athleteId}` encodea (mismo idiom que
+      // `athlete_notes`, QA-SEC-010): cualquier otro uid ve lo mismo exista o
+      // no el doc, así que no hay oráculo de existencia. Vale sólo para get:
+      // en una query `list` Firestore evalúa cada doc real, donde
+      // `resource != null`. uid de Firebase Auth sin guión bajo
+      // (docs/security.md §1.7).
       allow read: if request.auth != null
-                  && (request.auth.uid == resource.data.trainerId
+                  && ((resource == null
+                       && (docId.split('_')[0] == request.auth.uid
+                           || docId.split('_')[1] == request.auth.uid))
+                      || request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
       // rules-hardening Slice C (AD-1 option b) — Coach-Collection Create
       // Requires Trainer Role: closes the "any athlete-role user forges
@@ -4554,8 +4686,15 @@ service cloud.firestore {
     // preserva trainerId y athleteId. `meals` es un list — no validamos la
     // estructura en rules (validación se hace client-side).
     match /nutrition_plans/{docId} {
+      // Doc inexistente: `resource == null` → snapshot vacío (estado vacío del
+      // alumno) en vez de PERMISSION_DENIED. Acotado a las dos partes del
+      // docId, igual que `athlete_notes` / `athlete_billing` (sin oráculo de
+      // existencia para terceros). Es sólo para get; `list` no se amplía.
       allow read, list: if request.auth != null
-                  && (request.auth.uid == resource.data.trainerId
+                  && ((resource == null
+                       && (docId.split('_')[0] == request.auth.uid
+                           || docId.split('_')[1] == request.auth.uid))
+                      || request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid

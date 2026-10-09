@@ -47,7 +47,7 @@ class TemplatesPreferencesBar extends ConsumerWidget {
         l10n.routineCardDaysPerWeek(prefs.daysPerWeek!),
       if (prefs.minutesPerSession != null)
         l10n.routineCardMinutes('${prefs.minutesPerSession}'),
-      if (prefs.goal != null) templatesGoalLabel(l10n, prefs.goal!),
+      for (final g in prefs.goals) templatesGoalLabel(l10n, g),
       for (final g in prefs.priorityGroups) templatesZoneLabel(l10n, g),
     ];
 

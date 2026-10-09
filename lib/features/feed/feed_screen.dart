@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/analytics/analytics_service.dart';
 import '../../core/analytics/sub_tab_analytics.dart';
+import '../../core/telemetry/non_fatal.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
@@ -840,6 +843,26 @@ class _FeedAsyncBody<T> extends StatelessWidget {
   }
 }
 
+/// `_FeedAsyncBody` pinta el error pero no lo registra: el `(_, __)` lo
+/// descarta. Una query denegada por rules se veía igual que una caída de red y
+/// nadie se enteraba. Se reporta en la transición a error (no en cada build).
+void _reportFeedError(
+  WidgetRef ref,
+  ProviderListenable<AsyncValue<Object?>> provider,
+  String segmento,
+) {
+  ref.listen<AsyncValue<Object?>>(provider, (previous, next) {
+    if (!next.hasError || (previous?.hasError ?? false)) return;
+    unawaited(
+      reportNonFatal(
+        next.error!,
+        next.stackTrace ?? StackTrace.current,
+        reason: 'No se pudo cargar el feed ($segmento)',
+      ),
+    );
+  });
+}
+
 class _AmigosBody extends ConsumerWidget {
   const _AmigosBody({required this.showTitle});
 
@@ -854,6 +877,7 @@ class _AmigosBody extends ConsumerWidget {
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
 
+    _reportFeedError(ref, myFollowingFeedProvider, 'seguidores');
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(myFollowingFeedProvider),
@@ -931,6 +955,7 @@ class _MiGymBody extends ConsumerWidget {
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);
 
+    _reportFeedError(ref, myGymFeedProvider, 'mi gym');
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
       async: ref.watch(myGymFeedProvider),
@@ -1011,6 +1036,7 @@ class _PublicoBody extends ConsumerWidget {
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
     final blockedUids = ref.watch(myBlockedUidsProvider);
+    _reportFeedError(ref, feedPublicProvider, 'público');
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(feedPublicProvider),

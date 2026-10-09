@@ -1668,6 +1668,18 @@ class _ShellScaffoldState extends ConsumerState<_ShellScaffold> {
       return false;
     }
 
+    // El rebote del final NO es un gesto. En iOS (BouncingScrollPhysics) la
+    // lista pasa de largo el final y vuelve sola: ese regreso llega como
+    // scroll hacia ARRIBA y expandía la barra. Expandirla agranda el
+    // `padding.bottom` que el Scaffold publica, el final del scroll se corre
+    // 20 px en pleno rebote, y la última fila queda pegada al vidrio: se
+    // sentía trabado justo al llegar abajo. Mientras la posición está fuera
+    // de rango, la barra se queda como está.
+    if (metrics.pixels > metrics.maxScrollExtent) {
+      _dragAccumulator = 0;
+      return false;
+    }
+
     // Cambiar de dirección resetea: la intención nueva no arrastra el saldo
     // de la anterior.
     if (delta.isNegative != _dragAccumulator.isNegative) _dragAccumulator = 0;

@@ -303,7 +303,13 @@ explícito del atleta (rachas / volumen / main lifts). Vive en la 2da página
 swipeable del tab **Feed** (`/feed?tab=rankings`). `/workout?tab=rankings` y
 `/profile/rankings` son hosts anteriores y redirigen ahí — no los borres, hay
 bookmarks y notificaciones vivas apuntándoles. No lo confundas con
-"Gamificación" de la lista de arriba. → Detalle en [docs/product.md](./docs/product.md).
+"Gamificación" de la lista de arriba.
+
+Los **rangos de levantamiento** (Bronce … Olímpico, la insignia de las pestañas
+de sentadilla / banca / peso muerto) también están en scope: son parte de
+Rankings y NO son Levels / XP — se derivan del mayor peso levantado, escalado
+por peso corporal, y no acumulan puntos. Se llaman "rango", no "tier" (ya es el
+plan del PF) ni "nivel". → Detalle en [docs/product.md](./docs/product.md).
 
 ### 5. Tab bar (5 tabs, Inicio al medio)
 

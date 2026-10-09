@@ -30,50 +30,81 @@ class ChatListScreen extends ConsumerWidget {
     final chatsAsync = ref.watch(chatsForCurrentUserProvider);
     final currentUid = ref.watch(currentUidProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    // Lo normal es que haya algo debajo: el header del Feed empuja la bandeja,
+    // y una notificación de chat arma Feed → Mensajes → chat
+    // (`abrirChatConStack`). Ahí todo es un `pop` nativo — flecha, swipe de iOS
+    // y back de Android hacen lo mismo.
+    //
+    // Esto es la red para cuando la bandeja quedó SOLA (un `go` directo a
+    // `/feed/messages`, o el fallback de `ChatScreen`): no hay nada que popear,
+    // y el back de Android cerraría la app. Ahí volvemos al feed.
+    //
+    // El `PopScope` sólo bloquea en ESE caso (`canPop == false`), y ahí no le
+    // quita nada al swipe de iOS: el gesto no existe sin una ruta debajo. Con
+    // la bandeja empujada, `canPop` es true y el gesto queda intacto.
+    //
+    // `maybeOf` para no exigir un GoRouter en los tests que montan la pantalla
+    // suelta.
+    final router = GoRouter.maybeOf(context);
+    final canPop = router?.canPop() ?? Navigator.of(context).canPop();
+    void goBack() {
+      if (router != null && !canPop) {
+        router.go('/feed');
+      } else {
+        Navigator.of(context).maybePop();
+      }
+    }
+
+    return PopScope(
+      canPop: canPop || router == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) goBack();
+      },
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        title: Text(
-          l10n.chatListTitle,
-          style: GoogleFonts.barlowCondensed(
-            color: palette.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+            onPressed: goBack,
+          ),
+          title: Text(
+            l10n.chatListTitle,
+            style: GoogleFonts.barlowCondensed(
+              color: palette.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+            ),
           ),
         ),
-      ),
-      body: TreinoStateSwitcher(
-        childKey: ValueKey(
-          chatsAsync.when(
-            data: (_) => 'data',
-            loading: () => 'loading',
-            error: (_, __) => 'error',
+        body: TreinoStateSwitcher(
+          childKey: ValueKey(
+            chatsAsync.when(
+              data: (_) => 'data',
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+            ),
           ),
-        ),
-        child: chatsAsync.when(
-          loading: () =>
-              Center(child: CircularProgressIndicator(color: palette.accent)),
-          error: (_, __) => _ErrorState(
-            onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+          child: chatsAsync.when(
+            loading: () =>
+                Center(child: CircularProgressIndicator(color: palette.accent)),
+            error: (_, __) => _ErrorState(
+              onRetry: () => ref.invalidate(chatsForCurrentUserProvider),
+            ),
+            data: (chats) {
+              if (chats.isEmpty) return const _EmptyState();
+              return ListView.separated(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: chats.length,
+                separatorBuilder: (_, __) =>
+                    Divider(height: 1, color: palette.border, indent: 76),
+                itemBuilder: (_, i) =>
+                    _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
+              );
+            },
           ),
-          data: (chats) {
-            if (chats.isEmpty) return const _EmptyState();
-            return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: chats.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: palette.border, indent: 76),
-              itemBuilder: (_, i) =>
-                  _ChatRow(chat: chats[i], currentUid: currentUid ?? ''),
-            );
-          },
         ),
       ),
     );

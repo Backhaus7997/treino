@@ -61,6 +61,8 @@ Aunque el repo viejo (`gymrankiOS` / `gymrank` Android) los tenía, en TREINO Fl
 
 Si el usuario pide implementar alguno, **frená y confirmá** antes de hacerlo — viola scope acordado.
 
+**Excepción confirmada: rangos de levantamiento dentro de Rankings.** Las pestañas de sentadilla, banca y peso muerto de `/feed?tab=rankings` muestran una insignia de rango (Bronce · Plata · Oro · Platino · Diamante · Campeón · Titán · Olímpico) y una franja "Tu rango". Es parte de Rankings y NO es "Levels / XP": no hay puntos que se acumulen ni un nivel que se gane por usar la app. El rango se **deriva** del mayor peso levantado, escalado por el peso corporal del atleta (fórmula en `functions/src/ranking-ranks.ts`), y puede bajar si el peso sale de la ventana de 365 sesiones. Se llama "rango" y no "tier" ni "nivel" a propósito: `tier` ya es el plan del PF y "nivel" suena a XP. Confirmado por Martín el 2026-10-08.
+
 ## Tono y voz (microcopy)
 
 - **Vos-form rioplatense**: "entrená hoy", "empezá", "no rompas la racha".

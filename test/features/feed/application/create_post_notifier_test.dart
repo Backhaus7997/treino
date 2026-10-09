@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -321,6 +322,36 @@ void main() {
     test(
         'SCENARIO-231: submit with gym privacy and null gymId returns false with error',
         () async {
+      final notifier =
+          container.read(createPostNotifierProvider(null).notifier);
+      await container.read(createPostNotifierProvider(null).future);
+
+      notifier.setText('Buena sesión!');
+      notifier.setPrivacy(PostPrivacy.gym);
+      final result =
+          await notifier.submit(moderationMessage: 'bloqueado por moderación');
+
+      expect(result, isFalse);
+      verifyNever(() => mockRepo.create(any()));
+      expect(
+        container
+            .read(createPostNotifierProvider(null))
+            .valueOrNull
+            ?.errorMessage,
+        isNotNull,
+      );
+    });
+  });
+
+  group('CreatePostNotifier — "SIN GYM" no es un gym', () {
+    test('submit con privacidad gym y gymId kNoGymId se rechaza sin escribir',
+        () async {
+      final mockRepo = MockPostRepository();
+      final container = _makeContainer(
+        profileFactory: () => _makeProfile(gymId: kNoGymId),
+        mockRepo: mockRepo,
+      );
+      addTearDown(container.dispose);
       final notifier =
           container.read(createPostNotifierProvider(null).notifier);
       await container.read(createPostNotifierProvider(null).future);

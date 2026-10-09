@@ -45,7 +45,7 @@ void main() {
       const prefs = TemplatePreferences(
         daysPerWeek: 2,
         minutesPerSession: 30,
-        goal: RoutineGoal.sport,
+        goals: [RoutineGoal.sport],
         priorityMuscleGroups: ['back'],
       );
       // La combinación que el issue cita como "cero matches" en un filtro duro.
@@ -72,7 +72,8 @@ void main() {
 
   group('sin dato es NEUTRO, entre el match y el desajuste', () {
     // El orden de estos tres es la decisión de diseño central del scoring.
-    const wantsAesthetics = TemplatePreferences(goal: RoutineGoal.aesthetics);
+    const wantsAesthetics =
+        TemplatePreferences(goals: [RoutineGoal.aesthetics]);
 
     test('match > sin declarar > desajuste', () {
       final match = TemplateAffinity.score(
@@ -98,6 +99,61 @@ void main() {
       final sinMinutos = TemplateAffinity.score(_routine(), prefs);
       final conflicto = TemplateAffinity.score(_routine(minutes: 120), prefs);
       expect(sinMinutos, greaterThan(conflicto));
+    });
+  });
+
+  group('varios objetivos elegidos (2026-10-09)', () {
+    // Sólo objetivo respondido: días, minutos y zonas dan neutral (0.5), así
+    // que score = (1.5 + objetivo) / 4 y el orden lo decide el objetivo.
+    const saludYEstetica = TemplatePreferences(
+      goals: [RoutineGoal.health, RoutineGoal.aesthetics],
+    );
+
+    test('cubre los dos > cubre uno > sin declarar > ninguno', () {
+      final ambos = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.aesthetics, RoutineGoal.health]),
+        saludYEstetica,
+      );
+      final uno = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.health, RoutineGoal.sport]),
+        saludYEstetica,
+      );
+      final sinDeclarar = TemplateAffinity.score(_routine(), saludYEstetica);
+      final ninguno = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.sport]),
+        saludYEstetica,
+      );
+
+      expect(ambos, greaterThan(uno));
+      expect(uno, greaterThan(sinDeclarar),
+          reason: 'servir a uno de los dos objetivos le SIRVE: no puede '
+              'empatar con una plantilla que no dice nada');
+      expect(sinDeclarar, greaterThan(ninguno));
+    });
+
+    test('con un solo objetivo el puntaje es el de siempre: 1 o 0', () {
+      const soloSalud = TemplatePreferences(goals: [RoutineGoal.health]);
+      final match = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.health, RoutineGoal.sport]),
+        soloSalud,
+      );
+      final desajuste = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.sport]),
+        soloSalud,
+      );
+      expect(match, closeTo((1.5 + 1) / 4, 1e-9));
+      expect(desajuste, closeTo((1.5 + 0) / 4, 1e-9));
+    });
+
+    test('un objetivo repetido no infla ni diluye el puntaje', () {
+      const repetido = TemplatePreferences(
+        goals: [RoutineGoal.health, RoutineGoal.health],
+      );
+      expect(
+        TemplateAffinity.score(
+            _routine(goals: const [RoutineGoal.health]), repetido),
+        closeTo((1.5 + 1) / 4, 1e-9),
+      );
     });
   });
 
@@ -149,16 +205,41 @@ void main() {
         _routine(zones: const ['glutes']),
         prefs,
       );
-      expect(amplia, exacta,
+      final noCubre =
+          TemplateAffinity.score(_routine(zones: const ['chest']), prefs);
+      expect(amplia, greaterThan(TemplateAffinity.neutral),
           reason: 'castigar la amplitud hundiría a las Full Body, que son '
-              'justo las que más gente necesita');
+              'justo las que más gente necesita: cubrir la zona suma');
+      expect(amplia, greaterThan(noCubre));
+      expect(exacta, greaterThan(amplia),
+          reason: 'la que dedica más ejercicios a lo pedido va primero: sin '
+              'el énfasis, una PPL con una sentadilla empata con una de '
+              'glúteos');
     });
 
-    test('cuerpo completo cubre cualquier zona pedida', () {
-      expect(
-        TemplateAffinity.score(_routine(zones: const ['fullbody']), prefs),
-        TemplateAffinity.score(_routine(zones: const ['glutes']), prefs),
+    test('cuerpo completo cubre a medias: más que nada, menos que la zona', () {
+      final global =
+          TemplateAffinity.score(_routine(zones: const ['fullbody']), prefs);
+      final exacta =
+          TemplateAffinity.score(_routine(zones: const ['glutes']), prefs);
+      final noCubre =
+          TemplateAffinity.score(_routine(zones: const ['chest']), prefs);
+      expect(global, greaterThan(noCubre));
+      expect(global, lessThan(exacta));
+    });
+
+    test('un solo ejercicio global no convierte la plantilla en un match', () {
+      // El bug del catálogo de 50: un peso muerto etiquetado `fullbody` le
+      // daba 1 en zonas a cualquier plantilla, pidiera lo que pidiera el
+      // atleta. 40 de las 50 tienen al menos uno.
+      final conUnGlobal = TemplateAffinity.score(
+        _routine(zones: const ['chest', 'back', 'shoulders', 'fullbody']),
+        prefs,
       );
+      final exacta =
+          TemplateAffinity.score(_routine(zones: const ['glutes']), prefs);
+      expect(conUnGlobal, lessThan(exacta));
+      expect(conUnGlobal, lessThan(TemplateAffinity.neutral + 0.1));
     });
 
     test('no cubrirla puntúa peor que no tener zonas derivables', () {

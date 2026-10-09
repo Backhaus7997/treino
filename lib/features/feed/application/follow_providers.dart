@@ -33,9 +33,16 @@ final followEdgeProvider =
 /// Reemplaza a `acceptedFriendsProvider` con una diferencia semántica que hay
 /// que tener presente al migrar consumidores: el viejo devolvía a los dos lados
 /// de la relación; este devuelve SOLO a quienes el usuario sigue.
+///
+/// **Solo aristas confirmadas por el servidor** (ver
+/// `FollowRepository.watchConfirmedFollowingOf`). Sus consumidores arman
+/// queries de posts que las rules autorizan leyendo la arista; con el valor
+/// optimista, la query salía con un autor que el servidor todavía no veía como
+/// seguido y se denegaba entera. Nadie usa este provider para pintar el estado
+/// del botón SEGUIR (eso es `followEdgeProvider`), así que no pierde nada.
 final followingProvider =
     StreamProvider.family.autoDispose<List<String>, String>((ref, uid) {
-  return ref.watch(followRepositoryProvider).watchFollowingOf(uid);
+  return ref.watch(followRepositoryProvider).watchConfirmedFollowingOf(uid);
 });
 
 /// Solicitudes de follow que [uid] recibió y todavía no resolvió. Alimenta el

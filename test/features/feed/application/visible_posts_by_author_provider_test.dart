@@ -225,6 +225,31 @@ void main() {
       expect(posts, isEmpty);
     });
 
+    // "SIN GYM" no es un gimnasio: un viewer legacy con gymId 'no-gym' que mira
+    // a otro 'no-gym' no debe emitir la query del tier gym (las reglas la
+    // deniegan entera) ni ver sus posts `privacy: gym`; sí ve los públicos.
+    test('viewer "no-gym" no consulta el tier gym y ve sólo lo público',
+        () async {
+      final firestore = FakeFirebaseFirestore();
+      await _seedPost(firestore,
+          id: 'p-pub', authorUid: target, privacy: 'public');
+      await _seedPost(firestore,
+          id: 'p-gym',
+          authorUid: target,
+          privacy: 'gym',
+          authorGymId: 'no-gym');
+
+      final container = _makeContainer(
+        firestore: firestore,
+        viewerUid: viewer,
+        viewerProfile: const UserPublicProfile(uid: viewer, gymId: 'no-gym'),
+      );
+
+      final posts =
+          await container.read(visiblePostsByAuthorProvider(target).future);
+      expect(posts.map((p) => p.id), ['p-pub']);
+    });
+
     test('isSelf → viewer sees ALL their own posts regardless of privacy',
         () async {
       final firestore = FakeFirebaseFirestore();

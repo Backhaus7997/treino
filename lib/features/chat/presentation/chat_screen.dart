@@ -331,9 +331,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
-          // Opened from a push the deep-link uses context.go() (replaces the
-          // stack), so there's nothing to pop — fall back to the chat inbox
-          // instead of a dead button.
+          // Desde una notificación el chat llega con Feed → Mensajes debajo
+          // (`abrirChatConStack`), así que esto es un pop. El `go` queda de
+          // red por si el stack no se pudo armar y el chat quedó solo: mejor
+          // la bandeja que un botón muerto.
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/feed/messages'),
         ),

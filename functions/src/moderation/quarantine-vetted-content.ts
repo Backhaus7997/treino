@@ -44,11 +44,30 @@
  * Hay un test que lo fija.
  */
 
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 import { checkText, type ModerationVerdict } from "./vetted_terms_filter";
+
+/**
+ * El app de firebase-admin, inicializado si hace falta.
+ *
+ * `getFirestore()` SIN argumento busca el app por defecto y tira «The default
+ * Firebase app does not exist» si nadie lo inicializo. `index.ts` no llama a
+ * `initializeApp()`: cada modulo se lo asegura solo (mismo patron que
+ * `sync-shared-profile.ts` y el resto del repo). Este modulo no lo hacia, y en
+ * produccion fallaba en CADA invocacion desde el primer deploy. Los tests no
+ * lo veian porque inicializaban el app por defecto ellos mismos.
+ */
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
 
 /** Coleccion del registro. `allow read, write: if false` para todo cliente. */
 export const QUARANTINE_COLLECTION = "moderation_quarantine";
@@ -630,7 +649,7 @@ export const quarantinePost = onDocumentWritten(
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;
-    const db = getFirestore();
+    const db = getFirestore(ensureApp());
     const authorUid = after.get("authorUid") as string | undefined;
 
     await quarantineIfVetted({
@@ -681,7 +700,7 @@ export const quarantinePublicProfileName = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     await quarantineDisplayName(
-      getFirestore(),
+      getFirestore(ensureApp()),
       event.params.uid,
       after.get("displayName"),
     );
@@ -708,7 +727,7 @@ export const quarantineTrainerProfileName = onDocumentWritten(
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;
-    const db = getFirestore();
+    const db = getFirestore(ensureApp());
     await quarantineDisplayName(db, event.params.uid, after.get("displayName"));
 
     // `quarantineDisplayName` pudo haber escrito sobre ESTE MISMO documento:
@@ -819,7 +838,7 @@ export const quarantineGym = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     await quarantineGymName({
-      db: getFirestore(),
+      db: getFirestore(ensureApp()),
       path: after.ref.path,
       name: after.get("name"),
       nameNeeded: after.get("nameNeeded"),
@@ -834,7 +853,7 @@ export const quarantineChatMessage = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     await quarantineIfVetted({
-      db: getFirestore(),
+      db: getFirestore(ensureApp()),
       path: after.ref.path,
       field: "text",
       value: after.get("text"),
@@ -851,7 +870,7 @@ export const quarantineReview = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     await quarantineIfVetted({
-      db: getFirestore(),
+      db: getFirestore(ensureApp()),
       path: after.ref.path,
       field: "comment",
       value: after.get("comment"),
@@ -879,7 +898,7 @@ export const quarantineRoutine = onDocumentWritten(
     if (!after?.exists) return;
     const data = after.data() ?? {};
     await quarantineRoutineIfVetted({
-      db: getFirestore(),
+      db: getFirestore(ensureApp()),
       path: after.ref.path,
       data,
       authorUid:
@@ -896,7 +915,7 @@ export const quarantineDisplayNameOnWrite = onDocumentWritten(
     const after = event.data?.after;
     if (!after?.exists) return;
     await quarantineDisplayName(
-      getFirestore(),
+      getFirestore(ensureApp()),
       event.params.uid,
       after.get("displayName"),
     );
