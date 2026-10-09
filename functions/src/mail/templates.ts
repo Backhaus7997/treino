@@ -30,7 +30,12 @@ import {
   TIER_TEMPLATE_LIMITS,
   TIER_WEIGHT_LIMITS,
 } from "../subscriptions/tier-config";
-import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
+import {
+  ATHLETE_PRICES_ARS,
+  ATHLETE_PRO_MAX_OWN_ROUTINES,
+  ATHLETE_PRO_MAX_ROUTINE_DAYS,
+  ATHLETE_PRO_MAX_ROUTINE_WEEKS,
+} from "../subscriptions/athlete-plan-config";
 import { formatArs, formatShortDateAR } from "./format";
 
 // Mirrored from AppColorPrimitives — see header note.
@@ -508,6 +513,8 @@ function lineToText(line: Line): string {
 interface PlanCard {
   nombre: string;
   detalle: string;
+  /** Líneas extra bajo el detalle, una por beneficio. Solo las usa el mail del código. */
+  puntos?: string[];
   precio?: { monto: string; periodo: string };
   linea: Line;
 }
@@ -549,6 +556,9 @@ function planesToHtml(planes: Planes): string {
       `line-height:1.4;color:${MINT};">${esc(c.nombre)}</div>`,
       `<div style="padding-top:2px;font-size:16px;font-weight:700;line-height:1.35;color:${BONE};">`,
       `${esc(comoTitulo(c.detalle))}</div>`,
+      ...(c.puntos ?? []).map(
+        (p) => `<div style="padding-top:4px;font-size:14px;line-height:1.4;color:${MUTED};">${esc(p)}</div>`,
+      ),
       "</td>",
       precio,
       "</tr></table>",
@@ -665,33 +675,63 @@ function cardDePlanPf(tier: SubscriptionTier, detalle: string): PlanCard {
 }
 
 /**
- * Los planes del PF, una card por plan, con su cupo de alumnos.
+ * Los planes del PF en el mail del código: una card por plan, SIN precio, con
+ * lo que trae cada uno (cupo de alumnos, ejercicios propios y plantillas).
  *
- * Nombres, cupos y precios salen de `tier-config.ts`, en el orden de
- * `TIER_LABELS` (de Free a Plan 3). El anual va en una línea aparte y sin
- * montos: cuatro precios dobles en el mail que trae un código son ruido, y el
- * detalle está a un toque, en VER LOS PLANES.
+ * Todo sale de `tier-config.ts`, en el orden de `TIER_LABELS` (de Free a
+ * Plan 3). El precio no va: se ve en el checkout al que lleva VER LOS PLANES, y
+ * un monto escrito acá es un monto más que mantener de memoria.
  */
 function planesDelPf(): Block[] {
   const tiers = Object.keys(TIER_LABELS) as SubscriptionTier[];
   return [
-    new Planes(tiers.map((tier) => cardDePlanPf(tier, cupoLabel(TIER_WEIGHT_LIMITS[tier])))),
-    ["Cada plan también se puede pagar por año."],
+    new Planes(
+      tiers.map((tier): PlanCard => {
+        const nombre = TIER_LABELS[tier];
+        const detalle = cupoLabel(TIER_WEIGHT_LIMITS[tier]);
+        const ejercicios = TIER_CUSTOM_EXERCISE_LIMITS[tier];
+        const plantillas = TIER_TEMPLATE_LIMITS[tier];
+        const puntos = [
+          ejercicios === null ? "Ejercicios propios sin límite" : `Hasta ${ejerciciosLabel(ejercicios)}`,
+          plantillas === null ? "Plantillas sin límite" : `Hasta ${plantillasLabel(plantillas)}`,
+        ]; // i18n: email comercial
+        return {
+          nombre,
+          detalle,
+          puntos,
+          linea: [strong(nombre), ` · ${detalle} · ${puntos.map((p) => p.toLowerCase()).join(" · ")}`],
+        };
+      }),
+    ),
   ];
 }
 
 /**
- * Los planes del alumno: el gratis y TREINO Pro con su precio, de
- * `athlete-plan-config.ts`. Sin lista de beneficios: el detalle vive en el
- * checkout, y cada beneficio escrito acá es una promesa más que mantener a mano.
- * Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así que
- * «el que tenés hoy» no miente.
+ * Los planes del alumno en el mail del código: el gratis y TREINO Pro con lo
+ * que trae, SIN precio (se ve en el checkout). Los topes de Pro salen de
+ * `athlete-plan-config.ts`, que `athlete-pro-limites.test.ts` ata a los de la
+ * app. Sólo lo recibe quien hoy está en el gratis (ver `muestraPlanes`), así
+ * que «el que tenés hoy» no miente.
  */
 function planesDelAlumno(): Block[] {
+  const detalle = "Todo lo que ya usás, sin los topes del plan gratis";
+  const puntos = [
+    `Rutinas de hasta ${ATHLETE_PRO_MAX_ROUTINE_DAYS} días`,
+    `Hasta ${ATHLETE_PRO_MAX_ROUTINE_WEEKS} semanas, con periodización`,
+    "Todas las plantillas del catálogo, de principiante a avanzado",
+    "Personalizar cualquier plantilla del catálogo",
+    `Hasta ${ATHLETE_PRO_MAX_OWN_ROUTINES} rutinas propias`,
+    "Gráficos de 3 meses y 1 año",
+  ]; // i18n: email comercial
   return [
     new Planes([
       { nombre: "Gratis", detalle: "El que tenés hoy", linea: [strong("Gratis"), " · el que tenés hoy."] },
-      cardDeTreinoPro(),
+      {
+        nombre: "TREINO Pro",
+        detalle,
+        puntos,
+        linea: [strong("TREINO Pro"), ` · ${detalle.toLowerCase()}: ${puntos.map((p) => p.toLowerCase()).join("; ")}.`],
+      },
     ]),
   ];
 }

@@ -45,7 +45,7 @@ function cards(html: string): Card[] {
 describe("planes del PF en el mail del código", () => {
   const { html, text } = renderMail("email-code-trainer", { codigo: "048213", showPlans: "1" }, PIE);
 
-  it("una card por plan, de Free a Plan 3, con su cupo de alumnos", () => {
+  it("una card por plan, de Free a Plan 3, con su cupo de alumnos y SIN precio", () => {
     expect(cards(html).map((c) => [c.nombre, c.detalle])).toEqual([
       ["Free", "2 alumnos"],
       ["Plan 1", "7 alumnos"],
@@ -54,13 +54,18 @@ describe("planes del PF en el mail del código", () => {
     ]);
   });
 
-  it("los pagos llevan el precio por mes a la derecha; el Free no lleva precio", () => {
-    const [free, plan1, plan2, plan3] = cards(html);
-    expect(free.precio).toBeUndefined();
-    expect(plan1.precio).toMatch(/^\$\s?12\.000$/);
-    expect(plan2.precio).toMatch(/^\$\s?22\.000$/);
-    expect(plan3.precio).toMatch(/^\$\s?39\.000$/);
-    expect([plan1, plan2, plan3].map((c) => c.periodo)).toEqual(["por mes", "por mes", "por mes"]);
+  it("ninguna card lleva precio, ni en el HTML ni en el texto plano", () => {
+    expect(cards(html).every((c) => c.precio === undefined)).toBe(true);
+    expect(html).not.toMatch(/\$\s?\d/);
+    expect(text).not.toMatch(/\$\s?\d/);
+    expect(text).not.toMatch(/por mes|por año/);
+  });
+
+  it("cada card detalla ejercicios propios y plantillas", () => {
+    expect(html).toContain("Hasta 20 ejercicios propios");
+    expect(html).toContain("Hasta 3 plantillas");
+    expect(html).toContain("Ejercicios propios sin límite");
+    expect(html).toContain("Plantillas sin límite");
   });
 
   it("en el HTML los planes ya no son párrafos", () => {
@@ -68,11 +73,9 @@ describe("planes del PF en el mail del código", () => {
     expect(html).not.toMatch(/<p[^>]*><strong[^>]*>Free<\/strong>/);
   });
 
-  it("el texto plano sigue igual: una línea por plan, en minúscula dentro de la frase", () => {
-    expect(text).toContain("Free · 2 alumnos");
-    expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
-    expect(text).toMatch(/Plan 3 · alumnos sin límite · \$\s?39\.000 por mes/);
-    expect(text).toContain("Cada plan también se puede pagar por año.");
+  it("el texto plano: una línea por plan, en minúscula dentro de la frase", () => {
+    expect(text).toContain("Free · 2 alumnos · hasta 20 ejercicios propios · hasta 3 plantillas");
+    expect(text).toContain("Plan 3 · alumnos sin límite · ejercicios propios sin límite · plantillas sin límite");
   });
 
   it("el código sigue después de los planes", () => {
@@ -81,15 +84,19 @@ describe("planes del PF en el mail del código", () => {
 });
 
 describe("planes del alumno", () => {
-  it("el mail del código: el gratis y TREINO Pro, sin precio a la derecha", () => {
+  it("el mail del código: el gratis y TREINO Pro con sus beneficios, sin precio", () => {
     const { html } = renderMail("email-code-athlete", { codigo: "048213", showPlans: "1" }, PIE);
     const [gratis, pro] = cards(html);
 
     expect(cards(html)).toHaveLength(2);
     expect(gratis).toEqual({ nombre: "Gratis", detalle: "El que tenés hoy" });
     expect(pro.nombre).toBe("TREINO Pro");
-    expect(pro.detalle).toMatch(/^\$\s?3\.500 por mes o \$\s?35\.000 por año$/);
+    expect(pro.detalle).toBe("Todo lo que ya usás, sin los topes del plan gratis");
     expect(pro.precio).toBeUndefined();
+    expect(html).toContain("Rutinas de hasta 7 días");
+    expect(html).toContain("Hasta 16 semanas, con periodización");
+    expect(html).toContain("Hasta 10 rutinas propias");
+    expect(html).not.toMatch(/\$\s?\d/);
   });
 
   it("el mail del tope: una sola card, la de TREINO Pro", () => {
