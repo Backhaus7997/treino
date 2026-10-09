@@ -1034,7 +1034,7 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
 /// "15 kg" para enteros, "17.5 kg" para fraccionarios.
 String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
 
-/// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.png`.
+/// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.jpg`.
 ///
 /// Es síncrono a propósito: resolverlo con el AssetManifest sería async y el
 /// encabezado saltaría de alto al cargar. El test `routine_hero_photos_test`
@@ -1042,12 +1042,56 @@ String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
 /// acá (o al revés) rompe el CI.
 @visibleForTesting
 const Set<String> routineIdsWithHeroPhoto = {
+  'alta-intensidad-1-serie-avanzado',
+  'atletico-4dias-avanzado',
+  'basico-series-al-fallo-principiante',
   'bro-split-intermediate',
   'calistenia-beginner',
+  'calistenia-progresiones-principiante',
+  'casa-mancuernas-principiante',
+  'cinco-por-cinco-principiante',
+  'cinco-por-cinco-rampa-intermedio',
+  'complejo-pesas-rusas-intermedio',
+  'especializacion-sentadilla-avanzado',
+  'fuerza-3dias-avanzado',
+  'fuerza-alto-volumen-5dias-intermedio',
+  'fuerza-atletica-4dias-intermedio',
+  'fuerza-base-principiante',
+  'fuerza-corredores-intermedio',
+  'fuerza-hipertrofia-intermedio',
+  'full-body-2dias-avanzado',
+  'full-body-2dias-intermedio',
   'full-body-3day',
+  'full-body-express-2dias',
+  'gluteos-foco-intermedio',
+  'gluteos-piernas-principiante',
+  'halterofilia-inicial-intermedio',
+  'hipertrofia-5dias-avanzado',
+  'hipertrofia-intermedio',
+  'metodo-conjugado-avanzado',
+  'ondas-fuerza-3dias-principiante',
+  'ondas-fuerza-5x10-intermedio',
+  'ondas-fuerza-triunvirato-intermedio',
+  'pesa-rusa-funcional-intermedio',
+  'piramide-inversa-3dias-intermedio',
+  'potencia-hipertrofia-5dias-avanzado',
+  'potencia-hipertrofia-tp-intermedio',
   'powerlifting-base',
   'ppl-beginner',
+  'ppl-express-avanzado',
+  'ppl-lineal-6dias-intermedio',
+  'ppl-torso-pierna-5dias-intermedio',
+  'prevencion-lesiones-principiante',
+  'rendimiento-deportivo-intermedio',
+  'seis-basicos-principiante',
+  'split-clasico-6dias-avanzado',
+  'torso-pierna-clasico-intermedio',
+  'torso-pierna-express-intermedio',
+  'torso-pierna-principiante',
+  'tres-niveles-principiante',
   'upper-lower-intermediate',
+  'volumen-10x10-avanzado',
+  'volumen-recuperacion-intensidad-intermedio',
 };
 
 class _HeroStrip extends ConsumerWidget {
@@ -1065,7 +1109,7 @@ class _HeroStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    // Solo las plantillas del catálogo con foto (`assets/routines/{id}.png`)
+    // Solo las plantillas del catálogo con foto (`assets/routines/{id}.jpg`)
     // llevan hero. Las demás —planes del PF, rutinas propias y las plantillas
     // del catálogo sin foto— usan el encabezado compacto (badges + título, sin
     // imagen ni bloque degradado de 320px que el errorBuilder pintaba).
@@ -1107,10 +1151,10 @@ class _HeroStrip extends ConsumerWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Convention: assets/routines/{routine.id}.png. Missing asset →
+          // Convention: assets/routines/{routine.id}.jpg. Missing asset →
           // errorBuilder paints the gradient so the screen never breaks.
           Image.asset(
-            'assets/routines/${routine.id}.png',
+            'assets/routines/${routine.id}.jpg',
             key: const Key('routine-hero-photo'),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => gradient,
