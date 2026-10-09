@@ -12,6 +12,10 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/data/mail_verification_service.dart';
 import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
+import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/profile/domain/verified_email.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 /// Doble del notifier de auth: anota `cancelOnboarding` y puede fallar.
@@ -34,6 +38,25 @@ class _AuthFalso extends AuthNotifier {
 class _MockAuth extends Mock implements FirebaseAuth {}
 
 class _MockUser extends Mock implements User {}
+
+class _MockMetadata extends Mock implements UserMetadata {}
+
+/// Perfil de un alta: alumno, sin ningún mail confirmado.
+UserProfile _perfil({
+  UserRole role = UserRole.athlete,
+  Map<String, VerifiedEmail> emailVerification = const {},
+}) {
+  final creado = DateTime.utc(2026, 10, 1);
+  return UserProfile(
+    uid: 'u1',
+    email: 'ana@test.com',
+    displayName: 'Ana',
+    role: role,
+    createdAt: creado,
+    updatedAt: creado,
+    emailVerification: emailVerification,
+  );
+}
 
 class _MockFunctions extends Mock implements FirebaseFunctions {}
 
@@ -106,17 +129,28 @@ Future<void> _montar(
   _Navegacion? navegacion,
   _Reloj? reloj,
   _AuthFalso? authFalso,
+  Stream<UserProfile?>? perfil,
+  Duration? antiguedad = const Duration(hours: 1),
 }) async {
   final auth = _MockAuth();
   final user = _MockUser();
+  final metadata = _MockMetadata();
   when(() => user.uid).thenReturn('u1');
   when(() => user.email).thenReturn('ana@test.com');
+  // Por defecto, un alta de hace una hora: la cuenta a la que se le ofrece
+  // «Me equivoqué de mail». `antiguedad: null` = Auth no sabe cuándo se creó.
+  when(() => metadata.creationTime).thenReturn(
+    antiguedad == null ? null : DateTime.now().subtract(antiguedad),
+  );
+  when(() => user.metadata).thenReturn(metadata);
   when(() => auth.currentUser).thenReturn(user);
 
   final container = ProviderContainer(
     overrides: [
       firebaseAuthProvider.overrideWithValue(auth),
       mailVerificationServiceProvider.overrideWithValue(servicio),
+      userProfileProvider
+          .overrideWith((_) => perfil ?? Stream.value(_perfil())),
       if (authFalso != null) authNotifierProvider.overrideWith(() => authFalso),
     ],
   );
@@ -632,6 +666,105 @@ void main() {
           .tap(find.byKey(const Key('verify_mail_wrong_email_confirm')));
       await tester.pumpAndSettle();
       expect(auth.cancelaciones, 2);
+      await _desmontar(tester);
+    });
+  });
+  // A esta pantalla no llegan solo las altas: el router también manda a
+  // cuentas con historia (promoción a entrenador, cambio de mail en Auth, y
+  // TODAS las viejas sin verificar el día que se prende `app_config/email_gate`).
+  // «Me equivoqué de mail» borra sin reautenticar, así que a esas no se les
+  // muestra. Les queda «Cerrar sesión».
+  group('«Me equivoqué de mail» solo en un alta recién creada', () {
+    Future<void> sinElBoton(WidgetTester tester) async {
+      expect(find.byKey(const Key('verify_mail_wrong_email')), findsNothing);
+      expect(find.byKey(const Key('verify_mail_sign_out')), findsOneWidget);
+      await _desmontar(tester);
+    }
+
+    testWidgets('alta de hace una hora, alumno sin mail confirmado: está',
+        (tester) async {
+      await _montar(tester, _Servicio());
+
+      expect(find.byKey(const Key('verify_mail_wrong_email')), findsOneWidget);
+      await _desmontar(tester);
+    });
+
+    testWidgets('cuenta creada hace más de 24 h (interruptor recién prendido)',
+        (tester) async {
+      await _montar(tester, _Servicio(),
+          antiguedad: const Duration(hours: 24, minutes: 1));
+      await sinElBoton(tester);
+    });
+
+    testWidgets('cuenta de hace meses', (tester) async {
+      await _montar(tester, _Servicio(), antiguedad: const Duration(days: 200));
+      await sinElBoton(tester);
+    });
+
+    testWidgets('entrenador (promovido), aunque la cuenta sea nueva',
+        (tester) async {
+      await _montar(tester, _Servicio(),
+          perfil: Stream.value(_perfil(role: UserRole.trainer)));
+      await sinElBoton(tester);
+    });
+
+    testWidgets('promovido con la entrada de alumno ya confirmada',
+        (tester) async {
+      await _montar(
+        tester,
+        _Servicio(),
+        perfil: Stream.value(_perfil(
+          role: UserRole.trainer,
+          emailVerification: const {
+            'athlete': VerifiedEmail(email: 'ana@test.com'),
+          },
+        )),
+      );
+      await sinElBoton(tester);
+    });
+
+    testWidgets('mail cambiado en Auth: ya había confirmado otro',
+        (tester) async {
+      await _montar(
+        tester,
+        _Servicio(),
+        perfil: Stream.value(_perfil(
+          emailVerification: const {
+            'athlete': VerifiedEmail(email: 'viejo@test.com'),
+          },
+        )),
+      );
+      await sinElBoton(tester);
+    });
+
+    testWidgets('perfil cargando: falla cerrado', (tester) async {
+      final perfil = StreamController<UserProfile?>();
+      addTearDown(perfil.close);
+      await _montar(tester, _Servicio(), perfil: perfil.stream);
+      await sinElBoton(tester);
+    });
+
+    testWidgets('sin perfil (null): falla cerrado', (tester) async {
+      await _montar(tester, _Servicio(), perfil: Stream.value(null));
+      await sinElBoton(tester);
+    });
+
+    testWidgets('Auth no sabe cuándo se creó: falla cerrado', (tester) async {
+      await _montar(tester, _Servicio(), antiguedad: null);
+      await sinElBoton(tester);
+    });
+
+    testWidgets('el perfil llega después: recién ahí aparece', (tester) async {
+      final perfil = StreamController<UserProfile?>();
+      addTearDown(perfil.close);
+      await _montar(tester, _Servicio(), perfil: perfil.stream);
+      expect(find.byKey(const Key('verify_mail_wrong_email')), findsNothing);
+
+      perfil.add(_perfil());
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('verify_mail_wrong_email')), findsOneWidget);
       await _desmontar(tester);
     });
   });

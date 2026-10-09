@@ -10,8 +10,10 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../profile/application/user_providers.dart';
 import '../application/auth_providers.dart';
 import '../data/mail_verification_service.dart';
+import '../domain/alta_reciente.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
 
@@ -348,6 +350,19 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
     final puedeReenviar =
         _reenviarEn == 0 && !_enviando && !_verificado && !_borrando;
     final enEsperaPorTope = _limitado && _reenviarEn > 0;
+    // «Me equivoqué de mail» borra la cuenta entera sin reautenticar: solo para
+    // un alta recién creada. A esta pantalla también llegan cuentas con
+    // historia (promoción a entrenador, cambio de mail, el interruptor del gate
+    // prendido para cuentas viejas); a esas se les esconde, y falla CERRADO
+    // mientras el perfil carga. Ver `esAltaRecienCreada`.
+    final altaReciente = esAltaRecienCreada(
+      profile: ref.watch(userProfileProvider).valueOrNull,
+      creadaEn:
+          ref.watch(firebaseAuthProvider).currentUser?.metadata.creationTime,
+      // `DateTime.now` y no `_ahora()`: el reloj inyectado es el de la cuenta
+      // regresiva, y los tests cuentan cuántas veces lo lee la pantalla.
+      ahora: DateTime.now(),
+    );
     // Desde 90 min en horas (hacia arriba): «en 1440 min» no se lee.
     final cuanto = _reenviarEn >= _segundosParaHoras
         ? '${(_reenviarEn / 3600).ceil()} h'
@@ -453,22 +468,24 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
                     label: const Text('Cerrar sesión'), // i18n
                   ),
                 ),
-                Center(
-                  child: TextButton(
-                    key: const Key('verify_mail_wrong_email'),
-                    onPressed: signingOut ? null : _equivocoDeMail,
-                    style: TextButton.styleFrom(
-                      foregroundColor: palette.textMuted,
+                if (altaReciente || _borrando)
+                  Center(
+                    child: TextButton(
+                      key: const Key('verify_mail_wrong_email'),
+                      onPressed: signingOut ? null : _equivocoDeMail,
+                      style: TextButton.styleFrom(
+                        foregroundColor: palette.textMuted,
+                      ),
+                      child: _borrando
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              AppL10n.of(context).verifyMailWrongEmailAction),
                     ),
-                    child: _borrando
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(AppL10n.of(context).verifyMailWrongEmailAction),
                   ),
-                ),
               ],
             ),
           ),
