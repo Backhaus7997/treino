@@ -260,4 +260,70 @@ void main() {
       expect(await repo.listVirtualOnly(), isEmpty);
     });
   });
+
+  // ─── hiddenFromDiscovery ──────────────────────────────────────────────────
+  //
+  // Cuentas internas / de QA / de revisores de las tiendas: fuera de TODO
+  // listado del alumno, pero accesibles por uid. Se siembra con mapas crudos
+  // (no con `toJson`) para controlar si el campo está AUSENTE, que es el caso
+  // de casi todos los docs reales.
+
+  group('TrainerPublicProfileRepository.hiddenFromDiscovery', () {
+    Future<void> seedRaw(String uid, Map<String, Object?> extra) =>
+        firestore.collection('trainerPublicProfiles').doc(uid).set({
+          'uid': uid,
+          'displayName': uid,
+          'displayNameLowercase': uid,
+          'trainerGeohash': 's621h',
+          'trainerGeohashes': ['s621h'],
+          'trainerOffersOnline': true,
+          ...extra,
+        });
+
+    setUp(() async {
+      await seedRaw('oculto', {'hiddenFromDiscovery': true});
+      await seedRaw('explicito-visible', {'hiddenFromDiscovery': false});
+      await seedRaw('sin-campo', {});
+    });
+
+    const visibles = ['explicito-visible', 'sin-campo'];
+
+    test('listByGeohashPrefix descarta al oculto', () async {
+      final r = await repo.listByGeohashPrefix('s621h');
+      expect(r.map((t) => t.uid), unorderedEquals(visibles));
+    });
+
+    test('listByGeohashes descarta al oculto', () async {
+      final r = await repo.listByGeohashes(['s621h']);
+      expect(r.map((t) => t.uid), unorderedEquals(visibles));
+    });
+
+    test('listVirtualOnly descarta al oculto', () async {
+      final r = await repo.listVirtualOnly();
+      expect(r.map((t) => t.uid), unorderedEquals(visibles));
+    });
+
+    test('listAll descarta al oculto', () async {
+      final r = await repo.listAll();
+      expect(r.map((t) => t.uid), unorderedEquals(visibles));
+    });
+
+    test('el perfil sin el campo se parsea como visible', () async {
+      final t = await repo.getById('sin-campo');
+      expect(t!.hiddenFromDiscovery, isFalse);
+    });
+
+    test('un valor no booleano se parsea como visible y no tira el listado',
+        () async {
+      await seedRaw('roto', {'hiddenFromDiscovery': 'si'});
+      final r = await repo.listByGeohashPrefix('s621h');
+      expect(r.map((t) => t.uid), unorderedEquals([...visibles, 'roto']));
+    });
+
+    test('getById sigue devolviendo al oculto', () async {
+      final t = await repo.getById('oculto');
+      expect(t, isNotNull);
+      expect(t!.hiddenFromDiscovery, isTrue);
+    });
+  });
 }

@@ -2209,7 +2209,11 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == null
                     && request.resource.data.get('reviewCount', null) == null
-                    && request.resource.data.get('athleteCount', null) == null;
+                    && request.resource.data.get('athleteCount', null) == null
+                    // `hiddenFromDiscovery` lo fija sólo un admin (scripts/
+                    // set_trainer_discovery_visibility.js): un cliente no puede
+                    // crear su tarjeta ya oculta ni con un valor no booleano.
+                    && request.resource.data.get('hiddenFromDiscovery', false) == false;
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -2231,7 +2235,11 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
                     && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
-                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
+                    && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null)
+                    // Flag de admin: el dueño no lo enciende ni lo apaga (si no,
+                    // un PF oculto se reaparece solo, o se oculta uno a sí mismo
+                    // con un valor que el modelo no espera).
+                    && request.resource.data.get('hiddenFromDiscovery', null) == resource.data.get('hiddenFromDiscovery', null);
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
