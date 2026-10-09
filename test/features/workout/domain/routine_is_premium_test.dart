@@ -81,58 +81,88 @@ void main() {
       }
     });
 
-    test('quedan exactamente 3 gratis — el free tiene con qué entrenar', () {
+    test('quedan exactamente 15 gratis — el free tiene con qué entrenar', () {
       // Si esto baja a 0, el plan gratis se queda sin ningún programa que
       // seguir y el catálogo deja de ser una razón para instalar la app.
+      //
+      // Eran 3 hasta que el catálogo pasó de 7 a 50 (octubre de 2026): las
+      // 15 de principiante son gratis, el mismo corte por nivel de siempre.
       final gratis = templates
           .cast<Map<String, dynamic>>()
           .where((t) => t['isPremium'] == false)
           .toList();
-      expect(gratis, hasLength(3));
+      expect(gratis, hasLength(15));
       expect(
         gratis.map((t) => t['id']),
         containsAll(['ppl-beginner', 'full-body-3day', 'calistenia-beginner']),
       );
     });
 
-    test('NINGUNA plantilla paga entra en la forma del plan gratis', () {
-      // ─── El candado que el servidor no puede poner ───────────────────────
+    test(
+        'las pagas que entran en la forma free son un conjunto ACEPTADO y '
+        'cerrado', () {
+      // ─── Decisión de producto, 2026-10-09: el dueño ACEPTÓ este hueco ────
       //
       // `isPremium` frena ENTRENAR la plantilla (el CREATE de `sessions` lo
-      // mira). No frena COPIARLA: el CREATE de `/routines` no mira ese campo
-      // ni una vez, y no puede — el payload de una rutina copiada es idéntico
-      // al de una escrita a mano. El servidor no tiene con qué distinguirlos.
+      // mira). Antes del #1155 la única traba contra COPIARLA era la FORMA:
+      // si una plantilla paga entraba en `withinFreeRoutineShape` (hasta 3
+      // días y 1 semana), un alumno free la copiaba y el servidor la aceptaba.
+      // Este test exigía que NINGUNA pagada entrara, y por eso estuvo en rojo
+      // cuando el catálogo pasó de 7 a 50: 13 pagas tienen <=3 días y 1 semana.
       //
-      // Lo único que queda en pie es la FORMA. Si una plantilla paga entra en
-      // `withinFreeRoutineShape` —hasta 3 días y 1 semana—, un alumno free la
-      // copia, el servidor la acepta, y desde ahí la entrena para siempre sin
-      // pasar por ningún gate: la copia es `user-created` y el cliente nunca
-      // escribe `isPremium`.
+      // Desde el #1155 el candado REAL es otro: el CREATE de `/routines`
+      // rechaza las copias selladas con `copiedFrom` apuntando a una
+      // plantilla del sistema cuando el paywall está activo
+      // (`copiadaDelCatalogo()` en firestore.rules y su cláusula en el create).
+      // Copiar vía la app ("Usar como base") queda bloqueado en el servidor
+      // para CUALQUIER plantilla paga, entre en la forma free o no. Ese sello
+      // lo prueba `routine_editor_paywall_test.dart` ("EL SELLO: la copia
+      // guardada lleva `copiedFrom` con la fuente"); si el editor deja de
+      // estamparlo, esa suite se pone roja.
       //
-      // El 2026-09-14 `hipertrofia-intermedio` entraba EXACTO: 3 días, sin
-      // `numWeeks`. Se la llevó a 6 (PPL dos veces por semana), que además
-      // resolvió que fuera casi un clon de `ppl-beginner` —3 días, PPL, 58
-      // series contra 60— o sea que se cobraba por un 3% más de volumen.
+      // Lo que queda abierto es tipear a mano una rutina de <=3 días en el
+      // editor, y ninguna regla puede frenarlo (el propio comentario de las
+      // reglas lo dice). El dueño lo aceptó.
       //
-      // Este test es lo que evita que vuelva sola. No es un detalle de
-      // implementación: es el único lugar del repo donde el candado del
-      // catálogo es verificable.
+      // Qué guarda este test: el conjunto aceptado es EXPLÍCITO. Una plantilla
+      // paga NUEVA que entre en la forma free rompe acá y obliga a decidirlo
+      // a conciencia (agregarla a la lista, o darle más días/semanas).
+      const aceptadas = {
+        'alta-intensidad-1-serie-avanzado',
+        'cinco-por-cinco-rampa-intermedio',
+        'complejo-pesas-rusas-intermedio',
+        'fuerza-3dias-avanzado',
+        'fuerza-corredores-intermedio',
+        'full-body-2dias-avanzado',
+        'full-body-2dias-intermedio',
+        'halterofilia-inicial-intermedio',
+        'pesa-rusa-funcional-intermedio',
+        'piramide-inversa-3dias-intermedio',
+        'rendimiento-deportivo-intermedio',
+        'volumen-10x10-avanzado',
+        'volumen-recuperacion-intensidad-intermedio',
+      };
       const maxDiasFree = 3; // kFreeMaxRoutineDays
       const maxSemanasFree = 1; // kFreeMaxRoutineWeeks
 
+      final entranEnLaFormaFree = <String>{};
       for (final t in templates.cast<Map<String, dynamic>>()) {
         if (t['isPremium'] != true) continue;
         final dias = (t['days'] as List<dynamic>).length;
         final semanas = (t['numWeeks'] as int?) ?? 1;
-        expect(
-          dias > maxDiasFree || semanas > maxSemanasFree,
-          isTrue,
-          reason:
-              '${t['id']} tiene $dias día(s) y $semanas semana(s): entra en la '
-              'forma free, así que un alumno gateado puede copiarla y el '
-              'servidor no tiene con qué rebotarla.',
-        );
+        if (dias <= maxDiasFree && semanas <= maxSemanasFree) {
+          entranEnLaFormaFree.add(t['id'] as String);
+        }
       }
+
+      expect(
+        entranEnLaFormaFree,
+        aceptadas,
+        reason: 'El conjunto de pagas que caben en el plan gratis cambió. '
+            'Ya no es una traba (la traba es el sello `copiedFrom`, #1155), '
+            'pero sumar una nueva es una decisión: agregala a `aceptadas` o '
+            'dale más de $maxDiasFree días / $maxSemanasFree semana.',
+      );
     });
   });
 }
