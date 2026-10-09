@@ -31,7 +31,7 @@ function cards(html: string): Card[] {
     .split("background:#1D2321")
     .slice(1)
     .map((trozo) => {
-      const nombre = /color:#(?:2CE5A2|FFFFFF);">([^<]+)<\/div>/.exec(trozo);
+      const nombre = /color:#(?:2CE5A2|FFFFFF|D457EC);">([^<]+)<\/div>/.exec(trozo);
       const detalle = /(?:padding-top:2px;|padding-top:8px;font-size:28px;)[^"]*">([^<]+)<\/div>/.exec(trozo);
       const precio = /<td align="right"[^>]*><div[^>]*>([^<]+)<\/div><div[^>]*>([^<]+)<\/div>/.exec(trozo);
       return {
@@ -85,6 +85,40 @@ describe("planes del PF en el mail del código", () => {
 
   it("el código sigue después de los planes", () => {
     expect(html.indexOf("048213")).toBeGreaterThan(html.lastIndexOf("background:#1D2321"));
+  });
+});
+
+describe("colores del mail del código", () => {
+  it("el titular queda blanco, con y sin planes", () => {
+    const con = renderMail("email-code-athlete", { codigo: "048213", showPlans: "1" }, PIE).html;
+    const sin = renderMail("email-code-athlete", { codigo: "048213", showPlans: "0" }, PIE).html;
+    expect(con).toMatch(/<h1[^>]*color:#FFFFFF;/);
+    expect(sin).toMatch(/<h1[^>]*color:#FFFFFF;/);
+  });
+
+  it("alumno: el nombre del plan va en morado y el título grande en verde, igual que el PF", () => {
+    const { html } = renderMail("email-code-athlete", { codigo: "048213", showPlans: "1" }, PIE);
+    expect(html).toMatch(/color:#D457EC;">Gratis<\/div>/);
+    expect(html).toMatch(/color:#D457EC;">TREINO Pro<\/div>/);
+    expect(html).toMatch(/color:#2CE5A2;">El que tenés hoy<\/div>/);
+    expect(html).toMatch(/color:#2CE5A2;">Sin los topes del plan gratis<\/div>/);
+    expect(html).not.toMatch(/color:#D457EC;">(El que|Sin los)/);
+  });
+
+  it("entrenador: el nombre del plan va en morado y el héroe en verde", () => {
+    const { html } = renderMail("email-code-trainer", { codigo: "048213", showPlans: "1" }, PIE);
+    for (const plan of ["Free", "Plan 1", "Plan 2", "Plan 3"]) {
+      expect(html).toContain(`color:#D457EC;">${plan}</div>`);
+    }
+    expect(html).toMatch(/color:#2CE5A2;">Hasta 15 alumnos<\/div>/);
+    expect(html).toMatch(/color:#2CE5A2;">Gratis<\/div>/);
+    expect(html).not.toMatch(/color:#D457EC;">Hasta/);
+  });
+
+  it("entrenador: cada fila de las cards lleva su ✓", () => {
+    const { html } = renderMail("email-code-trainer", { codigo: "048213", showPlans: "1" }, PIE);
+    const filas = html.match(/&#10003;<\/span>&nbsp; (Ejercicios propios|Plantillas): /g) ?? [];
+    expect(filas).toHaveLength(8); // 4 planes × 2 filas
   });
 });
 
