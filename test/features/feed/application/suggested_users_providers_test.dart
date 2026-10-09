@@ -10,6 +10,8 @@ import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/core/utils/geohash.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show Gym, kNoGymId;
+import 'package:treino/features/moderation/application/moderation_providers.dart'
+    show myBlockedUidsProvider;
 import 'package:treino/features/gyms/domain/gym_source.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -28,11 +30,13 @@ void main() {
   ProviderContainer buildContainer({
     String? uid = 'me',
     FollowRepository? followRepository,
+    List<String> blocked = const [],
   }) {
     final container = ProviderContainer(
       overrides: [
         firestoreProvider.overrideWithValue(firestore),
         currentUidProvider.overrideWithValue(uid),
+        myBlockedUidsProvider.overrideWithValue(blocked),
         if (followRepository != null)
           followRepositoryProvider.overrideWithValue(
             followRepository,
@@ -77,6 +81,38 @@ void main() {
           ).toJson(),
         );
   }
+
+  test('no sugiere perfiles sin nombre (null, vacío o en blanco)', () async {
+    for (final uid in ['nulo', 'vacio', 'blanco']) {
+      await firestore.collection('userPublicProfiles').doc(uid).set(
+            UserPublicProfile(
+              uid: uid,
+              displayName: switch (uid) {
+                'vacio' => '',
+                'blanco' => '   ',
+                _ => null,
+              },
+              gymId: 'gym-a',
+            ).toJson(),
+          );
+    }
+    await seedProfile(uid: 'con-nombre');
+
+    final result =
+        await buildContainer().read(suggestedUsersProvider('gym-a').future);
+
+    expect(result.map((profile) => profile.uid), ['con-nombre']);
+  });
+
+  test('no sugiere a quienes bloqueé', () async {
+    await seedProfile(uid: 'bloqueado');
+    await seedProfile(uid: 'available');
+
+    final result = await buildContainer(blocked: ['bloqueado'])
+        .read(suggestedUsersProvider('gym-a').future);
+
+    expect(result.map((profile) => profile.uid), ['available']);
+  });
 
   test('excludes the current user from same-gym suggestions', () async {
     await seedProfile(uid: 'me');
