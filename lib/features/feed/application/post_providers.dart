@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../data/post_repository.dart';
@@ -170,8 +171,10 @@ final visiblePostsByAuthorProvider =
     // current gym.
     final viewerGymId =
         (await ref.watch(userPublicProfileProvider(viewerUid).future))?.gymId;
-    if (viewerGymId != null) {
-      visible.addAll(await repo.byAuthorGymTier(targetUid, viewerGymId));
+    // "SIN GYM" (kNoGymId) no es un gimnasio: con ese sentinel la query
+    // coincidiría con otro usuario sin gym y las reglas la deniegan entera.
+    if (hasRealGym(viewerGymId)) {
+      visible.addAll(await repo.byAuthorGymTier(targetUid, viewerGymId!));
     }
 
     visible.sort((a, b) => b.createdAt.compareTo(a.createdAt));

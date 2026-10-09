@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/domain/gym.dart' show hasRealGym;
 import '../../../gyms/domain/gym_display_name.dart';
 import '../../domain/public_profile_view.dart';
 import 'post_avatar.dart';
@@ -24,7 +25,8 @@ class PublicProfileHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final gymId = view.authorGymId;
-    final gymAsync = gymId == null ? null : ref.watch(gymByIdProvider(gymId));
+    final gymAsync =
+        !hasRealGym(gymId) ? null : ref.watch(gymByIdProvider(gymId!));
     final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
 
     // The parent screen extends its body behind the transparent AppBar so
