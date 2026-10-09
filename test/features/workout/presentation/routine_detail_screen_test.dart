@@ -215,27 +215,48 @@ void main() {
       },
     );
 
-    testWidgets('SCENARIO-079: hero strip attempts Image.asset by routine id', (
-      tester,
-    ) async {
+    testWidgets(
+        'SCENARIO-079: plantilla del catálogo CON foto pinta el hero con su Image.asset',
+        (tester) async {
       await tester.pumpWidget(
-        _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
-          routineByIdStreamProvider(
-            'test-id',
-          ).overrideWith((ref) => Stream.value(_makeRoutine(id: 'test-id'))),
+        _wrapWithOverrides(
+            const RoutineDetailScreen(routineId: 'ppl-beginner'), [
+          routineByIdStreamProvider('ppl-beginner').overrideWith(
+              (ref) => Stream.value(_makeRoutine(id: 'ppl-beginner'))),
         ]),
       );
       await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const Key('routine-hero')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const Key('routine-hero'))).height, 320);
+      expect(find.byKey(const Key('routine-compact-header')), findsNothing);
       final image = tester.widget<Image>(
-        find.byWidgetPredicate(
-          (w) =>
-              w is Image &&
-              w.image is AssetImage &&
-              (w.image as AssetImage).assetName ==
-                  'assets/routines/test-id.png',
-        ),
+        find.byKey(const Key('routine-hero-photo')),
       );
-      expect(image.errorBuilder, isNotNull);
+      expect((image.image as AssetImage).assetName,
+          'assets/routines/ppl-beginner.png');
+    });
+
+    testWidgets(
+        'SCENARIO-079b: plantilla del catálogo SIN foto usa el encabezado compacto, sin bloque de 320',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithOverrides(const RoutineDetailScreen(routineId: 'test-id'), [
+          routineByIdStreamProvider('test-id').overrideWith(
+              (ref) => Stream.value(_makeRoutine(id: 'sin-foto-xyz'))),
+        ]),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byKey(const Key('routine-hero')), findsNothing);
+      expect(find.byKey(const Key('routine-hero-photo')), findsNothing);
+      expect(find.byType(Image), findsNothing);
+      final header = find.byKey(const Key('routine-compact-header'));
+      expect(header, findsOneWidget);
+      expect(tester.getSize(header).height, lessThan(200));
+      // El título sigue visible dentro del encabezado.
+      expect(
+        find.descendant(of: header, matching: find.text('PUSH')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('SCENARIO-080: badge shows "PPL · DÍA 1"', (tester) async {

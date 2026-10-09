@@ -1034,6 +1034,22 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
 /// "15 kg" para enteros, "17.5 kg" para fraccionarios.
 String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
 
+/// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.png`.
+///
+/// Es síncrono a propósito: resolverlo con el AssetManifest sería async y el
+/// encabezado saltaría de alto al cargar. El test `routine_hero_photos_test`
+/// compara este set contra el directorio, así que sumar una foto sin sumarla
+/// acá (o al revés) rompe el CI.
+@visibleForTesting
+const Set<String> routineIdsWithHeroPhoto = {
+  'bro-split-intermediate',
+  'calistenia-beginner',
+  'full-body-3day',
+  'powerlifting-base',
+  'ppl-beginner',
+  'upper-lower-intermediate',
+};
+
 class _HeroStrip extends ConsumerWidget {
   const _HeroStrip({
     required this.routine,
@@ -1049,14 +1065,15 @@ class _HeroStrip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    // Only the public seeded catalogue ships a photo asset
-    // (`assets/routines/{id}.png`). Trainer-defined plans AND athlete-created
-    // routines have none — render a compact header (badges + title, no image
-    // / 320px gradient / scrims) instead of the green gradient block the
-    // missing-asset errorBuilder used to paint (device feedback 2026-06-11).
-    final hasHeroPhoto = routine.source == RoutineSource.system;
+    // Solo las plantillas del catálogo con foto (`assets/routines/{id}.png`)
+    // llevan hero. Las demás —planes del PF, rutinas propias y las plantillas
+    // del catálogo sin foto— usan el encabezado compacto (badges + título, sin
+    // imagen ni bloque degradado de 320px que el errorBuilder pintaba).
+    final hasHeroPhoto = routine.source == RoutineSource.system &&
+        routineIdsWithHeroPhoto.contains(routine.id);
     if (!hasHeroPhoto) {
       return Padding(
+        key: const Key('routine-compact-header'),
         padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,6 +1101,7 @@ class _HeroStrip extends ConsumerWidget {
     );
 
     return SizedBox(
+      key: const Key('routine-hero'),
       height: 320,
       width: double.infinity,
       child: Stack(
@@ -1093,6 +1111,7 @@ class _HeroStrip extends ConsumerWidget {
           // errorBuilder paints the gradient so the screen never breaks.
           Image.asset(
             'assets/routines/${routine.id}.png',
+            key: const Key('routine-hero-photo'),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => gradient,
           ),
