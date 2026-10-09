@@ -149,16 +149,41 @@ void main() {
         _routine(zones: const ['glutes']),
         prefs,
       );
-      expect(amplia, exacta,
+      final noCubre =
+          TemplateAffinity.score(_routine(zones: const ['chest']), prefs);
+      expect(amplia, greaterThan(TemplateAffinity.neutral),
           reason: 'castigar la amplitud hundiría a las Full Body, que son '
-              'justo las que más gente necesita');
+              'justo las que más gente necesita: cubrir la zona suma');
+      expect(amplia, greaterThan(noCubre));
+      expect(exacta, greaterThan(amplia),
+          reason: 'la que dedica más ejercicios a lo pedido va primero: sin '
+              'el énfasis, una PPL con una sentadilla empata con una de '
+              'glúteos');
     });
 
-    test('cuerpo completo cubre cualquier zona pedida', () {
-      expect(
-        TemplateAffinity.score(_routine(zones: const ['fullbody']), prefs),
-        TemplateAffinity.score(_routine(zones: const ['glutes']), prefs),
+    test('cuerpo completo cubre a medias: más que nada, menos que la zona', () {
+      final global =
+          TemplateAffinity.score(_routine(zones: const ['fullbody']), prefs);
+      final exacta =
+          TemplateAffinity.score(_routine(zones: const ['glutes']), prefs);
+      final noCubre =
+          TemplateAffinity.score(_routine(zones: const ['chest']), prefs);
+      expect(global, greaterThan(noCubre));
+      expect(global, lessThan(exacta));
+    });
+
+    test('un solo ejercicio global no convierte la plantilla en un match', () {
+      // El bug del catálogo de 50: un peso muerto etiquetado `fullbody` le
+      // daba 1 en zonas a cualquier plantilla, pidiera lo que pidiera el
+      // atleta. 40 de las 50 tienen al menos uno.
+      final conUnGlobal = TemplateAffinity.score(
+        _routine(zones: const ['chest', 'back', 'shoulders', 'fullbody']),
+        prefs,
       );
+      final exacta =
+          TemplateAffinity.score(_routine(zones: const ['glutes']), prefs);
+      expect(conUnGlobal, lessThan(exacta));
+      expect(conUnGlobal, lessThan(TemplateAffinity.neutral + 0.1));
     });
 
     test('no cubrirla puntúa peor que no tener zonas derivables', () {

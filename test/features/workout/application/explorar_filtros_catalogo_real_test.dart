@@ -16,6 +16,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/domain/muscle_group.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/unified_templates_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -186,6 +187,88 @@ void main() {
         await primera(ExperienceLevel.advanced, 6, 75, RoutineGoal.aesthetics),
         'split-clasico-6dias-avanzado',
       );
+    });
+  });
+  group('zonas', () {
+    const piernas = TemplatePreferences(
+      priorityMuscleGroups: ['glutes', 'quads'],
+    );
+
+    test('40 de las 50 tienen al menos un ejercicio de cuerpo completo', () {
+      // El dato que hacía inútil al filtro: con la regla vieja, un solo
+      // `fullbody` le daba 1 en zonas a la plantilla, pidiera lo que pidiera
+      // el atleta.
+      final conGlobal = catalogo.where(
+        (r) => r.primaryMuscleGroups.contains(MuscleGroup.cuerpoCompleto),
+      );
+      expect(conGlobal, hasLength(40));
+    });
+
+    test('pedir piernas/glúteos no empata a todo el catálogo', () async {
+      final grilla = await _grilla(catalogo, prefs: piernas);
+      final primera = grilla.first.id;
+      final ultima = grilla.last.id;
+      // Con la regla vieja 47 de 50 daban 1 en zonas: el orden quedaba igual
+      // al del JSON y la primera era `ppl-beginner`.
+      expect(primera, isNot('ppl-beginner'));
+      expect(primera, isNot(ultima));
+    });
+
+    test('las de glúteos y piernas van antes que las de tren superior',
+        () async {
+      bool trenSuperior(Routine r) {
+        const arriba = {
+          MuscleGroup.pecho,
+          MuscleGroup.espalda,
+          MuscleGroup.hombros,
+          MuscleGroup.biceps,
+          MuscleGroup.triceps,
+        };
+        final grupos = [
+          for (final d in r.days)
+            for (final s in d.slots) MuscleGroup.fromKey(s.muscleGroup),
+        ].whereType<MuscleGroup>().toList();
+        return grupos.where(arriba.contains).length >= grupos.length * 0.6;
+      }
+
+      const deGluteos = {
+        ExperienceLevel.beginner: ['gluteos-piernas-principiante'],
+        ExperienceLevel.intermediate: [
+          'gluteos-foco-intermedio',
+          'fuerza-corredores-intermedio',
+        ],
+      };
+      for (final MapEntry(key: nivel, value: ids) in deGluteos.entries) {
+        final grilla = await _grilla(catalogo, nivel: nivel, prefs: piernas);
+        final orden = grilla.map((r) => r.id).toList();
+        final superiores = [
+          for (final r in grilla)
+            if (trenSuperior(r)) r.id,
+        ];
+        expect(superiores, isNotEmpty, reason: nivel.name);
+        for (final id in ids) {
+          expect(orden.indexOf(id), lessThan(3),
+              reason: '$id tiene que estar entre las 3 primeras: $orden');
+          for (final sup in superiores) {
+            expect(orden.indexOf(id), lessThan(orden.indexOf(sup)),
+                reason: '$id antes que $sup (${nivel.name})');
+          }
+        }
+      }
+    });
+
+    test('pedir pecho y espalda manda las de glúteos al fondo', () async {
+      final grilla = await _grilla(
+        catalogo,
+        nivel: ExperienceLevel.beginner,
+        prefs: const TemplatePreferences(
+          priorityMuscleGroups: ['chest', 'back'],
+        ),
+      );
+      final orden = grilla.map((r) => r.id).toList();
+      expect(orden.indexOf('gluteos-piernas-principiante'),
+          greaterThanOrEqualTo(orden.length - 3),
+          reason: '$orden');
     });
   });
 }
