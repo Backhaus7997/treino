@@ -356,3 +356,144 @@ describe("userPublicProfiles rules — isProfilePublic privacy flag", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. Rangos de levantamiento — squatRank / benchRank / deadliftRank.
+//
+// Los escribe SÓLO la CF (Admin SDK, saltea las reglas) a partir de best*Kg y
+// del peso corporal del doc privado. Reciben el mismo trato que las métricas
+// de la sección 1: CF-write-only, con la excepción de la transición de
+// opt-out. Y, como `request.resource.data` es el doc mergeado, tienen que
+// estar en el `hasOnly` de update: sin eso, un doc que YA tiene un rango
+// escrito por la CF no se podría volver a editar nunca (el segundo test).
+// ---------------------------------------------------------------------------
+describe("userPublicProfiles rules — lift ranks (CF-write-only)", () => {
+  const uid = "athlete-ranks";
+
+  it("denies the owner forging a rank on their own doc", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { rankingOptIn: true, benchRank: 2 },
+    });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertFails(ref.update({ benchRank: 8 }));
+  });
+
+  it("denies the owner seeding a rank the CF never wrote", async () => {
+    await seed(uid, { userGymId: "gym-a", profile: { rankingOptIn: true } });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertFails(ref.update({ squatRank: 8 }));
+  });
+
+  it("keeps a doc that already stores CF-written ranks editable (hasOnly allowlist)", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: {
+        rankingOptIn: true,
+        squatRank: 5,
+        benchRank: 4,
+        deadliftRank: 3,
+      },
+    });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    // Un cambio de displayName no toca los rangos, pero el doc mergeado los
+    // trae: sin el hasOnly actualizado esto sería permission-denied.
+    await assertSucceeds(ref.update({ displayName: "Alice" }));
+    // Y re-presentar el valor guardado tampoco es una falsificación.
+    await assertSucceeds(ref.update({ benchRank: 4, displayName: "Alicia" }));
+  });
+
+  it("allows the Admin SDK (server trigger path) to write a real rank", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { rankingOptIn: true, benchRank: 2 },
+    });
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await assertSucceeds(
+        ctx.firestore().collection(COL_PROFILES).doc(uid).update({ benchRank: 6 }),
+      );
+    });
+  });
+
+  it("denies a create that seeds a rank, but accepts one that leaves it null", async () => {
+    const fresh = "athlete-ranks-create";
+    await seed(fresh, { userGymId: "gym-a" });
+
+    const bob = testEnv.authenticatedContext(fresh);
+    const ref = bob.firestore().collection(COL_PROFILES).doc(fresh);
+
+    await assertFails(ref.set({ uid: fresh, benchRank: 8 }));
+    await assertSucceeds(
+      ref.set({
+        uid: fresh,
+        benchRank: null,
+        squatRank: null,
+        deadliftRank: null,
+      }),
+    );
+  });
+
+  it("allows the opt-out transition to reset the ranks to null (clearRankingMetrics)", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: {
+        rankingOptIn: true,
+        lifetimeVolumeKg: 3400,
+        bestSquatKg: 110,
+        squatRank: 5,
+        benchRank: 4,
+        deadliftRank: 3,
+      },
+    });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertSucceeds(
+      ref.update({
+        rankingOptIn: false,
+        lifetimeVolumeKg: 0,
+        bestSquatKg: null,
+        bestBenchKg: null,
+        bestDeadliftKg: null,
+        squatRank: null,
+        benchRank: null,
+        deadliftRank: null,
+      }),
+    );
+  });
+
+  it("denies flipping opt-in off while forging a non-null rank (no laundering path)", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { rankingOptIn: true, benchRank: 2 },
+    });
+
+    const alice = testEnv.authenticatedContext(uid);
+    const ref = alice.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertFails(ref.update({ rankingOptIn: false, benchRank: 8 }));
+  });
+
+  it("denies a non-owner writing a rank on someone else's doc", async () => {
+    await seed(uid, {
+      userGymId: "gym-a",
+      profile: { rankingOptIn: true, benchRank: 2 },
+    });
+
+    const attacker = testEnv.authenticatedContext("athlete-ranks-attacker");
+    const ref = attacker.firestore().collection(COL_PROFILES).doc(uid);
+
+    await assertFails(ref.update({ benchRank: 8 }));
+  });
+});
