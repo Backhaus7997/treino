@@ -7632,7 +7632,7 @@ abstract class AppL10n {
   /// No description provided for @templatesOnboardingStep3Label.
   ///
   /// In es_AR, this message translates to:
-  /// **'Objetivo'**
+  /// **'Objetivos · podés elegir más de uno'**
   String get templatesOnboardingStep3Label;
 
   /// Paso 4. Zonas a priorizar; opcional. El título baja la presión de la última pregunta. NO dice 'queda como filtro': nada de esto filtra la grilla.

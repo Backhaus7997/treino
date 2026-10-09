@@ -45,7 +45,7 @@ void main() {
       const prefs = TemplatePreferences(
         daysPerWeek: 2,
         minutesPerSession: 30,
-        goal: RoutineGoal.sport,
+        goals: [RoutineGoal.sport],
         priorityMuscleGroups: ['back'],
       );
       // La combinación que el issue cita como "cero matches" en un filtro duro.
@@ -72,7 +72,8 @@ void main() {
 
   group('sin dato es NEUTRO, entre el match y el desajuste', () {
     // El orden de estos tres es la decisión de diseño central del scoring.
-    const wantsAesthetics = TemplatePreferences(goal: RoutineGoal.aesthetics);
+    const wantsAesthetics =
+        TemplatePreferences(goals: [RoutineGoal.aesthetics]);
 
     test('match > sin declarar > desajuste', () {
       final match = TemplateAffinity.score(
@@ -98,6 +99,61 @@ void main() {
       final sinMinutos = TemplateAffinity.score(_routine(), prefs);
       final conflicto = TemplateAffinity.score(_routine(minutes: 120), prefs);
       expect(sinMinutos, greaterThan(conflicto));
+    });
+  });
+
+  group('varios objetivos elegidos (2026-10-09)', () {
+    // Sólo objetivo respondido: días, minutos y zonas dan neutral (0.5), así
+    // que score = (1.5 + objetivo) / 4 y el orden lo decide el objetivo.
+    const saludYEstetica = TemplatePreferences(
+      goals: [RoutineGoal.health, RoutineGoal.aesthetics],
+    );
+
+    test('cubre los dos > cubre uno > sin declarar > ninguno', () {
+      final ambos = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.aesthetics, RoutineGoal.health]),
+        saludYEstetica,
+      );
+      final uno = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.health, RoutineGoal.sport]),
+        saludYEstetica,
+      );
+      final sinDeclarar = TemplateAffinity.score(_routine(), saludYEstetica);
+      final ninguno = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.sport]),
+        saludYEstetica,
+      );
+
+      expect(ambos, greaterThan(uno));
+      expect(uno, greaterThan(sinDeclarar),
+          reason: 'servir a uno de los dos objetivos le SIRVE: no puede '
+              'empatar con una plantilla que no dice nada');
+      expect(sinDeclarar, greaterThan(ninguno));
+    });
+
+    test('con un solo objetivo el puntaje es el de siempre: 1 o 0', () {
+      const soloSalud = TemplatePreferences(goals: [RoutineGoal.health]);
+      final match = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.health, RoutineGoal.sport]),
+        soloSalud,
+      );
+      final desajuste = TemplateAffinity.score(
+        _routine(goals: const [RoutineGoal.sport]),
+        soloSalud,
+      );
+      expect(match, closeTo((1.5 + 1) / 4, 1e-9));
+      expect(desajuste, closeTo((1.5 + 0) / 4, 1e-9));
+    });
+
+    test('un objetivo repetido no infla ni diluye el puntaje', () {
+      const repetido = TemplatePreferences(
+        goals: [RoutineGoal.health, RoutineGoal.health],
+      );
+      expect(
+        TemplateAffinity.score(
+            _routine(goals: const [RoutineGoal.health]), repetido),
+        closeTo((1.5 + 1) / 4, 1e-9),
+      );
     });
   });
 

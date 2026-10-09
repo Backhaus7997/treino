@@ -4308,7 +4308,7 @@ class AppL10nEn extends AppL10n {
       'Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.';
 
   @override
-  String get templatesOnboardingStep3Label => 'Goal';
+  String get templatesOnboardingStep3Label => 'Goals · pick one or more';
 
   @override
   String get templatesOnboardingStep4Title => 'This is not an exam';

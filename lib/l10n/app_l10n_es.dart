@@ -4389,7 +4389,8 @@ class AppL10nEs extends AppL10n {
       'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.';
 
   @override
-  String get templatesOnboardingStep3Label => 'Objetivo';
+  String get templatesOnboardingStep3Label =>
+      'Objetivos · podés elegir más de uno';
 
   @override
   String get templatesOnboardingStep4Title => 'Esto no es un examen';
@@ -9687,7 +9688,8 @@ class AppL10nEsAr extends AppL10nEs {
       'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.';
 
   @override
-  String get templatesOnboardingStep3Label => 'Objetivo';
+  String get templatesOnboardingStep3Label =>
+      'Objetivos · podés elegir más de uno';
 
   @override
   String get templatesOnboardingStep4Title => 'Esto no es un examen';

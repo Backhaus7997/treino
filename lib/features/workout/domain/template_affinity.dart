@@ -97,15 +97,36 @@ abstract final class TemplateAffinity {
     return gap >= 1 ? 0 : 1 - gap;
   }
 
-  /// Objetivo. Multi-valor del lado de la plantilla: alcanza con que UNO
-  /// coincida, porque una Full Body que sirve a salud y a estética le sirve
-  /// entera a quien busca cualquiera de las dos.
+  /// Objetivo. Multi-valor de los DOS lados: la plantilla sirve a varios
+  /// (`Routine.goals`) y, desde 2026-10-09, el atleta también puede elegir
+  /// varios (`TemplatePreferences.goals`).
+  ///
+  ///   * Ninguno en común ⇒ 0, igual que antes.
+  ///   * Alguno en común ⇒ [_pisoObjetivo] + el resto proporcional a cuántos
+  ///     de los elegidos cubre: `piso + (1 − piso) · |elegidos ∩ plantilla| /
+  ///     |elegidos|`.
+  ///
+  /// El piso es lo que hace que una plantilla que sirve a UNO de dos objetivos
+  /// siga rankeando bien: con 0.75, cubrir uno de dos da 0.875 — bastante más
+  /// que el [neutral] de una sin objetivos declarados, y un poco menos que
+  /// una que cubre los dos. Sin piso (proporción pura) daría 0.5 y empataría
+  /// con "no sé", que es justamente lo que no es: le sirve.
+  ///
+  /// Con UN solo objetivo elegido la fórmula da 1 o 0, idéntico a cuando el
+  /// campo era único. Ese es el invariante que cuida el barrido de 300
+  /// combinaciones de `explorar_filtros_catalogo_real_test.dart`.
   static double _goalScore(Routine routine, TemplatePreferences preferences) {
-    final wanted = preferences.goal;
-    if (wanted == null) return neutral;
+    final wanted = preferences.goals.toSet();
+    if (wanted.isEmpty) return neutral;
     if (routine.goals.isEmpty) return neutral; // publicada antes de #635
-    return routine.goals.contains(wanted) ? 1 : 0;
+    final enComun = wanted.intersection(routine.goals.toSet()).length;
+    if (enComun == 0) return 0;
+    return _pisoObjetivo + (1 - _pisoObjetivo) * enComun / wanted.length;
   }
+
+  /// Puntaje mínimo de una plantilla que sirve a AL MENOS uno de los objetivos
+  /// elegidos. Ver [_goalScore].
+  static const double _pisoObjetivo = 0.75;
 
   /// Zonas priorizadas, contra las que la plantilla DERIVA de sus slots
   /// (#635 PR#1). Nunca es null, pero puede venir vacía.

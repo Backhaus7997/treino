@@ -319,6 +319,11 @@ void main() {
         tester,
         templatesOnboardingOptionKey('goal', 'health'),
       );
+      // Dos objetivos (2026-10-09): se guardan los dos.
+      await _tapAndSettle(
+        tester,
+        templatesOnboardingOptionKey('goal', 'aesthetics'),
+      );
       await _tapAndSettle(tester, templatesOnboardingCtaKey);
 
       await _tapAndSettle(
@@ -333,7 +338,9 @@ void main() {
           .updateWithKey('templatePreferences')!['templatePreferences']! as Map;
       expect(prefs['daysPerWeek'], 3);
       expect(prefs['minutesPerSession'], 45);
-      expect(prefs['goal'], 'health');
+      expect(prefs['goals'], ['health', 'aesthetics']);
+      expect(prefs['goal'], 'health',
+          reason: 'la 1.0 sólo lee `goal`: va el primero elegido');
       expect(
         (prefs['priorityMuscleGroups']! as List).toSet(),
         {'back', 'core'},

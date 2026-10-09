@@ -17,6 +17,7 @@ Future<void> _pumpView(
   WidgetTester tester, {
   VoidCallback? onSkip,
   ThemeData? theme,
+  TemplatePreferences? initialPreferences,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -36,6 +37,7 @@ Future<void> _pumpView(
             return SingleChildScrollView(
               child: TemplatesOnboardingView(
                 steps: templatesOnboardingSteps(l10n),
+                initialPreferences: initialPreferences,
                 onFinish: (p) => _finished = p,
                 onSkip: onSkip ?? () {},
                 skipLabel: l10n.onboardingTourSkip,
@@ -140,7 +142,7 @@ void main() {
       await _advanceTo(tester, 3);
 
       expect(find.text('¿PARA QUÉ QUERÉS ENTRENAR?'), findsOneWidget);
-      expect(find.text('Objetivo'), findsOneWidget);
+      expect(find.text('Objetivos · podés elegir más de uno'), findsOneWidget);
 
       for (final goal in RoutineGoal.values) {
         expect(
@@ -156,20 +158,38 @@ void main() {
       expect(find.text('BIENESTAR'), findsOneWidget);
     });
 
-    testWidgets('is single-choice: a second pick replaces the first',
-        (tester) async {
+    testWidgets(
+        'is multi-select: a second pick ADDS to the first (2026-10-09, '
+        'pedido del owner)', (tester) async {
+      await _pumpView(tester);
+      await _advanceTo(tester, 3);
+
+      await _tap(tester, templatesOnboardingOptionKey('goal', 'health'));
+      await _tap(tester, templatesOnboardingOptionKey('goal', 'aesthetics'));
+      await _tap(tester, templatesOnboardingCtaKey);
+
+      final result = await _finishFrom(tester);
+      expect(result?.goals, [RoutineGoal.health, RoutineGoal.aesthetics],
+          reason: 'en el orden en que se tocaron: el primero es el que se '
+              'espeja en `goal` para la 1.0');
+      expect(result?.toJson()['goal'], 'health');
+    });
+
+    testWidgets('deselecting one of several keeps the rest', (tester) async {
       await _pumpView(tester);
       await _advanceTo(tester, 3);
 
       await _tap(tester, templatesOnboardingOptionKey('goal', 'health'));
       await _tap(tester, templatesOnboardingOptionKey('goal', 'sport'));
+      await _tap(tester, templatesOnboardingOptionKey('goal', 'wellbeing'));
+      await _tap(tester, templatesOnboardingOptionKey('goal', 'health'));
       await _tap(tester, templatesOnboardingCtaKey);
 
       final result = await _finishFrom(tester);
-      expect(result?.goal, RoutineGoal.sport);
+      expect(result?.goals, [RoutineGoal.sport, RoutineGoal.wellbeing]);
     });
 
-    testWidgets('tapping the chosen pill again clears it', (tester) async {
+    testWidgets('tapping the only chosen pill again clears it', (tester) async {
       await _pumpView(tester);
       await _advanceTo(tester, 3);
 
@@ -178,7 +198,22 @@ void main() {
       await _tap(tester, templatesOnboardingCtaKey);
 
       final result = await _finishFrom(tester);
-      expect(result?.goal, isNull);
+      expect(result?.goals, isEmpty);
+    });
+
+    testWidgets('reopened with saved goals, starts with all of them chosen',
+        (tester) async {
+      await _pumpView(
+        tester,
+        initialPreferences: const TemplatePreferences(
+          goals: [RoutineGoal.sport, RoutineGoal.health],
+        ),
+      );
+      await _advanceTo(tester, 3);
+      await _tap(tester, templatesOnboardingCtaKey);
+
+      final result = await _finishFrom(tester);
+      expect(result?.goals.toSet(), {RoutineGoal.sport, RoutineGoal.health});
     });
   });
 
@@ -266,7 +301,7 @@ void main() {
       final result = await _finishFrom(tester);
       expect(result?.daysPerWeek, 5);
       expect(result?.minutesPerSession, 75);
-      expect(result?.goal, RoutineGoal.aesthetics);
+      expect(result?.goals, [RoutineGoal.aesthetics]);
       expect(result?.priorityMuscleGroups, ['glutes']);
       expect(result?.isEmpty, isFalse);
     });
