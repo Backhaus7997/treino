@@ -752,6 +752,37 @@ class UserRepository {
     };
   }
 
+  /// Completa el subset de PF con el nombre de la cuenta cuando no lo trae.
+  ///
+  /// El alta (ProfileSetup) manda `displayName` SIN campos de PF, así que el
+  /// espejo no se dispara; después "Editar perfil de PF" guarda bio, tarifa y
+  /// lugares sin nombre y `set(merge)` CREA la tarjeta sin `displayName` ni
+  /// `displayNameLowercase`: en el directorio sale con "?" y `listAll()`
+  /// (`orderBy('displayNameLowercase')`) la excluye. Nada la rellenaba.
+  ///
+  /// Un `displayName` explícito en el partial gana (no se pisa). Si la cuenta
+  /// no tiene nombre, no se agrega nada: nunca se escribe un nombre vacío, que
+  /// anularía `displayNameLowercase`. El nombre de `users/` ya viene filtrado
+  /// por el guard del cliente y por la cuarentena del servidor
+  /// (`quarantineDisplayName` lo reemplaza por `usuario_xxxxxx`), así que
+  /// copiarlo no re-publica un nombre vetado. Una lectura extra, sólo en
+  /// guardados de PF sin nombre; los de alumnos devuelven null antes y no
+  /// llegan acá.
+  Future<Map<String, Object?>> _conNombreDeLaCuenta(
+    String uid,
+    Map<String, Object?> subset,
+  ) async {
+    if (subset.containsKey('displayName')) return subset;
+    final snap = await _users.doc(uid).get();
+    final name = (snap.data()?['displayName'] as String?)?.trim();
+    if (name == null || name.isEmpty) return subset;
+    return {
+      ...subset,
+      'displayName': name,
+      'displayNameLowercase': name.toLowerCase(),
+    };
+  }
+
   Future<void> update(
     String uid,
     Map<String, Object?> partial, {
@@ -821,12 +852,14 @@ class UserRepository {
     final publicSubset = await _publicSubsetFromPartial(efectivo, uid: uid);
     final hasLocationConsent =
         await _resolveEffectiveLocationConsent(uid, efectivo);
-    final trainerPublicSubset = _trainerPublicSubsetFromPartial(
-          efectivo,
-          uid: uid,
-          hasLocationConsent: hasLocationConsent,
-        ) ??
-        await _trainerNameOnlySubset(uid, efectivo);
+    final trainerSubsetDelPartial = _trainerPublicSubsetFromPartial(
+      efectivo,
+      uid: uid,
+      hasLocationConsent: hasLocationConsent,
+    );
+    final trainerPublicSubset = trainerSubsetDelPartial != null
+        ? await _conNombreDeLaCuenta(uid, trainerSubsetDelPartial)
+        : await _trainerNameOnlySubset(uid, efectivo);
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
