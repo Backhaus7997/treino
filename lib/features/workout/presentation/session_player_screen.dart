@@ -33,7 +33,6 @@ import '../domain/routine_slot.dart';
 import '../domain/superset_blocks.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
-import '../domain/session_time_fit.dart';
 import '../domain/set_log.dart';
 import '../../watch/application/watch_effort_notifier.dart';
 import '../../watch/application/watch_timer_control_notifier.dart';
@@ -46,7 +45,6 @@ import 'widgets/duration_set_row.dart';
 import 'widgets/exercise_feedback_sheet.dart';
 import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
-import 'widgets/time_fit_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym;
 
@@ -596,57 +594,14 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
-  /// La ranura del ajuste de tiempo (#645): la invitacion a declararlo cuando
-  /// no hay nada recortado, o el aviso con el resultado y el deshacer cuando
-  /// si lo hay. Nunca las dos: un solo camino a mano en cada estado.
-  ///
-  /// Sin nada medible en el dia no se dibuja NADA. Ofrecer "ajustar" sobre una
-  /// sesion cuya duracion no se puede estimar es prometer una cuenta que la
-  /// pantalla despues no puede mostrar — misma postura que las tarjetas de
-  /// rutina, que ante `minutes == null` no escriben ni "0 min" ni un guion.
-  List<Widget> _buildTimeFitSlot(SessionState state) {
-    if (state.droppedExerciseIds.isNotEmpty) {
-      return [
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _SessionTrimNotice(state: state, onUndo: _undoTrim),
-        ),
-      ];
-    }
-    final current = estimateSessionMinutes(state.day, week: state.activeWeek);
-    if (current == null) return const [];
-    return [
-      const SizedBox(height: 12),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: _TimeFitPrompt(
-          currentMinutes: current,
-          onTap: () => _openTimeFit(state),
-        ),
-      ),
-    ];
-  }
-
   /// Builds the exercise list with block gating: current block fully expanded,
   /// completed blocks collapsed to summary, future blocks locked/dimmed.
-  ///
-  /// La lista se arma sobre [SessionState.activeSlots], no sobre `day.slots`:
-  /// un ejercicio recortado (#645) no se dibuja. Dibujarlo lo mostraria como
-  /// bloque COMPLETADO —`plannedSetsFor` le da 0 y `computeBlockStatuses` lee
-  /// eso como "todo hecho"—, o sea, la lista le diria "lo hiciste" sobre algo
-  /// que el atleta saco. Lo que salio se cuenta en `_SessionTrimNotice`, que
-  /// es tambien donde esta el deshacer.
-  ///
-  /// Los indices de `_activatedBlocks` siguen siendo validos: el recorte es
-  /// siempre una cola contigua del final (`planSessionTimeFit`), asi que lo
-  /// que queda es un PREFIJO de los bloques y ningun indice se corre.
   List<Widget> _buildExerciseList(SessionState state) {
     final palette = AppPalette.of(context);
     // Source week ONCE here and thread down — single-week sessions use 0
     // so effectiveSetsForWeek(0) falls back to effectiveSets (REQ-PERIOD-042).
     final week = state.session.weekNumber;
-    final blocks = buildBlocks(state.activeSlots.toList(growable: false));
+    final blocks = buildBlocks(state.day.slots);
     // live-set-editing AD-5: single resolver every gating/render denominator
     // routes through. Bound method closes over `state`, so callers never
     // read the raw plan count directly.
@@ -752,39 +707,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           slot,
           log,
         );
-  }
-
-  /// Abre la hoja donde el atleta declara cuanto tiempo tiene hoy (#645).
-  ///
-  /// Los ejercicios que ya tienen series cargadas viajan como
-  /// `lockedExerciseIds`: el recorte nunca puede esconder trabajo hecho, y el
-  /// recorrido de `planSessionTimeFit` frena ahi.
-  void _openTimeFit(SessionState state) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => TimeFitSheet(
-        day: state.day,
-        week: state.activeWeek,
-        lockedExerciseIds: state.setLogs.map((l) => l.exerciseId).toSet(),
-        onApply: _applyTrim,
-      ),
-    );
-  }
-
-  /// Aplica el recorte que el atleta acepto. Solo toca la sesion de hoy.
-  void _applyTrim(List<String> exerciseIds) {
-    ref
-        .read(sessionNotifierProvider(widget.init).notifier)
-        .dropExercisesForToday(exerciseIds);
-  }
-
-  /// Devuelve a la sesion todo lo que se habia recortado por tiempo (#645).
-  void _undoTrim() {
-    ref
-        .read(sessionNotifierProvider(widget.init).notifier)
-        .restoreDroppedExercises();
   }
 
   /// Callback wired to each row's delete icon (AD-6). Una fila SIN loguear
@@ -987,7 +909,6 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: _SessionStatsCard(state: state),
                     ),
-                    ..._buildTimeFitSlot(state),
                     const SizedBox(height: 20),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -1182,9 +1103,7 @@ class _SessionStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // Los ejercicios recortados (#645) no estan en el denominador: la barra
-    // mide lo que se hace HOY, no lo que decia el plan.
-    final total = state.activeExerciseCount;
+    final total = state.day.slots.length;
     final completed = state.completedExerciseCount;
     final progress = total > 0 ? completed / total : 0.0;
 
@@ -1244,165 +1163,6 @@ class _SessionStatsCard extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(palette.accent),
             minHeight: 4,
             borderRadius: BorderRadius.circular(2),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── _TimeFitPrompt ────────────────────────────────────────────────────────────
-
-/// La invitación a declarar el tiempo disponible, arriba del listado (#645).
-///
-/// Se dibuja sólo cuando NO hay nada recortado: una vez aplicado el ajuste,
-/// este lugar lo ocupa `_SessionTrimNotice`, que muestra el resultado y el
-/// deshacer. Dos estados de la misma ranura, nunca los dos juntos — así el
-/// atleta siempre tiene un solo camino a mano y no puede apilar recortes sin
-/// entender de dónde salió cada uno.
-class _TimeFitPrompt extends StatelessWidget {
-  const _TimeFitPrompt({required this.currentMinutes, required this.onTap});
-
-  final int currentMinutes;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-    return TreinoTappable(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          // Contorno tenue en acento: es la unica fila de esta pantalla que
-          // ABRE ALGO sin ser un ejercicio, y el chevron —la senal de "esto
-          // lleva al detalle"— ya esta gastado en las filas del listado.
-          border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Icon(TreinoIcon.clock, size: 16, color: palette.accent),
-            const SizedBox(width: AppSpacing.s8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.sessionTimeFitPromptTitle,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.hairline),
-                  Text(
-                    l10n.sessionTimeFitCurrent('~$currentMinutes'),
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── _SessionTrimNotice ────────────────────────────────────────────────────────
-
-/// El aviso de que la sesión de hoy va recortada para entrar en el tiempo que
-/// el atleta declaró tener (#645).
-///
-/// Existe SÓLO cuando hay algo recortado, y es el único lugar de la pantalla
-/// que nombra lo que salió: la lista de abajo dibuja la sesión de hoy y nada
-/// más. Sin este aviso el recorte sería invisible —la sesión se vería como una
-/// rutina más corta, sin rastro de la decisión— y no habría forma de volver
-/// atrás. Por eso el deshacer vive acá y no escondido en un menú.
-///
-/// El número se recalcula sobre lo que QUEDA ([estimateSessionMinutes]), no
-/// sobre el día del plan, y lleva siempre "~" porque siempre es calculado —
-/// misma convención que la duración de las tarjetas (#639).
-class _SessionTrimNotice extends StatelessWidget {
-  const _SessionTrimNotice({required this.state, required this.onUndo});
-
-  final SessionState state;
-  final VoidCallback onUndo;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final l10n = AppL10n.of(context);
-
-    // En el orden del día, no en el orden en que se sacaron.
-    final names = state.day.slots
-        .where((s) => state.droppedExerciseIds.contains(s.exerciseId))
-        .map((s) => s.exerciseName)
-        .join(' · ');
-    final minutes = estimateSessionMinutes(
-      state.day,
-      week: state.activeWeek,
-      droppedExerciseIds: state.droppedExerciseIds,
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(TreinoIcon.clock, size: 16, color: palette.accent),
-          const SizedBox(width: AppSpacing.s8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (minutes != null) ...[
-                  Text(
-                    l10n.sessionTrimAdjustedTo('~$minutes'),
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                      letterSpacing: 1.2,
-                      color: palette.accent,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.hairline),
-                ],
-                Text(
-                  l10n.sessionTrimDroppedList(names),
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onUndo,
-            child: Text(
-              l10n.sessionTrimUndo,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 0.5,
-                color: palette.accent,
-              ),
-            ),
           ),
         ],
       ),

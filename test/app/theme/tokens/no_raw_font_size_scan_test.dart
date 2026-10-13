@@ -320,7 +320,6 @@ void main() {
       'features/workout/presentation/widgets/template_rating_sheet.dart',
       'features/workout/presentation/widgets/template_ratings_section.dart',
       'features/workout/presentation/widgets/templates_preferences_bar.dart',
-      'features/workout/presentation/widgets/time_fit_sheet.dart',
       'features/workout/trainer_workout_view.dart',
       'main_wear_liveness_spike.dart',
       'main_wear_spike.dart',
