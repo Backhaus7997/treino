@@ -63,7 +63,11 @@ function effectiveName(
   const name = snap.get("name");
   if (typeof name !== "string") return null;
   const trimmed = name.trim();
-  return trimmed !== "" && trimmed !== GYM_PLACEHOLDER_NAME ? name : null;
+  // El marcador solo lo es en un gym de Places: uno sembrado o creado a mano
+  // puede llamarse "Gimnasio" de verdad, y ese nombre si se propaga.
+  const esMarcador =
+    snap.get("source") === "google-places" && trimmed === GYM_PLACEHOLDER_NAME;
+  return trimmed !== "" && !esMarcador ? name : null;
 }
 
 /**

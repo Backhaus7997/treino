@@ -1,4 +1,5 @@
 import 'gym.dart';
+import 'gym_source.dart';
 
 /// Safe fallback helpers for rendering a gym's display name.
 ///
@@ -23,10 +24,14 @@ import 'gym.dart';
 /// `null` (unknown/deleted id — caller hides the subtitle).
 ///
 /// El marcador [kGymPlaceholderName] que se guarda en los gyms de Places NO es
-/// un nombre: se trata como vacío para que jamás se muestre.
+/// un nombre: se trata como vacío para que jamás se muestre. Sólo en los de
+/// Places: un gym sembrado o creado a mano puede llamarse «Gimnasio» de verdad,
+/// y ése no tiene nombre en vivo que lo reemplace.
 String gymDisplayNameFromGym(Gym? gym) {
   final name = gym?.name ?? '';
-  return name == kGymPlaceholderName ? '' : name;
+  final esMarcador =
+      gym?.source == GymSource.googlePlaces && name == kGymPlaceholderName;
+  return esMarcador ? '' : name;
 }
 
 /// For LIST/feed contexts reading the already-denormalized

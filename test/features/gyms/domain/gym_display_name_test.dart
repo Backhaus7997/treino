@@ -17,6 +17,7 @@ import 'package:treino/features/gyms/domain/gym_source.dart';
 Gym _gym({
   String id = 'sportclub-belgrano',
   String name = 'SportClub - Belgrano',
+  GymSource source = GymSource.seed,
 }) =>
     Gym(
       id: id,
@@ -24,7 +25,7 @@ Gym _gym({
       lat: -34.56,
       lng: -58.45,
       geohash: 'abc123',
-      source: GymSource.seed,
+      source: source,
       createdAt: DateTime.utc(2026, 1, 1),
     );
 
@@ -38,7 +39,20 @@ void main() {
     });
 
     test('el marcador de Places NUNCA es un nombre: da vacío', () {
-      expect(gymDisplayNameFromGym(_gym(name: kGymPlaceholderName)), isEmpty);
+      expect(
+        gymDisplayNameFromGym(
+          _gym(name: kGymPlaceholderName, source: GymSource.googlePlaces),
+        ),
+        isEmpty,
+      );
+    });
+
+    test('un gym que NO es de Places y se llama «Gimnasio» conserva su nombre',
+        () {
+      expect(
+        gymDisplayNameFromGym(_gym(name: kGymPlaceholderName)),
+        equals(kGymPlaceholderName),
+      );
     });
 
     test('SCENARIO-529: null Gym (unresolvable id) → empty string, no throw',

@@ -82,6 +82,18 @@ describe("propagateGymName", () => {
     }
   });
 
+  it("gym que NO es de Places llamado 'Gimnasio': ese nombre es real y se copia", async () => {
+    await db.doc("gyms/g1").set(gym({ name: "Gimnasio", source: "self-service" }));
+    await seedProfile("u1", "g1", null);
+
+    const n = await propagateGymName({ db, gymId: "g1" });
+
+    expect(n).toBe(1);
+    expect(
+      (await db.doc("userPublicProfiles/u1").get()).get("gymName"),
+    ).toBe("Gimnasio");
+  });
+
   it("gym nombrado: copia el nombre a TODOS los vinculados y a nadie mas", async () => {
     await db.doc("gyms/g1").set(gym({ name: "Mi Gym" }));
     await seedProfile("u1", "g1", null);
