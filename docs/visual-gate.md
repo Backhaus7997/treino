@@ -255,7 +255,7 @@ del job lista los archivos que cambiaron.
 > cierto es leerla como que un run del bot nunca queda en `action_required`.
 >
 > **Lo que destraba es el PR, no el push.** Abrilo si falta; si está en conflicto,
-> resolvelo — el `git merge origin/main` genera por sí mismo el `synchronize` que
+> resolvelo — el `git merge origin/develop` genera por sí mismo el `synchronize` que
 > corre todo.
 >
 > ```bash
@@ -282,21 +282,21 @@ del job lista los archivos que cambiaron.
 > caminos, y por eso las dos mandaban a hacer lo equivocado la mitad de las
 > veces.
 
-### Traé `main` a tu rama ANTES de regenerar
+### Traé la base del PR (`develop`) a tu rama ANTES de regenerar
 
 Los dos workflows no miran el mismo árbol, y la diferencia muerde:
 
 | | Evento | Qué código corre |
 |---|---|---|
 | `regen-goldens.yml` | `push` | **tu rama, sola** |
-| `visual-gate` (ci.yml) | `pull_request` | **el merge** de tu rama con `main` |
+| `visual-gate` (ci.yml) | `pull_request` | **el merge** de tu rama con la base del PR (`develop`) |
 
-O sea que si `main` avanzó desde que abriste la rama, regenerás contra un árbol
+O sea que si `develop` avanzó desde que abriste la rama, regenerás contra un árbol
 y el gate valida contra otro. Los goldens salen "correctos" y el gate los
 rechaza, sin que el diff del PR muestre nada raro.
 
 ```bash
-git merge origin/main        # primero esto
+git merge origin/develop     # primero esto (origin/main sólo si el PR es develop → main)
 git commit --allow-empty -m "chore(gate): regenerar goldens [regen-goldens]"
 ```
 
