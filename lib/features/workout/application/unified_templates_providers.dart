@@ -6,6 +6,7 @@ import '../domain/routine.dart';
 import 'routine_providers.dart';
 import 'template_preferences_providers.dart';
 import '../domain/template_affinity.dart';
+import '../domain/template_search.dart';
 
 /// Where a PLANTILLAS grid entry comes from — drives its badge and its
 /// position in the grid.
@@ -145,4 +146,29 @@ final rankedUnifiedTemplatesProvider =
       });
     return [for (final s in scored) s.entry];
   });
+});
+
+/// Texto de búsqueda de EXPLORAR (#1412), ya con debounce aplicado: el campo
+/// de la pestaña escribe acá recién cuando el atleta dejó de tipear.
+///
+/// `autoDispose` y la pestaña `keepAlive` van de la mano: el valor vive lo
+/// que vive la pestaña, y el campo de texto (que se crea vacío al montarse)
+/// nunca queda desincronizado de lo que el provider recuerda.
+final templatesSearchQueryProvider =
+    StateProvider.autoDispose<String>((ref) => '');
+
+/// [rankedUnifiedTemplatesProvider] filtrado por el texto de búsqueda.
+///
+/// Compone con lo que ya hay: parte de la lista que respeta la pill de nivel
+/// y el orden por afinidad, y SÓLO saca elementos — filtrar no reordena, así
+/// que el orden por afinidad se conserva entre los resultados. Sin consulta
+/// devuelve la misma lista tal cual.
+final searchedUnifiedTemplatesProvider =
+    Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
+  final entries = ref.watch(rankedUnifiedTemplatesProvider);
+  final query = ref.watch(templatesSearchQueryProvider);
+  if (TemplateSearch.isBlank(query)) return entries;
+  return entries.whenData(
+    (list) => TemplateSearch.filter(list, query, (e) => e.routine),
+  );
 });

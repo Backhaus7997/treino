@@ -1976,6 +1976,24 @@ abstract class AppL10n {
   /// **'No hay rutinas para este nivel.'**
   String get workoutExploreEmptyLevel;
 
+  /// Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscar por nombre, músculo o ejercicio'**
+  String get workoutExploreSearchHint;
+
+  /// Tooltip / semantics label of the clear (X) button inside the EXPLORAR search box (#1412).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Borrar búsqueda'**
+  String get workoutExploreSearchClear;
+
+  /// Empty state of the EXPLORAR grid when the text search matches no template (#1412). The query is shown back to the athlete inside guillemets.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos plantillas para «{query}»'**
+  String workoutExploreSearchEmpty(String query);
+
   /// Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638).
   ///
   /// In es_AR, this message translates to:
