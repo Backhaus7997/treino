@@ -1116,7 +1116,19 @@ class SessionRepository {
     // `watchSessionFinished` arma un stream nuevo en cada llamada. Si alguien
     // lo convierte en un broadcast compartido, esto se rompe.
     var existioDeVerdad = false;
-    return _sessions(uid).doc(sessionId).snapshots().map((snap) {
+    // `includeMetadataChanges: true` NO es opcional. El ACK del servidor a un
+    // create hecho en ESTE dispositivo no cambia ningún dato —sólo
+    // `hasPendingWrites` pasa a false— y sin el flag el SDK no emite ese
+    // snapshot (mismo comportamiento que documenta `follow_repository.dart`).
+    // `existioDeVerdad` no se prendía nunca, y una desaparición posterior
+    // confirmada por el servidor se leía como «nunca existió».
+    //
+    // El costo es una emisión por cada cambio de metadata; el `distinct()` del
+    // final deja que los consumidores vean sólo los cambios de valor.
+    return _sessions(uid)
+        .doc(sessionId)
+        .snapshots(includeMetadataChanges: true)
+        .map((snap) {
       if (snap.exists) {
         // Existencia CONFIRMADA: el documento está Y no hay una escritura
         // local pendiente inventándolo. `hasPendingWrites` es el dato que
@@ -1146,7 +1158,7 @@ class SessionRepository {
       //   sólo la procedencia — y es justo el caso que le mostraba al atleta
       //   «terminaste el entreno desde la muñeca» sobre un rechazo de paywall.
       return existioDeVerdad && !snap.metadata.isFromCache;
-    });
+    }).distinct();
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────
