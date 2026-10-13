@@ -759,19 +759,68 @@ void main() {
       return container;
     }
 
-    test('submit vincula el gymId del draft sin tocar el resolver ni gyms/*',
+    setUpAll(() {
+      registerFallbackValue(() async {});
+    });
+
+    test('elegir el gym no escribe nada; el submit lo crea y vincula',
         () async {
+      final order = <String>[];
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenAnswer((inv) async {
+        order.add('resolve');
+        return const ResolveGymPlaceResult(
+            gymId: 'ChIJ_A', name: 'Gimnasio', source: 'google-places');
+      });
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A');
+      verifyZeroInteractions(resolver);
+
+      await notifier.submit();
+
+      expect(order, ['resolve']);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_A');
+    });
+
+    test('elegir A y después B: submit sólo resuelve B', () async {
+      final ids = <String>[];
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenAnswer((inv) async {
+        final id = inv.namedArguments[#placeId] as String;
+        ids.add(id);
+        return ResolveGymPlaceResult(
+            gymId: id, name: 'Gimnasio', source: 'google-places');
+      });
+      final container = await arrancar();
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateGymId('ChIJ_A');
+      notifier.updateGymId('ChIJ_B');
+
+      await notifier.submit();
+
+      expect(ids, ['ChIJ_B']);
+    });
+
+    test('si crear el gym falla, el usuario no queda vinculado', () async {
+      when(() => resolver.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          )).thenThrow(const ResolveGymPlaceFailure$Unknown());
       final container = await arrancar();
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateGymId('ChIJ_A');
 
-      await notifier.submit();
+      await expectLater(
+          notifier.submit(), throwsA(isA<ResolveGymPlaceFailure>()));
 
-      verifyZeroInteractions(resolver);
       final user = await firestore.collection('users').doc('u1').get();
-      expect(user.data()!['gymId'], 'ChIJ_A');
-      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
-      expect(a.exists, isFalse);
+      expect(user.data()!['gymId'], isNull);
     });
 
     test('sin gym (centinela) se persiste null', () async {

@@ -46,15 +46,24 @@ const REGION = "southamerica-east1";
 export const PROPAGATE_PAGE_SIZE = 400;
 
 /**
- * Nombre que corresponde mostrar: el del gym, o `null` si no existe o esta
- * marcado `nameNeeded` (su nombre no es de un usuario).
+ * Marcador con el que el cliente crea los gyms de Places (el nombre de Google
+ * no se puede guardar, #1338): no es un nombre y jamas se copia a los perfiles.
+ * Debe coincidir con `kGymPlaceholderName` (lib/features/gyms/domain/gym.dart).
+ */
+export const GYM_PLACEHOLDER_NAME = "Gimnasio";
+
+/**
+ * Nombre que corresponde mostrar: el del gym, o `null` si no existe, esta
+ * marcado `nameNeeded` (su nombre no es de un usuario) o es el marcador.
  */
 function effectiveName(
   snap: FirebaseFirestore.DocumentSnapshot,
 ): string | null {
   if (!snap.exists || snap.get("nameNeeded") === true) return null;
   const name = snap.get("name");
-  return typeof name === "string" && name.trim() !== "" ? name : null;
+  if (typeof name !== "string") return null;
+  const trimmed = name.trim();
+  return trimmed !== "" && trimmed !== GYM_PLACEHOLDER_NAME ? name : null;
 }
 
 /**

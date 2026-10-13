@@ -443,7 +443,7 @@ class _ListContent extends ConsumerWidget {
   /// Devuelve un label corto para la ubicación más cercana del PF:
   ///   - Si es `gym` → `gymDisplayNameProvider` (Google en vivo para gyms de
   ///     Places, nunca guardado).
-  ///   - Si es `gym` y el nombre no está (cargando / sin doc) → 'Gimnasio'.
+  ///   - Si es `gym` y el nombre no está (cargando / sin red) → null.
   ///   - Si es `custom` → el `customLabel`.
   ///   - Si `nearest` es null → null (sin label).
   String? _labelFor(WidgetRef ref, TrainerLocation? nearest) {
@@ -451,7 +451,7 @@ class _ListContent extends ConsumerWidget {
     if (nearest.type == TrainerLocationType.gym) {
       final nombre =
           ref.watch(gymDisplayNameProvider(nearest.gymId)).valueOrNull;
-      return (nombre == null || nombre.isEmpty) ? 'Gimnasio' : nombre;
+      return (nombre == null || nombre.isEmpty) ? null : nombre;
     }
     return nearest.customLabel;
   }

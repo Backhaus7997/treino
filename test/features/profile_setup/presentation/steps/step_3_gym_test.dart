@@ -172,8 +172,8 @@ void main() {
     });
 
     testWidgets(
-        'selecting a suggestion resolves it (no session token), sets '
-        "draft.gymId to the Place's id, and does NOT write users/{uid}",
+        "selecting a suggestion sets draft.gymId to the Place's id and does "
+        'NOT resolve it nor write anything (the gym doc is created on submit)',
         (tester) async {
       when(() => mockPlacesService.search(
             textQuery: any(named: 'textQuery'),
@@ -205,10 +205,10 @@ void main() {
       await tester.tap(find.text('QIVOX Villa Warcalde'));
       await tester.pumpAndSettle();
 
-      verify(() => mockResolveService.call(
-            placeId: 'ChIJ_1',
-            sessionToken: null,
-          )).called(1);
+      verifyNever(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          ));
       // Antes acá había un `verify(update).called(1)`, y estaba verde con el
       // bug adentro: el mock aceptaba una escritura que las reglas denegaban
       // sobre un `users/{uid}` inexistente. El gymId lo persiste `submit()`.
@@ -264,50 +264,6 @@ void main() {
         container.read(profileSetupNotifierProvider).draft.gymId,
         'ChIJ_1',
       );
-      verifyNever(() => mockUserRepo.update(any(), any()));
-    });
-
-    testWidgets(
-        'si el resolve falla → avisa con un SnackBar y el draft no cambia',
-        (tester) async {
-      when(() => mockPlacesService.search(
-            textQuery: any(named: 'textQuery'),
-            biasLatitude: any(named: 'biasLatitude'),
-            biasLongitude: any(named: 'biasLongitude'),
-          )).thenAnswer((_) async => const [
-            GymSuggestion(
-              placeId: 'ChIJ_1',
-              primaryText: 'QIVOX Villa Warcalde',
-              secondaryText: 'Some street 123',
-            ),
-          ]);
-      when(() => mockResolveService.call(
-            placeId: any(named: 'placeId'),
-            sessionToken: any(named: 'sessionToken'),
-          )).thenThrow(const ResolveGymPlaceFailure$Server(
-        'Places API request failed. Please try again.',
-        statusCode: 503,
-      ));
-
-      await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
-      await tester.pumpAndSettle();
-
-      await tester.enterText(find.byType(TextField), 'qivox');
-      await tester.pump(const Duration(milliseconds: 5));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('QIVOX Villa Warcalde'));
-      await tester.pumpAndSettle();
-
-      // El síntoma del bug era justamente el silencio: tocar el gimnasio y que
-      // no pasara nada.
-      final l10n = AppL10n.of(tester.element(find.byType(Step3Gym)));
-      expect(find.text(l10n.profileSetupGymSelectError), findsOneWidget);
-
-      final container = ProviderScope.containerOf(
-        tester.element(find.byType(Step3Gym)),
-      );
-      expect(container.read(profileSetupNotifierProvider).draft.gymId, isNull);
       verifyNever(() => mockUserRepo.update(any(), any()));
     });
 

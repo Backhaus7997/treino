@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart'
     show authStateChangesProvider, firebaseAuthProvider;
+import '../../gyms/application/places_providers.dart'
+    show resolveGymPlaceServiceProvider;
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/application/user_providers.dart';
@@ -232,9 +234,8 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
   void updateBornAt(DateTime value) =>
       state = state.copyWith(draft: state.draft.copyWith(bornAt: value));
 
-  /// Fija el gym del draft. El doc `gyms/{placeId}` ya lo creó el resolver al
-  /// tocar el gym; el nombre de Google no se pide ni se guarda (se muestra en
-  /// vivo).
+  /// Fija el gym del draft. El doc `gyms/{placeId}` se crea en el submit; el
+  /// nombre de Google no se pide ni se guarda (se muestra en vivo).
   void updateGymId(String? value) =>
       state = state.copyWith(draft: state.draft.copyWith(gymId: value));
 
@@ -392,6 +393,15 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         acceptedTermsVersion: sello?['acceptedTermsVersion'] as int?,
         acceptedPrivacyVersion: sello?['acceptedPrivacyVersion'] as int?,
       );
+
+      // Gym de Places elegido en el paso 3: recién ahora se crea el doc
+      // compartido (marcador como nombre; el de Google se muestra en vivo), y
+      // ANTES del update de `users/{uid}`. Si el usuario eligió otro gym o
+      // abandonó, no se escribió nada.
+      final gymId = draft.gymId;
+      if (gymId != null && gymId != kNoGymId) {
+        await ref.read(resolveGymPlaceServiceProvider).call(placeId: gymId);
+      }
 
       final partial = <String, Object?>{
         'displayName': handle,

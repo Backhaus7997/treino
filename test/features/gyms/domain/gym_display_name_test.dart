@@ -37,6 +37,10 @@ void main() {
       );
     });
 
+    test('el marcador de Places NUNCA es un nombre: da vacío', () {
+      expect(gymDisplayNameFromGym(_gym(name: kGymPlaceholderName)), isEmpty);
+    });
+
     test('SCENARIO-529: null Gym (unresolvable id) → empty string, no throw',
         () {
       expect(gymDisplayNameFromGym(null), equals(''));

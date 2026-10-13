@@ -1,11 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/telemetry/non_fatal.dart';
-import '../../../../l10n/app_l10n.dart';
-import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
@@ -22,9 +17,10 @@ import '../widgets/gym_search_box.dart';
 /// `gyms/{placeId}`) y lo deja en el draft. El `gymId` del usuario lo persiste
 /// `ProfileSetupNotifier.submit()`, que lo manda en su parcial.
 ///
-/// Nadie nombra el gym: el resolver crea `gyms/{placeId}` con un marcador
-/// como nombre y el nombre de Google se muestra en vivo, sin guardarse
-/// (política de Places, #1338).
+/// Tocar un gimnasio sólo lo deja en el draft (no resuelve ni escribe nada).
+/// El submit crea `gyms/{placeId}` con un marcador como nombre si no existe y
+/// el nombre de Google se muestra en vivo, sin guardarse (política de Places,
+/// #1338). Nadie nombra el gym.
 ///
 /// Este paso NO escribe `users/{uid}`, y no es un detalle. Hasta sep-2026
 /// escribía `{'gymId': ...}` ahí (vía `selectGymActionProvider`), apoyado en
@@ -50,43 +46,14 @@ import '../widgets/gym_search_box.dart';
 class Step3Gym extends ConsumerWidget {
   const Step3Gym({super.key});
 
-  Future<void> _onGymIdSelected(
-    BuildContext context,
-    WidgetRef ref,
-    String? gymId,
-  ) async {
+  /// Sólo deja el gym en el draft. El doc compartido `gyms/{placeId}` se crea
+  /// en el submit: crearlo al tocar dejaba docs huérfanos en un catálogo que
+  /// lee todo el mundo si el usuario cambiaba de gym o abandonaba el alta.
+  void _onGymIdSelected(WidgetRef ref, String? gymId) {
     final notifier = ref.read(profileSetupNotifierProvider.notifier);
-    if (gymId == null || gymId == kNoGymId) {
-      notifier.updateGymId(kNoGymId);
-      return;
-    }
-
-    // Todo lo que se usa después del await se toma ANTES: leer `ref` o
-    // `context` con la operación en vuelo tiraba "Cannot use ref after the
-    // widget was disposed" cuando la pantalla se desmontaba en el medio, y el
-    // gimnasio nunca llegaba al draft.
-    final resolver = ref.read(resolveGymPlaceServiceProvider);
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppL10n.of(context);
-
-    try {
-      final result = await resolver.call(placeId: gymId);
-      notifier.updateGymId(result.gymId);
-    } catch (e, st) {
-      // Antes esto no avisaba a nadie: ni al usuario, que tocaba el gimnasio
-      // y no pasaba nada, ni a Crashlytics. Por eso el bug de `bornAtOk` se
-      // vio como «el gimnasio no se deja elegir» y no como lo que era.
-      unawaited(reportNonFatal(
-        e,
-        st,
-        reason: 'Step3Gym: no se pudo resolver el gimnasio elegido en el alta',
-      ));
-      if (messenger.mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.profileSetupGymSelectError)),
-        );
-      }
-    }
+    notifier.updateGymId(
+      gymId == null || gymId == kNoGymId ? kNoGymId : gymId,
+    );
   }
 
   @override
@@ -102,7 +69,7 @@ class Step3Gym extends ConsumerWidget {
         padding: const EdgeInsets.only(top: 20),
         child: GymSearchBox(
           selectedGymId: selectedGymId,
-          onGymIdSelected: (gymId) => _onGymIdSelected(context, ref, gymId),
+          onGymIdSelected: (gymId) => _onGymIdSelected(ref, gymId),
         ),
       ),
     );

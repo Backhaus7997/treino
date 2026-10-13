@@ -58,6 +58,7 @@ class GymRepository {
   /// de Google.
   Future<void> createFromPlace(Gym gym) async {
     final data = gym.toJson()
+      ..['name'] = kGymPlaceholderName
       ..remove('address')
       ..removeWhere((_, v) => v == null)
       ..['coordsFetchedAt'] = FieldValue.serverTimestamp()

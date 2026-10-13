@@ -67,22 +67,51 @@ void main() {
     expect(doc.data()!['name'], 'Gimnasio');
   });
 
-  test('gym de Places con el pedido caído: cae al nombre guardado', () async {
+  test('gym de Places con el pedido caído: vacío, JAMÁS el marcador', () async {
     await seedGym('ChIJ_1', 'Gimnasio', 'google-places');
     when(() => resolver.fetchDisplayName('ChIJ_1'))
         .thenThrow(const ResolveGymPlaceFailure$Unknown());
 
     final c = container();
-    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), 'Gimnasio');
+    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), '');
   });
 
-  test('gym de Places con Google sin nombre: cae al guardado', () async {
+  test('gym de Places con nombre legacy real y pedido caído: usa el guardado',
+      () async {
+    await seedGym('ChIJ_L', 'Iron Box (tipeado)', 'google-places');
+    when(() => resolver.fetchDisplayName('ChIJ_L'))
+        .thenThrow(const ResolveGymPlaceFailure$Unknown());
+
+    final c = container();
+    expect(await c.read(gymDisplayNameProvider('ChIJ_L').future),
+        'Iron Box (tipeado)');
+  });
+
+  test('gym de Places con Google sin nombre: vacío', () async {
     await seedGym('ChIJ_1', 'Gimnasio', 'google-places');
     when(() => resolver.fetchDisplayName('ChIJ_1'))
         .thenAnswer((_) async => null);
 
     final c = container();
-    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), 'Gimnasio');
+    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), '');
+  });
+
+  test('un fallo NO se cachea: sin oyentes, el próximo consumidor reintenta',
+      () async {
+    await seedGym('ChIJ_1', 'Gimnasio', 'google-places');
+    var calls = 0;
+    when(() => resolver.fetchDisplayName('ChIJ_1')).thenAnswer((_) async {
+      calls++;
+      if (calls == 1) throw const ResolveGymPlaceFailure$Unknown();
+      return 'Iron Box';
+    });
+
+    final c = container();
+    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), '');
+    // Dejar que el provider autoDispose se libere antes del reintento.
+    await Future<void>.delayed(Duration.zero);
+    expect(await c.read(gymDisplayNameProvider('ChIJ_1').future), 'Iron Box');
+    expect(calls, 2);
   });
 
   test('gym sembrado: usa el nombre guardado y no llama a Google', () async {

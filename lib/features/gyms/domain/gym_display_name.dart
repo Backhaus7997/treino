@@ -21,7 +21,13 @@ import 'gym.dart';
 /// For DETAIL contexts backed by `gymByIdProvider` (Riverpod-cached lookup
 /// by id). Returns the resolved gym's composed name, or `''` when [gym] is
 /// `null` (unknown/deleted id — caller hides the subtitle).
-String gymDisplayNameFromGym(Gym? gym) => gym?.name ?? '';
+///
+/// El marcador [kGymPlaceholderName] que se guarda en los gyms de Places NO es
+/// un nombre: se trata como vacío para que jamás se muestre.
+String gymDisplayNameFromGym(Gym? gym) {
+  final name = gym?.name ?? '';
+  return name == kGymPlaceholderName ? '' : name;
+}
 
 /// For LIST/feed contexts reading the already-denormalized
 /// `UserPublicProfile.gymName` (no per-row fetch). Returns [gymName] as-is

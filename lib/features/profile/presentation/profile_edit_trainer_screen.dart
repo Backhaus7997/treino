@@ -1108,17 +1108,16 @@ class _ToggleCard extends StatelessWidget {
 // ── Gym picker sheet ─────────────────────────────────────────────────────────
 
 /// Título de un gym a partir de [gymDisplayNameProvider]: el nombre vivo si
-/// llegó; si no, [loadingLabel] mientras carga o [fallback] ('Gimnasio').
+/// llegó; si no, [loadingLabel] mientras carga el catálogo o vacío (el marcador
+/// 'Gimnasio' nunca se muestra como nombre).
 String _gymTitle(
   AsyncValue<String> name, {
   required bool loading,
   required String loadingLabel,
-  String fallback = 'Gimnasio',
 }) {
   final v = name.valueOrNull;
   if (v != null && v.isNotEmpty) return v;
-  if (loading || name.isLoading) return loading ? loadingLabel : fallback;
-  return fallback;
+  return loading ? loadingLabel : '';
 }
 
 class _GymPickerSheet extends StatefulWidget {
@@ -1244,7 +1243,6 @@ class _GymPickerSheetState extends State<_GymPickerSheet> {
                                 ref.watch(gymDisplayNameProvider(g.id)),
                                 loading: false,
                                 loadingLabel: '',
-                                fallback: g.name,
                               ),
                               style: TextStyle(
                                 color: palette.textPrimary,

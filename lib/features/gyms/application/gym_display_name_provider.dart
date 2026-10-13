@@ -13,10 +13,11 @@ import 'places_providers.dart';
 ///   (Place Details, máscara `displayName`). Los términos de Google Maps
 ///   Platform prohíben guardar su contenido, así que el nombre vive sólo en
 ///   la memoria de la sesión: este provider es `autoDispose` y se "fija"
-///   (`keepAlive`) únicamente cuando Google contestó, de modo que un fallo de
-///   red no queda cacheado toda la sesión.
-/// - Si el pedido falla o viene vacío, cae al `gym.name` guardado (para un gym
-///   nuevo es el marcador [kGymPlaceholderName]).
+///   (`keepAlive`) mientras el pedido está en vuelo y se suelta si falló, de modo
+///   que un fallo de red no queda cacheado toda la sesión.
+/// - Si el pedido falla o viene vacío, cae al `gym.name` guardado SI es un
+///   nombre real (legacy tipeado por un usuario); el marcador
+///   [kGymPlaceholderName] jamás se muestra: da `''`.
 /// - Gyms sembrados / autogestionados → el `name` guardado.
 final gymDisplayNameProvider =
     FutureProvider.autoDispose.family<String, String?>((ref, gymId) async {
@@ -25,17 +26,19 @@ final gymDisplayNameProvider =
   if (gym == null) return '';
 
   if (gym.source == GymSource.googlePlaces) {
+    // keepAlive ANTES del await: si los oyentes se van con el pedido (pago)
+    // en vuelo, la respuesta no se descarta. Se cierra si falla o viene vacío,
+    // así el próximo consumidor reintenta (sin Timer: rompe tests ajenos).
+    final link = ref.keepAlive();
     try {
       final live = await ref
           .read(resolveGymPlaceServiceProvider)
           .fetchDisplayName(gym.id);
-      if (live != null) {
-        ref.keepAlive();
-        return live;
-      }
+      if (live != null) return live;
     } catch (_) {
-      // Sin red / sin key / Google caído: se muestra el nombre guardado.
+      // Sin red / sin key / Google caído: ver abajo.
     }
+    link.close();
   }
   return gymDisplayNameFromGym(gym);
 });
