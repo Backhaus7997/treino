@@ -344,9 +344,18 @@ pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
 
 ### 8. Branching y PRs
 
-- Equipo de **3 devs**. Nadie pushea directo a `main`.
+- Equipo de **3 devs**. Nadie pushea directo a `main` ni a `develop`.
 - **Una rama por cambio** (no por fase). Naming: `<tipo>/<scope>-<descripción-kebab>`.
-- PR con **1+ approve**, **squash and merge**, branch auto-delete.
+- **Todo PR de una rama va contra `develop`**, nunca contra `main`. `develop` es la
+  rama de integración: va por delante de `main`, y los builds de prueba (TestFlight,
+  sideloads, devices) se sacan de ahí.
+- **A `main` sólo se mergea `develop`.** Ningún PR con otra rama de origen entra a
+  `main`, ni hot-fixes: el hot-fix va a `develop` y sube con el release. Se sube
+  cuando se juntaron varios cambios probados, y ese merge es el release.
+- Rama → `develop`: **squash and merge**, branch auto-delete. `develop` → `main`:
+  **merge commit** (un squash hace divergir las dos ramas).
+- **No se exige approve**: hoy no hay otro dev que pueda darlo. El review lo cubren
+  el CI, los bots (Codex, CodeQL) y la prueba en device sobre `develop`.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
 - Si modificás `AGENTS.md` o algo en `docs/` → reviewer aprueba **explícitamente** la modificación de las reglas.
 - **Después de todo rebase y antes de todo force-push**:

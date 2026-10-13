@@ -6,8 +6,11 @@ Equipo, setup, commits, branching, PRs, ciclo SDD y calidad gates. Si vas a abri
 
 Equipo de **3 desarrolladores**. Esto implica:
 
-- **Nadie pushea directo a `main`** (ni siquiera fixes de una línea, salvo emergencias acordadas).
-- Toda feature/fix entra por **PR con review**: mínimo 1 approve antes de mergear.
+- **Nadie pushea directo a `main` ni a `develop`** (ni siquiera fixes de una línea).
+- Toda feature/fix entra por **PR contra `develop`**. **No se exige approve**: hoy no
+  hay otro dev que pueda darlo, así que el gate es el CI, los bots (Codex, CodeQL) y
+  la prueba en device sobre `develop`.
+- **A `main` sólo entra `develop`** (ver [Ramas: develop y main](#ramas-develop-y-main)).
 - `main` queda **siempre deployable** (verde, sin trabajo a medio terminar).
 - Las decisiones de scope/arquitectura se discuten en el PR o issue antes de implementar.
 
@@ -96,17 +99,41 @@ Ejemplos:
 ### Flujo
 
 ```
-1. git checkout main && git pull
-2. git checkout -b <tipo>/<scope>-<name>
-3. /sdd-new <name>          ← arranca el ciclo SDD (cambios no triviales)
+1. git fetch origin && git checkout -b <tipo>/<scope>-<name> origin/develop
+2. /sdd-new <name>          ← arranca el ciclo SDD (cambios no triviales)
    → explore → propose → spec → design → tasks → apply → verify
-4. flutter analyze && flutter test     ← gate de calidad local
-5. git push -u origin <branch>
-6. /branch-pr               ← crea el PR contra main
-7. Esperar 1+ approve
-8. Merge SQUASH desde GitHub
-9. git checkout main && git pull && git branch -d <branch>
+3. flutter analyze && flutter test     ← gate de calidad local
+4. git push -u origin <branch>
+5. gh pr create --base develop         ← SIEMPRE contra develop
+6. CI verde + leer bots y anotaciones (Codex, CodeQL)
+7. Merge SQUASH desde GitHub
+8. git branch -d <branch>
 ```
+
+### Ramas: develop y main
+
+```
+feat/x ──┐
+fix/y  ──┼──► develop ──(varios cambios probados)──► main ──► release
+docs/z ──┘    builds de prueba        merge commit
+```
+
+- **`develop` es la rama de integración.** Todo PR de una rama va contra `develop`, y
+  `develop` va normalmente por delante de `main` en commits.
+- **Los builds de prueba salen de `develop`** (TestFlight, sideloads, devices). Lo que
+  se prueba es lo que después sube a `main`, no cada rama suelta.
+- **A `main` sólo se mergea `develop`.** Ningún PR de otra rama entra a `main`. Cuando
+  `develop` junta varios cambios probados, se abre `develop → main` y ese merge es el
+  release.
+- **`develop → main` va con merge commit, no squash.** Un squash deja a `develop` con
+  commits que `main` no tiene por SHA, las ramas divergen y el siguiente PR sale con
+  «head branch is out of date».
+- **Si `main` tiene algo que `develop` no** (no debería pasar con esta regla, pero
+  pasa con un merge viejo): sincronizá `main → develop` con merge commit **antes** de
+  abrir el próximo `develop → main`.
+- **`develop` no se borra al mergear.** El auto-delete de GitHub borra la rama de
+  origen del PR; en `develop → main` la rama de origen es `develop`. Si GitHub la
+  borra, se restaura desde el botón del PR antes de seguir.
 
 ### Cierre de fase
 
@@ -119,14 +146,11 @@ git push origin v0.X.0-fase<N>
 
 No hay rama de fase. Se usa el tag como punto de referencia para `git diff v0.1.0-fase0..v0.2.0-fase1`.
 
-### Push directo a main: prohibido
+### Push directo a main o develop: prohibido
 
-Salvo:
-
-- Hot-fix crítico de prod (acordado en grupo, sin demora).
-- Updates triviales en `README.md` por el lead del repo.
-
-Cualquier otro push a `main` debe revertirse.
+Sin excepciones. Un hot-fix crítico de prod también va por PR a `develop` y sube a
+`main` con un `develop → main` inmediato: así `main` nunca tiene un commit que
+`develop` no tenga.
 
 ## Pull Requests
 
@@ -134,18 +158,21 @@ Usar el template `.github/pull_request_template.md` (se carga solo al abrir el P
 
 Reglas:
 
-- **1 approve mínimo** antes de mergear.
-- **Strategy: Squash and merge** (un commit limpio en main por PR).
-- Branch eliminada al mergear (auto-delete activado en GitHub).
-- CI debe pasar antes del approve (cuando lo cableemos).
+- **Base `develop`** para todo PR de una rama. **Base `main`** sólo para `develop → main`.
+- **No se exige approve.** Hoy no hay otro dev que pueda darlo; exigirlo dejaba todo
+  PR trabado o mergeado salteando la regla. Si se suma alguien, se vuelve a exigir.
+- **Strategy**: rama → `develop` con **squash and merge**; `develop → main` con
+  **merge commit**.
+- Branch eliminada al mergear (auto-delete activado en GitHub), salvo `develop`.
+- CI verde antes de mergear, y leer bots y anotaciones: un check verde puede traer
+  warnings.
 - El PR debe linkear al issue (`Closes #N`) si existe.
-- Si el cambio modifica `AGENTS.md`, archivos de `docs/`, `CONTRIBUTING.md` o specs SDD, el reviewer debe aprobar la modificación de las reglas explícitamente en el comentario.
+- Si el cambio modifica `AGENTS.md`, archivos de `docs/`, `CONTRIBUTING.md` o specs SDD,
+  la modificación de las reglas se aprueba explícitamente (hoy, el dueño del repo).
 
-### Reviews — SLA del equipo
+### Reviews
 
-- **24 h SLA**: si nadie revisa en 24h, ping en chat.
-- **48 h hard limit**: si nadie revisa en 48h, podés mergear con review de cualquier otro dev (no del owner).
-- **Conflictos de merge**: el autor del PR los resuelve, no el reviewer.
+- **Conflictos de merge**: el autor del PR los resuelve.
 - **Refactors grandes**: NUNCA mezclar con features. PR `refactor/<scope>` separado.
 
 ## Workflow SDD (Spec-Driven Development)
