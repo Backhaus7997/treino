@@ -208,4 +208,39 @@ void main() {
       expect(data['acceptedTermsVersion'], 1);
     });
   });
+
+  // La otra carrera del alta, medida en un emulador Android (2026-10-13), que
+  // #1390 no cubría: el token de FCM se guarda apenas existe la cuenta de Auth
+  // y, mientras el servidor no lo rechaza, el SDK muestra un `users/{uid}` con
+  // SÓLO `fcmTokens`. El registro lo leía como perfil, `fromJson` reventaba
+  // por la falta de `uid` y el rollback borraba la cuenta.
+  group('un users/{uid} a medio escribir (sin uid) no es un perfil', () {
+    setUp(() => firestore._primero = false);
+
+    Future<void> sembrarFantasma() =>
+        firestore.collection('users').doc(_uid).set({
+          'fcmTokens': ['tok-del-telefono']
+        });
+
+    test('el registro crea el perfil encima y NO borra la cuenta', () async {
+      await sembrarFantasma();
+
+      final result =
+          await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      expect(result, same(user));
+      verifyNever(() => user.delete());
+      final data = await doc();
+      expect(data!['uid'], _uid);
+      expect(data['role'], 'athlete');
+      expect(data['termsAcceptedAt'], isA<Timestamp>());
+      expect(data['acceptedTermsVersion'], kTermsVersion);
+    });
+
+    test('UserRepository.get lo devuelve como null, sin tirar', () async {
+      await sembrarFantasma();
+
+      expect(await repo.get(_uid), isNull);
+    });
+  });
 }

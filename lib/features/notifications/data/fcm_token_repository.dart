@@ -22,13 +22,41 @@ class FcmTokenRepository {
   /// Idempotent — duplicate tokens are not added.
   /// Creates the `fcmTokens` field if absent on the document.
   /// REQ-PN-DATA-001, REQ-PN-DATA-002, SCENARIO-619, 620, 621.
+  ///
+  /// ─── Por qué `update` y no `set(merge)` ───────────────────────────────────
+  ///
+  /// Si `users/{uid}` todavía no existe, no se escribe nada. Pasa en el alta
+  /// por mail: `fcmLifecycleProvider` guarda el token apenas existe la cuenta
+  /// de Auth, antes de que el registro cree el perfil.
+  ///
+  /// Con `set(merge)` ese caso era peor que inútil. El servidor lo rechaza
+  /// siempre —el create de `users/{uid}` exige `uid`, `email` y `role`—, pero
+  /// el SDK aplica la escritura en el teléfono AL INSTANTE y, hasta que llega
+  /// el rechazo, muestra un `users/{uid}` con SÓLO `fcmTokens`. El registro lo
+  /// leía como perfil, `UserProfile.fromJson` reventaba y el rollback borraba
+  /// la cuenta recién creada: «Hubo un problema creando tu perfil» (medido en
+  /// un emulador Android, 2026-10-13). `update` sobre un doc inexistente no
+  /// aparece en la vista local: sólo falla.
+  ///
+  /// OJO con CÓMO falla, que no es igual en todos lados. Contra producción
+  /// vuelve `permission-denied` —las reglas de update corren antes de que el
+  /// servidor note que el doc no existe; medido el mismo día—, y eso lo ataja
+  /// y loguea `FcmService.init`, igual que antes con el `set(merge)`. El
+  /// `not-found` de acá abajo es lo que tira `fake_cloud_firestore`: se
+  /// silencia porque no hay nada que reportar, no porque sea lo que pasa en
+  /// el teléfono.
+  ///
+  /// El token no se pierde: `FcmService.init` vuelve a correr al próximo
+  /// arranque y cuando `PermissionGate` concede el permiso.
   Future<void> saveToken(String uid, String token) async {
-    await _users.doc(uid).set(
-      {
+    try {
+      await _users.doc(uid).update({
         'fcmTokens': FieldValue.arrayUnion([token]), // ADR-PN-001, ADR-PN-002
-      },
-      SetOptions(merge: true),
-    );
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'not-found') return;
+      rethrow;
+    }
   }
 
   /// Removes [token] from `users/[uid].fcmTokens` using `arrayRemove`.
