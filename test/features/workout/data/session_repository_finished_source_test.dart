@@ -40,6 +40,7 @@
 // ignore_for_file: subtype_of_sealed_class
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
@@ -69,6 +70,10 @@ class _Snapshot extends Mock implements DocumentSnapshot<Map<String, Object?>> {
   final Map<String, Object?>? _datos;
   final _MockMetadata _metadata;
 
+  /// Mismos DATOS que [otro]: lo único que puede cambiar es la metadata.
+  bool mismosDatosQue(_Snapshot otro) =>
+      _existe == otro._existe && mapEquals(_datos, otro._datos);
+
   @override
   bool get exists => _existe;
 
@@ -86,13 +91,40 @@ extension on _MockMetadata {
   }
 }
 
+/// Lo que el SDK le entrega a un listener, a partir de lo que pasa en el doc.
+///
+/// Sin `includeMetadataChanges: true`, un snapshot cuyos DATOS son iguales a
+/// los del anterior —sólo cambió `isFromCache` o `hasPendingWrites`— **no se
+/// emite**. Es el `shouldRaiseEvent` del core de Firestore, el mismo
+/// comportamiento que documenta `follow_repository.dart`. El ACK del servidor
+/// a una escritura propia es exactamente eso: mismos datos,
+/// `hasPendingWrites` true → false.
+///
+/// Un mock que emite todo sin mirar el flag no puede ver ese bug: el código
+/// que se olvida del flag pasaría igual.
+List<_Snapshot> _loQueEmiteElSdk(
+  List<_Snapshot> enElDoc, {
+  required bool includeMetadataChanges,
+}) {
+  if (includeMetadataChanges) return enElDoc;
+  final out = <_Snapshot>[];
+  for (final s in enElDoc) {
+    if (out.isNotEmpty && s.mismosDatosQue(out.last)) continue;
+    out.add(s);
+  }
+  return out;
+}
+
 void main() {
   const uid = 'u1';
   const sessionId = 's1';
 
-  /// Arma el repositorio sobre un `snapshots()` que emite [snaps] en orden.
-  SessionRepository repoQueEmite(
-      List<DocumentSnapshot<Map<String, Object?>>> snaps) {
+  setUpAll(() => registerFallbackValue(ListenSource.defaultSource));
+
+  /// Arma el repositorio sobre un documento por el que pasan [snaps] en orden.
+  /// Lo que llega al listener depende de `includeMetadataChanges`, como en el
+  /// SDK real — ver [_loQueEmiteElSdk].
+  SessionRepository repoQueEmite(List<_Snapshot> snaps) {
     final firestore = _MockFirestore();
     final users = _MockCollection();
     final userDoc = _MockDoc();
@@ -103,9 +135,18 @@ void main() {
     when(() => users.doc(uid)).thenReturn(userDoc);
     when(() => userDoc.collection('sessions')).thenReturn(sessions);
     when(() => sessions.doc(sessionId)).thenReturn(sessionDoc);
-    when(sessionDoc.snapshots).thenAnswer(
-      (_) => Stream<DocumentSnapshot<Map<String, Object?>>>.fromIterable(snaps),
-    );
+    when(
+      () => sessionDoc.snapshots(
+        includeMetadataChanges: any(named: 'includeMetadataChanges'),
+        source: any(named: 'source'),
+      ),
+    ).thenAnswer((inv) {
+      final conMetadata =
+          inv.namedArguments[#includeMetadataChanges] as bool? ?? false;
+      return Stream<DocumentSnapshot<Map<String, Object?>>>.fromIterable(
+        _loQueEmiteElSdk(snaps, includeMetadataChanges: conMetadata),
+      );
+    });
     return SessionRepository(firestore: firestore);
   }
 
@@ -183,6 +224,61 @@ void main() {
           'significa que alguien la haya terminado. Leerlo como «terminada» le '
           'dice al atleta que cerró el entreno desde la muñeca sobre un '
           'rechazo de paywall.',
+    );
+  });
+
+  test(
+      'una sesión creada en ESTE dispositivo sí se lee como terminada cuando '
+      'desaparece', () async {
+    // El ACK del servidor al create propio no cambia ningún dato: sólo
+    // `hasPendingWrites` pasa de true a false. Sin `includeMetadataChanges`
+    // el SDK no emite ese snapshot, `existioDeVerdad` no se prendía nunca, y
+    // la desaparición posterior —confirmada por el servidor— se leía como
+    // «nunca existió». El player quedaba vivo sobre una sesión borrada.
+    const datos = {'finishedAt': null};
+    final repo = repoQueEmite([
+      // Tocó Empezar: escritura local sin confirmar.
+      _Snapshot(
+        existe: true,
+        desdeElCache: false,
+        escrituraPendiente: true,
+        datos: datos,
+      ),
+      // El servidor la ACKea. Mismos datos: cambio SÓLO de metadata.
+      _Snapshot(existe: true, desdeElCache: false, datos: datos),
+      // Después alguien la borra, y lo dice el servidor.
+      _Snapshot(existe: false, desdeElCache: false),
+    ]);
+
+    await expectLater(
+      repo.watchSessionFinished(uid: uid, sessionId: sessionId),
+      emitsInOrder([false, true]),
+      reason: 'la sesión existió en el servidor —el ACK lo prueba— así que '
+          'su desaparición es un cierre. Si el ACK no se escucha, el teléfono '
+          'nunca se entera y sigue escribiendo sobre una sesión que no existe.',
+    );
+  });
+
+  test('los snapshots de sólo-metadata no re-emiten el mismo valor', () async {
+    // Escuchar la metadata es lo que arregla el caso de arriba, pero tiene un
+    // costo: cada ACK y cada cambio de `isFromCache` es una emisión más. Los
+    // consumidores (notifier del player, sesión del reloj) reaccionan a cada
+    // valor; que vean sólo los CAMBIOS es parte del contrato.
+    const datos = {'finishedAt': null};
+    final repo = repoQueEmite([
+      _Snapshot(existe: true, desdeElCache: true, datos: datos),
+      _Snapshot(
+        existe: true,
+        desdeElCache: false,
+        escrituraPendiente: true,
+        datos: datos,
+      ),
+      _Snapshot(existe: true, desdeElCache: false, datos: datos),
+    ]);
+
+    expect(
+      await repo.watchSessionFinished(uid: uid, sessionId: sessionId).toList(),
+      [false],
     );
   });
 }
