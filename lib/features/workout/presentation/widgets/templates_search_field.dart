@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/tokens.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/unified_templates_providers.dart';
@@ -71,41 +72,53 @@ class _TemplatesSearchFieldState extends ConsumerState<TemplatesSearchField> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     OutlineInputBorder border(Color color) => OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: color),
         );
 
-    return TextField(
-      controller: _controller,
-      textInputAction: TextInputAction.search,
-      style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 14),
-      decoration: InputDecoration(
-        prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
-        suffixIcon: _controller.text.isEmpty
-            ? null
-            : IconButton(
-                icon: Icon(
-                  TreinoIcon.close,
-                  color: palette.textMuted,
-                  size: 18,
-                ),
-                tooltip: l10n.workoutExploreSearchClear,
-                splashRadius: 18,
-                onPressed: _clear,
-              ),
-        hintText: l10n.workoutExploreSearchHint,
-        hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
-        filled: true,
-        fillColor: palette.bgCard,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 10,
+    // Material transparente propio: el TextField lo exige como ancestro, y
+    // esta pestaña también se monta fuera del Scaffold del shell (deep-link
+    // /workout?tab=plantillas en los tests del router).
+    return Material(
+      type: MaterialType.transparency,
+      child: TextField(
+        controller: _controller,
+        textInputAction: TextInputAction.search,
+        style: GoogleFonts.barlow(
+          color: palette.textPrimary,
+          fontSize: AppTextSize.body,
         ),
-        border: border(palette.border),
-        enabledBorder: border(palette.border),
-        focusedBorder: border(palette.accent),
+        decoration: InputDecoration(
+          prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  icon: Icon(
+                    TreinoIcon.close,
+                    color: palette.textMuted,
+                    size: 18,
+                  ),
+                  tooltip: l10n.workoutExploreSearchClear,
+                  splashRadius: 18,
+                  onPressed: _clear,
+                ),
+          hintText: l10n.workoutExploreSearchHint,
+          hintStyle: GoogleFonts.barlow(
+            color: palette.textMuted,
+            fontSize: AppTextSize.body,
+          ),
+          filled: true,
+          fillColor: palette.bgCard,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s12,
+          ),
+          border: border(palette.border),
+          enabledBorder: border(palette.border),
+          focusedBorder: border(palette.accent),
+        ),
+        onChanged: _onChanged,
       ),
-      onChanged: _onChanged,
     );
   }
 }
