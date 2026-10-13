@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -115,13 +116,12 @@ final blockedAthletesProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda que `UserRepository.watch`, por la misma razón: con la
       // cache local fría la PRIMERA snapshot llega con `exists == false` antes
       // de que el servidor confirme. Sin este filtro, el PF que abre el
       // navegador nuevo y viene rebotado de un guardado lee «tu cuenta no
       // tiene publicada la lista» durante el round-trip.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final raw = snap.data()?['blockedAthleteIds'];
     // Campo ausente ≠ lista vacía. Un `List` vacío es el backend diciendo

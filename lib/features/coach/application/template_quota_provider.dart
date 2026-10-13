@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/routine_providers.dart'
     show trainerTemplatesStreamProvider;
@@ -55,11 +56,10 @@ final templateUsageSummaryProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda de caché fría que `_customExercisePlanLimitProvider`:
       // con la cache local fría la PRIMERA snapshot llega con
       // `exists == false` antes de que el servidor confirme.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final data = snap.data();
     final usage = data?['templateUsage'];
@@ -84,12 +84,11 @@ final _templatePlanLimitProvider = StreamProvider.autoDispose<int?>((ref) {
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda que `_customExercisePlanLimitProvider`: con la cache
       // local fría la PRIMERA snapshot llega con `exists == false` antes de
       // que el servidor confirme. Sin esto, un PF con tope real vería "sin
       // tope" durante el round-trip.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final raw = snap.data()?[kPlanLimitsField];
     final limit = raw is Map ? raw['templates'] : null;

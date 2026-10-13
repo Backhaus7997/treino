@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/custom_exercise_providers.dart'
     show customExercisesForTrainerStreamProvider;
@@ -48,14 +49,13 @@ final _customExercisePlanLimitProvider = StreamProvider.autoDispose<int?>(
         .watch(firestoreProvider)
         .collection('users')
         .doc(uid)
-        .snapshots()
+        .snapshotsSinCacheVacia()
         // Misma guarda que `chatMediaQuotaProvider` y
         // `_athleteSubscriptionStatusProvider` en
         // `athlete_entitlement_provider.dart`, y por el mismo motivo: con la
         // cache local fría la PRIMERA snapshot llega con `exists == false`
         // antes de que el servidor confirme. Sin esto, un PF con tope real
         // vería "sin tope" durante el round-trip.
-        .where((snap) => snap.exists || !snap.metadata.isFromCache)
         .map((snap) {
       final raw = snap.data()?[kPlanLimitsField];
       final limit = raw is Map ? raw['customExercises'] : null;
@@ -95,9 +95,8 @@ final customExerciseUsageSummaryProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda de caché fría que [_customExercisePlanLimitProvider].
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final data = snap.data();
     final usage = data?[kCustomExerciseUsageField];
