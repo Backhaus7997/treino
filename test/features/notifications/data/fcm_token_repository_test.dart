@@ -168,6 +168,23 @@ void main() {
       },
     );
 
+    // Alta por mail (oct-2026): el token se guarda apenas existe la cuenta de
+    // Auth, ANTES de que el registro cree `users/{uid}`. Con `set(merge)` el
+    // SDK creaba en el teléfono un doc fantasma con sólo `fcmTokens` —el
+    // servidor lo rechaza igual: las reglas exigen `uid` para crear— y el
+    // registro lo leía como perfil, no lo podía parsear y borraba la cuenta.
+    test(
+      'saveToken sobre un users/{uid} que todavía no existe NO lo crea',
+      () async {
+        const uid = 'user-sin-perfil';
+
+        await repo.saveToken(uid, 'tok-1');
+
+        final snap = await firestore.collection('users').doc(uid).get();
+        expect(snap.exists, isFalse);
+      },
+    );
+
     // ADR-PN-001: verify the field name is fcmTokens (camelCase), not
     // fcm_tokens (snake_case).
     test(

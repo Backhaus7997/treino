@@ -655,6 +655,23 @@
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },
+  "workoutExploreSearchHint": "Buscar por nombre, músculo o ejercicio",
+  "@workoutExploreSearchHint": {
+    "description": "Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise."
+  },
+  "workoutExploreSearchClear": "Borrar búsqueda",
+  "@workoutExploreSearchClear": {
+    "description": "Tooltip / semantics label of the clear (X) button inside the EXPLORAR search box (#1412)."
+  },
+  "workoutExploreSearchEmpty": "No encontramos plantillas para «{query}»",
+  "@workoutExploreSearchEmpty": {
+    "description": "Empty state of the EXPLORAR grid when the text search matches no template (#1412). The query is shown back to the athlete inside guillemets.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "workoutExploreLoadError": "Hubo un error cargando las rutinas.",
   "@workoutExploreLoadError": {
     "description": "Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638)."
@@ -3819,26 +3836,6 @@
   "@routineCardDaysPerWeek": {"description": "Días por semana en la línea de metadata de la tarjeta de rutina.", "placeholders": {"days": {"type": "int"}}},
   "routineCardMinutes": "{value} min",
   "@routineCardMinutes": {"description": "Duración estimada por sesión en la tarjeta de rutina. El valor ya viene con el prefijo ~ cuando es calculado.", "placeholders": {"value": {"type": "String"}}},
-  "sessionTrimAdjustedTo": "Ajustado a {value} min",
-  "@sessionTrimAdjustedTo": {"description": "Título del aviso de sesión recortada en el player (#645). El valor ya viene con el prefijo ~ cuando es calculado.", "placeholders": {"value": {"type": "String"}}},
-  "sessionTrimDroppedList": "Fuera de hoy: {names}",
-  "@sessionTrimDroppedList": {"description": "Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.", "placeholders": {"names": {"type": "String"}}},
-  "sessionTrimUndo": "DESHACER",
-  "@sessionTrimUndo": {"description": "Acción que devuelve a la sesión todo lo que se había recortado (#645)."},
-  "sessionTimeFitPromptTitle": "¿CUÁNTO TIEMPO TENÉS HOY?",
-  "@sessionTimeFitPromptTitle": {"description": "Entrada al ajuste de tiempo en el player y título de su hoja (#645)."},
-  "sessionTimeFitCurrent": "Esta sesión son {value} min",
-  "@sessionTimeFitCurrent": {"description": "Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.", "placeholders": {"value": {"type": "String"}}},
-  "sessionTimeFitAlreadyFits": "Con {value} min ya entrás. No hace falta sacar nada.",
-  "@sessionTimeFitAlreadyFits": {"description": "Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
-  "sessionTimeFitTrimHeadline": "Si sacás esto, la sesión queda en {value} min:",
-  "@sessionTimeFitTrimHeadline": {"description": "Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.", "placeholders": {"value": {"type": "String"}}},
-  "sessionTimeFitCannotFit": "No llegamos a ese tiempo. Lo más corto posible son {value} min:",
-  "@sessionTimeFitCannotFit": {"description": "Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).", "placeholders": {"value": {"type": "String"}}},
-  "sessionTimeFitNothingToTrim": "No hay nada que sacar sin dejar la sesión vacía.",
-  "@sessionTimeFitNothingToTrim": {"description": "Respuesta cuando no queda ningún ejercicio recortable (#645)."},
-  "sessionTimeFitApply": "AJUSTAR HOY",
-  "@sessionTimeFitApply": {"description": "Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645)."},
   "onboardingCardDismiss": "ENTENDIDO",
   "@onboardingCardDismiss": {
     "description": "Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve."

@@ -1048,6 +1048,18 @@ class AppL10nEs extends AppL10n {
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
 
   @override
+  String get workoutExploreSearchHint =>
+      'Buscar por nombre, músculo o ejercicio';
+
+  @override
+  String get workoutExploreSearchClear => 'Borrar búsqueda';
+
+  @override
+  String workoutExploreSearchEmpty(String query) {
+    return 'No encontramos plantillas para «$query»';
+  }
+
+  @override
   String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
 
   @override
@@ -4234,49 +4246,6 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String sessionTrimAdjustedTo(String value) {
-    return 'Ajustado a $value min';
-  }
-
-  @override
-  String sessionTrimDroppedList(String names) {
-    return 'Fuera de hoy: $names';
-  }
-
-  @override
-  String get sessionTrimUndo => 'DESHACER';
-
-  @override
-  String get sessionTimeFitPromptTitle => '¿CUÁNTO TIEMPO TIENES HOY?';
-
-  @override
-  String sessionTimeFitCurrent(String value) {
-    return 'Esta sesión son $value min';
-  }
-
-  @override
-  String sessionTimeFitAlreadyFits(String value) {
-    return 'Con $value min ya entras. No hace falta quitar nada.';
-  }
-
-  @override
-  String sessionTimeFitTrimHeadline(String value) {
-    return 'Si quitas esto, la sesión queda en $value min:';
-  }
-
-  @override
-  String sessionTimeFitCannotFit(String value) {
-    return 'No llegamos a ese tiempo. Lo más corto posible son $value min:';
-  }
-
-  @override
-  String get sessionTimeFitNothingToTrim =>
-      'No hay nada que quitar sin dejar la sesión vacía.';
-
-  @override
-  String get sessionTimeFitApply => 'AJUSTAR HOY';
-
-  @override
   String get onboardingCardDismiss => 'ENTENDIDO';
 
   @override
@@ -6405,6 +6374,18 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreSearchHint =>
+      'Buscar por nombre, músculo o ejercicio';
+
+  @override
+  String get workoutExploreSearchClear => 'Borrar búsqueda';
+
+  @override
+  String workoutExploreSearchEmpty(String query) {
+    return 'No encontramos plantillas para «$query»';
+  }
 
   @override
   String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
@@ -9588,49 +9569,6 @@ class AppL10nEsAr extends AppL10nEs {
   String routineCardMinutes(String value) {
     return '$value min';
   }
-
-  @override
-  String sessionTrimAdjustedTo(String value) {
-    return 'Ajustado a $value min';
-  }
-
-  @override
-  String sessionTrimDroppedList(String names) {
-    return 'Fuera de hoy: $names';
-  }
-
-  @override
-  String get sessionTrimUndo => 'DESHACER';
-
-  @override
-  String get sessionTimeFitPromptTitle => '¿CUÁNTO TIEMPO TENÉS HOY?';
-
-  @override
-  String sessionTimeFitCurrent(String value) {
-    return 'Esta sesión son $value min';
-  }
-
-  @override
-  String sessionTimeFitAlreadyFits(String value) {
-    return 'Con $value min ya entrás. No hace falta sacar nada.';
-  }
-
-  @override
-  String sessionTimeFitTrimHeadline(String value) {
-    return 'Si sacás esto, la sesión queda en $value min:';
-  }
-
-  @override
-  String sessionTimeFitCannotFit(String value) {
-    return 'No llegamos a ese tiempo. Lo más corto posible son $value min:';
-  }
-
-  @override
-  String get sessionTimeFitNothingToTrim =>
-      'No hay nada que sacar sin dejar la sesión vacía.';
-
-  @override
-  String get sessionTimeFitApply => 'AJUSTAR HOY';
 
   @override
   String get onboardingCardDismiss => 'ENTENDIDO';

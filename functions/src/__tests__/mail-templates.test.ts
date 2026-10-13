@@ -1223,20 +1223,23 @@ describe("código de verificación del mail", () => {
     expect(out.html).toMatch(new RegExp(`font-size:30px[^>]*>${CODIGO}</strong>`));
   });
 
-  it("el del PF lista los cuatro planes, con cupo y precio", () => {
+  it("el del PF lista los cuatro planes, con cupo y detalle, sin precio", () => {
     const { text } = renderMail("email-code-trainer", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
-    expect(text).toContain("Free · 2 alumnos");
-    expect(text).toMatch(/Plan 1 · 7 alumnos · \$\s?12\.000 por mes/);
-    expect(text).toMatch(/Plan 2 · 15 alumnos · \$\s?22\.000 por mes/);
-    expect(text).toMatch(/Plan 3 · alumnos sin límite · \$\s?39\.000 por mes/);
+    expect(text).toContain("Free · Gratis");
+    expect(text).toContain("Plan 1 · Hasta 7 alumnos · Ejercicios propios: 60 · Plantillas: Sin tope");
+    expect(text).toContain("Plan 2 · Hasta 15 alumnos · Ejercicios propios: 120 · Plantillas: Sin tope");
+    expect(text).toContain("Plan 3 · Alumnos sin tope · Ejercicios propios: Sin tope");
+    expect(text).not.toMatch(/\$\s?\d/);
   });
 
-  it("el del alumno lista el gratis y TREINO Pro, con su precio", () => {
+  it("el del alumno lista el gratis y TREINO Pro con sus beneficios, sin precio", () => {
     const { text } = renderMail("email-code-athlete", { codigo: CODIGO, showPlans: "1" }, CON_PIE);
 
     expect(text).toContain("Gratis · el que tenés hoy.");
-    expect(text).toMatch(/TREINO Pro · \$\s?3\.500 por mes o \$\s?35\.000 por año\./);
+    expect(text).toContain("TREINO Pro · sin los topes del plan gratis:");
+    expect(text).toContain("hasta 10 rutinas propias");
+    expect(text).not.toMatch(/\$\s?\d/);
     // El alumno no ve los planes del PF.
     expect(text).not.toContain("Plan 1");
   });
@@ -1251,14 +1254,14 @@ describe("código de verificación del mail", () => {
       jest.doMock("../subscriptions/tier-config", () => ({
         ...jest.requireActual("../subscriptions/tier-config"),
         TIER_WEIGHT_LIMITS: { free: 3, plan1: 8, plan2: 16, plan3: null },
-        TIER_PRICES_ARS: {
-          plan1: { monthly: 11111, annual: 1 },
-          plan2: { monthly: 22222, annual: 1 },
-          plan3: { monthly: 33333, annual: 1 },
-        },
+        TIER_CUSTOM_EXERCISE_LIMITS: { free: 21, plan1: 61, plan2: 121, plan3: null },
+        TIER_TEMPLATE_LIMITS: { free: 4, plan1: null, plan2: null, plan3: null },
       }));
       jest.doMock("../subscriptions/athlete-plan-config", () => ({
         ATHLETE_PRICES_ARS: { monthly: 4444, annual: 44440 },
+        ATHLETE_PRO_MAX_ROUTINE_DAYS: 5,
+        ATHLETE_PRO_MAX_ROUTINE_WEEKS: 12,
+        ATHLETE_PRO_MAX_OWN_ROUTINES: 8,
       }));
       // `require` y no `import`: `isolateModules` es sincrónico (ver
       // `mp-precio-colision.test.ts`).
@@ -1270,10 +1273,11 @@ describe("código de verificación del mail", () => {
     jest.dontMock("../subscriptions/tier-config");
     jest.dontMock("../subscriptions/athlete-plan-config");
 
-    expect(pf).toContain("Free · 3 alumnos");
-    expect(pf).toContain(`Plan 1 · 8 alumnos · ${formatArs(11111)} por mes`);
-    expect(pf).toContain(`Plan 3 · alumnos sin límite · ${formatArs(33333)} por mes`);
-    expect(alumno).toContain(`TREINO Pro · ${formatArs(4444)} por mes o ${formatArs(44440)} por año.`);
+    expect(pf).toContain("Free · Gratis · Hasta 3 alumnos activos · cada alumno pausado cuenta 0,5 · Ejercicios propios: 21 · Plantillas: 4");
+    expect(pf).toContain("Plan 1 · Hasta 8 alumnos · Ejercicios propios: 61 · Plantillas: Sin tope");
+    expect(alumno).toContain("rutinas de hasta 5 días; hasta 12 semanas");
+    expect(alumno).toContain("hasta 8 rutinas propias");
+    expect(alumno).not.toMatch(/\$\s?\d/);
   });
 
   it("el del alumno manda al checkout de gettreino.com", () => {

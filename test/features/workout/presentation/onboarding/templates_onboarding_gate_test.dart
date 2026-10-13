@@ -9,6 +9,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/domain/template_preferences.dart';
 import 'package:treino/features/workout/presentation/onboarding/templates_onboarding_gate.dart';
 import 'package:treino/features/workout/presentation/onboarding/templates_onboarding_view.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -139,7 +140,142 @@ Future<void> _tapAndSettle(WidgetTester tester, Key key) async {
   await _settle(tester);
 }
 
+/// Stands in for the "AJUSTAR" entry point on the PLANTILLAS bar.
+class _EditorHost extends ConsumerWidget {
+  const _EditorHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Center(
+        child: ElevatedButton(
+          onPressed: () => showTemplatesPreferencesEditor(
+            context: context,
+            ref: ref,
+          ),
+          child: const Text('ABRIR-EDITOR'),
+        ),
+      );
+}
+
+Future<void> _pumpEditor(
+  WidgetTester tester, {
+  required _CapturingUserRepository repo,
+  Size size = const Size(390, 844),
+}) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        userRepositoryProvider.overrideWithValue(repo),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(
+            _profile().copyWith(
+              templatePreferences: const TemplatePreferences(
+                daysPerWeek: 4,
+                minutesPerSession: 60,
+              ),
+            ),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const Scaffold(body: _EditorHost()),
+      ),
+    ),
+  );
+  await _settle(tester);
+  await tester.tap(find.text('ABRIR-EDITOR'));
+  await _settle(tester);
+}
+
 void main() {
+  group('showTemplatesPreferencesEditor — dismissible (#1411)', () {
+    testWidgets('dragging the sheet down closes it, nothing is saved',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpEditor(tester, repo: repo);
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+
+      // Change an answer first: a dismiss must discard it, not save it.
+      await _tapAndSettle(tester, templatesOnboardingOptionKey('days', '3'));
+
+      // Drag from the top edge of the sheet (above the scrollable content).
+      final top = tester.getTopLeft(find.byType(TemplatesOnboardingView));
+      await tester.flingFrom(
+        Offset(195, top.dy - 4),
+        const Offset(0, 600),
+        2000,
+      );
+      await _settle(tester);
+
+      expect(find.byType(TemplatesOnboardingView), findsNothing);
+      expect(repo.updateCount, 0, reason: 'dismiss must not write anything');
+    });
+
+    testWidgets('tapping the scrim closes it, nothing is saved',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpEditor(tester, repo: repo);
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+
+      await _tapAndSettle(tester, templatesOnboardingOptionKey('days', '3'));
+
+      await tester.tapAt(const Offset(195, 20));
+      await _settle(tester);
+
+      expect(find.byType(TemplatesOnboardingView), findsNothing);
+      expect(repo.updateCount, 0, reason: 'dismiss must not write anything');
+    });
+
+    testWidgets('dragging INSIDE the scrollable content does not dismiss',
+        (tester) async {
+      // Short surface: the content overflows, so the scroll view is live and
+      // owns vertical drags. (A sheet whose content fits has nothing to
+      // scroll, so a drag anywhere on it dismisses — intended.)
+      await _pumpEditor(
+        tester,
+        repo: _CapturingUserRepository(),
+        size: const Size(390, 360),
+      );
+
+      await tester.fling(
+        find.byType(TemplatesOnboardingView),
+        const Offset(0, 300),
+        1500,
+      );
+      await _settle(tester);
+
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+    });
+  });
+
+  group('maybeShowTemplatesOnboarding — stays mandatory (#1411)', () {
+    testWidgets('neither drag nor scrim tap dismisses the first-time sheet',
+        (tester) async {
+      await _pump(tester,
+          repo: _CapturingUserRepository(), profile: _profile());
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+
+      final top = tester.getTopLeft(find.byType(TemplatesOnboardingView));
+      await tester.flingFrom(
+        Offset(195, top.dy - 4),
+        const Offset(0, 600),
+        2000,
+      );
+      await _settle(tester);
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+
+      await tester.tapAt(const Offset(195, 20));
+      await _settle(tester);
+      expect(find.byType(TemplatesOnboardingView), findsOneWidget);
+    });
+  });
+
   group('maybeShowTemplatesOnboarding — first-entry gate', () {
     testWidgets('presents the sheet for an athlete who has not seen it',
         (tester) async {

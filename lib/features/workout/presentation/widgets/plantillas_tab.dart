@@ -9,12 +9,14 @@ import '../../../paywall/application/athlete_entitlement_provider.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../application/routine_providers.dart';
 import '../../application/unified_templates_providers.dart';
+import '../../domain/template_search.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
 import 'premium_chip.dart';
 import 'routine_card.dart';
 import 'templates_preferences_bar.dart';
+import 'templates_search_field.dart';
 import '../../../../app/theme/tokens/primitives.dart';
 
 /// PLANTILLAS tab page (workout redesign slice 2) — EVERY template in one
@@ -130,8 +132,14 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     // el atleta respondió en el mini-onboarding. Quien no respondió ve el
     // mismo orden de siempre — con preferencias vacías el provider devuelve la
     // lista sin tocar.
-    final entriesAsync = ref.watch(rankedUnifiedTemplatesProvider);
+    //
+    // Encima de eso, la búsqueda por texto (#1412) filtra Y reordena por
+    // relevancia: parte de la lista ya filtrada por nivel y ordenada por
+    // afinidad, y esa afinidad queda como desempate entre resultados con el
+    // mismo puntaje. Sin texto no cambia nada.
+    final entriesAsync = ref.watch(searchedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
+    final searchQuery = ref.watch(templatesSearchQueryProvider);
 
     Widget message(Widget child) => SliverToBoxAdapter(
           child: Padding(
@@ -144,9 +152,11 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
       data: (entries) {
         if (entries.isEmpty) {
           final l10n = AppL10n.of(context);
-          final msg = filter == null
-              ? l10n.workoutExploreEmptyAll
-              : l10n.workoutExploreEmptyLevel;
+          final msg = !TemplateSearch.isBlank(searchQuery)
+              ? l10n.workoutExploreSearchEmpty(searchQuery)
+              : filter == null
+                  ? l10n.workoutExploreEmptyAll
+                  : l10n.workoutExploreEmptyLevel;
           return message(
             Text(
               msg,
@@ -194,6 +204,11 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(0),
+                  child: const TemplatesSearchField(),
+                ),
+                const SizedBox(height: AppSpacing.s8),
                 TreinoFadeSlideIn(
                   delay: AppMotion.stagger(0),
                   child: const LevelFilterPills(),

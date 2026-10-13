@@ -100,7 +100,11 @@ Future<void> maybeShowTemplatesOnboarding({
       // bar sits on top of it.
       useRootNavigator: true,
       isScrollControlled: true,
-      // NO drag, and no scrim tap. Unlike the slide decks — where dragging the
+      // DECISION (#1411): this one stays MANDATORY — no drag, no scrim tap —
+      // while the editor below (`showTemplatesPreferencesEditor`) IS
+      // dismissible. Here the answers drive the catalogue ordering and this is
+      // the first-time flow; the editor already has saved answers to fall back
+      // on. Unlike the slide decks — where dragging the
       // sheet away is a fine way to say "I read it" — this one is a FORM: a
       // half-answered flow closed by a stray downward swipe loses the answers
       // silently and, because `finally` marks the surface seen, never offers
@@ -152,6 +156,7 @@ Future<void> maybeShowTemplatesOnboarding({
 ///
 /// SALTAR acá significa "cerrar sin cambiar", no "no quiero responder": el
 /// `onSkip` popea sin escribir, así que las preferencias viejas sobreviven.
+/// Lo mismo vale para deslizar la hoja o tocar fuera (#1411): descartan.
 Future<void> showTemplatesPreferencesEditor({
   required BuildContext context,
   required WidgetRef ref,
@@ -170,8 +175,12 @@ Future<void> showTemplatesPreferencesEditor({
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
-      enableDrag: false,
-      isDismissible: false,
+      // Dismissible (drag / scrim tap / back) — #1411. Closing without the CTA
+      // DISCARDS: the form state lives inside `TemplatesOnboardingView` and only
+      // `onFinish` writes, so a dismiss leaves the saved preferences untouched.
+      // Inner scroll: the sheet's `SingleChildScrollView` wins the gesture arena
+      // while it can scroll, so dragging the content scrolls it; only a drag on
+      // a non-scrollable area (or content that fits) dismisses.
       backgroundColor: Colors.transparent,
       barrierColor: palette.scrimDark.withValues(alpha: 0.66),
       builder: (sheetContext) => _TemplatesOnboardingSheet(
