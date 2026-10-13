@@ -359,7 +359,8 @@ pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
 - Si modificás `AGENTS.md` o algo en `docs/` → reviewer aprueba **explícitamente** la modificación de las reglas.
 - **Después de todo rebase y antes de todo force-push**:
-  `git diff origin/main HEAD | rg '^-[^-]'` — ver §11.2, que explica por qué NO va con
+  `git diff origin/<base> HEAD | rg '^-[^-]'` (`<base>` = la base del PR: `develop` para
+  toda rama, `main` sólo para `develop → main`) — ver §11.2, que explica por qué NO va con
   `diff` a secas (en Windows reporta el archivo entero como borrado).
 
 → Detalle en [docs/workflow.md](./docs/workflow.md).
@@ -477,14 +478,17 @@ reintroducía, palabra por palabra, las afirmaciones falsas que el PR pisado exi
 para corregir.
 
 **El chequeo, obligatorio antes de todo force-push post-rebase.** Compara tu rama contra
-`main` y lista lo que estás sacando:
+la **base del PR** y lista lo que estás sacando. Desde que toda rama sale de `develop`
+(§8), la base es `develop`: comparar contra `main` no ve lo que ya está en `develop` y
+todavía no salió en un release, que es justo lo que un rebase puede pisar.
 
 ```bash
-git diff origin/main HEAD | rg '^-[^-]'
+git diff origin/develop HEAD | rg '^-[^-]'   # PR de una rama (el caso normal)
+git diff origin/main HEAD | rg '^-[^-]'      # sólo para develop → main
 ```
 
 - Salida vacía → tu cambio es **aditivo**. Seguí.
-- Cualquier salida → estás **borrando** algo que está en `main`. Que sea a propósito, y
+- Cualquier salida → estás **borrando** algo que está en la base. Que sea a propósito, y
   que quede escrito en el mensaje del commit por qué. El header de cada hunk (`--- a/…`)
   dice de qué archivo es cada línea.
 
