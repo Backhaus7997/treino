@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/utils/location_precision.dart';
+import '../../coach_hub/application/lugar_search_providers.dart'
+    show kPlacesWebClientKey;
 import '../../../core/utils/geohash.dart';
 import '../../profile/application/user_providers.dart'
     show userRepositoryProvider;
@@ -75,7 +78,10 @@ final resolveGymPlaceServiceProvider = Provider<ResolveGymPlaceService>(
   (ref) => ResolveGymPlaceService(
     gymRepository: ref.watch(gymRepositoryProvider),
     httpClient: ref.watch(httpClientProvider),
-    clientApiKey: _placesClientKey,
+    // En el navegador (Coach Hub) el build no trae PLACES_CLIENT_KEY: trae la
+    // key web. Sin esto, gymDisplayNameProvider —que pasa por este servicio—
+    // dejaba sin nombre a todo gym de Places en el Hub.
+    clientApiKey: kIsWeb ? kPlacesWebClientKey : _placesClientKey,
   ),
 );
 
