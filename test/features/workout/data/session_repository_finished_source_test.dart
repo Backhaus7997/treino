@@ -219,7 +219,9 @@ void main() {
 
     await expectLater(
       repo.watchSessionFinished(uid: uid, sessionId: sessionId),
-      emitsInOrder([false, false]),
+      // `emitsDone` y no un segundo `false`: el stream sólo emite cambios de
+      // valor (`distinct`), así que lo que importa es que NUNCA llegue `true`.
+      emitsInOrder([false, emitsDone]),
       reason: 'la sesión nunca existió en el servidor, así que su ausencia no '
           'significa que alguien la haya terminado. Leerlo como «terminada» le '
           'dice al atleta que cerró el entreno desde la muñeca sobre un '
