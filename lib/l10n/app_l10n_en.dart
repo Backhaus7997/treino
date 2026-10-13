@@ -1026,6 +1026,17 @@ class AppL10nEn extends AppL10n {
   String get workoutExploreEmptyLevel => 'No routines for this level.';
 
   @override
+  String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
+
+  @override
+  String get workoutExploreSearchClear => 'Clear search';
+
+  @override
+  String workoutExploreSearchEmpty(String query) {
+    return 'We couldn\'t find templates for «$query»';
+  }
+
+  @override
   String get workoutExploreLoadError =>
       'Something went wrong loading the routines.';
 

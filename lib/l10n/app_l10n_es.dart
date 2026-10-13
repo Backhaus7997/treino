@@ -1048,6 +1048,18 @@ class AppL10nEs extends AppL10n {
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
 
   @override
+  String get workoutExploreSearchHint =>
+      'Buscar por nombre, músculo o ejercicio';
+
+  @override
+  String get workoutExploreSearchClear => 'Borrar búsqueda';
+
+  @override
+  String workoutExploreSearchEmpty(String query) {
+    return 'No encontramos plantillas para «$query»';
+  }
+
+  @override
   String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';
 
   @override
@@ -6362,6 +6374,18 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String get workoutExploreSearchHint =>
+      'Buscar por nombre, músculo o ejercicio';
+
+  @override
+  String get workoutExploreSearchClear => 'Borrar búsqueda';
+
+  @override
+  String workoutExploreSearchEmpty(String query) {
+    return 'No encontramos plantillas para «$query»';
+  }
 
   @override
   String get workoutExploreLoadError => 'Hubo un error cargando las rutinas.';

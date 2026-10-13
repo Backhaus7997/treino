@@ -655,6 +655,23 @@
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },
+  "workoutExploreSearchHint": "Buscar por nombre, músculo o ejercicio",
+  "@workoutExploreSearchHint": {
+    "description": "Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise."
+  },
+  "workoutExploreSearchClear": "Borrar búsqueda",
+  "@workoutExploreSearchClear": {
+    "description": "Tooltip / semantics label of the clear (X) button inside the EXPLORAR search box (#1412)."
+  },
+  "workoutExploreSearchEmpty": "No encontramos plantillas para «{query}»",
+  "@workoutExploreSearchEmpty": {
+    "description": "Empty state of the EXPLORAR grid when the text search matches no template (#1412). The query is shown back to the athlete inside guillemets.",
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "workoutExploreLoadError": "Hubo un error cargando las rutinas.",
   "@workoutExploreLoadError": {
     "description": "Error state of the EXPLORAR catalogue grid. Paired with plantillasRetryLabel as the retry CTA (#638)."
