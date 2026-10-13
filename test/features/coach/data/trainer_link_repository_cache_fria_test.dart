@@ -287,7 +287,9 @@ void main() {
       'caché vacía y luego confirmación del servidor SOLO de metadata: '
       'emite el vacío (no se cuelga)', () async {
     final sinMetadata = StreamController<QuerySnapshot<Map<String, Object?>>>();
-    addTearDown(sinMetadata.close);
+    // Sin `await`: un controller con eventos en buffer y sin oyente nunca
+    // completa su `close()`.
+    addTearDown(() => unawaited(sinMetadata.close()));
     when(() => afterOrderBy.snapshots()).thenAnswer((_) => sinMetadata.stream);
 
     final emissions = <List<TrainerLink>>[];

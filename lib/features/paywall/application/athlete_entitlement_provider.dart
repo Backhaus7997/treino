@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../insights/domain/chart_period.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show currentAthleteLinkProvider;
@@ -223,13 +224,12 @@ final _athleteSubscriptionStatusProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda que `UserRepository.watch` y `blockedAthletesProvider`,
       // por el mismo motivo: con la cache local fría la PRIMERA snapshot llega
       // con `exists == false` antes de que el servidor confirme. Sin esto, un
       // alumno que paga y abre la app ve `free` durante el round-trip — y con
       // él, el sheet de límite en la cara.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final raw = snap.data()?[kAthleteSubscriptionField];
     if (raw is! Map) return null;
@@ -263,9 +263,8 @@ final customExerciseVideoCountProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda de cache fría que `_athleteSubscriptionStatusProvider`.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map((snap) {
     final raw = snap.data()?[kCustomExerciseVideoUsageField];
     if (raw is! Map) return 0; // sin contador todavía ⇒ ningún video subido
@@ -398,9 +397,8 @@ final chatMediaQuotaProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
+      .snapshotsSinCacheVacia()
       // Misma guarda de cache fría que `_athleteSubscriptionStatusProvider`.
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
       .map<ChatMediaQuota?>((snap) {
     final data = snap.data();
     final raw = data?[kChatMediaUsageField];

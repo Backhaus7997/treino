@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+import 'package:flutter/foundation.dart' show listEquals;
 
 import '../domain/trainer_link.dart';
 import '../domain/trainer_link_status.dart';
@@ -217,7 +218,17 @@ class TrainerLinkRepository {
         .where('athleteId', isEqualTo: athleteId)
         .orderBy('requestedAt', descending: true);
     return query
-        .snapshots()
+        // `includeMetadataChanges: true` es lo que evita que la guarda de
+        // abajo cuelgue el stream. En la 2ª suscripción a esta query, el SDK
+        // entrega primero el resultado de la caché (vacío, `isFromCache`) y,
+        // cuando el servidor confirma el MISMO vacío, sólo cambia la metadata:
+        // sin la opción esa confirmación no se emite, la única snapshot ya se
+        // descartó y el provider queda en loading para siempre — el alumno
+        // free veía el paywall la primera vez y nunca más, porque
+        // `athleteEntitlementProvider` devuelve `unknown` (no gatea) mientras
+        // falte el vínculo. Mismo SDK, mismo arreglo que
+        // `FollowRepository.watchConfirmedFollowingOf`.
+        .snapshots(includeMetadataChanges: true)
         .map((snap) {
           final links =
               snap.docs.map(_fromDoc).whereType<TrainerLink>().toList();
@@ -245,7 +256,11 @@ class TrainerLinkRepository {
         // cuando la caché está incompleta, que es exactamente el caso que
         // importa. Lo encontró Codex en el PR #1109.)
         .where((par) => par.$1.isNotEmpty || !par.$2)
-        .map((par) => par.$1);
+        .map((par) => par.$1)
+        // Con la metadata incluida llegan re-emisiones con los MISMOS vínculos
+        // (caché → servidor, `hasPendingWrites`). Comparar por contenido evita
+        // reconstruir todo lo que depende de `currentAthleteLinkProvider`.
+        .distinct(listEquals);
   }
 
   // ─── watchForTrainer ────────────────────────────────────────────────────

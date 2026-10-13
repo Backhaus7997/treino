@@ -58,9 +58,11 @@ void main() {
     repo = UserRepository(firestore: firestore);
   });
 
-  tearDown(() async {
-    await conMetadata.close();
-    await sinMetadata.close();
+  // Sin `await`: un controller con eventos en buffer y sin oyente nunca
+  // completa su `close()`.
+  tearDown(() {
+    unawaited(conMetadata.close());
+    unawaited(sinMetadata.close());
   });
 
   DocumentSnapshot<Map<String, Object?>> inexistente({

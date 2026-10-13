@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Source,
         Timestamp;
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
@@ -685,8 +686,7 @@ class UserRepository {
   Stream<bool> watchCorreosPromocionales(String uid) {
     return _users
         .doc(uid)
-        .snapshots()
-        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .snapshotsSinCacheVacia()
         .map((snap) => _correosPromocionalesDe(snap.data()))
         .distinct();
   }
@@ -997,16 +997,21 @@ class UserRepository {
   Stream<UserProfile?> watch(String uid) {
     return _users
         .doc(uid)
-        .snapshots()
+        .snapshotsSinCacheVacia()
         // A cold local cache yields a first snapshot with exists=false BEFORE
         // the network confirms — emitting null here sends an existing user to
         // /profile-setup. Only a server-confirmed snapshot may report absence.
-        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        // (`snapshotsSinCacheVacia` también escucha los cambios de metadata:
+        // sin eso, la confirmación del servidor de un perfil inexistente no
+        // se emite y el stream queda en loading para siempre.)
         .map((snap) {
       final data = snap.data();
       if (!snap.exists || data == null) return null;
       return UserProfile.fromJson(data);
-    });
+    })
+        // Los cambios de metadata re-emiten el mismo perfil; `UserProfile` es
+        // freezed (igualdad por valor), así que no despiertan a nadie.
+        .distinct();
   }
 
   /// `true` mientras `users/{uid}` tenga escrituras locales sin confirmar.
