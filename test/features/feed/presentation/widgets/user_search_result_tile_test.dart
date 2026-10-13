@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/presentation/widgets/user_search_result_tile.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 // ---------------------------------------------------------------------------
@@ -24,7 +26,7 @@ UserPublicProfile _fakeProfile({
     );
 
 /// Wraps the tile inside a GoRouter so context.push works.
-Widget _wrapWithRouter(Widget tile) {
+Widget _wrapWithRouter(Widget tile, {List<Override> overrides = const []}) {
   final routes = <GoRoute>[
     GoRoute(
       path: '/',
@@ -39,9 +41,12 @@ Widget _wrapWithRouter(Widget tile) {
 
   final router = GoRouter(initialLocation: '/', routes: routes);
 
-  return MaterialApp.router(
-    theme: AppTheme.dark(),
-    routerConfig: router,
+  return ProviderScope(
+    overrides: overrides,
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      routerConfig: router,
+    ),
   );
 }
 
@@ -51,8 +56,8 @@ void main() {
   // ---------------------------------------------------------------------------
   group('UserSearchResultTile — rendering', () {
     testWidgets(
-        'SCENARIO-281: renders PostAvatar, displayName, and the denormalized '
-        'gym name', (tester) async {
+        'SCENARIO-281: renders PostAvatar, displayName, and the gym name '
+        'resolved by gymId (live for Places gyms)', (tester) async {
       final tile = UserSearchResultTile(
         profile: _fakeProfile(
           uid: 'u1',
@@ -63,12 +68,20 @@ void main() {
         onTap: () {},
       );
 
-      await tester.pumpWidget(_wrapWithRouter(tile));
+      await tester.pumpWidget(_wrapWithRouter(
+        tile,
+        overrides: [
+          gymDisplayNameProvider('smart-fit-palermo')
+              .overrideWith((_) async => 'SmartFit - Palermo'),
+        ],
+      ));
+      await tester.pump();
       await tester.pump();
 
       // displayName visible (rendered uppercase by design)
       expect(find.textContaining('ANA'), findsOneWidget);
-      // gym name read from the denormalized UserPublicProfile.gymName field
+      // gym name comes from gymDisplayNameProvider(gymId), NOT from the
+      // denormalized gymName (which here deliberately says the same thing).
       expect(find.textContaining('SmartFit - Palermo'), findsOneWidget);
     });
 

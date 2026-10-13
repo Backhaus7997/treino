@@ -430,7 +430,6 @@ void main() {
       when(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
-            name: any(named: 'name'),
           )).thenAnswer((_) async => const ResolveGymPlaceResult(
             gymId: 'gym-0',
             name: 'Gym gym-0',
@@ -456,7 +455,6 @@ void main() {
       verifyNever(() => mockResolveService.call(
             placeId: any(named: 'placeId'),
             sessionToken: any(named: 'sessionToken'),
-            name: any(named: 'name'),
           ));
     });
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/core/utils/firestore_snapshots.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart'
     show kPlanLimitsField;
@@ -44,8 +45,7 @@ final _topePublicadoProvider =
       .watch(firestoreProvider)
       .collection('users')
       .doc(uid)
-      .snapshots()
-      .where((snap) => snap.exists || !snap.metadata.isFromCache)
+      .snapshotsSinCacheVacia()
       .map(
         (snap) => TopeDeAlumnosPublicado.leer(snap.data()?[kPlanLimitsField]),
       )

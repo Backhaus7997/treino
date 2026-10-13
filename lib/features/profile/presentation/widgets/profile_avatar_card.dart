@@ -7,8 +7,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/handle_derivation.dart';
 import '../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
-import '../../../gyms/application/gym_providers.dart';
-import '../../../gyms/domain/gym_display_name.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../application/user_providers.dart';
 import '../../../gyms/domain/gym.dart' show hasRealGym;
 
@@ -157,8 +156,7 @@ class _CardBody extends StatelessWidget {
 // ── Gym chip ──────────────────────────────────────────────────────────────────
 
 /// DETAIL context (single self-user) — resolves the gym name live via
-/// [gymByIdProvider] rather than a denormalized field, since `UserProfile`
-/// (unlike `UserPublicProfile`) has no `gymName`. gyms-foundation Phase 3.
+/// [gymDisplayNameProvider] (nombre de Google en vivo, nunca guardado).
 class _GymChip extends ConsumerWidget {
   const _GymChip({required this.gymId, required this.palette});
 
@@ -167,8 +165,7 @@ class _GymChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final gymAsync = ref.watch(gymByIdProvider(gymId));
-    final name = gymDisplayNameFromGym(gymAsync.valueOrNull);
+    final name = ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
     if (name.isEmpty) return const SizedBox.shrink();
 
     return Container(

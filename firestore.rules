@@ -2479,8 +2479,10 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() > 0
                     && request.resource.data.name.size() <= 100
-                    // Places policy (#1338): `name` is typed by the first user
-                    // who links the gym; Google's text is never stored. No
+                    // Places policy (#1338): Google's text is never stored, so
+                    // the client writes a fixed placeholder as `name`
+                    // ('Gimnasio'; the rule only requires it to be non-empty)
+                    // and the real name is shown live from Google. No
                     // `address`, and `nameNeeded` is only ever set by the
                     // migration (Admin SDK), never by a client.
                     && !('address' in request.resource.data)

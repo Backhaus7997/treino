@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/gyms/domain/gym_source.dart';
@@ -47,6 +48,22 @@ Widget _wrap({
     );
 
 void main() {
+  testWidgets(
+      'un gym con el marcador guardado muestra el nombre de Google en vivo',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      currentGymId: 'ChIJ_1',
+      overrides: [
+        gymDisplayNameProvider('ChIJ_1')
+            .overrideWith((ref) async => 'Iron Box Palermo'),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Iron Box Palermo'), findsOneWidget);
+    expect(find.text('Gimnasio'), findsNothing);
+  });
+
   testWidgets('renders the resolved gym name via overridden gymByIdProvider',
       (tester) async {
     await tester.pumpWidget(_wrap(

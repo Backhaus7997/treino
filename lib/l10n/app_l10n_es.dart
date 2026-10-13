@@ -5297,37 +5297,6 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get gymNameDialogTitle => 'Ponle nombre a tu gimnasio';
-
-  @override
-  String get gymNameDialogBody =>
-      'Escribe el nombre con el que quieres que lo vean los demás.';
-
-  @override
-  String get gymNameDialogHint => 'Nombre del gimnasio';
-
-  @override
-  String get gymNameDialogConfirm => 'GUARDAR';
-
-  @override
-  String get gymNamePromptTitle => 'Tu gimnasio necesita un nombre';
-
-  @override
-  String get gymNamePromptBody =>
-      'Ayúdanos: ¿cómo se llama? Lo verán todos los que entrenan ahí.';
-
-  @override
-  String get gymNamePromptCta => 'PONERLE NOMBRE';
-
-  @override
-  String get gymNamePromptDismiss => 'Ahora no';
-
-  @override
-  String gymNamePromptRaceMessage(String name) {
-    return 'Alguien ya lo nombró: $name.';
-  }
-
-  @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.';
 }
@@ -10619,37 +10588,6 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String eliminarCuentaWebPopupHint(String provider) {
     return 'Para confirmar que sos vos, se va a abrir una ventana de $provider.';
-  }
-
-  @override
-  String get gymNameDialogTitle => 'Ponele nombre a tu gimnasio';
-
-  @override
-  String get gymNameDialogBody =>
-      'Escribí el nombre con el que querés que lo vean los demás.';
-
-  @override
-  String get gymNameDialogHint => 'Nombre del gimnasio';
-
-  @override
-  String get gymNameDialogConfirm => 'GUARDAR';
-
-  @override
-  String get gymNamePromptTitle => 'Tu gimnasio necesita un nombre';
-
-  @override
-  String get gymNamePromptBody =>
-      'Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.';
-
-  @override
-  String get gymNamePromptCta => 'PONERLE NOMBRE';
-
-  @override
-  String get gymNamePromptDismiss => 'Ahora no';
-
-  @override
-  String gymNamePromptRaceMessage(String name) {
-    return 'Alguien ya lo nombró: $name.';
   }
 
   @override

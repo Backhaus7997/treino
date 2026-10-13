@@ -292,23 +292,25 @@ Después abrí el PR. Dos formas:
 ```
 /branch-pr
 ```
-Te crea el PR contra `main`, llena el body con el resumen del cambio, linkea issue si existe.
+Te crea el PR, llena el body con el resumen del cambio, linkea issue si existe.
 
 **B) Via GitHub CLI:**
 ```bash
-gh pr create --base main --fill
+gh pr create --base develop --fill
 ```
 
-**C) Via web GitHub:** entrá al repo, GitHub te ofrece "Compare & pull request" automático.
+**C) Via web GitHub:** entrá al repo, GitHub te ofrece "Compare & pull request" automático. **Cambiá la base a `develop`**: GitHub propone `main` por default.
+
+Con `/branch-pr` también: verificá que la base sea `develop`.
 
 ### Reglas del PR
 
 - **Template**: se carga solo (`.github/pull_request_template.md`). Llená TODO.
-- **Reviewers**: asigná a los otros 2 devs.
-- **Approve mínimo**: 1.
-- **Estrategia de merge**: **Squash and merge**. Nada de "Create a merge commit".
+- **Base**: `develop`. A `main` sólo entra `develop` (ver [docs/workflow.md](./docs/workflow.md#ramas-develop-y-main)).
+- **Approve**: no se exige; hoy no hay otro dev que pueda darlo.
+- **Estrategia de merge**: rama → `develop` con **Squash and merge**. `develop → main` con merge commit.
 - **Auto-delete branch**: activado, no hace falta borrar manualmente.
-- **CI** (cuando esté): debe pasar antes del approve.
+- **CI**: tiene que estar verde antes de mergear.
 
 ### Cuando un PR tuyo recibe comentarios
 
@@ -317,13 +319,12 @@ gh pr create --base main --fill
 git commit -am "address review: <qué arreglaste>"
 git push
 ```
-GitHub re-dispara los reviews automáticamente. Cuando volvés a tener 1 approve, mergeás.
+Con el CI verde de nuevo, mergeás.
 
 ### Después del merge
 
 ```bash
-git checkout main
-git pull
+git fetch origin
 git branch -d <tu-branch>     # borra local; remota ya se borró sola
 ```
 

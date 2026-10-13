@@ -25,7 +25,8 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/invite_athlete_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
-import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show hasRealGym;
 import '../../../../../l10n/app_l10n.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/payments/domain/payment.dart';
@@ -220,10 +221,16 @@ class _LinksLoaded extends ConsumerWidget {
         c.athleteId,
     };
 
-    // Una sola lectura del catálogo de gimnasios (~20 docs) en vez de un
-    // gymByIdProvider por fila (N+1) — mismo criterio que el batch de perfiles.
-    final gyms = ref.watch(gymsProvider).valueOrNull ?? const [];
-    final gymNameById = {for (final g in gyms) g.id: g.name};
+    // Un pedido por gimnasio DISTINTO del roster (no uno por fila): el nombre
+    // sale de `gymDisplayNameProvider` (Google en vivo para gyms de Places,
+    // nunca guardado) y queda en memoria durante la sesión.
+    final gymNameById = <String, String>{};
+    for (final p in (profilesAsync.valueOrNull ?? const {}).values) {
+      final gid = p.gymId;
+      if (!hasRealGym(gid) || gymNameById.containsKey(gid)) continue;
+      final nombre = ref.watch(gymDisplayNameProvider(gid)).valueOrNull;
+      if (nombre != null && nombre.isNotEmpty) gymNameById[gid!] = nombre;
+    }
 
     final rosterWithEstado = [
       for (final l in roster) (link: l, estado: estadoForLink(l, conDeudaIds)),

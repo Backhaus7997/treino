@@ -17,6 +17,7 @@ import '../../coach/application/location_permission_gateway.dart';
 import '../../coach/presentation/widgets/location_permission_flow.dart';
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
+import '../../gyms/application/gym_display_name_provider.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
 import '../application/trainer_location_consent_providers.dart';
@@ -874,8 +875,13 @@ class _GymsSection extends ConsumerWidget {
                         // While the catalog is still loading we show a neutral
                         // loading label rather than the 'Gimnasio' fallback,
                         // which would otherwise masquerade as real data.
-                        title: gymsById[loc.gymId]?.name ??
-                            (gymsLoading ? l10n.coachLoadingLabel : 'Gimnasio'),
+                        // Nombre en vivo (Google para gyms de Places); el
+                        // `name` guardado de un gym nuevo es un marcador.
+                        title: _gymTitle(
+                          ref.watch(gymDisplayNameProvider(loc.gymId)),
+                          loading: gymsLoading,
+                          loadingLabel: l10n.coachLoadingLabel,
+                        ),
                         subtitle: gymsById[loc.gymId]?.address,
                         trailing:
                             gymsLoading && !gymsById.containsKey(loc.gymId)
@@ -1101,6 +1107,19 @@ class _ToggleCard extends StatelessWidget {
 
 // ── Gym picker sheet ─────────────────────────────────────────────────────────
 
+/// Título de un gym a partir de [gymDisplayNameProvider]: el nombre vivo si
+/// llegó; si no, [loadingLabel] mientras carga el catálogo o vacío (el marcador
+/// 'Gimnasio' nunca se muestra como nombre).
+String _gymTitle(
+  AsyncValue<String> name, {
+  required bool loading,
+  required String loadingLabel,
+}) {
+  final v = name.valueOrNull;
+  if (v != null && v.isNotEmpty) return v;
+  return loading ? loadingLabel : '';
+}
+
 class _GymPickerSheet extends StatefulWidget {
   const _GymPickerSheet({required this.gyms});
   final List<Gym> gyms;
@@ -1218,11 +1237,17 @@ class _GymPickerSheetState extends State<_GymPickerSheet> {
                               const EdgeInsets.symmetric(horizontal: 4),
                           leading: Icon(TreinoIcon.gym,
                               color: palette.accent, size: 22),
-                          title: Text(
-                            g.name,
-                            style: TextStyle(
-                              color: palette.textPrimary,
-                              fontWeight: FontWeight.w600,
+                          title: Consumer(
+                            builder: (_, ref, __) => Text(
+                              _gymTitle(
+                                ref.watch(gymDisplayNameProvider(g.id)),
+                                loading: false,
+                                loadingLabel: '',
+                              ),
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                           subtitle: g.address == null

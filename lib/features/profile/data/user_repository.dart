@@ -10,9 +10,11 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Source,
         Timestamp;
 
+import '../../../core/utils/firestore_snapshots.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
+import '../../gyms/domain/gym_source.dart';
 import '../domain/notification_pref_keys.dart';
 import '../domain/user_profile.dart';
 import '../domain/user_role.dart';
@@ -177,17 +179,22 @@ class UserRepository {
   /// Resolves the composed brand-branch display name for [gymId].
   ///
   /// - `null` or [kNoGymId] → `null`, no lookup attempted.
-  /// - Gym flagged `nameNeeded` → `null` (its stored name isn't user-typed).
+  /// - Gym de Places o `nameNeeded` → `null` (su nombre no se guarda).
   /// - Unknown/unresolvable id → `null`, logged, never throws — a stale or
   ///   deleted gym doc must not abort the whole `update()` batch.
   Future<String?> _resolveGymName(String? gymId) async {
     if (gymId == null || gymId == kNoGymId) return null;
     try {
       final gym = await _gyms.getById(gymId);
-      // Un gym marcado `nameNeeded` guarda un nombre que vino de Google: no
-      // se copia al perfil público (política de Places, #1338). El nombre
-      // vuelve a copiarse cuando alguien lo nombra.
-      if (gym == null || gym.nameNeeded) return null;
+      // Un gym de Places NO tiene nombre propio guardado (política de Places,
+      // #1338): su nombre se muestra en vivo (`gymDisplayNameProvider`) y no
+      // se copia al perfil público. Tampoco el de un gym `nameNeeded` legacy,
+      // cuyo nombre guardado vino de Google.
+      if (gym == null ||
+          gym.nameNeeded ||
+          gym.source == GymSource.googlePlaces) {
+        return null;
+      }
       return gym.name;
     } catch (e, st) {
       developer.log(
@@ -679,8 +686,7 @@ class UserRepository {
   Stream<bool> watchCorreosPromocionales(String uid) {
     return _users
         .doc(uid)
-        .snapshots()
-        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        .snapshotsSinCacheVacia()
         .map((snap) => _correosPromocionalesDe(snap.data()))
         .distinct();
   }
@@ -797,13 +803,19 @@ class UserRepository {
     bool grantLocationConsent = false,
   }) async {
     final now = Timestamp.fromDate(DateTime.now().toUtc());
-    final efectivo = grantLocationConsent
+    final conConsentimiento = grantLocationConsent
         ? <String, Object?>{
             ...partial,
             'trainerLocationConsentAt': now,
             'trainerLocationConsentPromptedAt': now,
           }
         : partial;
+    // "Sin gym" se persiste SIEMPRE como `null`: el centinela [kNoGymId] es un
+    // valor de borrador de la UI. Guardado como string, el feed y los rankings
+    // lo leían como un gimnasio más y juntaban a todos los "sin gym".
+    final efectivo = conConsentimiento['gymId'] == kNoGymId
+        ? <String, Object?>{...conConsentimiento, 'gymId': null}
+        : conConsentimiento;
 
     // Guideline 1.2 de App Review. El `displayName` es el texto libre que mas
     // se ve: aparece en cada post, cada mensaje y cada tarjeta de descubrimiento.
@@ -985,16 +997,21 @@ class UserRepository {
   Stream<UserProfile?> watch(String uid) {
     return _users
         .doc(uid)
-        .snapshots()
+        .snapshotsSinCacheVacia()
         // A cold local cache yields a first snapshot with exists=false BEFORE
         // the network confirms — emitting null here sends an existing user to
         // /profile-setup. Only a server-confirmed snapshot may report absence.
-        .where((snap) => snap.exists || !snap.metadata.isFromCache)
+        // (`snapshotsSinCacheVacia` también escucha los cambios de metadata:
+        // sin eso, la confirmación del servidor de un perfil inexistente no
+        // se emite y el stream queda en loading para siempre.)
         .map((snap) {
       final data = snap.data();
       if (!snap.exists || data == null) return null;
       return UserProfile.fromJson(data);
-    });
+    })
+        // Los cambios de metadata re-emiten el mismo perfil; `UserProfile` es
+        // freezed (igualdad por valor), así que no despiertan a nadie.
+        .distinct();
   }
 
   /// `true` mientras `users/{uid}` tenga escrituras locales sin confirmar.

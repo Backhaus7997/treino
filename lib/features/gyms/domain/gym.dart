@@ -69,6 +69,13 @@ class Gym with _$Gym {
   factory Gym.fromJson(Map<String, Object?> json) => _$GymFromJson(json);
 }
 
+/// Nombre ALMACENADO de un gym creado desde Google Places.
+///
+/// Los términos de Google Maps Platform prohíben guardar su `displayName`, así
+/// que el doc lleva este marcador (la regla de `gyms` exige un `name` no
+/// vacío) y el nombre real se muestra en vivo (`gymDisplayNameProvider`).
+const String kGymPlaceholderName = 'Gimnasio';
+
 /// Sentinel id que representa la opción "OTRO GYM / SIN GYM" del mockup.
 /// El atleta puede dejarlo sin elegir un gym del catálogo.
 ///

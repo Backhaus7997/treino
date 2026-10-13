@@ -10,9 +10,8 @@ import '../../../../core/utils/kg_format.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
-import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
-import '../../../gyms/domain/gym_display_name.dart';
 import '../../../moderation/domain/report_target_kind.dart';
 import '../../../moderation/presentation/moderation_actions.dart';
 import '../../application/post_actions_notifier.dart';
@@ -57,19 +56,18 @@ class PostCard extends ConsumerWidget {
     // #549: `authorGymId` is an OPAQUE id, never a display name — gyms coming
     // from Google Places carry a place id (`ChIJ…`) and the card used to print
     // it uppercased as if it were the name. Resolve it against the `gyms/`
-    // catalog instead, the same `gymByIdProvider` + `gymDisplayNameFromGym`
-    // pattern `PublicProfileHero` and `PinnedCurrentGym` already use. The
-    // provider is a non-autoDispose family, so a feed of N posts across K
-    // distinct gyms costs K reads, cached for the app's lifetime.
+    // catalog instead, the `gymDisplayNameProvider` (Google en vivo, nunca guardado), el mismo
+    // pattern `PublicProfileHero` and `PinnedCurrentGym` already use. El
+    // provider se fija en memoria al traer el nombre, así que un feed de N
+    // posts de K gyms distintos cuesta K pedidos por sesión.
     //
     // An unresolvable id (deleted gym, place id never upserted into the
     // catalog) yields '' → the gym segment is omitted and only the date shows.
     // Rendering the raw id is not a fallback we accept.
     final gymId = post.authorGymId;
-    final gymAsync = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
-        ? null
-        : ref.watch(gymByIdProvider(gymId));
-    final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
+    final gymName = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
+        ? ''
+        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
 
     return Container(
       decoration: BoxDecoration(
