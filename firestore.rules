@@ -321,6 +321,87 @@ service cloud.firestore {
                  && data.get('acceptedTermsVersion', null) is int
                  && data.get('acceptedPrivacyVersion', null) is int);
     }
+
+    // ── Ubicaciones del PF: `trainerLocations` (#1338) ──────────────────────
+    // A scope raíz porque las consumen dos `match` hermanos: `users/{uid}` (la
+    // lista privada) y `trainerPublicProfiles/{uid}` (el espejo público).
+    //
+    // QUÉ CUBRE. Políticas de Google Places: de un lugar se puede guardar el
+    // `placeId` y las coordenadas con su fecha, nunca el nombre ni la dirección
+    // de Google. La regla no puede saber si un texto vino de Google, pero sí que
+    // cada lugar tenga SÓLO las claves del modelo: sin el allowlist un cliente
+    // modificado podía colgar `formattedAddress` o `name` de cada lugar, y en el
+    // espejo eso lo lee cualquier autenticado. Mismo criterio que el `hasOnly`
+    // del create `google-places` de `gyms`.
+    //
+    // LA FORMA ACEPTADA es la unión de lo que escribe CADA build publicada, no
+    // sólo la de hoy: `TrainerLocation.toJson()` emite las 7 claves de abajo
+    // hasta la build 53 y las 10 desde la 54 (16ae0f77), siempre con los null
+    // explícitos (json_serializable). Las 3 nuevas no son obligatorias: las
+    // builds viejas siguen guardando el perfil, y además al releer un lugar las
+    // DESCARTAN. Lo que escriben el job de refresco, las migraciones y la
+    // cuarentena (Admin SDK) es un subconjunto de las mismas 10 — siempre
+    // `{...lugar, ...}` —, y vuelve por el cliente en el próximo guardado.
+    //
+    // QUÉ NO CUBRE, y no es descuido: el TIPO de `gymId`, `customLabel`,
+    // `geohash`, `placeId`, `coordsFetchedAt` y `stale`, y el largo de la
+    // etiqueta. Firestore corta la evaluación a las 1.000 expresiones y
+    // deniega con un permission-denied sin mensaje. Medido contra el emulador
+    // (oct-2026): el `allow update` de `users/{uid}` ya gasta ~225 antes de
+    // mirar un lugar, cada lugar NUEVO con esta forma cuesta ~43 y el par
+    // lat/lng ~30 más. Con 10 lugares nuevos quedan `users` en ~650 y el
+    // espejo en ~830. Con todos los tipos y largos, según cómo se escribieran,
+    // entraban entre UNO y CUATRO lugares nuevos por escritura: un PF que
+    // cargara varios de una vez no guardaba más. Por eso el rango de lat/lng
+    // va sólo en el espejo, que es lo público y arranca en ~90. El caso
+    // límite lo fija `scripts/rules_test/trainer-locations.test.js`
+    // ("presupuesto"): si esta regla o la de `users` crecen y se comen el
+    // margen, se pone rojo ahí y no en producción.
+    //
+    // `customLabel` puede ser "" (la cuarentena de moderación lo vacía así).
+    // `lat`/`lng` pueden ser null (un lugar `stale`: el job borra las
+    // coordenadas que ya no puede cachear).
+    function ubicacionDePFOk(m, claves, publica) {
+      return m.keys().hasOnly(claves)
+          && m.type in ['gym', 'custom']
+          && m.id is string
+          // `math.abs` de algo que no es número tira error, y el error
+          // deniega: cubre el tipo y el rango en una sola expresión.
+          && (!publica
+              || ((m.get('lat', null) == null || math.abs(m.lat) <= 90)
+                  && (m.get('lng', null) == null || math.abs(m.lng) <= 180)));
+    }
+
+    // Las reglas no tienen bucles: cada índice va escrito, y el tope de 10 es
+    // lo que vuelve el chequeo completo (sin tope, el índice 10 entraría sin
+    // mirar). La UI no tiene tope; 10 es el "límite implícito" del diseño
+    // multi-ubicación (openspec/changes/trainer-multi-location, decisión 5) y
+    // lo máximo que entra en el presupuesto con margen.
+    //
+    // `previas` es la lista guardada (`[]` en un create). Un lugar IDÉNTICO a
+    // uno ya guardado pasa sin revalidarse: es el disyunto "no cambió" del
+    // #849 llevado a cada elemento — tocar un lugar no congela la lista por
+    // un lugar viejo de otra forma — y además es lo que mantiene barato el
+    // guardado común, que trae uno solo nuevo.
+    function ubicacionesDePFOk(nuevas, previas, publica) {
+      let antes = previas is list ? previas : [];
+      let claves = ['id', 'type', 'gymId', 'customLabel', 'lat', 'lng', 'geohash',
+                    'placeId', 'coordsFetchedAt', 'stale'];
+      return nuevas is list
+          && (nuevas.size() == 0
+              || (nuevas.size() <= 10
+                  && (nuevas[0] in antes || ubicacionDePFOk(nuevas[0], claves, publica))
+                  && (nuevas.size() <= 1 || nuevas[1] in antes || ubicacionDePFOk(nuevas[1], claves, publica))
+                  && (nuevas.size() <= 2 || nuevas[2] in antes || ubicacionDePFOk(nuevas[2], claves, publica))
+                  && (nuevas.size() <= 3 || nuevas[3] in antes || ubicacionDePFOk(nuevas[3], claves, publica))
+                  && (nuevas.size() <= 4 || nuevas[4] in antes || ubicacionDePFOk(nuevas[4], claves, publica))
+                  && (nuevas.size() <= 5 || nuevas[5] in antes || ubicacionDePFOk(nuevas[5], claves, publica))
+                  && (nuevas.size() <= 6 || nuevas[6] in antes || ubicacionDePFOk(nuevas[6], claves, publica))
+                  && (nuevas.size() <= 7 || nuevas[7] in antes || ubicacionDePFOk(nuevas[7], claves, publica))
+                  && (nuevas.size() <= 8 || nuevas[8] in antes || ubicacionDePFOk(nuevas[8], claves, publica))
+                  && (nuevas.size() <= 9 || nuevas[9] in antes || ubicacionDePFOk(nuevas[9], claves, publica))));
+    }
+
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -465,7 +546,12 @@ service cloud.firestore {
                     && request.resource.data.get('storeAccountToken', null) == null
                     && bornAtOk(request.resource.data)
                     // Ver `altaPorMailTraeConsentimiento`, arriba.
-                    && altaPorMailTraeConsentimiento(request.resource.data);
+                    && altaPorMailTraeConsentimiento(request.resource.data)
+                    // El alta manda `trainerLocations: []` (`UserProfile.toJson`).
+                    // Se valida igual: lo que se siembra acá ya no pasa por el
+                    // update mientras no cambie, y el rol de PF se le da
+                    // después a este mismo documento.
+                    && ubicacionesDePFOk(request.resource.data.get('trainerLocations', []), [], false);
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
@@ -597,7 +683,15 @@ service cloud.firestore {
                     // Y no alcanza con el piso: sin esta otra, en vez de
                     // cambiarla por una invalida uno simplemente la BORRA (o
                     // la pone en null, que para `bornAtOk` es lo mismo).
-                    && bornAtKept(resource.data, request.resource.data);
+                    && bornAtKept(resource.data, request.resource.data)
+                    // Ubicaciones del PF (#1338): sólo si la escritura cambia
+                    // la lista. Un update que no la toca no la revalida —el
+                    // documento puede traer una lista vieja de otra forma y no
+                    // tiene que quedar congelado por eso (#849)—, y cada lugar
+                    // que ya estaba guardado tampoco. Ver `ubicacionesDePFOk`.
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['trainerLocations'])
+                        || ubicacionesDePFOk(request.resource.data.get('trainerLocations', []),
+                                             resource.data.get('trainerLocations', []), false));
 
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
@@ -2243,6 +2337,12 @@ service cloud.firestore {
     // partial merge with a large, evolving discovery-field set, making
     // hasOnly a high-risk coupling trap for near-zero security value (those
     // fields are self-attested, not a trust boundary).
+    //
+    // Eso vale para las claves DEL DOCUMENTO, y sigue así. Cada lugar de
+    // `trainerLocations` sí tiene allowlist (#1338, `ubicacionDePFOk`): ahí
+    // la razón no es seguridad sino las políticas de Google Places, y la forma
+    // es la de un modelo que cambia poco, no la de un set de discovery que
+    // crece.
     match /trainerPublicProfiles/{uid} {
       // Any authenticated user can read (SCENARIO-416).
       allow read: if request.auth != null;
@@ -2276,7 +2376,9 @@ service cloud.firestore {
                     // `hiddenFromDiscovery` lo fija sólo un admin (scripts/
                     // set_trainer_discovery_visibility.js): un cliente no puede
                     // crear su tarjeta ya oculta ni con un valor no booleano.
-                    && request.resource.data.get('hiddenFromDiscovery', false) == false;
+                    && request.resource.data.get('hiddenFromDiscovery', false) == false
+                    // Ubicaciones publicadas (#1338) — ver el `allow update`.
+                    && ubicacionesDePFOk(request.resource.data.get('trainerLocations', []), [], true);
 
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
@@ -2302,7 +2404,13 @@ service cloud.firestore {
                     // Flag de admin: el dueño no lo enciende ni lo apaga (si no,
                     // un PF oculto se reaparece solo, o se oculta uno a sí mismo
                     // con un valor que el modelo no espera).
-                    && request.resource.data.get('hiddenFromDiscovery', null) == resource.data.get('hiddenFromDiscovery', null);
+                    && request.resource.data.get('hiddenFromDiscovery', null) == resource.data.get('hiddenFromDiscovery', null)
+                    // Ubicaciones publicadas (#1338): misma forma que la lista
+                    // privada, más el rango de lat/lng — esto lo lee cualquier
+                    // autenticado. Sólo si la escritura cambia la lista.
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['trainerLocations'])
+                        || ubicacionesDePFOk(request.resource.data.get('trainerLocations', []),
+                                             resource.data.get('trainerLocations', []), true));
 
       // Delete denied — managed exclusively via privileged server-side operations.
       allow delete: if false;
