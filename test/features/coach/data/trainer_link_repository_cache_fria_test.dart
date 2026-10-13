@@ -76,6 +76,12 @@ void main() {
     when(
       () => afterWhere.orderBy('requestedAt', descending: true),
     ).thenReturn(afterOrderBy);
+    // El repo escucha con `includeMetadataChanges: true` (ver el test de
+    // abajo). Los tests de la guarda usan este stream, que ve TODO lo que el
+    // SDK emitiría con esa opción.
+    when(
+      () => afterOrderBy.snapshots(includeMetadataChanges: true),
+    ).thenAnswer((_) => snapshots.stream);
     when(() => afterOrderBy.snapshots()).thenAnswer((_) => snapshots.stream);
 
     repo = TrainerLinkRepository(firestore: firestore);
@@ -260,6 +266,68 @@ void main() {
     expect(emissions, hasLength(1));
     expect(emissions.single, hasLength(1));
     expect(emissions.single.single.id, active.id);
+
+    await sub.cancel();
+  });
+
+  // REGRESIÓN DEL "PAYWALL UNA SOLA VEZ".
+  //
+  // Comportamiento real del SDK de Firestore: en la SEGUNDA suscripción a una
+  // query ya corrida, el listener recibe primero el resultado de la caché
+  // (vacío, `isFromCache: true`) y, cuando el servidor confirma el MISMO
+  // resultado vacío, lo único que cambia es la metadata (`isFromCache` pasa a
+  // false). Sin `includeMetadataChanges: true` el SDK NO emite ese cambio, así
+  // que la guarda descartaba la única snapshot y el stream quedaba en loading
+  // para siempre: el alumno free veía el paywall la primera vez y nunca más.
+  //
+  // `fake_cloud_firestore` no modela esto, así que se simula a mano: el stream
+  // SIN la opción sólo recibe la snapshot de caché; el stream CON la opción
+  // recibe además la confirmación del servidor.
+  test(
+      'caché vacía y luego confirmación del servidor SOLO de metadata: '
+      'emite el vacío (no se cuelga)', () async {
+    final sinMetadata = StreamController<QuerySnapshot<Map<String, Object?>>>();
+    addTearDown(sinMetadata.close);
+    when(() => afterOrderBy.snapshots()).thenAnswer((_) => sinMetadata.stream);
+
+    final emissions = <List<TrainerLink>>[];
+    final sub = repo.watchForAthlete(athleteId).listen(emissions.add);
+
+    final cache = fakeSnapshot(docs: const [], isFromCache: true);
+    final servidor = fakeSnapshot(docs: const [], isFromCache: false);
+    // Lo que el SDK entrega según se haya pedido o no la metadata.
+    sinMetadata.add(cache);
+    snapshots
+      ..add(cache)
+      ..add(servidor);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emissions, hasLength(1),
+        reason: 'el servidor confirmó "no hay vínculos": el alumno free tiene '
+            'que poder ver el gate');
+    expect(emissions.single, isEmpty);
+    verify(() => afterOrderBy.snapshots(includeMetadataChanges: true))
+        .called(1);
+
+    await sub.cancel();
+  });
+
+  test('re-emisiones que sólo cambian la metadata no se propagan', () async {
+    final theLink = link(id: 'link-1');
+    final realDocs = await realDocsFor([theLink]);
+
+    final emissions = <List<TrainerLink>>[];
+    final sub = repo.watchForAthlete(athleteId).listen(emissions.add);
+
+    snapshots
+      ..add(fakeSnapshot(docs: realDocs, isFromCache: true))
+      ..add(fakeSnapshot(docs: realDocs, isFromCache: false))
+      ..add(fakeSnapshot(docs: realDocs, isFromCache: false));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emissions, hasLength(1),
+        reason: 'mismos vínculos, mismo estado: reconstruir todo lo que '
+            'depende del provider por un cambio de metadata es trabajo en vano');
 
     await sub.cancel();
   });
