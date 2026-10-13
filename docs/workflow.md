@@ -131,6 +131,12 @@ docs/z ──┘    builds de prueba        merge commit
 - **Si `main` tiene algo que `develop` no** (no debería pasar con esta regla, pero
   pasa con un merge viejo): sincronizá `main → develop` con merge commit **antes** de
   abrir el próximo `develop → main`.
+- **Esto lo hace cumplir GitHub, no la buena voluntad.** La ruleset «main» exige el
+  check `main solo desde develop` (`.github/workflows/main-solo-desde-develop.yml`):
+  un PR contra `main` desde cualquier otra rama queda rojo y no se puede mergear.
+  También prohíbe push directo, force-push y borrar la rama, y sólo permite merge
+  commit. La ruleset «develop» prohíbe push directo, force-push y borrarla.
+  Dependabot abre sus PRs contra `develop` (`target-branch` en `.github/dependabot.yml`).
 - **`develop` no se borra al mergear.** El auto-delete de GitHub borra la rama de
   origen del PR; en `develop → main` la rama de origen es `develop`. Si GitHub la
   borra, se restaura desde el botón del PR antes de seguir.

@@ -15,6 +15,8 @@ updates:
   # importa: un CVE acá corre con permisos de servidor sobre todos los datos.
   # ---------------------------------------------------------------------------
   - package-ecosystem: npm
+    # A main sólo entra develop (docs/workflow.md): los bumps también.
+    target-branch: develop
     directory: /functions
     schedule:
       interval: weekly
@@ -39,6 +41,8 @@ updates:
   # firebase-admin con functions/ y hoy también tiene 1 critical + 3 high.
   # ---------------------------------------------------------------------------
   - package-ecosystem: npm
+    # A main sólo entra develop (docs/workflow.md): los bumps también.
+    target-branch: develop
     directory: /scripts
     schedule:
       interval: monthly
@@ -68,6 +72,8 @@ updates:
   # está en ^3 acá y en ^5 en functions/ — Dependabot va a proponer alinearlos.
   # ---------------------------------------------------------------------------
   - package-ecosystem: npm
+    # A main sólo entra develop (docs/workflow.md): los bumps también.
+    target-branch: develop
     directory: /scripts/rules_test
     schedule:
       interval: monthly
@@ -91,6 +97,8 @@ updates:
   # actions en total entre ci.yml y security.yml.
   # ---------------------------------------------------------------------------
   - package-ecosystem: github-actions
+    # A main sólo entra develop (docs/workflow.md): los bumps también.
+    target-branch: develop
     directory: /
     schedule:
       interval: weekly
@@ -173,6 +181,8 @@ updates:
   # Mensual y agrupado: un bump de Flutter/Firebase obliga a correr la suite
   # entera (~13 min) y a probar en device. Semanal sería ruido puro.
   - package-ecosystem: pub
+    # A main sólo entra develop (docs/workflow.md): los bumps también.
+    target-branch: develop
     directory: /
     schedule:
       interval: monthly

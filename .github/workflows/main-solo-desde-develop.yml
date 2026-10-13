@@ -1,0 +1,34 @@
+# A `main` sólo entra `develop` (docs/workflow.md §Ramas: develop y main).
+#
+# El job es un check REQUERIDO por la ruleset «main» del repo: sin él en verde,
+# GitHub no deja mergear. Un PR de cualquier otra rama contra `main` queda rojo
+# y bloqueado — la regla deja de ser honor system.
+#
+# Corre con `pull_request` y lee sólo metadatos del evento: no hace checkout ni
+# ejecuta código del PR.
+name: Rama de origen
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  solo-desde-develop:
+    name: main solo desde develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar que el PR venga de develop
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REF" = "develop" ] && [ "$HEAD_REPO" = "$BASE_REPO" ]; then
+            echo "OK: develop -> main"
+            exit 0
+          fi
+          echo "::error::A main sólo se mergea develop. Este PR viene de '$HEAD_REPO:$HEAD_REF'. Cambiá la base a develop (docs/workflow.md §Ramas: develop y main)."
+          exit 1
