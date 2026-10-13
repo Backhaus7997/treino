@@ -19,6 +19,18 @@ bool _trains(Routine r, Set<String> groups) => r.days.any(
       (d) => d.slots.any((s) => groups.contains(s.muscleGroup)),
     );
 
+double _share(Routine r, Set<String> groups) {
+  final slots = r.days.expand((d) => d.slots).toList();
+  if (slots.isEmpty) return 0;
+  return slots.where((s) => groups.contains(s.muscleGroup)).length /
+      slots.length;
+}
+
+bool _nameHas(Routine r, String word) {
+  final texts = [r.name, r.split ?? '', ...r.days.map((d) => d.name)];
+  return texts.any((t) => TemplateSearch.normalize(t).contains(word));
+}
+
 RoutineSlot _slot(String name, String group) => RoutineSlot(
       exerciseId: name,
       exerciseName: name,
@@ -68,12 +80,14 @@ void main() {
       }
     });
 
-    test('"pecho" no trae plantillas que no entrenan pecho', () {
+    test('"pecho" no trae plantillas que no lo entrenan ni lo nombran', () {
       final res = buscar('pecho').toSet();
       final fuera = catalogo.where((r) => !res.contains(r));
       expect(fuera, isNotEmpty);
-      for (final r in fuera) {
-        expect(_trains(r, {'chest'}), isFalse, reason: r.name);
+      for (final r in catalogo) {
+        if (res.contains(r)) {
+          expect(_trains(r, {'chest'}) || _nameHas(r, 'pecho'), isTrue);
+        }
       }
     });
 
@@ -85,16 +99,63 @@ void main() {
       'brazos': {'biceps', 'triceps'},
       'abdomen': {'core'},
     }.entries) {
-      test('"${caso.key}" encuentra todo lo que entrena esos grupos', () {
+      test('"${caso.key}" trae las que lo entrenan >=10% y ninguna que no', () {
         final res = buscar(caso.key).toSet();
         expect(res, isNotEmpty);
         for (final r in catalogo) {
-          if (_trains(r, caso.value)) {
+          if (_share(r, caso.value) >= 0.10) {
             expect(res, contains(r), reason: '${r.name} debería aparecer');
+          }
+          if (!_trains(r, caso.value) && !_nameHas(r, 'brazo')) {
+            expect(res, isNot(contains(r)), reason: r.name);
           }
         }
       });
     }
+
+    test('"pecho": las que lo dicen en nombre/días van antes que el resto', () {
+      final res = buscar('pecho');
+      final enNombre = res.where((r) => _nameHas(r, 'pecho')).toList();
+      expect(enNombre, isNotEmpty);
+      final nombres = res.take(enNombre.length).toSet();
+      expect(nombres, enNombre.toSet());
+      // Y se nombran las de la auditoría.
+      final top = res.take(enNombre.length).map((r) => r.name).join('|');
+      expect(top, contains('Bro Split'));
+      expect(top, contains('Split Clásico 6 Días'));
+    });
+
+    test('"pecho": las que sólo lo entrenan van por participación desc', () {
+      final res = buscar('pecho');
+      // Puntaje < 500 = sólo por músculo (debajo de nombre y ejercicio).
+      final soloMusculo =
+          res.where((r) => TemplateSearch.score(r, 'pecho')! < 500).toList();
+      expect(soloMusculo.length, greaterThan(3));
+      final shares = soloMusculo.map((r) => _share(r, {'chest'})).toList();
+      expect(shares, [...shares]..sort((a, b) => b.compareTo(a)));
+    });
+
+    test('"pecho" descarta Glúteos Foco (1 de 27 slots) y ruido <10%', () {
+      final res = buscar('pecho');
+      expect(
+          res.map((r) => r.name), isNot(contains(startsWith('Glúteos Foco'))));
+      for (final r in res) {
+        expect(
+          _share(r, {'chest'}) >= 0.10 || _nameHas(r, 'pecho'),
+          isTrue,
+          reason: r.name,
+        );
+      }
+      expect(res.length, lessThan(46));
+    });
+
+    test('"gluteos": Glúteos Foco y Glúteos y Piernas encabezan', () {
+      final res = buscar('gluteos');
+      expect(
+        res.take(2).map((r) => r.name.split(' — ').first).toSet(),
+        {'Glúteos Foco', 'Glúteos y Piernas'},
+      );
+    });
 
     test('ignora mayúsculas y acentos: GLUTEOS = glúteos = Glúteos', () {
       final a = buscar('GLUTEOS');
@@ -156,11 +217,9 @@ void main() {
       expect(buscar('de la y'), catalogo);
     });
 
-    test('conserva el orden de entrada entre los resultados', () {
+    test('consulta en blanco no reordena', () {
       final invertido = catalogo.reversed.toList();
-      final res = TemplateSearch.filter(invertido, 'pecho', (r) => r);
-      final posiciones = res.map(invertido.indexOf).toList();
-      expect(posiciones, [...posiciones]..sort());
+      expect(TemplateSearch.filter(invertido, '', (r) => r), invertido);
     });
   });
 
@@ -194,6 +253,48 @@ void main() {
 
     test('nombre de día', () {
       expect(TemplateSearch.matches(ppl, 'legs'), isTrue);
+    });
+
+    test('empate de puntaje: gana el orden de entrada (afinidad)', () {
+      final a = _routine('Alfa', days: [
+        RoutineDay(dayNumber: 1, name: 'D', slots: [_slot('X', 'chest')]),
+      ]);
+      final b = _routine('Beta', days: [
+        RoutineDay(dayNumber: 1, name: 'D', slots: [_slot('Y', 'chest')]),
+      ]);
+      expect(TemplateSearch.filter([a, b], 'pecho', (r) => r), [a, b]);
+      expect(TemplateSearch.filter([b, a], 'pecho', (r) => r), [b, a]);
+    });
+
+    test('tiers: nombre > ejercicio > músculo > nivel', () {
+      final nombre = _routine('Pecho total', days: [
+        RoutineDay(dayNumber: 1, name: 'D', slots: [_slot('X', 'back')]),
+      ]);
+      final ejercicio = _routine('E', days: [
+        RoutineDay(
+            dayNumber: 1, name: 'D', slots: [_slot('Press de pecho', 'chest')]),
+      ]);
+      final musculo = _routine('M', days: [
+        RoutineDay(dayNumber: 1, name: 'D', slots: [_slot('Z', 'chest')]),
+      ]);
+      final lista = [musculo, ejercicio, nombre];
+      expect(
+        TemplateSearch.filter(lista, 'pecho', (r) => r),
+        [nombre, ejercicio, musculo],
+      );
+    });
+
+    test('corte: músculo con <10% de los slots no matchea; por nombre sí', () {
+      final slots = [
+        _slot('A', 'chest'),
+        for (var i = 0; i < 19; i++) _slot('B$i', 'quads'),
+      ];
+      final debil = _routine('Piernas', days: [
+        RoutineDay(dayNumber: 1, name: 'D', slots: slots),
+      ]);
+      expect(TemplateSearch.matches(debil, 'pecho'), isFalse);
+      final porNombre = _routine('Pecho', days: debil.days);
+      expect(TemplateSearch.matches(porNombre, 'pecho'), isTrue);
     });
 
     test('stem', () {

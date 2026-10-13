@@ -157,12 +157,15 @@ final rankedUnifiedTemplatesProvider =
 final templatesSearchQueryProvider =
     StateProvider.autoDispose<String>((ref) => '');
 
-/// [rankedUnifiedTemplatesProvider] filtrado por el texto de búsqueda.
+/// [rankedUnifiedTemplatesProvider] filtrado Y REORDENADO por relevancia
+/// según el texto de búsqueda.
 ///
-/// Compone con lo que ya hay: parte de la lista que respeta la pill de nivel
-/// y el orden por afinidad, y SÓLO saca elementos — filtrar no reordena, así
-/// que el orden por afinidad se conserva entre los resultados. Sin consulta
-/// devuelve la misma lista tal cual.
+/// Parte de la lista que ya respeta la pill de nivel y el orden por afinidad.
+/// Con consulta, [TemplateSearch.filter] descarta lo que no matchea (o matchea
+/// muy débil) y ordena por relevancia — nombre > ejercicio > músculo por
+/// participación > objetivo/nivel —; el orden por afinidad queda sólo como
+/// desempate entre puntajes iguales. Sin consulta devuelve la lista rankeada
+/// tal cual.
 final searchedUnifiedTemplatesProvider =
     Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
   final entries = ref.watch(rankedUnifiedTemplatesProvider);

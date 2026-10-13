@@ -10,20 +10,28 @@ import 'routine_goal.dart';
 ///
 /// ## Qué mira una plantilla
 ///
-/// En este orden de peso (el orden de arriba es el de relevancia editorial;
-/// hoy NO se usa para reordenar, ver más abajo):
+/// Nombre de la plantilla, `split` y nombre de cada día; nombre de cada
+/// ejercicio; grupo muscular de los slots (`slots[].muscleGroup`, traducido
+/// por [_muscleSynonyms] — "pecho" encuentra un PPL cuyo nombre no lo dice);
+/// y objetivo y nivel con su vocabulario en español.
 ///
-///  1. nombre de la plantilla, `split` y nombre de cada día,
-///  2. grupo muscular de los slots (`slots[].muscleGroup`), traducido por
-///     [_muscleSynonyms] — "pecho" encuentra un PPL cuyo nombre no lo dice,
-///  3. nombre de cada ejercicio,
-///  4. objetivo y nivel, con su vocabulario en español.
+/// ## Relevancia (ordena, no sólo filtra)
 ///
-/// ## Qué NO hace
+/// El catálogo es parejo: casi toda plantilla tiene algún slot de pecho, así
+/// que filtrar sin ordenar devolvía 46 de 50 en cualquier orden. Por eso los
+/// resultados se rankean. Tiers por palabra, de mayor a menor:
 ///
-/// No ordena. El orden por afinidad del mini-onboarding (#635) se conserva
-/// entre los resultados: esto es un FILTRO, y filtrar una lista ya ordenada
-/// preserva su orden. Por eso el peso de arriba no se traduce en puntaje.
+///  1. nombre / split / nombre de día (1000),
+///  2. nombre de ejercicio (500),
+///  3. sólo músculo: 100 + 300 × (slots del grupo / slots totales),
+///  4. objetivo o nivel (50, débil).
+///
+/// Corte de ruido: si una palabra matchea SÓLO por músculo y el grupo ocupa
+/// menos del 10% de los slots, no matchea ([minMuscleShare]). Un match por
+/// nombre pasa siempre, sin importar el porcentaje.
+///
+/// Con varias palabras todas deben matchear y el puntaje es la suma.
+/// El desempate es la posición de entrada, o sea el orden por afinidad.
 ///
 /// ## Reglas de matching
 ///
@@ -184,19 +192,40 @@ abstract final class TemplateSearch {
     return out;
   }
 
-  /// ¿[routine] responde a [query]?
+  /// Puntaje por tier de una palabra. Los tiers están separados para que un
+  /// tier más alto siempre gane al de abajo (el muscular llega a 400 como
+  /// máximo, el de ejercicio arranca en 500).
+  static const double _tierName = 1000;
+  static const double _tierExercise = 500;
+  static const double _tierMuscleBase = 100;
+  static const double _tierMuscleSpan = 300; // base + span*share, share<=1
+  static const double _tierWeak = 50;
+
+  /// Piso de participación: si una palabra sólo matchea por músculo y ese
+  /// grupo ocupa menos de esta fracción de los slots, NO matchea. Evita que
+  /// "pecho" traiga una plantilla de glúteos con 1 ejercicio de pecho en 27.
+  static const double minMuscleShare = 0.10;
+
+  /// Relevancia de [routine] para [query], o `null` si no matchea.
   ///
-  /// Una consulta en blanco responde a todo.
-  static bool matches(Routine routine, String query) {
+  /// Cada palabra tiene que matchear (AND) y el puntaje de la plantilla es la
+  /// SUMA de los puntajes por palabra: una plantilla que matchea todas las
+  /// palabras en el nombre le gana a una que matchea una en el nombre y otra
+  /// sólo por músculo. Consulta en blanco: `0`.
+  static double? score(Routine routine, String query) {
     final tokens = queryTokens(query);
-    if (tokens.isEmpty) return true;
-    final index = _Index.of(routine);
-    return tokens.every(index.satisfies);
+    if (tokens.isEmpty) return 0;
+    return _Index.of(routine).scoreAll(tokens);
   }
 
-  /// Filtra [items] conservando su orden. [routineOf] saca la rutina de cada
-  /// elemento, así sirve igual para `List<Routine>` que para los
-  /// `TemplateEntry` de la grilla.
+  /// ¿[routine] responde a [query]? (blanco responde a todo).
+  static bool matches(Routine routine, String query) =>
+      score(routine, query) != null;
+
+  /// Filtra Y ORDENA por relevancia (mayor primero). El empate se resuelve
+  /// por la posición original en [items], o sea que el orden por afinidad
+  /// del mini-onboarding actúa de desempate. Sin consulta devuelve [items]
+  /// sin tocar. [routineOf] saca la rutina de cada elemento.
   static List<T> filter<T>(
     List<T> items,
     String query,
@@ -204,50 +233,121 @@ abstract final class TemplateSearch {
   ) {
     final tokens = queryTokens(query);
     if (tokens.isEmpty) return items;
-    return [
-      for (final item in items)
-        if (tokens.every(_Index.of(routineOf(item)).satisfies)) item,
-    ];
+    final scored = <({T item, double score, int position})>[];
+    for (var i = 0; i < items.length; i++) {
+      final s = _Index.of(routineOf(items[i])).scoreAll(tokens);
+      if (s != null) scored.add((item: items[i], score: s, position: i));
+    }
+    // List.sort no es estable en Dart: el desempate va explícito.
+    scored.sort((a, b) {
+      final byScore = b.score.compareTo(a.score);
+      return byScore != 0 ? byScore : a.position.compareTo(b.position);
+    });
+    return [for (final e in scored) e.item];
   }
 }
 
 /// Lo buscable de una plantilla, ya normalizado.
 class _Index {
-  _Index._(this._words, this._muscles);
+  _Index._(
+    this._nameWords,
+    this._exerciseWords,
+    this._weakWords,
+    this._muscleCounts,
+    this._totalSlots,
+  );
 
-  final Set<String> _words;
-  final Set<String> _muscles;
+  /// Nombre, split y nombres de día.
+  final Set<String> _nameWords;
+  final Set<String> _exerciseWords;
+
+  /// Objetivo y nivel.
+  final Set<String> _weakWords;
+
+  /// Slots por clave de músculo y total de slots (todos los días).
+  final Map<String, int> _muscleCounts;
+  final int _totalSlots;
 
   factory _Index.of(Routine r) {
-    final words = <String>{
+    final nameWords = <String>{
       ...TemplateSearch._words(r.name),
       if (r.split != null) ...TemplateSearch._words(r.split!),
     };
-    final muscles = <String>{};
+    final exerciseWords = <String>{};
+    final counts = <String, int>{};
+    var total = 0;
     for (final day in r.days) {
-      words.addAll(TemplateSearch._words(day.name));
+      nameWords.addAll(TemplateSearch._words(day.name));
       for (final slot in day.slots) {
-        words.addAll(TemplateSearch._words(slot.exerciseName));
-        muscles.add(slot.muscleGroup.trim().toLowerCase());
+        exerciseWords.addAll(TemplateSearch._words(slot.exerciseName));
+        final key = slot.muscleGroup.trim().toLowerCase();
+        counts[key] = (counts[key] ?? 0) + 1;
+        total++;
       }
     }
+    final weak = <String>{};
     for (final g in r.goals) {
       final w = TemplateSearch._goalWords[g];
-      if (w != null) words.addAll(TemplateSearch._words(w));
+      if (w != null) weak.addAll(TemplateSearch._words(w));
     }
     final level = TemplateSearch._levelWords[r.level];
-    if (level != null) words.addAll(TemplateSearch._words(level));
-    return _Index._(words, muscles);
+    if (level != null) weak.addAll(TemplateSearch._words(level));
+    return _Index._(nameWords, exerciseWords, weak, counts, total);
   }
 
-  /// Un token se satisface por texto (nombre, día, ejercicio, objetivo,
-  /// nivel) o por un músculo que algún slot trabaja.
-  bool satisfies(String token) {
-    for (final w in _words) {
-      if (TemplateSearch._wordMatches(w, token)) return true;
-    }
+  static bool _any(Set<String> words, String token) =>
+      words.any((w) => TemplateSearch._wordMatches(w, token));
+
+  /// Participación (0..1) de los grupos que [token] nombra, o `null` si no
+  /// nombra ninguno. Los slots de la plantilla son el denominador.
+  double? _muscleShare(String token) {
     final named = TemplateSearch._musclesNamedBy(token);
-    if (named.isEmpty) return false;
-    return named.any(_muscles.contains);
+    if (named.isEmpty) return null;
+    if (_totalSlots == 0) return 0;
+    var hits = 0;
+    for (final key in named) {
+      hits += _muscleCounts[key] ?? 0;
+    }
+    return hits / _totalSlots;
+  }
+
+  /// Puntaje de una palabra, o `null` si no matchea. Gana el mejor tier.
+  ///
+  /// Cuando la palabra además nombra un músculo, los tiers de nombre y de
+  /// ejercicio suman un bonus de hasta 99 puntos por participación, sólo para
+  /// ordenar DENTRO del tier (nunca lo cruza): entre dos plantillas con
+  /// "pecho" en el nombre, sube la que más pecho entrena.
+  double? _scoreToken(String token) {
+    final share = _muscleShare(token);
+    final bonus = 99 * (share ?? 0);
+    if (_any(_nameWords, token)) return TemplateSearch._tierName + bonus;
+    // Una palabra de músculo dentro de un nombre de ejercicio no es evidencia
+    // de que la plantilla lo entrene ("Jalón al pecho" es de espalda), así
+    // que también pasa por el corte de participación.
+    final weakMuscle = share != null && share < TemplateSearch.minMuscleShare;
+    if (!weakMuscle && _any(_exerciseWords, token)) {
+      return TemplateSearch._tierExercise + bonus;
+    }
+    double? best;
+    if (share != null && share >= TemplateSearch.minMuscleShare) {
+      best = TemplateSearch._tierMuscleBase +
+          TemplateSearch._tierMuscleSpan * share;
+    }
+    if (_any(_weakWords, token)) {
+      best = best == null
+          ? TemplateSearch._tierWeak
+          : (best > TemplateSearch._tierWeak ? best : TemplateSearch._tierWeak);
+    }
+    return best;
+  }
+
+  double? scoreAll(List<String> tokens) {
+    var sum = 0.0;
+    for (final t in tokens) {
+      final s = _scoreToken(t);
+      if (s == null) return null;
+      sum += s;
+    }
+    return sum;
   }
 }

@@ -133,9 +133,10 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     // mismo orden de siempre — con preferencias vacías el provider devuelve la
     // lista sin tocar.
     //
-    // Encima de eso, la búsqueda por texto (#1412) sólo FILTRA: parte de la
-    // lista ya filtrada por nivel y ordenada por afinidad, así que el orden
-    // se conserva entre los resultados.
+    // Encima de eso, la búsqueda por texto (#1412) filtra Y reordena por
+    // relevancia: parte de la lista ya filtrada por nivel y ordenada por
+    // afinidad, y esa afinidad queda como desempate entre resultados con el
+    // mismo puntaje. Sin texto no cambia nada.
     final entriesAsync = ref.watch(searchedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
     final searchQuery = ref.watch(templatesSearchQueryProvider);
