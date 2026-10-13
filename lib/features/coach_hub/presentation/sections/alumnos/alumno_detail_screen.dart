@@ -36,7 +36,8 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
-import 'package:treino/features/gyms/application/gym_providers.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show hasRealGym;
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
 import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
@@ -327,9 +328,9 @@ class AlumnoDetailScreen extends ConsumerWidget {
     };
     final estado = link == null ? null : estadoForLink(link, conDeudaIds);
     final gymId = profile?.gymId;
-    final gymName = gymId == null
+    final gymName = !hasRealGym(gymId)
         ? null
-        : ref.watch(gymByIdProvider(gymId)).valueOrNull?.name;
+        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull;
     final billing = ref.watch(athleteBillingProvider(athleteId)).valueOrNull;
 
     return DefaultTabController(

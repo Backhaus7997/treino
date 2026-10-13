@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../../gyms/domain/gym.dart' show hasRealGym;
-import '../../../gyms/domain/gym_display_name.dart';
 import '../../domain/public_profile_view.dart';
 import 'post_avatar.dart';
 
@@ -14,7 +13,7 @@ import 'post_avatar.dart';
 /// is unknown / null / sentinel). Background is a vertical accent→bg gradient.
 ///
 /// DETAIL context (single target user) — resolves the gym name live via
-/// [gymByIdProvider] rather than reading a denormalized field, so the name
+/// [gymDisplayNameProvider] rather than reading a denormalized field, so the name
 /// always reflects the current `gyms/` catalog. gyms-foundation Phase 3.
 class PublicProfileHero extends ConsumerWidget {
   const PublicProfileHero({super.key, required this.view});
@@ -25,9 +24,9 @@ class PublicProfileHero extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final gymId = view.authorGymId;
-    final gymAsync =
-        !hasRealGym(gymId) ? null : ref.watch(gymByIdProvider(gymId!));
-    final gymName = gymDisplayNameFromGym(gymAsync?.valueOrNull);
+    final gymName = !hasRealGym(gymId)
+        ? ''
+        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
 
     // The parent screen extends its body behind the transparent AppBar so
     // this gradient reaches the very top. Add the status-bar inset + the

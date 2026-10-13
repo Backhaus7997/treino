@@ -8941,60 +8941,6 @@ abstract class AppL10n {
   /// **'Para confirmar que sos vos, se va a abrir una ventana de {provider}.'**
   String eliminarCuentaWebPopupHint(String provider);
 
-  /// Title of the dialog asking the user to name the gym they just picked (the name is typed by the first user, never taken from Google).
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Ponele nombre a tu gimnasio'**
-  String get gymNameDialogTitle;
-
-  /// Body of the gym name dialog.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Escribí el nombre con el que querés que lo vean los demás.'**
-  String get gymNameDialogBody;
-
-  /// Hint of the gym name text field.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Nombre del gimnasio'**
-  String get gymNameDialogHint;
-
-  /// Confirm button of the gym name dialog. Cancel reuses commonCancel.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'GUARDAR'**
-  String get gymNameDialogConfirm;
-
-  /// Título de la card de Inicio que pide nombrar el gimnasio vinculado cuando está marcado nameNeeded (migración de Places, #1338).
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Tu gimnasio necesita un nombre'**
-  String get gymNamePromptTitle;
-
-  /// Cuerpo de la card que pide nombrar el gimnasio.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Ayudanos: ¿cómo se llama? Lo van a ver todos los que entrenan ahí.'**
-  String get gymNamePromptBody;
-
-  /// Botón de la card que abre el diálogo para nombrar el gimnasio.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'PONERLE NOMBRE'**
-  String get gymNamePromptCta;
-
-  /// Cierra la card de nombrar el gimnasio hasta la próxima sesión.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Ahora no'**
-  String get gymNamePromptDismiss;
-
-  /// Snackbar cuando otro usuario nombró el gimnasio antes que vos; muestra el nombre ganador.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Alguien ya lo nombró: {name}.'**
-  String gymNamePromptRaceMessage(String name);
-
   /// Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo.
   ///
   /// In es_AR, this message translates to:

@@ -469,7 +469,7 @@ void main() {
     });
 
     test(
-        'SCENARIO-525: update with gymId=kNoGymId writes gymName:null with no '
+        'SCENARIO-525: update with gymId=kNoGymId persists null and gymName:null, no '
         'gym resolution attempted', () async {
       await seedDoc('u-gym-2');
       await firestore.collection('userPublicProfiles').doc('u-gym-2').set({
@@ -485,8 +485,11 @@ void main() {
 
       final pubSnap =
           await firestore.collection('userPublicProfiles').doc('u-gym-2').get();
-      expect(pubSnap.data()!['gymId'], equals('no-gym'));
+      // El centinela se normaliza: "sin gym" se persiste como null.
+      expect(pubSnap.data()!['gymId'], isNull);
       expect(pubSnap.data()!['gymName'], isNull);
+      final privSnap = await firestore.collection('users').doc('u-gym-2').get();
+      expect(privSnap.data()!['gymId'], isNull);
     });
 
     test(

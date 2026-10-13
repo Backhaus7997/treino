@@ -278,8 +278,9 @@ void main() {
     });
 
     test(
-        'a kNoGymId private gymId writes gymId:kNoGymId/gymName:null on the '
-        'public doc without throwing', () async {
+        'a legacy kNoGymId private gymId is normalized to null on BOTH docs '
+        '(the rules pin public.gymId == private.gymId) without throwing',
+        () async {
       await seedUser(uid, gymId: kNoGymId);
       await publicProfileRepo.set(const UserPublicProfile(uid: uid));
 
@@ -287,8 +288,9 @@ void main() {
 
       final profile = await publicProfileRepo.get(uid);
       expect(profile!.rankingOptIn, isTrue);
-      expect(profile.gymId, equals(kNoGymId));
+      expect(profile.gymId, isNull);
       expect(profile.gymName, isNull);
+      expect((await userRepo.get(uid))!.gymId, isNull);
     });
 
     test(

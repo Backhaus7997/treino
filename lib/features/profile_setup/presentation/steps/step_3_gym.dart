@@ -1,14 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/moderation/moderation_guard.dart';
-import '../../../../core/telemetry/non_fatal.dart';
-import '../../../../l10n/app_l10n.dart';
-import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
-import '../../../gyms/presentation/gym_name_dialog.dart';
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
 import '../widgets/gym_search_box.dart';
@@ -22,13 +15,12 @@ import '../widgets/gym_search_box.dart';
 ///
 /// Tocar un gimnasio lo RESUELVE en el acto (`ResolveGymPlaceService`: LEE
 /// `gyms/{placeId}`) y lo deja en el draft. El `gymId` del usuario lo persiste
-/// `ProfileSetupNotifier.submit()`, que lo manda en su parcial y hace el
-/// dual-write de `gymName` leyendo ese `gyms/{placeId}`.
+/// `ProfileSetupNotifier.submit()`, que lo manda en su parcial.
 ///
-/// Un gym NUEVO se nombra acá, pero el nombre queda en el draft
-/// (`pendingGymName`) y el doc compartido se CREA en el submit, antes del
-/// update de `users/{uid}`: crearlo al elegir dejaba el nombre de alguien que
-/// después elegía otro gimnasio o abandonaba el alta (#1338).
+/// Tocar un gimnasio sólo lo deja en el draft (no resuelve ni escribe nada).
+/// El submit crea `gyms/{placeId}` con un marcador como nombre si no existe y
+/// el nombre de Google se muestra en vivo, sin guardarse (política de Places,
+/// #1338). Nadie nombra el gym.
 ///
 /// Este paso NO escribe `users/{uid}`, y no es un detalle. Hasta sep-2026
 /// escribía `{'gymId': ...}` ahí (vía `selectGymActionProvider`), apoyado en
@@ -54,65 +46,14 @@ import '../widgets/gym_search_box.dart';
 class Step3Gym extends ConsumerWidget {
   const Step3Gym({super.key});
 
-  Future<void> _onGymIdSelected(
-    BuildContext context,
-    WidgetRef ref,
-    String? gymId,
-  ) async {
+  /// Sólo deja el gym en el draft. El doc compartido `gyms/{placeId}` se crea
+  /// en el submit: crearlo al tocar dejaba docs huérfanos en un catálogo que
+  /// lee todo el mundo si el usuario cambiaba de gym o abandonaba el alta.
+  void _onGymIdSelected(WidgetRef ref, String? gymId) {
     final notifier = ref.read(profileSetupNotifierProvider.notifier);
-    if (gymId == null || gymId == kNoGymId) {
-      notifier.updateGymId(kNoGymId);
-      return;
-    }
-
-    // Todo lo que se usa después del await se toma ANTES: leer `ref` o
-    // `context` con la operación en vuelo tiraba "Cannot use ref after the
-    // widget was disposed" cuando la pantalla se desmontaba en el medio, y el
-    // gimnasio nunca llegaba al draft.
-    final resolver = ref.read(resolveGymPlaceServiceProvider);
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppL10n.of(context);
-
-    try {
-      var result = await resolver.call(placeId: gymId, name: null);
-      if (result.needsName && !result.existsUnnamed) {
-        // Gym nuevo: lo nombra quien lo crea. Un gym que ya existe sin
-        // nombre de usuario NO se nombra acá: la regla de Firestore sólo deja
-        // a quien ya está vinculado (`users/{uid}.gymId`), y en el alta ese
-        // doc todavía no existe. Queda en el draft y lo nombra su primer
-        // usuario vinculado desde el perfil.
-        if (!context.mounted) return;
-        final typed = await showGymNameDialog(context);
-        if (typed == null) return;
-        // El nombre se valida acá (feedback inmediato) pero se ESCRIBE en el
-        // submit: el gym compartido no puede quedar con el nombre de alguien
-        // que después elige otro o abandona el alta (#1338).
-        ModerationGuard.ensure(typed, campo: 'gym.name');
-        notifier.updateGymId(gymId, pendingName: typed.trim());
-        return;
-      }
-      notifier.updateGymId(result.gymId);
-    } on ModerationBlockedException {
-      if (messenger.mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.moderationBlockedMessage)),
-        );
-      }
-    } catch (e, st) {
-      // Antes esto no avisaba a nadie: ni al usuario, que tocaba el gimnasio
-      // y no pasaba nada, ni a Crashlytics. Por eso el bug de `bornAtOk` se
-      // vio como «el gimnasio no se deja elegir» y no como lo que era.
-      unawaited(reportNonFatal(
-        e,
-        st,
-        reason: 'Step3Gym: no se pudo resolver el gimnasio elegido en el alta',
-      ));
-      if (messenger.mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.profileSetupGymSelectError)),
-        );
-      }
-    }
+    notifier.updateGymId(
+      gymId == null || gymId == kNoGymId ? kNoGymId : gymId,
+    );
   }
 
   @override
@@ -128,7 +69,7 @@ class Step3Gym extends ConsumerWidget {
         padding: const EdgeInsets.only(top: 20),
         child: GymSearchBox(
           selectedGymId: selectedGymId,
-          onGymIdSelected: (gymId) => _onGymIdSelected(context, ref, gymId),
+          onGymIdSelected: (gymId) => _onGymIdSelected(ref, gymId),
         ),
       ),
     );

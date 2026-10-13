@@ -14,8 +14,7 @@ import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
-import '../../gyms/application/gym_providers.dart';
-import '../../gyms/domain/gym_display_name.dart';
+import '../../gyms/application/gym_display_name_provider.dart';
 import '../../coach/application/trainer_link_providers.dart';
 import '../application/duration_timer_providers.dart';
 import '../application/exercise_providers.dart';
@@ -1034,11 +1033,10 @@ class _AttendanceCard extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
     final gymId = profileAsync.valueOrNull?.gymId;
-    // DETAIL context (self) — UserProfile has no denormalized gymName, so
-    // resolve live via gymByIdProvider. gyms-foundation Phase 3.
+    // DETAIL context (self): `gymDisplayNameProvider` (Google en vivo).
     final gymName = !hasRealGym(gymId)
         ? ''
-        : gymDisplayNameFromGym(ref.watch(gymByIdProvider(gymId!)).valueOrNull);
+        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
     final now = DateTime.now().toLocal();
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');

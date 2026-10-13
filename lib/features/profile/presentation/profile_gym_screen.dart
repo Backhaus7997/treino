@@ -12,8 +12,7 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/application/places_providers.dart';
-import '../../gyms/domain/gym.dart' show kNoGymId;
-import '../../gyms/presentation/gym_name_dialog.dart';
+import '../../gyms/domain/gym.dart' show hasRealGym, kNoGymId;
 import '../../profile_setup/presentation/widgets/gym_search_box.dart';
 import '../application/user_providers.dart';
 import 'widgets/nearby_gyms_list.dart';
@@ -27,14 +26,14 @@ import 'widgets/pinned_current_gym.dart';
 /// "Onboarding and profile-edit pickers share behavior" (single-search-box
 /// contract, ADR-PSR-011).
 ///
-/// A Google Places tap only stages `_pendingGymId` locally — the resolve
+/// A Google Places tap only stages el borrador locally — the resolve
 /// (client-side Details call, billable) happens on explicit "GUARDAR" tap,
 /// not on every suggestion tap, to avoid unnecessary Places billing on
 /// accidental selections. `kNoGymId` needs no resolution.
 ///
 /// Ese contrato vale para TODOS los caminos de selección de la pantalla
 /// (issue #814): buscador tipeado, "OTRO GYM / SIN GYM" y lista de cercanos
-/// ([NearbyGymsList]) mueven únicamente `_pendingGymId`. Hasta #814 el tap
+/// ([NearbyGymsList]) mueven únicamente el borrador. Hasta #814 el tap
 /// en un cercano resolvía y escribía en el acto, así que cambiaba el
 /// gimnasio del atleta —dato que alimenta rankings y feed por gimnasio— sin
 /// que apretara GUARDAR y sin forma de arrepentirse. [_save] es el único
@@ -47,14 +46,27 @@ class ProfileGymScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
-  String? _pendingGymId;
-  bool _initialized = false;
+  /// Borrador del gym elegido. `null` == SIN GYM (nunca el sentinel
+  /// [kNoGymId]: se normaliza al tocar). Sólo vale si [_touched].
+  ///
+  /// Antes el borrador se inicializaba "perezoso" en el primer `build` con lo
+  /// que hubiera en `userProfileProvider`; si el perfil todavía cargaba, el
+  /// borrador quedaba clavado en `null` para siempre y GUARDAR se habilitaba
+  /// sin tocar nada (un tap pisaba el gym real con `null`). Ahora el efectivo
+  /// se deriva en cada build: sin tocar nada, es siempre el gym vigente.
+  String? _draftGymId;
+  bool _touched = false;
   bool _saving = false;
+
+  void _onGymIdSelected(String? gymId) => setState(() {
+        _touched = true;
+        _draftGymId = hasRealGym(gymId) ? gymId : null;
+      });
 
   Future<void> _save(String uid, String? gymId) async {
     setState(() => _saving = true);
     try {
-      if (gymId != null && gymId != kNoGymId) {
+      if (hasRealGym(gymId)) {
         // Google Place selection — resolve (server-side Details + upsert)
         // then persist. selectGymActionProvider writes `gymId` to
         // `users/{uid}` itself (UserRepository.update dual-writes gymName).
@@ -64,23 +76,10 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         // mostrando su spinner (`_saving`) mientras el Details viaja.
         await ref
             .read(selectGymActionProvider.notifier)
-            .select(uid: uid, placeId: gymId);
-        var actionState = ref.read(selectGymActionProvider);
+            .select(uid: uid, placeId: gymId!);
+        final actionState = ref.read(selectGymActionProvider);
         if (actionState.hasError) {
           throw actionState.error!;
-        }
-        if (actionState.valueOrNull?.needsName ?? false) {
-          // Gym nuevo (o sin nombre de usuario): lo nombra quien lo vincula.
-          if (!mounted) return;
-          final typed = await showGymNameDialog(context);
-          if (typed == null) return;
-          await ref
-              .read(selectGymActionProvider.notifier)
-              .select(uid: uid, placeId: gymId, name: typed);
-          actionState = ref.read(selectGymActionProvider);
-          if (actionState.hasError) {
-            throw actionState.error!;
-          }
         }
       } else {
         // "SIN GYM" se persiste como `null` (igual que el wizard): el
@@ -120,15 +119,19 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final myUid = ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
-    final currentGymId = ref.watch(userProfileProvider).valueOrNull?.gymId;
+    final rawGymId = ref.watch(userProfileProvider).valueOrNull?.gymId;
+    // El `'no-gym'` que dejaron versiones viejas es "sin gym", igual que null.
+    final currentGymId = hasRealGym(rawGymId) ? rawGymId : null;
+    final pendingGymId = _touched ? _draftGymId : currentGymId;
 
-    // Lazy-initialize _pendingGymId to currentGymId on first build.
-    if (!_initialized) {
-      _pendingGymId = currentGymId;
-      _initialized = true;
-    }
-
-    final saveEnabled = _pendingGymId != currentGymId && !_saving;
+    // Con el centinela legacy guardado, "sin gym" ya es el estado visible pero
+    // el valor persistido es otro: tocar OTRO tiene que poder GUARDAR para
+    // migrarlo a `null`, aunque borrador y vigente normalizados coincidan.
+    final legacySentinelStored = rawGymId != null && currentGymId == null;
+    final saveEnabled = _touched &&
+        !_saving &&
+        (pendingGymId != currentGymId ||
+            (legacySentinelStored && pendingGymId == null));
 
     return Column(
       children: [
@@ -169,22 +172,20 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                   GymSearchBox(
                     // `null` en el perfil == SIN GYM (así lo guarda esta pantalla y el
                     // wizard), así que se resalta aunque el borrador sea null.
-                    selectedGymId: _pendingGymId ?? kNoGymId,
-                    onGymIdSelected: (gymId) =>
-                        setState(() => _pendingGymId = gymId ?? kNoGymId),
+                    selectedGymId: pendingGymId ?? kNoGymId,
+                    onGymIdSelected: _onGymIdSelected,
                     // gym-selection-v2 AD-10: la lista de cercanos ocupa el
                     // estado de query vacía. Su tap es draft-only, igual que
                     // el del buscador de acá arriba (#814): sólo mueve
-                    // `_pendingGymId`. La resolución del Place y el write a
+                    // el borrador. La resolución del Place y el write a
                     // `users/{uid}.gymId` los hace `_save()` al tocar
                     // GUARDAR, que es el ÚNICO punto de persistencia de esta
                     // pantalla. `selectedGymId` le devuelve el borrador para
                     // que la fila tocada se resalte.
                     emptyQueryContent: NearbyGymsList(
                       currentGymId: currentGymId,
-                      selectedGymId: _pendingGymId,
-                      onGymSelected: (gymId) =>
-                          setState(() => _pendingGymId = gymId),
+                      selectedGymId: pendingGymId,
+                      onGymSelected: _onGymIdSelected,
                     ),
                   ),
                 ],
@@ -202,7 +203,7 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed:
-                    saveEnabled ? () => _save(myUid, _pendingGymId) : null,
+                    saveEnabled ? () => _save(myUid, pendingGymId) : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
                   foregroundColor: TreinoButtonTokens.foreground(context),

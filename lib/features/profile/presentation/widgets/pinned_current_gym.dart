@@ -5,16 +5,15 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../gyms/application/gym_providers.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
-import '../../../gyms/domain/gym_display_name.dart';
 
 /// Pinned card showing the athlete's current gym at the top of
 /// `ProfileGymScreen` — design gym-selection-v2 AD-11.
 ///
-/// Reuses `gymByIdProvider` + `gymDisplayNameFromGym`, the exact pattern
-/// `profile_cuenta_section.dart` already uses for the "Gimnasio" tile
-/// subtitle. Display-only — it does NOT re-trigger selection (it IS the
+/// Usa `gymDisplayNameProvider` (nombre de Google en vivo para gyms de
+/// Places), igual que el subtítulo del tile "Gimnasio" de
+/// `profile_cuenta_section.dart`. Display-only — it does NOT re-trigger selection (it IS the
 /// current selection); tapping a different gym elsewhere on the screen
 /// replaces it.
 ///
@@ -34,7 +33,7 @@ class PinnedCurrentGym extends ConsumerWidget {
     if (gymId == null || gymId == kNoGymId) return const SizedBox.shrink();
 
     final palette = AppPalette.of(context);
-    final gymAsync = ref.watch(gymByIdProvider(gymId));
+    final gymAsync = ref.watch(gymDisplayNameProvider(gymId));
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -55,13 +54,13 @@ class PinnedCurrentGym extends ConsumerWidget {
             ),
           ),
           error: (_, __) => const SizedBox.shrink(),
-          data: (gym) => Row(
+          data: (name) => Row(
             children: [
               Icon(TreinoIcon.mapPin, color: palette.accent, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  gymDisplayNameFromGym(gym),
+                  name,
                   style: GoogleFonts.barlowCondensed(
                     color: palette.textPrimary,
                     fontSize: 14,

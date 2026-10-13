@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/utils/geohash.dart';
 import '../domain/gym.dart';
 import '../domain/gym_source.dart';
@@ -17,30 +16,20 @@ class ResolveGymPlaceResult {
     required this.gymId,
     required this.name,
     required this.source,
-    this.needsName = false,
-    this.existsUnnamed = false,
   });
 
   /// Google Place ID, reused as `gyms/{gymId}` doc id.
   final String gymId;
 
-  /// Nombre que escribió un usuario. Vacío si [needsName].
+  /// Nombre ALMACENADO del gym (`gyms/{gymId}.name`). Para un gym de Places
+  /// es el marcador [kGymPlaceholderName]: el nombre de Google se muestra en
+  /// vivo (`gymDisplayNameProvider`) y nunca se guarda.
   final String name;
 
-  /// Always `'google-places'` here — kept as a plain string (not
-  /// [GymSource]) so callers that only round-trip it don't need to import
-  /// the domain enum.
+  /// Always `'google-places'` for newly created docs — kept as a plain string
+  /// (not [GymSource]) so callers that only round-trip it don't need to
+  /// import the domain enum.
   final String source;
-
-  /// `true` cuando el gym no existe todavía, o existe sin nombre de usuario:
-  /// quien llama tiene que pedirle el nombre al usuario y volver a llamar
-  /// con `name`. En ese caso NO se escribió nada.
-  final bool needsName;
-
-  /// `true` cuando [needsName] y el doc `gyms/{gymId}` YA existe (migrado,
-  /// marcado `nameNeeded`). Nombrarlo exige que el usuario esté vinculado a
-  /// ese gym (regla de Firestore), cosa que todavía no pasa durante el alta.
-  final bool existsUnnamed;
 }
 
 /// Client-side failure resolving a gym place. Sealed so callers can
@@ -101,10 +90,14 @@ final class ResolveGymPlaceFailure$Unknown extends ResolveGymPlaceFailure {
 /// [GymRepository.createFromPlace] (an authenticated user can create
 /// `googlePlaces`-sourced gym docs directly — see firestore.rules).
 ///
+/// POLÍTICA DE PLACES: los términos de Google Maps Platform prohíben GUARDAR
+/// su contenido (nombre, dirección) — sólo el `place_id` (y lat/lng ≤30 días).
+/// Por eso el doc se crea con el marcador [kGymPlaceholderName] y el nombre
+/// real se pide en vivo con [fetchDisplayName], en memoria y sin persistir.
+///
 /// `GET https://places.googleapis.com/v1/places/{placeId}`
 /// Headers: `X-Goog-Api-Key`, `X-Goog-FieldMask`.
 /// Query:   `sessionToken` (optional, shared with the Autocomplete session).
-/// Response fields used: `location.latitude`/`longitude` ONLY.
 class ResolveGymPlaceService {
   ResolveGymPlaceService({
     required GymRepository gymRepository,
@@ -114,9 +107,11 @@ class ResolveGymPlaceService {
         _httpClient = httpClient,
         _clientApiKey = clientApiKey;
 
-  /// Solo `location`: Google no deja guardar su nombre ni su dirección, y
-  /// el campo `location` es SKU Essentials (barato).
+  /// Para crear el doc sólo hace falta `location` (SKU Essentials, barato).
   static const _fieldMask = 'location';
+
+  /// Para mostrar el nombre en vivo.
+  static const _displayNameFieldMask = 'displayName';
 
   final GymRepository _gymRepository;
   final http.Client _httpClient;
@@ -124,71 +119,26 @@ class ResolveGymPlaceService {
 
   /// Resolves [placeId], reading through the `gyms/{placeId}` cache first.
   ///
-  /// El nombre del gym lo escribe el PRIMER usuario que lo vincula
-  /// ([name], sin prefill de Google) y todos ven ese. Sin [name]:
-  /// - gym inexistente o marcado `nameNeeded` → devuelve `needsName: true`
-  ///   sin escribir ni llamar a Google;
-  /// - gym con nombre → lo devuelve tal cual.
-  /// Con [name] sobre un gym ya nombrado, gana el nombre existente.
+  /// Si el gym ya existe se devuelve tal cual, sin llamar a Google. Si no, se
+  /// pide la ubicación y se crea con [kGymPlaceholderName] — nunca se escribe
+  /// texto de Google.
   ///
   /// [sessionToken] MUST be the same token shared with the Autocomplete
   /// session that produced [placeId] (spec: "the same token in the one
   /// Place Details request triggered by the eventual selection").
   ///
-  /// [beforeNaming] se ejecuta justo ANTES de escribir el nombre de un gym
-  /// `nameNeeded`: la regla de Firestore sólo deja nombrarlo a quien ya tiene
-  /// `users/{uid}.gymId` apuntando a ese gym, así que quien llama vincula acá.
-  ///
-  /// Throws [ResolveGymPlaceFailure] on error and
-  /// `ModerationBlockedException` when [name] is blocked — never crashes.
+  /// Throws [ResolveGymPlaceFailure] on error — never crashes.
   Future<ResolveGymPlaceResult> call({
     required String placeId,
-    String? name,
     String? sessionToken,
-    Future<void> Function()? beforeNaming,
   }) async {
     if (placeId.isEmpty) {
       throw const ResolveGymPlaceFailure$Config('placeId is required.');
     }
-    final typed = name?.trim();
-    final hasTyped = typed != null && typed.isNotEmpty;
-    // El nombre es texto público de usuario: mismo filtro que displayName.
-    // Se valida ANTES de cualquier red o escritura.
-    if (hasTyped) ModerationGuard.ensure(typed, campo: 'gym.name');
 
     // ── Read-through cache ──────────────────────────────────────────────
     final cached = await _gymRepository.getById(placeId);
     if (cached != null) {
-      if (cached.nameNeeded) {
-        if (!hasTyped) {
-          return ResolveGymPlaceResult(
-            gymId: cached.id,
-            name: '',
-            source: cached.source.toWire(),
-            needsName: true,
-            existsUnnamed: true,
-          );
-        }
-        try {
-          await beforeNaming?.call();
-          await _gymRepository.setName(cached.id, typed);
-        } catch (_) {
-          // Carrera: otro usuario lo nombró entre nuestro getById y el
-          // update (la regla niega al segundo). Gana el nombre del primero.
-          final winner = await _gymRepository.getById(placeId);
-          if (winner == null || winner.nameNeeded) rethrow;
-          return ResolveGymPlaceResult(
-            gymId: winner.id,
-            name: winner.name,
-            source: winner.source.toWire(),
-          );
-        }
-        return ResolveGymPlaceResult(
-          gymId: cached.id,
-          name: typed,
-          source: cached.source.toWire(),
-        );
-      }
       return ResolveGymPlaceResult(
         gymId: cached.id,
         name: cached.name,
@@ -197,14 +147,77 @@ class ResolveGymPlaceService {
     }
 
     // ── Cache miss ──────────────────────────────────────────────────────
-    if (!hasTyped) {
-      return ResolveGymPlaceResult(
-        gymId: placeId,
-        name: '',
-        source: GymSource.googlePlaces.toWire(),
-        needsName: true,
+    final decoded = await _getDetails(
+      placeId,
+      fieldMask: _fieldMask,
+      sessionToken: sessionToken,
+    );
+
+    final location = decoded['location'];
+    final lat = (location is Map) ? location['latitude'] as num? : null;
+    final lng = (location is Map) ? location['longitude'] as num? : null;
+
+    if (lat == null || lng == null) {
+      throw const ResolveGymPlaceFailure$Server(
+        'Places API returned an incomplete result. Please try again.',
       );
     }
+
+    final gym = Gym(
+      id: placeId,
+      name: kGymPlaceholderName,
+      lat: lat.toDouble(),
+      lng: lng.toDouble(),
+      geohash: geohash5(lat.toDouble(), lng.toDouble()),
+      source: GymSource.googlePlaces,
+      createdAt: DateTime.now().toUtc(),
+    );
+
+    try {
+      await _gymRepository.createFromPlace(gym);
+    } catch (_) {
+      // Carrera: otro usuario creó el gym entre nuestro getById y el create
+      // (la regla niega el segundo escritor). Gana el doc del primero.
+      final winner = await _gymRepository.getById(placeId);
+      if (winner == null) rethrow;
+      return ResolveGymPlaceResult(
+        gymId: winner.id,
+        name: winner.name,
+        source: winner.source.toWire(),
+      );
+    }
+
+    return ResolveGymPlaceResult(
+      gymId: placeId,
+      name: kGymPlaceholderName,
+      source: 'google-places',
+    );
+  }
+
+  /// Nombre actual del lugar según Google (`displayName.text`), pedido EN VIVO.
+  ///
+  /// Es contenido de Places: quien llama lo muestra y lo descarta (cache en
+  /// memoria de la sesión como máximo). NUNCA se escribe en Firestore.
+  /// Devuelve `null` si Google no trae nombre. Throws [ResolveGymPlaceFailure]
+  /// ante error de red/servidor/configuración.
+  Future<String?> fetchDisplayName(String placeId) async {
+    if (placeId.isEmpty) {
+      throw const ResolveGymPlaceFailure$Config('placeId is required.');
+    }
+    final decoded =
+        await _getDetails(placeId, fieldMask: _displayNameFieldMask);
+    final displayName = decoded['displayName'];
+    final text = (displayName is Map) ? displayName['text'] : null;
+    if (text is! String) return null;
+    final trimmed = text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  Future<Map<dynamic, dynamic>> _getDetails(
+    String placeId, {
+    required String fieldMask,
+    String? sessionToken,
+  }) async {
     if (_clientApiKey.isEmpty) {
       throw const ResolveGymPlaceFailure$Config(
         'PLACES_CLIENT_KEY is empty — provide it via '
@@ -225,7 +238,7 @@ class ResolveGymPlaceService {
         uri,
         headers: {
           'X-Goog-Api-Key': _clientApiKey,
-          'X-Goog-FieldMask': _fieldMask,
+          'X-Goog-FieldMask': fieldMask,
         },
       );
     } catch (e) {
@@ -245,45 +258,6 @@ class ResolveGymPlaceService {
         'Places API returned an unexpected response.',
       );
     }
-
-    final location = decoded['location'];
-    final lat = (location is Map) ? location['latitude'] as num? : null;
-    final lng = (location is Map) ? location['longitude'] as num? : null;
-
-    if (lat == null || lng == null) {
-      throw const ResolveGymPlaceFailure$Server(
-        'Places API returned an incomplete result. Please try again.',
-      );
-    }
-
-    final gym = Gym(
-      id: placeId,
-      name: typed,
-      lat: lat.toDouble(),
-      lng: lng.toDouble(),
-      geohash: geohash5(lat.toDouble(), lng.toDouble()),
-      source: GymSource.googlePlaces,
-      createdAt: DateTime.now().toUtc(),
-    );
-
-    try {
-      await _gymRepository.createFromPlace(gym);
-    } catch (_) {
-      // Carrera: otro usuario creó el gym entre nuestro getById y el create
-      // (la regla niega el segundo escritor). Gana el nombre del primero.
-      final winner = await _gymRepository.getById(placeId);
-      if (winner == null) rethrow;
-      return ResolveGymPlaceResult(
-        gymId: winner.id,
-        name: winner.name,
-        source: winner.source.toWire(),
-      );
-    }
-
-    return ResolveGymPlaceResult(
-      gymId: placeId,
-      name: typed,
-      source: 'google-places',
-    );
+    return decoded;
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../gyms/domain/gym_display_name.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
+import '../../../gyms/domain/gym.dart' show hasRealGym;
 import '../../../profile/domain/user_public_profile.dart';
 import 'post_avatar.dart';
 
@@ -17,7 +19,7 @@ import 'post_avatar.dart';
 /// does NOT import go_router so it stays independently testable.
 ///
 /// Uses [UserPublicProfile] — never [UserProfile] (privacy boundary).
-class UserSearchResultTile extends StatelessWidget {
+class UserSearchResultTile extends ConsumerWidget {
   const UserSearchResultTile({
     super.key,
     required this.profile,
@@ -28,9 +30,13 @@ class UserSearchResultTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final gymName = gymDisplayNameFromDenormalized(profile.gymName);
+    // Por `gymId`, no por el `gymName` denormalizado: para gyms de Places el
+    // nombre es de Google y se pide en vivo.
+    final gymName = !hasRealGym(profile.gymId)
+        ? ''
+        : ref.watch(gymDisplayNameProvider(profile.gymId)).valueOrNull ?? '';
     final displayName = profile.displayName ?? 'Anónimo';
 
     return GestureDetector(

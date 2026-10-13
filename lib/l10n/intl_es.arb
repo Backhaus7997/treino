@@ -1141,14 +1141,5 @@
   "eliminarCuentaWebReauthPasswordBody": "Por seguridad, introduce tu contraseña para confirmar que eres tú.",
   "eliminarCuentaWebReauthCta": "CONFIRMAR",
   "eliminarCuentaWebPopupHint": "Para confirmar que eres tú, se abrirá una ventana de {provider}.",
-  "gymNameDialogTitle": "Ponle nombre a tu gimnasio",
-  "gymNameDialogBody": "Escribe el nombre con el que quieres que lo vean los demás.",
-  "gymNameDialogHint": "Nombre del gimnasio",
-  "gymNameDialogConfirm": "GUARDAR",
-  "gymNamePromptTitle": "Tu gimnasio necesita un nombre",
-  "gymNamePromptBody": "Ayúdanos: ¿cómo se llama? Lo verán todos los que entrenan ahí.",
-  "gymNamePromptCta": "PONERLE NOMBRE",
-  "gymNamePromptDismiss": "Ahora no",
-  "gymNamePromptRaceMessage": "Alguien ya lo nombró: {name}.",
   "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren."
 }

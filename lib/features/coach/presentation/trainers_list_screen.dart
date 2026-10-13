@@ -9,8 +9,7 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/treino_segmented_pill.dart';
-import '../../gyms/application/gym_providers.dart';
-import '../../gyms/domain/gym.dart';
+import '../../gyms/application/gym_display_name_provider.dart';
 import '../application/location_permission_gateway.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
@@ -398,13 +397,6 @@ class _ListContent extends ConsumerWidget {
     final discoveryAsync = ref.watch(trainerDiscoveryProvider);
     final position = ref.watch(athleteLocationProvider).valueOrNull;
     final virtualOnly = ref.watch(virtualOnlyFilterProvider);
-    // Cargamos el catálogo completo una sola vez — el provider está cacheado
-    // (FutureProvider sin autoDispose). Lookup por gymId es O(1) en el map.
-    final gymsAsync = ref.watch(gymsProvider);
-    final gymsById = <String, Gym>{
-      for (final g in gymsAsync.valueOrNull ?? const <Gym>[]) g.id: g,
-    };
-
     return TreinoStateSwitcher(
       childKey: ValueKey(discoveryAsync.when(
         loading: () => 'loading',
@@ -430,7 +422,7 @@ class _ListContent extends ConsumerWidget {
               final t = trainers[i];
               final nearest =
                   position == null ? null : nearestLocationOf(t, position);
-              final label = _labelFor(nearest, gymsById);
+              final label = _labelFor(ref, nearest);
               final isVirtual = virtualOnly ||
                   (effectiveLocationsOf(t).isEmpty && t.trainerOffersOnline);
               return TrainerListTile(
@@ -449,15 +441,17 @@ class _ListContent extends ConsumerWidget {
   }
 
   /// Devuelve un label corto para la ubicación más cercana del PF:
-  ///   - Si es `gym` y el gym está en `gymsById` → el `name` del gym.
-  ///   - Si es `gym` pero no encontramos el doc (cache miss) → 'Gimnasio'.
+  ///   - Si es `gym` → `gymDisplayNameProvider` (Google en vivo para gyms de
+  ///     Places, nunca guardado).
+  ///   - Si es `gym` y el nombre no está (cargando / sin red) → null.
   ///   - Si es `custom` → el `customLabel`.
   ///   - Si `nearest` es null → null (sin label).
-  String? _labelFor(TrainerLocation? nearest, Map<String, Gym> gymsById) {
+  String? _labelFor(WidgetRef ref, TrainerLocation? nearest) {
     if (nearest == null) return null;
     if (nearest.type == TrainerLocationType.gym) {
-      final gym = nearest.gymId == null ? null : gymsById[nearest.gymId];
-      return gym?.name ?? 'Gimnasio';
+      final nombre =
+          ref.watch(gymDisplayNameProvider(nearest.gymId)).valueOrNull;
+      return (nombre == null || nombre.isEmpty) ? null : nombre;
     }
     return nearest.customLabel;
   }

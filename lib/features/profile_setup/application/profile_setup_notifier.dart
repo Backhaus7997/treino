@@ -51,7 +51,6 @@ class ProfileSetupState {
     this.usernameAvailability = UsernameAvailability.unknown,
     this.termsAccepted = false,
     this.avatarUploadFailed = false,
-    this.pendingGymName,
   });
 
   final ProfileSetupDraft draft;
@@ -73,15 +72,6 @@ class ProfileSetupState {
   /// del avatar elegido. Se resetea al inicio de cada submit (reintentos).
   final bool avatarUploadFailed;
 
-  /// Nombre que el usuario le puso a un gym NUEVO (Places, #1338) y que todavía
-  /// no se escribió: el doc compartido `gyms/{draft.gymId}` se crea en
-  /// [ProfileSetupNotifier.submit], junto con el resto del alta. Escribirlo al
-  /// elegir el gym dejaba el nombre de alguien que después elegía otro gym o
-  /// abandonaba el alta, en un catálogo que lee todo el mundo. Sólo tiene
-  /// sentido junto a `draft.gymId`; [ProfileSetupNotifier.updateGymId] lo
-  /// reemplaza en cada selección.
-  final String? pendingGymName;
-
   ProfileSetupState copyWith({
     ProfileSetupDraft? draft,
     int? currentStep,
@@ -91,8 +81,6 @@ class ProfileSetupState {
     UsernameAvailability? usernameAvailability,
     bool? termsAccepted,
     bool? avatarUploadFailed,
-    String? pendingGymName,
-    bool clearPendingGymName = false,
   }) =>
       ProfileSetupState(
         draft: draft ?? this.draft,
@@ -103,9 +91,6 @@ class ProfileSetupState {
         usernameAvailability: usernameAvailability ?? this.usernameAvailability,
         termsAccepted: termsAccepted ?? this.termsAccepted,
         avatarUploadFailed: avatarUploadFailed ?? this.avatarUploadFailed,
-        pendingGymName: clearPendingGymName
-            ? null
-            : (pendingGymName ?? this.pendingGymName),
       );
 
   /// Cantidad de steps del flow. FUENTE ÚNICA — `ProfileSetupHeader` lee de
@@ -249,15 +234,10 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
   void updateBornAt(DateTime value) =>
       state = state.copyWith(draft: state.draft.copyWith(bornAt: value));
 
-  /// Fija el gym del draft. [pendingName] es el nombre de un gym nuevo que se
-  /// escribe en el submit; cada selección lo REEMPLAZA (sin [pendingName] lo
-  /// borra), así que nombrar el gym A y elegir después el B descarta el de A.
-  void updateGymId(String? value, {String? pendingName}) =>
-      state = state.copyWith(
-        draft: state.draft.copyWith(gymId: value),
-        pendingGymName: pendingName,
-        clearPendingGymName: pendingName == null,
-      );
+  /// Fija el gym del draft. El doc `gyms/{placeId}` se crea en el submit; el
+  /// nombre de Google no se pide ni se guarda (se muestra en vivo).
+  void updateGymId(String? value) =>
+      state = state.copyWith(draft: state.draft.copyWith(gymId: value));
 
   void updateExperienceLevel(ExperienceLevel value) => state = state.copyWith(
         draft: state.draft.copyWith(experienceLevel: value),
@@ -414,20 +394,13 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         acceptedPrivacyVersion: sello?['acceptedPrivacyVersion'] as int?,
       );
 
-      // Gym nuevo nombrado en el paso 3 (#1338): recién ahora se crea el doc
-      // compartido, y ANTES del update — que lee `gyms/{gymId}` para el
-      // dual-write de `gymName`. Si el usuario eligió otro gym o abandonó, el
-      // nombre pendiente ya se descartó y acá no se escribe nada.
-      final pendingGymName = state.pendingGymName;
+      // Gym de Places elegido en el paso 3: recién ahora se crea el doc
+      // compartido (marcador como nombre; el de Google se muestra en vivo), y
+      // ANTES del update de `users/{uid}`. Si el usuario eligió otro gym o
+      // abandonó, no se escribió nada.
       final gymId = draft.gymId;
-      if (pendingGymName != null && gymId != null && gymId != kNoGymId) {
-        await ref.read(resolveGymPlaceServiceProvider).call(
-              placeId: gymId,
-              name: pendingGymName,
-              // Si entre medio el gym pasó a existir sin nombre, la regla sólo
-              // deja nombrarlo a quien ya está vinculado.
-              beforeNaming: () => repo.update(uid, {'gymId': gymId}),
-            );
+      if (gymId != null && gymId != kNoGymId) {
+        await ref.read(resolveGymPlaceServiceProvider).call(placeId: gymId);
       }
 
       final partial = <String, Object?>{
