@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart'
     show
         CollectionReference,
+        DocumentSnapshot,
         FirebaseFirestore,
         GetOptions,
         SetOptions,
@@ -528,12 +529,8 @@ class UserRepository {
     await batch.commit();
   }
 
-  Future<UserProfile?> get(String uid) async {
-    final snap = await _users.doc(uid).get();
-    final data = snap.data();
-    if (!snap.exists || data == null) return null;
-    return UserProfile.fromJson(data);
-  }
+  Future<UserProfile?> get(String uid) async =>
+      _perfilDe(await _users.doc(uid).get());
 
   /// Como [get], pero del SERVIDOR: nunca de la caché local.
   ///
@@ -542,11 +539,22 @@ class UserRepository {
   /// pisaría lo que ya está en el servidor. Sin conexión tira, a propósito:
   /// es preferible no poder terminar el alta a registrar consentimiento sobre
   /// un dato que no se pudo confirmar.
-  Future<UserProfile?> getFromServer(String uid) async {
-    final snap =
-        await _users.doc(uid).get(const GetOptions(source: Source.server));
+  Future<UserProfile?> getFromServer(String uid) async => _perfilDe(
+      await _users.doc(uid).get(const GetOptions(source: Source.server)));
+
+  /// El perfil de [snap], o null si el doc no existe o no es un perfil.
+  ///
+  /// Un `users/{uid}` sin `uid` NO es un perfil: ningún cliente lo puede crear
+  /// así (el create de las reglas exige `uid`). Lo que sí aparece es la vista
+  /// LOCAL de una escritura parcial todavía no confirmada —p. ej. un
+  /// `set(merge)` de un solo campo sobre un doc que aún no existe— mientras el
+  /// servidor no la rechaza. Parsearla tiraba un `TypeError`, y en el alta por
+  /// mail ese error terminaba con el rollback borrando la cuenta recién creada
+  /// (ver `FcmTokenRepository.saveToken`). Tratarla como «todavía no hay
+  /// perfil» es lo correcto: el registro lo crea encima.
+  UserProfile? _perfilDe(DocumentSnapshot<Map<String, Object?>> snap) {
     final data = snap.data();
-    if (!snap.exists || data == null) return null;
+    if (!snap.exists || data == null || data['uid'] == null) return null;
     return UserProfile.fromJson(data);
   }
 
