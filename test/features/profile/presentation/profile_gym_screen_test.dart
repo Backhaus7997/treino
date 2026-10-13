@@ -329,10 +329,14 @@ void main() {
 
     testWidgets('"no gym" option remains selectable without a search',
         (tester) async {
+      // Con un gym real vigente: elegir SIN GYM es un cambio y se guarda.
       await tester.pumpWidget(_buildScreen(
-        profile: _profile(gymId: null),
+        profile: _profile(gymId: 'gym-actual'),
         userRepo: mockUserRepo,
         placesService: mockPlacesService,
+        extraOverrides: [
+          gymByIdProvider('gym-actual').overrideWith((ref) async => null),
+        ],
       ));
       await tester.pumpAndSettle();
 

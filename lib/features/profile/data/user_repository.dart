@@ -797,13 +797,19 @@ class UserRepository {
     bool grantLocationConsent = false,
   }) async {
     final now = Timestamp.fromDate(DateTime.now().toUtc());
-    final efectivo = grantLocationConsent
+    final conConsentimiento = grantLocationConsent
         ? <String, Object?>{
             ...partial,
             'trainerLocationConsentAt': now,
             'trainerLocationConsentPromptedAt': now,
           }
         : partial;
+    // "Sin gym" se persiste SIEMPRE como `null`: el centinela [kNoGymId] es un
+    // valor de borrador de la UI. Guardado como string, el feed y los rankings
+    // lo leían como un gimnasio más y juntaban a todos los "sin gym".
+    final efectivo = conConsentimiento['gymId'] == kNoGymId
+        ? <String, Object?>{...conConsentimiento, 'gymId': null}
+        : conConsentimiento;
 
     // Guideline 1.2 de App Review. El `displayName` es el texto libre que mas
     // se ve: aparece en cada post, cada mensaje y cada tarjeta de descubrimiento.
