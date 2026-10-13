@@ -3,12 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/moderation/moderation_guard.dart';
 import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../gyms/application/places_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
-import '../../../gyms/presentation/gym_name_dialog.dart';
 import '../../application/profile_setup_notifier.dart';
 import '../../application/profile_setup_providers.dart';
 import '../widgets/gym_search_box.dart';
@@ -22,13 +20,11 @@ import '../widgets/gym_search_box.dart';
 ///
 /// Tocar un gimnasio lo RESUELVE en el acto (`ResolveGymPlaceService`: LEE
 /// `gyms/{placeId}`) y lo deja en el draft. El `gymId` del usuario lo persiste
-/// `ProfileSetupNotifier.submit()`, que lo manda en su parcial y hace el
-/// dual-write de `gymName` leyendo ese `gyms/{placeId}`.
+/// `ProfileSetupNotifier.submit()`, que lo manda en su parcial.
 ///
-/// Un gym NUEVO se nombra acá, pero el nombre queda en el draft
-/// (`pendingGymName`) y el doc compartido se CREA en el submit, antes del
-/// update de `users/{uid}`: crearlo al elegir dejaba el nombre de alguien que
-/// después elegía otro gimnasio o abandonaba el alta (#1338).
+/// Nadie nombra el gym: el resolver crea `gyms/{placeId}` con un marcador
+/// como nombre y el nombre de Google se muestra en vivo, sin guardarse
+/// (política de Places, #1338).
 ///
 /// Este paso NO escribe `users/{uid}`, y no es un detalle. Hasta sep-2026
 /// escribía `{'gymId': ...}` ahí (vía `selectGymActionProvider`), apoyado en
@@ -74,30 +70,8 @@ class Step3Gym extends ConsumerWidget {
     final l10n = AppL10n.of(context);
 
     try {
-      var result = await resolver.call(placeId: gymId, name: null);
-      if (result.needsName && !result.existsUnnamed) {
-        // Gym nuevo: lo nombra quien lo crea. Un gym que ya existe sin
-        // nombre de usuario NO se nombra acá: la regla de Firestore sólo deja
-        // a quien ya está vinculado (`users/{uid}.gymId`), y en el alta ese
-        // doc todavía no existe. Queda en el draft y lo nombra su primer
-        // usuario vinculado desde el perfil.
-        if (!context.mounted) return;
-        final typed = await showGymNameDialog(context);
-        if (typed == null) return;
-        // El nombre se valida acá (feedback inmediato) pero se ESCRIBE en el
-        // submit: el gym compartido no puede quedar con el nombre de alguien
-        // que después elige otro o abandona el alta (#1338).
-        ModerationGuard.ensure(typed, campo: 'gym.name');
-        notifier.updateGymId(gymId, pendingName: typed.trim());
-        return;
-      }
+      final result = await resolver.call(placeId: gymId);
       notifier.updateGymId(result.gymId);
-    } on ModerationBlockedException {
-      if (messenger.mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.moderationBlockedMessage)),
-        );
-      }
     } catch (e, st) {
       // Antes esto no avisaba a nadie: ni al usuario, que tocaba el gimnasio
       // y no pasaba nada, ni a Crashlytics. Por eso el bug de `bornAtOk` se

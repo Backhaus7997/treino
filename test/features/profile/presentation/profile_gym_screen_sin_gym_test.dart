@@ -11,7 +11,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
-import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/application/user_providers.dart';

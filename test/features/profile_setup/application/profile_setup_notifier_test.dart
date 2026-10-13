@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/auth/application/auth_providers.dart'
     show authStateChangesProvider, firebaseAuthProvider;
 import 'package:treino/features/auth/presentation/legal/legal_content.dart';
@@ -733,46 +734,14 @@ void main() {
     });
   });
 
-  // Places (#1338): el nombre del gym lo escribe quien lo vincula, pero el
-  // alta recién se confirma en submit(). Crear/nombrar el doc compartido al
-  // tocar el gym dejaba el nombre de alguien que después elegía otro gym.
-  group('gym nuevo nombrado en el alta: se crea en el submit', () {
+  // Places (#1338): el nombre de Google no se guarda ni se pide (se muestra en
+  // vivo). El submit sólo manda el `gymId` del draft: no llama al resolver ni
+  // escribe `gyms/*`.
+  group('gym de Places en el alta', () {
     late _MockResolveGymPlaceService resolver;
-    late List<String> log;
-
-    setUpAll(() {
-      registerFallbackValue(() async {});
-    });
 
     setUp(() {
       resolver = _MockResolveGymPlaceService();
-      log = [];
-      when(() => resolver.call(
-            placeId: any(named: 'placeId'),
-            name: any(named: 'name'),
-            sessionToken: any(named: 'sessionToken'),
-            beforeNaming: any(named: 'beforeNaming'),
-          )).thenAnswer((inv) async {
-        final placeId = inv.namedArguments[#placeId] as String;
-        final name = inv.namedArguments[#name] as String?;
-        log.add('resolve:$placeId:$name');
-        // Simula la creación del doc compartido, para que el dual-write de
-        // gymName del update (que lo lee) lo encuentre.
-        await firestore.collection('gyms').doc(placeId).set({
-          'id': placeId,
-          'name': name,
-          'lat': -31.4,
-          'lng': -64.2,
-          'geohash': '6e7sx',
-          'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
-          'source': 'google-places',
-        });
-        return ResolveGymPlaceResult(
-          gymId: placeId,
-          name: name ?? '',
-          source: 'google-places',
-        );
-      });
     });
 
     Future<ProviderContainer> arrancar() async {
@@ -790,61 +759,7 @@ void main() {
       return container;
     }
 
-    test(
-        'submit crea el gym con el nombre pendiente ANTES de vincular al usuario',
-        () async {
-      final container = await arrancar();
-      final notifier = container.read(profileSetupNotifierProvider.notifier);
-      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
-
-      // Tocar el gym y nombrarlo no escribe nada.
-      verifyNever(() => resolver.call(
-            placeId: any(named: 'placeId'),
-            name: any(named: 'name'),
-            sessionToken: any(named: 'sessionToken'),
-            beforeNaming: any(named: 'beforeNaming'),
-          ));
-
-      await notifier.submit();
-
-      expect(log, ['resolve:ChIJ_A:Mi gimnasio']);
-      final user = await firestore.collection('users').doc('u1').get();
-      expect(user.data()!['gymId'], 'ChIJ_A');
-      // El dual-write leyó el gym recién creado: el resolve fue antes del update.
-      final pub =
-          await firestore.collection('userPublicProfiles').doc('u1').get();
-      expect(pub.data()!['gymName'], 'Mi gimnasio');
-    });
-
-    test('nombrar A y elegir B: submit no toca A', () async {
-      final container = await arrancar();
-      final notifier = container.read(profileSetupNotifierProvider.notifier);
-      notifier.updateGymId('ChIJ_A', pendingName: 'Nombre para A');
-      notifier.updateGymId('ChIJ_B');
-
-      await notifier.submit();
-
-      expect(log, isEmpty);
-      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
-      expect(a.exists, isFalse);
-      final user = await firestore.collection('users').doc('u1').get();
-      expect(user.data()!['gymId'], 'ChIJ_B');
-    });
-
-    test('abandonar el alta no escribe ningún gym', () async {
-      final container = await arrancar();
-      container
-          .read(profileSetupNotifierProvider.notifier)
-          .updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
-
-      container.dispose();
-
-      expect(log, isEmpty);
-      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
-      expect(a.exists, isFalse);
-    });
-
-    test('sin nombre pendiente (gym ya nombrado) submit no llama al resolver',
+    test('submit vincula el gymId del draft sin tocar el resolver ni gyms/*',
         () async {
       final container = await arrancar();
       final notifier = container.read(profileSetupNotifierProvider.notifier);
@@ -852,22 +767,19 @@ void main() {
 
       await notifier.submit();
 
-      expect(log, isEmpty);
+      verifyZeroInteractions(resolver);
+      final user = await firestore.collection('users').doc('u1').get();
+      expect(user.data()!['gymId'], 'ChIJ_A');
+      final a = await firestore.collection('gyms').doc('ChIJ_A').get();
+      expect(a.exists, isFalse);
     });
 
-    test('si crear el gym falla, el usuario no queda vinculado', () async {
+    test('sin gym (centinela) se persiste null', () async {
       final container = await arrancar();
-      when(() => resolver.call(
-            placeId: any(named: 'placeId'),
-            name: any(named: 'name'),
-            sessionToken: any(named: 'sessionToken'),
-            beforeNaming: any(named: 'beforeNaming'),
-          )).thenThrow(const ResolveGymPlaceFailure$Unknown());
       final notifier = container.read(profileSetupNotifierProvider.notifier);
-      notifier.updateGymId('ChIJ_A', pendingName: 'Mi gimnasio');
+      notifier.updateGymId(kNoGymId);
 
-      await expectLater(
-          notifier.submit(), throwsA(isA<ResolveGymPlaceFailure>()));
+      await notifier.submit();
 
       final user = await firestore.collection('users').doc('u1').get();
       expect(user.data()!['gymId'], isNull);

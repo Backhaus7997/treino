@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/gyms/application/gym_display_name_provider.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart'
     show myFollowingFeedProvider;
 import 'package:treino/features/feed/application/follow_providers.dart';
@@ -199,15 +200,18 @@ void main() {
             userPublicProfileProvider('bob').overrideWith(
               (_) => Stream.value(profile),
             ),
+            gymDisplayNameProvider('smart-fit-palermo')
+                .overrideWith((_) async => 'SmartFit - Palermo'),
           ],
         ),
       );
 
       await tester.pump();
+      await tester.pump();
 
       // displayName uppercase (tile renders toUpperCase)
       expect(find.text('ANA GARCÍA'), findsOneWidget);
-      // gym name read from the denormalized profile.gymName field
+      // gym name resolved by profile.gymId via gymDisplayNameProvider
       expect(find.text('SmartFit - Palermo'), findsOneWidget);
       // PostAvatar should be present
       expect(find.byType(PostAvatar), findsOneWidget);

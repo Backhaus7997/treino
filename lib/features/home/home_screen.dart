@@ -11,7 +11,6 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
 import '../coach/application/trainer_link_providers.dart';
-import '../gyms/presentation/gym_name_prompt_card.dart';
 import '../coach/domain/trainer_link.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
@@ -197,9 +196,6 @@ class _AthleteHome extends ConsumerWidget {
               child: headerOrSkeleton,
             ),
             const SizedBox(height: 20),
-            // Colapsa (espaciado incluido) salvo que el gym vinculado esté
-            // sin nombre por la migración de Places (#1338).
-            const GymNamePromptCard(),
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
               child: hasNoRoutine

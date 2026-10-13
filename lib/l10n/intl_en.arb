@@ -2256,14 +2256,5 @@
   "eliminarCuentaWebReauthPasswordBody": "For your security, enter your password to confirm it's you.",
   "eliminarCuentaWebReauthCta": "CONFIRM",
   "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open.",
-  "gymNameDialogTitle": "Name your gym",
-  "gymNameDialogBody": "Type the name you want other people to see.",
-  "gymNameDialogHint": "Gym name",
-  "gymNameDialogConfirm": "SAVE",
-  "gymNamePromptTitle": "Your gym needs a name",
-  "gymNamePromptBody": "Help us out: what is it called? Everyone who trains there will see it.",
-  "gymNamePromptCta": "NAME IT",
-  "gymNamePromptDismiss": "Not now",
-  "gymNamePromptRaceMessage": "Someone already named it: {name}.",
   "coachHubOnboardingPfLocationStaleHint": "This place is no longer available. Pick this place again so people can find you."
 }

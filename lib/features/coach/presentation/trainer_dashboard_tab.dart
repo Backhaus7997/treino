@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
-import '../../gyms/presentation/gym_name_prompt_card.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../notifications/presentation/widgets/notification_bell.dart';
@@ -77,8 +76,6 @@ class TrainerDashboardTab extends ConsumerWidget {
       children: [
         const _DashboardHeader(),
         const SizedBox(height: 18),
-        // Aviso de gym sin nombre (#1338); colapsa salvo que corresponda.
-        const GymNamePromptCard(),
         // #393: pending requests are NOT shown inline here anymore — they live
         // in the «Solicitudes» tab of the notification centre so they don't clutter
         // the dashboard.

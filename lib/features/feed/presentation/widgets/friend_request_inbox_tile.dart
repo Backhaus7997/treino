@@ -6,7 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
-import '../../../gyms/domain/gym_display_name.dart';
+import '../../../gyms/application/gym_display_name_provider.dart';
+import '../../../gyms/domain/gym.dart' show hasRealGym;
 import '../../application/feed_screen_providers.dart'
     show myFollowingFeedProvider;
 import '../../application/follow_providers.dart' show followRepositoryProvider;
@@ -56,7 +57,10 @@ class _FriendRequestInboxTileState
     final profile = profileAsync.valueOrNull;
     final displayName = profile?.displayName ?? 'Usuario anónimo';
     final avatarUrl = profile?.avatarUrl;
-    final gymName = gymDisplayNameFromDenormalized(profile?.gymName);
+    final gymId = profile?.gymId;
+    final gymName = !hasRealGym(gymId)
+        ? ''
+        : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

@@ -161,43 +161,24 @@ class SelectGymAction extends AsyncNotifier<ResolveGymPlaceResult?> {
   /// desmontó mientras la operación estaba en vuelo. El estado se sigue
   /// publicando igual para quien quiera mostrar loading/error.
   ///
-  /// Si el gym es nuevo (o está marcado `nameNeeded`) y no llegó [name], NO
-  /// se vincula nada: devuelve `false` y el estado trae `needsName: true`
-  /// para que la pantalla pida el nombre y vuelva a llamar con [name]
-  /// (el nombre lo escribe el usuario, nunca Google).
+  /// El gym se crea con un marcador como nombre y el nombre de Google se
+  /// muestra en vivo (`gymDisplayNameProvider`): acá nunca se pide ni se
+  /// guarda un nombre.
   Future<bool> select({
     required String uid,
     required String placeId,
-    String? name,
     bool useSessionToken = false,
   }) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final service = ref.read(resolveGymPlaceServiceProvider);
-      final userRepo = ref.read(userRepositoryProvider);
-      // Al nombrar un gym `nameNeeded`, la regla de Firestore exige que el
-      // usuario YA esté vinculado a él: el servicio llama este hook justo
-      // antes de escribir el nombre. Sin nombre tipeado no hay nada que
-      // nombrar, así que no se pasa.
-      final result = name == null
-          ? await service.call(
-              placeId: placeId,
-              sessionToken: null,
-              name: null,
-            )
-          : await service.call(
-              placeId: placeId,
-              sessionToken: null,
-              name: name,
-              beforeNaming: () => userRepo.update(uid, {'gymId': placeId}),
-            );
-      if (result.needsName) return result;
+      final result = await service.call(placeId: placeId, sessionToken: null);
       await ref
           .read(userRepositoryProvider)
           .update(uid, {'gymId': result.gymId});
       return result;
     });
-    return !state.hasError && state.valueOrNull?.needsName != true;
+    return !state.hasError;
   }
 }
 

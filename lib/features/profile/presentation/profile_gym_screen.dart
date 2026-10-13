@@ -13,7 +13,6 @@ import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../gyms/application/places_providers.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym, kNoGymId;
-import '../../gyms/presentation/gym_name_dialog.dart';
 import '../../profile_setup/presentation/widgets/gym_search_box.dart';
 import '../application/user_providers.dart';
 import 'widgets/nearby_gyms_list.dart';
@@ -78,22 +77,9 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         await ref
             .read(selectGymActionProvider.notifier)
             .select(uid: uid, placeId: gymId!);
-        var actionState = ref.read(selectGymActionProvider);
+        final actionState = ref.read(selectGymActionProvider);
         if (actionState.hasError) {
           throw actionState.error!;
-        }
-        if (actionState.valueOrNull?.needsName ?? false) {
-          // Gym nuevo (o sin nombre de usuario): lo nombra quien lo vincula.
-          if (!mounted) return;
-          final typed = await showGymNameDialog(context);
-          if (typed == null) return;
-          await ref
-              .read(selectGymActionProvider.notifier)
-              .select(uid: uid, placeId: gymId!, name: typed);
-          actionState = ref.read(selectGymActionProvider);
-          if (actionState.hasError) {
-            throw actionState.error!;
-          }
         }
       } else {
         // "SIN GYM" se persiste como `null` (igual que el wizard): el
