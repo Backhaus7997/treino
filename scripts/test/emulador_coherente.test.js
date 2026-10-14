@@ -200,6 +200,24 @@ for (const entrada of SCRIPTS) {
     });
   }
 
+  for (const variable of [FIRESTORE, ...PARCIALES]) {
+    // Nota 3 del #1442: `' '` el SDK la lee y se rompe, así que no es emulador
+    // NI nube. Sola, antes seguía por la credencial; acompañando a un Firestore
+    // redirigido, antes corría como emulador con un servicio roto al lado.
+    const casos = [{ [variable]: ' ' }];
+    if (variable !== FIRESTORE) casos.push({ [FIRESTORE]: 'localhost:8080', [variable]: ' ' });
+
+    for (const env of casos) {
+      const etiqueta = Object.keys(env).join(' + ');
+      test(`${script}: ${variable} EN BLANCO aborta (${etiqueta})`, () => {
+        const r = correr(entrada, env);
+        assert.strictEqual(r.code, 1, `tenía que cortar con exit 1.\nSALIDA:\n${r.todo}`);
+        assert.match(r.todo, /EN BLANCO/);
+        assert.ok(!r.llegoAFirestore, `llegó a Firestore igual.\nSALIDA:\n${r.todo}`);
+      });
+    }
+  }
+
   test(`${script}: con FIRESTORE_EMULATOR_HOST corre sin credencial y sin cartel`, () => {
     // El contracontrol: el arreglo NO puede cobrarle nada al camino documentado.
     // `FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js` es la

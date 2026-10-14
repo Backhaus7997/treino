@@ -366,6 +366,81 @@ test('la incoherencia se chequea ANTES que la credencial', () => {
   assert.strictEqual(err.codigo, 'EMULADOR_INCOHERENTE');
 });
 
+// Nota 3 del #1442. `' '` el SDK la lee como puesta y se rompe (ver
+// `estadoDeVariable` en `target_project.js`): no es emulador, pero tampoco
+// nube. Seguir por el camino de la credencial era lo que pasaba, y es el peor
+// de los dos: `lib/admin.js` cargaba la clave de producción mientras
+// `storage_target.js` le imprimía EMULADOR al operador.
+const VARIABLES_DE_EMULADOR = [
+  'FIRESTORE_EMULATOR_HOST',
+  'FIREBASE_AUTH_EMULATOR_HOST',
+  'STORAGE_EMULATOR_HOST',
+  'FIREBASE_STORAGE_EMULATOR_HOST',
+  'FIREBASE_DATABASE_EMULATOR_HOST',
+];
+
+/** IO que revienta si se usa: prueba que se abortó ANTES de mirar la credencial. */
+const SIN_TOCAR_CREDENCIAL = {
+  existeEntrada: () => assert.fail('no tiene que llegar a mirar el filesystem'),
+  leerArchivo: () => assert.fail('no tiene que llegar a leer credenciales'),
+  home: HOME,
+};
+
+test('una variable de emulador EN BLANCO aborta, sea cual sea', () => {
+  for (const v of VARIABLES_DE_EMULADOR) {
+    const err = capturar(() => resolverContexto({ env: { [v]: ' ' }, ...SIN_TOCAR_CREDENCIAL }));
+    assert.strictEqual(err.codigo, 'EMULADOR_EN_BLANCO', v);
+    assert.match(err.message, new RegExp(`${v}  \\(en blanco\\)`), v);
+    assert.match(err.message, new RegExp(`unset ${v}`), v);
+  }
+});
+
+test('el par en blanco de la nota 3 del #1442 aborta, con la credencial de prod exportada', () => {
+  // La corrida exacta del reporte, con `$TREINO_SA_KEY` puesta: antes llegaba
+  // a `cargarCredencial` y devolvía `modo: 'credencial'`.
+  const err = capturar(() =>
+    resolverContexto({
+      env: {
+        FIRESTORE_EMULATOR_HOST: ' ',
+        FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+        [VAR_RUTA]: FUERA,
+      },
+      ...SIN_TOCAR_CREDENCIAL,
+    }),
+  );
+  assert.strictEqual(err.codigo, 'EMULADOR_EN_BLANCO');
+});
+
+test('una parcial en blanco aborta aunque Firestore esté redirigido', () => {
+  // Antes esto era `modo: 'emulador'`. Con `STORAGE_EMULATOR_HOST=' '` Storage
+  // arma el endpoint `https:// ` y NO va al emulador aunque Firestore sí.
+  const err = capturar(() =>
+    resolverContexto({
+      env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080', STORAGE_EMULATOR_HOST: ' ' },
+      ...SIN_TOCAR_CREDENCIAL,
+    }),
+  );
+  assert.strictEqual(err.codigo, 'EMULADOR_EN_BLANCO');
+});
+
+test('FIRESTORE_ y FIREBASE_STORAGE_EMULATOR_HOST vacías no son "en blanco": la corrida sigue igual', () => {
+  // El contracontrol. `export FIRESTORE_EMULATOR_HOST=` es una forma común de
+  // "apagarla", y Firestore la trata como ausente (medido): abortar ahí sería
+  // una alarma falsa. Sigue al camino de la credencial, como antes.
+  // `STORAGE_EMULATOR_HOST=''` queda AFUERA a propósito: @google-cloud/storage
+  // sí la lee (endpoint `https:`). Ver `estadoDeVariable`.
+  const err = capturar(() =>
+    resolverContexto({ env: { FIRESTORE_EMULATOR_HOST: '' }, existeEntrada: fsFalso(), home: HOME }),
+  );
+  assert.strictEqual(err.codigo, 'SIN_VARIABLE');
+
+  const ctx = resolverContexto({
+    env: { FIRESTORE_EMULATOR_HOST: 'localhost:8080', FIREBASE_STORAGE_EMULATOR_HOST: '' },
+    ...SIN_TOCAR_CREDENCIAL,
+  });
+  assert.strictEqual(ctx.modo, 'emulador');
+});
+
 test('con Firestore redirigido, las parciales acompañan sin abortar', () => {
   const ctx = resolverContexto({
     env: {

@@ -210,6 +210,21 @@ for (const escritor of ESCRITORES) {
     assert.doesNotMatch(r.todo, /EMULADOR \(Firestore \+ Storage\)/);
   });
 
+  test(`${script}: con las dos variables EN BLANCO aborta y no dice EMULADOR (nota 3 del #1442)`, () => {
+    // La corrida del reporte, nombrando producción: antes salía
+    // `destino: EMULADOR (Firestore + Storage)`, sin cartel, y `lib/admin.js`
+    // inicializaba con la credencial porque para él `' '` no es emulador.
+    const r = correr(
+      { ...escritor, argv: [...escritor.argv, '--project=treino-dev'] },
+      { FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' },
+    );
+    assert.strictEqual(r.code, 1, `tenía que cortar con exit 1.\nSALIDA:\n${r.todo}`);
+    assert.match(r.stderr, /EN BLANCO/);
+    assert.doesNotMatch(r.todo, /destino: EMULADOR/);
+    assert.doesNotMatch(r.todo, /STUB_STORAGE_REACHED/);
+    assert.doesNotMatch(r.todo, /STUB_FIRESTORE_REACHED/);
+  });
+
   test(`${script}: SIN NADA cae en demo-treino y no llega al Storage de prod`, () => {
     // ÉSTE ES EL TEST DEL #840, y es el que antes decía lo contrario.
     //
