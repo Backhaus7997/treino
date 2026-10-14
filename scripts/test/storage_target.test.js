@@ -314,11 +314,23 @@ test('el guard mata la corrida cuando el destino es incoherente', () => {
     'jamás puede decir EMULADOR cuando Storage no está redirigido — ése ES el bug');
 });
 
-test('el abort explica que emulator.sh no levanta Storage', () => {
+test('el abort dice cómo tener Storage escuchando en el 9199', () => {
   // Sin ese dato el operador prueba `FIREBASE_STORAGE_EMULATOR_HOST=...`, el
-  // emulador no está escuchando en 9199, y se come un ECONNREFUSED opaco.
+  // emulador no está escuchando en 9199, y se come un ECONNREFUSED opaco. Hasta
+  // el #1434 el dato era "emulator.sh NO levanta Storage"; desde entonces lo
+  // levanta en los dos modos, y una frase vieja acá manda a la receta a mano.
   const r = correrGuard({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
-  assert.match(r.stderr, /emulator\.sh NO levanta Storage/);
+  assert.match(r.stderr, /\.\/scripts\/emulator\.sh/);
+  assert.match(r.stderr, /9199/);
+  assert.doesNotMatch(r.stderr, /NO levanta Storage/);
+});
+
+test('el abort no manda a levantar el emulador con un emulators:start a mano', () => {
+  // A mano se saltea el strip_rules.js de emulator.sh: sin `firestore.deploy.rules`
+  // (gitignoreado) el emulador de Firestore arranca en allow-all (#1435). La
+  // receta del abort decía exactamente eso hasta este cambio.
+  const r = correrGuard({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
+  assert.doesNotMatch(r.stderr, /firebase emulators:start/);
 });
 
 test('el guard deja pasar y grita el cartel cuando el destino es producción', () => {

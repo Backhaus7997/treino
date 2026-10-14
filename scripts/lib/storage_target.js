@@ -31,6 +31,10 @@
  * datos partidos en dos entornos, que es exactamente el daño que se quiere
  * evitar.
  *
+ * (Lo del emulador de Storage ausente dejó de ser cierto con el #1434: desde el
+ * 2026-10-14 `emulator.sh` lo levanta en los dos modos. El primer motivo —no
+ * inventar un destino que el operador no pidió— sigue en pie solo.)
+ *
  * Entonces la regla es una sola y no admite grises: **Firestore y Storage
  * apuntan los dos al emulador, o los dos a la nube. Cualquier mezcla aborta
  * antes de la primera escritura.** Un script que escribe mitad en local y mitad
@@ -337,13 +341,13 @@ function textoDeAbort(plan) {
     '⛔  Este script NO corre a medias: escribir mitad en local y mitad en la',
     '⛔  nube deja datos rotos en los dos lados (#838).',
     '⛔',
-    '⛔  Para correr entero contra el emulador, levantalo CON Storage y',
-    '⛔  exportá las dos variables:',
-    '⛔    firebase emulators:start --only firestore,auth,storage',
+    '⛔  Para correr entero contra el emulador, levantalo con emulator.sh',
+    '⛔  (desde el #1434 trae Storage en el 9199) y exportá las dos variables:',
+    '⛔    ./scripts/emulator.sh',
     '⛔    export FIRESTORE_EMULATOR_HOST=localhost:8080',
     '⛔    export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199',
-    '⛔  (ojo: scripts/emulator.sh NO levanta Storage — arranca --only',
-    '⛔   firestore,auth,functions.)',
+    '⛔  (no con un emulators:start a mano: se saltea strip_rules.js y',
+    '⛔   Firestore arranca sin reglas, en allow-all — #1435.)',
     '⛔',
     '⛔  Para correr entero contra la nube, sacá FIRESTORE_EMULATOR_HOST del',
     '⛔  ambiente. Leé el cartel que sale después: es producción.',
