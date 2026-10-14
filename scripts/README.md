@@ -568,9 +568,12 @@ rollback de esos fixes.
 Cómo deployar:
 
 ```sh
-git fetch origin    # sin esto, el worktree sale del origin/develop local, que puede ser viejo
+# Refspec explícito, igual que el guard: un `git fetch origin` pelado no mueve
+# origin/develop en un clon --single-branch, y el worktree saldría de reglas viejas.
+git fetch origin +refs/heads/develop:refs/remotes/origin/develop
 git worktree add .claude/worktrees/deploy origin/develop
 cd .claude/worktrees/deploy
+rg -l guard_fuente_de_deploy firebase.json scripts/deploy_rules.js   # tienen que salir los dos
 firebase deploy --only firestore:rules --project prod
 ```
 
