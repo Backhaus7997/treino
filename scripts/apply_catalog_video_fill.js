@@ -25,6 +25,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { armadorDeUrlDeDescarga } = require('./lib/url_de_descarga');
 const { inicializarAdmin } = require('./lib/admin');
 const { getStorage } = require('firebase-admin/storage');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -38,6 +39,9 @@ const DO_FILL = process.argv.includes('--fill-empty');
 // va a pasar `--apply`: si el destino es producción, que lo lea ahí.
 const DESTINO = exigirDestinoCoherente({ argv: process.argv.slice(2) });
 const BUCKET = DESTINO.bucket;
+// La URL que se estampa sale del mismo plan: contra el emulador nombra al
+// emulador, no a Google (ver lib/url_de_descarga.js).
+const urlDeDescarga = armadorDeUrlDeDescarga(DESTINO);
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
@@ -87,7 +91,7 @@ async function uploadVideo(fileId, id) {
   const token = randomUUID();
   const dest = `exerciseVideos/${id}.mp4`;
   await bucket.upload(tmp, { destination: dest, metadata: { contentType: 'video/mp4', metadata: { firebaseStorageDownloadTokens: token } } });
-  return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+  return urlDeDescarga({ destino: dest, token });
 }
 
 (async () => {
