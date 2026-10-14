@@ -672,15 +672,19 @@ Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
 imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
 `initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
 
-Para correr entero contra el emulador hay que levantarlo **con Storage** —
-`scripts/emulator.sh` arranca `--only firestore,auth,functions`, así que el
-emulador de Storage (puerto 9199, declarado en `firebase.json`) no está:
+Para correr entero contra el emulador hay que levantarlo **con Storage**.
+`scripts/emulator.sh` lo levanta desde el 2026-10-14, en los dos modos (puerto
+9199, declarado en `firebase.json`):
 
 ```bash
-firebase emulators:start --only firestore,auth,storage
+./scripts/emulator.sh
 export FIRESTORE_EMULATOR_HOST=localhost:8080
 export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
+
+(Antes este párrafo decía que `emulator.sh` arrancaba sin Storage y mandaba a
+levantarlo a mano. Era cierto entonces; dejó de serlo cuando la app empezó a
+mandar Storage al emulador con `USE_EMULATOR=true`.)
 
 Sin ninguna de las dos variables el destino ya **no** es producción: desde el
 #840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la

@@ -1,6 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/coach_hub_app.dart';
 import 'core/analytics/analytics_consent.dart';
+import 'core/firebase/emuladores.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'features/coach_hub/presentation/sections/ajustes/tabs/eliminar_cuenta_dialog.dart'
     show coachHubAccountDeletionOverrides;
@@ -65,8 +64,10 @@ Future<void> main() async {
     defaultValue: false,
   );
   if (useEmulator) {
-    FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
-    await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
+    // La misma función que la app. Antes este bloque conectaba sólo Firestore
+    // y Auth a mano, y los callables del Hub (`acceptTrainerLink`,
+    // `createPreapproval`, …) pegaban a PRODUCCIÓN en modo emulador.
+    await conectarEmuladores();
   }
 
   // Eager-resolve SharedPreferences before runApp so that providers depending
