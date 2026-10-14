@@ -22,7 +22,8 @@ const { planDeStorage } = require('../lib/storage_target');
 
 const RC = path.join(__dirname, '..', '..', '.firebaserc');
 const DESTINO = 'exercises/thumbs/pullup-pesocorporal.jpg';
-const TOKEN = '58220ca2-4d77-4af9-8d3e-d7e26addd322';
+// Falso a propósito: un UUID real acá lo marca gitleaks (generic-api-key).
+const TOKEN = 'token-de-prueba';
 
 /** Lo que los cuatro scripts escribían a mano hasta este cambio. */
 const urlDeAntes = (bucket) =>
