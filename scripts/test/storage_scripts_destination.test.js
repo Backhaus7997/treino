@@ -478,3 +478,40 @@ for (const archivo of INERTES) {
     );
   });
 }
+
+// ── Los cuatro escritores sólo importan servicios que el emulador desvía ──
+//
+// Contra el emulador, `resolverProjectId` les da `PROJECT_ID_EMULADOR`, que es
+// el id de PRODUCCIÓN usado como namespace local. Es seguro porque con las dos
+// variables puestas firebase-admin manda Firestore y Storage a localhost, y los
+// cuatro no usan ningún otro servicio. Si uno sumara `firebase-admin/auth` (o
+// un cliente de `googleapis`) sin su variable de emulador, ese servicio saldría
+// a la nube con el id de producción y la credencial que encuentre — y en esta
+// máquina hay ADC de `gcloud` (AGENTS.md, Entornos). Con el default anterior
+// (`demo-treino`) esa misma regresión le pegaba a un proyecto que no existe.
+//
+// Lo que este test mira y lo que NO: los `require(...)` / `from '...'`
+// LITERALES de los cuatro archivos de entrada. No ve un `require` computado,
+// un `import()` dinámico, ni lo que se abra a través de `lib/*`. Hoy no hay
+// ninguno de esos tres; si aparece, este test no lo agarra.
+
+const SERVICIOS_DESVIADOS = new Set(['firebase-admin/firestore', 'firebase-admin/storage']);
+const MODULO_GOOGLE = /(?:require\(\s*|from\s+)['"]((?:firebase-admin|googleapis|google-auth-library|@google-cloud\/[\w-]+)(?:\/[\w-]+)?)['"]/g;
+
+for (const { script } of ESCRITORES) {
+  test(`${script}: sólo importa firebase-admin/firestore y /storage, los dos que el paso 4 exige emulados`, () => {
+    const src = fs.readFileSync(path.join(SCRIPTS_DIR, script), 'utf8');
+    const modulos = [...src.matchAll(MODULO_GOOGLE)].map((m) => m[1]);
+
+    // Si el regex dejara de ver los imports, el test pasaría sin mirar nada.
+    assert.ok(modulos.length > 0, `no encontré ningún import de firebase-admin en ${script}`);
+    const fuera = modulos.filter((m) => !SERVICIOS_DESVIADOS.has(m));
+    assert.deepStrictEqual(
+      fuera,
+      [],
+      `${script} importa ${fuera.join(', ')}: contra el emulador correría con el id de ` +
+        'producción como namespace y ese servicio no está desviado. Exigí su variable de ' +
+        'emulador en `resolverProjectId` antes de sumarlo.',
+    );
+  });
+}
