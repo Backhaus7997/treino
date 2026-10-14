@@ -672,28 +672,19 @@ Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
 imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
 `initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
 
-Para correr entero contra el emulador hay que levantarlo **con Storage** —
-`scripts/emulator.sh` arranca `--only firestore,auth,functions`, así que el
-emulador de Storage (puerto 9199, declarado en `firebase.json`) no está:
+Para correr entero contra el emulador hay que levantarlo **con Storage**.
+`scripts/emulator.sh` lo levanta desde el 2026-10-14, en los dos modos (puerto
+9199, declarado en `firebase.json`):
 
 ```bash
-# Desde la raíz del repo. Queda corriendo: el resto, en la terminal del script.
-node scripts/strip_rules.js && firebase emulators:start --only firestore,auth,storage
-
+./scripts/emulator.sh
 export FIRESTORE_EMULATOR_HOST=localhost:8080
 export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
 
-El `strip_rules.js` es el paso de `emulator.sh` que a mano se pierde:
-`firebase.json` carga `firestore.deploy.rules` (gitignoreado), y si falta el
-emulador de Firestore arranca en allow-all (#1435). Lo otro que `emulator.sh`
-hace y esto no es buscar el JDK 21: acá tiene que estar en el PATH.
-
-Va **sin `--project`, a propósito**, aunque `emulator.sh` fija `treino-dev`:
-con sólo esas dos variables los cuatro scripts resuelven `demo-treino` (el
-último eslabón de la cadena de arriba), y el emulador pelado también. Con
-`--project treino-dev` el emulador arrancaría en un namespace y los scripts
-escribirían en otro.
+(Antes este párrafo decía que `emulator.sh` arrancaba sin Storage y mandaba a
+levantarlo a mano. Era cierto entonces; dejó de serlo cuando la app empezó a
+mandar Storage al emulador con `USE_EMULATOR=true`.)
 
 Sin ninguna de las dos variables el destino ya **no** es producción: desde el
 #840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la
