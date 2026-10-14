@@ -73,11 +73,16 @@ test('STORAGE_EMULATOR_HOST le gana a FIREBASE_STORAGE_EMULATOR_HOST, como en el
 });
 
 test('contra el emulador sin un host legible, TIRA — nunca cae al de la nube', () => {
-  // El plan cuenta `' '` como emulador (Boolean de un string no vacío). Si el
-  // armador "se arreglara" con el host de la nube, sería el bug de vuelta con
-  // otra cara. Tiene que cortar, y antes de la primera subida.
+  // El plan toma estos ambientes como emulador, pero ninguno trae un host que
+  // se pueda leer. Si el armador "se arreglara" con el host de la nube, sería
+  // el bug de vuelta con otra cara. Tiene que cortar, y antes de la primera
+  // subida.
+  //
+  // Acá había una fila con `FIREBASE_STORAGE_EMULATOR_HOST=' '`, que el plan
+  // contaba como emulador con su `Boolean()`. Desde el #1445 el plan ya no lo
+  // hace: una variable en blanco aborta antes (ver el test de abajo), así que
+  // esa fila dejó de llegar al armador.
   for (const env of [
-    { FIRESTORE_EMULATOR_HOST: 'localhost:8080', FIREBASE_STORAGE_EMULATOR_HOST: ' ' },
     // Sin esquema en STORAGE_EMULATOR_HOST, `new URL` lee `localhost:` como
     // protocolo. No se adivina.
     { FIRESTORE_EMULATOR_HOST: 'localhost:8080', STORAGE_EMULATOR_HOST: 'localhost:9199' },
@@ -89,6 +94,16 @@ test('contra el emulador sin un host legible, TIRA — nunca cae al de la nube',
     assert.strictEqual(plan.contraEmulador, true, `precondición: ${JSON.stringify(env)} es emulador para el plan`);
     assert.throws(() => armadorDeUrlDeDescarga(plan, env), /EMULADOR/);
   }
+});
+
+test('con una variable en blanco el plan aborta antes, y el armador tampoco arma', () => {
+  // La fila que salió del test de arriba: el corte se movió al plan (#1445),
+  // pero el armador sigue sin estampar nada sobre ese plan.
+  const env = { FIRESTORE_EMULATOR_HOST: 'localhost:8080', FIREBASE_STORAGE_EMULATOR_HOST: ' ' };
+  const plan = planDeStorage({ argv: [], env, rutaFirebaserc: RC });
+  assert.strictEqual(plan.coherente, false, 'precondición: el plan aborta');
+  assert.strictEqual(plan.contraEmulador, false);
+  assert.throws(() => armadorDeUrlDeDescarga(plan, env), /no es coherente/);
 });
 
 test('con un plan incoherente no arma nada', () => {
