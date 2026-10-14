@@ -45,7 +45,15 @@ const { spawnSync } = require('node:child_process');
 const SCRIPTS_DIR = path.join(__dirname, '..');
 
 /** El script y lo que él mismo carga o corre. Se copian del repo en cada test. */
-const COPIADOS = ['emulator.sh', 'strip_rules.js', path.join('lib', 'java21.sh')];
+// El helper de secretos y credenciales también, con su credencial falsa: sin
+// ella `emulator.sh` aborta antes de llegar a las reglas.
+const COPIADOS = [
+  'emulator.sh',
+  'strip_rules.js',
+  path.join('lib', 'java21.sh'),
+  path.join('lib', 'emulador_sin_produccion.sh'),
+  path.join('lib', 'credencial_falsa_del_emulador.json'),
+];
 const FIREBASE_JSON = path.join(SCRIPTS_DIR, '..', 'firebase.json');
 
 const STUBS = {

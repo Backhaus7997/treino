@@ -1,0 +1,7 @@
+{
+  "_que_es": "Credencial FALSA para scripts/emulator.sh. No autentica nada: la exporta como GOOGLE_APPLICATION_CREDENTIALS para que el runtime de Functions del emulador no use las ADC ni el firebase login del dev. Ver scripts/lib/emulador_sin_produccion.sh.",
+  "type": "authorized_user",
+  "client_id": "credencial-falsa-del-emulador.apps.googleusercontent.com",
+  "client_secret": "no-es-un-secreto",
+  "refresh_token": "no-es-un-token"
+}
