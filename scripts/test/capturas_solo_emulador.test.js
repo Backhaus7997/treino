@@ -32,8 +32,10 @@
  * exige en POSITIVO `STUB_SUBPATH_INTERCEPTED`, y el caso con host es el
  * control: ahí el marcador de Firestore TIENE que aparecer.
  *
- * La lista de scripts sale del directorio, no de una enumeración: uno nuevo que
- * se saltee la compuerta entra solo a estos tests y los pone en rojo.
+ * La lista de scripts sale del directorio, no de una enumeración: un `.js`,
+ * `.cjs` o `.mjs` nuevo de `capturas/` que se saltee la compuerta entra solo a
+ * estos tests y los pone en rojo. Un SUBDIRECTORIO no lo recorre: si aparece
+ * uno, un test se rompe para que alguien decida en vez de quedar afuera callado.
  */
 
 const test = require('node:test');
@@ -63,8 +65,10 @@ const HOST = `localhost:${PUERTO_FIRESTORE}`;
  * El host que reciben los scripts CARGADOS. No es `HOST` a propósito: en esta
  * máquina el emulador de :8080 suele ser de otra sesión, y si el doble algún
  * día no se aplicara, el caso de control le escribiría las semillas de capturas
- * encima. Un puerto cerrado vale igual para la compuerta (es un host) y, sin el
- * doble, termina en ECONNREFUSED en vez de en datos ajenos.
+ * encima. Un puerto cerrado vale igual para la compuerta (es un host). Sin el
+ * doble, el SDK real NO termina: reintenta con backoff contra el puerto cerrado
+ * (medido: 8 intentos en 75 s) hasta que el `timeout` de `correr()` lo corta.
+ * Lento y ruidoso, pero sin escribir en ningún emulador.
  */
 const HOST_SIN_EMULADOR_VIVO = '127.0.0.1:1';
 
@@ -92,8 +96,45 @@ for (const blanco of BLANCOS) {
     assert.strictEqual(v.motivo, 'EN_BLANCO');
     assert.match(v.mensaje, /FIRESTORE_EMULATOR_HOST {2}\(en blanco\)/);
     assert.match(v.mensaje, /unset FIRESTORE_EMULATOR_HOST\n/);
+    // Después del unset queda ausente: ahí sí hay que sugerir el host.
+    assert.ok(v.mensaje.includes(`export FIRESTORE_EMULATOR_HOST=${HOST}`), v.mensaje);
   });
 }
+
+test('con Firestore en OTRO puerto y Auth en blanco, no le sugiere el puerto default a Firestore', () => {
+  // Seguir la sugerencia mandaría la semilla al :8080, que suele ser el
+  // emulador de otra sesión. Firestore ya está bien: sólo hay que sacar el blanco.
+  const v = veredictoSoloEmulador(['firestore'], {
+    FIRESTORE_EMULATOR_HOST: 'localhost:8085',
+    FIREBASE_AUTH_EMULATOR_HOST: ' ',
+  });
+  assert.strictEqual(v.motivo, 'EN_BLANCO');
+  assert.ok(v.mensaje.includes('unset FIREBASE_AUTH_EMULATOR_HOST\n'), v.mensaje);
+  assert.doesNotMatch(v.mensaje, /export /);
+});
+
+test('la excepción de variablesEnBlanco vale acá: Storage de Firebase en blanco con STORAGE_EMULATOR_HOST puesta pasa', () => {
+  // firebase-admin ignora FIREBASE_STORAGE_EMULATOR_HOST si STORAGE_EMULATOR_HOST
+  // tiene host (#1445). La compuerta no tiene criterio propio: dice lo mismo
+  // que `target_project.js`.
+  const v = veredictoSoloEmulador(['firestore'], {
+    FIRESTORE_EMULATOR_HOST: HOST,
+    STORAGE_EMULATOR_HOST: 'http://localhost:9199',
+    FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+  });
+  assert.deepStrictEqual(v, { ok: true });
+});
+
+test('para Storage sugiere FIREBASE_STORAGE_EMULATOR_HOST, no STORAGE_EMULATOR_HOST', () => {
+  // `@google-cloud/storage` le antepone `https://` a STORAGE_EMULATOR_HOST, y
+  // el emulador habla HTTP.
+  const puerto = JSON.parse(fs.readFileSync(path.join(SCRIPTS_DIR, '..', 'firebase.json'), 'utf8'))
+    .emulators.storage.port;
+  const v = veredictoSoloEmulador(['storage'], {});
+  assert.strictEqual(v.motivo, 'SIN_EMULADOR');
+  assert.ok(v.mensaje.includes(`export FIREBASE_STORAGE_EMULATOR_HOST=localhost:${puerto}`), v.mensaje);
+  assert.doesNotMatch(v.mensaje, /export STORAGE_EMULATOR_HOST/);
+});
 
 test('con host de Firestore → pasa', () => {
   assert.deepStrictEqual(veredictoSoloEmulador(['firestore'], { FIRESTORE_EMULATOR_HOST: HOST }), {
@@ -137,14 +178,37 @@ test('una lista vacía o un servicio desconocido tiran, aunque el ambiente esté
 
 // ─── El cableado de cada script ─────────────────────────────────────────────
 
-const SCRIPTS = fs
-  .readdirSync(CAPTURAS_DIR)
-  .filter((f) => f.endsWith('.js'))
+const ENTRADAS = fs.readdirSync(CAPTURAS_DIR, { withFileTypes: true });
+const SCRIPTS = ENTRADAS.filter((e) => e.isFile() && /\.(c|m)?js$/.test(e.name))
+  .map((e) => e.name)
   .sort();
 
 test('el directorio de capturas tiene scripts (si no, el resto mide nada)', () => {
   assert.ok(SCRIPTS.length > 0, `no encontré scripts en ${CAPTURAS_DIR}`);
 });
+
+test('capturas/ no tiene subdirectorios: estos tests no los recorren', () => {
+  const subdirs = ENTRADAS.filter((e) => e.isDirectory()).map((e) => e.name);
+  assert.deepStrictEqual(
+    subdirs,
+    [],
+    'apareció un subdirectorio en scripts/capturas/. Sus scripts NO pasan por estos tests: ' +
+      'hacé que los recorran (o justificá por qué no) antes de sacar este test.',
+  );
+});
+
+/**
+ * El fuente sin comentarios, con el mismo criterio que `frontera.test.js`. Sin
+ * esto, un `// exigirSoloEmulador(['firestore'])` arriba y la llamada real
+ * después de `getFirestore()` dejaban el test de orden en verde (lo midió la
+ * revisión del PR).
+ */
+function sinComentarios(fuente) {
+  return fuente.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/** La llamada a la compuerta, con `'firestore'` entre los servicios declarados. */
+const LLAMADA_A_LA_COMPUERTA = /exigirSoloEmulador\(\s*\[[^\]]*'firestore'[^\]]*\]\s*\)/;
 
 /**
  * Corre un script de capturas con el doble puesto. El ambiente arranca SIN
@@ -227,10 +291,13 @@ for (const script of SCRIPTS) {
   });
 
   test(`${script}: la compuerta va antes de initializeApp()`, () => {
-    const fuente = fs.readFileSync(path.join(CAPTURAS_DIR, script), 'utf8');
-    const compuerta = fuente.indexOf("exigirSoloEmulador(['firestore'])");
-    const inicializa = fuente.indexOf('initializeApp(');
-    assert.ok(compuerta >= 0, `${script} no llama a exigirSoloEmulador(['firestore'])`);
+    // Los de conducta no ven esto: el `initializeApp`/`getFirestore` del doble
+    // son inertes. La regla (y por qué es más estricta de lo que el SDK pide
+    // hoy) está en el comentario de `exigirSoloEmulador`.
+    const codigo = sinComentarios(fs.readFileSync(path.join(CAPTURAS_DIR, script), 'utf8'));
+    const compuerta = codigo.search(LLAMADA_A_LA_COMPUERTA);
+    const inicializa = codigo.indexOf('initializeApp(');
+    assert.ok(compuerta >= 0, `${script} no llama a exigirSoloEmulador([…'firestore'…])`);
     assert.ok(inicializa >= 0, `${script} no llama a initializeApp() — ¿cambió la forma del script?`);
     assert.ok(compuerta < inicializa, `${script}: la compuerta corre después de initializeApp()`);
   });

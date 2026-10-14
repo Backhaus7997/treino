@@ -21,8 +21,8 @@
  *     FIRESTORE_EMULATOR_HOST=' '   → los siete pasan la compuerta y
  *                                     `getFirestore()` tira "is not a valid host"
  *
- * O sea que hoy no escriben en ningún lado sólo porque el SDK se rompe un
- * renglón más abajo. Eso no es una compuerta: es una validación interna de
+ * O sea que antes de este cambio no escribían en ningún lado sólo porque el SDK
+ * se rompía un renglón más abajo. Eso no es una compuerta: es una validación interna de
  * `@google-cloud/firestore`, que ningún contrato obliga a mantener y que
  * cualquier actualización del lockfile se puede llevar.
  *
@@ -63,15 +63,34 @@ function puertoDelEmulador(servicio) {
   }
 }
 
+/**
+ * Qué variable se sugiere exportar por servicio, cuando no es la primera de
+ * `VARIABLES_POR_SERVICIO`. Storage es la excepción: `STORAGE_EMULATOR_HOST`
+ * la lee `@google-cloud/storage`, que le antepone `https://` a un host pelado
+ * (`localhost:9199` termina en `https://localhost:9199`, y el emulador habla
+ * HTTP). La convención del repo es la de Firebase, que firebase-admin reescribe
+ * a `http://` (`storage_target.js`, `scripts/README.md`).
+ */
+const VARIABLE_SUGERIDA = Object.freeze({ storage: 'FIREBASE_STORAGE_EMULATOR_HOST' });
+
 function sugerenciasDeExport(servicios) {
   return servicios.map((servicio) => {
-    const variable = VARIABLES_POR_SERVICIO[servicio][0];
+    const variable = VARIABLE_SUGERIDA[servicio] || VARIABLES_POR_SERVICIO[servicio][0];
     const puerto = puertoDelEmulador(servicio);
     return `export ${variable}=${puerto === null ? '<host:puerto>' : `localhost:${puerto}`}`;
   });
 }
 
-function mensajeEnBlanco(enBlanco, servicios) {
+/** Los servicios del script que hoy NO van al emulador: sólo a ésos se les sugiere un host. */
+function serviciosSinEmulador(servicios, env) {
+  return servicios.filter((s) => !contraEmuladorDe([s], env));
+}
+
+function mensajeEnBlanco(enBlanco, servicios, env) {
+  // Sólo los que faltan: con Firestore en `localhost:8085` y Auth en blanco,
+  // sugerir `export FIRESTORE_EMULATOR_HOST=localhost:8080` mandaría la semilla
+  // a otro emulador — el de :8080 suele ser de otra sesión.
+  const faltan = serviciosSinEmulador(servicios, env);
   return [
     '',
     '⛔ ─────────────────────────────────────────────────────────────────────',
@@ -79,13 +98,15 @@ function mensajeEnBlanco(enBlanco, servicios) {
     '⛔',
     ...renglonesEnBlanco(enBlanco).map((r) => `⛔    ${r}`),
     '⛔',
-    '⛔  Ninguna es un host: ninguna lleva su servicio al emulador. Este',
-    '⛔  script es SOLO para el emulador, y un ambiente que no dice a dónde',
-    '⛔  ir no se adivina.',
+    '⛔  Ninguna de éstas tiene un host, así que por ellas ningún servicio',
+    '⛔  llega a un emulador. Este script es SOLO para el emulador, y un',
+    '⛔  ambiente que no dice a dónde ir no se adivina.',
     '⛔',
-    '⛔  Sacalas del ambiente y exportá el host del emulador:',
+    '⛔  Sacalas del ambiente:',
     `⛔    unset ${enBlanco.join(' ')}`,
-    ...sugerenciasDeExport(servicios).map((s) => `⛔    ${s}`),
+    ...(faltan.length === 0
+      ? []
+      : ['⛔  y exportá el host del emulador:', ...sugerenciasDeExport(faltan).map((s) => `⛔    ${s}`)]),
     '⛔',
     '⛔  Contexto: scripts/capturas/README.md / AGENTS.md → Entornos',
     '⛔ ─────────────────────────────────────────────────────────────────────',
@@ -94,7 +115,7 @@ function mensajeEnBlanco(enBlanco, servicios) {
 }
 
 function mensajeSinEmulador(servicios, env) {
-  const faltan = servicios.filter((s) => !contraEmuladorDe([s], env));
+  const faltan = serviciosSinEmulador(servicios, env);
   const renglones = faltan.flatMap((s) =>
     VARIABLES_POR_SERVICIO[s].map((v) => `${v}  (${estadoDeVariable(env[v])})`),
   );
@@ -124,12 +145,15 @@ function mensajeSinEmulador(servicios, env) {
  * `{ ok: false, motivo, mensaje }`, sin efectos: la que corta el proceso es
  * `exigirSoloEmulador`.
  *
- *   'EN_BLANCO'    → alguna variable de emulador, de CUALQUIER servicio, está
- *                    en blanco. Primero, para que `' '` en
- *                    `FIRESTORE_EMULATOR_HOST` diga lo que es en vez de
- *                    "no está desviado". Y de cualquier servicio por el mismo
- *                    motivo que `credenciales.js`: el ambiente se contradice y
- *                    quien lo armó cree algo que no es.
+ *   'EN_BLANCO'    → `variablesEnBlanco` encontró alguna, sea del servicio que
+ *                    sea. Primero, para que `' '` en `FIRESTORE_EMULATOR_HOST`
+ *                    diga lo que es en vez de "no está desviado". Y no sólo las
+ *                    de `servicios`, por el mismo motivo que `credenciales.js`:
+ *                    el ambiente se contradice y quien lo armó cree algo que no
+ *                    es. Las excepciones son las de `variablesEnBlanco`, no
+ *                    éstas: hoy, una sola —`FIREBASE_STORAGE_EMULATOR_HOST` en
+ *                    blanco con `STORAGE_EMULATOR_HOST` puesta, que el SDK
+ *                    ignora—.
  *   'SIN_EMULADOR' → alguno de los `servicios` no tiene host
  *                    (`contraEmuladorDe` exige TODOS).
  *
@@ -149,7 +173,7 @@ function veredictoSoloEmulador(servicios, env = process.env) {
 
   const enBlanco = variablesEnBlanco(env);
   if (enBlanco.length > 0) {
-    return { ok: false, motivo: 'EN_BLANCO', mensaje: mensajeEnBlanco(enBlanco, servicios) };
+    return { ok: false, motivo: 'EN_BLANCO', mensaje: mensajeEnBlanco(enBlanco, servicios, env) };
   }
   if (!contraEmuladorDe(servicios, env)) {
     return { ok: false, motivo: 'SIN_EMULADOR', mensaje: mensajeSinEmulador(servicios, env) };
@@ -159,8 +183,16 @@ function veredictoSoloEmulador(servicios, env = process.env) {
 
 /**
  * La compuerta en sí: imprime el motivo y sale con 1 si el script no puede
- * correr. Va ANTES de `initializeApp()`, que es donde el script se ata a un
- * destino.
+ * correr.
+ *
+ * Va antes de `initializeApp()`, y la regla es más estricta de lo que el SDK
+ * pide HOY a propósito. Con firebase-admin 14.5.0, `lib/app/` no lee ninguna
+ * `*_EMULATOR_HOST`: `FIRESTORE_EMULATOR_HOST` la lee `@google-cloud/firestore`
+ * al construir el cliente (`build/src/index.js:614`), o sea en `getFirestore()`,
+ * y el primer socket sale recién con el primer RPC (medido con tripwire de red).
+ * Alcanzaría con ir antes de eso. Pero en qué llamada
+ * se ata cada SDK a su destino es un detalle interno que cambia entre
+ * versiones; arriba de toda inicialización no depende de ninguno.
  */
 function exigirSoloEmulador(servicios, env = process.env) {
   const veredicto = veredictoSoloEmulador(servicios, env);
