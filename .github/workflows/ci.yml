@@ -690,6 +690,17 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      # `firebase.json` le hace cargar al emulador `firestore.deploy.rules`
+      # (#1132), que es GENERADO y está gitignoreado: en un checkout limpio no
+      # existe. Sin él el emulador no falla, arranca en allow-all, y este job
+      # corrió así hasta acá. No se ponía rojo: las suites de reglas cargan las
+      # suyas, y los dos tests REST del reloj —que no cargan nada— heredaban las
+      # que otra suite había dejado en `treino-dev` si jest la corría antes.
+      # Si este paso falta, ahora corta el globalSetup de
+      # functions/jest.config.js antes de la primera suite.
+      - name: Generate firestore.deploy.rules
+        run: node scripts/strip_rules.js
+
       # Levanta firestore + auth + storage, corre TODO el suite (unit +
       # emulator-backed + rules) y baja el emulador. Dos detalles no obvios:
       #   - storage: cascade/storage y delete-account borran objetos del emulador
