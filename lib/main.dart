@@ -1,10 +1,7 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -16,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
 import 'core/analytics/analytics_consent.dart';
+import 'core/firebase/emuladores.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
 
@@ -178,19 +176,11 @@ Future<void> main() async {
       defaultValue: false,
     );
     if (useEmulator) {
-      FirebaseFirestore.instance.useFirestoreEmulator('localhost', 8080);
-      await FirebaseAuth.instance.useAuthEmulator('localhost', 9099);
-      // Sin esto los callables salen a PRODUCCIÓN aunque corras contra el
-      // emulador, así que ningún callable del proyecto se podía probar en
-      // local. La región tiene que ser la misma con la que se construyen las
-      // instancias en los providers (southamerica-east1): `instanceFor`
-      // cachea por región, y apuntar otra deja la real sin redirigir.
-      //
-      // Requiere levantar el emulador de functions:
-      //   ./scripts/emulator.sh   (fija --project treino-dev; el default de
-      //   .firebaserc es `demo-treino`, ver #840)
-      FirebaseFunctions.instanceFor(region: 'southamerica-east1')
-          .useFunctionsEmulator('localhost', 5001);
+      // Firestore, Auth, Functions y Storage, en una sola función que comparte
+      // con el Coach Hub — ver su dartdoc. Requiere `./scripts/emulator.sh`
+      // (fija --project treino-dev; el default de .firebaserc es
+      // `demo-treino`, ver #840).
+      await conectarEmuladores();
     }
 
     // Eager-resolve SharedPreferences before runApp so that all providers

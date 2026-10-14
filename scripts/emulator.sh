@@ -6,7 +6,14 @@ set -euo pipefail
 #   Firestore:  localhost:8080
 #   Auth:       localhost:9099
 #   Functions:  localhost:5001   (rankings, borrado en cascada, notificaciones)
+#   Storage:    localhost:9199   (avatares, fotos de posts, adjuntos de chat)
 #   UI:         localhost:4444
+#
+# Storage va en los dos modos desde el 2026-10-14. La app con USE_EMULATOR=true
+# ahora le manda Storage al emulador (`lib/core/firebase/emuladores.dart`);
+# antes ninguna superficie lo hacía y las subidas en local iban al bucket de
+# PRODUCCIÓN. Sin este emulador levantado, esas subidas fallan en vez de ir a
+# prod — que es lo correcto, pero deja los flujos con archivos sin poder probar.
 #
 # Las Cloud Functions ahora corren en el emulador, así que las features que
 # dependen de ellas son testeables en local. Ej: los rankings de VOLUMEN/LIFTS
@@ -79,8 +86,8 @@ source "$(dirname "$0")/lib/java21.sh"
 asegurar_java21 || exit 1
 
 if [ "${SKIP_FUNCTIONS:-0}" = "1" ]; then
-  echo "SKIP_FUNCTIONS=1 -> Firestore + Auth solamente (sin Functions)."
-  exec firebase emulators:start --only firestore,auth --project treino-dev
+  echo "SKIP_FUNCTIONS=1 -> Firestore + Auth + Storage (sin Functions)."
+  exec firebase emulators:start --only firestore,auth,storage --project treino-dev
 fi
 
 # El emulador carga las Functions desde functions/lib (JS compilado, gitignoreado),
@@ -94,4 +101,4 @@ if [ ! -d functions/node_modules ]; then
 fi
 npm --prefix functions run build
 
-exec firebase emulators:start --only firestore,auth,functions --project treino-dev
+exec firebase emulators:start --only firestore,auth,functions,storage --project treino-dev
