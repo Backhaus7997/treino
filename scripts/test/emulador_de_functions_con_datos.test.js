@@ -39,6 +39,14 @@
  * sale de `.firebaserc` o de un `firebase use` heredado (AGENTS.md § Entornos,
  * corolario 4), y eso no se ve desde acá.
  *
+ * Sin `--only` se levantan todos los emuladores de firebase.json, que es
+ * seguro… si el comando está entero en esa línea. En un YAML no se puede
+ * saber sin parsearlo: un `run: >` pliega las líneas de abajo en el MISMO
+ * comando, y el `--only functions --project treino-dev` puede estar ahí
+ * (Codex en el #1441). Y en shell un `$` puede traer los flags de una
+ * variable. En los dos casos el test falla cerrado: pide el `--only` escrito
+ * en la misma línea que `emulators:`.
+ *
  * Los `.md` y los comentarios quedan afuera a propósito: no se ejecutan, y un
  * gate que se pone rojo por un comentario entrena a ignorarlo. Para ver todas
  * las menciones del repo, incluidas las que este test no mira:
@@ -60,6 +68,8 @@ const REPO = path.join(__dirname, '..', '..');
 const EJECUTABLES = /(^|\/)package\.json$|\.(sh|ya?ml)$/;
 
 const DE_DATOS = ['firestore', 'auth', 'storage'];
+
+const esYaml = (archivo) => /\.ya?ml$/.test(archivo);
 
 /** Los comandos de un archivo, con las continuaciones de shell ya unidas. */
 function comandos(archivo, texto) {
@@ -85,14 +95,20 @@ function invocaciones(comando) {
       return {
         only: only ? only[1].split(',').map((s) => s.split(':')[0]) : null,
         project: project ? project[1] : null,
+        tramo,
       };
     });
 }
 
-function problema({ only, project }) {
+function problema({ only, project, tramo }, { yaml }) {
   // Sin `--only` se levantan todos los que declara firebase.json (ver el
-  // último test).
-  if (only === null) return null;
+  // último test), salvo que el comando pueda seguir fuera de esta línea (ver
+  // el encabezado).
+  if (only === null) {
+    if (yaml) return 'sin --only en un YAML: escribilo en la misma línea que `emulators:`';
+    if (tramo.includes('$')) return 'sin --only y con flags que pueden venir de una variable';
+    return null;
+  }
   if (only.some((s) => s.includes('$'))) {
     return `--only no se puede resolver acá: ${only.join(',')}`;
   }
@@ -103,8 +119,11 @@ function problema({ only, project }) {
 }
 
 function problemasDe(archivo, texto) {
+  const contexto = { yaml: esYaml(archivo) };
   return comandos(archivo, texto).flatMap((comando) =>
-    invocaciones(comando).map(problema).filter(Boolean),
+    invocaciones(comando)
+      .map((inv) => problema(inv, contexto))
+      .filter(Boolean),
   );
 }
 
@@ -133,6 +152,16 @@ test('el detector marca el `serve` de la plantilla y deja pasar los buenos', () 
   // Las continuaciones de shell: `scripts/test_rules.sh` parte así su comando.
   const partido = 'firebase emulators:exec \\\n  --only functions \\\n  --project treino-dev "x"';
   assert.strictEqual(problemasDe('x.sh', partido).length, 1);
+
+  // Un `run: >` pliega las líneas en un solo comando: partido por líneas,
+  // `emulators:start` queda sin `--only` y parecería levantar todo.
+  const plegado = [
+    '      - run: >',
+    '          firebase emulators:start',
+    '          --only functions --project treino-dev',
+  ].join('\n');
+  assert.strictEqual(problemasDe('.github/workflows/x.yml', plegado).length, 1);
+  assert.strictEqual(problemasDe('x.sh', 'firebase emulators:start "$@"').length, 1);
 
   const pkg = JSON.stringify({
     scripts: { serve: 'firebase emulators:start --only functions --project treino-dev' },
@@ -163,7 +192,7 @@ test('ningún comando del repo levanta functions con los datos en producción', 
   );
 
   const malos = encontrados
-    .map((e) => ({ ...e, problema: problema(e) }))
+    .map((e) => ({ ...e, problema: problema(e, { yaml: esYaml(e.archivo) }) }))
     .filter((e) => e.problema)
     .map((e) => `${e.archivo}: ${e.problema}\n    ${e.comando}`);
   assert.deepStrictEqual(malos, [], `\n${malos.join('\n')}\n` +
