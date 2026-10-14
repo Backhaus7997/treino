@@ -556,6 +556,16 @@ describe("nutrition_plans — one plan per PF↔athlete pair, trainer-only", () 
   });
 
   describe("create", () => {
+    // The create requires the trainer role (`tieneRolDePF`). Both trainers get
+    // it, so the negatives below fail for the reason they name — the docId or
+    // the payload — and not because the caller lacks a `users` doc.
+    // `nutrition-plans-docid.test.js` (scripts/rules_test) covers the role gate
+    // and the plant-a-fake-plan attack itself.
+    beforeEach(async () => {
+      await seedDoc("users", TRAINER, { uid: TRAINER, role: "trainer" });
+      await seedDoc("users", OTHER_TRAINER, { uid: OTHER_TRAINER, role: "trainer" });
+    });
+
     it("allows the trainer to create the pair's plan", async () => {
       await assertSucceeds(
         ctxDb(TRAINER).collection(COL_NUTRITION).doc(PLAN_ID).set(planDoc()),

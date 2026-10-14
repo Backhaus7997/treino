@@ -436,12 +436,23 @@ Ordenados por lo que me preocuparía primero:
 
 No son agujeros, pero salieron al leer y conviene que estén escritas:
 
-- **`athlete_files` create no ata el docId al par.** `athlete_notes`,
-  `follow_up_entries` y `nutrition_plans` verifican
-  `docId == trainerId + '_' + athleteId`; `athlete_files` sólo pide
-  `trainerId == auth.uid`. No es explotable (el gate de lectura mira
-  `resource.data.trainerId`, no el docId), pero es una inconsistencia dentro
-  de la misma familia de reglas.
+- **`athlete_files` create no ata el docId al par.** `athlete_notes` y
+  `nutrition_plans` verifican `docId == trainerId + '_' + athleteId`;
+  `athlete_files` sólo pide `trainerId == auth.uid`. No es explotable (el gate
+  de lectura mira `resource.data.trainerId`, no el docId), pero es una
+  inconsistencia dentro de la misma familia de reglas. `follow_up_entries`
+  tampoco lo ata, y tampoco es explotable: su docId lleva timestamp
+  (`{trainerId}_{athleteId}_{ts}`) y sólo lo lee el PF.
+
+  Una versión anterior de esta nota decía que **`follow_up_entries` y
+  `nutrition_plans` ya ataban el docId. Era falso para los dos**, y en
+  `nutrition_plans` sí era explotable. La app del alumno lee
+  `{suPF}_{él}` sin mirar `trainerId`, así que cualquier cuenta creaba ese doc
+  con su propio `trainerId`: el alumno veía un plan falso como "el de tu PF" y
+  el PF real quedaba sin poder escribirlo. Lo encontró la QA E2E del
+  2026-10-14; el create ahora ata el docId y exige rol de PF, y lo fija
+  `scripts/rules_test/nutrition-plans-docid.test.js`. Mismo patrón que §11.1
+  de AGENTS.md: la afirmación tranquilizadora es lo que hizo que nadie mirara.
 - **`session_shares` / `profile_shares` no validan la forma del doc** más allá
   de `trainerId is string`. El alumno puede guardar campos arbitrarios en su
   propio grant. Sin impacto de seguridad; sin `keys().hasOnly()` tampoco hay
