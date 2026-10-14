@@ -53,6 +53,26 @@ const SERVICIOS = Object.freeze(Object.keys(VARIABLES_POR_SERVICIO));
 const TODAS_LAS_VARIABLES = Object.freeze(SERVICIOS.flatMap((s) => VARIABLES_POR_SERVICIO[s]));
 
 /**
+ * El NAMESPACE del emulador local: el `--project` con el que lo levanta
+ * `scripts/emulator.sh`, el `projectId` de `lib/firebase_options.dart` y donde
+ * siembra `seed_emulator_full.js`. Contra el emulador no es un destino real
+ * —el SDK enruta por las variables de entorno—, es la carpeta local donde
+ * están los datos.
+ *
+ * Que coincida con PRODUCCIÓN no es un descuido, es herencia: la app quedó
+ * inicializada con el id real y el emulador tiene que hablar su mismo idioma.
+ * Por eso este valor sólo se usa DETRÁS de un chequeo de emulador, nunca como
+ * default suelto.
+ *
+ * Vive acá, y no en `lib/admin.js`, porque `lib/storage_target.js` también lo
+ * necesita y ése es puro: sin `firebase-admin`. Una sola copia: que el
+ * emulador, la semilla y los scripts de Storage miren namespaces distintos fue
+ * el bug de este cambio. `test/emulador_namespace.test.js` lo ata a
+ * `emulator.sh` y a `firebase_options.dart`.
+ */
+const PROJECT_ID_EMULADOR = 'treino-dev';
+
+/**
  * Qué hace el SDK con cada variable EN BLANCO, para que el abort lo diga por
  * variable. Una frase genérica ("Firestore tira al inicializar") sería falsa el
  * día que la única en blanco sea la de Auth. Las de Firestore y Storage están
@@ -268,6 +288,7 @@ function projectIdObjetivo(env = process.env) {
 }
 
 module.exports = {
+  PROJECT_ID_EMULADOR,
   SERVICIOS,
   TODAS_LAS_VARIABLES,
   EFECTO_EN_BLANCO,

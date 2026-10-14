@@ -30,9 +30,11 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     #840 que protege del lado de Node:
 
     **Lee `.firebaserc` exactamente un módulo: `scripts/lib/storage_target.js`**
-    (`FIREBASERC` en la línea 60, leído por `proyectoDeFirebaserc`). Es el
+    (`FIREBASERC`, leído por `proyectoDeFirebaserc`). Es el
     último eslabón de su cadena `--project=` → `GOOGLE_CLOUD_PROJECT` →
-    `GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`, y de él dependen los
+    `GOOGLE_APPLICATION_CREDENTIALS` → (sólo con Firestore **y** Storage en el
+    emulador: el namespace del emulador, `treino-dev`) → `.firebaserc`, y de él
+    dependen los
     **cuatro scripts que suben a Storage** (los † de la lista de más abajo). Para
     esos cuatro, y sólo para esos, el default de `demo-treino` sí desvía la
     corrida sin variables: antes del #840 un `node scripts/upload_enriched_videos.js`

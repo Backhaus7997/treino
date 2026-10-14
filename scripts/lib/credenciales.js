@@ -59,6 +59,7 @@ const os = require('node:os');
 // `contraEmuladorDeFirestore` más abajo para por qué no se define acá.
 // `target_project.js` no requiere este archivo: no hay ciclo.
 const {
+  PROJECT_ID_EMULADOR,
   VARIABLES_POR_SERVICIO,
   contraEmuladorDe,
   estadoDeVariable,
@@ -658,7 +659,7 @@ function rechazarSiApuntaAlRepo(io) {
  */
 function resolverContexto({
   env = process.env,
-  projectIdEmulador = 'treino-dev',
+  projectIdEmulador = PROJECT_ID_EMULADOR,
   ...io
 } = {}) {
   // La coherencia va PRIMERO: si el ambiente se contradice, el error útil es

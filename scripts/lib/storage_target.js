@@ -60,6 +60,8 @@ const {
   bannerDeProduccion,
 } = require('./firebase_projects');
 const {
+  PROJECT_ID_EMULADOR,
+  contraEmuladorDe,
   emuladoresActivos: emuladoresPorServicio,
   renglonesEnBlanco,
   variablesEnBlanco,
@@ -120,7 +122,58 @@ function proyectoDeSaKey(ruta) {
  *   1. `--project=` explícito (lo que el operador pidió gana siempre)
  *   2. `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT` (las que mira el SDK)
  *   3. el `project_id` del `GOOGLE_APPLICATION_CREDENTIALS`
- *   4. `.firebaserc`
+ *   4. con Firestore Y Storage en el emulador: `PROJECT_ID_EMULADOR`
+ *   5. `.firebaserc`
+ *
+ * ─── EL PASO 4: CONTRA EL EMULADOR, EL NAMESPACE DEL EMULADOR ──────────────
+ *
+ * El default de `.firebaserc` es `demo-treino` desde el #840, y está ahí como
+ * TRAMPA para el CLI —un `deploy` sin `--project` tiene que fallar—, no como
+ * namespace. El emulador lo levanta `emulator.sh` con `--project treino-dev`,
+ * y ahí escriben la app y la semilla. Cayendo en `.firebaserc`, los cuatro
+ * scripts de Storage leían un namespace vacío. Medido el 2026-10-14 con un
+ * emulador levantado como `emulator.sh` (puertos alternos) y un ejercicio
+ * sembrado: `extract_exercise_thumbnails.js --upload` imprimió `destino:
+ * EMULADOR`, terminó en «subidos + patcheados: 0 · fallas: 1» («doc no existe
+ * en exercises») y salió con exit 0. El emulador no lo rechaza: sólo anota
+ * «Multiple projectIds are not recommended in single project mode» en
+ * `firestore-debug.log` —no en la consola del emulador— y sirve el namespace
+ * vacío.
+ *
+ * Lo que NO afloja del fail-safe del #840/#838:
+ *   - Exige las DOS variables. Con las dos, el SDK manda Firestore y Storage
+ *     a localhost por su cuenta y el id es una carpeta local. Sin ninguna, se
+ *     sigue cayendo en `demo-treino`; con una sola, `planDeStorage` aborta.
+ *   - Las exige con el criterio de `lib/target_project.js` —una variable en
+ *     blanco NO cuenta—, que es con el que `lib/credenciales.js` decide si
+ *     `lib/admin.js` arranca sin credencial. Si este paso viera emulador donde
+ *     `credenciales.js` ve nube, le daría el id de producción a una corrida que
+ *     `admin.js` manda a la NUBE, con el cartel apagado por `contraEmulador`.
+ *     (Pasaba con `' '` mientras `emuladoresActivos` tenía su propio
+ *     `Boolean()`; desde el #1445 delega allá, y una variable en blanco hace
+ *     abortar a `planDeStorage` antes de que el id importe.)
+ *   - Va después de 1-3: el que nombra un proyecto sigue ganando. Lo único que
+ *     cambia es el último recurso, y sólo contra el emulador.
+ *
+ * Medido contra el resolutor de `develop` con el #1444 y el #1445 adentro
+ * (019afc02), sobre 1080 combinaciones de argv y ambiente (las tres variables
+ * de emulador ausentes, vacías, en blanco o puestas, `GCLOUD_PROJECT`,
+ * `GOOGLE_APPLICATION_CREDENTIALS`, `--project=`, `--bucket=`): cambian 8,
+ * todas «emulador completo, nadie nombró proyecto», de `demo-treino` a
+ * `treino-dev`. Las 90 con las variables de emulador ausentes o vacías —la
+ * nube— dan idéntico, campo por campo. El script está en la descripción del
+ * PR #1442.
+ *
+ * Lo que NO se lee, a propósito: el `activeProjects` que escribe `firebase
+ * use`. El Admin SDK tampoco lo lee —`rg activeProjects` sobre `firebase-admin`,
+ * `google-auth-library`, `@google-cloud` y `google-gax` da 0—, así que seguirlo
+ * sería imprimir un destino distinto del que usa el SDK. Y es el pin que
+ * AGENTS.md (Entornos, corolario 4) muestra heredándose desde cualquier
+ * directorio padre: contra la nube haría que un `firebase use prod` olvidado
+ * en la raíz eligiera producción —con cartel, pero sin que nadie la pidiera—
+ * por una corrida que no la nombró; contra el
+ * emulador, `emulator.sh` lo pisa con su `--project` explícito, así que
+ * seguirlo volvería a separar los namespaces.
  */
 function resolverProjectId({ argv = [], env = process.env, rutaFirebaserc = FIREBASERC } = {}) {
   const porFlag = opcion(argv, 'project');
@@ -131,6 +184,10 @@ function resolverProjectId({ argv = [], env = process.env, rutaFirebaserc = FIRE
 
   const porSaKey = proyectoDeSaKey(env.GOOGLE_APPLICATION_CREDENTIALS);
   if (porSaKey) return { projectId: porSaKey, origen: 'GOOGLE_APPLICATION_CREDENTIALS' };
+
+  if (contraEmuladorDe(['firestore', 'storage'], env)) {
+    return { projectId: PROJECT_ID_EMULADOR, origen: 'namespace del emulador' };
+  }
 
   const porRc = proyectoDeFirebaserc(rutaFirebaserc);
   if (porRc) return { projectId: porRc, origen: '.firebaserc' };
