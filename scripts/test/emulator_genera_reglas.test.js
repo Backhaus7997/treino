@@ -141,9 +141,13 @@ function correr(repo, extra) {
   };
 }
 
+// `only` distingue QUÉ branch de emulator.sh arrancó: el liviano no lleva
+// `functions`, el completo sí. Storage va en los dos desde #1434 —la app con
+// USE_EMULATOR le manda Storage al emulador—, y este test y ese PR se
+// mergearon en paralelo: cada uno pasó su CI solo y se rompieron juntos.
 const MODOS = [
-  { nombre: 'SKIP_FUNCTIONS=1', env: { SKIP_FUNCTIONS: '1' }, only: 'firestore,auth' },
-  { nombre: 'modo completo', env: {}, only: 'firestore,auth,functions' },
+  { nombre: 'SKIP_FUNCTIONS=1', env: { SKIP_FUNCTIONS: '1' }, only: 'firestore,auth,storage' },
+  { nombre: 'modo completo', env: {}, only: 'firestore,auth,functions,storage' },
 ];
 
 for (const modo of MODOS) {
