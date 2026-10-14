@@ -75,7 +75,8 @@ test('sin nada cae en .firebaserc, que desde el #840 declara demo-treino', () =>
   // decía `assert.strictEqual(r.projectId, 'treino-dev')`. O sea: el último
   // eslabón de la cadena de resolución —el que atrapa al que no pasó flag, ni
   // env, ni credencial— apuntaba a producción. El #840 lo movió a
-  // `demo-treino`, el proyecto del emulador, que no existe en la nube.
+  // `demo-treino`, un id con el prefijo `demo-` que no existe en la nube. (No
+  // es el namespace del emulador: `emulator.sh` lo levanta en `treino-dev`.)
   //
   // Sigue siendo el ÚLTIMO recurso y sigue sin ser un permiso: quien nombra
   // producción a propósito la sigue teniendo, con cartel (ver más abajo).
@@ -366,4 +367,129 @@ test('el guard aborta si no puede resolver el proyecto — no adivina', () => {
   });
   assert.deepStrictEqual(codigos, [1]);
   assert.match(stderr.join('\n'), /no pude resolver/);
+});
+
+// ── El namespace del emulador ─────────────────────────────────────────────
+//
+// Con las DOS variables puestas y sin nombrar proyecto, el resolutor caía en
+// `.firebaserc` → `demo-treino`, mientras `emulator.sh`, la app y la semilla
+// viven en `treino-dev`. Los cuatro scripts leían un namespace vacío y
+// terminaban con exit 0 y «0 subidos». Ningún test lo veía: el de «los dos en
+// el emulador» de arriba mira coherencia, etiqueta y cartel, nunca a QUÉ
+// namespace se escribe.
+
+const os = require('node:os');
+const fs = require('node:fs');
+const { PROJECT_ID_EMULADOR } = require('../lib/target_project');
+const { contraEmuladorDeFirestore } = require('../lib/credenciales');
+
+const EMU_COMPLETO = Object.freeze({
+  FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+  FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+});
+
+test('los dos en el emulador sin nombrar proyecto: el namespace de emulator.sh, no el de .firebaserc', () => {
+  // Las dos formas de redirigir Storage que acepta firebase-admin.
+  for (const env of [
+    EMU_COMPLETO,
+    { FIRESTORE_EMULATOR_HOST: 'localhost:8080', STORAGE_EMULATOR_HOST: 'http://localhost:9199' },
+  ]) {
+    const p = plan(env);
+    assert.strictEqual(p.projectId, PROJECT_ID_EMULADOR);
+    assert.strictEqual(p.origenProyecto, 'namespace del emulador');
+    assert.strictEqual(p.bucket, `${PROJECT_ID_EMULADOR}.firebasestorage.app`);
+    assert.strictEqual(p.contraEmulador, true);
+    assert.match(p.etiquetaDestino, /EMULADOR/);
+    // El id coincide con el de producción, y contra el emulador igual no se
+    // grita: es una carpeta local. Si esto saliera, el cartel aparecería en
+    // TODA corrida local y se aprendería a ignorarlo.
+    assert.strictEqual(p.banner, null);
+    assert.strictEqual(p.esProduccion, false);
+  }
+});
+
+test('sin las DOS variables el emulador no participa: sigue mandando .firebaserc', () => {
+  // El fail-safe del #840 entero: olvidarse una variable, o las dos, NO puede
+  // terminar en el namespace del emulador — que es el id de producción. Con
+  // una sola, además, `planDeStorage` aborta (ver los tests del #838 arriba).
+  const casos = [
+    ['sin nada', ENV_LIMPIO],
+    ['sólo Firestore', { FIRESTORE_EMULATOR_HOST: 'localhost:8080' }],
+    ['sólo Storage (FIREBASE_)', { FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }],
+    ['sólo Storage', { STORAGE_EMULATOR_HOST: 'http://localhost:9199' }],
+    ['las dos vacías', { FIRESTORE_EMULATOR_HOST: '', FIREBASE_STORAGE_EMULATOR_HOST: '' }],
+    ['las dos en blanco', { FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' }],
+    ['Firestore puesta, Storage en blanco', { FIRESTORE_EMULATOR_HOST: 'localhost:8080', FIREBASE_STORAGE_EMULATOR_HOST: '\t' }],
+    ['Firestore en blanco, Storage puesta', { FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }],
+  ];
+  for (const [nombre, env] of casos) {
+    const r = resolverProjectId({ argv: [], env, rutaFirebaserc: FIREBASERC_REAL });
+    assert.strictEqual(r.projectId, 'demo-treino', nombre);
+    assert.strictEqual(r.origen, '.firebaserc', nombre);
+  }
+});
+
+test('el namespace del emulador sólo sale donde la frontera de credenciales TAMBIÉN ve emulador', () => {
+  // `lib/credenciales.js` decide con `contraEmuladorDeFirestore` si
+  // `lib/admin.js` corre sin credencial. Donde aquél dice "nube", el paso 4 de
+  // `resolverProjectId` le daría el id de producción a una corrida que va a la
+  // NUBE, con el cartel apagado por `contraEmulador`. El caso real es `' '`:
+  // el `emuladoresActivos` de `storage_target.js` es un `Boolean()` y le da
+  // true; `credenciales.js` hace trim y le da false.
+  const valores = [undefined, '', ' ', '\t', 'localhost:8080'];
+  for (const f of valores) {
+    for (const s of valores) {
+      const env = {};
+      if (f !== undefined) env.FIRESTORE_EMULATOR_HOST = f;
+      if (s !== undefined) env.FIREBASE_STORAGE_EMULATOR_HOST = s;
+      const r = resolverProjectId({ argv: [], env, rutaFirebaserc: FIREBASERC_REAL });
+      if (r.origen === 'namespace del emulador') {
+        assert.ok(contraEmuladorDeFirestore(env), `namespace del emulador con admin.js en la nube: ${JSON.stringify(env)}`);
+      }
+    }
+  }
+
+  // Y el caso concreto, para que el día que el criterio cambie se vea acá: en
+  // blanco las dos, el plan sigue diciendo lo que decía antes de este cambio
+  // —`demo-treino`— y no el id de producción.
+  const p = plan({ FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' });
+  assert.strictEqual(p.projectId, 'demo-treino');
+  assert.notStrictEqual(p.projectId, PROJECT_ID_EMULADOR);
+});
+
+test('contra el emulador, el que nombra un proyecto sigue ganando', (t) => {
+  // El paso nuevo reemplaza sólo al ÚLTIMO recurso. Flag, env y credencial
+  // conservan su orden con o sin emulador.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'treino-namespace-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const sa = path.join(dir, 'sa.json');
+  fs.writeFileSync(sa, JSON.stringify({ project_id: 'treino-de-la-credencial' }));
+
+  const casos = [
+    [{ argv: ['--project=treino-otro'], env: EMU_COMPLETO }, 'treino-otro', '--project='],
+    [{ argv: [], env: { ...EMU_COMPLETO, GCLOUD_PROJECT: 'treino-env' } }, 'treino-env', 'GOOGLE_CLOUD_PROJECT'],
+    [
+      { argv: [], env: { ...EMU_COMPLETO, GOOGLE_APPLICATION_CREDENTIALS: sa } },
+      'treino-de-la-credencial',
+      'GOOGLE_APPLICATION_CREDENTIALS',
+    ],
+  ];
+  for (const [entrada, projectId, origen] of casos) {
+    const r = resolverProjectId({ ...entrada, rutaFirebaserc: FIREBASERC_REAL });
+    assert.strictEqual(r.projectId, projectId, origen);
+    assert.strictEqual(r.origen, origen);
+  }
+});
+
+test('el guard contra el emulador imprime de dónde sale treino-dev, y no grita', () => {
+  // "Proyecto: treino-dev" a secas asusta, y con razón: es el id de
+  // producción. La línea tiene que decir que es el namespace del emulador.
+  const r = correrGuard(EMU_COMPLETO);
+  assert.deepStrictEqual(r.codigos, [], 'no tenía que abortar');
+  assert.ok(
+    r.stdout.includes(`Proyecto: ${PROJECT_ID_EMULADOR} (namespace del emulador)`),
+    `esperaba el origen del proyecto en stdout: ${r.stdout}`,
+  );
+  assert.match(r.stdout, /destino: EMULADOR \(Firestore \+ Storage\)/);
+  assert.doesNotMatch(r.stderr, /IS PRODUCTION/);
 });

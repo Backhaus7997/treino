@@ -58,7 +58,7 @@ const os = require('node:os');
 // El vocabulario del emulador sale de UN solo módulo (#846). Ver
 // `contraEmuladorDeFirestore` más abajo para por qué no se define acá.
 // `target_project.js` no requiere este archivo: no hay ciclo.
-const { VARIABLES_POR_SERVICIO, contraEmuladorDe } = require('./target_project');
+const { PROJECT_ID_EMULADOR, VARIABLES_POR_SERVICIO, contraEmuladorDe } = require('./target_project');
 
 /** La variable canónica que dice dónde está la credencial. No hay default (#834). */
 const VAR_RUTA = 'TREINO_SA_KEY';
@@ -615,7 +615,7 @@ function rechazarSiApuntaAlRepo(io) {
  */
 function resolverContexto({
   env = process.env,
-  projectIdEmulador = 'treino-dev',
+  projectIdEmulador = PROJECT_ID_EMULADOR,
   ...io
 } = {}) {
   // La coherencia va PRIMERO: si el ambiente se contradice, el error útil es

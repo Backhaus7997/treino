@@ -697,7 +697,16 @@ Los cuatro pasan por `lib/storage_target.js` antes de la primera escritura.
 **El bucket ya no está hardcodeado.** Se resuelve en este orden:
 `--bucket=<bucket>` → `FIREBASE_STORAGE_BUCKET` → derivado del proyecto activo
 (`--project=` → `GOOGLE_CLOUD_PROJECT` → `project_id` del
-`GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`).
+`GOOGLE_APPLICATION_CREDENTIALS` → **con Firestore Y Storage en el emulador**,
+el namespace del emulador → `.firebaserc`).
+
+El `activeProjects` que escribe `firebase use` **no** está en esa cadena, a
+propósito: el Admin SDK tampoco lo lee (`rg activeProjects` sobre
+`firebase-admin`, `google-auth-library`, `@google-cloud` y `google-gax` da 0), y
+es el pin que AGENTS.md (Entornos, corolario 4) muestra heredándose desde
+cualquier directorio padre. Seguirlo haría que un `firebase use prod` olvidado
+en la raíz eligiera producción —con cartel, pero sin que nadie la pidiera— por
+una corrida que no la nombró.
 
 **Firestore y Storage tienen que apuntar al mismo lado, o el script aborta.**
 Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
@@ -717,6 +726,40 @@ export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 (Antes este párrafo decía que `emulator.sh` arrancaba sin Storage y mandaba a
 levantarlo a mano. Era cierto entonces; dejó de serlo cuando la app empezó a
 mandar Storage al emulador con `USE_EMULATOR=true`.)
+
+**Con las dos variables, y si nadie nombra otro proyecto, el proyecto es el
+namespace del emulador** (`PROJECT_ID_EMULADOR` de `lib/target_project.js`, hoy
+`treino-dev`): el mismo
+`--project` con el que `emulator.sh` levanta el emulador, el `projectId` de
+`lib/firebase_options.dart` y donde siembra `seed_emulator_full.js`. La primera
+línea lo dice: `Proyecto: treino-dev (namespace del emulador) · … · destino:
+EMULADOR (Firestore + Storage)`. Contra el emulador ese id es una carpeta local,
+y por eso no sale el cartel.
+
+Hasta el 2026-10-14 esa misma receta resolvía `demo-treino` —el default del
+`.firebaserc`— y los scripts leían un namespace vacío. Medido con un emulador
+levantado como `emulator.sh` (puertos alternos) y un ejercicio sembrado:
+`extract_exercise_thumbnails.js --upload` terminó en «subidos + patcheados: 0 ·
+fallas: 1» («doc no existe en exercises») **con exit 0**. El emulador no lo
+rechaza: anota «Multiple projectIds are not recommended in single project mode»
+en `firestore-debug.log` y sirve el namespace vacío. Lo ata
+`test/emulador_namespace.test.js`, que falla si `emulator.sh`,
+`firebase_options.dart` y `PROJECT_ID_EMULADOR` dejan de decir lo mismo.
+
+**No le agregues `--project=treino-dev` a la receta del emulador.** Era la única
+forma de alinear los namespaces antes de este cambio, y es justo el comando que,
+en una terminal donde no exportaste ninguna de las dos variables, escribe en
+producción: el guard deja pasar con cartel, porque nombrar producción es
+pedirla. Sin el flag, olvidarse las dos cae en `demo-treino`; olvidarse una
+aborta, con o sin flag.
+
+Ojo con las URLs que estampan estos scripts: llevan el host real
+(`https://firebasestorage.googleapis.com/v0/b/<bucket>/o/…`) aunque corran
+contra el emulador. Con el namespace alineado, ese `<bucket>` es
+`treino-dev.firebasestorage.app` —se ve igual que una URL de producción— y el
+archivo existe sólo en el emulador de Storage. Antes decía
+`demo-treino.firebasestorage.app`: igual de rota, pero se notaba. Qué hace la
+app con esa URL no está medido.
 
 Sin ninguna de las dos variables el destino ya **no** es producción: desde el
 #840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la

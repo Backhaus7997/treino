@@ -60,6 +60,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
+const { PROJECT_ID_EMULADOR } = require('../lib/target_project');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
@@ -358,6 +359,31 @@ for (const escritor of ESCRITORES) {
     assert.doesNotMatch(completo.stderr, /ABORTADO/, 'con los dos redirigidos tiene que dejar pasar');
     assert.doesNotMatch(completo.stderr, /IS PRODUCTION/, 'contra emulador no se grita');
     assert.match(completo.todo, /EMULADOR \(Firestore \+ Storage\)/, 'esperaba la etiqueta de emulador');
+  });
+
+  test(`${script}: con las DOS variables y sin nombrar proyecto, escribe en el namespace del emulador`, () => {
+    // La receta del README (`./scripts/emulator.sh` + las dos variables) caía
+    // en el default de `.firebaserc` —`demo-treino`— y el emulador, la app y la
+    // semilla viven en `PROJECT_ID_EMULADOR`. El `update` sobre `exercises/{id}`
+    // no encontraba nada y el script salía con exit 0. Acá se mide por script,
+    // y no sólo en `lib/storage_target.js`: el `projectId` y el `storageBucket`
+    // que le llegan al SDK los arma cada uno.
+    const r = correr(escritor, {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    });
+
+    assert.ok(
+      r.stdout.includes(`Proyecto: ${PROJECT_ID_EMULADOR} (namespace del emulador)`),
+      `esperaba el namespace del emulador en stdout:\n${r.todo}`,
+    );
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${PROJECT_ID_EMULADOR}.firebasestorage.app`),
+      'el .bucket() no apuntó al bucket del namespace del emulador',
+    );
+    assert.doesNotMatch(r.todo, new RegExp(`${DEMO}\\.firebasestorage`), 'quedó el bucket de .firebaserc');
+    assert.doesNotMatch(r.stderr, /ABORTADO/);
+    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, 'contra el emulador el id es una carpeta local: no se grita');
   });
 }
 
