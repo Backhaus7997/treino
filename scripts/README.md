@@ -174,6 +174,11 @@ exportada con sólo whitespace (`FIRESTORE_EMULATOR_HOST=' '`, un tab, un salto
 de línea) corta antes de escribir, en los dos guards (`lib/credenciales.js` y
 `lib/storage_target.js`):
 
+La única excepción es la que hace el propio SDK: firebase-admin sólo mira
+`FIREBASE_STORAGE_EMULATOR_HOST` si `STORAGE_EMULATOR_HOST` no tiene valor.
+Con `STORAGE_EMULATOR_HOST` puesta, la de Firebase en blanco se ignora (Storage
+va al host de la otra, medido) y no aborta nada.
+
 ```
 ⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.
 ```

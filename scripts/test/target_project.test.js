@@ -182,6 +182,34 @@ test('renglonesEnBlanco: no imprime el valor y entra en la caja del abort', () =
   for (const v of VARIABLES) assert.ok(renglones.includes(`${v}  (en blanco)`), v);
 });
 
+test('variablesEnBlanco: la de Firebase en blanco no cuenta si STORAGE_EMULATOR_HOST tiene host', () => {
+  // Es la precedencia de firebase-admin: sólo mira FIREBASE_STORAGE_EMULATOR_HOST
+  // si STORAGE_EMULATOR_HOST no tiene valor. Medido: con la otra puesta, Storage
+  // va a localhost:9199. Abortar ahí era una alarma falsa (Codex, #1445).
+  assert.deepStrictEqual(
+    variablesEnBlanco({
+      STORAGE_EMULATOR_HOST: 'http://localhost:9199',
+      FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+    }),
+    [],
+  );
+  // El contracontrol: con la otra vacía o en blanco, firebase-admin SÍ la usa
+  // (vacía) o la corrida aborta igual (en blanco), y la de Firebase se nombra.
+  assert.deepStrictEqual(
+    variablesEnBlanco({ STORAGE_EMULATOR_HOST: '', FIREBASE_STORAGE_EMULATOR_HOST: ' ' }),
+    ['FIREBASE_STORAGE_EMULATOR_HOST'],
+  );
+  assert.deepStrictEqual(
+    variablesEnBlanco({ STORAGE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' }),
+    ['STORAGE_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST'],
+  );
+  // La excepción es sólo ésa: la inversa (la primaria en blanco) aborta igual.
+  assert.deepStrictEqual(
+    variablesEnBlanco({ STORAGE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }),
+    ['STORAGE_EMULATOR_HOST'],
+  );
+});
+
 test('EFECTO_EN_BLANCO: una frase por variable, ni una de más', () => {
   // El abort imprime esta frase por cada variable en blanco. Una que falte sale
   // como "→ undefined", que es peor que no decir nada.

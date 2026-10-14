@@ -430,6 +430,21 @@ test('una sola en blanco alcanza, aunque las otras dos digan emulador', () => {
   assert.match(r.stderr, /le gana a FIREBASE_STORAGE_EMULATOR_HOST/, 'falta la salvedad de precedencia');
 });
 
+test('FIREBASE_STORAGE_EMULATOR_HOST en blanco con STORAGE_EMULATOR_HOST puesta corre como emulador', () => {
+  // firebase-admin ignora la de Firebase cuando la otra tiene host (medido:
+  // Storage va a localhost:9199). Es una corrida coherente, y los dos guards
+  // tienen que decir lo mismo de ella. Antes de este caso, los dos abortaban.
+  const env = {
+    FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+    STORAGE_EMULATOR_HOST: 'http://localhost:9199',
+    FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+  };
+  const r = correrGuard(env);
+  assert.deepStrictEqual(r.codigos, [], 'abortó una corrida coherente');
+  assert.match(r.stdout, /destino: EMULADOR \(Firestore \+ Storage\)/);
+  assert.strictEqual(veredictoDeAdmin(env), 'emulador');
+});
+
 test('el abort de la variable en blanco no dice que los destinos "no coinciden"', () => {
   // Ése es el texto del split Firestore/Storage. Acá no hay destino que pueda
   // coincidir o no: decirlo manda a arreglar otra cosa.

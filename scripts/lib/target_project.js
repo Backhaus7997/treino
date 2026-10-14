@@ -63,8 +63,8 @@ const EFECTO_EN_BLANCO = Object.freeze({
   FIREBASE_AUTH_EMULATOR_HOST: 'Auth pasa a modo emulador (`!!host`) sin host',
   STORAGE_EMULATOR_HOST: 'Storage arma un endpoint inválido (`https://` + el blanco)',
   FIREBASE_STORAGE_EMULATOR_HOST:
-    'firebase-admin la reescribe a un endpoint inválido (`http://` + el blanco), ' +
-    'salvo que STORAGE_EMULATOR_HOST tenga host: ahí la ignora',
+    'con STORAGE_EMULATOR_HOST sin valor, firebase-admin la reescribe a un ' +
+    'endpoint inválido (`http://` + el blanco)',
   FIREBASE_DATABASE_EMULATOR_HOST: 'Database pasa a modo emulador (`if (host)`) sin host',
 });
 
@@ -147,9 +147,24 @@ function seteada(valor) {
  * todas y no sólo las del servicio que el llamador toca, por la misma razón por
  * la que `credenciales.js` aborta ante una parcial: el ambiente se contradice y
  * quien lo armó cree algo que no es.
+ *
+ * Con UNA excepción, la que el SDK mismo hace: firebase-admin sólo mira
+ * `FIREBASE_STORAGE_EMULATOR_HOST` si `STORAGE_EMULATOR_HOST` no tiene valor
+ * (`if (!STORAGE_EMULATOR_HOST && FIREBASE_STORAGE_EMULATOR_HOST)`, en
+ * `firebase-admin/lib/storage/storage.js`). Con la otra puesta, la de Firebase
+ * en blanco el SDK la ignora —medido: Storage va a `localhost:9199`— y vale lo
+ * mismo que vacía. Abortar ahí cortaba una corrida de emulador coherente, que
+ * es una alarma falsa (lo marcó Codex en el #1445). Si la otra está EN BLANCO
+ * no se excluye: la corrida aborta igual por ésa, y así el `unset` del mensaje
+ * nombra las dos de una vez.
  */
 function variablesEnBlanco(env = process.env) {
-  return TODAS_LAS_VARIABLES.filter((v) => estadoDeVariable(env[v]) === 'en blanco');
+  const storageConHost = estadoDeVariable(env.STORAGE_EMULATOR_HOST) === 'puesta';
+  return TODAS_LAS_VARIABLES.filter(
+    (v) =>
+      estadoDeVariable(env[v]) === 'en blanco' &&
+      !(v === 'FIREBASE_STORAGE_EMULATOR_HOST' && storageConHost),
+  );
 }
 
 /**
