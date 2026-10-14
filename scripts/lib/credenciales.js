@@ -58,7 +58,14 @@ const os = require('node:os');
 // El vocabulario del emulador sale de UN solo módulo (#846). Ver
 // `contraEmuladorDeFirestore` más abajo para por qué no se define acá.
 // `target_project.js` no requiere este archivo: no hay ciclo.
-const { PROJECT_ID_EMULADOR, VARIABLES_POR_SERVICIO, contraEmuladorDe } = require('./target_project');
+const {
+  PROJECT_ID_EMULADOR,
+  VARIABLES_POR_SERVICIO,
+  contraEmuladorDe,
+  estadoDeVariable,
+  renglonesEnBlanco,
+  variablesEnBlanco,
+} = require('./target_project');
 
 /** La variable canónica que dice dónde está la credencial. No hay default (#834). */
 const VAR_RUTA = 'TREINO_SA_KEY';
@@ -504,7 +511,9 @@ function evaluarProduccion(credencial, { projectIdDeclarado = null } = {}) {
  * producción (#826). Una condición más laxa que el redirect real convierte las
  * dos en una mentira — ver `VARS_DE_EMULADOR_PARCIALES`.
  *
- * Vacío o whitespace NO cuenta: exportar la variable en blanco no desvía nada.
+ * Vacía no cuenta: el SDK la ignora. En blanco (`' '`) tampoco cuenta acá, pero
+ * eso NO quiere decir "nube": el SDK la lee y se rompe, y `resolverContexto`
+ * aborta antes de preguntar esto. Ver `estadoDeVariable` en `target_project.js`.
  *
  * Se chequea ANTES que la credencial en todo el flujo: contra el emulador no
  * hay nada que proteger y no debe hacer falta ninguna variable (#834, (c)).
@@ -529,7 +538,42 @@ function contraEmuladorDeFirestore(env = process.env) {
 
 /** Las variables de emulador PARCIAL que están puestas. Lista, para nombrarlas. */
 function emuladoresParcialesPuestos(env = process.env) {
-  return VARS_DE_EMULADOR_PARCIALES.filter((v) => Boolean((env[v] || '').trim()));
+  return VARS_DE_EMULADOR_PARCIALES.filter((v) => estadoDeVariable(env[v]) === 'puesta');
+}
+
+/**
+ * EL MENSAJE DE LA VARIABLE EN BLANCO: el ambiente no dice a dónde ir.
+ *
+ * Seguir por cualquiera de los dos caminos sería afirmar un destino que nadie
+ * eligió (ver `estadoDeVariable` en `target_project.js`). El de la nube es el
+ * peor: carga la credencial de producción para una corrida que el operador
+ * armó, casi seguro, pensando en el emulador.
+ *
+ * No dice que "la corrida no va a ningún lado": con sólo la de Auth en blanco,
+ * Firestore SÍ iría a la nube. Lo que se afirma es por variable, y está medido.
+ */
+function mensajeEmuladorEnBlanco(enBlanco) {
+  return [
+    '',
+    '⛔ ─────────────────────────────────────────────────────────────────────',
+    '⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.',
+    '⛔',
+    ...renglonesEnBlanco(enBlanco).map((r) => `⛔    ${r}`),
+    '⛔',
+    '⛔  Ninguna es un host: ninguna lleva su servicio al emulador. El',
+    '⛔  ambiente no dice a dónde quería ir quien lo armó, y en vez de',
+    '⛔  adivinarlo (el camino de la nube carga la credencial) se aborta.',
+    '⛔',
+    '⛔  Primero sacalas del ambiente:',
+    `⛔    unset ${enBlanco.join(' ')}`,
+    '⛔  Para el emulador, después exportá el host:',
+    `⛔    export ${VAR_EMULADOR_FIRESTORE}=localhost:8080`,
+    '⛔  Para la nube, nada más; si el destino es producción, sale el cartel.',
+    '⛔',
+    '⛔  Contexto: #834 / #838 / AGENTS.md → Entornos',
+    '⛔ ─────────────────────────────────────────────────────────────────────',
+    '',
+  ].join('\n');
 }
 
 /**
@@ -622,6 +666,16 @@ function resolverContexto({
   // "tu emulador no desvía Firestore", no "falta la credencial". El segundo
   // manda a exportar la clave de producción para arreglar una corrida que la
   // persona quería local.
+  //
+  // Y la variable en blanco antes que todo: sin este corte, `' '` en
+  // FIRESTORE_EMULATOR_HOST no es emulador para `contraEmuladorDeFirestore`, así
+  // que la corrida seguía por la credencial — mientras `storage_target.js` la
+  // etiquetaba EMULADOR (nota 3 del #1442).
+  const enBlanco = variablesEnBlanco(env);
+  if (enBlanco.length > 0) {
+    throw new ErrorDeCredencial('EMULADOR_EN_BLANCO', mensajeEmuladorEnBlanco(enBlanco));
+  }
+
   const parciales = emuladoresParcialesPuestos(env);
   if (!contraEmuladorDeFirestore(env) && parciales.length > 0) {
     throw new ErrorDeCredencial('EMULADOR_INCOHERENTE', mensajeEmuladorIncoherente(parciales));

@@ -433,9 +433,10 @@ test('el namespace del emulador sólo sale donde la frontera de credenciales TAM
   // `lib/credenciales.js` decide con `contraEmuladorDeFirestore` si
   // `lib/admin.js` corre sin credencial. Donde aquél dice "nube", el paso 4 de
   // `resolverProjectId` le daría el id de producción a una corrida que va a la
-  // NUBE, con el cartel apagado por `contraEmulador`. El caso real es `' '`:
-  // el `emuladoresActivos` de `storage_target.js` es un `Boolean()` y le da
-  // true; `credenciales.js` hace trim y le da false.
+  // NUBE, con el cartel apagado por `contraEmulador`. El caso que lo motivó es
+  // `' '`: hasta el #1445, el `emuladoresActivos` de `storage_target.js` era un
+  // `Boolean()` y le daba true mientras `credenciales.js`, con trim, le daba
+  // false. Hoy delega allá; este test fija que el paso 4 no vuelva a divergir.
   const valores = [undefined, '', ' ', '\t', 'localhost:8080'];
   for (const f of valores) {
     for (const s of valores) {
@@ -450,9 +451,10 @@ test('el namespace del emulador sólo sale donde la frontera de credenciales TAM
   }
 
   // Y el caso concreto, para que el día que el criterio cambie se vea acá: en
-  // blanco las dos, el plan sigue diciendo lo que decía antes de este cambio
-  // —`demo-treino`— y no el id de producción.
+  // blanco las dos, el plan aborta (#1445) y el proyecto que nombra es el de
+  // `.firebaserc` —`demo-treino`—, no el id de producción.
   const p = plan({ FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' });
+  assert.strictEqual(p.coherente, false);
   assert.strictEqual(p.projectId, 'demo-treino');
   assert.notStrictEqual(p.projectId, PROJECT_ID_EMULADOR);
 });
@@ -492,4 +494,181 @@ test('el guard contra el emulador imprime de dónde sale treino-dev, y no grita'
   );
   assert.match(r.stdout, /destino: EMULADOR \(Firestore \+ Storage\)/);
   assert.doesNotMatch(r.stderr, /IS PRODUCTION/);
+});
+
+// ── Variables EN BLANCO: un solo criterio con credenciales.js ─────────────
+//
+// Nota 3 del #1442, reproducida sin red:
+//
+//   FIRESTORE_EMULATOR_HOST=' ' FIREBASE_STORAGE_EMULATOR_HOST=' ' --project=treino-dev
+//     plan:          `EMULADOR (Firestore + Storage)`, sin cartel
+//     credenciales:  nube → `lib/admin.js` inicializa CON la credencial
+//
+// El plan contaba `' '` como emulador con su propio `Boolean()`, y
+// `credenciales.js` como ausente con el `trim()` de `target_project.js`. Medido
+// contra el SDK, `' '` no es ninguna de las dos (ver `estadoDeVariable`): el
+// plan ahora delega en `target_project.js` y los dos abortan.
+
+const { ErrorDeCredencial, resolverContexto } = require('../lib/credenciales');
+const { textoDeAbort } = require('../lib/storage_target');
+
+const PAR_EN_BLANCO = Object.freeze({
+  FIRESTORE_EMULATOR_HOST: ' ',
+  FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+});
+
+test('nota 3 del #1442: el par en blanco ya no sale etiquetado EMULADOR', () => {
+  const plan = planDeStorage({ argv: ['--project=treino-dev'], env: PAR_EN_BLANCO });
+  assert.strictEqual(plan.etiquetaDestino, null);
+  assert.strictEqual(plan.contraEmulador, false);
+  assert.strictEqual(plan.coherente, false);
+  assert.deepStrictEqual(plan.variablesEnBlanco, [
+    'FIRESTORE_EMULATOR_HOST',
+    'FIREBASE_STORAGE_EMULATOR_HOST',
+  ]);
+});
+
+test('emuladoresActivos delega: `\' \'` no cuenta como emulador acá tampoco', () => {
+  assert.deepStrictEqual(emuladoresActivos(PAR_EN_BLANCO), { firestore: false, storage: false });
+  assert.deepStrictEqual(emuladoresActivos({ STORAGE_EMULATOR_HOST: '  ' }), {
+    firestore: false,
+    storage: false,
+  });
+});
+
+test('el guard aborta el par en blanco y NUNCA dice EMULADOR', () => {
+  const r = correrGuard(PAR_EN_BLANCO, ['--project=treino-dev']);
+  assert.deepStrictEqual(r.codigos, [1], 'esperaba exit(1)');
+  assert.match(r.stderr, /ABORTADO: hay variables de emulador exportadas EN BLANCO/);
+  assert.doesNotMatch(r.stdout + r.stderr, /EMULADOR \(Firestore \+ Storage\)/);
+  assert.doesNotMatch(r.stdout, /destino:/, 'imprimió una etiqueta sobre un destino que no existe');
+});
+
+test('una sola en blanco alcanza, aunque las otras dos digan emulador', () => {
+  // `STORAGE_EMULATOR_HOST=' '` le gana a `FIREBASE_STORAGE_EMULATOR_HOST`
+  // dentro de firebase-admin: Storage arma `https:// ` y no va al emulador.
+  // El plan decía EMULADOR porque las dos de Storage "estaban".
+  const r = correrGuard({
+    FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+    FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    STORAGE_EMULATOR_HOST: ' ',
+  });
+  assert.deepStrictEqual(r.codigos, [1]);
+  assert.match(r.stderr, /STORAGE_EMULATOR_HOST {2}\(en blanco\)/);
+  assert.match(r.stderr, /le gana a FIREBASE_STORAGE_EMULATOR_HOST/, 'falta la salvedad de precedencia');
+});
+
+test('FIREBASE_STORAGE_EMULATOR_HOST en blanco con STORAGE_EMULATOR_HOST puesta corre como emulador', () => {
+  // firebase-admin ignora la de Firebase cuando la otra tiene host (medido:
+  // Storage va a localhost:9199). Es una corrida coherente, y los dos guards
+  // tienen que decir lo mismo de ella. Antes de este caso, los dos abortaban.
+  const env = {
+    FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+    STORAGE_EMULATOR_HOST: 'http://localhost:9199',
+    FIREBASE_STORAGE_EMULATOR_HOST: ' ',
+  };
+  const r = correrGuard(env);
+  assert.deepStrictEqual(r.codigos, [], 'abortó una corrida coherente');
+  assert.match(r.stdout, /destino: EMULADOR \(Firestore \+ Storage\)/);
+  assert.strictEqual(veredictoDeAdmin(env), 'emulador');
+});
+
+test('el abort de la variable en blanco no dice que los destinos "no coinciden"', () => {
+  // Ése es el texto del split Firestore/Storage. Acá no hay destino que pueda
+  // coincidir o no: decirlo manda a arreglar otra cosa.
+  const texto = textoDeAbort(planDeStorage({ env: { FIREBASE_AUTH_EMULATOR_HOST: ' ' } }));
+  assert.doesNotMatch(texto, /no coinciden/);
+  assert.match(texto, /FIREBASE_AUTH_EMULATOR_HOST {2}\(en blanco\)/);
+  assert.match(texto, /unset FIREBASE_AUTH_EMULATOR_HOST/);
+  // La frase de Firestore NO puede salir si Firestore no está en blanco. Ni
+  // la salvedad de Storage, ni nada que diga que LA CORRIDA no va a ningún
+  // lado: con sólo Auth en blanco, Firestore sí iría a la nube.
+  assert.doesNotMatch(texto, /not a valid host/);
+  assert.doesNotMatch(texto, /le gana a FIREBASE_STORAGE_EMULATOR_HOST/);
+  assert.doesNotMatch(texto, /corrida no va/i);
+});
+
+test('FIRESTORE_ y FIREBASE_STORAGE_EMULATOR_HOST vacías no cambian nada', () => {
+  // El contracontrol: esas dos vacías el SDK las ignora (medido), y el plan
+  // tiene que dar lo mismo que sin ellas. `STORAGE_EMULATOR_HOST=''` no: ver
+  // `estadoDeVariable`.
+  const vacias = planDeStorage({
+    argv: ['--project=treino-dev'],
+    env: { FIRESTORE_EMULATOR_HOST: '', FIREBASE_STORAGE_EMULATOR_HOST: '' },
+  });
+  const sinNada = planDeStorage({ argv: ['--project=treino-dev'], env: ENV_LIMPIO });
+  assert.deepStrictEqual(vacias, sinNada);
+  assert.ok(vacias.banner, 'treino-dev nombrado sin emulador tiene que gritar');
+});
+
+/**
+ * Lo que `lib/admin.js` va a hacer con este ambiente, sin tocar ningún archivo:
+ * 'emulador', 'aborta' (el ambiente se contradice), o 'credencial' (la nube; si
+ * falta la credencial muere después, pero el camino ya es el de la nube).
+ */
+function veredictoDeAdmin(env) {
+  try {
+    return resolverContexto({
+      env,
+      existeEntrada: () => false,
+      leerArchivo: () => assert.fail('no tiene que leer credenciales'),
+      home: '/home/tester',
+    }).modo;
+  } catch (err) {
+    // Sólo se clasifican los veredictos del resolutor. Cualquier otra cosa —el
+    // `assert.fail` de `leerArchivo`, un bug— tiene que poner el test en rojo.
+    if (!(err instanceof ErrorDeCredencial)) throw err;
+    if (err.codigo === 'EMULADOR_EN_BLANCO' || err.codigo === 'EMULADOR_INCOHERENTE') {
+      return 'aborta';
+    }
+    return 'credencial';
+  }
+}
+
+test('CRITERIO ÚNICO: el plan nunca dice EMULADOR donde admin.js va a la nube', () => {
+  // El invariante de la nota 3, sobre todas las combinaciones de valores que
+  // separaban a los dos módulos: ausente, vacía, en blanco y puesta.
+  const F = [undefined, '', ' ', 'localhost:8080'];
+  const FS = [undefined, '', ' ', 'localhost:9199'];
+  const S = [undefined, '', ' ', 'http://localhost:9199'];
+  const AUTH = [undefined, ' ', 'localhost:9099'];
+  const ARGV = [[], ['--project=treino-dev']];
+  let filas = 0;
+  let comoEmulador = 0;
+  let enBlanco = 0;
+
+  for (const f of F) for (const fs_ of FS) for (const s of S) for (const a of AUTH) for (const argv of ARGV) {
+    const env = Object.fromEntries(
+      Object.entries({
+        FIRESTORE_EMULATOR_HOST: f,
+        FIREBASE_STORAGE_EMULATOR_HOST: fs_,
+        STORAGE_EMULATOR_HOST: s,
+        FIREBASE_AUTH_EMULATOR_HOST: a,
+      }).filter(([, v]) => v !== undefined),
+    );
+    const plan = planDeStorage({ argv, env, rutaFirebaserc: FIREBASERC_REAL });
+    const admin = veredictoDeAdmin(env);
+    const fila = `${JSON.stringify(env)} ${argv.join(' ')}`;
+    filas += 1;
+
+    if (plan.contraEmulador || /EMULADOR/.test(plan.etiquetaDestino || '')) {
+      comoEmulador += 1;
+      assert.strictEqual(admin, 'emulador', `el plan dice EMULADOR y admin.js hace "${admin}": ${fila}`);
+      assert.strictEqual(plan.banner, null, fila);
+    }
+    if (admin === 'credencial') {
+      assert.doesNotMatch(plan.etiquetaDestino || '', /EMULADOR/, fila);
+    }
+    if (plan.variablesEnBlanco.length > 0) {
+      enBlanco += 1;
+      assert.strictEqual(plan.etiquetaDestino, null, fila);
+      assert.strictEqual(admin, 'aborta', fila);
+    }
+  }
+
+  // El control del control: una matriz que nunca llega a la rama EMULADOR o a
+  // la de en blanco da verde sin haber medido nada.
+  assert.strictEqual(filas, 384);
+  assert.ok(comoEmulador > 0, 'ninguna fila llegó a EMULADOR: el test no mide el invariante');
+  assert.ok(enBlanco > 0, 'ninguna fila tuvo variables en blanco');
 });

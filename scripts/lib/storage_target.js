@@ -59,7 +59,13 @@ const {
   esProduccion,
   bannerDeProduccion,
 } = require('./firebase_projects');
-const { PROJECT_ID_EMULADOR, contraEmuladorDe } = require('./target_project');
+const {
+  PROJECT_ID_EMULADOR,
+  contraEmuladorDe,
+  emuladoresActivos: emuladoresPorServicio,
+  renglonesEnBlanco,
+  variablesEnBlanco,
+} = require('./target_project');
 
 /** `.firebaserc` de la raíz del repo — `scripts/lib/..` dos veces. */
 const FIREBASERC = path.join(__dirname, '..', '..', '.firebaserc');
@@ -140,27 +146,23 @@ function proyectoDeSaKey(ruta) {
  *     sigue cayendo en `demo-treino`; con una sola, `planDeStorage` aborta.
  *   - Las exige con el criterio de `lib/target_project.js` —una variable en
  *     blanco NO cuenta—, que es con el que `lib/credenciales.js` decide si
- *     `lib/admin.js` arranca sin credencial. NO con el `emuladoresActivos` de
- *     este archivo, que es un `Boolean()` y le da `true` a `' '`: ahí
- *     `credenciales.js` dice nube, y este paso le habría dado el id de
- *     producción a una corrida que `admin.js` manda a la NUBE, con el cartel
- *     apagado por `contraEmulador`.
+ *     `lib/admin.js` arranca sin credencial. Si este paso viera emulador donde
+ *     `credenciales.js` ve nube, le daría el id de producción a una corrida que
+ *     `admin.js` manda a la NUBE, con el cartel apagado por `contraEmulador`.
+ *     (Pasaba con `' '` mientras `emuladoresActivos` tenía su propio
+ *     `Boolean()`; desde el #1445 delega allá, y una variable en blanco hace
+ *     abortar a `planDeStorage` antes de que el id importe.)
  *   - Va después de 1-3: el que nombra un proyecto sigue ganando. Lo único que
  *     cambia es el último recurso, y sólo contra el emulador.
  *
- * Medido contra el resolutor anterior sobre 1080 combinaciones de argv y
- * ambiente (las tres variables de emulador vacías, en blanco o puestas,
- * `GCLOUD_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS`, `--project=`,
- * `--bucket=`): cambian 8, todas «emulador completo, nadie nombró proyecto»,
- * de `demo-treino` a `treino-dev`. Las 90 con las variables de emulador
- * ausentes o vacías —la nube— dan idéntico, campo por campo.
- *
- * El criterio de `emuladoresActivos` NO se tocó, a propósito. Unificarlo con el
- * de `target_project.js` movía otras 405 filas de esa matriz, entre ellas 135
- * que pasaban de abortar a correr (`FIREBASE_STORAGE_EMULATOR_HOST=' '` sola,
- * por ejemplo). Que una variable en blanco diga `destino: EMULADOR` mientras
- * `credenciales.js` la trata como nube es una divergencia que ya existía, y
- * merece su propio cambio.
+ * Medido contra el resolutor de `develop` con el #1444 y el #1445 adentro
+ * (019afc02), sobre 1080 combinaciones de argv y ambiente (las tres variables
+ * de emulador ausentes, vacías, en blanco o puestas, `GCLOUD_PROJECT`,
+ * `GOOGLE_APPLICATION_CREDENTIALS`, `--project=`, `--bucket=`): cambian 8,
+ * todas «emulador completo, nadie nombró proyecto», de `demo-treino` a
+ * `treino-dev`. Las 90 con las variables de emulador ausentes o vacías —la
+ * nube— dan idéntico, campo por campo. El script está en la descripción del
+ * PR #1442.
  *
  * Lo que NO se lee, a propósito: el `activeProjects` que escribe `firebase
  * use`. El Admin SDK tampoco lo lee —`rg activeProjects` sobre `firebase-admin`,
@@ -295,12 +297,19 @@ function resolverBucket({ argv = [], env = process.env, projectId = null } = {})
  * Storage: `firebase-admin` acepta las dos, y normaliza
  * `FIREBASE_STORAGE_EMULATOR_HOST` a `STORAGE_EMULATOR_HOST`. Mirar sólo una de
  * las dos daría un falso negativo y abortaría una corrida que estaba bien.
+ *
+ * DELEGA en `target_project.js` y no decide. Acá había una copia propia con
+ * `Boolean(env.X)`, y `Boolean(' ')` es `true`: con las dos variables en blanco
+ * el plan decía `EMULADOR (Firestore + Storage)` y apagaba el cartel, mientras
+ * `credenciales.js` —con el `trim()` de allá— veía la nube y `lib/admin.js`
+ * cargaba la credencial. Dos definiciones de "emulador" en el mismo proceso es
+ * el hueco del #846 otra vez; la respuesta de entonces fue no tener copia, y es
+ * la misma acá. Lo que hace `planDeStorage` con una variable en blanco está en
+ * `variablesEnBlanco`, también de allá.
  */
 function emuladoresActivos(env = process.env) {
-  return {
-    firestore: Boolean(env.FIRESTORE_EMULATOR_HOST),
-    storage: Boolean(env.STORAGE_EMULATOR_HOST || env.FIREBASE_STORAGE_EMULATOR_HOST),
-  };
+  const { firestore, storage } = emuladoresPorServicio(env);
+  return { firestore, storage };
 }
 
 /**
@@ -317,13 +326,21 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
   const { projectId, origen: origenProyecto } = resolverProjectId({ argv, env, rutaFirebaserc });
   const { bucket, origen: origenBucket } = resolverBucket({ argv, env, projectId });
   const emu = emuladoresActivos(env);
+  const enBlanco = variablesEnBlanco(env);
 
-  const contraEmulador = emu.firestore && emu.storage;
-  const enLaNube = !emu.firestore && !emu.storage;
+  // Una variable en blanco no es emulador ni nube (`estadoDeVariable`, en
+  // `target_project.js`): con una sola, ninguno de los dos destinos es cierto.
+  const contraEmulador = enBlanco.length === 0 && emu.firestore && emu.storage;
+  const enLaNube = enBlanco.length === 0 && !emu.firestore && !emu.storage;
   const coherente = contraEmulador || enLaNube;
 
   let motivo = null;
-  if (emu.firestore && !emu.storage) {
+  if (enBlanco.length > 0) {
+    motivo =
+      `${enBlanco.join(', ')} ${enBlanco.length === 1 ? 'está exportada' : 'están exportadas'} ` +
+      'EN BLANCO. Ninguna es un host: ninguna lleva su servicio al emulador, y ' +
+      'el ambiente no dice a dónde quería ir quien lo armó. No hay destino que nombrar.';
+  } else if (emu.firestore && !emu.storage) {
     motivo =
       'Firestore apunta al EMULADOR (FIRESTORE_EMULATOR_HOST) pero Storage NO: ' +
       `las subidas irían al bucket real "${bucket}" y la URL de producción ` +
@@ -349,6 +366,7 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
     origenBucket,
     emuladorFirestore: emu.firestore,
     emuladorStorage: emu.storage,
+    variablesEnBlanco: enBlanco,
     contraEmulador,
     coherente,
     motivo,
@@ -390,6 +408,38 @@ function textoDeAbort(plan) {
     }
   }
   if (renglon) motivo.push(`⛔  ${renglon}`);
+
+  // La variable en blanco tiene su propio texto: el de abajo empieza diciendo
+  // que los destinos "no coinciden", y acá no hay destino. Un abort que nombra
+  // mal el problema manda a arreglar otra cosa (§11.1).
+  const enBlanco = plan.variablesEnBlanco || [];
+  if (enBlanco.length > 0) {
+    return [
+      '',
+      '⛔ ─────────────────────────────────────────────────────────────────────',
+      '⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.',
+      '⛔',
+      ...motivo,
+      '⛔',
+      ...renglonesEnBlanco(enBlanco).map((r) => `⛔    ${r}`),
+      '⛔',
+      '⛔  Primero sacalas del ambiente:',
+      `⛔    unset ${enBlanco.join(' ')}`,
+      // Sólo si aplica: STORAGE_EMULATOR_HOST en blanco le gana a la otra
+      // dentro de firebase-admin, y exportar la de abajo no alcanzaría.
+      ...(enBlanco.includes('STORAGE_EMULATOR_HOST')
+        ? ['⛔  (STORAGE_EMULATOR_HOST en blanco le gana a FIREBASE_STORAGE_EMULATOR_HOST', '⛔   aunque ésa tenga host: sin el unset, exportarla no alcanza.)']
+        : []),
+      '⛔',
+      '⛔  Para el emulador, después exportá los hosts:',
+      '⛔    ./scripts/emulator.sh',
+      '⛔    export FIRESTORE_EMULATOR_HOST=localhost:8080',
+      '⛔    export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199',
+      '⛔  Para la nube, nada más; si el destino es producción, sale el cartel.',
+      '⛔ ─────────────────────────────────────────────────────────────────────',
+      '',
+    ].join('\n');
+  }
 
   return [
     '',

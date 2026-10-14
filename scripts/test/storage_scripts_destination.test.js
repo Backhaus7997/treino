@@ -211,6 +211,21 @@ for (const escritor of ESCRITORES) {
     assert.doesNotMatch(r.todo, /EMULADOR \(Firestore \+ Storage\)/);
   });
 
+  test(`${script}: con las dos variables EN BLANCO aborta y no dice EMULADOR (nota 3 del #1442)`, () => {
+    // La corrida del reporte, nombrando producción: antes salía
+    // `destino: EMULADOR (Firestore + Storage)`, sin cartel, y `lib/admin.js`
+    // inicializaba con la credencial porque para él `' '` no es emulador.
+    const r = correr(
+      { ...escritor, argv: [...escritor.argv, '--project=treino-dev'] },
+      { FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' },
+    );
+    assert.strictEqual(r.code, 1, `tenía que cortar con exit 1.\nSALIDA:\n${r.todo}`);
+    assert.match(r.stderr, /EN BLANCO/);
+    assert.doesNotMatch(r.todo, /destino: EMULADOR/);
+    assert.doesNotMatch(r.todo, /STUB_STORAGE_REACHED/);
+    assert.doesNotMatch(r.todo, /STUB_FIRESTORE_REACHED/);
+  });
+
   test(`${script}: SIN NADA cae en demo-treino y no llega al Storage de prod`, () => {
     // ÉSTE ES EL TEST DEL #840, y es el que antes decía lo contrario.
     //
@@ -356,7 +371,17 @@ for (const escritor of ESCRITORES) {
       FIRESTORE_EMULATOR_HOST: 'localhost:8080',
       FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
     });
-    assert.doesNotMatch(completo.stderr, /ABORTADO/, 'con los dos redirigidos tiene que dejar pasar');
+    // Cualquier ABORTADO salvo UNO: `upload_enriched_videos.js` aborta a
+    // propósito contra el emulador, porque su salida es un JSON versionado
+    // (ver storage_scripts_url.test.js). Ése no viola el invariante —el script
+    // muere, que es una de las dos salidas que permite— y con `/ABORTADO/` a
+    // secas lo ponía en rojo. La excepción nombra el texto entero: el abort de
+    // coherencia y el de "no pude resolver" siguen prohibidos acá.
+    assert.doesNotMatch(
+      completo.stderr,
+      /ABORTADO(?!: upload_enriched_videos\.js no escribe contra el emulador)/,
+      'con los dos redirigidos tiene que dejar pasar',
+    );
     assert.doesNotMatch(completo.stderr, /IS PRODUCTION/, 'contra emulador no se grita');
     assert.match(completo.todo, /EMULADOR \(Firestore \+ Storage\)/, 'esperaba la etiqueta de emulador');
   });
@@ -377,13 +402,24 @@ for (const escritor of ESCRITORES) {
       r.stdout.includes(`Proyecto: ${PROJECT_ID_EMULADOR} (namespace del emulador)`),
       `esperaba el namespace del emulador en stdout:\n${r.todo}`,
     );
+    assert.doesNotMatch(r.todo, new RegExp(`${DEMO}\\.firebasestorage`), 'quedó el bucket de .firebaserc');
+    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, 'contra el emulador el id es una carpeta local: no se grita');
+
+    if (script === 'upload_enriched_videos.js') {
+      // Su salida es `enriched-catalog.json`, versionado, y desde el #1444 se
+      // niega a escribirlo contra el emulador: aborta después del guard —que
+      // ya imprimió el namespace— y antes de abrir Storage.
+      assert.strictEqual(r.code, 1, 'contra el emulador sin --dry-run tiene que abortar');
+      assert.match(r.stderr, /no escribe contra el emulador/);
+      assert.doesNotMatch(r.todo, /STUB_STORAGE_REACHED/);
+      return;
+    }
+
     assert.ok(
       r.todo.includes(`STUB_STORAGE_REACHED bucket=${PROJECT_ID_EMULADOR}.firebasestorage.app`),
       'el .bucket() no apuntó al bucket del namespace del emulador',
     );
-    assert.doesNotMatch(r.todo, new RegExp(`${DEMO}\\.firebasestorage`), 'quedó el bucket de .firebaserc');
     assert.doesNotMatch(r.stderr, /ABORTADO/);
-    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, 'contra el emulador el id es una carpeta local: no se grita');
   });
 }
 

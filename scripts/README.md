@@ -169,6 +169,35 @@ aborta**.
 Si querés el emulador, agregá la que falta. Si querés la nube, sacá las otras
 del ambiente y leé el cartel que sale después.
 
+**Una variable EN BLANCO tampoco es "ausente": aborta.** Cualquiera de las cinco
+exportada con sólo whitespace (`FIRESTORE_EMULATOR_HOST=' '`, un tab, un salto
+de línea) corta antes de escribir, en los dos guards (`lib/credenciales.js` y
+`lib/storage_target.js`):
+
+La única excepción es la que hace el propio SDK: firebase-admin sólo mira
+`FIREBASE_STORAGE_EMULATOR_HOST` si `STORAGE_EMULATOR_HOST` no tiene valor.
+Con `STORAGE_EMULATOR_HOST` puesta, la de Firebase en blanco se ignora (Storage
+va al host de la otra, medido) y no aborta nada.
+
+```
+⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.
+```
+
+Ninguna es un host, y ninguna lleva su servicio al emulador. Medido sin red
+contra firebase-admin 14.5.0 (Firestore 9.3.1, Storage 8.2.0): con
+`FIRESTORE_EMULATOR_HOST` en blanco `getFirestore()` tira «is not a valid
+host», y con cualquiera de las dos de Storage el cliente arma un endpoint
+inválido. O sea que el servicio que esa variable desvía no va al emulador **ni**
+a la nube; el abort dice, variable por variable, qué hace el SDK con cada una.
+Hasta este cambio cada guard la contaba distinto —`storage_target.js` como
+emulador, `credenciales.js` como nube— y la misma corrida salía etiquetada
+`destino: EMULADOR`, sin cartel, con `lib/admin.js` cargando la credencial.
+
+La variable **vacía** sí cuenta como ausente: `export FIRESTORE_EMULATOR_HOST=`
+sigue siendo una forma válida de apagarla, porque Firestore la ignora. Con una
+excepción: `STORAGE_EMULATOR_HOST=''` el cliente de Storage la lee igual (arma
+el endpoint `https:`), así que ésa se apaga con `unset`, no vaciándola.
+
 ### Por qué se mira la identidad y no el project id
 
 El guard viejo miraba el proyecto. El revisor de #843 encontró por dónde se
@@ -712,6 +741,8 @@ una corrida que no la nombró.
 Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
 imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
 `initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
+Tampoco corre una variable de emulador exportada en blanco: ver "Sin
+credencial: el emulador".
 
 Para correr entero contra el emulador hay que levantarlo **con Storage**.
 `scripts/emulator.sh` lo levanta desde el 2026-10-14, en los dos modos (puerto
@@ -753,13 +784,11 @@ producción: el guard deja pasar con cartel, porque nombrar producción es
 pedirla. Sin el flag, olvidarse las dos cae en `demo-treino`; olvidarse una
 aborta, con o sin flag.
 
-Ojo con las URLs que estampan estos scripts: llevan el host real
-(`https://firebasestorage.googleapis.com/v0/b/<bucket>/o/…`) aunque corran
-contra el emulador. Con el namespace alineado, ese `<bucket>` es
-`treino-dev.firebasestorage.app` —se ve igual que una URL de producción— y el
-archivo existe sólo en el emulador de Storage. Antes decía
-`demo-treino.firebasestorage.app`: igual de rota, pero se notaba. Qué hace la
-app con esa URL no está medido.
+Las URLs que estampan contra el emulador nombran el bucket
+`treino-dev.firebasestorage.app`, pero con el host del emulador
+(`http://<FIREBASE_STORAGE_EMULATOR_HOST>/…`), así que no se confunden con una
+de producción. Ver «La URL que se estampa nombra el mismo lado que la subida»,
+más abajo.
 
 Sin ninguna de las dos variables el destino ya **no** es producción: desde el
 #840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la
@@ -815,6 +844,36 @@ archivo que copie el literal sería un cuarto destino que no responde ni a
 `test/storage_scripts_destination.test.js`, que barre `scripts/*.js` y
 `scripts/lib/*.js` y falla si la lista de archivos con el literal cambia o si
 alguno de ellos empieza a tocar Storage.
+
+**La URL que se estampa nombra el mismo lado que la subida.** Hasta el
+2026-10-14 los cuatro armaban la URL de descarga con el host de producción fijo
+(`https://firebasestorage.googleapis.com/v0/b/<bucket>/o/…`), también contra el
+emulador: el archivo quedaba en el emulador y la URL apuntaba a Google. Medido
+con `CachedNetworkImage` y HTTP real, esa URL da 404 (bucket `demo-treino…`) o
+**403 del Storage de producción** (bucket `treino-dev…`), y `ExerciseAssetImage`
+cae en silencio al asset local: la corrida parece andar.
+
+Ahora la arma `lib/url_de_descarga.js` desde el mismo plan que decide el
+destino: contra el emulador, `http://<FIREBASE_STORAGE_EMULATOR_HOST>/v0/b/<bucket>/o/…`
+(200 medido, con el token que el script subió); en la nube, la de siempre, byte
+a byte. Además:
+
+- **Eso arregla los thumbnails, no los videos.** La app sólo reproduce un
+  `videoUrl` con host `firebasestorage.googleapis.com` (`isFirebaseStorageVideo`),
+  así que el del emulador no se reproduce: el detalle se queda con la foto. El
+  de antes tampoco andaba —iba a Google con un token que allá no existe—; ahora
+  por lo menos no le pega a producción. Que el emulador reproduzca video es un
+  cambio de la app, no de estos scripts.
+- **No usa `getDownloadURL` del SDK**: contra el emulador de este repo da
+  `403 No READ permission` (su GET de metadata lo deniega el catch-all de
+  `storage.rules`).
+- **El host va tal como lo exportaste.** `localhost` anduvo en la medición
+  (Mac). En el emulador de Android `localhost` es el propio dispositivo —la Mac
+  es `10.0.2.2`—, así que ahí esperá que no cargue; no está medido.
+- **`upload_enriched_videos.js` no corre contra el emulador**, salvo con
+  `--dry-run`: su salida es `enriched-catalog.json`, versionado y que se
+  importa. Y `test/storage_scripts_url.test.js` falla si aparece en
+  `docs/video-catalog-audit/` una URL de descarga que no sea de la nube.
 
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
