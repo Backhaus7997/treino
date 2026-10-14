@@ -34,14 +34,18 @@ const { spawn, spawnSync } = require('node:child_process');
 const GUARD = path.join(__dirname, '..', 'guard_fuente_de_deploy.js');
 const LIB = path.join(__dirname, '..', 'lib', 'fuente_de_deploy.js');
 
-/** Sin herencia: un `TREINO_DEPLOY_FUERA_DE_DEVELOP=1` exportado pondría todo en verde. */
+/**
+ * Sin herencia: un `TREINO_DEPLOY_FUERA_DE_DEVELOP=1` exportado pondría todo en verde.
+ *
+ * El gitconfig vacío lo crea `sandbox()` una sola vez, al armar el tmpdir. Acá
+ * sólo se apunta a él: un `existsSync` + `writeFileSync` en cada llamada es un
+ * chequear-y-escribir que CodeQL marca como carrera (js/file-system-race).
+ */
 function entorno(base) {
-  const gitconfig = path.join(base, 'gitconfig-vacio');
-  if (!fs.existsSync(gitconfig)) fs.writeFileSync(gitconfig, '');
   return {
     PATH: process.env.PATH,
     HOME: base,
-    GIT_CONFIG_GLOBAL: gitconfig,
+    GIT_CONFIG_GLOBAL: path.join(base, 'gitconfig-vacio'),
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'sandbox',
     GIT_AUTHOR_EMAIL: 'sandbox@example.invalid',
@@ -63,6 +67,8 @@ function git(cwd, base, ...args) {
 function sandbox(t) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-fuente-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  // `wx`: el tmpdir es nuevo, así que si el archivo ya existe algo está mal.
+  fs.writeFileSync(path.join(base, 'gitconfig-vacio'), '', { flag: 'wx' });
 
   git(base, base, 'init', '--quiet', '--bare', '-b', 'main', 'origin.git');
   git(base, base, 'clone', '--quiet', 'origin.git', 'semilla');
