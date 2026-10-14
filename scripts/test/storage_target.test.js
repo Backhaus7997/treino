@@ -321,6 +321,14 @@ test('el abort explica que emulator.sh no levanta Storage', () => {
   assert.match(r.stderr, /emulator\.sh NO levanta Storage/);
 });
 
+test('el abort genera las reglas ANTES de levantar el emulador a mano', () => {
+  // Como no pasa por emulator.sh, la receta tiene que hacer su strip_rules: sin
+  // `firestore.deploy.rules` (gitignoreado) el emulador de Firestore arranca en
+  // allow-all (#1435). El orden es la mitad del test: después no sirve.
+  const r = correrGuard({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
+  assert.match(r.stderr, /strip_rules\.js &&[\s\S]*emulators:start/);
+});
+
 test('el guard deja pasar y grita el cartel cuando el destino es producción', () => {
   // Ojo con el env: desde el #840 hay que NOMBRAR producción para llegar acá.
   // Con `ENV_LIMPIO` y sin flag el guard cae en el default de `.firebaserc`,
