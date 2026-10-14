@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/firebase/emuladores.dart';
 import 'package:treino/core/widgets/exercise_asset_image.dart';
 import 'package:treino/core/widgets/firebase_storage_video_player.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -678,6 +679,46 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
       expect(find.byType(VideoPlayOverlay), findsOneWidget);
       expect(find.text('VIDEO'), findsNothing);
+    });
+
+    // Lo que estampan los scripts de Storage contra el emulador (#1444) y lo
+    // que devuelve `getDownloadURL()` en modo emulador.
+    const delEmulador = 'http://localhost:9199/v0/b/treino-dev'
+        '.firebasestorage.app/o/exercises%2Fvideos%2Fbench.mp4'
+        '?alt=media&token=t';
+
+    testWidgets(
+        'URL del emulador SIN USE_EMULATOR: hero de foto, sin play — igual que '
+        'en un build normal', (tester) async {
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        [
+          exerciseByIdProvider('bench-press').overrideWith(
+            (ref) async => _makeExercise(videoUrl: delEmulador),
+          ),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(ExerciseAssetImage), findsOneWidget);
+      expect(find.byType(VideoPlayOverlay), findsNothing);
+    });
+
+    testWidgets('URL del emulador CON USE_EMULATOR: el video va al hero',
+        (tester) async {
+      debugUsaEmuladoresOverride = true;
+      addTearDown(() => debugUsaEmuladoresOverride = null);
+      await tester.pumpWidget(_wrapWithOverrides(
+        const ExerciseDetailScreen(exerciseId: 'bench-press'),
+        [
+          exerciseByIdProvider('bench-press').overrideWith(
+            (ref) async => _makeExercise(videoUrl: delEmulador),
+          ),
+        ],
+      ));
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(VideoPlayOverlay), findsOneWidget);
     });
 
     testWidgets(
