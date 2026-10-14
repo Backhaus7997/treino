@@ -4691,9 +4691,13 @@ service cloud.firestore {
       //      reasignaba trainerId con set(merge:true) preservando `note`, y
       //      después leía la nota privada (la read gate mira resource.data.
       //      trainerId, el mismo campo que el update dejaba reescribir).
-      // Fix (mismo patrón que follow_up_entries / nutrition_plans): en create
-      // ligar el docId al uid firmante; en update fijar la identidad al
-      // pre-image para que trainerId/athleteId sean inmutables.
+      // Fix: en create ligar el docId al uid firmante; en update fijar la
+      // identidad al pre-image para que trainerId/athleteId sean inmutables.
+      // (Este comentario decía "mismo patrón que follow_up_entries /
+      // nutrition_plans". Era falso para los dos: ninguno ataba el docId, y
+      // `nutrition_plans` quedó abierto a exactamente este squat hasta que se
+      // le agregó la guarda. `follow_up_entries` sigue sin ella, pero su docId
+      // lleva timestamp y sólo lo lee el PF, así que no hay par que ocupar.)
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
@@ -4807,13 +4811,23 @@ service cloud.firestore {
                            || docId.split('_')[1] == request.auth.uid))
                       || request.auth.uid == resource.data.trainerId
                       || request.auth.uid == resource.data.athleteId);
+      // El docId ATADO al par es lo que hace segura la lectura del alumno: su
+      // app lee `{suPF}_{él}` sin mirar `trainerId`. Sin esta guarda cualquier
+      // cuenta creaba ese doc con su propio trainerId — el alumno veía un plan
+      // falso como "el de tu PF", y el PF real quedaba sin poder escribirlo
+      // (su write caía en el update, que exige ser el trainerId guardado).
+      // El rol cierra lo que queda: un atleta no crea planes, ni en su prefijo.
+      // Lo fija `scripts/rules_test/nutrition-plans-docid.test.js`.
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
                   && request.resource.data.athleteId.size() > 0
+                  && docId == request.resource.data.trainerId + '_'
+                              + request.resource.data.athleteId
                   && request.resource.data.title is string
                   && request.resource.data.title.size() < 200
-                  && request.resource.data.meals is list;
+                  && request.resource.data.meals is list
+                  && tieneRolDePF(request.auth.uid);
       allow update: if request.auth != null
                   && resource.data.trainerId == request.auth.uid
                   && request.resource.data.trainerId == resource.data.trainerId
