@@ -32,6 +32,43 @@ function git(args) {
   });
 }
 
+// El fetch que trae `origin/develop`, con dos cosas que un `git fetch origin
+// develop` pelado no garantiza:
+//
+// - **Refspec explícito.** El pelado actualiza `origin/develop` sólo si el
+//   `remote.origin.fetch` del clon mapea esa rama. En un clon `--single-branch`
+//   de main no la mapea: el fetch sale bien, `origin/develop` queda donde
+//   estaba, y el guard compara contra esa copia vieja y dice "✓ idéntico".
+//   Reproducido con un sandbox: develop con la regla nueva, el checkout con la
+//   vieja, exit 0. Es la "comparación contra una mentira" que el guard existe
+//   para evitar.
+//
+// - **Se corta si una conexión establecida deja de transferir.** Contra un
+//   servidor http que acepta la conexión y no manda nada, git esperaba sin
+//   límite (medido: seguía colgado a los 40 s) y el deploy con él, mudo por el
+//   `--quiet`. Ahora aborta si pasa menos de 1 KB/s durante 30 s.
+//
+//   Qué NO hace, medido:
+//   · No acota el connect ni el handshake TLS. En https —el remoto de este
+//     repo— un handshake que nunca contesta sigue colgado hasta el timeout de
+//     curl, 300 s. Lo que sí corta es una conexión https ya establecida que se
+//     queda muda (5 s con lowSpeedTime=5).
+//   · También corta a un servidor SANO que tarde más de 30 s en armar el pack:
+//     con `--quiet` no viaja nada mientras lo prepara (medido con `git
+//     http-backend` demorado: 35 s de silencio → corte a los 31 s). Contra
+//     GitHub no está medido; si pasa, falla cerrado y se reintenta.
+//   · Un remoto por ssh no lee `http.*`.
+//
+//   No es un timeout total a propósito: ponerse al día desde el checkout raíz
+//   del 2026-10-14 (`7496e2d3`, 602 commits atrás) son ~32 MB —`git
+//   pack-objects --revs` de `origin/develop ^7496e2d3`—, y un tope fijo
+//   cortaría un fetch lento pero en marcha, que al reintentar empieza de cero.
+const FETCH_DEVELOP = [
+  '-c', 'http.lowSpeedLimit=1000',
+  '-c', 'http.lowSpeedTime=30',
+  'fetch', '--quiet', 'origin', `+refs/heads/develop:refs/remotes/${REF_FUENTE}`,
+];
+
 function main(archivos) {
   if (archivos.length === 0) {
     console.error('uso: node scripts/guard_fuente_de_deploy.js <archivo> [<archivo>...]');
@@ -40,7 +77,18 @@ function main(archivos) {
 
   const r = verificarFuente({
     archivos,
-    actualizarRemoto: () => git(['fetch', '--quiet', 'origin', 'develop']),
+    actualizarRemoto: () => {
+      try {
+        git(FETCH_DEVELOP);
+      } catch (e) {
+        // `execFileSync` pone "Command failed: git …" en la primera línea y el
+        // stderr de git abajo, y el mensaje del guard se queda con la primera:
+        // la causa ("Operation too slow", "Could not resolve host") se perdía.
+        // Va en una sola línea para que llegue entera.
+        const causa = String(e.stderr || '').trim().split('\n').filter(Boolean).join(' · ');
+        throw new Error(causa || e.message);
+      }
+    },
     leerLocal: (archivo) => fs.readFileSync(path.join(ROOT, archivo), 'utf8'),
     leerRemoto: (archivo) => git(['show', `${REF_FUENTE}:${archivo}`]),
     env: process.env,
