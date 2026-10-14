@@ -80,6 +80,9 @@ test('contra el emulador sin un host legible, TIRA — nunca cae al de la nube',
     // Sin esquema en STORAGE_EMULATOR_HOST, `new URL` lee `localhost:` como
     // protocolo. No se adivina.
     { FIRESTORE_EMULATOR_HOST: 'localhost:8080', STORAGE_EMULATOR_HOST: 'localhost:9199' },
+    // CON esquema en FIREBASE_STORAGE_EMULATOR_HOST, que el SDK rechaza:
+    // con el `http://` de adelante el origen saldría `http://http`.
+    { FIRESTORE_EMULATOR_HOST: 'localhost:8080', FIREBASE_STORAGE_EMULATOR_HOST: 'http://localhost:9199' },
   ]) {
     const plan = planDeStorage({ argv: [], env, rutaFirebaserc: RC });
     assert.strictEqual(plan.contraEmulador, true, `precondición: ${JSON.stringify(env)} es emulador para el plan`);

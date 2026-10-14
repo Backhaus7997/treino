@@ -132,6 +132,20 @@ for (const e of ESTAMPADORES) {
     assert.ok(!url.includes('googleapis'), `URL de la nube en una corrida de emulador: ${url}`);
   });
 
+  test(`${e.script}: contra el emulador con un host ilegible, corta ANTES de la primera subida`, () => {
+    // `' '` cuenta como emulador para el plan, pero no es un host. El armador
+    // tira, y lo que se prueba acá es DÓNDE: si se armara recién al estampar,
+    // la excepción caería en el try/catch de cada archivo y la corrida
+    // terminaría "bien", con todo subido y nada patcheado.
+    const r = correr(e.script, e.argv, { ...EMULADOR, FIREBASE_STORAGE_EMULATOR_HOST: ' ', ...e.env });
+    assert.match(r.stdout, /destino: EMULADOR/, 'precondición: el plan lo toma como emulador');
+
+    assert.notStrictEqual(r.code, 0, `tenía que cortar:\n${r.todo}`);
+    assert.match(r.stderr, /no pude leer su host/);
+    assert.deepStrictEqual(r.capturas('CAPTURA_SUBIDA'), [], 'subió antes de cortar');
+    assert.deepStrictEqual(r.capturas('CAPTURA_UPDATE'), []);
+  });
+
   test(`${e.script}: en la nube la URL sigue siendo la de siempre`, () => {
     const r = correr(e.script, [...e.argv, ...NUBE_DE_PRUEBA], e.env);
     assert.doesNotMatch(r.todo, /EMULADOR/, 'precondición: corrida contra la nube');

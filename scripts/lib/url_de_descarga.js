@@ -19,13 +19,21 @@
  *   host real, bucket `treino-dev…`   → 403 de Google: el pedido llega al
  *                                       Storage de PRODUCCIÓN con un token que
  *                                       allá no existe (la misma con el bucket
- *                                       que le da al emulador el #1442)
+ *                                       que propone el PR #1442 para el emulador)
  *   host del emulador, mismo token    → 200, imagen 256x256
  *
  * Y el error no se ve: el `errorWidget` de `ExerciseAssetImage` cae al asset
  * local del ejercicio, así que la corrida contra el emulador "anda" y lo que se
  * ve es otra imagen. Con el bucket de producción la URL estampada es, además,
  * idéntica a una de producción a simple vista.
+ *
+ * ⚠️ Eso vale para `thumbnailUrl`. Para `videoUrl` este módulo NO alcanza: la
+ * app sólo reproduce URLs con host `firebasestorage.googleapis.com`
+ * (`isFirebaseStorageVideo`, `exercise_video_player.dart`), así que la del
+ * emulador no se reproduce — el detalle se queda con la foto y el reproductor
+ * dice "No pudimos leer el video.". La de antes tampoco andaba (le pedía a
+ * Google con un token que allá no existe); lo que cambia es que ya no le pega
+ * a producción. Que el emulador reproduzca video es un cambio de la app.
  *
  * ─── POR QUÉ NO `getDownloadURL` DEL SDK ────────────────────────────────────
  *
@@ -57,9 +65,15 @@ const HOST_DE_LA_NUBE = 'https://firebasestorage.googleapis.com';
  *
  * Un valor que no es una URL http(s) —uno en blanco, o `localhost:9199` en
  * `STORAGE_EMULATOR_HOST`, que `new URL` lee como esquema `localhost:`—
- * devuelve `null` en vez de adivinar.
+ * devuelve `null` en vez de adivinar. También uno con protocolo en
+ * `FIREBASE_STORAGE_EMULATOR_HOST`, que el SDK rechaza (`invalid-emulator-host`)
+ * y que con el `http://` de adelante daría el origen `http://http`.
  */
 function origenDelEmulador(env = process.env) {
+  // La misma regex que `storage.js` usa para rechazarla.
+  if (!env.STORAGE_EMULATOR_HOST && /https?:\/\//.test(env.FIREBASE_STORAGE_EMULATOR_HOST || '')) {
+    return null;
+  }
   const crudo = env.STORAGE_EMULATOR_HOST
     ? env.STORAGE_EMULATOR_HOST
     : env.FIREBASE_STORAGE_EMULATOR_HOST

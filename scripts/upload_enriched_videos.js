@@ -78,9 +78,10 @@ async function main() {
   // demás salidas de estos scripts son Firestore, y contra el emulador es el
   // Firestore local; ésta es `enriched-catalog.json`, que está VERSIONADO y lo
   // importa `import_enriched_catalog.js`. Una URL del emulador ahí adentro,
-  // commiteada o importada, es un video roto para todos los usuarios — y la
-  // app no lo muestra como roto (ver lib/url_de_descarga.js). Antes de bajar o
-  // subir nada; `--dry-run` no escribe, así que sigue andando.
+  // commiteada o importada, es un video que no se reproduce para ningún
+  // usuario: la app ni lo intenta fuera del host de Google (ver
+  // lib/url_de_descarga.js). Antes de bajar o subir nada; `--dry-run` no
+  // escribe, así que sigue andando.
   if (destino.contraEmulador && !DRY) {
     console.error(
       '\n⛔ ABORTADO: upload_enriched_videos.js no escribe contra el emulador.\n' +
