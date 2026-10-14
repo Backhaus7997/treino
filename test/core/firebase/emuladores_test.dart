@@ -8,8 +8,11 @@
 // es justamente el de un build normal. El modo emulador se prende con
 // `debugUsaEmuladoresOverride`, que cada test vuelve a `null`.
 //
-// Lo que NO se puede fijar desde acá es el corte por `kReleaseMode`: bajo
-// `flutter test` vale siempre `false`.
+// El corte de release se traba pasando `release: true`, porque bajo
+// `flutter test` común `kReleaseMode` es `false`. Que el default de ese
+// parámetro sea `kReleaseMode` se ve corriendo este archivo con
+// `--dart-define=dart.vm.product=true`: los tests que aceptan la URL se ponen
+// rojos (medido), que es lo que tiene que pasar en release.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/firebase/emuladores.dart';
 
@@ -49,9 +52,21 @@ void main() {
       }
     });
 
-    test('el puerto es el mismo que conecta conectarEmuladores()', () {
+    test('en release no acepta nada, ni con el override prendido', () {
       _modoEmulador(true);
-      expect(Uri.parse(_delEmulador).port, kPuertoEmuladorStorage);
+      expect(
+        esUrlDeDescargaDelEmuladorDeStorage(Uri.parse(_delEmulador),
+            release: true),
+        isFalse,
+      );
+    });
+
+    test('un escape que no es UTF-8 da false, no una excepción', () {
+      // En modo emulador le llega todo lo que el PF tipea en el editor; si
+      // tirara, la pantalla se pone roja en cada tecla.
+      _modoEmulador(true);
+      expect(_acepta('http://localhost:9199/v0/b/bkt/o/%FF'), isFalse);
+      expect(_acepta('https://example.com/%FF'), isFalse);
     });
 
     test('rechaza cualquier otro host, aunque se parezca', () {

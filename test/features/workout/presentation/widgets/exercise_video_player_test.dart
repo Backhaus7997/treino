@@ -69,6 +69,18 @@ void main() {
       expect(find.byType(FirebaseStorageVideoPlayer), findsNothing);
     });
 
+    testWidgets(
+        'con USE_EMULATOR, una URL con un escape inválido no rompe el build',
+        (tester) async {
+      _modoEmulador();
+      await tester.pumpWidget(_wrap(
+          const ExerciseVideoPlayer(videoUrl: 'https://example.com/%FF')));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('No pudimos leer el video.'), findsOneWidget);
+    });
+
     testWidgets('con USE_EMULATOR: monta el player nativo', (tester) async {
       _modoEmulador();
       await tester

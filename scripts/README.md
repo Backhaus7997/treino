@@ -824,7 +824,9 @@ a byte. Además:
   (`esUrlDeDescargaDelEmuladorDeStorage`, `lib/core/firebase/emuladores.dart`).
   Medido en el simulador de iOS con una URL armada por este módulo: el detalle
   pone el video en el hero y reproduce. Hasta ese cambio la app sólo aceptaba
-  `firebasestorage.googleapis.com` y el detalle se quedaba con la foto.
+  `firebasestorage.googleapis.com` y el detalle se quedaba con la foto. Este
+  módulo estampa el host que exportes, cualquiera sea; con uno fuera de esos
+  tres (`[::1]`, `0.0.0.0`) la URL sale igual y la app no la reproduce.
 - **No usa `getDownloadURL` del SDK**: contra el emulador de este repo da
   `403 No READ permission` (su GET de metadata lo deniega el catch-all de
   `storage.rules`).

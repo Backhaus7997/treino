@@ -52,6 +52,21 @@ void main() {
     }
   });
 
+  test('Storage se conecta en el puerto que acepta el gate de videos', () {
+    // `esUrlDeDescargaDelEmuladorDeStorage` acepta las URLs del emulador sólo
+    // en `kPuertoEmuladorStorage`. Si `conectarEmuladores()` vuelve a un
+    // literal y alguien lo cambia, la app sube a un puerto y el gate espera
+    // otro: los videos del emulador dejan de reproducir sin que nada falle.
+    final src = File(_emuladores).readAsStringSync();
+    expect(
+      RegExp(r"useStorageEmulator\(\s*'localhost',\s*kPuertoEmuladorStorage\s*\)")
+          .hasMatch(src),
+      isTrue,
+      reason: '$_emuladores tiene que conectar Storage con '
+          "useStorageEmulator('localhost', kPuertoEmuladorStorage)",
+    );
+  });
+
   test('los dos entry points usan conectarEmuladores() y no conectan a mano',
       () {
     final aMano = RegExp(r'use(Firestore|Auth|Functions|Storage)Emulator\(');
