@@ -713,6 +713,17 @@ jobs:
       - name: Run functions tests against the emulator
         run: firebase emulators:exec --only firestore,auth,storage --project treino-dev "npm --prefix functions test -- --runInBand"
 
+      # `scripts/emulator.sh` le cierra al emulador de Functions el Secret
+      # Manager de producción con CLOUD_SECRET_MANAGER_URL, una variable que
+      # firebase-tools no documenta. "Install Firebase CLI" instala la última
+      # versión en cada corrida: si una deja de leerla, los `defineSecret`
+      # vuelven a salir a treino-dev desde la máquina de cualquier dev, y esto
+      # es lo único que se pone rojo. ~15 s, emulador real, proyecto `demo-`.
+      # Va DESPUÉS de jest a propósito: un rojo de acá no tapa el de los tests.
+      - name: Emulator secrets stay local
+        timeout-minutes: 5
+        run: node scripts/check_emulator_secret_manager.js
+
   # La SEGUNDA suite de reglas: scripts/rules_test/*.test.js (#680 Slice B).
   #
   # Hay dos suites de reglas en el repo y hasta acá sólo una corría sola. Las
