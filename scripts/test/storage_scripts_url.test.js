@@ -133,15 +133,33 @@ for (const e of ESTAMPADORES) {
   });
 
   test(`${e.script}: contra el emulador con un host ilegible, corta ANTES de la primera subida`, () => {
-    // `' '` cuenta como emulador para el plan, pero no es un host. El armador
-    // tira, y lo que se prueba acá es DÓNDE: si se armara recién al estampar,
-    // la excepción caería en el try/catch de cada archivo y la corrida
-    // terminaría "bien", con todo subido y nada patcheado.
-    const r = correr(e.script, e.argv, { ...EMULADOR, FIREBASE_STORAGE_EMULATOR_HOST: ' ', ...e.env });
+    // `STORAGE_EMULATOR_HOST` sin esquema: el plan lo toma como emulador, pero
+    // `new URL` lee `127.0.0.1:` como protocolo y no hay host. El armador tira,
+    // y lo que se prueba acá es DÓNDE: si se armara recién al estampar, la
+    // excepción caería en el try/catch de cada archivo y la corrida terminaría
+    // "bien", con todo subido y nada patcheado.
+    //
+    // Hasta el #1445 este caso se armaba con `FIREBASE_STORAGE_EMULATOR_HOST=' '`,
+    // que el plan contaba como emulador. Ya no: una variable en blanco aborta en
+    // el plan (lo cubre el test de abajo), y con ella este test dejaba de medir
+    // al armador.
+    const r = correr(e.script, e.argv, { ...EMULADOR, STORAGE_EMULATOR_HOST: '127.0.0.1:19199', ...e.env });
     assert.match(r.stdout, /destino: EMULADOR/, 'precondición: el plan lo toma como emulador');
 
     assert.notStrictEqual(r.code, 0, `tenía que cortar:\n${r.todo}`);
     assert.match(r.stderr, /no pude leer su host/);
+    assert.deepStrictEqual(r.capturas('CAPTURA_SUBIDA'), [], 'subió antes de cortar');
+    assert.deepStrictEqual(r.capturas('CAPTURA_UPDATE'), []);
+  });
+
+  test(`${e.script}: con el host de Storage EN BLANCO, el plan corta antes de la primera subida`, () => {
+    // La fila que salió del test de arriba: desde el #1445 el corte es del plan
+    // y no del armador, pero la garantía es la misma — nada subido, nada
+    // patcheado, y nunca una URL de la nube.
+    const r = correr(e.script, e.argv, { ...EMULADOR, FIREBASE_STORAGE_EMULATOR_HOST: ' ', ...e.env });
+    assert.notStrictEqual(r.code, 0, `tenía que cortar:\n${r.todo}`);
+    assert.match(r.stderr, /EN BLANCO/);
+    assert.doesNotMatch(r.stdout, /destino: EMULADOR/);
     assert.deepStrictEqual(r.capturas('CAPTURA_SUBIDA'), [], 'subió antes de cortar');
     assert.deepStrictEqual(r.capturas('CAPTURA_UPDATE'), []);
   });
