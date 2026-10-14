@@ -167,9 +167,10 @@ Desde la raíz del repo:
 SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 ```
 
-Termina en el mismo `firebase emulators:start --only firestore,auth --project
-treino-dev` que estaba escrito acá a mano (sin `SKIP_FUNCTIONS=1` suma
-Functions y compila `functions/`), con dos diferencias:
+Levanta Firestore, Auth y Storage con `--project treino-dev`, como la línea que
+estaba escrita acá a mano más Storage, que la app con `USE_EMULATOR=true` usa
+desde el #1434 (sin `SKIP_FUNCTIONS=1` suma Functions y compila `functions/`).
+Lo que el comando a mano no hacía:
 
 - **Genera `firestore.deploy.rules` antes de arrancar, y si no puede no
   arranca.** `firebase.json` le hace cargar ese archivo —no `firestore.rules`—,
