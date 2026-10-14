@@ -156,15 +156,29 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     otra forma de saber a dónde van a escribir.
   - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
     explícito, y no es contradictorio. `emulators:*` no sale a la red de los
-    servicios emulados; ese id es sólo el *namespace* local donde escriben la
-    app (`lib/firebase_options.dart`) y las semillas
+    servicios emulados, y para ellos ese id es el *namespace* local donde
+    escriben la app (`lib/firebase_options.dart`) y las semillas
     (`scripts/seed_emulator_full.js`), y el proyecto al que
     `emulators.singleProjectMode: true` pinea el `firestore.get()`
     cross-service de las reglas de Storage. Con otro id la suite de reglas se
-    pone **roja** (medido: `chat-media-storage.test.js`, 2 tests). Ya está
-    resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`: **usalos** en
-    vez de escribir `firebase emulators:start` a mano, que ahora resolvería
-    `demo-treino` y te dejaría la UI de :4444 mirando un namespace vacío.
+    pone **roja** (medido: `chat-media-storage.test.js`, 2 tests).
+
+    **Para lo que NO está emulado, ese id es producción.** Esta nota decía que
+    era «sólo el namespace», y era la frase que hacía parecer inofensivo
+    nombrar `treino-dev`. El emulador de Functions le pide a Secret Manager
+    del proyecto de `--project` cada `defineSecret` al invocar una función, y
+    el valor llega a la función (medido el 2026-10-14 con un proyecto
+    `demo-`). Con `treino-dev` eso es la `RESEND_API_KEY` y el
+    `MP_ACCESS_TOKEN` reales (leído: contra producción no se invocó nada). Lo
+    cierra `scripts/emulator.sh`, bloque «Secretos».
+    Y una función que llama una API de Google sin emulador —FCM— sale con la
+    credencial del dev; eso no lo cierra nada (leído, no medido).
+
+    Ya está resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`:
+    **usalos** en vez de escribir `firebase emulators:start` a mano. Pelado
+    resolvería `demo-treino` y te dejaría la UI de :4444 mirando un namespace
+    vacío; con `--project treino-dev` y Functions, te saltea el cierre de
+    Secret Manager.
   - Corolario 4 — **`firebase use` le gana al default, no deja rastro en el
     repo, y SE HEREDA DE LOS DIRECTORIOS PADRE**. `firebase use <alias>` escribe
     `activeProjects` en `~/.config/configstore/firebase-tools.json`, que **no
