@@ -817,12 +817,16 @@ destino: contra el emulador, `http://<FIREBASE_STORAGE_EMULATOR_HOST>/v0/b/<buck
 (200 medido, con el token que el script subió); en la nube, la de siempre, byte
 a byte. Además:
 
-- **Eso arregla los thumbnails, no los videos.** La app sólo reproduce un
-  `videoUrl` con host `firebasestorage.googleapis.com` (`isFirebaseStorageVideo`),
-  así que el del emulador no se reproduce: el detalle se queda con la foto. El
-  de antes tampoco andaba —iba a Google con un token que allá no existe—; ahora
-  por lo menos no le pega a producción. Que el emulador reproduzca video es un
-  cambio de la app, no de estos scripts.
+- **Los videos, sólo con la app en modo emulador.** La app reproduce un
+  `videoUrl` del emulador (`http://` + `localhost`, `127.0.0.1` o `10.0.2.2`,
+  puerto 9199, forma `/v0/b/…/o/…`) únicamente cuando corre con
+  `--dart-define=USE_EMULATOR=true`, y nunca en release
+  (`esUrlDeDescargaDelEmuladorDeStorage`, `lib/core/firebase/emuladores.dart`).
+  Medido en el simulador de iOS con una URL armada por este módulo: el detalle
+  pone el video en el hero y reproduce. Hasta ese cambio la app sólo aceptaba
+  `firebasestorage.googleapis.com` y el detalle se quedaba con la foto. Este
+  módulo estampa el host que exportes, cualquiera sea; con uno fuera de esos
+  tres (`[::1]`, `0.0.0.0`) la URL sale igual y la app no la reproduce.
 - **No usa `getDownloadURL` del SDK**: contra el emulador de este repo da
   `403 No READ permission` (su GET de metadata lo deniega el catch-all de
   `storage.rules`).

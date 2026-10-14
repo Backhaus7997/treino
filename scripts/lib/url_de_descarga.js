@@ -27,13 +27,13 @@
  * ve es otra imagen. Con el bucket de producción la URL estampada es, además,
  * idéntica a una de producción a simple vista.
  *
- * ⚠️ Eso vale para `thumbnailUrl`. Para `videoUrl` este módulo NO alcanza: la
- * app sólo reproduce URLs con host `firebasestorage.googleapis.com`
- * (`isFirebaseStorageVideo`, `exercise_video_player.dart`), así que la del
- * emulador no se reproduce — el detalle se queda con la foto y el reproductor
- * dice "No pudimos leer el video.". La de antes tampoco andaba (le pedía a
- * Google con un token que allá no existe); lo que cambia es que ya no le pega
- * a producción. Que el emulador reproduzca video es un cambio de la app.
+ * ⚠️ Eso vale para `thumbnailUrl`. Para `videoUrl` la app pone una condición
+ * más: reproduce la URL del emulador sólo si corre con `USE_EMULATOR`, y nunca
+ * en release (`esUrlDeDescargaDelEmuladorDeStorage`,
+ * `lib/core/firebase/emuladores.dart`). Medido en el simulador de iOS con una
+ * URL armada por este módulo: el detalle pone el video en el hero y reproduce.
+ * Antes la app sólo aceptaba el host de Google, y el detalle se quedaba con la
+ * foto.
  *
  * ─── POR QUÉ NO `getDownloadURL` DEL SDK ────────────────────────────────────
  *
