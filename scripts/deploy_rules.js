@@ -31,6 +31,7 @@ const { GoogleAuth } = require('google-auth-library');
 const { bannerDeProduccion } = require('./lib/firebase_projects');
 
 const { ErrorDeCredencial, cargarCredencial } = require('./lib/credenciales');
+const { main: guardFuente } = require('./guard_fuente_de_deploy');
 
 const RULES_PATH = path.join(__dirname, '..', 'firestore.rules');
 
@@ -58,6 +59,11 @@ function credencial() {
   // `contraEmulador`: acá no existe el modo emulador. (#826)
   const bannerProd = bannerDeProduccion(projectId);
   if (bannerProd) console.warn(bannerProd);
+
+  // El mismo guard que corren los `predeploy` de `firebase.json`. Este script
+  // no pasa por esos hooks, así que sin esta línea sería la puerta de atrás
+  // exacta para repetir el rollback de reglas del 2026-10-13.
+  if (guardFuente(['firestore.rules']) !== 0) process.exit(1);
 
   const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
   console.log(`Project: ${projectId}`);
