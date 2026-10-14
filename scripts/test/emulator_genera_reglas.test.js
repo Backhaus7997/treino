@@ -142,8 +142,8 @@ function correr(repo, extra) {
 }
 
 const MODOS = [
-  { nombre: 'SKIP_FUNCTIONS=1', env: { SKIP_FUNCTIONS: '1' }, only: 'firestore,auth' },
-  { nombre: 'modo completo', env: {}, only: 'firestore,auth,functions' },
+  { nombre: 'SKIP_FUNCTIONS=1', env: { SKIP_FUNCTIONS: '1' }, only: 'firestore,auth,storage' },
+  { nombre: 'modo completo', env: {}, only: 'firestore,auth,functions,storage' },
 ];
 
 for (const modo of MODOS) {
