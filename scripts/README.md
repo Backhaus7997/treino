@@ -169,6 +169,30 @@ aborta**.
 Si querés el emulador, agregá la que falta. Si querés la nube, sacá las otras
 del ambiente y leé el cartel que sale después.
 
+**Una variable EN BLANCO tampoco es "ausente": aborta.** Cualquiera de las cinco
+exportada con sólo whitespace (`FIRESTORE_EMULATOR_HOST=' '`, un tab, un salto
+de línea) corta antes de escribir, en los dos guards (`lib/credenciales.js` y
+`lib/storage_target.js`):
+
+```
+⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.
+```
+
+Ninguna es un host, y ninguna lleva su servicio al emulador. Medido sin red
+contra firebase-admin 14.5.0 (Firestore 9.3.1, Storage 8.2.0): con
+`FIRESTORE_EMULATOR_HOST` en blanco `getFirestore()` tira «is not a valid
+host», y con cualquiera de las dos de Storage el cliente arma un endpoint
+inválido. O sea que el servicio que esa variable desvía no va al emulador **ni**
+a la nube; el abort dice, variable por variable, qué hace el SDK con cada una.
+Hasta este cambio cada guard la contaba distinto —`storage_target.js` como
+emulador, `credenciales.js` como nube— y la misma corrida salía etiquetada
+`destino: EMULADOR`, sin cartel, con `lib/admin.js` cargando la credencial.
+
+La variable **vacía** sí cuenta como ausente: `export FIRESTORE_EMULATOR_HOST=`
+sigue siendo una forma válida de apagarla, porque Firestore la ignora. Con una
+excepción: `STORAGE_EMULATOR_HOST=''` el cliente de Storage la lee igual (arma
+el endpoint `https:`), así que ésa se apaga con `unset`, no vaciándola.
+
 ### Por qué se mira la identidad y no el project id
 
 El guard viejo miraba el proyecto. El revisor de #843 encontró por dónde se
@@ -703,6 +727,8 @@ Los cuatro pasan por `lib/storage_target.js` antes de la primera escritura.
 Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
 imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
 `initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
+Tampoco corre una variable de emulador exportada en blanco: ver "Sin
+credencial: el emulador".
 
 Para correr entero contra el emulador hay que levantarlo **con Storage**.
 `scripts/emulator.sh` lo levanta desde el 2026-10-14, en los dos modos (puerto
