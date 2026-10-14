@@ -132,8 +132,22 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     script del repo lee `$TREINO_SA_KEY`, así que la variable sola no dispara
     nada — pero un `GOOGLE_APPLICATION_CREDENTIALS=$TREINO_SA_KEY node
     scripts/seed_gyms.js`, que es literalmente lo que dice el header de varios
-    de esos archivos, **escribe en producción**. (Las ADC de `gcloud` —
-    `~/.config/gcloud/application_default_credentials.json`— hoy no existen.)
+    de esos archivos, **escribe en producción**.
+
+    **Las ADC de `gcloud` SÍ existen** —
+    `~/.config/gcloud/application_default_credentials.json`, de la cuenta de
+    Google del dev, tipo `authorized_user`, desde el 2026-10-09—. Esta nota
+    decía que no, y era justo la frase que hacía parecer inofensivo al emulador
+    de Functions: un emulador de Functions sin Firestore/Auth/Storage emulados
+    escribe en producción **con esas ADC**, y si no hay ADC, con el login de
+    `firebase`, que el propio emulador le pasa al runtime (medido el
+    2026-10-14 con una función sonda; por eso `npm run serve` de `functions/`
+    ahora pasa por `scripts/emulator.sh`). Ese día no emitían token
+    (`invalid_rapt`), pero eso es una sesión vencida, no una barrera: vuelve
+    con `gcloud auth application-default login`. No des por sentado ni que
+    están ni que sirven: `ls` del archivo para lo primero, y
+    `gcloud auth application-default print-access-token >/dev/null` para lo
+    segundo.
 
     **El consejo de "leé qué proyecto imprime en la primera línea" vale sólo
     para la primera familia.** Los 22 del `initializeApp()` sin `credential` **no imprimen
