@@ -59,6 +59,15 @@ const PUERTO_FIRESTORE = JSON.parse(
 ).emulators.firestore.port;
 const HOST = `localhost:${PUERTO_FIRESTORE}`;
 
+/**
+ * El host que reciben los scripts CARGADOS. No es `HOST` a propósito: en esta
+ * máquina el emulador de :8080 suele ser de otra sesión, y si el doble algún
+ * día no se aplicara, el caso de control le escribiría las semillas de capturas
+ * encima. Un puerto cerrado vale igual para la compuerta (es un host) y, sin el
+ * doble, termina en ECONNREFUSED en vez de en datos ajenos.
+ */
+const HOST_SIN_EMULADOR_VIVO = '127.0.0.1:1';
+
 const BLANCOS = [' ', '\t', '\n', '  \t '];
 
 // ─── lib/solo_emulador.js, puro ─────────────────────────────────────────────
@@ -194,7 +203,7 @@ for (const script of SCRIPTS) {
     // El que distingue `variablesEnBlanco` de `contraEmuladorDe` sola: con
     // Firestore puesto, la segunda deja pasar.
     const r = correr(script, {
-      FIRESTORE_EMULATOR_HOST: HOST,
+      FIRESTORE_EMULATOR_HOST: HOST_SIN_EMULADOR_VIVO,
       FIREBASE_AUTH_EMULATOR_HOST: ' ',
     });
     noLlegoAFirestore(r, script);
@@ -212,7 +221,7 @@ for (const script of SCRIPTS) {
   test(`${script}: CONTROL — con el emulador puesto pasa la compuerta y llega a Firestore`, () => {
     // Sin este caso, los tres de arriba no prueban nada: "no llegó a Firestore"
     // también sería cierto de un script que muere antes por otra razón.
-    const r = correr(script, { FIRESTORE_EMULATOR_HOST: HOST });
+    const r = correr(script, { FIRESTORE_EMULATOR_HOST: HOST_SIN_EMULADOR_VIVO });
     assert.doesNotMatch(r.todo, /ABORTADO/, r.todo);
     assert.ok(r.todo.includes(STUB_FIRESTORE_REACHED), `${script} no llegó a Firestore:\n${r.todo}`);
   });
