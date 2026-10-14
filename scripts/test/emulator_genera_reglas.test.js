@@ -24,9 +24,12 @@
  * que importa es QUÉ REGLAS HAY en el instante en que arranca `firebase`.
  *
  * Así que se corre el `emulator.sh` REAL —copiado a un repo de juguete, con lo
- * que él mismo invoca— con `firebase`, `npm` y `java` reemplazados por stubs en
- * el PATH. El stub de `firebase` copia `firestore.deploy.rules` en el momento
- * en que lo llaman: es lo que el emulador de verdad hubiera cargado.
+ * que él mismo invoca y el `firebase.json` real— con `firebase`, `npm` y `java`
+ * reemplazados por stubs en el PATH. El stub de `firebase` hace lo mismo que el
+ * de verdad: lee qué archivo de reglas nombra `firebase.json` y lo copia en el
+ * momento en que lo llaman. Por eso el nombre no está escrito acá: si alguien
+ * le cambia el destino a `firebase.json` o a `strip_rules.js` sin el otro, el
+ * test se pone rojo.
  */
 
 'use strict';
@@ -43,14 +46,17 @@ const SCRIPTS_DIR = path.join(__dirname, '..');
 
 /** El script y lo que él mismo carga o corre. Se copian del repo en cada test. */
 const COPIADOS = ['emulator.sh', 'strip_rules.js', path.join('lib', 'java21.sh')];
+const FIREBASE_JSON = path.join(SCRIPTS_DIR, '..', 'firebase.json');
 
 const STUBS = {
   // Con `exec`, después de esto no queda script: lo que exista ahora es lo que
-  // el emulador cargaría.
+  // el emulador cargaría. Y cargaría lo que diga `firebase.json`, no un nombre
+  // fijo.
   firebase: [
     '#!/usr/bin/env bash',
     'printf "%s\\n" "$*" > "$FOTO_DIR/argv"',
-    'if [ -f firestore.deploy.rules ]; then cp firestore.deploy.rules "$FOTO_DIR/reglas"; fi',
+    'archivo="$(node -p \'require("./firebase.json").firestore.rules\')"',
+    'if [ -f "$archivo" ]; then cp "$archivo" "$FOTO_DIR/reglas"; fi',
   ].join('\n'),
   // El `npm --prefix functions run build` del modo completo.
   npm: '#!/usr/bin/env bash\nexit 0',
@@ -88,6 +94,7 @@ function repoDeJuguete(t, { conFuente = true, viejas = null } = {}) {
     fs.mkdirSync(path.dirname(destino), { recursive: true });
     fs.copyFileSync(path.join(SCRIPTS_DIR, rel), destino);
   }
+  fs.copyFileSync(FIREBASE_JSON, path.join(raiz, 'firebase.json'));
   // El modo con Functions corta antes de arrancar si no ve las deps.
   fs.mkdirSync(path.join(raiz, 'functions', 'node_modules'), { recursive: true });
 
@@ -154,7 +161,8 @@ for (const modo of MODOS) {
     assert.notStrictEqual(
       r.reglas,
       null,
-      'el emulador arrancó SIN firestore.deploy.rules: el de Firestore cae a allow-all.\n' +
+      'el emulador arrancó SIN el archivo de reglas que nombra firebase.json: el de\n' +
+        'Firestore cae a allow-all.\n' +
         `SALIDA:\n${r.salida}`,
     );
     assert.ok(r.reglas.includes(repo.marca), `no son las reglas de este firestore.rules:\n${r.reglas}`);
