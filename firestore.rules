@@ -855,14 +855,12 @@ service cloud.firestore {
       // CREARSE. Hermano de `userCreatedRoutineFields()`, y existe por el mismo
       // motivo: que el `create` no admita claves que después nadie puede editar.
       //
-      // ⚠️ NO es la lista de los `hasOnly` de UPDATE 3 y 4, y la diferencia es
-      // una sola clave que importa: `copiedFrom`. Esta lista describe lo que el
-      // CLIENTE ESCRIBE, y `createAssigned` manda `routine.toJson()` entero
-      // (menos `id`, más `createdAt`); el `toJson` generado emite `copiedFrom`
-      // SIEMPRE, con null cuando la rutina no se copió de ninguna. Sin la clave
-      // acá, este `hasOnly` rechazaría el create de TODO plan asignado — el
-      // modo de falla exacto que el COUPLING WARNING de abajo advierte, y que
-      // `routine.dart` ~100 ya documenta para la lista del atleta.
+      // Esta lista describe lo que el CLIENTE ESCRIBE, y `createAssigned` manda
+      // `routine.toJson()` entero (menos `id`, más `createdAt`); el `toJson`
+      // generado emite `copiedFrom` SIEMPRE, con null cuando la rutina no se
+      // copió de ninguna. Sin la clave acá, este `hasOnly` rechazaría el create
+      // de TODO plan asignado — el modo de falla que `routine.dart` ~100 ya
+      // documenta para la lista del atleta.
       //
       // `ratingAvg`/`ratingsCount` NO van: son CF-write-only y el create las
       // rechaza explícitamente unas líneas más abajo. Listarlas acá sería
@@ -873,6 +871,23 @@ service cloud.firestore {
                 'status', 'createdBy', 'createdAt',
                 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
                 'summary', 'goals', 'copiedFrom'];
+      }
+
+      // Lo que un doc del PF puede GUARDAR: lo que el cliente escribe al crearlo,
+      // más los agregados que la CF `templateRatingAggregate` le suma después.
+      // Es el `keys().hasOnly` de UPDATE 3 y 4, que miran el POST-estado del doc.
+      //
+      // DERIVADA de `trainerRoutineFields()` a propósito. Hasta #1365 eran dos
+      // listas escritas a mano: ese PR le sumó `copiedFrom` a la del create y no
+      // a éstas, así que todo plan o plantilla creado desde la app quedó
+      // INEDITABLE — el doc trae la clave (null) y el update la rechazaba. Lo
+      // fija `scripts/rules_test/trainer-routine-copiedfrom.test.js`.
+      //
+      // Que una clave esté acá NO la vuelve editable: eso lo decide el
+      // `affectedKeys()` de cada path. `copiedFrom` y los agregados no figuran
+      // en ninguno, así que siguen inmutables para el PF.
+      function trainerRoutineStoredFields() {
+        return trainerRoutineFields().concat(['ratingAvg', 'ratingsCount']);
       }
 
       // ¿Es `routineId` una plantilla del CATÁLOGO del sistema?
@@ -1310,11 +1325,11 @@ service cloud.firestore {
       //   - The payload must not contain keys outside the full known field
       //     set (hasOnly guard).
       //
-      // ⚠️  COUPLING WARNING — hasOnly field list below:
-      // This list MUST contain every field a trainer-assigned routine doc
-      // stores. If you add a field to the Routine model, createAssigned, or
-      // updateAssigned, you MUST add it here too — otherwise ALL trainer plan
-      // updates will fail with permission-denied.
+      // ⚠️  COUPLING WARNING — the hasOnly field list below is
+      // `trainerRoutineStoredFields()`, derived from `trainerRoutineFields()`.
+      // A new field on the Routine model goes THERE, once, and reaches the
+      // create and both trainer update paths. Do not inline a list here again:
+      // that is how #1365 bricked every trainer plan edit.
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.assignedBy
                     && resource.data.source == 'trainer-assigned'
@@ -1331,13 +1346,7 @@ service cloud.firestore {
                     // trainer-template path) so a doc that ever gained CF
                     // aggregates cannot brick the trainer's edits; the
                     // affectedKeys allowlist below still excludes them.
-                    && request.resource.data.keys().hasOnly(
-                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
-                         ['name', 'split', 'level', 'days',
-                         'source', 'assignedBy', 'assignedTo', 'visibility',
-                         'status', 'createdBy', 'createdAt',
-                         'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                         'ratingAvg', 'ratingsCount', 'summary', 'goals'])
+                    && request.resource.data.keys().hasOnly(trainerRoutineStoredFields())
                        // summary (#648): lo escribe el PF, con tope de largo.
                        // El tope vive ACA y no en el cliente: un cliente
                        // parcheado no lo respetaria. Los 7 sembrados miden
@@ -1375,11 +1384,9 @@ service cloud.firestore {
       //   - The payload must not contain keys outside the full known field
       //     set (hasOnly guard).
       //
-      // ⚠️  COUPLING WARNING — hasOnly field list below:
-      // This list MUST contain every field a trainer-template routine doc
-      // stores. If you add a field to the Routine model, createTemplate, or
-      // updateTemplate, you MUST add it here too — otherwise ALL trainer
-      // template updates will fail with permission-denied.
+      // ⚠️  COUPLING WARNING — same as UPDATE 3: the hasOnly field list below
+      // is `trainerRoutineStoredFields()`. Add new Routine fields to
+      // `trainerRoutineFields()`, never inline here.
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.assignedBy
                     && resource.data.source == 'trainer-template'
@@ -1398,13 +1405,7 @@ service cloud.firestore {
                     // published template, every content edit would fail this
                     // hasOnly without them. They stay un-editable because the
                     // affectedKeys() allowlist below does NOT include them.
-                    && request.resource.data.keys().hasOnly(
-                         // + numWeeks (periodization, Model B) — mirror RoutineRepository.
-                         ['name', 'split', 'level', 'days',
-                         'source', 'assignedBy', 'assignedTo', 'visibility',
-                         'status', 'createdBy', 'createdAt',
-                         'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                         'ratingAvg', 'ratingsCount', 'summary', 'goals'])
+                    && request.resource.data.keys().hasOnly(trainerRoutineStoredFields())
                        // summary (#648): lo escribe el PF, con tope de largo.
                        // El tope vive ACA y no en el cliente: un cliente
                        // parcheado no lo respetaria. Los 7 sembrados miden
