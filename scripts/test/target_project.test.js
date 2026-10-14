@@ -21,6 +21,11 @@ const path = require('node:path');
 
 const {
   SERVICIOS,
+  TODAS_LAS_VARIABLES,
+  EFECTO_EN_BLANCO,
+  renglonesEnBlanco,
+  estadoDeVariable,
+  variablesEnBlanco,
   emuladoresActivos,
   contraEmuladorDe,
   projectIdObjetivo,
@@ -111,11 +116,77 @@ test('emuladoresActivos: los dos nombres de Storage cuentan igual', () => {
 });
 
 test('emuladoresActivos: vacío o whitespace NO cuenta como emulador', () => {
-  // Exportar la variable en blanco no desvía nada, y tratarla como emulador
-  // apagaría la salvaguarda exactamente cuando el proceso sí va a producción.
+  // Ninguna de las dos desvía el servicio al emulador, y tratarlas como tal
+  // apagaría la salvaguarda. Pero "no es emulador" NO quiere decir "es la
+  // nube": `' '` el SDK la lee y se rompe. Eso lo resuelve `variablesEnBlanco`,
+  // más abajo, y por eso este test ya no dice que en blanco "no desvía nada".
   for (const valor of ['', '   ']) {
     assert.strictEqual(emuladoresActivos({ FIRESTORE_EMULATOR_HOST: valor }).firestore, false);
   }
+});
+
+// ── estadoDeVariable / variablesEnBlanco ──────────────────────────────────
+//
+// Nota 3 del #1442: con `FIRESTORE_EMULATOR_HOST=' '` y
+// `FIREBASE_STORAGE_EMULATOR_HOST=' '`, `storage_target.js` decía EMULADOR (su
+// `Boolean(' ')` es `true`) y `credenciales.js` decía nube (su `trim()`), así
+// que la misma corrida salía etiquetada EMULADOR, sin cartel, con `lib/admin.js`
+// cargando la credencial. Medido contra el SDK, ninguno de los dos tenía razón.
+
+test('estadoDeVariable: tres estados, y `\' \'` es el tercero', () => {
+  assert.strictEqual(estadoDeVariable(undefined), 'ausente');
+  // `''` es falsy: Firestore, firebase-admin (Storage), Auth y Database la
+  // ignoran. Medido; ver el comentario de `estadoDeVariable`.
+  assert.strictEqual(estadoDeVariable(''), 'ausente');
+  for (const valor of [' ', '   ', '\t', '\n', ' \t\n ']) {
+    assert.strictEqual(estadoDeVariable(valor), 'en blanco', JSON.stringify(valor));
+  }
+  assert.strictEqual(estadoDeVariable('localhost:8080'), 'puesta');
+  assert.strictEqual(estadoDeVariable('http://localhost:9199'), 'puesta');
+});
+
+test('variablesEnBlanco: nombra las cinco, en el orden del mapa', () => {
+  const todasEnBlanco = Object.fromEntries(VARIABLES.map((v) => [v, ' ']));
+  assert.deepStrictEqual(variablesEnBlanco(todasEnBlanco), [...TODAS_LAS_VARIABLES]);
+  // Que el mapa del módulo sea el de este archivo: si mañana entra una sexta
+  // variable, este test pide sumarla acá (y a `EFECTO_EN_BLANCO`).
+  assert.deepStrictEqual([...TODAS_LAS_VARIABLES].sort(), [...VARIABLES].sort());
+});
+
+test('variablesEnBlanco: ni la vacía, ni la puesta, ni la ausente', () => {
+  assert.deepStrictEqual(variablesEnBlanco({}), []);
+  assert.deepStrictEqual(
+    variablesEnBlanco({
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_AUTH_EMULATOR_HOST: '',
+      FIREBASE_STORAGE_EMULATOR_HOST: '  ',
+    }),
+    ['FIREBASE_STORAGE_EMULATOR_HOST'],
+  );
+});
+
+test('variablesEnBlanco: una sola variable en blanco alcanza, de cualquier servicio', () => {
+  for (const v of VARIABLES) {
+    assert.deepStrictEqual(variablesEnBlanco({ [v]: ' ' }), [v], v);
+  }
+});
+
+test('renglonesEnBlanco: no imprime el valor y entra en la caja del abort', () => {
+  // El valor puede ser un tab: escribirlo como `' '` mentiría sobre el
+  // ambiente. Y un renglón más largo que la caja de ⛔ se lee mal.
+  const renglones = renglonesEnBlanco(VARIABLES);
+  for (const r of renglones) {
+    assert.ok(r.length <= 62, `renglón de ${r.length}: ${r}`);
+    assert.doesNotMatch(r, /= ' '/);
+  }
+  for (const v of VARIABLES) assert.ok(renglones.includes(`${v}  (en blanco)`), v);
+});
+
+test('EFECTO_EN_BLANCO: una frase por variable, ni una de más', () => {
+  // El abort imprime esta frase por cada variable en blanco. Una que falte sale
+  // como "→ undefined", que es peor que no decir nada.
+  assert.deepStrictEqual(Object.keys(EFECTO_EN_BLANCO).sort(), [...VARIABLES].sort());
+  for (const v of VARIABLES) assert.ok(EFECTO_EN_BLANCO[v].trim(), v);
 });
 
 test('matriz de las 5 variables: contraEmuladorDe([firestore]) sólo mira la suya', () => {

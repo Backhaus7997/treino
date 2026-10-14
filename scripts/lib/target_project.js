@@ -37,8 +37,8 @@ const fs = require('node:fs');
  *
  * Storage tiene DOS: `firebase-admin` acepta las dos y normaliza
  * `FIREBASE_STORAGE_EMULATOR_HOST` a `STORAGE_EMULATOR_HOST`. Mirar una sola
- * daría un falso negativo — el mismo criterio que ya usa
- * `storage_target.js:emuladoresActivos()`.
+ * daría un falso negativo. `storage_target.js:emuladoresActivos()` delega acá
+ * (antes tenía su propia copia con `Boolean()`, que contaba `' '` como host).
  */
 const VARIABLES_POR_SERVICIO = Object.freeze({
   firestore: Object.freeze(['FIRESTORE_EMULATOR_HOST']),
@@ -49,13 +49,107 @@ const VARIABLES_POR_SERVICIO = Object.freeze({
 
 const SERVICIOS = Object.freeze(Object.keys(VARIABLES_POR_SERVICIO));
 
+/** Las cinco variables, en el orden del mapa. */
+const TODAS_LAS_VARIABLES = Object.freeze(SERVICIOS.flatMap((s) => VARIABLES_POR_SERVICIO[s]));
+
 /**
- * Vacío o whitespace NO cuenta: exportar la variable en blanco no desvía nada,
- * y tratarla como emulador apagaría la salvaguarda exactamente cuando el
- * proceso sí va a producción.
+ * Qué hace el SDK con cada variable EN BLANCO, para que el abort lo diga por
+ * variable. Una frase genérica ("Firestore tira al inicializar") sería falsa el
+ * día que la única en blanco sea la de Auth. Las de Firestore y Storage están
+ * medidas corriendo el SDK; las de Auth y Database, leyendo su código.
  */
+const EFECTO_EN_BLANCO = Object.freeze({
+  FIRESTORE_EMULATOR_HOST: 'getFirestore() tira: "is not a valid host"',
+  FIREBASE_AUTH_EMULATOR_HOST: 'Auth pasa a modo emulador (`!!host`) sin host',
+  STORAGE_EMULATOR_HOST: 'Storage arma un endpoint inválido (`https://` + el blanco)',
+  FIREBASE_STORAGE_EMULATOR_HOST:
+    'firebase-admin la reescribe a un endpoint inválido (`http://` + el blanco), ' +
+    'salvo que STORAGE_EMULATOR_HOST tenga host: ahí la ignora',
+  FIREBASE_DATABASE_EMULATOR_HOST: 'Database pasa a modo emulador (`if (host)`) sin host',
+});
+
+/**
+ * Los renglones que un abort imprime por cada variable en blanco: el nombre y
+ * su `EFECTO_EN_BLANCO`, envuelto a `ancho`. Vive acá y no en cada mensaje para
+ * que `credenciales.js` y `storage_target.js` digan exactamente lo mismo. No
+ * imprime el valor: puede ser un tab o un salto de línea, y escribirlo como
+ * `' '` sería mentir sobre lo que hay en el ambiente.
+ */
+function renglonesEnBlanco(variables, ancho = 62) {
+  const out = [];
+  for (const v of variables) {
+    out.push(`${v}  (en blanco)`);
+    let renglon = '  →';
+    for (const palabra of EFECTO_EN_BLANCO[v].split(' ')) {
+      if (renglon !== '  →' && `${renglon} ${palabra}`.length > ancho) {
+        out.push(renglon);
+        renglon = `    ${palabra}`;
+      } else {
+        renglon = `${renglon} ${palabra}`;
+      }
+    }
+    out.push(renglon);
+  }
+  return out;
+}
+
+/**
+ * Una variable de emulador tiene TRES estados, no dos:
+ *
+ *   'ausente'   → sin definir, o `''` (ver abajo la excepción de Storage).
+ *   'puesta'    → tiene un host. El SDK desvía el servicio ahí.
+ *   'en blanco' → sólo whitespace: espacios, tabs, saltos de línea. NO es
+ *                 ninguna de las otras dos.
+ *
+ * ─── Por qué `' '` no es "ausente" (lo que este archivo decía antes) ───────
+ *
+ * El comentario de `seteada()` afirmaba que "exportar la variable en blanco no
+ * desvía nada". Es falso. Medido con firebase-admin 14.5.0,
+ * @google-cloud/firestore 9.3.1 y @google-cloud/storage 8.2.0, sin red
+ * (tripwire en sockets y DNS), Firestore y Storage leen la variable con un
+ * chequeo truthy —`if (host)`, `typeof host === 'string'`— y `' '` es truthy.
+ * Auth (`!!host`) y Database (`if (host)`) hacen lo mismo, según su código:
+ *
+ *   FIRESTORE_EMULATOR_HOST=' '          → `getFirestore()` TIRA: "is not a valid host"
+ *   FIREBASE_STORAGE_EMULATOR_HOST=' '   → firebase-admin la reescribe a `http:// `
+ *   STORAGE_EMULATOR_HOST=' '            → endpoint `https:// `; ni una conexión
+ *
+ * O sea que el servicio que esa variable desvía no va al emulador, pero
+ * TAMPOCO a la nube: se rompe. Los demás servicios van adonde diga el resto del
+ * ambiente. Y los dos módulos que preguntaban esto contestaban cada uno una
+ * mentira distinta: `storage_target.js` (con `Boolean()`) la contaba como
+ * emulador —etiqueta `EMULADOR`, sin cartel—, y este archivo (con `trim()`)
+ * como ausente —lo que hace que `lib/admin.js` inicialice CON la credencial de
+ * la nube—. La misma corrida salía con las dos cosas a la vez. El ambiente no
+ * describe un destino, así que el estado es propio y quien pregunta ABORTA:
+ * ver `variablesEnBlanco`.
+ *
+ * `''` sí es "ausente", y se midió por separado: Firestore y firebase-admin
+ * para Storage la ignoran (`''` es falsy), y Auth y Database también, según su
+ * código. La excepción es `STORAGE_EMULATOR_HOST=''`, que @google-cloud/storage
+ * lee con `typeof` y convierte en el endpoint `https:` (la subida termina
+ * conectando a `upload:443`, sin autenticar). No se trata acá: el plan la
+ * nombra NUBE, que es la dirección que grita, y nada llega al Storage real.
+ */
+function estadoDeVariable(valor) {
+  if (typeof valor !== 'string' || valor === '') return 'ausente';
+  return valor.trim() === '' ? 'en blanco' : 'puesta';
+}
+
 function seteada(valor) {
-  return typeof valor === 'string' && valor.trim() !== '';
+  return estadoDeVariable(valor) === 'puesta';
+}
+
+/**
+ * Las variables de emulador exportadas EN BLANCO, de TODOS los servicios.
+ *
+ * No hay nada que hacer con ellas más que abortar: ver `estadoDeVariable`. Son
+ * todas y no sólo las del servicio que el llamador toca, por la misma razón por
+ * la que `credenciales.js` aborta ante una parcial: el ambiente se contradice y
+ * quien lo armó cree algo que no es.
+ */
+function variablesEnBlanco(env = process.env) {
+  return TODAS_LAS_VARIABLES.filter((v) => estadoDeVariable(env[v]) === 'en blanco');
 }
 
 /**
@@ -160,7 +254,12 @@ function projectIdObjetivo(env = process.env) {
 
 module.exports = {
   SERVICIOS,
+  TODAS_LAS_VARIABLES,
+  EFECTO_EN_BLANCO,
   VARIABLES_POR_SERVICIO,
+  renglonesEnBlanco,
+  estadoDeVariable,
+  variablesEnBlanco,
   emuladoresActivos,
   contraEmuladorDe,
   projectIdObjetivo,
