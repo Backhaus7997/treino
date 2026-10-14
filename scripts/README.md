@@ -773,6 +773,36 @@ archivo que copie el literal sería un cuarto destino que no responde ni a
 `scripts/lib/*.js` y falla si la lista de archivos con el literal cambia o si
 alguno de ellos empieza a tocar Storage.
 
+**La URL que se estampa nombra el mismo lado que la subida.** Hasta el
+2026-10-14 los cuatro armaban la URL de descarga con el host de producción fijo
+(`https://firebasestorage.googleapis.com/v0/b/<bucket>/o/…`), también contra el
+emulador: el archivo quedaba en el emulador y la URL apuntaba a Google. Medido
+con `CachedNetworkImage` y HTTP real, esa URL da 404 (bucket `demo-treino…`) o
+**403 del Storage de producción** (bucket `treino-dev…`), y `ExerciseAssetImage`
+cae en silencio al asset local: la corrida parece andar.
+
+Ahora la arma `lib/url_de_descarga.js` desde el mismo plan que decide el
+destino: contra el emulador, `http://<FIREBASE_STORAGE_EMULATOR_HOST>/v0/b/<bucket>/o/…`
+(200 medido, con el token que el script subió); en la nube, la de siempre, byte
+a byte. Además:
+
+- **Eso arregla los thumbnails, no los videos.** La app sólo reproduce un
+  `videoUrl` con host `firebasestorage.googleapis.com` (`isFirebaseStorageVideo`),
+  así que el del emulador no se reproduce: el detalle se queda con la foto. El
+  de antes tampoco andaba —iba a Google con un token que allá no existe—; ahora
+  por lo menos no le pega a producción. Que el emulador reproduzca video es un
+  cambio de la app, no de estos scripts.
+- **No usa `getDownloadURL` del SDK**: contra el emulador de este repo da
+  `403 No READ permission` (su GET de metadata lo deniega el catch-all de
+  `storage.rules`).
+- **El host va tal como lo exportaste.** `localhost` anduvo en la medición
+  (Mac). En el emulador de Android `localhost` es el propio dispositivo —la Mac
+  es `10.0.2.2`—, así que ahí esperá que no cargue; no está medido.
+- **`upload_enriched_videos.js` no corre contra el emulador**, salvo con
+  `--dry-run`: su salida es `enriched-catalog.json`, versionado y que se
+  importa. Y `test/storage_scripts_url.test.js` falla si aparece en
+  `docs/video-catalog-audit/` una URL de descarga que no sea de la nube.
+
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
 `firebase-admin` stubbeado y cero red: `npm --prefix scripts test`. Los corre el

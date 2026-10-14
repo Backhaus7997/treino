@@ -355,7 +355,17 @@ for (const escritor of ESCRITORES) {
       FIRESTORE_EMULATOR_HOST: 'localhost:8080',
       FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
     });
-    assert.doesNotMatch(completo.stderr, /ABORTADO/, 'con los dos redirigidos tiene que dejar pasar');
+    // Cualquier ABORTADO salvo UNO: `upload_enriched_videos.js` aborta a
+    // propósito contra el emulador, porque su salida es un JSON versionado
+    // (ver storage_scripts_url.test.js). Ése no viola el invariante —el script
+    // muere, que es una de las dos salidas que permite— y con `/ABORTADO/` a
+    // secas lo ponía en rojo. La excepción nombra el texto entero: el abort de
+    // coherencia y el de "no pude resolver" siguen prohibidos acá.
+    assert.doesNotMatch(
+      completo.stderr,
+      /ABORTADO(?!: upload_enriched_videos\.js no escribe contra el emulador)/,
+      'con los dos redirigidos tiene que dejar pasar',
+    );
     assert.doesNotMatch(completo.stderr, /IS PRODUCTION/, 'contra emulador no se grita');
     assert.match(completo.todo, /EMULADOR \(Firestore \+ Storage\)/, 'esperaba la etiqueta de emulador');
   });

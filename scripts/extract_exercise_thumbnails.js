@@ -54,6 +54,7 @@ const crypto = require('crypto');
 const { execFileSync, execFile } = require('child_process');
 
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { armadorDeUrlDeDescarga } = require('./lib/url_de_descarga');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 
@@ -161,6 +162,10 @@ async function upload() {
   // puede desmentir a lo que el script hace — es el mismo objeto.
   const destino = exigirDestinoCoherente({ argv: args });
   const { bucket: BUCKET } = destino;
+  // La URL que se estampa sale del MISMO plan: contra el emulador nombra al
+  // emulador, no a Google (ver lib/url_de_descarga.js). Antes de la primera
+  // subida, para que un host ilegible corte acá.
+  const urlDeDescarga = armadorDeUrlDeDescarga(destino);
 
   // Credenciales: la única puerta (#834). Reemplaza al guard propio que estaba
   // acá, que exigía `GOOGLE_APPLICATION_CREDENTIALS` a mano y encima mandaba a
@@ -201,7 +206,7 @@ async function upload() {
           metadata: { firebaseStorageDownloadTokens: token },
         },
       });
-      const url = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+      const url = urlDeDescarga({ destino: dest, token });
       await snap.ref.update({ thumbnailUrl: url });
       ok++;
       if (ok % 50 === 0) console.log(`  progreso: ${ok}/${jpgs.length}`);
