@@ -10,9 +10,35 @@ declarado del set: poder regenerarlo igual dentro de seis meses.
 
 ## Todos los scripts son EMULATOR-ONLY
 
-Cada uno aborta si no encuentra `FIRESTORE_EMULATOR_HOST`. Ninguno lee
-`.firebaserc`, ninguno toma credenciales de producción: hablan por HTTP con el
-emulador y nada más. Ver el banner de Entornos de `AGENTS.md`.
+Cada uno llama a `exigirSoloEmulador(['firestore'])` (`scripts/lib/solo_emulador.js`)
+antes de `initializeApp()`, y aborta si:
+
+- `FIRESTORE_EMULATOR_HOST` no tiene un host (sin definir, o `''`), o
+- **cualquier** variable de emulador está exportada en blanco (`' '`, un tab, un
+  salto de línea) — también la de Auth o Storage, aunque estos scripts no las
+  usen: el ambiente se contradice y no se adivina a dónde quería ir.
+
+**Esa compuerta es lo único que los separa de producción.** No pasan por
+`lib/admin.js` ni piden credencial: inicializan con `projectId: 'treino-dev'`,
+que contra el emulador es sólo el namespace local. Si la compuerta dejara pasar
+algo que no es el emulador, el SDK resolvería la credencial por su cuenta
+(`GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud`) y `treino-dev` sería
+producción. Ver el banner de Entornos de `AGENTS.md`.
+
+Hasta el fix la compuerta era `if (!process.env.FIRESTORE_EMULATOR_HOST)`, que
+deja pasar `' '`. Medido sin red: los siete pasaban y morían recién en
+`getFirestore()` («is not a valid host»). Los frenaba el SDK, no la compuerta.
+Lo fija `scripts/test/capturas_solo_emulador.test.js`, que levanta cada script
+del directorio —también los que se agreguen— y exige que aborte antes de tocar
+Firestore.
+
+Y con la compuerta abierta tampoco hablan **sólo** con el emulador. Medido con
+el emulador puesto, sin credenciales en el ambiente y con `HOME` vacío: antes
+del primer socket al emulador, el SDK intenta conectarse a `169.254.169.254:80`
+y a `metadata.google.internal`. Por los destinos parece la detección del
+metadata server de GCP que hace `google-auth-library`; el contenido de esos
+requests no está medido, y tampoco qué pasa con las ADC reales en `HOME`. Lo que
+sí está medido es que no es "nada más que el emulador".
 
 ## API modular, no namespaced — y corré `npm ci` antes de creerle a tu local
 
