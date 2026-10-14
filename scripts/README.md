@@ -541,6 +541,41 @@ Imprime el banner de producción antes del primer request (`lib/firebase_project
 y a diferencia del resto lo imprime **siempre** que el destino sea producción:
 apagarlo con la variable del emulador sería mentir. (#826)
 
+### Sólo se deploya lo que está en `develop`
+
+El 2026-10-13 se deployaron las reglas desde un checkout 58 commits atrás de
+`main`, y producción perdió en silencio las reglas de #1387 y #1395: un
+rollback sin conflicto, sin aviso y con el deploy en verde. Desde entonces
+`guard_fuente_de_deploy.js` frena el deploy si lo que se va a subir **no es
+idéntico a `origin/develop`**, recién fetcheado. Corre en tres lugares:
+
+| camino | cómo |
+|---|---|
+| `firebase deploy` de firestore (reglas o índices) | primer `predeploy` de `firebase.json`, sobre `firestore.rules` y `firestore.indexes.json` |
+| `firebase deploy` de storage | `predeploy` de `firebase.json`, sobre `storage.rules` |
+| `node deploy_rules.js` | lo llama antes de leer las reglas, porque este script no pasa por los hooks |
+
+Frena una rama vieja (revierte reglas ya deployadas) y un cambio sin mergear
+(sube reglas que nadie revisó). Compara normalizando CRLF/LF, por la misma
+trampa de AGENTS.md §11.2. Si no puede fetchear, frena: comparar contra un
+`origin/develop` local viejo es comparar contra una mentira.
+
+Por qué `develop` y no `main`: todo cambio de reglas entra por `develop`, y
+producción puede ir adelante de `main` (#1431 y #1432 se deployaron desde
+`develop` antes del release). Un guard contra `main` dejaría pasar justo el
+rollback de esos fixes.
+
+Cómo deployar:
+
+```sh
+git worktree add .claude/worktrees/deploy origin/develop
+cd .claude/worktrees/deploy
+firebase deploy --only firestore:rules --project prod
+```
+
+Emergencia, a sabiendas: `TREINO_DEPLOY_FUERA_DE_DEVELOP=1`. Deja pasar, pero
+imprime igual qué difiere. Avisá al equipo qué subiste y por qué.
+
 ---
 
 ## backfill_gym_ids.js / backfill_gym_names.js (gyms-foundation Phase 4)
