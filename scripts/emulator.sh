@@ -76,8 +76,9 @@ set -euo pipefail
 # `scripts/strip_rules.js` y que está en `.gitignore`. El `predeploy` lo genera
 # para el deploy; para el emulador no lo generaba nadie.
 #
-# Y si falta, el emulador NO falla: loguea "rules file ... does not exist. The
-# emulator will default to allowing all reads and writes", y lo cumple. Eso
+# Y si falta, el emulador NO falla. Avisa dos cosas —"Cloud Firestore rules
+# file <ruta> specified in firebase.json does not exist." y "The emulator will
+# default to allowing all reads and writes."— y la segunda la cumple. Eso
 # pasaba en todo clone y todo worktree limpio. Medido el 2026-10-14 sobre
 # develop: un PATCH SIN auth que crea `users/victima` con `role: "trainer"`
 # —lo que la regla 3 de AGENTS.md reserva al Admin SDK— devolvía 200. Con el
@@ -103,9 +104,16 @@ set -euo pipefail
 # pasadas del límite, por ejemplo— no escribe nada, así que quedarían cargadas
 # las viejas con el aviso enterrado en el log.
 #
-# Las suites de reglas no dependen de nada de esto: `scripts/rules_test/` y los
-# `*-rules.test.ts` de functions leen `firestore.rules` directo y lo cargan con
-# `initializeTestEnvironment`.
+# Casi todas las suites de reglas son independientes de esto: `scripts/rules_test/`
+# y los `*-rules.test.ts` de functions leen `firestore.rules` directo y, salvo
+# los de análisis estático, lo cargan con `initializeTestEnvironment`. Las
+# excepciones son las dos `watch-rest-*-rules.test.ts`: le pegan al emulador
+# por REST y miden las reglas que ÉL tenga cargadas, o sea las que nombra
+# `firebase.json`. Para listarlas:
+#
+#   rg --files-without-match initializeTestEnvironment functions/src/__tests__ -g '*rules*.test.ts'
+#
+# (da tres; `rules-read-isolation.test.ts` es estático y lee `firestore.rules`.)
 
 # Java 21+, que `firebase-tools` 15+ exige para cualquier emulador.
 #
@@ -131,8 +139,8 @@ abortar_sin_reglas() {
 
 # Las reglas que va a cargar el emulador (ver "Qué reglas carga" arriba). Va
 # antes del branch de SKIP_FUNCTIONS para cubrir los dos `emulators:start`.
-# `strip_rules.js` resuelve sus rutas desde su propio directorio, así que
-# escribe en la raíz del repo aunque esto se corra desde otro lado.
+# `strip_rules.js` resuelve sus rutas desde su propio directorio: escribe en la
+# raíz del repo, al lado de `firebase.json`, que es donde el emulador lo busca.
 node "$(dirname "$0")/strip_rules.js" || abortar_sin_reglas
 
 if [ "${SKIP_FUNCTIONS:-0}" = "1" ]; then
