@@ -55,16 +55,57 @@ set -euo pipefail
 # es la peor forma de romper el arranque local.
 #
 # Lo que NO es cierto (se verificó, y vale escribirlo para que nadie lo repita):
-# el emulador de Firestore aplica `firestore.rules` a CUALQUIER proyecto que le
-# pidan, no sólo al default. Un GET sin auth a `demo-treino` devuelve el mismo
-# PERMISSION_DENIED con línea de regla que a `treino-dev`. Donde el proyecto
-# default SÍ decide el resultado es en las reglas de Storage que hacen
-# `firestore.get()` cross-service — ahí manda `emulators.singleProjectMode: true`
-# de firebase.json. Eso vive en scripts/test_rules.sh, no acá.
+# que el proyecto decida si el emulador de Firestore aplica reglas. Las aplica
+# a CUALQUIER proyecto que le pidan, no sólo al default: con las reglas
+# cargadas, un GET y un PATCH sin auth dan 403 tanto en `demo-treino` como en
+# `treino-dev` (medido otra vez el 2026-10-14). Donde el proyecto default SÍ
+# decide el resultado es en las reglas de Storage que hacen `firestore.get()`
+# cross-service — ahí manda `emulators.singleProjectMode: true` de
+# firebase.json. Eso vive en scripts/test_rules.sh, no acá.
 #
 # `emulators:start` no toca la red de los servicios emulados, así que nombrar
 # treino-dev acá no alcanza producción. Lo que alcanzaba producción era el
 # default, y el default ya no puede.
+#
+# --------------------------------------------------------------------------
+# Qué reglas carga el emulador de Firestore, y por qué este script las genera
+# --------------------------------------------------------------------------
+# NO carga `firestore.rules`. Carga el archivo que `firebase.json` nombra en
+# `firestore.rules`, y desde el #1132 (2026-09-15) ese archivo es
+# `firestore.deploy.rules`: las mismas reglas sin comentarios, que genera
+# `scripts/strip_rules.js` y que está en `.gitignore`. El `predeploy` lo genera
+# para el deploy; para el emulador no lo generaba nadie.
+#
+# Y si falta, el emulador NO falla: loguea "rules file ... does not exist. The
+# emulator will default to allowing all reads and writes", y lo cumple. Eso
+# pasaba en todo clone y todo worktree limpio. Medido el 2026-10-14 sobre
+# develop: un PATCH SIN auth que crea `users/victima` con `role: "trainer"`
+# —lo que la regla 3 de AGENTS.md reserva al Admin SDK— devolvía 200. Con el
+# archivo generado, 403.
+#
+# Por eso se corre `strip_rules.js` antes de levantar el emulador, y si falla
+# no se levanta. Se regenera SIEMPRE, no sólo cuando falta: un
+# `firestore.deploy.rules` que quedó de otra corrida son las reglas de otro día
+# con cara de las de hoy. Lo fija `scripts/test/emulator_genera_reglas.test.js`.
+#
+# ⚠ Editar `firestore.rules` con el emulador corriendo NO se refleja solo. El
+# emulador recarga las reglas en caliente, pero el archivo que vigila es
+# `firestore.deploy.rules`. Después de cada edición, en otra terminal:
+#
+#   node scripts/strip_rules.js
+#
+# y el emulador loguea "Change detected, updating rules...". Medido el
+# 2026-10-14: editar sólo `firestore.rules` deja cargadas las reglas viejas
+# (403 → 403); correr el strip las actualiza (→ 200, con una regla allow-all).
+#
+# No se agregó un watcher que lo haga solo, a propósito: sería un proceso más
+# corriendo detrás del emulador, y si el strip fallara ahí adentro —reglas
+# pasadas del límite, por ejemplo— no escribe nada, así que quedarían cargadas
+# las viejas con el aviso enterrado en el log.
+#
+# Las suites de reglas no dependen de nada de esto: `scripts/rules_test/` y los
+# `*-rules.test.ts` de functions leen `firestore.rules` directo y lo cargan con
+# `initializeTestEnvironment`.
 
 # Java 21+, que `firebase-tools` 15+ exige para cualquier emulador.
 #
@@ -77,6 +118,22 @@ set -euo pipefail
 # shellcheck source=lib/java21.sh
 source "$(dirname "$0")/lib/java21.sh"
 asegurar_java21 || exit 1
+
+abortar_sin_reglas() {
+  {
+    echo ""
+    echo "ERROR: no se pudo generar firestore.deploy.rules; el emulador NO se levanta."
+    echo "Levantarlo igual sería correr con las reglas de otra corrida o, si el"
+    echo "archivo no existe, sin ninguna: el emulador de Firestore cae a allow-all."
+  } >&2
+  exit 1
+}
+
+# Las reglas que va a cargar el emulador (ver "Qué reglas carga" arriba). Va
+# antes del branch de SKIP_FUNCTIONS para cubrir los dos `emulators:start`.
+# `strip_rules.js` resuelve sus rutas desde su propio directorio, así que
+# escribe en la raíz del repo aunque esto se corra desde otro lado.
+node "$(dirname "$0")/strip_rules.js" || abortar_sin_reglas
 
 if [ "${SKIP_FUNCTIONS:-0}" = "1" ]; then
   echo "SKIP_FUNCTIONS=1 -> Firestore + Auth solamente (sin Functions)."
