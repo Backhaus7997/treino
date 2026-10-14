@@ -30,7 +30,7 @@ final wearAuthUidProvider = StreamProvider<String?>(
 // la mitad del instrumental de diagnóstico.
 //
 // Para conseguir un token a mano, con los emuladores arriba:
-//   firebase emulators:start --only firestore,auth,functions
+//   ./scripts/emulator.sh   # mismos tres emuladores, con reglas y treino-dev
 //   # y desde functions/, mintear para el atleta de prueba con el Admin SDK.
 
 const _tokenInyectado = String.fromEnvironment('WEAR_CUSTOM_TOKEN');
