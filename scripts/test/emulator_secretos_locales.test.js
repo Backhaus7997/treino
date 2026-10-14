@@ -40,6 +40,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
+const LOOPBACK = ['127.0.0.1', '::1', 'localhost'];
 const COPIADOS = ['emulator.sh', 'strip_rules.js', path.join('lib', 'java21.sh')];
 
 const STUBS = {
@@ -154,7 +155,7 @@ for (const modo of MODOS) {
     // `http:` es lo que hace que el CLI no cargue credencial (token "owner").
     assert.strictEqual(u.protocol, 'http:', `con ${u.protocol} el CLI manda una credencial real: ${r.smUrl}`);
     const host = u.hostname.replace(/^\[|\]$/g, '');
-    assert.ok(['127.0.0.1', '::1', 'localhost'].includes(host), `no es loopback: ${r.smUrl}`);
+    assert.ok(LOOPBACK.includes(host), `no es loopback: ${r.smUrl}`);
 
     // Que nadie atienda se mide, no se supone: si algo escuchara ahí, recibiría
     // los pedidos de secretos y podría contestarlos.
@@ -163,15 +164,14 @@ for (const modo of MODOS) {
   });
 
   test(`${modo.nombre}: un CLOUD_SECRET_MANAGER_URL heredado del entorno se pisa`, (t) => {
-    const r = correr(repoDeJuguete(t), {
-      ...modo.env,
-      CLOUD_SECRET_MANAGER_URL: 'https://secretmanager.googleapis.com',
-    });
+    const heredado = 'https://secretmanager.googleapis.com';
+    const r = correr(repoDeJuguete(t), { ...modo.env, CLOUD_SECRET_MANAGER_URL: heredado });
     arranco(r, modo);
     assert.ok(r.smUrl, `no llegó CLOUD_SECRET_MANAGER_URL a firebase.\nSALIDA:\n${r.salida}`);
-    assert.ok(
-      !r.smUrl.includes('googleapis.com'),
-      `el emulador arrancó con el Secret Manager de verdad: ${r.smUrl}`,
-    );
+    assert.notStrictEqual(r.smUrl, heredado, 'el emulador arrancó con el Secret Manager de verdad');
+    // El host parseado, no un substring de la URL: `includes('googleapis.com')`
+    // dejaba pasar cualquier host que no lo contuviera, loopback o no.
+    const host = new URL(r.smUrl).hostname.replace(/^\[|\]$/g, '');
+    assert.ok(LOOPBACK.includes(host), `el heredado se pisó con un host que no es loopback: ${r.smUrl}`);
   });
 }
