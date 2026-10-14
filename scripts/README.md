@@ -568,6 +568,7 @@ rollback de esos fixes.
 Cómo deployar:
 
 ```sh
+git fetch origin    # sin esto, el worktree sale del origin/develop local, que puede ser viejo
 git worktree add .claude/worktrees/deploy origin/develop
 cd .claude/worktrees/deploy
 firebase deploy --only firestore:rules --project prod
@@ -575,6 +576,34 @@ firebase deploy --only firestore:rules --project prod
 
 Emergencia, a sabiendas: `TREINO_DEPLOY_FUERA_DE_DEVELOP=1`. Deja pasar, pero
 imprime igual qué difiere. Avisá al equipo qué subiste y por qué.
+
+**Un checkout viejo no tiene este guard.** El guard vive en el `firebase.json`
+y el `deploy_rules.js` del checkout desde el que deployás. Uno anterior a #1433
+trae los suyos, sin guard, y deploya como siempre: es exactamente el checkout
+que el guard existe para frenar, y es el único que no lo puede frenar. Esto
+protege a partir de que el checkout lo tenga; no antes. Medido el 2026-10-14: el
+checkout raíz del repo estaba en `c0881fcc`, anterior a #1433, sin guard.
+
+Antes de deployar desde un checkout que no sabés de cuándo es:
+
+```sh
+rg -l guard_fuente_de_deploy firebase.json scripts/deploy_rules.js
+```
+
+Tienen que salir los dos archivos. Si falta alguno, no deployes desde ahí: usá
+el worktree de `origin/develop` de arriba, y repetí el chequeo adentro de ese
+worktree. Ojo con lo que dice: que el checkout **tiene** el guard, no que
+tenga la última versión del guard.
+
+El fetch del guard no es un `git fetch origin develop` pelado: lleva refspec
+explícito, porque en un clon `--single-branch` el pelado no mueve
+`origin/develop` y el guard comparaba contra la copia vieja (con "✓ idéntico").
+Y se corta si una conexión ya establecida deja de transferir —menos de 1 KB/s
+durante 30 s—, donde antes el deploy se quedaba colgado sin decir nada. Lo que
+**no** cubre: un handshake TLS que nunca contesta (eso lo corta curl a los
+300 s), ni un remoto por ssh; y puede cortar a un servidor sano que tarde más
+de 30 s en armar el pack, en cuyo caso falla cerrado y se reintenta. Las
+mediciones, en el comentario de `FETCH_DEVELOP` en `guard_fuente_de_deploy.js`.
 
 ---
 
