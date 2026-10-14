@@ -6,13 +6,16 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/app_theme.dart';
+import '../../../../core/firebase/emuladores.dart'
+    show esUrlDeDescargaDelEmuladorDeStorage;
 import '../../../../core/widgets/firebase_storage_video_player.dart';
 import '../../../../core/widgets/treino_icon.dart';
 
 /// Tappable card for an exercise's tutorial video. Dual-mode:
 ///
-///   * Firebase Storage URL (`firebasestorage.googleapis.com`) → renders a
-///     native [VideoPlayer] inline with play/pause controls.
+///   * Firebase Storage URL (`firebasestorage.googleapis.com`, or the Storage
+///     emulator's under `USE_EMULATOR`) → renders a native [VideoPlayer]
+///     inline with play/pause controls.
 ///   * YouTube URL → renders the YouTube thumbnail with a subtle play
 ///     overlay; tap opens youtube.com in a Safari View Controller (iOS) or
 ///     Chrome Custom Tab (Android) via `url_launcher`'s `inAppBrowserView`
@@ -168,6 +171,9 @@ class _VideoPlaceholder extends StatelessWidget {
 
 /// True for Firebase Storage download URLs.
 /// Shape: `https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?...`
+///
+/// With `USE_EMULATOR` (never in release) it also accepts the Storage
+/// emulator's own download URLs — see [esUrlDeDescargaDelEmuladorDeStorage].
 bool isFirebaseStorageVideo(String? raw) {
   if (raw == null) return false;
   final url = raw.trim();
@@ -178,8 +184,12 @@ bool isFirebaseStorageVideo(String? raw) {
   } catch (_) {
     return false;
   }
-  return uri.host.toLowerCase() == 'firebasestorage.googleapis.com';
+  return _esUrlDeStorage(uri);
 }
+
+bool _esUrlDeStorage(Uri uri) =>
+    uri.host.toLowerCase() == 'firebasestorage.googleapis.com' ||
+    esUrlDeDescargaDelEmuladorDeStorage(uri);
 
 /// Extracts the storage object path from a Firebase Storage download URL,
 /// or `null` if [url] is not such a URL. Used to delete the underlying
@@ -194,7 +204,7 @@ String? extractFirebaseStoragePath(String? raw) {
   } catch (_) {
     return null;
   }
-  if (uri.host.toLowerCase() != 'firebasestorage.googleapis.com') return null;
+  if (!_esUrlDeStorage(uri)) return null;
   final segs = uri.pathSegments;
   final oIdx = segs.indexOf('o');
   if (oIdx == -1 || oIdx + 1 >= segs.length) return null;
