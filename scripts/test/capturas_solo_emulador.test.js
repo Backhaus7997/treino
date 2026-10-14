@@ -182,10 +182,12 @@ function noLlegoAFirestore(r, script) {
 for (const script of SCRIPTS) {
   test(`${script}: con FIRESTORE_EMULATOR_HOST en blanco ABORTA por el blanco, antes de Firestore`, () => {
     const r = correr(script, { FIRESTORE_EMULATOR_HOST: ' ' });
+    // Primero el marcador: un script que llega a Firestore también sale con 1
+    // (el doble tira), y el rojo tiene que decir eso, no "otro mensaje".
+    noLlegoAFirestore(r, script);
     assert.strictEqual(r.code, 1, r.todo);
     assert.match(r.stderr, /ABORTADO: hay variables de emulador exportadas EN BLANCO/);
     assert.match(r.stderr, /FIRESTORE_EMULATOR_HOST {2}\(en blanco\)/);
-    noLlegoAFirestore(r, script);
   });
 
   test(`${script}: con Firestore desviado y Auth en blanco ABORTA igual`, () => {
@@ -195,16 +197,16 @@ for (const script of SCRIPTS) {
       FIRESTORE_EMULATOR_HOST: HOST,
       FIREBASE_AUTH_EMULATOR_HOST: ' ',
     });
+    noLlegoAFirestore(r, script);
     assert.strictEqual(r.code, 1, r.todo);
     assert.match(r.stderr, /FIREBASE_AUTH_EMULATOR_HOST {2}\(en blanco\)/);
-    noLlegoAFirestore(r, script);
   });
 
   test(`${script}: sin FIRESTORE_EMULATOR_HOST ABORTA, antes de Firestore`, () => {
     const r = correr(script, {});
+    noLlegoAFirestore(r, script);
     assert.strictEqual(r.code, 1, r.todo);
     assert.match(r.stderr, /ABORTADO: este script es SOLO para el emulador/);
-    noLlegoAFirestore(r, script);
   });
 
   test(`${script}: CONTROL — con el emulador puesto pasa la compuerta y llega a Firestore`, () => {
