@@ -10,9 +10,47 @@ declarado del set: poder regenerarlo igual dentro de seis meses.
 
 ## Todos los scripts son EMULATOR-ONLY
 
-Cada uno aborta si no encuentra `FIRESTORE_EMULATOR_HOST`. Ninguno lee
-`.firebaserc`, ninguno toma credenciales de producción: hablan por HTTP con el
-emulador y nada más. Ver el banner de Entornos de `AGENTS.md`.
+Cada uno llama a `exigirSoloEmulador(['firestore'])` (`scripts/lib/solo_emulador.js`)
+antes de `initializeApp()`, y aborta si:
+
+- `FIRESTORE_EMULATOR_HOST` no está puesta (sin definir, o `''`), o
+- alguna variable de emulador está exportada en blanco (`' '`, un tab, un salto
+  de línea) — también la de Auth o Storage, aunque estos scripts no las usen: el
+  ambiente se contradice y no se adivina a dónde quería ir. El criterio es el de
+  `variablesEnBlanco` (`scripts/lib/target_project.js`), con su única excepción:
+  `FIREBASE_STORAGE_EMULATOR_HOST` en blanco no cuenta si `STORAGE_EMULATOR_HOST`
+  tiene host, porque firebase-admin la ignora.
+
+La compuerta mira que la variable tenga texto, **no** que el texto sea un host
+válido: un carácter invisible que `trim()` no saca (U+200B) pasa, y ahí el que
+frena es otra vez el SDK. Con cualquier valor no vacío, `@google-cloud/firestore`
+o tira (`validateHost`) o pasa a modo emulador contra ese host, sin TLS
+(`build/src/index.js:614`); no vuelve a la nube. Pero eso lo dice el SDK, no la
+compuerta.
+
+**Esa compuerta es lo único que los separa de producción.** No pasan por
+`lib/admin.js` ni piden credencial: inicializan con `projectId: 'treino-dev'`,
+que contra el emulador es sólo el namespace local. Si la compuerta dejara pasar
+algo que no es el emulador, el SDK resolvería la credencial por su cuenta
+(`GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud`) y `treino-dev` sería
+producción. Ver el banner de Entornos de `AGENTS.md`.
+
+Hasta el fix la compuerta era `if (!process.env.FIRESTORE_EMULATOR_HOST)`, que
+deja pasar `' '`. Medido sin red: los siete pasaban y morían recién en
+`getFirestore()` («is not a valid host»). Los frenaba el SDK, no la compuerta.
+Lo fija `scripts/test/capturas_solo_emulador.test.js`, que levanta cada
+`.js`/`.cjs`/`.mjs` de este directorio —también los que se agreguen— y exige que
+aborte antes de tocar Firestore. Un subdirectorio no lo recorre: si aparece uno,
+el test se pone rojo para que alguien lo decida.
+
+Y aun pasando la compuerta, tampoco hablan **sólo** con el emulador. Medido con
+el emulador puesto, sin credenciales en el ambiente y con `HOME` vacío: antes
+del primer socket al emulador, el SDK intenta conectarse a `169.254.169.254:80`
+y a `metadata.google.internal.:80`. Son exactamente las dos direcciones de
+`gcp-metadata` (`HOST_ADDRESS` y `SECONDARY_HOST_ADDRESS`), la detección del
+metadata server de GCP; según su código es un GET de detección, no una
+escritura. Qué pasa con las ADC reales en `HOME` no está medido. Lo que sí está
+medido es que no es "nada más que el emulador".
 
 ## API modular, no namespaced — y corré `npm ci` antes de creerle a tu local
 
