@@ -65,6 +65,7 @@ import { SendFcmInput, sendFcm } from "../notifications/send-fcm";
 import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   COMEBACK_COOLDOWN_DAYS,
+  COMEBACK_MAX_DAYS,
   DAILY_REMINDERS_PREF_KEY,
   comebackCooldownElapsed,
   comebackCopy,
@@ -576,7 +577,7 @@ describe("streak-at-risk", () => {
     expect(mockedSendFcm).toHaveBeenCalledTimes(1);
   });
 
-  it("singular: 'Te faltan 1 entrenamiento… racha de 1 semana' un domingo", async () => {
+  it("singular: 'Te falta 1 entrenamiento… racha de 1 semana' un domingo", async () => {
     // Domingo: queda 1 día. Objetivo 3, dos sesiones esta semana → falta 1.
     createFake(seed(
       [user("u1"), assignedPlan("p", "u1", 3)],
@@ -588,7 +589,7 @@ describe("streak-at-risk", () => {
 
     expect(lastCall().notification).toEqual({
       title: "Hoy o se corta 🔥",
-      body: "Te faltan 1 entrenamiento esta semana para sostener tu racha de 1 semana.",
+      body: "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana.",
     });
   });
 
@@ -820,8 +821,10 @@ describe("comeback-reminder", () => {
     expect(lastCall().notification.body).toBe("Hace 6 días que no entrenás. ¿Arrancamos hoy?");
   });
 
-  it("solo ve la ventana: quien se fue hace más de 8 semanas NO recibe nada", async () => {
+  it("el escaneo ve exactamente la ventana de 8 semanas + la actual", async () => {
     // La ventana arranca el lunes 2026-03-16 00:00 ART (03:00 UTC), inclusive.
+    // Ninguno de los dos recibe push: 58 días sin entrenar ya pasó el tope del
+    // comeback. Lo que se mide acá es qué entra al escaneo.
     const fake = createFake(seed(
       [user("dentro")], [sessionAt("dentro", "2026-03-16T00:00:00")],
       [user("fuera")], [sessionAt("fuera", "2026-03-15T23:59:00")],
@@ -829,8 +832,7 @@ describe("comeback-reminder", () => {
 
     const result = await notifyDailyRemindersHandler(app, WED, messaging);
 
-    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
-    expect(mockedSendFcm.mock.calls[0][1].uids).toEqual(["dentro"]);
+    expect(mockedSendFcm).not.toHaveBeenCalled();
     expect(result.athletesWithSessions).toBe(1);
     // Y la query pidió exactamente esa ventana.
     expect(fake.queryLog[0].fields.slice(0, 2)).toEqual([
@@ -852,6 +854,80 @@ describe("comeback-reminder", () => {
 
     expect(result.athletesWithSessions).toBe(0);
     expect(mockedSendFcm).not.toHaveBeenCalled();
+  });
+});
+
+describe("tope del comeback-reminder: día 4 y día 11, después silencio", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /** Corre el handler un día por vez, `fromDay`..`toDay` días después del 9/5. */
+  const runDays = async (fromDay: number, toDay: number) => {
+    // La última sesión es el sábado 9/5; WED (13/5) es el día 4.
+    createFake(seed([user("u1")], [sessionAt("u1", "2026-05-09T12:00:00")]));
+    for (let d = fromDay; d <= toDay; d++) {
+      await notifyDailyRemindersHandler(app, new Date(WED.getTime() + (d - 4) * DAY), messaging);
+    }
+    // Sólo los comeback: el tope es de ESE tipo. La racha en riesgo es otro
+    // aviso y puede aparecer en el medio (ver el test de convivencia).
+    return mockedSendFcm.mock.calls
+      .filter((c) => c[1].kind === "comeback-reminder")
+      .map((c) => c[1].notification.body);
+  };
+
+  it("COMEBACK_MAX_DAYS es 17", () => {
+    expect(COMEBACK_MAX_DAYS).toBe(17);
+  });
+
+  it("corriendo todos los días del 4 al 30, llegan exactamente dos: día 4 y día 11", async () => {
+    expect(await runDays(4, 30)).toEqual([
+      "Hace 4 días que no entrenás. ¿Arrancamos hoy?",
+      "Hace 11 días que no entrenás. ¿Arrancamos hoy?",
+    ]);
+  });
+
+  it("si el primero sale tarde (día 6), siguen siendo dos como mucho: 6 y 13", async () => {
+    expect(await runDays(6, 30)).toEqual([
+      "Hace 6 días que no entrenás. ¿Arrancamos hoy?",
+      "Hace 13 días que no entrenás. ¿Arrancamos hoy?",
+    ]);
+  });
+
+  it("convive con la racha: el domingo de la semana sin entrenar llega la racha en riesgo", async () => {
+    // Entrenó el sábado 9/5: cumplió esa semana (sin rutina, objetivo 1) y
+    // tiene racha de 1. El domingo 17/5 (día 8) es su última chance de
+    // sostenerla. En total, del día 4 al 30: volvé (4), racha (8), volvé (11).
+    await runDays(4, 30);
+    expect(mockedSendFcm.mock.calls.map((c) => [c[1].kind, c[1].notification.body])).toEqual([
+      ["comeback-reminder", "Hace 4 días que no entrenás. ¿Arrancamos hoy?"],
+      ["streak-at-risk", "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana."],
+      ["comeback-reminder", "Hace 11 días que no entrenás. ¿Arrancamos hoy?"],
+    ]);
+  });
+
+  it("día 17 todavía dispara, día 18 ya no (y no cuesta lecturas)", async () => {
+    createFake(seed(
+      [user("d17")], [sessionAt("d17", "2026-04-26T12:00:00")],
+      [user("d18")], [sessionAt("d18", "2026-04-25T12:00:00")],
+    ));
+
+    const result = await notifyDailyRemindersHandler(app, WED, messaging);
+
+    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
+    expect(mockedSendFcm.mock.calls[0][1].uids).toEqual(["d17"]);
+    expect(result.candidates).toBe(1);
+  });
+
+  it("al volver a entrenar, la cuenta arranca de nuevo", async () => {
+    // Ya recibió sus dos avisos de la inactividad anterior (el último hace 8
+    // días); entrenó el sábado 9/5 y hoy, día 4, vuelve a calificar.
+    createFake(seed(
+      [user("u1", { lastComebackReminderDate: "2026-05-05" })],
+      [sessionAt("u1", "2026-05-09T12:00:00")],
+    ));
+
+    await notifyDailyRemindersHandler(app, WED, messaging);
+
+    expect(lastCall().notification.body).toBe("Hace 4 días que no entrenás. ¿Arrancamos hoy?");
   });
 });
 
@@ -1307,8 +1383,8 @@ describe("escaneo", () => {
 
 describe("copy", () => {
   it.each([
-    [1, 1, "Te faltan 1 entrenamiento esta semana para sostener tu racha de 1 semana."],
-    [1, 2, "Te faltan 1 entrenamiento esta semana para sostener tu racha de 2 semanas."],
+    [1, 1, "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana."],
+    [1, 2, "Te falta 1 entrenamiento esta semana para sostener tu racha de 2 semanas."],
     [2, 1, "Te faltan 2 entrenamientos esta semana para sostener tu racha de 1 semana."],
     [7, 12, "Te faltan 7 entrenamientos esta semana para sostener tu racha de 12 semanas."],
   ])("streakAtRiskCopy(%i, %i)", (missing, weeks, body) => {

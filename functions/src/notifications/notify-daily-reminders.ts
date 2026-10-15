@@ -15,22 +15,28 @@
  *    completó una sesión hoy.
  *
  * 2. `comeback-reminder` — "Te extrañamos en el gym 💪". Su última sesión que
- *    cuenta tiene 4 días ART calendario o más, y no se le mandó este tipo en los
- *    últimos 7 días (se reintenta recién al día 7, no al 6).
+ *    cuenta tiene entre 4 y 17 días ART calendario, y no se le mandó este tipo
+ *    en los últimos 7 días (se reintenta recién al día 7, no al 6). En la
+ *    práctica son DOS avisos por período de inactividad —el día 4 y el día 11—
+ *    y después silencio hasta que vuelva a entrenar (ver abajo).
  *
  * Si califica para los dos, gana el 1 y el 2 NO se consume: no se escribe
  * `lastComebackReminderDate`, así que el cooldown de 7 días no corre.
  *
- * ─── Quién NO recibe el "volvé a entrenar", A PROPÓSITO ────────────────────
+ * ─── El "volvé a entrenar" tiene TOPE: dos avisos y silencio ───────────────
  *
- * Sólo se consideran atletas con alguna sesión que cuenta dentro de la VENTANA
- * de la query (las últimas 8 semanas + la actual). Quien se fue hace más tiempo
- * no aparece en el escaneo y no recibe nada. No es un hueco: es el producto.
- * No perseguimos a los churneados — un push semanal a alguien que dejó de usar
- * la app hace tres meses es la forma más rápida de que desinstale o apague las
- * notificaciones de TODO. El borde es entonces móvil: un atleta que sigue
- * inactivo recibe a lo sumo un "volvé" por semana, hasta que su última sesión
- * sale de la ventana.
+ * Decisión de producto (2026-10-15, #1449): a quien deja de entrenar le llegan
+ * a lo sumo DOS avisos —día 4 y día 11 sin entrenar— y después nada hasta que
+ * vuelva a completar una sesión. Más avisos a alguien que no responde es la
+ * forma más rápida de que apague TODAS las notificaciones de TREINO (chat y
+ * turnos incluidos) o desinstale. No perseguimos a los churneados.
+ *
+ * El tope no guarda estado: sale de la ventana [COMEBACK_MIN_DAYS,
+ * COMEBACK_MAX_DAYS] = [4, 17] combinada con el cooldown de 7 días. En 14 días
+ * de ventana no entran tres envíos separados por 7 (harían falta 4, 11 y 18),
+ * así que el máximo es dos aunque el primero salga tarde (un día de scheduler
+ * caído, un opt-out que se prendió después). Al volver a entrenar, la cuenta
+ * arranca desde la nueva última sesión.
  *
  * ─── La racha: port, no reglas propias ─────────────────────────────────────
  *
@@ -152,6 +158,13 @@ export const DAILY_REMINDER_DEEP_LINK = "/home";
 /** Cuántos días calendario ART sin entrenar disparan el "volvé a entrenar". */
 export const COMEBACK_MIN_DAYS = 4;
 
+/**
+ * Último día calendario ART sin entrenar en que todavía sale un "volvé a
+ * entrenar". Con el cooldown de 7 deja exactamente dos avisos: día 4 y día 11.
+ * Ver «El "volvé a entrenar" tiene TOPE» en la cabecera.
+ */
+export const COMEBACK_MAX_DAYS = 17;
+
 /** Días que tienen que pasar desde el último "volvé a entrenar" para otro. */
 export const COMEBACK_COOLDOWN_DAYS = 7;
 
@@ -209,12 +222,14 @@ export function streakAtRiskCopy(
   missing: number,
   streakWeeks: number,
 ): { title: string; body: string } {
+  // El verbo concuerda también: "Te falta 1 entrenamiento", no "Te faltan 1".
+  const falta = missing === 1 ? "falta" : "faltan";
   const sesiones = missing === 1 ? "entrenamiento" : "entrenamientos";
   const semanas = streakWeeks === 1 ? "semana" : "semanas";
   return {
     title: "Hoy o se corta 🔥",
     body:
-      `Te faltan ${missing} ${sesiones} esta semana ` +
+      `Te ${falta} ${missing} ${sesiones} esta semana ` +
       `para sostener tu racha de ${streakWeeks} ${semanas}.`,
   };
 }
@@ -732,7 +747,9 @@ export async function notifyDailyRemindersHandler(
     const streakCandidate =
       !activity.trainedToday &&
       activity.previousWeekCount >= activity.currentWeekCount + cal.daysLeft;
-    const comebackCandidate = activity.daysSinceLast >= COMEBACK_MIN_DAYS;
+    const comebackCandidate =
+      activity.daysSinceLast >= COMEBACK_MIN_DAYS &&
+      activity.daysSinceLast <= COMEBACK_MAX_DAYS;
     if (!streakCandidate && !comebackCandidate) continue;
 
     result.candidates++;
