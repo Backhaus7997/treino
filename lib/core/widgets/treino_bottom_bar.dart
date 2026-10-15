@@ -321,8 +321,9 @@ class TreinoBottomBar extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   /// Cuando es `true` la barra se compacta: pierde alto, se angosta (ver
-  /// [resolveCollapsedInset]) y esconde los labels, dejando solo los íconos. La dispara el shell al detectar scroll hacia
-  /// abajo en cualquier pantalla (ver `_ShellScaffold` en `app/router.dart`).
+  /// [resolveCollapsedInset]) y esconde los labels, dejando solo los íconos.
+  /// La dispara el shell al detectar scroll hacia abajo en cualquier pantalla
+  /// (ver `_ShellScaffold` en `app/router.dart`).
   ///
   /// **No es el único disparador del estado compacto**: la barra también se
   /// queda con los íconos cuando los labels no entran a lo ancho (ver
