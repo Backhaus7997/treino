@@ -223,6 +223,45 @@ void main() {
     });
   });
 
+  group('NutricionScreen — SCENARIO-STALE (pulido-post-revision)', () {
+    testWidgets(
+        'las filas ya cargadas sobreviven a un error del stream, avisan y '
+        'Reintentar re-suscribe', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await _pump(
+        tester,
+        linksStream: controller.stream,
+        profiles: [_prof('a1', 'Ana García'), _prof('a2', 'Beto López')],
+        settle: false,
+      );
+
+      controller.add([_link('a1')]);
+      await tester.pumpAndSettle();
+      expect(find.text('Ana García'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('permission-denied'));
+      await tester.pumpAndSettle();
+      expect(find.text('Ana García'), findsOneWidget);
+      expect(find.byKey(const Key('nutricion_error')), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([_link('a2')]);
+      await tester.pumpAndSettle();
+      expect(find.text('Beto López'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
   group('NutricionScreen — error (WU-05)', () {
     testWidgets('error al cargar el roster → mensaje + retry invoca invalidate',
         (tester) async {

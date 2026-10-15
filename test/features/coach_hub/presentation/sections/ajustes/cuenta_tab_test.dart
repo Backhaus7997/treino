@@ -248,4 +248,93 @@ void main() {
       verifyNever(() => repo.update(any(), any()));
     });
   });
+
+  group(
+      'SCENARIO-STALE — cuenta sostiene el perfil ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `CuentaTab.build` despachaba con `profileAsync.when()` —
+    // dispatch por SUBTIPO runtime, ignora `hasValue`. `userProfileProvider`
+    // es un StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que un error transitorio (con perfil ya cargado) caía en la rama
+    // `error:` y tapaba el formulario con "No se pudo cargar tu cuenta.".
+    testWidgets(
+        'el perfil ya cargado no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      var listens = 0;
+      final controller = StreamController<UserProfile?>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_harness(profileStream: controller.stream));
+      await tester.pump();
+
+      controller.add(_trainer());
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('No se pudo cargar tu cuenta.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía Ramírez'),
+        findsOneWidget,
+        reason: 'un error transitorio con perfil ya cargado no debe tapar '
+            'el formulario de cuenta',
+      );
+      expect(find.text('No se pudo cargar tu cuenta.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(_trainer());
+      await tester.pumpAndSettle();
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    // `AsyncValue<UserProfile?>`: un `null` con error es «no sé», no «no hay
+    // cuenta». Antes caía en «No se pudo cargar tu cuenta.» SIN reintento
+    // (y el caso sin error mostraba el mismo texto).
+    testWidgets(
+        'último valor null + error → error con Reintentar que re-suscribe',
+        (tester) async {
+      var listens = 0;
+      final controller = StreamController<UserProfile?>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_harness(profileStream: controller.stream));
+      await tester.pump();
+
+      controller.add(null);
+      await tester.pumpAndSettle();
+      // Control: null SIN error no ofrece reintento (afirma que no hay perfil).
+      expect(find.text('No se pudo cargar tu cuenta.'), findsOneWidget);
+      expect(find.text('Reintentar'), findsNothing);
+
+      controller.addError(Exception('permission-denied'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('cuenta_error')), findsOneWidget);
+      expect(find.text('Reintentar'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(_trainer());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('cuenta_error')), findsNothing);
+      expect(find.text('Sofía Ramírez'), findsOneWidget);
+    });
+  });
 }

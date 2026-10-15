@@ -6,6 +6,8 @@
 /// REQ-PAGW-ACTION-003 (ADR-F9-06).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -202,6 +204,78 @@ void main() {
         find.text('Todavía no tenés alumnos vinculados.'), // i18n
         findsOneWidget,
       );
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — picker sostiene la lista ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `_AthletePickerDialog.build` despachaba con
+    // `linksAsync.when(...)` — dispatch por SUBTIPO runtime, ignora
+    // `hasValue`. `trainerLinksStreamProvider` es un StreamProvider en vivo
+    // — Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que un error
+    // transitorio (sin estar en loading) caía en la rama `error:` y tapaba
+    // la lista de alumnos ya cargada con "No pudimos cargar tus alumnos.".
+    testWidgets(
+        'lista de alumnos ya cargada no desaparece tras un error '
+        'transitorio del stream de vínculos (stale-while-refresh)',
+        (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_wrap(overrides: [
+        trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+        ..._profilesOverride({
+          'athlete-1': 'Juana Pérez',
+          'athlete-2': 'Karen Díaz',
+        }),
+      ]));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('trigger')));
+      // settle:false — TreinoShimmer del picker anima en loop mientras
+      // trainerLinksStreamProvider no emitió nada todavía.
+      await tester.pump();
+
+      controller.add([
+        _link(
+            id: 'l1', athleteId: 'athlete-1', status: TrainerLinkStatus.active),
+      ]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Juana Pérez'), findsOneWidget);
+      expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Juana Pérez'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar la '
+            'lista de alumnos',
+      );
+      expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([
+        _link(
+            id: 'l2', athleteId: 'athlete-2', status: TrainerLinkStatus.active),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('Karen Díaz'), findsOneWidget);
+      expect(find.text('Juana Pérez'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

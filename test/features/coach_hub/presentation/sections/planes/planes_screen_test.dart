@@ -99,6 +99,39 @@ void main() {
     });
   });
 
+  group('SCENARIO-STALE — PlanesScreen sostiene el resumen (pulido)', () {
+    testWidgets(
+        'el resumen ya cargado sobrevive a un error del stream, avisa y '
+        'Reintentar re-suscribe', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<AthleteBilling>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await _pump(tester, overrides: [
+        trainerBillingsProvider.overrideWith((ref) => controller.stream),
+      ]);
+      controller.add(_billings);
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsNothing);
+      expect(find.byKey(const Key('kpi_card_skeleton')), findsNothing);
+
+      controller.addError(Exception('permission-denied'));
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+      expect(find.byKey(const Key('kpi_card_skeleton')), findsNothing);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(_billings);
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
   group('SCENARIO-PS-02 — PlanesScreen: loading', () {
     testWidgets('mientras trainerBillingsProvider no resolvió → skeletons',
         (tester) async {

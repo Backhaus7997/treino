@@ -13,6 +13,7 @@ import '../../../../../workout/application/session_providers.dart'
 import '../../../../../workout/domain/equipment_type.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
+import '../../../widgets/stale_async.dart';
 
 // ── Filter state providers (autoDispose → reset on section exit) ──────────────
 
@@ -70,10 +71,21 @@ final bibliotecaExercisesProvider =
   final muscles = ref.watch(bibliotecaMuscleFilterProvider);
   final equipment = ref.watch(bibliotecaEquipmentFilterProvider);
 
-  // Catalog is the spine — propagate its loading/error states.
-  if (catalogAsync.isLoading) return const AsyncLoading();
-  if (catalogAsync.hasError) {
-    return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+  // Catalog is the spine — hasValue-first (pulido-post-revision, mismo
+  // patrón que pagosBucketsProvider): `exercisesProvider` es un
+  // `FutureProvider` en vivo (re-corre con cada emisión de
+  // `authStateChangesProvider`) — Riverpod 2.5+ preserva el valor previo
+  // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+  // así que `hasValue == true` Y `hasError == true` pueden darse a la vez
+  // tras un error transitorio. Antes se chequeaba `isLoading`/`hasError`
+  // ANTES que el valor cacheado, así que ese error transitorio tiraba el
+  // catálogo ya cargado en la CAPA PROVIDER (peor que en UI: se pierde el
+  // cache, no solo la pantalla).
+  if (!catalogAsync.hasValue) {
+    if (catalogAsync.hasError) {
+      return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+    }
+    return const AsyncLoading();
   }
 
   final catalog = catalogAsync.requireValue;
@@ -124,9 +136,12 @@ final bibliotecaUnfilteredCountProvider =
   final catalogAsync = ref.watch(exercisesProvider);
   final uid = ref.watch(currentUidProvider) ?? '';
 
-  if (catalogAsync.isLoading) return const AsyncLoading();
-  if (catalogAsync.hasError) {
-    return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+  // hasValue-first — ver comentario en `bibliotecaExercisesProvider`.
+  if (!catalogAsync.hasValue) {
+    if (catalogAsync.hasError) {
+      return AsyncError(catalogAsync.error!, catalogAsync.stackTrace!);
+    }
+    return const AsyncLoading();
   }
 
   final catalog = catalogAsync.requireValue;
@@ -144,3 +159,11 @@ final bibliotecaUnfilteredCountProvider =
   final customs = customsAsync.requireValue;
   return AsyncData(catalog.length + customs.length);
 });
+
+/// `true` cuando el catálogo ([exercisesProvider]) ya había cargado y DESPUÉS
+/// falló. [bibliotecaExercisesProvider] sostiene la grilla ya calculada; este
+/// flag deja a la UI avisar «Datos desactualizados · Reintentar»
+/// (`ref.invalidate(exercisesProvider)`).
+final bibliotecaStaleProvider = Provider.autoDispose<bool>(
+  (ref) => ref.watch(exercisesProvider).isStale,
+);
