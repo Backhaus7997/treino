@@ -2572,13 +2572,20 @@ class _PagosTab extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final paymentsAsync = ref.watch(trainerPaymentsProvider);
     final pendingAsync = ref.watch(pagosPorCobrarProvider);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     Widget body;
     String stateKey;
     if (paymentsAsync.hasValue && pendingAsync.hasValue) {
       stateKey = 'data';
-      body =
-          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
+      body = _buildPagosBody(
+        context,
+        ref,
+        palette,
+        paymentsAsync,
+        pendingAsync,
+        linksAsync,
+      );
     } else if (paymentsAsync.hasError || pendingAsync.hasError) {
       stateKey = 'error';
       body =
@@ -2599,6 +2606,7 @@ class _PagosTab extends ConsumerWidget {
     AppPalette palette,
     AsyncValue<List<Payment>> paymentsAsync,
     AsyncValue<List<CobroPendiente>> pendingAsync,
+    AsyncValue<List<TrainerLink>> linksAsync,
   ) {
     final history = paymentsAsync.requireValue
         .where((p) => p.athleteId == athleteId)
@@ -2613,12 +2621,16 @@ class _PagosTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Pagos ya cargados cuyo stream (o el de cobros pendientes) falló
-          // después. El historial sale de `trainerPaymentsProvider`; los
-          // pendientes, de `pagosPorCobrarProvider`.
-          staleNoticeIf(paymentsAsync.isStale || pendingAsync.isStale, () {
+          // Pagos ya cargados cuyo stream (o el de vínculos) falló después.
+          // El historial sale de `trainerPaymentsProvider`; los pendientes
+          // derivan de `pagosPorCobrarProvider`, que es un Provider derivado
+          // y NUNCA lleva valor+error juntos (ante un stream roto con valor
+          // previo devuelve `AsyncData`): su `isStale` es código muerto. El
+          // aviso se maneja desde las fuentes reales, y Reintentar invalida
+          // la que falló (invalidar el derivado no re-suscribe nada).
+          staleNoticeIf(paymentsAsync.isStale || linksAsync.isStale, () {
             if (paymentsAsync.isStale) ref.invalidate(trainerPaymentsProvider);
-            if (pendingAsync.isStale) ref.invalidate(pagosPorCobrarProvider);
+            if (linksAsync.isStale) ref.invalidate(trainerLinksStreamProvider);
           }),
           Row(
             children: [

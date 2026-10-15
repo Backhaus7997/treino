@@ -323,6 +323,11 @@ Future<void> _pump(
   List<Session> sessions = const [],
   List<Payment> payments = const [],
   Stream<List<Payment>>? paymentsStream,
+  // Stream de vínculos controlable (para simular que se corta tras cargar).
+  Stream<List<TrainerLink>>? linksStream,
+  // `true` usa el `pagosPorCobrarProvider` REAL (derivado de vínculos +
+  // pagos) en vez del stub `AsyncData(pendingCobros)`.
+  bool realPagosPorCobrar = false,
   // `false` cuando un stream queda en loading a propósito: el shimmer anima
   // en loop y `pumpAndSettle` no termina nunca; se pumpea a mano.
   bool settle = true,
@@ -371,9 +376,12 @@ Future<void> _pump(
       overrides: [
         userPublicProfileProvider
             .overrideWith((ref, id) => Stream.value(profile)),
-        trainerLinksStreamProvider
-            .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
-        pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => linksStream ?? Stream.value(link == null ? [] : [link]),
+        ),
+        if (!realPagosPorCobrar)
+          pagosPorCobrarProvider
+              .overrideWith((ref) => AsyncData(pendingCobros)),
         trainerPaymentsProvider.overrideWith(
           (ref) => paymentsStream ?? Stream.value(payments),
         ),
@@ -2455,6 +2463,59 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Mensualidad nueva'), findsOneWidget);
       expect(find.text('Mensualidad visible'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    testWidgets(
+        'Pagos avisa y re-suscribe los vínculos si ESE stream falla después '
+        'de cargar', (tester) async {
+      // `pagosPorCobrarProvider` es derivado: ante un stream de vínculos roto
+      // con valor previo devuelve AsyncData, nunca valor+error. El aviso tiene
+      // que salir de la fuente real, y Reintentar tiene que re-suscribirla.
+      var listens = 0;
+      final links = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(links.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        linksStream: links.stream,
+        realPagosPorCobrar: true,
+        payments: [
+          _pago(
+            id: 'p-hist',
+            concept: 'Mensualidad visible',
+            amountArs: 28000,
+            status: PaymentStatus.paid,
+          ),
+        ],
+        trainerProfile: _trainerProfile(),
+        settle: false,
+      );
+      links.add([_link(TrainerLinkStatus.active)]);
+      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
+      expect(find.text('Mensualidad visible'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      links.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mensualidad visible'), findsOneWidget);
+      expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir el stream de vínculos');
+
+      links.add([_link(TrainerLinkStatus.active)]);
+      await tester.pumpAndSettle();
+      expect(find.text('Mensualidad visible'), findsOneWidget);
       expect(find.text('Datos desactualizados'), findsNothing);
     });
 

@@ -32,6 +32,8 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
@@ -522,6 +524,7 @@ class DashboardInactivosCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final inactivosAsync = ref.watch(inactivosProvider);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     return _SectionCard(
       child: Column(
@@ -529,9 +532,18 @@ class DashboardInactivosCard extends ConsumerWidget {
         children: [
           TreinoSectionHeader(title: l10n.dashboardInactivosTitle),
           const SizedBox(height: AppSpacing.s12),
+          // `inactivosProvider` lee `trainerLinksStreamProvider` con
+          // `valueOrNull`: si el stream de vínculos se rompe tras cargar, el
+          // future se recomputa OK y nunca marca error. Por eso el aviso
+          // también sale de la fuente real, y Reintentar la re-suscribe.
           staleNoticeIf(
-            inactivosAsync.isStale,
-            () => ref.invalidate(inactivosProvider),
+            inactivosAsync.isStale || linksAsync.isStale,
+            () {
+              if (linksAsync.isStale) {
+                ref.invalidate(trainerLinksStreamProvider);
+              }
+              if (inactivosAsync.isStale) ref.invalidate(inactivosProvider);
+            },
           ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(inactivosAsync)),

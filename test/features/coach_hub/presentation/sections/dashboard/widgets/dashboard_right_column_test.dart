@@ -19,7 +19,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
@@ -29,7 +33,8 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
-    show currentUidProvider;
+    show currentUidProvider, finishedInWindowByUidProvider;
+import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ─── Factories ────────────────────────────────────────────────────────────────
@@ -79,6 +84,9 @@ List<Override> _baseOverrides({
 }) {
   return [
     currentUidProvider.overrideWithValue('trainer-1'),
+    trainerLinksStreamProvider.overrideWith(
+      (ref) => Stream.value(const <TrainerLink>[]),
+    ),
     trainerAppointmentsStreamProvider.overrideWith(
       (ref, key) => appointments is Stream<List<Appointment>>
           ? appointments
@@ -521,6 +529,9 @@ void main() {
 
       final container = ProviderContainer(overrides: [
         currentUidProvider.overrideWithValue('trainer-1'),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => Stream.value(const <TrainerLink>[]),
+        ),
         trainerAppointmentsStreamProvider.overrideWith(
           (ref, key) => Stream.value(const <Appointment>[]),
         ),
@@ -575,6 +586,75 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('Eva Gil'), findsOneWidget);
       expect(find.textContaining('Carla Díaz'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — inactivos ante corte del stream de vínculos '
+      '(pulido-post-revision)', () {
+    // `inactivosProvider` lee los vínculos con `valueOrNull`: si el stream se
+    // rompe tras cargar, el future se recomputa OK y NUNCA marca error. El
+    // aviso tiene que salir de `trainerLinksStreamProvider` mismo.
+    testWidgets(
+        'avisa cuando el stream de vínculos falla después de cargar y '
+        'Reintentar lo re-suscribe', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      TrainerLink link() => TrainerLink(
+            id: 'l1',
+            trainerId: 'trainer-1',
+            athleteId: 'a1',
+            status: TrainerLinkStatus.active,
+            requestedAt: DateTime.utc(2026, 1, 1),
+          );
+
+      await _pump(
+        tester,
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerAppointmentsStreamProvider.overrideWith(
+            (ref, key) => Stream.value(const <Appointment>[]),
+          ),
+          pagosBucketsProvider.overrideWith(
+            (ref) => const AsyncData(
+              PagosBuckets(vencidos: [], porVencer: [], pagados: [], todos: []),
+            ),
+          ),
+          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          finishedInWindowByUidProvider.overrideWith(
+            (ref, key) => Future.value(const <Session>[]),
+          ),
+          userPublicProfileProvider('a1').overrideWith(
+            (ref) => Stream.value(_pub('a1', 'Carla Díaz')),
+          ),
+        ],
+      );
+
+      controller.add([link()]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      controller.addError(Exception('transient links hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir el stream de vínculos');
+
+      controller.add([link()]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
       expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
