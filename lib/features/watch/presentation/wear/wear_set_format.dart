@@ -13,8 +13,9 @@ import '../../../workout/domain/set_spec.dart';
 ///
 /// Orden de precedencia, idéntico al de Swift:
 ///   1. duración en segundos
-///   2. reps exactas
-///   3. rango de reps (colapsa a un número si min == max)
+///   2. distancia en metros
+///   3. reps exactas
+///   4. rango de reps (colapsa a un número si min == max)
 /// y después, si hay peso, se le antepone `objetivo × peso kg`.
 String describeSetSpec(SetSpec spec) {
   var target = '';
@@ -25,6 +26,12 @@ String describeSetSpec(SetSpec spec) {
 
   if (duration != null) {
     target = '${duration}s';
+  } else if (spec.distanceMeters case final distance?) {
+    final rounded = distance.roundToDouble();
+    final text = distance == rounded
+        ? rounded.toInt().toString()
+        : distance.toStringAsFixed(1);
+    target = '$text m';
   } else if (reps != null) {
     target = '$reps';
   } else if (min != null && max != null) {

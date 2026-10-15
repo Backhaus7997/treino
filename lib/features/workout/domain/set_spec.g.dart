@@ -16,6 +16,7 @@ _$SetSpecImpl _$$SetSpecImplFromJson(Map<String, dynamic> json) =>
       repsMin: (json['repsMin'] as num?)?.toInt(),
       repsMax: (json['repsMax'] as num?)?.toInt(),
       durationSeconds: (json['durationSeconds'] as num?)?.toInt(),
+      distanceMeters: (json['distanceMeters'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$$SetSpecImplToJson(_$SetSpecImpl instance) =>
@@ -26,6 +27,7 @@ Map<String, dynamic> _$$SetSpecImplToJson(_$SetSpecImpl instance) =>
       'repsMin': instance.repsMin,
       'repsMax': instance.repsMax,
       'durationSeconds': instance.durationSeconds,
+      'distanceMeters': instance.distanceMeters,
     };
 
 const _$SetTypeEnumMap = {

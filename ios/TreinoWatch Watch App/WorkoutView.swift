@@ -611,6 +611,12 @@ struct WorkoutView: View {
         var target = ""
         if let duration = spec.durationSeconds {
             target = "\(duration)s"
+        } else if let distance = spec.distanceMeters {
+            let rounded = distance.rounded()
+            let text = distance == rounded
+                ? String(Int(rounded))
+                : String(format: "%.1f", distance)
+            target = "\(text) m"
         } else if let reps = spec.reps {
             target = "\(reps)"
         } else if let min = spec.repsMin, let max = spec.repsMax {

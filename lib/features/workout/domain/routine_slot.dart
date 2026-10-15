@@ -166,10 +166,27 @@ class RoutineSlot with _$RoutineSlot {
   bool isPresentInWeek(int week) =>
       activeWeeks.isEmpty || activeWeeks.contains(week);
 
-  /// Derives the exercise mode from the new field, falling back to legacy
-  /// signals (durationSeconds > 0 → [ExerciseMode.duration]).
+  /// Derives the exercise mode — the SINGLE source of truth for every
+  /// consumer (session player, both routine editors, Wear/watch).
+  ///
+  /// Precedence:
+  /// 1. An explicit [exerciseMode] of `duration`/`distance` wins.
+  /// 2. Otherwise (reps/absent), meters in ANY set of [sets] or of ANY week of
+  ///    [weeklySets] (`distanceMeters > 0`) → [ExerciseMode.distance].
+  /// 3. Otherwise legacy `durationSeconds > 0` → [ExerciseMode.duration].
+  /// 4. Otherwise [ExerciseMode.reps].
+  ///
+  /// Distance beats the legacy duration signal when both appear: a slot that
+  /// carries meters was authored as distance (a stale `durationSeconds` is
+  /// leftover, same rule the web editor already applied). Without rule 2 a doc
+  /// with `exerciseMode: reps` and meters in its sets rendered distance rows
+  /// whose check was dropped by the reps guard (same class as QA-WKT-001).
   ExerciseMode get effectiveExerciseMode {
     if (exerciseMode != ExerciseMode.reps) return exerciseMode;
+    bool hasMeters(SetSpec s) => (s.distanceMeters ?? 0) > 0;
+    if (sets.any(hasMeters) || weeklySets.any((w) => w.any(hasMeters))) {
+      return ExerciseMode.distance;
+    }
     if (durationSeconds != null && durationSeconds! > 0) {
       return ExerciseMode.duration;
     }

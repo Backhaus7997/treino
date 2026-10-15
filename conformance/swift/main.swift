@@ -182,7 +182,8 @@ private func specs(_ raw: Any?) -> [SetSpec] {
             repsMin: s["repsMin"] as? Int,
             repsMax: s["repsMax"] as? Int,
             weightKg: (s["weightKg"] as? NSNumber)?.doubleValue,
-            durationSeconds: s["durationSeconds"] as? Int
+            durationSeconds: s["durationSeconds"] as? Int,
+            distanceMeters: (s["distanceMeters"] as? NSNumber)?.doubleValue
         )
     }
 }
@@ -197,7 +198,8 @@ private func describe(_ specs: [SetSpec]) -> String {
         let repsMax: String = spec.repsMax.map { String($0) } ?? "nil"
         let weight: String = spec.weightKg.map { String($0) } ?? "nil"
         let duration: String = spec.durationSeconds.map { String($0) } ?? "nil"
-        parts.append("{reps:\(reps),min:\(repsMin),max:\(repsMax),kg:\(weight),dur:\(duration)}")
+        let distance: String = spec.distanceMeters.map { String($0) } ?? "nil"
+        parts.append("{reps:\(reps),min:\(repsMin),max:\(repsMax),kg:\(weight),dur:\(duration),m:\(distance)}")
     }
     return "[" + parts.joined(separator: ", ") + "]"
 }

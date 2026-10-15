@@ -67,6 +67,7 @@ Map<String, dynamic> _$$RoutineSlotImplToJson(_$RoutineSlotImpl instance) =>
 const _$ExerciseModeEnumMap = {
   ExerciseMode.reps: 'reps',
   ExerciseMode.duration: 'duration',
+  ExerciseMode.distance: 'distance',
 };
 
 const _$RepModeEnumMap = {

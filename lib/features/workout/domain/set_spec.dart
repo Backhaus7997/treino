@@ -11,6 +11,7 @@ part 'set_spec.g.dart';
 /// - Reps + single: [weightKg] + [reps]
 /// - Reps + range:  [weightKg] + [repsMin] + [repsMax]
 /// - Duration:      [durationSeconds]
+/// - Distance:      [distanceMeters]
 @freezed
 class SetSpec with _$SetSpec {
   const factory SetSpec({
@@ -36,6 +37,9 @@ class SetSpec with _$SetSpec {
 
     /// Target duration in seconds — used when [ExerciseMode.duration].
     int? durationSeconds,
+
+    /// Target distance in meters — used when [ExerciseMode.distance].
+    double? distanceMeters,
   }) = _SetSpec;
 
   factory SetSpec.fromJson(Map<String, Object?> json) =>
