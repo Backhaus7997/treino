@@ -108,6 +108,21 @@ void main() {
       }
     });
 
+    test('la plantilla trae 7 bloques de 15 renglones, todos con estilo', () {
+      expect(kTemplateDays, 7);
+      expect(kTemplateRowsPerDay, 15);
+      for (var day = 0; day < kTemplateDays; day++) {
+        final base = day * 16;
+        // Encabezado del bloque y el ÚLTIMO renglón (el 15.º).
+        expect(_style(sheet, 0, base)!.backgroundColor, ExcelColor.black);
+        expect(_numFmtOf(_ref(3, base + 15)), '49',
+            reason: 'bloque ${day + 1}: falta el renglón 15');
+        expect(_alignmentOf(_ref(3, base + 15)), 'center');
+      }
+      // Y la hoja no se pasa del último renglón del 7.º bloque.
+      expect(sheet.maxRows, lessThanOrEqualTo(16 * 7));
+    });
+
     test('la columna del ejercicio es ancha', () {
       expect(sheet.getColumnWidth(1), kProgramExerciseWidth);
       expect(kProgramExerciseWidth, greaterThan(kProgramWeekWidth * 2));

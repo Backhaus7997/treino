@@ -36,7 +36,7 @@ notación — **nunca** ejercicios cargados).
   los demás días pueden no repetirlas — las columnas de semana se fijan con el
   primer encabezado.
 - **Hasta 7 días** y **hasta 16 semanas** (el techo actual del producto,
-  `athlete_entitlement.dart`). La plantilla descargable trae 7 bloques de **10
+  `athlete_entitlement.dart`). La plantilla descargable trae 7 bloques de **15
   renglones** cada uno y 6 semanas; el parser NO depende de esas cantidades:
   lee cualquier cantidad de renglones entre encabezados y cualquier cantidad de
   columnas SEMANA contiguas (1 a 16).
@@ -120,12 +120,31 @@ ejercicios van sin reps (sin error).
 ## Ejercicios que no matchean
 
 Política de #1455: exacto o alias → se asigna solo; aproximado → sugerencia
-confirmable; sin candidato → rojo con "Asignar manualmente". **Ambos bloquean
-la asignación** hasta resolverse.
+confirmable; sin candidato → rojo. **Ambos bloquean la asignación** hasta
+resolverse.
 
-Pendiente de decisión del PO: si una fila sin coincidencia se convierte en
-ejercicio propio (al confirmar o automáticamente). Hasta decidirlo, queda como
-hoy.
+Acciones de una fila **sin candidato** (decisión del PO, 2026-10-15):
+
+- **Vincular con la biblioteca**: el picker manual de siempre. Registra el
+  alias (`addAlias`) para futuros imports.
+- **Crear como propio**: crea un ejercicio propio del PF **sólo cuando el PF
+  confirma el formulario**; subir el Excel nunca crea nada. Reusa el camino
+  existente: `intentarCrearEjercicioPropio` (tope del plan) y el diálogo
+  `showCreateCustomExerciseDialog` con el nombre original precargado
+  (editable; músculo y equipo opcionales), que persiste con
+  `CustomExerciseRepository.create` en `users/{uid}/customExercises`.
+  - **Tope por plan** (`customExerciseQuotaProvider.isAtOrOverLimit`; Free 20,
+    Plan 1 60, Plan 2 120, Plan 3 sin tope): en el tope se muestra el mismo
+    aviso de la app, no se abre el formulario ni se crea nada, y la fila sigue
+    roja con «Vincular con la biblioteca» disponible.
+  - La fila queda resuelta con el ejercicio nuevo y también los OTROS
+    componentes sin candidato con el MISMO nombre normalizado (mismo texto sin
+    importar mayúsculas, tildes ni espacios): son el mismo ejercicio repetido.
+    Nombres parecidos pero distintos no se tocan.
+  - **No** se llama `addAlias`: la CF indexa contra el catálogo global y el
+    ejercicio propio es privado del PF.
+  - Las filas con sugerencia pendiente no ofrecen esta acción (Confirmar /
+    Cambiar).
 
 ## Mapeo al modelo
 

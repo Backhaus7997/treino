@@ -151,8 +151,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "Asignar manualmente" to trigger manual mapping
-      await tester.tap(find.text('Asignar manualmente'));
+      // Tap "Vincular con la biblioteca" to trigger manual mapping
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
 
       // Pick the exercise from the bottom sheet
@@ -210,7 +210,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Asignar manualmente'));
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();
@@ -265,7 +265,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Asignar manualmente'));
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();

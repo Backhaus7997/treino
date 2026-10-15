@@ -6,7 +6,7 @@ import 'periodized_excel_parser.dart';
 
 /// Cantidades de la plantilla descargable. El parser NO depende de ellas.
 const int kTemplateDays = 7;
-const int kTemplateRowsPerDay = 10;
+const int kTemplateRowsPerDay = 15;
 const int kTemplateWeeks = 6;
 
 /// Columnas de la hoja `Programa`: A = N°, B = ejercicio, C = DESCANSOS y
@@ -17,7 +17,7 @@ const double kProgramRestWidth = 12;
 const double kProgramWeekWidth = 14;
 
 /// Genera el `.xlsx` de la plantilla periodizada que baja el PF desde el
-/// Coach Hub: hoja `Programa` (7 bloques de día × 10 renglones vacíos, 6
+/// Coach Hub: hoja `Programa` (7 bloques de día × 15 renglones vacíos, 6
 /// semanas) y hoja `Instrucciones` con ejemplos GENÉRICOS de notación.
 Uint8List buildPeriodizedTemplateBytes() {
   final excel = Excel.createExcel();

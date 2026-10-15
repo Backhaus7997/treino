@@ -32,6 +32,7 @@ Exercise _ex(String letter) => Exercise(
 ///   - 2: Ejercicio F, descanso 45, distancia `4x20m`
 Map<(int, int), Object> _plan() {
   const w0 = 3; // columna D = SEMANA 1
+  const day2 = 1 + kTemplateRowsPerDay + 1; // primer renglón del 2.º bloque
   return {
     // DÍA 1 — calentamiento
     (1, 1): 'Ejercicio A',
@@ -48,13 +49,13 @@ Map<(int, int), Object> _plan() {
     for (var w = 0; w < 6; w++)
       if (w != 2) (3, w0 + w): w == 0 ? '3xmax' : '3x8',
     // DÍA 2
-    (12, 0): 1,
-    (12, 1): 'Ejercicio E',
-    for (var w = 0; w < 6; w++) (12, w0 + w): "8'",
-    (13, 0): 2,
-    (13, 1): 'Ejercicio F',
-    (13, 2): 45,
-    for (var w = 0; w < 6; w++) (13, w0 + w): '4x20m',
+    (day2, 0): 1,
+    (day2, 1): 'Ejercicio E',
+    for (var w = 0; w < 6; w++) (day2, w0 + w): "8'",
+    (day2 + 1, 0): 2,
+    (day2 + 1, 1): 'Ejercicio F',
+    (day2 + 1, 2): 45,
+    for (var w = 0; w < 6; w++) (day2 + 1, w0 + w): '4x20m',
   };
 }
 

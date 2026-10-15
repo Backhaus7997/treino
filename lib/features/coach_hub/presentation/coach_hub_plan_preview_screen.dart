@@ -26,12 +26,14 @@ import '../../workout/application/routine_providers.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_source.dart';
 import '../../workout/domain/routine_visibility.dart';
+import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../application/cf_providers.dart';
 import '../application/plan_import_providers.dart';
 import '../data/exercise_matcher.dart';
 import '../data/periodized_import_draft.dart';
 import '../data/periodized_routine_mapper.dart';
 import '../domain/periodized_plan.dart';
+import 'widgets/create_custom_exercise_dialog.dart';
 import 'widgets/filter_chips/filter_chips.dart';
 import 'widgets/import_plan_widgets.dart';
 import 'widgets/periodized_plan_preview.dart';
@@ -175,7 +177,7 @@ class _CoachHubPlanPreviewScreenState
       setState(() => _error = draft.pendingSuggestions > 0
           ? 'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
               'continuar.'
-          : 'Hay ejercicios sin match. Asignalos manualmente antes de '
+          : 'Hay ejercicios sin match. Vinculalos con la biblioteca o creá el propio antes de '
               'continuar.');
       return;
     }
@@ -352,6 +354,34 @@ class _CoachHubPlanPreviewScreenState
     );
   }
 
+  /// «Crear como propio»: el ejercicio propio se crea acá, al confirmar el
+  /// formulario, NUNCA al subir el Excel. Mismo camino que el resto del Coach
+  /// Hub: el embudo del tope del plan y el diálogo de ejercicio propio (con el
+  /// texto original del PF precargado) sobre `CustomExerciseRepository`.
+  Future<void> _createCustomFor({
+    required ExerciseKey key,
+    required String rowName,
+  }) async {
+    // En el tope muestra el MISMO aviso que el resto de la app y corta: la
+    // fila queda en rojo y «Vincular con la biblioteca» sigue disponible.
+    final canCreate = await intentarCrearEjercicioPropio(context, ref);
+    if (!canCreate || !mounted) return;
+    final created =
+        await showCreateCustomExerciseDialog(context, initialName: rowName);
+    if (created == null || !mounted) return;
+
+    _resolveExercise(
+      key: key,
+      rowName: rowName,
+      exercise: MatcherExercise(
+        id: created.id,
+        name: created.name,
+        muscleGroup: created.muscleGroup,
+      ),
+      custom: true,
+    );
+  }
+
   void _confirmSuggestion({
     required ExerciseKey key,
     required String rowName,
@@ -365,6 +395,7 @@ class _CoachHubPlanPreviewScreenState
     required ExerciseKey key,
     required String rowName,
     required MatcherExercise exercise,
+    bool custom = false,
   }) {
     final current = ref.read(periodizedImportProvider);
     if (current == null) return;
@@ -375,12 +406,18 @@ class _CoachHubPlanPreviewScreenState
 
     // Se resuelve por la clave EXACTA (día, fila, componente): keyed por el
     // nombre solo se resolverían de una vez todos los renglones homónimos.
-    ref.read(periodizedImportProvider.notifier).state =
-        current.resolve(key, exercise);
+    // Un ejercicio propio recién creado además resuelve los homónimos EXACTOS
+    // (mismo nombre normalizado): son el mismo ejercicio repetido en el plan.
+    ref.read(periodizedImportProvider.notifier).state = custom
+        ? current.resolveWithSameName(key, exercise)
+        : current.resolve(key, exercise);
     setState(() {
       _error = null;
       _hasManualMappings = true;
     });
+    // Un ejercicio propio NO se registra como alias: `addAlias` indexa contra
+    // el catálogo global y el propio vive en `users/{uid}/customExercises`.
+    if (custom) return;
     // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
     unawaited(_addAlias(exercise.id, rowName));
   }
@@ -527,6 +564,8 @@ class _CoachHubPlanPreviewScreenState
                           },
                           onPickManual: (key, rawName) =>
                               _pickExerciseFor(key: key, rowName: rawName),
+                          onCreateCustom: (key, rawName) =>
+                              _createCustomFor(key: key, rowName: rawName),
                         ),
                       ),
                     const SizedBox(height: AppSpacing.s8),

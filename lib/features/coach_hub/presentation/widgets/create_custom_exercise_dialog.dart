@@ -31,10 +31,16 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 ///
 /// Description + secondary muscle still live only on mobile's editor; `copyWith`
 /// on edit preserves them so a web save never strips them.
-Future<CustomExercise?> showCreateCustomExerciseDialog(BuildContext context) {
+///
+/// [initialName] precarga el campo NOMBRE (el import de Excel pasa el texto
+/// original del entrenador); sigue siendo editable y es el mismo formulario.
+Future<CustomExercise?> showCreateCustomExerciseDialog(
+  BuildContext context, {
+  String? initialName,
+}) {
   return showDialog<CustomExercise>(
     context: context,
-    builder: (_) => const _CustomExerciseFormDialog(),
+    builder: (_) => _CustomExerciseFormDialog(initialName: initialName),
   );
 }
 
@@ -53,7 +59,10 @@ Future<CustomExercise?> showEditCustomExerciseDialog(
 }
 
 class _CustomExerciseFormDialog extends ConsumerStatefulWidget {
-  const _CustomExerciseFormDialog({this.existing});
+  const _CustomExerciseFormDialog({this.existing, this.initialName});
+
+  /// Sólo en modo creación: texto con el que arranca el campo NOMBRE.
+  final String? initialName;
 
   /// Non-null → edit mode (pre-fills the form and updates); null → create mode.
   final CustomExercise? existing;
@@ -85,6 +94,8 @@ class _CustomExerciseFormDialogState
       _muscle = MuscleGroup.fromKey(ex.muscleGroup);
       _equipment = ex.equipment;
       _videoCtrl.text = ex.videoUrl ?? '';
+    } else {
+      _nameCtrl.text = widget.initialName ?? '';
     }
   }
 

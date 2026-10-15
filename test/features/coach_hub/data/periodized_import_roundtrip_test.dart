@@ -42,7 +42,7 @@ void main() {
     });
 
     test(
-        'Programa: encabezado del DÍA 1 con 6 semanas y 7 bloques de 10 '
+        'Programa: encabezado del DÍA 1 con 6 semanas y 7 bloques de 15 '
         'renglones', () {
       final s = book[kProgramSheet];
       String at(int r, int c) => s
@@ -54,13 +54,13 @@ void main() {
         ['N°', 'DÍA 1', 'DESCANSOS', for (var w = 1; w <= 6; w++) 'SEMANA $w'],
       );
       for (var d = 1; d <= 7; d++) {
-        final row = (d - 1) * 11;
+        final row = (d - 1) * (1 + kTemplateRowsPerDay);
         expect(at(row, 0), 'N°');
         expect(at(row, 1), 'DÍA $d');
         expect(at(row, 2), 'DESCANSOS');
         if (d > 1) expect(at(row, 3), 'null'); // sin SEMANA repetida
       }
-      expect(at(11 * 7 - 1, 1), 'null');
+      expect(at((1 + kTemplateRowsPerDay) * kTemplateDays - 1, 1), 'null');
     });
 
     test('Instrucciones: notación genérica, sin ejercicios cargados', () {
@@ -91,6 +91,7 @@ void main() {
     late PeriodizedMatchResult match;
 
     setUp(() {
+      const day2Row = 1 + kTemplateRowsPerDay + 1;
       final cells = <(int, int), Object>{
         // DÍA 1: calentamiento (superserie), superserie de 3 con distancia y
         // un renglón común con calificador y una semana vacía.
@@ -113,11 +114,11 @@ void main() {
         (3, 6): '4x8',
         (3, 7): '4x8',
         (3, 8): '4x8',
-        // DÍA 2: una fila de duración pura.
-        (12, 0): 1,
-        (12, 1): 'Trote',
-        (12, 2): "1'30''",
-        for (var w = 0; w < 6; w++) (12, 3 + w): "${20 + w}'",
+        // DÍA 2: una fila de duración pura (primer renglón del 2.º bloque).
+        (day2Row, 0): 1,
+        (day2Row, 1): 'Trote',
+        (day2Row, 2): "1'30''",
+        for (var w = 0; w < 6; w++) (day2Row, 3 + w): "${20 + w}'",
       };
       parsed =
           parsePeriodizedExcel(_fill(buildPeriodizedTemplateBytes(), cells));

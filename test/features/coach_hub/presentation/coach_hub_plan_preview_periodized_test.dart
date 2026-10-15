@@ -168,11 +168,12 @@ void main() {
       await pumpPreview(tester, draft, repo);
 
       expect(find.text('sin match'), findsOneWidget);
-      expect(find.text('Asignar manualmente'), findsOneWidget);
+      expect(find.text('Vincular con la biblioteca'), findsOneWidget);
 
       await _selectAnaAndAssign(tester);
       expect(
-        find.text('Hay ejercicios sin match. Asignalos manualmente antes de '
+        find.text(
+            'Hay ejercicios sin match. Vinculalos con la biblioteca o creá el propio antes de '
             'continuar.'),
         findsOneWidget,
       );

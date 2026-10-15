@@ -82,6 +82,47 @@ class PeriodizedImportDraft {
     );
   }
 
+  /// Como [resolve], pero además asigna [exercise] a los OTROS componentes
+  /// todavía sin candidato (ni asignación ni sugerencia) cuyo nombre
+  /// normalizado es idéntico al de [key]. Es lo que corresponde al crear un
+  /// ejercicio propio: «Press X» repetido en tres días es UN ejercicio.
+  /// Nunca toca componentes con otro nombre, aunque se parezcan.
+  PeriodizedImportDraft resolveWithSameName(
+    ExerciseKey key,
+    MatcherExercise exercise,
+  ) {
+    String? target;
+    for (final day in plan.days) {
+      for (final row in day.rows) {
+        for (final ex in row.exercises) {
+          if (exerciseKeyOf(day, row, ex) == key) {
+            target = normalize(ex.rawName);
+          }
+        }
+      }
+    }
+    final next = {...assignments, key: exercise};
+    final nextSuggestions = {...suggestions}..remove(key);
+    if (target != null && target.isNotEmpty) {
+      for (final day in plan.days) {
+        for (final row in day.rows) {
+          for (final ex in row.exercises) {
+            final k = exerciseKeyOf(day, row, ex);
+            if (next.containsKey(k) || nextSuggestions.containsKey(k)) continue;
+            if (normalize(ex.rawName) == target) next[k] = exercise;
+          }
+        }
+      }
+    }
+    return PeriodizedImportDraft(
+      plan: plan,
+      warnings: warnings,
+      name: name,
+      assignments: next,
+      suggestions: nextSuggestions,
+    );
+  }
+
   PeriodizedImportDraft withName(String value) => PeriodizedImportDraft(
         plan: plan,
         warnings: warnings,

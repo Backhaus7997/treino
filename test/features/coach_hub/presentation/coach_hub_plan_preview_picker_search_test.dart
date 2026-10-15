@@ -40,7 +40,7 @@ UserProfile _trainerProfile() => UserProfile(
     );
 
 /// Un plan con un único renglón sin match, así la vista previa muestra UN
-/// botón "Asignar manualmente" que abre el picker bajo prueba.
+/// botón "Vincular con la biblioteca" que abre el picker bajo prueba.
 PeriodizedImportDraft _planWithOneUnmatched() => draftOf([
       [1, 'Misterioso', null, ...sameWeeks('3x10')],
     ]);
@@ -122,7 +122,7 @@ Future<void> _pumpPreviewAndOpenPicker(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
 
-  await tester.tap(find.text('Asignar manualmente'));
+  await tester.tap(find.text('Vincular con la biblioteca'));
   await tester.pumpAndSettle();
 }
 

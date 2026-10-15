@@ -92,6 +92,7 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
     required this.draft,
     required this.onConfirmSuggestion,
     required this.onPickManual,
+    required this.onCreateCustom,
   });
 
   final PeriodizedDay day;
@@ -101,6 +102,10 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
   final PeriodizedImportDraft draft;
   final void Function(ExerciseKey key) onConfirmSuggestion;
   final void Function(ExerciseKey key, String rawName) onPickManual;
+
+  /// «Crear como propio»: el padre pasa por el tope del plan y abre el
+  /// formulario de ejercicio propio con [rawName] precargado.
+  final void Function(ExerciseKey key, String rawName) onCreateCustom;
 
   @override
   Widget build(BuildContext context) {
@@ -129,6 +134,7 @@ class PeriodizedDayPreviewCard extends StatelessWidget {
               draft: draft,
               onConfirmSuggestion: onConfirmSuggestion,
               onPickManual: onPickManual,
+              onCreateCustom: onCreateCustom,
             ),
         ],
       ),
@@ -144,6 +150,7 @@ class _RowBlock extends StatelessWidget {
     required this.draft,
     required this.onConfirmSuggestion,
     required this.onPickManual,
+    required this.onCreateCustom,
   });
 
   final PeriodizedDay day;
@@ -152,6 +159,10 @@ class _RowBlock extends StatelessWidget {
   final PeriodizedImportDraft draft;
   final void Function(ExerciseKey key) onConfirmSuggestion;
   final void Function(ExerciseKey key, String rawName) onPickManual;
+
+  /// «Crear como propio»: el padre pasa por el tope del plan y abre el
+  /// formulario de ejercicio propio con [rawName] precargado.
+  final void Function(ExerciseKey key, String rawName) onCreateCustom;
 
   @override
   Widget build(BuildContext context) {
@@ -166,6 +177,7 @@ class _RowBlock extends StatelessWidget {
           draft: draft,
           onConfirmSuggestion: onConfirmSuggestion,
           onPickManual: onPickManual,
+          onCreateCustom: onCreateCustom,
         ),
     ];
 
@@ -225,6 +237,7 @@ class _ExerciseLine extends StatelessWidget {
     required this.draft,
     required this.onConfirmSuggestion,
     required this.onPickManual,
+    required this.onCreateCustom,
   });
 
   final ExerciseKey exKey;
@@ -233,6 +246,10 @@ class _ExerciseLine extends StatelessWidget {
   final PeriodizedImportDraft draft;
   final void Function(ExerciseKey key) onConfirmSuggestion;
   final void Function(ExerciseKey key, String rawName) onPickManual;
+
+  /// «Crear como propio»: el padre pasa por el tope del plan y abre el
+  /// formulario de ejercicio propio con [rawName] precargado.
+  final void Function(ExerciseKey key, String rawName) onCreateCustom;
 
   @override
   Widget build(BuildContext context) {
@@ -328,12 +345,24 @@ class _ExerciseLine extends StatelessWidget {
                     onPressed: () => onConfirmSuggestion(exKey),
                   ),
                 TreinoButton(
-                  label: suggestion != null ? 'Cambiar' : 'Asignar manualmente',
+                  label: suggestion != null
+                      ? 'Cambiar'
+                      : 'Vincular con la biblioteca',
                   icon: TreinoIcon.search,
                   variant: TreinoButtonVariant.ghostAccent,
                   size: TreinoButtonSize.sm,
                   onPressed: () => onPickManual(exKey, exercise.rawName),
                 ),
+                // Sólo sin candidato: con una sugerencia el camino es
+                // confirmarla o cambiarla.
+                if (suggestion == null)
+                  TreinoButton(
+                    label: 'Crear como propio',
+                    icon: TreinoIcon.plus,
+                    variant: TreinoButtonVariant.ghostAccent,
+                    size: TreinoButtonSize.sm,
+                    onPressed: () => onCreateCustom(exKey, exercise.rawName),
+                  ),
               ],
             ),
           ],

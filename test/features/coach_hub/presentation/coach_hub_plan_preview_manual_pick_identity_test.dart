@@ -114,10 +114,10 @@ void main() {
 
       // Two identical unmatched rows → two badges, two manual-pick buttons.
       expect(find.text('sin match'), findsNWidgets(2));
-      expect(find.text('Asignar manualmente'), findsNWidgets(2));
+      expect(find.text('Vincular con la biblioteca'), findsNWidgets(2));
 
       // Resolve only the FIRST row.
-      await tester.tap(find.text('Asignar manualmente').first);
+      await tester.tap(find.text('Vincular con la biblioteca').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();
@@ -125,7 +125,7 @@ void main() {
       // BUG: keying on rowName resolved BOTH rows (findsNothing).
       // FIXED: exactly one row remains unmatched.
       expect(find.text('sin match'), findsOneWidget);
-      expect(find.text('Asignar manualmente'), findsOneWidget);
+      expect(find.text('Vincular con la biblioteca'), findsOneWidget);
     });
   });
 }
