@@ -758,6 +758,23 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get workoutWeekCompletedTitle => 'Week complete! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You\'re on a $count-week streak.',
+      one: 'Your first week complete!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'View week summary';
+
+  @override
   String get wellbeingTrendScreenTitle => 'HOW I FELT';
 
   @override

@@ -435,6 +435,23 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "workoutWeekCompletedTitle": "¡Semana cumplida! 🔥",
+  "@workoutWeekCompletedTitle": {
+    "description": "Titulo de la tarjeta de felicitacion del resumen post-entreno. Aparece UNA sola vez por semana: en la sesion que hace que las sesiones que cuentan lleguen justo al objetivo semanal. No es un push, es in-app."
+  },
+  "workoutWeekCompletedStreak": "{count, plural, =1{¡Tu primera semana cumplida!} other{Llevás {count} semanas de racha.}}",
+  "@workoutWeekCompletedStreak": {
+    "description": "Subtitulo de la tarjeta 'Semana cumplida'. count es la racha semanal que queda DESPUES de esta sesion (incluye la semana que acaba de cumplirse). Con 1 no hay racha todavia: se celebra la primera semana en vez de decir 'racha de 1 semana'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutWeekCompletedAction": "Ver resumen de la semana",
+  "@workoutWeekCompletedAction": {
+    "description": "Boton de la tarjeta 'Semana cumplida'. Abre Insights, que siempre arranca en la semana en curso: por eso la tarjeta solo aparece cuando la sesion es de esta semana."
+  },
   "wellbeingTrendScreenTitle": "CÓMO ME SENTÍ",
   "@wellbeingTrendScreenTitle": {
     "description": "Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them."

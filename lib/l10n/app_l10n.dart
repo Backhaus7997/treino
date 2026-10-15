@@ -1472,6 +1472,24 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Titulo de la tarjeta de felicitacion del resumen post-entreno. Aparece UNA sola vez por semana: en la sesion que hace que las sesiones que cuentan lleguen justo al objetivo semanal. No es un push, es in-app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Semana cumplida! 🔥'**
+  String get workoutWeekCompletedTitle;
+
+  /// Subtitulo de la tarjeta 'Semana cumplida'. count es la racha semanal que queda DESPUES de esta sesion (incluye la semana que acaba de cumplirse). Con 1 no hay racha todavia: se celebra la primera semana en vez de decir 'racha de 1 semana'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{¡Tu primera semana cumplida!} other{Llevás {count} semanas de racha.}}'**
+  String workoutWeekCompletedStreak(int count);
+
+  /// Boton de la tarjeta 'Semana cumplida'. Abre Insights, que siempre arranca en la semana en curso: por eso la tarjeta solo aparece cuando la sesion es de esta semana.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver resumen de la semana'**
+  String get workoutWeekCompletedAction;
+
   /// Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them.
   ///
   /// In es_AR, this message translates to:

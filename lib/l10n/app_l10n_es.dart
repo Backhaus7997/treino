@@ -773,6 +773,23 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get workoutWeekCompletedTitle => '¡Semana cumplida! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Llevas $count semanas de racha.',
+      one: '¡Tu primera semana cumplida!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'Ver resumen de la semana';
+
+  @override
   String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
 
   @override
@@ -6079,6 +6096,23 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get workoutWeekCompletedTitle => '¡Semana cumplida! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Llevás $count semanas de racha.',
+      one: '¡Tu primera semana cumplida!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'Ver resumen de la semana';
 
   @override
   String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
