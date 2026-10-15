@@ -6,6 +6,10 @@
 ///      en Swift. Los fixtures de `conformance/routine_selection.json` son el
 ///      contrato entre ambas — si divergen, teléfono y reloj le muestran
 ///      rutinas DISTINTAS al mismo usuario.
+///   3. replicable también por el backend:
+///      `functions/src/notifications/weekly-streak.ts` la porta para sacar el
+///      objetivo semanal de los recordatorios diarios (#1449), contra los
+///      mismos fixtures.
 ///
 /// Trabaja sobre ids y no sobre objetos `Routine` a propósito: la regla es de
 /// identidad, no de contenido, y así el contrato es portable a Swift sin

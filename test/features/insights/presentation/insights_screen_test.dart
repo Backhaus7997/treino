@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -327,13 +328,15 @@ void main() {
           ]),
       routineByIdProvider('r1').overrideWith((ref) async => null),
       visibleRoutineByIdProvider('r1').overrideWith((ref) async => null),
+      // Objetivo semanal real del atleta (rutina de 3 días), no un 5 fijo.
+      weeklyStreakTargetProvider.overrideWithValue(3),
     ];
 
     await tester.pumpWidget(_wrap(const InsightsScreen(), overrides));
     await tester.pumpAndSettle();
 
-    // Current week shown first: 1/5 sessions.
-    expect(find.text('1 / 5'), findsOneWidget);
+    // Current week shown first: 1/3 sessions.
+    expect(find.text('1 / 3'), findsOneWidget);
 
     // Tap ‹ (previous week chevron) — must be the FIRST IconButton in the
     // header row (‹ comes before the title, › comes after).
@@ -341,7 +344,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Previous week also had exactly 1 finished session — count stays
-    // "1 / 5" but the underlying week (and its muscle data) changed, which
+    // "1 / 3" but the underlying week (and its muscle data) changed, which
     // the VOLUMEN POR GRUPO card below reflects: chest (this week) becomes
     // 0 once we've paged away from it, legs (prev week) becomes visible.
     // Assert on the range title instead, which is unambiguous per week.

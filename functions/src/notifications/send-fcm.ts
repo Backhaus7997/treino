@@ -36,6 +36,7 @@ const STALE_TOKEN_CODES = new Set([
 export type NotificationKind =
   | "appointment"
   | "chat-message"
+  | "comeback-reminder"
   | "discomfort"
   | "friend-accepted"
   | "friend-follow"
@@ -45,7 +46,9 @@ export type NotificationKind =
   | "overdue-payment"
   | "reaction"
   | "review"
-  | "session-finished";
+  | "session-finished"
+  | "streak-at-risk"
+  | "training-due";
 
 /** Input shape accepted by sendFcm. */
 export interface SendFcmInput {

@@ -178,17 +178,22 @@ void main() {
 
     // La fila de Privacidad se llamaba «Analítica de uso» y desde que la pantalla
     // que abre también guarda los correos promocionales, con ese rótulo nadie
-    // iba a buscarlos ahí. La ruta no cambia.
+    // iba a buscarlos ahí; lo mismo pasó con «Analítica y correos» cuando se
+    // sumó el interruptor de recordatorios de entrenamiento. La ruta no cambia.
     testWidgets(
-        'la fila de Privacidad se rotula «Analítica y correos» y abre '
-        '/profile/settings/privacidad', (tester) async {
+        'la fila de Privacidad se rotula «Analítica, correos y recordatorios» y '
+        'abre /profile/settings/privacidad', (tester) async {
       await tester.pumpWidget(_buildProfileScreen());
       await tester.pumpAndSettle();
 
-      await tester.scrollUntilVisible(find.text('Analítica y correos'), 50);
+      await tester.scrollUntilVisible(
+        find.text('Analítica, correos y recordatorios'),
+        50,
+      );
       expect(find.text('Analítica de uso'), findsNothing);
+      expect(find.text('Analítica y correos'), findsNothing);
 
-      await tester.tap(find.text('Analítica y correos'));
+      await tester.tap(find.text('Analítica, correos y recordatorios'));
       await tester.pumpAndSettle();
 
       expect(find.text('PRIVACIDAD'), findsOneWidget);

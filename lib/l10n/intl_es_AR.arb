@@ -435,6 +435,23 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "workoutWeekCompletedTitle": "¡Semana cumplida! 🔥",
+  "@workoutWeekCompletedTitle": {
+    "description": "Titulo de la tarjeta de felicitacion del resumen post-entreno. Aparece UNA sola vez por semana: en la sesion que hace que las sesiones que cuentan lleguen justo al objetivo semanal. No es un push, es in-app."
+  },
+  "workoutWeekCompletedStreak": "{count, plural, =1{¡Tu primera semana cumplida!} other{Llevás {count} semanas de racha.}}",
+  "@workoutWeekCompletedStreak": {
+    "description": "Subtitulo de la tarjeta 'Semana cumplida'. count es la racha semanal que queda DESPUES de esta sesion (incluye la semana que acaba de cumplirse). Con 1 no hay racha todavia: se celebra la primera semana en vez de decir 'racha de 1 semana'.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutWeekCompletedAction": "Ver resumen de la semana",
+  "@workoutWeekCompletedAction": {
+    "description": "Boton de la tarjeta 'Semana cumplida'. Abre Insights, que siempre arranca en la semana en curso: por eso la tarjeta solo aparece cuando la sesion es de esta semana."
+  },
   "wellbeingTrendScreenTitle": "CÓMO ME SENTÍ",
   "@wellbeingTrendScreenTitle": {
     "description": "Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them."
@@ -4469,9 +4486,9 @@
   "@privacyAnalyticsCrashNote": {
     "description": "Aclaracion de que Crashlytics NO esta incluido en el interruptor. Va explicita porque un interruptor que dice 'analitica' y deja otra recoleccion prendida es justo la clase de media verdad que AGENTS.md 11.1 persigue."
   },
-  "privacyEntryTitle": "Analítica y correos",
+  "privacyEntryTitle": "Analítica, correos y recordatorios",
   "@privacyEntryTitle": {
-    "description": "Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica."
+    "description": "Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos; despues decia 'Analitica y correos' y con ese nadie iba a buscar ahi los recordatorios de entrenamiento. Un tema por interruptor del atleta en el titulo, para que el que busque cualquiera de los tres lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica."
   },
   "privacyPromoEmailsTitle": "Correos promocionales",
   "@privacyPromoEmailsTitle": {
@@ -4484,6 +4501,18 @@
   "privacyPromoEmailsSaveError": "No pudimos guardar el cambio. Intentá de nuevo.",
   "@privacyPromoEmailsSaveError": {
     "description": "Snackbar cuando falla la escritura del interruptor de correos promocionales. El interruptor vuelve solo al valor real."
+  },
+  "privacyTrainingRemindersTitle": "Recordatorios de entrenamiento",
+  "@privacyTrainingRemindersTitle": {
+    "description": "Titulo del interruptor de recordatorios de entrenamiento en la pantalla de privacidad. Solo lo ve el atleta. Es una preferencia de la CUENTA (users/{uid}.notificationPrefs.recordatorios_entrenamiento.push), no del dispositivo. Mismas palabras prohibidas que privacyPromoEmailsTitle (Guideline 3.1.3 de Apple)."
+  },
+  "privacyTrainingRemindersSubtitle": "Te avisamos si tu racha está en riesgo o si hace días que no entrenás.",
+  "@privacyTrainingRemindersSubtitle": {
+    "description": "Subtitulo del interruptor de recordatorios de entrenamiento. Nombra los dos avisos que el backend manda hoy (racha en riesgo y volver a entrenar); si aparece un tercero, esta frase tiene que cubrirlo. Mismas palabras prohibidas que privacyPromoEmailsTitle."
+  },
+  "privacyTrainingRemindersSaveError": "No pudimos guardar el cambio. Intentá de nuevo.",
+  "@privacyTrainingRemindersSaveError": {
+    "description": "Snackbar cuando falla la escritura del interruptor de recordatorios de entrenamiento. El interruptor vuelve solo al valor real."
   },
   "customExerciseCounter": "{count} de {limit} ejercicios propios",
   "@customExerciseCounter": {

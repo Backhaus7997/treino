@@ -131,6 +131,20 @@ cambia sin tocar el contrato, se pone rojo — que es todo el punto. Corre en
 ubuntu porque el código bajo prueba solo importa Foundation, disponible en el
 Swift de Linux; un runner macOS costaría diez veces más sin aportar nada.
 
+### Un tercer consumidor: `functions/` (TypeScript)
+
+`session_counting.json` y `routine_selection.json` también los corre
+`functions/src/__tests__/weekly-streak.test.ts` (jest, job *functions-test*). El
+push diario de recordatorio (`notifyDailyReminders`) calcula la racha semanal en
+el servidor con `functions/src/notifications/weekly-streak.ts`, un port de
+`weekly_streak_calculator.dart` que necesita las mismas dos reglas: qué sesión
+cuenta y cuál rutina es la activa. Si el servidor las resolviera distinto, el
+push diría "tu racha de 4 semanas" mientras la app muestra 3.
+
+No hay runner Swift que cablear para esto: el reloj no calcula la racha. Pero si
+cambiás cualquiera de esos dos fixtures, el rojo puede venir de `functions/`
+además de Dart y Swift — corregí las tres implementaciones.
+
 ### Verificado que detecta divergencia
 
 No alcanza con que pase. Se rompió a propósito cada implementación y se
