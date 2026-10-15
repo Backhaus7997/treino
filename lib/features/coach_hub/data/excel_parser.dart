@@ -258,16 +258,22 @@ Uint8List _targetsRelativos(Uint8List bytes) {
   return zip == null ? bytes : Uint8List.fromList(zip);
 }
 
-RawParsedPlan parseExcelBytes(Uint8List bytes) {
-  Excel workbook;
+/// Decodifica el `.xlsx` tolerando los `Target` absolutos de OOXML. Es el
+/// único camino de lectura: lo comparten el parser viejo y el periodizado, así
+/// el arreglo de arriba no se puede regresionar en uno solo de los dos.
+Excel decodeWorkbookBytes(Uint8List bytes) {
   try {
-    workbook = Excel.decodeBytes(_targetsRelativos(bytes));
+    return Excel.decodeBytes(_targetsRelativos(bytes));
   } catch (e) {
     // El mensaje NOMBRA el motivo. Antes era un `catch (_)` con un texto fijo:
     // el PF veía «no es un Excel válido» sobre un archivo válido y no había
     // forma de saber por qué, ni para él ni para nosotros.
     throw ExcelParseException('No pudimos leer el Excel. Detalle: $e');
   }
+}
+
+RawParsedPlan parseExcelBytes(Uint8List bytes) {
+  final workbook = decodeWorkbookBytes(bytes);
 
   final planSheet = workbook.sheets[_planSheet];
   if (planSheet == null) {

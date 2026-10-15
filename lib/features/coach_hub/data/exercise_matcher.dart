@@ -215,21 +215,46 @@ MatcherExercise? _bestFuzzySuggestion(String query, _Index index) {
       .firstWhere((exercise) => exercise.id == bestIds.single);
 }
 
+/// Veredicto del matcher para UN nombre: coincidencia exacta/alias
+/// ([exercise]), sugerencia confirmable ([suggestion]) o ninguna de las dos.
+class ExerciseNameMatch {
+  const ExerciseNameMatch({this.exercise, this.suggestion});
+  final MatcherExercise? exercise;
+  final MatcherExercise? suggestion;
+}
+
+/// Matcher de nombres sueltos sobre un catálogo ya indexado. Es la misma
+/// política de [matchExercises] (#1455: exacto o alias se asigna solo,
+/// aproximado sólo sugiere, nunca se adivina una variante), pero por nombre,
+/// para que cada componente de una superserie pase por separado.
+class ExerciseNameMatcher {
+  ExerciseNameMatcher(List<MatcherExercise> exercises)
+      : _index = _Index.build(exercises);
+
+  final _Index _index;
+
+  ExerciseNameMatch match(String rawName) {
+    final key = normalize(rawName);
+    final exercise = _index.byName[key];
+    if (exercise != null) return ExerciseNameMatch(exercise: exercise);
+    return ExerciseNameMatch(suggestion: _bestFuzzySuggestion(key, _index));
+  }
+}
+
 MatchResult matchExercises(
   List<RawParsedDay> rawDays,
   List<MatcherExercise> exercises,
 ) {
-  final index = _Index.build(exercises);
+  final matcher = ExerciseNameMatcher(exercises);
   final unmatched = <ParsedPlanUnmatched>[];
   final days = <ParsedPlanDay>[];
 
   for (final day in rawDays) {
     final items = <ParsedPlanItem>[];
     for (final item in day.items) {
-      final key = normalize(item.rowName);
-      final exercise = index.byName[key];
-      final suggestion =
-          exercise == null ? _bestFuzzySuggestion(key, index) : null;
+      final verdict = matcher.match(item.rowName);
+      final exercise = verdict.exercise;
+      final suggestion = verdict.suggestion;
 
       if (exercise == null) {
         unmatched.add(ParsedPlanUnmatched(
