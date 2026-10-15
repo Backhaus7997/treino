@@ -370,6 +370,16 @@ class _CoachHubPlanPreviewScreenState
     final current = ref.read(parsedPlanProvider);
     if (current == null) return;
 
+    // Una fila ya resuelta no se resuelve dos veces: un doble tap llegaba hasta
+    // acá, sacaba el pendiente de OTRA fila con el mismo (día, rowName) y
+    // volvía a llamar a addAlias.
+    final day = current.days.where((d) => d.dayNumber == dayNumber).firstOrNull;
+    if (day == null ||
+        itemIndex >= day.items.length ||
+        day.items[itemIndex].exerciseId != null) {
+      return;
+    }
+
     // Match on the exact (day, item index) — keying on rowName alone would
     // resolve every same-named unmatched row in the day at once. ADR-CXP-006.
     final updatedDays = current.days
