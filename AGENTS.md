@@ -390,6 +390,29 @@ pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
   cuando se juntaron varios cambios probados, y ese merge es el release.
 - Rama → `develop`: **squash and merge**, branch auto-delete. `develop` → `main`:
   **merge commit** (un squash hace divergir las dos ramas).
+- **Mergeado el PR de una rama a `develop`, esa rama se borra: remota, local y
+  su worktree.** `develop` y `main` no se borran nunca — los rulesets las
+  protegen contra borrado, y por eso el merge `develop → main` no se lleva
+  `develop` aunque el auto-delete esté prendido.
+  - **La remota** la borra GitHub sola (`delete_branch_on_merge`). Verificá con
+    `git ls-remote --heads origin <rama>` que no quedó.
+  - **La local y el worktree son tuyos.** El `--delete-branch` de
+    `gh pr merge` no puede borrar la local mientras su worktree exista —
+    avisa y la saltea, aunque el PR ya quedó mergeado. Desde fuera del worktree:
+
+    ```bash
+    gh pr view <N> --json state --jq .state   # tiene que decir MERGED
+    git worktree remove .claude/worktrees/<wt>
+    git branch -D <rama>
+    ./scripts/agent-ledger.sh release <scope>
+    ```
+
+  - Es `-D` y no `-d` **a propósito**: con squash, la rama nunca queda como
+    ancestro de `develop` y `-d` se niega siempre. Por eso el `-D` va recién
+    después de confirmar MERGED, nunca antes.
+  - Si el worktree tiene procesos vivos (`lsof -a -d cwd | rg <wt>`), no lo
+    borres: puede ser otra sesión. El 2026-10-15 se juntaron 37 ramas locales y
+    18 worktrees, de los cuales 13 eran de PRs ya mergeados.
 - **No se exige approve**: hoy no hay otro dev que pueda darlo. El review lo cubren
   el CI, los bots (Codex, CodeQL) y la prueba en device sobre `develop`.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
