@@ -63,20 +63,24 @@ Widget _wrap(
   List<CustomExercise> customs = const [],
   bool catalogLoading = false,
   bool catalogError = false,
+  Override? catalogOverride,
 }) {
   return ProviderScope(
     overrides: [
       currentUidProvider.overrideWithValue(_kTrainerId),
-      exercisesProvider.overrideWith((ref) {
-        // Loading: future que nunca completa (Completer) — se queda en
-        // AsyncLoading SIN un Timer pendiente (un Future.delayed dispararía
-        // el assert !timersPending en el teardown).
-        if (catalogLoading) return Completer<List<Exercise>>().future;
-        if (catalogError) {
-          return Future<List<Exercise>>.error(Exception('catalog error'));
-        }
-        return Future<List<Exercise>>.value(catalog);
-      }),
+      catalogOverride ??
+          exercisesProvider.overrideWith((ref) {
+            // Loading: future que nunca completa (Completer) — se queda en
+            // AsyncLoading SIN un Timer pendiente (un Future.delayed
+            // dispararía el assert !timersPending en el teardown).
+            if (catalogLoading) return Completer<List<Exercise>>().future;
+            if (catalogError) {
+              return Future<List<Exercise>>.error(
+                Exception('catalog error'),
+              );
+            }
+            return Future<List<Exercise>>.value(catalog);
+          }),
       customExercisesForTrainerStreamProvider(_kTrainerId).overrideWith(
         (ref) => Stream.value(customs),
       ),
@@ -187,6 +191,64 @@ void main() {
 
       expect(fadeSlideInAncestor.delay, AppMotion.stagger(1));
       expect(fadeSlideInAncestor.delay, isNot(Duration.zero));
+    });
+  });
+
+  group(
+      'EjerciciosTab — SCENARIO-STALE — grilla sostiene ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression coverage: `bibliotecaExercisesProvider` sostiene el
+    // catálogo ya cargado (hasValue-first) y siempre emite `AsyncData` pura,
+    // así que la grilla no desaparece. El error NO se pierde:
+    // `bibliotecaStaleProvider` lo expone y `EjerciciosTab` muestra
+    // «Datos desactualizados · Reintentar» (invalida `exercisesProvider`).
+    testWidgets(
+        'grilla ya cargada no desaparece tras un error transitorio del '
+        'catálogo (protegida por bibliotecaExercisesProvider)', (tester) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
+
+      await tester.pumpWidget(
+        _wrap(
+          const EjerciciosTab(),
+          catalogOverride: exercisesProvider.overrideWith((ref) async {
+            if (recovered) return const [_curl];
+            if (ref.watch(attempt) == 0) return const [_bench];
+            throw Exception('transient catalog hiccup');
+          }),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(find.textContaining('Error al cargar ejercicios'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      final element = tester.element(find.byType(EjerciciosTab));
+      ProviderScope.containerOf(element).read(attempt.notifier).state = 1;
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Press de Banca'),
+        findsOneWidget,
+        reason: 'un error transitorio del catálogo no debe tapar la grilla '
+            'ya cargada',
+      );
+      expect(find.textContaining('Error al cargar ejercicios'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a pedir el catálogo (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Curl de Bíceps'), findsOneWidget);
+      expect(find.text('Press de Banca'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

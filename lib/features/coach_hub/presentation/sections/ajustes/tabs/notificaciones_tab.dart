@@ -8,6 +8,8 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_prefs.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Notificaciones» de Configuración (Fase W3.2 / Fase 12 WU-05).
@@ -27,25 +29,43 @@ class NotificacionesTab extends ConsumerWidget {
     final prefsAsync = ref.watch(webNotificationPreferencesProvider);
     final uid = ref.watch(userProfileProvider).valueOrNull?.uid;
 
-    // Cross-fade entre loading→data→error (ADR-F12-03), mismo patrón que
-    // CuentaTab (WU-03): cada estado con su propia key para que
-    // TreinoStateSwitcher detecte el cambio y anime.
-    final stateKey = switch (prefsAsync) {
-      AsyncData() => const ValueKey('data'),
-      AsyncError() => const ValueKey('error'),
-      _ => const ValueKey('loading'),
-    };
+    // hasValue-first (pulido-post-revision, mismo defecto que el picker de
+    // alumnos, commit cf1cc143): `webNotificationPreferencesProvider` es un
+    // StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que `hasValue==true` Y `hasError==true` pueden darse a la vez
+    // tras un error transitorio. `switch`/`.when()` despachan por SUBTIPO
+    // runtime (ignoran `hasValue`) — se prioriza el valor cacheado.
+    final stateKey = prefsAsync.hasValue
+        ? const ValueKey('data')
+        : prefsAsync.hasError
+            ? const ValueKey('error')
+            : const ValueKey('loading');
+
+    final Widget content;
+    if (prefsAsync.hasValue) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            prefsAsync.isStale,
+            () => ref.invalidate(webNotificationPreferencesProvider),
+          ),
+          _NotifBody(prefs: prefsAsync.requireValue, uid: uid, colW: _colW),
+        ],
+      );
+    } else if (prefsAsync.hasError) {
+      content = _muted(
+        context,
+        'No se pudieron cargar tus preferencias.', // i18n: Fase W3
+      );
+    } else {
+      content = const _NotifSkeleton();
+    }
 
     return TreinoStateSwitcher(
       childKey: stateKey,
-      child: prefsAsync.when(
-        loading: () => const _NotifSkeleton(),
-        error: (_, __) => _muted(
-          context,
-          'No se pudieron cargar tus preferencias.', // i18n: Fase W3
-        ),
-        data: (prefs) => _NotifBody(prefs: prefs, uid: uid, colW: _colW),
-      ),
+      child: content,
     );
   }
 }

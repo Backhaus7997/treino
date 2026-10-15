@@ -8,6 +8,8 @@
 // NO se usa AppL10n en este archivo (constraint C-6).
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -177,125 +179,144 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
         ),
       ),
     );
+    final displayApptAsync = apptAsync.hasValue
+        ? AsyncValue.data(apptAsync.requireValue)
+        : apptAsync;
 
-    return TreinoStateSwitcher(
-      childKey: ValueKey(apptAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: apptAsync.when(
-        loading: () => const CoachHubSkeleton(
-          filas: 3,
-          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+    final apptKey = TrainerAppointmentsKey(
+      trainerId: widget.trainerId,
+      fromDate: widget.rangeFrom,
+      toDate: widget.rangeTo,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        staleNoticeIf(
+          apptAsync.isStale,
+          () => ref.invalidate(trainerAppointmentsStreamProvider(apptKey)),
         ),
-        error: (_, __) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(
-            child: Text(
-              'Error al cargar los turnos.', // i18n
-              style: TextStyle(color: palette.textMuted),
+        TreinoStateSwitcher(
+          childKey: ValueKey(displayApptAsync.when(
+            loading: () => 'loading',
+            error: (_, __) => 'error',
+            data: (_) => 'data',
+          )),
+          child: displayApptAsync.when(
+            loading: () => const CoachHubSkeleton(
+              filas: 3,
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
             ),
-          ),
-        ),
-        data: (allAppts) {
-          // Filtrar: confirmados del día seleccionado.
-          final dayAppts = allAppts
-              .where(
-                (a) =>
-                    a.status == AppointmentStatus.confirmed &&
-                    a.startsAt.year == widget.selectedDay.year &&
-                    a.startsAt.month == widget.selectedDay.month &&
-                    a.startsAt.day == widget.selectedDay.day,
-              )
-              .toList()
-            ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-
-          if (dayAppts.isEmpty) {
-            return Padding(
+            error: (_, __) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Center(
                 child: Text(
-                  'No hay sesiones este día.', // i18n
+                  'Error al cargar los turnos.', // i18n
                   style: TextStyle(color: palette.textMuted),
                 ),
               ),
-            );
-          }
+            ),
+            data: (allAppts) {
+              // Filtrar: confirmados del día seleccionado.
+              final dayAppts = allAppts
+                  .where(
+                    (a) =>
+                        a.status == AppointmentStatus.confirmed &&
+                        a.startsAt.year == widget.selectedDay.year &&
+                        a.startsAt.month == widget.selectedDay.month &&
+                        a.startsAt.day == widget.selectedDay.day,
+                  )
+                  .toList()
+                ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
 
-          // Selección EFECTIVA: intersección de lo tildado con lo que sigue
-          // siendo válido en el stream vigente (por si algo se cobró/canceló
-          // por otra vía mientras el trainer elegía). El lock al alumno se
-          // DERIVA de acá — nunca de un campo de estado aparte — así se
-          // libera solo si esa selección deja de existir.
-          final effectiveSelected = dayAppts
-              .where((a) => _selectedIds.contains(a.id) && _isBillable(a))
-              .toList();
-          final lockedAthleteId = effectiveSelected.isEmpty
-              ? null
-              : effectiveSelected.first.athleteId;
+              if (dayAppts.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      'No hay sesiones este día.', // i18n
+                      style: TextStyle(color: palette.textMuted),
+                    ),
+                  ),
+                );
+              }
 
-          // Pre-calienta la tarifa de referencia del alumno lockeado ANTES de
-          // que el trainer llegue a BatchCobrarDialog — mismo gotcha que Slice
-          // 2a (obs. #468): un StreamProvider recién suscripto sigue en
-          // AsyncLoading el primer microtask, y BatchCobrarDialog prellena el
-          // monto con un ref.read() síncrono al abrir.
-          if (lockedAthleteId != null) {
-            ref.watch(athleteBillingProvider(lockedAthleteId));
-          }
+              // Selección EFECTIVA: intersección de lo tildado con lo que sigue
+              // siendo válido en el stream vigente (por si algo se cobró/canceló
+              // por otra vía mientras el trainer elegía). El lock al alumno se
+              // DERIVA de acá — nunca de un campo de estado aparte — así se
+              // libera solo si esa selección deja de existir.
+              final effectiveSelected = dayAppts
+                  .where((a) => _selectedIds.contains(a.id) && _isBillable(a))
+                  .toList();
+              final lockedAthleteId = effectiveSelected.isEmpty
+                  ? null
+                  : effectiveSelected.first.athleteId;
 
-          final cards = <Widget>[
-            for (final appt in dayAppts)
-              AppointmentCard(
-                key: ValueKey(appt.id),
-                appointment: appt,
-                trainerId: widget.trainerId,
+              // Pre-calienta la tarifa de referencia del alumno lockeado ANTES de
+              // que el trainer llegue a BatchCobrarDialog — mismo gotcha que Slice
+              // 2a (obs. #468): un StreamProvider recién suscripto sigue en
+              // AsyncLoading el primer microtask, y BatchCobrarDialog prellena el
+              // monto con un ref.read() síncrono al abrir.
+              if (lockedAthleteId != null) {
+                ref.watch(athleteBillingProvider(lockedAthleteId));
+              }
+
+              final cards = <Widget>[
+                for (final appt in dayAppts)
+                  AppointmentCard(
+                    key: ValueKey(appt.id),
+                    appointment: appt,
+                    trainerId: widget.trainerId,
+                    selectionMode: _selectionMode,
+                    selected:
+                        _selectedIds.contains(appt.id) && _isBillable(appt),
+                    selectable: _isBillable(appt) &&
+                        (lockedAthleteId == null ||
+                            lockedAthleteId == appt.athleteId),
+                    onToggleSelected: () => _toggleSelected(appt),
+                    onLongPress: () => _handleLongPress(appt),
+                  ),
+              ];
+
+              final header = _SelectionHeaderRow(
                 selectionMode: _selectionMode,
-                selected: _selectedIds.contains(appt.id) && _isBillable(appt),
-                selectable: _isBillable(appt) &&
-                    (lockedAthleteId == null ||
-                        lockedAthleteId == appt.athleteId),
-                onToggleSelected: () => _toggleSelected(appt),
-                onLongPress: () => _handleLongPress(appt),
-              ),
-          ];
+                selectedCount: effectiveSelected.length,
+                onEnterSelection: _enterSelectionMode,
+                onCancelSelection: _exitSelectionMode,
+              );
 
-          final header = _SelectionHeaderRow(
-            selectionMode: _selectionMode,
-            selectedCount: effectiveSelected.length,
-            onEnterSelection: _enterSelectionMode,
-            onCancelSelection: _exitSelectionMode,
-          );
+              final bottomBar = effectiveSelected.isNotEmpty
+                  ? _CobrarLoteBar(
+                      count: effectiveSelected.length,
+                      onTap: () => _openBatchCobrar(effectiveSelected),
+                    )
+                  : const SizedBox.shrink();
 
-          final bottomBar = effectiveSelected.isNotEmpty
-              ? _CobrarLoteBar(
-                  count: effectiveSelected.length,
-                  onTap: () => _openBatchCobrar(effectiveSelected),
-                )
-              : const SizedBox.shrink();
-
-          if (widget.fillHeight) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                header,
-                const SizedBox(height: 8),
-                Expanded(child: ListView(children: cards)),
-                bottomBar,
-              ],
-            );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              header,
-              const SizedBox(height: 8),
-              ...cards,
-              bottomBar,
-            ],
-          );
-        },
-      ),
+              if (widget.fillHeight) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    header,
+                    const SizedBox(height: 8),
+                    Expanded(child: ListView(children: cards)),
+                    bottomBar,
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  header,
+                  const SizedBox(height: 8),
+                  ...cards,
+                  bottomBar,
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

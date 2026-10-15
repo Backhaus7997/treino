@@ -35,5 +35,7 @@ export 'list_row/list_row.dart';
 export 'pager/coach_hub_pager.dart';
 export 'section_header/section_header.dart';
 export 'section_hero/section_hero.dart';
+export 'stale_async.dart';
+export 'stale_data_notice.dart';
 export 'treino_interactive_state.dart';
 export 'treino_dropdown.dart';

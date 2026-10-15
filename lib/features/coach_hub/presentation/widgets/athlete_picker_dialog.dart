@@ -22,6 +22,8 @@
 /// Sección: coach_hub/pagos — contrato: sin Scaffold, sin HEX, es-AR + // i18n.
 library;
 
+import 'stale_async.dart';
+import 'stale_data_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -53,6 +55,9 @@ class _AthletePickerDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final displayLinksAsync = linksAsync.hasValue
+        ? AsyncValue.data(linksAsync.requireValue)
+        : linksAsync;
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
@@ -66,16 +71,26 @@ class _AthletePickerDialog extends ConsumerWidget {
       ),
       content: SizedBox(
         width: 360,
-        child: TreinoStateSwitcher(
-          childKey: ValueKey(_stateKeyOf(linksAsync)),
-          child: linksAsync.when(
-            loading: () => const _PickerSkeleton(),
-            error: (e, _) => Text(
-              'No pudimos cargar tus alumnos.', // i18n
-              style: TextStyle(color: palette.textMuted),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            staleNoticeIf(
+              linksAsync.isStale,
+              () => ref.invalidate(trainerLinksStreamProvider),
             ),
-            data: (links) => _AthleteList(links: links),
-          ),
+            TreinoStateSwitcher(
+              childKey: ValueKey(_stateKeyOf(linksAsync)),
+              child: displayLinksAsync.when(
+                loading: () => const _PickerSkeleton(),
+                error: (e, _) => Text(
+                  'No pudimos cargar tus alumnos.', // i18n
+                  style: TextStyle(color: palette.textMuted),
+                ),
+                data: (links) => _AthleteList(links: links),
+              ),
+            ),
+          ],
         ),
       ),
       actions: [
@@ -90,9 +105,9 @@ class _AthletePickerDialog extends ConsumerWidget {
 }
 
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de 3 filas placeholder mientras resuelve el stream de vínculos.

@@ -34,7 +34,12 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
     show fmtArs;
 
 import '../../widgets/coach_hub_widgets.dart'
-    show CoachHubSectionHero, KpiCard, TreinoEmptyState, TreinoFilterChips;
+    show
+        CoachHubSectionHero,
+        KpiCard,
+        StaleDataNotice,
+        TreinoEmptyState,
+        TreinoFilterChips;
 import 'planes_filtro_provider.dart';
 import 'tarifas_model.dart';
 import 'tarifas_provider.dart';
@@ -90,6 +95,16 @@ class PlanesScreen extends ConsumerWidget {
             child: const _DescopeBanner(),
           ),
         ),
+
+        // ── Aviso de datos desactualizados (stream falló tras cargar) ──────
+        ref.watch(tarifasResumenStaleProvider)
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: StaleDataNotice(
+                  onRetry: () => ref.invalidate(trainerBillingsProvider),
+                ),
+              )
+            : const SizedBox.shrink(),
 
         // ── KPI strip ──────────────────────────────────────────────────────
         Padding(

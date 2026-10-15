@@ -19,15 +19,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
-    show currentUidProvider;
+    show currentUidProvider, finishedInWindowByUidProvider;
+import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ─── Factories ────────────────────────────────────────────────────────────────
@@ -77,6 +84,9 @@ List<Override> _baseOverrides({
 }) {
   return [
     currentUidProvider.overrideWithValue('trainer-1'),
+    trainerLinksStreamProvider.overrideWith(
+      (ref) => Stream.value(const <TrainerLink>[]),
+    ),
     trainerAppointmentsStreamProvider.overrideWith(
       (ref, key) => appointments is Stream<List<Appointment>>
           ? appointments
@@ -133,6 +143,26 @@ Future<GoRouter> _pump(
     ),
   );
   return router;
+}
+
+Future<void> _pumpWithContainer(
+  WidgetTester tester, {
+  required ProviderContainer container,
+}) async {
+  await tester.pumpWidget(
+    UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const Scaffold(
+          body: SingleChildScrollView(child: DashboardRightColumn()),
+        ),
+      ),
+    ),
+  );
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -343,6 +373,289 @@ void main() {
       expect(router.routerDelegate.currentConfiguration.uri.path, '/pagos');
 
       handle.dispose();
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — próximas sesiones persisten ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: trainerAppointmentsStreamProvider es un
+    // StreamProvider.family en vivo — Riverpod 2.5+ preserva el valor
+    // previo dentro de un AsyncError subsiguiente (copyWithPrevious/
+    // "seamless"). Además, la extracción de `rows` usaba `.whenData()`
+    // (== `.map()`, despacha por SUBTIPO RUNTIME) — en el estado compuesto
+    // (hasValue && hasError) NO ejecuta el callback `data:`, así que
+    // `rows` quedaba `null` y la sección caía al estado de error de
+    // pantalla completa aunque el stream tuviera sesiones ya cargadas.
+    // Fix: extracción vía `valueOrNull` + precedencia hasValue-first.
+    testWidgets(
+        'sesión ya cargada no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      // Broadcast + contador: el reintento tiene que volver a suscribirse.
+      var listens = 0;
+      final controller = StreamController<List<Appointment>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      final container = ProviderContainer(
+        overrides: _baseOverrides(appointments: controller.stream),
+      );
+      addTearDown(container.dispose);
+
+      await _pumpWithContainer(tester, container: container);
+
+      final now = DateTime.now().toUtc();
+      controller.add([
+        _confirmed(
+          id: 's1',
+          athleteDisplayName: 'Ana López',
+          startsAt: now.add(const Duration(hours: 1)),
+        ),
+      ]);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Ana López'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Ana López'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar '
+            'la sesión próxima',
+      );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([
+        _confirmed(
+          id: 's2',
+          athleteDisplayName: 'Beto Sosa',
+          startsAt: now.add(const Duration(hours: 2)),
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Beto Sosa'), findsOneWidget);
+      expect(find.textContaining('Ana López'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — vencimientos persisten ante error transitorio '
+      '(pulido-post-revision)', () {
+    // `pagosBucketsProvider` sostiene los buckets ya calculados (nunca emite
+    // «valor + error»), y `pagosBucketsStaleProvider` expone si la fuente
+    // (`trainerPaymentsProvider`) falló DESPUÉS de cargar. Acá se usa el
+    // provider REAL de buckets sobre un stream de pagos que emite y luego
+    // falla — el camino completo, no un AsyncValue armado a mano.
+    testWidgets(
+        'vencidos ya cargados no desaparecen tras un error transitorio, '
+        'avisan y Reintentar re-suscribe los pagos', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<Payment>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await _pump(
+        tester,
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerAppointmentsStreamProvider.overrideWith(
+            (ref, key) => Stream.value(const <Appointment>[]),
+          ),
+          trainerPaymentsProvider.overrideWith((ref) => controller.stream),
+          inactivosProvider.overrideWith(
+            (ref) =>
+                Future.value(const InactivosResult(inactiveAthleteIds: [])),
+          ),
+          userPublicProfileProvider('a1').overrideWith(
+            (ref) => Stream.value(_pub('a1', 'Beto Ruiz')),
+          ),
+          userPublicProfileProvider('a2').overrideWith(
+            (ref) => Stream.value(_pub('a2', 'Dana Paz')),
+          ),
+        ],
+      );
+
+      controller.add([_pendingPayment(id: 'p1', athleteId: 'a1')]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Beto Ruiz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      final l10n = AppL10n.of(tester.element(find.byType(Scaffold)));
+      expect(find.textContaining('Beto Ruiz'), findsOneWidget);
+      expect(find.text(l10n.coachHubSectionLoadError), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2,
+          reason: 'Reintentar tiene que re-suscribir el stream de pagos');
+
+      controller.add([_pendingPayment(id: 'p2', athleteId: 'a2')]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dana Paz'), findsOneWidget);
+      expect(find.textContaining('Beto Ruiz'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — inactivos persisten ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: inactivosProvider es un FutureProvider que hace fan-out
+    // sobre finishedInWindowByUidProvider. Si ese fan-out lanza un error
+    // transitorio en un rebuild posterior a un cómputo exitoso, Riverpod
+    // preserva el valor previo dentro del AsyncError resultante (mismo
+    // copyWithPrevious/"seamless", no exclusivo de StreamProvider). El
+    // widget chequeaba hasError ANTES que el resultado ya cargado, así que
+    // tapaba la lista de inactivos con el error de pantalla completa.
+    testWidgets(
+        'lista de inactivos ya cargada no desaparece tras un error '
+        'transitorio del future compuesto', (tester) async {
+      final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
+
+      final container = ProviderContainer(overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        trainerLinksStreamProvider.overrideWith(
+          (ref) => Stream.value(const <TrainerLink>[]),
+        ),
+        trainerAppointmentsStreamProvider.overrideWith(
+          (ref, key) => Stream.value(const <Appointment>[]),
+        ),
+        pagosBucketsProvider.overrideWith(
+          (ref) => const AsyncData(
+            PagosBuckets(
+              vencidos: [],
+              porVencer: [],
+              pagados: [],
+              todos: [],
+            ),
+          ),
+        ),
+        inactivosProvider.overrideWith((ref) async {
+          if (recovered) {
+            return const InactivosResult(inactiveAthleteIds: ['a2']);
+          }
+          if (ref.watch(attempt) == 0) {
+            return const InactivosResult(inactiveAthleteIds: ['a1']);
+          }
+          throw Exception('transient fan-out hiccup');
+        }),
+        userPublicProfileProvider('a1').overrideWith(
+          (ref) => Stream.value(_pub('a1', 'Carla Díaz')),
+        ),
+        userPublicProfileProvider('a2').overrideWith(
+          (ref) => Stream.value(_pub('a2', 'Eva Gil')),
+        ),
+      ]);
+      addTearDown(container.dispose);
+
+      await _pumpWithContainer(tester, container: container);
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      container.read(attempt.notifier).state = 1;
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Carla Díaz'),
+        findsOneWidget,
+        reason: 'un error transitorio del fan-out no debe tapar la lista '
+            'de inactivos ya calculada',
+      );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a correr el future (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Eva Gil'), findsOneWidget);
+      expect(find.textContaining('Carla Díaz'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — inactivos ante corte del stream de vínculos '
+      '(pulido-post-revision)', () {
+    // `inactivosProvider` lee los vínculos con `valueOrNull`: si el stream se
+    // rompe tras cargar, el future se recomputa OK y NUNCA marca error. El
+    // aviso tiene que salir de `trainerLinksStreamProvider` mismo.
+    testWidgets(
+        'avisa cuando el stream de vínculos falla después de cargar y '
+        'Reintentar lo re-suscribe', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      TrainerLink link() => TrainerLink(
+            id: 'l1',
+            trainerId: 'trainer-1',
+            athleteId: 'a1',
+            status: TrainerLinkStatus.active,
+            requestedAt: DateTime.utc(2026, 1, 1),
+          );
+
+      await _pump(
+        tester,
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerAppointmentsStreamProvider.overrideWith(
+            (ref, key) => Stream.value(const <Appointment>[]),
+          ),
+          pagosBucketsProvider.overrideWith(
+            (ref) => const AsyncData(
+              PagosBuckets(vencidos: [], porVencer: [], pagados: [], todos: []),
+            ),
+          ),
+          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          finishedInWindowByUidProvider.overrideWith(
+            (ref, key) => Future.value(const <Session>[]),
+          ),
+          userPublicProfileProvider('a1').overrideWith(
+            (ref) => Stream.value(_pub('a1', 'Carla Díaz')),
+          ),
+        ],
+      );
+
+      controller.add([link()]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      controller.addError(Exception('transient links hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir el stream de vínculos');
+
+      controller.add([link()]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }
