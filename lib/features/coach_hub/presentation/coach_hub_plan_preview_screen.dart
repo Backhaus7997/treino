@@ -1,3 +1,5 @@
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -1015,6 +1017,19 @@ class _AthletePicker extends ConsumerWidget {
     final displayLinksAsync = linksAsync.hasValue
         ? AsyncValue.data(linksAsync.requireValue)
         : linksAsync;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        staleNoticeIf(
+          linksAsync.isStale,
+          () => ref.invalidate(trainerLinksStreamProvider),
+        ),
+        _athleteOptions(displayLinksAsync),
+      ],
+    );
+  }
+
+  Widget _athleteOptions(AsyncValue<List<TrainerLink>> displayLinksAsync) {
     return displayLinksAsync.when(
       // Skeleton y no spinner: lo que viene es una LISTA de alumnos y su forma
       // ya la conocemos. El spinner medía 36px y la lista mide varios cientos,

@@ -2404,7 +2404,10 @@ void main() {
 
   group('errores transitorios conservan datos ya cargados', () {
     testWidgets('Pagos conserva el historial', (tester) async {
-      final payments = StreamController<List<Payment>>();
+      var listens = 0;
+      final payments = StreamController<List<Payment>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(payments.close);
 
       await _pump(
@@ -2426,16 +2429,40 @@ void main() {
       ]);
       await tester.pumpAndSettle();
       expect(find.text('Mensualidad visible'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
 
       payments.addError(Exception('corte transitorio'));
       await tester.pumpAndSettle();
 
       expect(find.text('Mensualidad visible'), findsOneWidget);
       expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir el stream de pagos');
+
+      payments.add([
+        _pago(
+          id: 'p-nuevo',
+          concept: 'Mensualidad nueva',
+          amountArs: 30000,
+          status: PaymentStatus.paid,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('Mensualidad nueva'), findsOneWidget);
+      expect(find.text('Mensualidad visible'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
 
     testWidgets('Resumen conserva la nota fijada', (tester) async {
-      final notes = StreamController<AthleteNote?>();
+      var listens = 0;
+      final notes = StreamController<AthleteNote?>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(notes.close);
 
       await _pump(
@@ -2449,12 +2476,151 @@ void main() {
       notes.add(_note(note: 'Nota que debe seguir visible'));
       await tester.pumpAndSettle();
       expect(find.text('Nota que debe seguir visible'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
 
       notes.addError(Exception('corte transitorio'));
       await tester.pumpAndSettle();
 
       expect(find.text('Nota que debe seguir visible'), findsOneWidget);
       expect(find.text('No se pudo cargar la nota.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir el stream de la nota');
+
+      notes.add(_note(note: 'Nota actualizada'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nota actualizada'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    testWidgets(
+        'Progreso conserva las mediciones y avisa que están '
+        'desactualizadas', (tester) async {
+      var listens = 0;
+      final meds = StreamController<List<Measurement>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(meds.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        extraOverrides: [
+          measurementsForAthleteProvider.overrideWith((ref, id) => meds.stream),
+        ],
+        settle: false,
+      );
+      await navigateAlumnoDetail(tester, group: 'Progreso');
+
+      meds.add([_meas(60.5, fat: 22.4, waist: 71)]);
+      await tester.pumpAndSettle();
+      expect(find.text('60.5 kg'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      meds.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('60.5 kg'), findsOneWidget);
+      expect(find.text('No se pudo cargar el progreso.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir las mediciones');
+
+      meds.add([_meas(58.5, fat: 21.0, waist: 70)]);
+      await tester.pumpAndSettle();
+      expect(find.text('58.5 kg'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    testWidgets(
+        'Resumen conserva el resumen y avisa si una fuente falló después de '
+        'cargar', (tester) async {
+      var listens = 0;
+      final meds = StreamController<List<Measurement>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(meds.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        extraOverrides: [
+          measurementsForAthleteProvider.overrideWith((ref, id) => meds.stream),
+        ],
+        settle: false,
+      );
+
+      meds.add([_meas(60.5)]);
+      await tester.pumpAndSettle();
+      expect(find.text('PESO CORPORAL'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      meds.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('PESO CORPORAL'), findsOneWidget);
+      expect(find.text('No se pudo cargar el resumen.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir las mediciones');
+
+      meds.add([_meas(59.0)]);
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    testWidgets(
+        'Notas privadas conserva la nota y avisa que está '
+        'desactualizada', (tester) async {
+      var listens = 0;
+      final notes = StreamController<AthleteNote?>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(notes.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNoteStream: notes.stream,
+        settle: false,
+      );
+      await navigateAlumnoDetail(tester, group: 'Privado', subview: 'Notas');
+
+      notes.add(_note(note: 'Apunte privado'));
+      await tester.pumpAndSettle();
+      expect(find.text('Apunte privado'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      final listensAntes = listens;
+
+      notes.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apunte privado'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, greaterThan(listensAntes),
+          reason: 'Reintentar tiene que re-suscribir la nota');
+
+      notes.add(_note(note: 'Apunte privado'));
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

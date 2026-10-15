@@ -37,6 +37,8 @@ import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -216,6 +218,10 @@ class DashboardProximasSesionesCard extends ConsumerWidget {
             title: l10n.dashboardProximasSesionesSectionLabel,
           ),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            appointmentsAsync.isStale,
+            () => ref.invalidate(trainerAppointmentsStreamProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(appointmentsAsync, rows)),
             child: _ProximasSesionesContent(
@@ -357,11 +363,17 @@ class DashboardVencimientos7dCard extends ConsumerWidget {
         children: [
           TreinoSectionHeader(title: l10n.dashboardVencimientosTitle),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            ref.watch(pagosBucketsStaleProvider),
+            () => ref.invalidate(trainerPaymentsProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(bucketsAsync)),
             child: _VencimientosContent(
               bucketsAsync: bucketsAsync,
-              onRetry: () => ref.invalidate(pagosBucketsProvider),
+              // El stream vive en `trainerPaymentsProvider`: invalidar sólo el
+              // derivado no re-suscribe nada.
+              onRetry: () => ref.invalidate(trainerPaymentsProvider),
             ),
           ),
         ],
@@ -517,6 +529,10 @@ class DashboardInactivosCard extends ConsumerWidget {
         children: [
           TreinoSectionHeader(title: l10n.dashboardInactivosTitle),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            inactivosAsync.isStale,
+            () => ref.invalidate(inactivosProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(inactivosAsync)),
             child: _InactivosContent(

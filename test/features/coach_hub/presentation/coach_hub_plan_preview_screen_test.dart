@@ -298,7 +298,10 @@ void main() {
     testWidgets(
         'los alumnos ya cargados no desaparecen tras un error transitorio '
         'del stream (stale-while-refresh)', (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       final plan = _planWithUnmatched();
@@ -330,6 +333,7 @@ void main() {
         ),
         findsOneWidget,
       );
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pump();
@@ -341,6 +345,17 @@ void main() {
         reason: 'un error transitorio con alumnos ya cargados no debe tapar '
             'el picker con el mensaje de error',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(const <TrainerLink>[]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

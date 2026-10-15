@@ -211,7 +211,11 @@ void main() {
     testWidgets(
         'solicitud ya cargada no desaparece tras un error transitorio del '
         'stream (stale-while-refresh)', (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
+      // Broadcast + contador: el reintento tiene que volver a suscribirse.
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       final container = ProviderContainer(overrides: [
@@ -239,6 +243,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('pending_request_r1')), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
@@ -251,6 +256,18 @@ void main() {
             'la solicitud pendiente',
       );
       expect(find.text(l10n.coachHubSectionLoadError), findsNothing);
+      // ...y avisa que están desactualizadas.
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([_link(id: 'r2', athleteId: 'a1')]);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('pending_request_r2')), findsOneWidget);
+      expect(find.byKey(const Key('pending_request_r1')), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

@@ -207,7 +207,10 @@ void main() {
       final links = [
         _link(id: 'l1', athleteId: 'a1', status: TrainerLinkStatus.active),
       ];
-      final controller = StreamController<List<TrainerLink>>();
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
       final container = ProviderContainer(
         overrides: [
@@ -228,6 +231,12 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(sub.close);
+      final staleSub = container.listen(
+        nutricionEntriesStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
 
       controller.add(links);
       await Future<void>.delayed(Duration.zero);
@@ -236,9 +245,12 @@ void main() {
       final afterData = container.read(nutricionEntriesProvider);
       expect(afterData.hasValue, isTrue);
       expect(afterData.value!.map((e) => e.link.athleteId), ['a1']);
+      expect(container.read(nutricionEntriesStaleProvider), isFalse);
 
       controller.addError(Exception('transient stream hiccup'));
       await Future<void>.delayed(Duration.zero);
+      // Las entries se sostienen, pero el error queda observable.
+      expect(container.read(nutricionEntriesStaleProvider), isTrue);
 
       final afterError = container.read(nutricionEntriesProvider);
       expect(
@@ -247,6 +259,15 @@ void main() {
         reason: 'a transient stream error must not blank cached entries',
       );
       expect(afterError.value!.map((e) => e.link.athleteId), ['a1']);
+
+      // Reintentar = invalidar la fuente: re-suscribe y apaga el aviso.
+      container.invalidate(trainerLinksStreamProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(listens, 2);
+      controller.add(links);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(nutricionEntriesStaleProvider), isFalse);
     });
   });
 

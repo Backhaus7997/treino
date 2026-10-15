@@ -220,7 +220,10 @@ void main() {
         status: PaymentStatus.pending,
         createdAt: _periodStart.subtract(const Duration(days: 1)),
       );
-      final controller = StreamController<List<Payment>>();
+      var listens = 0;
+      final controller = StreamController<List<Payment>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
       final container = ProviderContainer(
         overrides: [
@@ -235,6 +238,12 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(sub.close);
+      final staleSub = container.listen<bool>(
+        pagosBucketsStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
 
       controller.add([payment]);
       await Future<void>.delayed(Duration.zero);
@@ -242,9 +251,12 @@ void main() {
       final afterData = container.read(pagosBucketsProvider);
       expect(afterData.hasValue, isTrue);
       expect(afterData.value!.vencidos.map((p) => p.id), contains('v1'));
+      expect(container.read(pagosBucketsStaleProvider), isFalse);
 
       controller.addError(Exception('transient stream hiccup'));
       await Future<void>.delayed(Duration.zero);
+      // Los buckets se sostienen, pero el error queda observable.
+      expect(container.read(pagosBucketsStaleProvider), isTrue);
 
       final afterError = container.read(pagosBucketsProvider);
       expect(
@@ -257,9 +269,18 @@ void main() {
       controller.add([payment]);
       await Future<void>.delayed(Duration.zero);
 
+      // Reintentar = invalidar la fuente: re-suscribe.
+      container.invalidate(trainerPaymentsProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(listens, 2);
+
+      controller.add([payment]);
+      await Future<void>.delayed(Duration.zero);
+
       final afterRecover = container.read(pagosBucketsProvider);
       expect(afterRecover.hasValue, isTrue);
       expect(afterRecover.value!.vencidos.map((p) => p.id), contains('v1'));
+      expect(container.read(pagosBucketsStaleProvider), isFalse);
     });
   });
 }

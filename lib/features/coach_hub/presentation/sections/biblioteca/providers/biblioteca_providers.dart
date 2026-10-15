@@ -13,6 +13,7 @@ import '../../../../../workout/application/session_providers.dart'
 import '../../../../../workout/domain/equipment_type.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
+import '../../../widgets/stale_async.dart';
 
 // ── Filter state providers (autoDispose → reset on section exit) ──────────────
 
@@ -158,3 +159,11 @@ final bibliotecaUnfilteredCountProvider =
   final customs = customsAsync.requireValue;
   return AsyncData(catalog.length + customs.length);
 });
+
+/// `true` cuando el catálogo ([exercisesProvider]) ya había cargado y DESPUÉS
+/// falló. [bibliotecaExercisesProvider] sostiene la grilla ya calculada; este
+/// flag deja a la UI avisar «Datos desactualizados · Reintentar»
+/// (`ref.invalidate(exercisesProvider)`).
+final bibliotecaStaleProvider = Provider.autoDispose<bool>(
+  (ref) => ref.watch(exercisesProvider).isStale,
+);

@@ -197,14 +197,11 @@ void main() {
   group(
       'EjerciciosTab — SCENARIO-STALE — grilla sostiene ante error '
       'transitorio (pulido-post-revision)', () {
-    // Regression coverage: `EjerciciosTab` sigue usando `.when()` +
-    // `_stateKey` con `hasError` chequeado antes que `hasValue`, pero queda
-    // PROTEGIDO por el fix hasValue-first de `bibliotecaExercisesProvider`
-    // (ver biblioteca_providers.dart): una vez que el catálogo tiene
-    // `hasValue == true`, el provider siempre emite `AsyncData` pura — nunca
-    // vuelve a componer un `hasValue == true && hasError == true`
-    // simultáneo para esta tab. Este test verifica esa protección
-    // end-to-end sin tocar `ejercicios_tab.dart`.
+    // Regression coverage: `bibliotecaExercisesProvider` sostiene el
+    // catálogo ya cargado (hasValue-first) y siempre emite `AsyncData` pura,
+    // así que la grilla no desaparece. El error NO se pierde:
+    // `bibliotecaStaleProvider` lo expone y `EjerciciosTab` muestra
+    // «Datos desactualizados · Reintentar» (invalida `exercisesProvider`).
     testWidgets(
         'grilla ya cargada no desaparece tras un error transitorio del '
         'catálogo (protegida por bibliotecaExercisesProvider)', (tester) async {
@@ -214,11 +211,13 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
 
       await tester.pumpWidget(
         _wrap(
           const EjerciciosTab(),
           catalogOverride: exercisesProvider.overrideWith((ref) async {
+            if (recovered) return const [_curl];
             if (ref.watch(attempt) == 0) return const [_bench];
             throw Exception('transient catalog hiccup');
           }),
@@ -228,6 +227,7 @@ void main() {
 
       expect(find.text('Press de Banca'), findsOneWidget);
       expect(find.textContaining('Error al cargar ejercicios'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       final element = tester.element(find.byType(EjerciciosTab));
       ProviderScope.containerOf(element).read(attempt.notifier).state = 1;
@@ -240,6 +240,15 @@ void main() {
             'ya cargada',
       );
       expect(find.textContaining('Error al cargar ejercicios'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a pedir el catálogo (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Curl de Bíceps'), findsOneWidget);
+      expect(find.text('Press de Banca'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

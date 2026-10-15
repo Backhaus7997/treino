@@ -84,7 +84,11 @@ void main() {
     testWidgets(
         'las reglas ya cargadas no desaparecen tras un error transitorio '
         'del stream de reglas (stale-while-refresh)', (tester) async {
-      final rulesController = StreamController<List<AvailabilityRule>>();
+      var listens = 0;
+      final rulesController =
+          StreamController<List<AvailabilityRule>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(rulesController.close);
 
       await tester.pumpWidget(_harness(
@@ -98,6 +102,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('09:00 – 12:00 · 60 min'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       rulesController.addError(Exception('transient stream hiccup'));
       await tester.pump();
@@ -109,14 +114,41 @@ void main() {
         reason: 'un error transitorio con reglas ya cargadas no debe tapar '
             'la lista de reglas',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      rulesController.add(const [
+        AvailabilityRule(
+          id: 'r2',
+          trainerId: _trainerId,
+          dayOfWeek: 2,
+          startHour: 14,
+          startMinute: 0,
+          endHour: 17,
+          endMinute: 0,
+          slotDurationMin: 60,
+        ),
+      ]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('14:00 – 17:00 · 60 min'), findsOneWidget);
+      expect(find.text('09:00 – 12:00 · 60 min'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
 
     testWidgets(
         'las excepciones ya cargadas no desaparecen tras un error '
         'transitorio del stream de excepciones (stale-while-refresh)',
         (tester) async {
+      var listens = 0;
       final overridesController =
-          StreamController<List<AvailabilityOverride>>();
+          StreamController<List<AvailabilityOverride>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(overridesController.close);
 
       await tester.pumpWidget(_harness(
@@ -130,6 +162,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.text('Día bloqueado'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       overridesController.addError(Exception('transient stream hiccup'));
       await tester.pump();
@@ -141,6 +174,19 @@ void main() {
         reason: 'un error transitorio con excepciones ya cargadas no debe '
             'tapar la lista de excepciones',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      overridesController.add(const <AvailabilityOverride>[]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Sin excepciones.'), findsOneWidget);
+      expect(find.text('Día bloqueado'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

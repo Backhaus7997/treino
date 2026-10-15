@@ -868,7 +868,10 @@ void main() {
     testWidgets(
         'roster ya cargado no desaparece tras un error transitorio del '
         'stream de vínculos (stale-while-refresh)', (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       // settle:false — el shimmer de la tabla anima en loop mientras
@@ -876,7 +879,7 @@ void main() {
       await _pump(
         tester,
         linksStream: controller.stream,
-        profiles: [_prof('a1', 'Sofía')],
+        profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Tomás')],
         settle: false,
       );
 
@@ -886,6 +889,7 @@ void main() {
 
       expect(find.text('Sofía'), findsOneWidget);
       expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
@@ -897,6 +901,17 @@ void main() {
             'roster',
       );
       expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([_link('a2', TrainerLinkStatus.active)]);
+      await tester.pumpAndSettle();
+      expect(find.text('Tomás'), findsOneWidget);
+      expect(find.text('Sofía'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
 
     // Regression: mismo defecto en `_LinksLoaded.build` — despachaba con
@@ -909,12 +924,14 @@ void main() {
         'roster ya cargado no desaparece tras un error transitorio del '
         'batch de perfiles (stale-while-refresh)', (tester) async {
       final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
 
       await _pump(
         tester,
         links: [_link('a1', TrainerLinkStatus.active)],
         profilesOverride: userPublicProfilesBatchProvider.overrideWith(
           (ref, key) {
+            if (recovered) return {'a1': _prof('a1', 'Sofía Recuperada')};
             if (ref.watch(attempt) == 0) {
               return {'a1': _prof('a1', 'Sofía')};
             }
@@ -924,6 +941,7 @@ void main() {
       );
 
       expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       final element = tester.element(find.byType(AlumnosScreen));
       ProviderScope.containerOf(element).read(attempt.notifier).state = 1;
@@ -935,6 +953,14 @@ void main() {
         reason: 'un error transitorio con data ya cargada no debe tapar el '
             'roster',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a correr el batch de perfiles (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sofía Recuperada'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

@@ -274,6 +274,14 @@ class _LinksLoaded extends ConsumerWidget {
       tableLoading: tableState == 'loading',
       errorMessage: errorMessage,
       onRetry: onRetry,
+      // Roster ya cargado cuyo stream (links o perfiles) falló después: las
+      // filas siguen, pero avisamos y ofrecemos re-suscribir la fuente rota.
+      staleRetry: linksAsync.isStale
+          ? () => ref.invalidate(trainerLinksStreamProvider)
+          : profilesAsync.isStale
+              ? () =>
+                  ref.invalidate(userPublicProfilesBatchProvider(ids.join(',')))
+              : null,
     );
   }
 }
@@ -294,6 +302,7 @@ class _RosterFrame extends ConsumerWidget {
     this.tableLoading = false,
     this.errorMessage,
     this.onRetry,
+    this.staleRetry,
   });
 
   final List<_RosterEntry> roster;
@@ -312,6 +321,10 @@ class _RosterFrame extends ConsumerWidget {
   final bool tableLoading;
   final String? errorMessage;
   final VoidCallback? onRetry;
+
+  /// No-`null` cuando hay filas visibles pero su fuente falló después de
+  /// cargar: dispara el aviso «Datos desactualizados · Reintentar».
+  final VoidCallback? staleRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -402,6 +415,7 @@ class _RosterFrame extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s14),
+              staleNoticeIf(staleRetry != null, staleRetry ?? () {}),
               // ÚNICO cross-fade de la pantalla, y envuelve SÓLO esto.
               //
               // Antes el switcher estaba arriba de todo y remontaba el frame

@@ -73,6 +73,10 @@ class InvitacionesScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.s14),
+          staleNoticeIf(
+            linksAsync.isStale,
+            () => ref.invalidate(trainerLinksStreamProvider),
+          ),
           TreinoStateSwitcher(
             childKey:
                 ValueKey('invitaciones_${_stateKeyOf(linksAsync)}_${tab.name}'),

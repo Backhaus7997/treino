@@ -1,6 +1,8 @@
 // PR3a+PR3b — Panel de edición de reglas y excepciones de disponibilidad.
 // Strings en español hardcodeado + // i18n. NO se usa AppL10n (constraint C-6).
 // Dialogs: showDialog/AlertDialog (ADR-AGW-3). NO showModalBottomSheet.
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -92,6 +94,11 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Reglas ─────────────────────────────────────────────────
+                    staleNoticeIf(
+                      rulesAsync.isStale,
+                      () => ref.invalidate(
+                          availabilityRulesStreamProvider(trainerId)),
+                    ),
                     (rulesAsync.hasValue
                             ? AsyncValue.data(rulesAsync.requireValue)
                             : rulesAsync)
@@ -144,6 +151,11 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                     ),
 
                     // ── Overrides list ─────────────────────────────────────────
+                    staleNoticeIf(
+                      overridesAsync.isStale,
+                      () =>
+                          ref.invalidate(overridesStreamProvider(overridesKey)),
+                    ),
                     (overridesAsync.hasValue
                             ? AsyncValue.data(overridesAsync.requireValue)
                             : overridesAsync)

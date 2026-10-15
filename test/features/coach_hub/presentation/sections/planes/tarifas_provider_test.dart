@@ -138,7 +138,10 @@ void main() {
         amountArs: 15000,
         cadence: BillingCadence.mensual,
       );
-      final controller = StreamController<List<AthleteBilling>>();
+      var listens = 0;
+      final controller = StreamController<List<AthleteBilling>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
       final container = ProviderContainer(
         overrides: [
@@ -153,6 +156,12 @@ void main() {
         fireImmediately: true,
       );
       addTearDown(sub.close);
+      final staleSub = container.listen(
+        tarifasResumenStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
 
       controller.add([billing]);
       await Future<void>.delayed(Duration.zero);
@@ -160,9 +169,14 @@ void main() {
       final afterData = container.read(tarifasResumenProvider);
       expect(afterData.hasValue, isTrue);
       expect(afterData.value!.alumnosConTarifa, 1);
+      expect(container.read(tarifasResumenStaleProvider), isFalse);
 
       controller.addError(Exception('transient stream hiccup'));
       await Future<void>.delayed(Duration.zero);
+
+      // El resumen se sostiene, pero el error NO se pierde: la UI lo lee del
+      // flag para avisar «Datos desactualizados».
+      expect(container.read(tarifasResumenStaleProvider), isTrue);
 
       final afterError = container.read(tarifasResumenProvider);
       expect(
@@ -178,6 +192,55 @@ void main() {
       final afterRecover = container.read(tarifasResumenProvider);
       expect(afterRecover.hasValue, isTrue);
       expect(afterRecover.value!.alumnosConTarifa, 1);
+      expect(container.read(tarifasResumenStaleProvider), isFalse);
+    });
+
+    test('Reintentar (invalidar la fuente) re-suscribe y apaga el aviso',
+        () async {
+      var listens = 0;
+      final controller = StreamController<List<AthleteBilling>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+      final container = ProviderContainer(
+        overrides: [
+          trainerBillingsProvider.overrideWith((ref) => controller.stream),
+        ],
+      );
+      addTearDown(container.dispose);
+      final sub = container.listen(
+        tarifasResumenProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      final staleSub = container.listen(
+        tarifasResumenStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
+
+      controller.add([
+        _billing(
+          athleteId: 'a1',
+          amountArs: 15000,
+          cadence: BillingCadence.mensual,
+        ),
+      ]);
+      await Future<void>.delayed(Duration.zero);
+      controller.addError(Exception('permanent'));
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(tarifasResumenStaleProvider), isTrue);
+      expect(listens, 1);
+
+      container.invalidate(trainerBillingsProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(listens, 2);
+
+      controller.add(const []);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(tarifasResumenStaleProvider), isFalse);
     });
   });
 }

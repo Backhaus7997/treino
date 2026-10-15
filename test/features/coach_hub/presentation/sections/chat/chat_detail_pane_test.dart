@@ -294,7 +294,10 @@ void main() {
       'thread persists through a transient stream error when messages were '
       'already loaded',
       (tester) async {
-        final controller = StreamController<List<Message>>();
+        var listens = 0;
+        final controller = StreamController<List<Message>>.broadcast(
+          onListen: () => listens++,
+        );
         addTearDown(controller.close);
 
         final container = _buildContainer(overrides: [
@@ -324,12 +327,32 @@ void main() {
         ]);
         await tester.pumpAndSettle();
         expect(find.text('hola A'), findsOneWidget);
+        expect(find.text('Datos desactualizados'), findsNothing);
 
         controller.addError('transient');
         await tester.pumpAndSettle();
 
         expect(find.text('No pudimos cargar los mensajes.'), findsNothing);
         expect(find.text('hola A'), findsOneWidget);
+        expect(find.text('Datos desactualizados'), findsOneWidget);
+
+        await tester.tap(find.text('Reintentar'));
+        await tester.pumpAndSettle();
+        expect(listens, 2,
+            reason: 'Reintentar tiene que re-suscribir el stream');
+
+        controller.add([
+          Message(
+            id: 'm2',
+            senderId: _athleteUid,
+            text: 'hola B',
+            createdAt: DateTime(2026, 7, 2),
+          ),
+        ]);
+        await tester.pumpAndSettle();
+        expect(find.text('hola B'), findsOneWidget);
+        expect(find.text('hola A'), findsNothing);
+        expect(find.text('Datos desactualizados'), findsNothing);
       },
     );
 

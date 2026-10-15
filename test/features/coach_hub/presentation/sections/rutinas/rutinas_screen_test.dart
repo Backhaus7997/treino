@@ -174,6 +174,14 @@ void main() {
 
       expect(find.text('Hipertrofia base'), findsOneWidget);
       expect(find.text('No pudimos cargar tus rutinas.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a leer (ahora sí resuelve) y apaga el aviso.
+      fail = false;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hipertrofia base'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

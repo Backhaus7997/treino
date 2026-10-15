@@ -241,14 +241,26 @@ void main() {
       await container.read(exercisesProvider.future);
       await Future.microtask(() {});
 
+      final staleSub = container.listen<bool>(
+        bibliotecaStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
+
       final loaded = container.read(bibliotecaExercisesProvider);
       expect(loaded.hasValue, isTrue);
       expect(loaded.requireValue.any((e) => e.id == _bench.id), isTrue);
+      expect(container.read(bibliotecaStaleProvider), isFalse);
 
       container.read(attempt.notifier).state = 1;
       await Future.microtask(() {});
       await Future.microtask(() {});
 
+      // El catálogo se sostiene, pero el error queda observable. (El error
+      // de un FutureProvider llega un par de turnos después del rebuild.)
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(bibliotecaStaleProvider), isTrue);
       final afterError = container.read(bibliotecaExercisesProvider);
       expect(
         afterError.hasValue,

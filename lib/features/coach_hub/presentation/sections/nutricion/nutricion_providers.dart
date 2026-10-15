@@ -7,6 +7,7 @@ import '../../../../coach/domain/trainer_link.dart';
 import '../../../../coach/domain/trainer_link_status.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../widgets/stale_async.dart';
 
 /// Filtro del overview cross-alumno de Nutrición (ADR-F6-01) — chips
 /// Todos/Con plan/Sin plan.
@@ -103,3 +104,12 @@ Map<NutricionFiltro, int> nutricionFiltroCounts(List<NutricionEntry> entries) {
       filtro: entries.where((e) => matchesNutricionFiltro(e, filtro)).length,
   };
 }
+
+/// `true` cuando [trainerLinksStreamProvider] ya había cargado vínculos y
+/// DESPUÉS falló (stream cerrado por error, casi siempre permanente).
+/// [nutricionEntriesProvider] sostiene las entries ya calculadas; este flag
+/// deja a la UI avisar «Datos desactualizados · Reintentar»
+/// (`ref.invalidate(trainerLinksStreamProvider)`).
+final nutricionEntriesStaleProvider = Provider.autoDispose<bool>(
+  (ref) => ref.watch(trainerLinksStreamProvider).isStale,
+);

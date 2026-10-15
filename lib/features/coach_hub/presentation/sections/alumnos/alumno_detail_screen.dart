@@ -1125,6 +1125,21 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     );
   }
 
+  /// Aviso «Datos desactualizados» de Progreso: mediciones o pruebas ya
+  /// cargadas cuyo stream falló después. Reintenta sólo la fuente rota.
+  Widget _staleProgressNotice(
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) =>
+      staleNoticeIf(measAsync.isStale || perfAsync.isStale, () {
+        if (measAsync.isStale) {
+          ref.invalidate(measurementsForAthleteProvider(widget.athleteId));
+        }
+        if (perfAsync.isStale) {
+          ref.invalidate(performanceTestsForAthleteProvider(widget.athleteId));
+        }
+      });
+
   Widget _buildAntropometria(
     AppPalette palette,
     AsyncValue<List<Measurement>> measAsync,
@@ -1158,6 +1173,7 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
                   palette: palette,
                 ),
                 const SizedBox(height: 20),
+                _staleProgressNotice(measAsync, perfAsync),
                 _ProgressReading(
                   measurements: measAsync,
                   performanceTests: perfAsync,
@@ -1215,6 +1231,7 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
                   palette: palette,
                 ),
                 const SizedBox(height: 20),
+                _staleProgressNotice(measAsync, perfAsync),
                 _ProgressReading(
                   measurements: measAsync,
                   performanceTests: perfAsync,
@@ -1651,6 +1668,25 @@ class _ResumenTab extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Fuentes del resumen ya cargadas cuyo stream falló después
+            // (incluidas las sesiones: un link pausado las corta). Reintenta
+            // sólo las rotas.
+            staleNoticeIf(
+              measAsync.isStale ||
+                  routinesAsync.isStale ||
+                  sessionsAsync.isStale,
+              () {
+                if (measAsync.isStale) {
+                  ref.invalidate(measurementsForAthleteProvider(athleteId));
+                }
+                if (routinesAsync.isStale) {
+                  ref.invalidate(assignedRoutinesByTrainerProvider);
+                }
+                if (sessionsAsync.isStale) {
+                  ref.invalidate(sessionsByUidProvider(athleteId));
+                }
+              },
+            ),
             kpiRow,
             const SizedBox(height: 20),
             heatmapBlock,
@@ -1888,66 +1924,78 @@ class _NoteCard extends ConsumerWidget {
     // branch abajo); el SizedBox externo solo mantiene el maxWidth completo.
     return SizedBox(
       width: double.infinity,
-      child: TreinoStateSwitcher(
-        childKey: ValueKey(displayAsync.when(
-          loading: () => 'loading',
-          error: (_, __) => 'error',
-          data: (_) => 'data',
-        )),
-        child: displayAsync.when(
-          loading: () => SizedBox(
-            height: 48,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            async.isStale,
+            () => ref.invalidate(athleteNoteProvider(
+                (trainerId: trainerId, athleteId: athleteId))),
+          ),
+          TreinoStateSwitcher(
+            childKey: ValueKey(displayAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: displayAsync.when(
+              loading: () => SizedBox(
+                height: 48,
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  ),
+                ),
               ),
+              error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
+              data: (note) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: palette.bgCard,
+                    border: Border.all(color: palette.border),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: note == null || note.note.trim().isEmpty
+                      ? Text(
+                          'Sin nota fijada.', // i18n: Fase W2
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              note.note,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontSize: 13,
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _haceDias(note.updatedAt), // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                );
+              },
             ),
           ),
-          error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
-          data: (note) {
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: note == null || note.note.trim().isEmpty
-                  ? Text(
-                      'Sin nota fijada.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          note.note,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 13,
-                            height: 1.45,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _haceDias(note.updatedAt), // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-            );
-          },
-        ),
+        ],
       ),
     );
   }
@@ -2004,86 +2052,97 @@ class _ProxSesionCard extends ConsumerWidget {
     // hijo, sin esto la card queda angosta al medio.
     return SizedBox(
       width: double.infinity,
-      child: TreinoStateSwitcher(
-        childKey: ValueKey(displayAsync.when(
-          loading: () => 'loading',
-          error: (_, __) => 'error',
-          data: (_) => 'data',
-        )),
-        child: displayAsync.when(
-          loading: () => SizedBox(
-            height: 48,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            async.isStale,
+            () => ref.invalidate(trainerAppointmentsStreamProvider),
+          ),
+          TreinoStateSwitcher(
+            childKey: ValueKey(displayAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: displayAsync.when(
+              loading: () => SizedBox(
+                height: 48,
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  ),
+                ),
               ),
+              error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
+              data: (appointments) {
+                final upcoming = appointments
+                    .where((a) =>
+                        a.athleteId == athleteId &&
+                        a.status == AppointmentStatus.confirmed &&
+                        a.startsAt.isAfter(now))
+                    .toList()
+                  ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+                final next = upcoming.firstOrNull;
+
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: palette.bgCard,
+                    border: Border.all(color: palette.border),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: next == null
+                      ? Text(
+                          'Sin sesiones próximas.', // i18n: Fase W2
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _fmtDate(next.startsAt), // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${next.durationMin} min', // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (next.noteBefore != null &&
+                                next.noteBefore!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                next.noteBefore!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                );
+              },
             ),
           ),
-          error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
-          data: (appointments) {
-            final upcoming = appointments
-                .where((a) =>
-                    a.athleteId == athleteId &&
-                    a.status == AppointmentStatus.confirmed &&
-                    a.startsAt.isAfter(now))
-                .toList()
-              ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-            final next = upcoming.firstOrNull;
-
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: next == null
-                  ? Text(
-                      'Sin sesiones próximas.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _fmtDate(next.startsAt), // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${next.durationMin} min', // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        if (next.noteBefore != null &&
-                            next.noteBefore!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            next.noteBefore!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: palette.textMuted,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-            );
-          },
-        ),
+        ],
       ),
     );
   }
@@ -2554,6 +2613,13 @@ class _PagosTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Pagos ya cargados cuyo stream (o el de cobros pendientes) falló
+          // después. El historial sale de `trainerPaymentsProvider`; los
+          // pendientes, de `pagosPorCobrarProvider`.
+          staleNoticeIf(paymentsAsync.isStale || pendingAsync.isStale, () {
+            if (paymentsAsync.isStale) ref.invalidate(trainerPaymentsProvider);
+            if (pendingAsync.isStale) ref.invalidate(pagosPorCobrarProvider);
+          }),
           Row(
             children: [
               Expanded(
@@ -3421,6 +3487,14 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // La nota ya cargó pero su stream falló después: lo que se ve
+                // (y lo que se edita) puede no ser lo último guardado.
+                staleNoticeIf(
+                  noteAsync.isStale,
+                  () => ref.invalidate(athleteNoteProvider(
+                    (trainerId: trainerUid, athleteId: widget.athleteId),
+                  )),
+                ),
                 // ── Header row: title + last-updated timestamp ─────────────
                 Row(
                   children: [

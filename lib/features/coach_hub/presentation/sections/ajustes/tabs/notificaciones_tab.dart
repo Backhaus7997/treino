@@ -8,6 +8,8 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_prefs.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Notificaciones» de Configuración (Fase W3.2 / Fase 12 WU-05).
@@ -42,8 +44,16 @@ class NotificacionesTab extends ConsumerWidget {
 
     final Widget content;
     if (prefsAsync.hasValue) {
-      content =
-          _NotifBody(prefs: prefsAsync.requireValue, uid: uid, colW: _colW);
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            prefsAsync.isStale,
+            () => ref.invalidate(webNotificationPreferencesProvider),
+          ),
+          _NotifBody(prefs: prefsAsync.requireValue, uid: uid, colW: _colW),
+        ],
+      );
     } else if (prefsAsync.hasError) {
       content = _muted(
         context,

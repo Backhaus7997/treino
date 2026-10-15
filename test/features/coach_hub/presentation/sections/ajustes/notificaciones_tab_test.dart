@@ -102,7 +102,10 @@ void main() {
     testWidgets(
         'la matriz ya cargada no desaparece tras un error transitorio del '
         'stream (stale-while-refresh)', (tester) async {
-      final controller = StreamController<NotifPrefs>();
+      var listens = 0;
+      final controller = StreamController<NotifPrefs>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       await tester.pumpWidget(_harness(prefsStream: controller.stream));
@@ -117,6 +120,7 @@ void main() {
         find.text('No se pudieron cargar tus preferencias.'),
         findsNothing,
       );
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
@@ -131,6 +135,16 @@ void main() {
         find.text('No se pudieron cargar tus preferencias.'),
         findsNothing,
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(NotifPrefs.fromFirestore(null));
+      await tester.pumpAndSettle();
+      expect(find.text('Mensaje nuevo'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

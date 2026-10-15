@@ -40,20 +40,36 @@ class CuentaTab extends ConsumerWidget {
     // `hasValue==true` Y `hasError==true` pueden darse a la vez tras un
     // error transitorio. `switch`/`.when()` despachan por SUBTIPO runtime
     // (ignoran `hasValue`) — se prioriza el valor cacheado.
-    final stateKey = profileAsync.hasValue
-        ? const ValueKey('data')
-        : profileAsync.hasError
-            ? const ValueKey('error')
+    //
+    // `AsyncValue<UserProfile?>`: un `null` CON error es «no sé», no «no hay
+    // cuenta» — se muestra el error con «Reintentar». Un `null` sin error sí
+    // afirma que no hay perfil.
+    final profile = profileAsync.valueOrNull;
+    final unknown = profileAsync.hasError && profile == null;
+    final stateKey = unknown
+        ? const ValueKey('error')
+        : profileAsync.hasValue
+            ? const ValueKey('data')
             : const ValueKey('loading');
 
     final Widget content;
-    if (profileAsync.hasValue) {
-      final profile = profileAsync.requireValue;
+    if (unknown) {
+      content = _CuentaError(
+        onRetry: () => ref.invalidate(userProfileProvider),
+      );
+    } else if (profileAsync.hasValue) {
       content = profile == null
           ? const _Muted('No se pudo cargar tu cuenta.') // i18n: Fase W3
-          : _CuentaForm(profile: profile);
-    } else if (profileAsync.hasError) {
-      content = const _Muted('No se pudo cargar tu cuenta.'); // i18n: Fase W3
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                staleNoticeIf(
+                  profileAsync.isStale,
+                  () => ref.invalidate(userProfileProvider),
+                ),
+                _CuentaForm(profile: profile),
+              ],
+            );
     } else {
       content = const _CuentaSkeleton();
     }
@@ -759,6 +775,30 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w600,
         letterSpacing: 0.8,
       ),
+    );
+  }
+}
+
+/// Error de carga de la cuenta con «Reintentar» — se usa cuando no sabemos si
+/// existe el perfil (error sin valor, o último valor `null` + error).
+class _CuentaError extends StatelessWidget {
+  const _CuentaError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: const Key('cuenta_error'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _Muted('No se pudo cargar tu cuenta.'), // i18n: Fase W3
+        TreinoButton(
+          label: 'Reintentar', // i18n: Fase W3
+          variant: TreinoButtonVariant.ghostAccent,
+          onPressed: onRetry,
+        ),
+      ],
     );
   }
 }

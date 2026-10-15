@@ -5,6 +5,7 @@ import '../../../../profile/application/user_providers.dart'
     show firestoreProvider;
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../widgets/stale_async.dart';
 import 'tarifas_model.dart';
 
 /// Stream de TODOS los [AthleteBilling] del PF actual (uno por alumno),
@@ -72,3 +73,11 @@ final tarifasResumenProvider =
   }
   return const AsyncValue.loading();
 });
+
+/// `true` cuando [trainerBillingsProvider] ya había cargado y DESPUÉS falló
+/// (stream cerrado por error, casi siempre permanente). [tarifasResumenProvider]
+/// sostiene el resumen ya calculado; este flag deja a la UI avisar «Datos
+/// desactualizados · Reintentar» (`ref.invalidate(trainerBillingsProvider)`).
+final tarifasResumenStaleProvider = Provider.autoDispose<bool>(
+  (ref) => ref.watch(trainerBillingsProvider).isStale,
+);

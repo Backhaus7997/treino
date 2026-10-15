@@ -61,6 +61,10 @@ class RutinasScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 20),
+          staleNoticeIf(
+            rutinasAsync.isStale,
+            () => ref.invalidate(routinesAuthoredByProvider(uid)),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(displayRutinasAsync.when(
               loading: () => 'loading',

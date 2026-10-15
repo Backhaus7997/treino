@@ -416,7 +416,12 @@ void main() {
     testWidgets(
         'las solicitudes ya cargadas no desaparecen tras un error '
         'transitorio del stream (stale-while-refresh)', (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
+      // Broadcast + contador de suscripciones: el reintento tiene que volver
+      // a suscribirse (un stream de Firestore se cierra tras un error).
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       await _pump(tester, linksStream: controller.stream, settle: false);
@@ -426,6 +431,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 400));
 
       expect(find.byKey(const Key('solicitud_card_l_a1')), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+      expect(listens, 1);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pump();
@@ -438,6 +445,20 @@ void main() {
             'tapar la bandeja con el estado de error',
       );
       expect(find.text('No pudimos cargar esta sección.'), findsNothing);
+      // ...pero tampoco se calla: avisa que los datos están desactualizados.
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([_link('a9', TrainerLinkStatus.pending, id: 'l_a9')]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('solicitud_card_l_a9')), findsOneWidget);
+      expect(find.byKey(const Key('solicitud_card_l_a1')), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 

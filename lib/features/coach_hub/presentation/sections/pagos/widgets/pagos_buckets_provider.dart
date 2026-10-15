@@ -12,6 +12,7 @@ import 'package:treino/features/payments/application/payment_providers.dart'
     show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
@@ -106,3 +107,14 @@ final pagosBucketsProvider =
   }
   return const AsyncValue.loading();
 });
+
+/// `true` cuando [trainerPaymentsProvider] ya había cargado pagos y DESPUÉS
+/// falló (stream de Firestore cerrado por error, casi siempre permanente).
+///
+/// [pagosBucketsProvider] sigue sosteniendo los buckets ya calculados (nunca
+/// emite el estado compuesto «valor + error», así que sus otros consumidores
+/// no cambian), y este flag le deja a la UI avisar «Datos desactualizados ·
+/// Reintentar». El reintento es `ref.invalidate(trainerPaymentsProvider)`.
+final pagosBucketsStaleProvider = Provider.autoDispose<bool>(
+  (ref) => ref.watch(trainerPaymentsProvider).isStale,
+);

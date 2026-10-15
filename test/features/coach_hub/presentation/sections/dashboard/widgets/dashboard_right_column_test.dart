@@ -23,6 +23,8 @@ import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -381,7 +383,11 @@ void main() {
     testWidgets(
         'sesión ya cargada no desaparece tras un error transitorio del '
         'stream (stale-while-refresh)', (tester) async {
-      final controller = StreamController<List<Appointment>>();
+      // Broadcast + contador: el reintento tiene que volver a suscribirse.
+      var listens = 0;
+      final controller = StreamController<List<Appointment>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       final container = ProviderContainer(
@@ -402,6 +408,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Ana López'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
@@ -412,49 +419,87 @@ void main() {
         reason: 'un error transitorio con data ya cargada no debe tapar '
             'la sesión próxima',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([
+        _confirmed(
+          id: 's2',
+          athleteDisplayName: 'Beto Sosa',
+          startsAt: now.add(const Duration(hours: 2)),
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Beto Sosa'), findsOneWidget);
+      expect(find.textContaining('Ana López'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 
   group(
-      'SCENARIO-STALE — vencimientos hasValue-first, defensa en profundidad '
+      'SCENARIO-STALE — vencimientos persisten ante error transitorio '
       '(pulido-post-revision)', () {
-    // pagosBucketsProvider ya está corregido a nivel provider (commit
-    // b3a14117) y no debería emitir un AsyncValue compuesto — pero el
-    // widget también se flipea a hasValue-first por defensa en
-    // profundidad. Este test construye el AsyncValue compuesto
-    // manualmente (copyWithPrevious) para probar la precedencia del
-    // widget independientemente de la garantía del provider.
+    // `pagosBucketsProvider` sostiene los buckets ya calculados (nunca emite
+    // «valor + error»), y `pagosBucketsStaleProvider` expone si la fuente
+    // (`trainerPaymentsProvider`) falló DESPUÉS de cargar. Acá se usa el
+    // provider REAL de buckets sobre un stream de pagos que emite y luego
+    // falla — el camino completo, no un AsyncValue armado a mano.
     testWidgets(
-        'AsyncValue compuesto (hasValue && hasError) muestra la data, no '
-        'el error de pantalla completa', (tester) async {
-      final payment = _pendingPayment(id: 'p1', athleteId: 'a1');
-      final data = AsyncValue<PagosBuckets>.data(
-        PagosBuckets(
-          vencidos: [payment],
-          porVencer: const [],
-          pagados: const [],
-          todos: [payment],
-        ),
+        'vencidos ya cargados no desaparecen tras un error transitorio, '
+        'avisan y Reintentar re-suscribe los pagos', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<Payment>>.broadcast(
+        onListen: () => listens++,
       );
-      final compound = AsyncValue<PagosBuckets>.error(
-        Exception('transient stream hiccup'),
-        StackTrace.current,
-      ).copyWithPrevious(data);
+      addTearDown(controller.close);
 
       await _pump(
         tester,
         overrides: [
-          ..._baseOverrides(buckets: compound),
+          currentUidProvider.overrideWithValue('trainer-1'),
+          trainerAppointmentsStreamProvider.overrideWith(
+            (ref, key) => Stream.value(const <Appointment>[]),
+          ),
+          trainerPaymentsProvider.overrideWith((ref) => controller.stream),
+          inactivosProvider.overrideWith(
+            (ref) =>
+                Future.value(const InactivosResult(inactiveAthleteIds: [])),
+          ),
           userPublicProfileProvider('a1').overrideWith(
             (ref) => Stream.value(_pub('a1', 'Beto Ruiz')),
           ),
+          userPublicProfileProvider('a2').overrideWith(
+            (ref) => Stream.value(_pub('a2', 'Dana Paz')),
+          ),
         ],
       );
+
+      controller.add([_pendingPayment(id: 'p1', athleteId: 'a1')]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Beto Ruiz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
 
       final l10n = AppL10n.of(tester.element(find.byType(Scaffold)));
       expect(find.textContaining('Beto Ruiz'), findsOneWidget);
       expect(find.text(l10n.coachHubSectionLoadError), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2,
+          reason: 'Reintentar tiene que re-suscribir el stream de pagos');
+
+      controller.add([_pendingPayment(id: 'p2', athleteId: 'a2')]);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Dana Paz'), findsOneWidget);
+      expect(find.textContaining('Beto Ruiz'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 
@@ -472,6 +517,7 @@ void main() {
         'lista de inactivos ya cargada no desaparece tras un error '
         'transitorio del future compuesto', (tester) async {
       final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
 
       final container = ProviderContainer(overrides: [
         currentUidProvider.overrideWithValue('trainer-1'),
@@ -489,6 +535,9 @@ void main() {
           ),
         ),
         inactivosProvider.overrideWith((ref) async {
+          if (recovered) {
+            return const InactivosResult(inactiveAthleteIds: ['a2']);
+          }
           if (ref.watch(attempt) == 0) {
             return const InactivosResult(inactiveAthleteIds: ['a1']);
           }
@@ -497,6 +546,9 @@ void main() {
         userPublicProfileProvider('a1').overrideWith(
           (ref) => Stream.value(_pub('a1', 'Carla Díaz')),
         ),
+        userPublicProfileProvider('a2').overrideWith(
+          (ref) => Stream.value(_pub('a2', 'Eva Gil')),
+        ),
       ]);
       addTearDown(container.dispose);
 
@@ -504,6 +556,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Carla Díaz'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       container.read(attempt.notifier).state = 1;
       await tester.pumpAndSettle();
@@ -514,6 +567,15 @@ void main() {
         reason: 'un error transitorio del fan-out no debe tapar la lista '
             'de inactivos ya calculada',
       );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a correr el future (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Eva Gil'), findsOneWidget);
+      expect(find.textContaining('Carla Díaz'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

@@ -221,12 +221,18 @@ void main() {
         'lista de alumnos ya cargada no desaparece tras un error '
         'transitorio del stream de vínculos (stale-while-refresh)',
         (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
       addTearDown(controller.close);
 
       await tester.pumpWidget(_wrap(overrides: [
         trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
-        ..._profilesOverride({'athlete-1': 'Juana Pérez'}),
+        ..._profilesOverride({
+          'athlete-1': 'Juana Pérez',
+          'athlete-2': 'Karen Díaz',
+        }),
       ]));
       await tester.pumpAndSettle();
 
@@ -244,6 +250,7 @@ void main() {
 
       expect(find.text('Juana Pérez'), findsOneWidget);
       expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
 
       controller.addError(Exception('transient stream hiccup'));
       await tester.pumpAndSettle();
@@ -255,6 +262,20 @@ void main() {
             'lista de alumnos',
       );
       expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([
+        _link(
+            id: 'l2', athleteId: 'athlete-2', status: TrainerLinkStatus.active),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('Karen Díaz'), findsOneWidget);
+      expect(find.text('Juana Pérez'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
     });
   });
 }

@@ -56,6 +56,10 @@ class DashboardPendingSection extends ConsumerWidget {
             count: pending?.length,
           ),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            linksAsync.isStale,
+            () => ref.invalidate(trainerLinksStreamProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(linksAsync, pending)),
             child: _PendingContent(linksAsync: linksAsync, pending: pending),

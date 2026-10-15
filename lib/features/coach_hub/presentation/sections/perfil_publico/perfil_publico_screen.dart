@@ -84,16 +84,29 @@ class PerfilPublicoScreen extends ConsumerWidget {
             // que `hasValue == true` Y `hasError == true` pueden darse a la
             // vez tras un error transitorio. `.when()` despacha por SUBTIPO
             // runtime (ignora `hasValue`) — se prioriza el valor cacheado.
-            child: profileAsync.hasValue
-                ? _perfilPublicoContentFor(profileAsync.requireValue)
-                : profileAsync.hasError
-                    ? TreinoEmptyState(
-                        key: const Key('perfil_publico_error'),
-                        icon: TreinoIcon.errorState,
-                        title:
-                            'No pudimos cargar tu perfil público.', // i18n: Fase 11
-                        ctaLabel: 'Reintentar', // i18n: Fase 11
-                        onCtaTap: () => ref.invalidate(userProfileProvider),
+            //
+            // `AsyncValue<UserProfile?>`: un `null` con error NO es «no existe»
+            // — es «no sé». Sólo un `null` SIN error afirma que falta el perfil
+            // (`_perfilPublicoErrorFor` gana cuando el valor es null y hay error).
+            child: _isUnknownProfile(profileAsync)
+                ? TreinoEmptyState(
+                    key: const Key('perfil_publico_error'),
+                    icon: TreinoIcon.errorState,
+                    title:
+                        'No pudimos cargar tu perfil público.', // i18n: Fase 11
+                    ctaLabel: 'Reintentar', // i18n: Fase 11
+                    onCtaTap: () => ref.invalidate(userProfileProvider),
+                  )
+                : profileAsync.hasValue
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          staleNoticeIf(
+                            profileAsync.isStale,
+                            () => ref.invalidate(userProfileProvider),
+                          ),
+                          _perfilPublicoContentFor(profileAsync.requireValue),
+                        ],
                       )
                     : const _PerfilPublicoLoading(),
           ),
@@ -111,9 +124,14 @@ Widget _perfilPublicoContentFor(UserProfile? profile) => profile == null
       )
     : _PerfilPublicoContent(profile: profile);
 
-String _stateKeyOf(AsyncValue<Object?> value) {
+/// `true` cuando NO sabemos si el perfil existe: error y sin perfil (sea
+/// porque nunca cargó o porque el último valor conocido era `null`).
+bool _isUnknownProfile(AsyncValue<UserProfile?> value) =>
+    value.hasError && value.valueOrNull == null;
+
+String _stateKeyOf(AsyncValue<UserProfile?> value) {
+  if (_isUnknownProfile(value)) return 'error';
   if (value.hasValue) return 'data';
-  if (value.hasError) return 'error';
   return 'loading';
 }
 
