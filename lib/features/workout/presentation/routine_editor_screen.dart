@@ -5722,17 +5722,17 @@ class _SlotEditorState extends State<_SlotEditor> {
       return '${sets.length} × $target';
     }
     return resumenDePrescripcion(
-        modo: slot.exerciseMode,
-        sets: [
-          for (final set in sets)
-            (
-              reps: set.reps,
-              durationSeconds: set.durationSeconds,
-              weightKg: set.weightKg,
-            ),
-        ],
-        unidadDePeso: l10n.monthlyReportVolumeUnit,
-      );
+      modo: slot.exerciseMode,
+      sets: [
+        for (final set in sets)
+          (
+            reps: set.reps,
+            durationSeconds: set.durationSeconds,
+            weightKg: set.weightKg,
+          ),
+      ],
+      unidadDePeso: l10n.monthlyReportVolumeUnit,
+    );
   }
 
   String _restSummary(int seconds) {
@@ -6837,7 +6837,10 @@ class RoutineEditorTestBridge {
       )
       ..exerciseMode = ExerciseMode.distance
       ..weeklySets = [
-        [for (final distance in distances) _EditableSet(distanceMeters: distance)],
+        [
+          for (final distance in distances)
+            _EditableSet(distanceMeters: distance)
+        ],
       ];
     return buildRoutineSlot(slot, null);
   }

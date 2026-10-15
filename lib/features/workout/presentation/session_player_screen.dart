@@ -2175,28 +2175,29 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                       : null,
                 )
               : _RepsSetRow(
-              key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
-              setNumber: setNumber,
-              spec: spec,
-              mode: mode,
-              plannedReps: plannedReps,
-              // For done rows preserve the athlete's original entry so
-              // re-editing does not silently snap back to the planned
-              // value; for pending rows preload with the planned target.
-              initialReps: isRowDone ? logged.reps : plannedReps,
-              initialWeightKg: initialWeight,
-              isDone: isRowDone,
-              isExpanded: isExpanded,
-              onCheck: isCurrent
-                  ? (reps, weightKg) =>
-                      widget.onSetCheck(setNumber, reps, weightKg)
-                  : null,
-              onSetUpdate: isRowDone
-                  ? (reps, weightKg) =>
-                      widget.onSetUpdate(logged, reps, weightKg)
-                  : null,
-              onSummaryTap: isRowDone ? () => _toggleDoneRow(setNumber) : null,
-            );
+                  key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
+                  setNumber: setNumber,
+                  spec: spec,
+                  mode: mode,
+                  plannedReps: plannedReps,
+                  // For done rows preserve the athlete's original entry so
+                  // re-editing does not silently snap back to the planned
+                  // value; for pending rows preload with the planned target.
+                  initialReps: isRowDone ? logged.reps : plannedReps,
+                  initialWeightKg: initialWeight,
+                  isDone: isRowDone,
+                  isExpanded: isExpanded,
+                  onCheck: isCurrent
+                      ? (reps, weightKg) =>
+                          widget.onSetCheck(setNumber, reps, weightKg)
+                      : null,
+                  onSetUpdate: isRowDone
+                      ? (reps, weightKg) =>
+                          widget.onSetUpdate(logged, reps, weightKg)
+                      : null,
+                  onSummaryTap:
+                      isRowDone ? () => _toggleDoneRow(setNumber) : null,
+                );
 
       if (showRemoveIcon) {
         innerRow = Row(
