@@ -495,12 +495,11 @@ class _RoutineEditorWebScreenState
     // exerciseMode/repMode fields (mirrors mobile's _repModeFromHydratedSets),
     // applied to week 0 only since mode is per-slot, not per-week.
     final week0 = weeklySets.first;
-    // La distancia manda sobre el resto: el slot guardado trae el modo
-    // explícito, y si el campo quedó viejo alcanza con que algún set de la
-    // semana 0 tenga metros. Sin esto, abrir en la web una rutina con
-    // distancia y guardarla la reseteaba a reps y borraba los metros.
-    final isDistance = slot.effectiveExerciseMode == ExerciseMode.distance ||
-        week0.any((s) => (s.distanceMeters ?? 0) > 0);
+    // La distancia sale de `effectiveExerciseMode` (fuente única, la misma
+    // que usan el móvil y el player): modo explícito o metros en cualquier
+    // set/semana. Sin esto, abrir en la web una rutina con distancia y
+    // guardarla la reseteaba a reps y borraba los metros.
+    final isDistance = slot.effectiveExerciseMode == ExerciseMode.distance;
     final isDuration =
         !isDistance && week0.any((s) => (s.durationSeconds ?? 0) > 0);
     final isRange = !isDistance &&

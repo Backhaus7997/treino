@@ -113,6 +113,25 @@ class _RemoveTrackingNotifier extends SessionNotifier {
       onRemoveSet(slot, target);
 }
 
+/// Stub que registra los `logSet` y los refleja en el estado, para verificar
+/// que un set se persiste y completa el ejercicio.
+class _LoggingNotifier extends SessionNotifier {
+  _LoggingNotifier(this._state);
+  final SessionState _state;
+  final loggedSets = <SetLog>[];
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> logSet(SetLog setLog) async {
+    loggedSets.add(setLog);
+    final current = state.value;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(setLogs: [...current.setLogs, setLog]));
+  }
+}
+
 // ── Factories de estado ───────────────────────────────────────────────────────
 
 SessionState _defaultState() => SessionState(
@@ -1001,6 +1020,49 @@ void main() {
       expect(find.text('6 m'), findsOneWidget);
       expect(find.text('Iniciar'), findsNothing);
       expect(find.byIcon(TreinoIcon.checkCircleEmpty), findsWidgets);
+    });
+
+    testWidgets(
+        'slot con exerciseMode reps + metros en sets: el check LOGUEA el set '
+        'y completa el ejercicio (no lo descarta el guard de reps)',
+        (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sprint-2',
+        exerciseName: 'Sprint',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        // exerciseMode ausente (default reps) y metros en los sets.
+        sets: [SetSpec(distanceMeters: 6)],
+      );
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      final notifier = _LoggingNotifier(state);
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [sessionNotifierProvider.overrideWith(() => notifier)],
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('6 m'), findsOneWidget);
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(notifier.loggedSets.single.exerciseId, 'sprint-2');
+      expect(notifier.loggedSets.single.setNumber, 1);
+      expect(find.text('1/1'), findsOneWidget,
+          reason: 'el bloque colapsa a completo');
     });
   });
 

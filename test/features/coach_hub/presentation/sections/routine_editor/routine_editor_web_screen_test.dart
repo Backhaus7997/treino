@@ -4919,6 +4919,41 @@ void main() {
     });
 
     testWidgets(
+        'doc con exerciseMode reps y metros SOLO en weeklySets hidrata como '
+        'distancia y re-guardar conserva el modo (fuente: effectiveExerciseMode)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      final doc = distanceRoutine();
+      final slot0 = doc.days.single.slots.single;
+      final stale = doc.copyWith(days: [
+        doc.days.single.copyWith(slots: [
+          slot0.copyWith(exerciseMode: ExerciseMode.reps, sets: const []),
+        ]),
+      ]);
+      when(() => repo.getById(any())).thenAnswer((_) async => stale);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r-dist');
+
+      await _tapGuardar(tester);
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(slot.weeklySets.first.map((s) => s.distanceMeters), [6.0, 6.0]);
+    });
+
+    testWidgets(
         'el chip Distancia convierte un slot de reps y guarda los '
         'metros tipeados', (tester) async {
       final repo = _MockRoutineRepository();

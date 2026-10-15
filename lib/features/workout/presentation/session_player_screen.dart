@@ -559,7 +559,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// (su métrica es el tiempo; el `_DurationSetRow` loguea vía
   /// `onSetCheck(setNumber, 0, 0.0)` cuando el countdown llega a 0). Ahí el guard
   /// NO aplica — si no, el set nunca se marca hecho y un día con cualquier
-  /// ejercicio por tiempo jamás puede terminarse.
+  /// ejercicio por tiempo jamás puede terminarse. Idem DISTANCIA
+  /// (`_DistanceSetRow` llama `onSetCheck(n, 0, 0)`): `effectiveExerciseMode`
+  /// la infiere de los metros aunque el doc diga `exerciseMode: reps`.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
     if (slot.effectiveExerciseMode == ExerciseMode.reps && reps <= 0) {
       return;
@@ -2140,9 +2142,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           (mode == ExerciseMode.duration ||
               (specDurationSeconds != null && specDurationSeconds > 0));
       final targetSeconds = isDurationSet ? (specDurationSeconds ?? 0) : 0;
-      final isDistanceSet = spec != null &&
-          (mode == ExerciseMode.distance ||
-              (spec.distanceMeters != null && spec.distanceMeters! > 0));
+      // El modo sale de `effectiveExerciseMode` (fuente única): ya infiere
+      // distancia de los metros en sets/semanas, así que la fila y el guard de
+      // `_logSet` nunca pueden discrepar.
+      final isDistanceSet = spec != null && mode == ExerciseMode.distance;
 
       final isFutureSet = !isRowDone && !isCurrent;
       // live-set-editing AD-6: the delete icon shows on LOGGED rows and on
