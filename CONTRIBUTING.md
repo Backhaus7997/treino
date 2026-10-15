@@ -325,8 +325,12 @@ Con el CI verde de nuevo, mergeás.
 
 ```bash
 git fetch origin
-git branch -d <tu-branch>     # borra local; remota ya se borró sola
+gh pr view <N> --json state --jq .state      # tiene que decir MERGED
+git worktree remove .claude/worktrees/<wt>   # si trabajaste en uno
+git branch -D <tu-branch>     # -D: con squash, -d se niega siempre. La remota ya se borró sola
 ```
+
+`develop` y `main` no se borran nunca. Detalle en `AGENTS.md` §8.
 
 ---
 

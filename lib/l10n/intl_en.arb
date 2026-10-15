@@ -302,6 +302,9 @@
   "workoutSnackShareSuccess": "",
   "workoutSnackShareError": "",
   "workoutPostAutoCompleteText": "",
+  "workoutWeekCompletedTitle": "Week complete! 🔥",
+  "workoutWeekCompletedStreak": "{count, plural, =1{Your first week complete!} other{You're on a {count}-week streak.}}",
+  "workoutWeekCompletedAction": "View week summary",
   "wellbeingTrendScreenTitle": "HOW I FELT",
   "wellbeingTrendEmptyState": "You haven't logged how you feel yet. Once you do, your own series shows up here.",
   "wellbeingTrendNeedsMoreData": "One entry isn't a trend yet.",
@@ -2033,10 +2036,13 @@
   "privacyAnalyticsSubtitle": "Helps us understand which parts of the app get used.",
   "privacyAnalyticsExplainer": "If you turn this off, TREINO stops recording how you use the app. It does not affect your workouts, your data, or how anything works. You can turn it back on whenever you want. This is a preference for THIS device: if you also use the Coach Hub, it is configured separately there.",
   "privacyAnalyticsCrashNote": "Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.",
-  "privacyEntryTitle": "Analytics and emails",
+  "privacyEntryTitle": "Analytics, emails and reminders",
   "privacyPromoEmailsTitle": "Promotional emails",
   "privacyPromoEmailsSubtitle": "Turn it off and we'll stop sending them. Account notices still reach you.",
   "privacyPromoEmailsSaveError": "We couldn't save the change. Try again.",
+  "privacyTrainingRemindersTitle": "Training reminders",
+  "privacyTrainingRemindersSubtitle": "We'll let you know if your streak is at risk or you haven't trained in a few days.",
+  "privacyTrainingRemindersSaveError": "We couldn't save the change. Try again.",
   "customExerciseCounter": "{count} of {limit} custom exercises",
   "@customExerciseCounter": {
     "placeholders": {
@@ -2256,5 +2262,9 @@
   "eliminarCuentaWebReauthPasswordBody": "For your security, enter your password to confirm it's you.",
   "eliminarCuentaWebReauthCta": "CONFIRM",
   "eliminarCuentaWebPopupHint": "To confirm it's you, a {provider} window will open.",
-  "coachHubOnboardingPfLocationStaleHint": "This place is no longer available. Pick this place again so people can find you."
+  "coachHubOnboardingPfLocationStaleHint": "This place is no longer available. Pick this place again so people can find you.",
+  "appUpdateTitle": "Update the app",
+  "appUpdateBody": "This version of TREINO is no longer supported and could lose data from your routines. Update it to keep training.",
+  "appUpdateCta": "UPDATE",
+  "appUpdateOpenError": "We couldn't open the store. Search for TREINO on the App Store or Google Play."
 }

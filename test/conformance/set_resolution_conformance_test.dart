@@ -108,6 +108,7 @@ List<SetSpec> _specs(Object? raw) => (raw as List<dynamic>)
         repsMax: s['repsMax'] as int?,
         weightKg: (s['weightKg'] as num?)?.toDouble(),
         durationSeconds: s['durationSeconds'] as int?,
+        distanceMeters: (s['distanceMeters'] as num?)?.toDouble(),
       ),
     )
     .toList(growable: false);
@@ -117,8 +118,9 @@ List<SetSpec> _specs(Object? raw) => (raw as List<dynamic>)
 /// representación interna de cada lenguaje.
 String _normalize(SetSpec s) =>
     '{reps:${s.reps},min:${s.repsMin},max:${s.repsMax},'
-    'kg:${s.weightKg},dur:${s.durationSeconds}}';
+    'kg:${s.weightKg},dur:${s.durationSeconds},m:${s.distanceMeters}}';
 
 String _normalizeJson(Map<String, dynamic> s) =>
     '{reps:${s['reps']},min:${s['repsMin']},max:${s['repsMax']},'
-    'kg:${(s['weightKg'] as num?)?.toDouble()},dur:${s['durationSeconds']}}';
+    'kg:${(s['weightKg'] as num?)?.toDouble()},dur:${s['durationSeconds']},'
+    'm:${(s['distanceMeters'] as num?)?.toDouble()}}';

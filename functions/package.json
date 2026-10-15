@@ -4,11 +4,11 @@
   "description": "Firebase Cloud Functions for TREINO",
   "scripts": {
     "build": "tsc",
-    "serve": "npm run build && firebase emulators:start --only functions --project treino-dev",
+    "serve": "cd .. && bash scripts/emulator.sh",
     "test": "jest --forceExit",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "test:rules": "jest --forceExit --runInBand \"[-]rules\\.test\\.ts$\"",
-    "test:rules:emulator": "firebase emulators:exec --only firestore,auth,storage --project treino-rules-test \"npm run test:rules\"",
+    "test:rules:emulator": "node ../scripts/strip_rules.js && firebase emulators:exec --only firestore,auth,storage --project treino-rules-test \"npm run test:rules\"",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix"
   },
@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@firebase/rules-unit-testing": "^5.0.2",
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.2",
     "eslint": "^10.12.0",

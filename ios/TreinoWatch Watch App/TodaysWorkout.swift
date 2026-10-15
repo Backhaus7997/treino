@@ -216,7 +216,8 @@ enum TodaysWorkoutResolver {
                 repsMin: FS.int(f["repsMin"]),
                 repsMax: FS.int(f["repsMax"]),
                 weightKg: FS.double(f["weightKg"]),
-                durationSeconds: FS.int(f["durationSeconds"])
+                durationSeconds: FS.int(f["durationSeconds"]),
+                distanceMeters: FS.double(f["distanceMeters"])
             )
         }
     }

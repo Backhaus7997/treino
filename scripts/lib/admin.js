@@ -55,8 +55,12 @@ const {
   resolverContexto,
 } = require('./credenciales');
 
-/** Proyecto contra el que corre el emulador local (`scripts/emulator.sh`). */
-const PROJECT_ID_EMULADOR = 'treino-dev';
+/**
+ * Proyecto contra el que corre el emulador local (`scripts/emulator.sh`). Se
+ * define en `lib/target_project.js` —ver ahí por qué— y se re-exporta acá para
+ * los scripts que ya lo importan de este módulo.
+ */
+const { PROJECT_ID_EMULADOR } = require('./target_project');
 
 /**
  * Inicializa `firebase-admin` pasando por la frontera y devuelve

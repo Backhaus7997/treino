@@ -690,6 +690,17 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      # `firebase.json` le hace cargar al emulador `firestore.deploy.rules`
+      # (#1132), que es GENERADO y está gitignoreado: en un checkout limpio no
+      # existe. Sin él el emulador no falla, arranca en allow-all, y este job
+      # corrió así hasta acá. No se ponía rojo: las suites de reglas cargan las
+      # suyas, y los dos tests REST del reloj —que no cargan nada— heredaban las
+      # que otra suite había dejado en `treino-dev` si jest la corría antes.
+      # Si este paso falta, ahora corta el globalSetup de
+      # functions/jest.config.js antes de la primera suite.
+      - name: Generate firestore.deploy.rules
+        run: node scripts/strip_rules.js
+
       # Levanta firestore + auth + storage, corre TODO el suite (unit +
       # emulator-backed + rules) y baja el emulador. Dos detalles no obvios:
       #   - storage: cascade/storage y delete-account borran objetos del emulador
@@ -701,6 +712,19 @@ jobs:
       #     `test` ya trae --forceExit.
       - name: Run functions tests against the emulator
         run: firebase emulators:exec --only firestore,auth,storage --project treino-dev "npm --prefix functions test -- --runInBand"
+
+      # `scripts/emulator.sh` deja al emulador de Functions sin acceso a
+      # producción con dos cierres que dependen de comportamiento que
+      # firebase-tools no documenta: CLOUD_SECRET_MANAGER_URL (secretos) y que
+      # el CLI no le inyecte el `firebase login` al runtime cuando le pasamos
+      # una credencial falsa (FCM). "Install Firebase CLI" instala la última
+      # versión en cada corrida: si una cambia cualquiera de los dos, esto es
+      # lo único que se pone rojo. ~20 s, emulador real, proyecto `demo-`,
+      # login inventado, sin red. Va DESPUÉS de jest a propósito: un rojo de
+      # acá no tapa el de los tests.
+      - name: Emulator stays off production
+        timeout-minutes: 5
+        run: node scripts/check_emulator_sin_produccion.js
 
   # La SEGUNDA suite de reglas: scripts/rules_test/*.test.js (#680 Slice B).
   #

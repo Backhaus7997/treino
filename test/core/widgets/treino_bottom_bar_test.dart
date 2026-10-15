@@ -300,6 +300,39 @@ void main() {
     });
   });
 
+  group('resolveCollapsedInset — cuánto se angosta compactada', () {
+    double insetFor(double barWidth) =>
+        resolveCollapsedInset(barWidth: barWidth, itemCount: 5);
+
+    test('iPhone 17 Pro (402 − 2×20): se angosta el máximo', () {
+      expect(insetFor(362), 28);
+    });
+
+    test('360dp (360 − 2×20): frena en el piso de 56 por tab', () {
+      // 320 − 5×56 = 40 → 20 por lado, no 28.
+      final inset = insetFor(320);
+      expect(inset, 20);
+      expect((320 - 2 * inset) / 5, 56);
+    });
+
+    test('si ni expandida llega al piso, no se angosta', () {
+      expect(insetFor(260), 0);
+    });
+
+    test('ningún teléfono actual deja tabs compactados bajo 56', () {
+      for (final screen in [320.0, 360.0, 375.0, 393.0, 412.0, 440.0]) {
+        for (final margin in [12.0, 20.0]) {
+          final barWidth = screen - 2 * margin;
+          final tab = (barWidth - 2 * insetFor(barWidth)) / 5;
+          if (barWidth / 5 >= 56) {
+            expect(tab, greaterThanOrEqualTo(56 - 1e-9),
+                reason: '$screen dp, margen $margin');
+          }
+        }
+      }
+    });
+  });
+
   group('TreinoBottomBar — los 5 destinos entran siempre', () {
     const labels = ['ENTRENAR', 'FEED', 'INICIO', 'COACH', 'PERFIL'];
 
@@ -430,6 +463,62 @@ void main() {
       // El label sigue en el árbol —la semántica no se pierde— pero invisible.
       expect(labelOpacity(tester), 0);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('collapsed true → la barra se angosta, centrada', (
+      tester,
+    ) async {
+      Rect barRect() => tester.getRect(
+            find
+                .descendant(
+                  of: find.byType(TreinoBottomBar),
+                  matching: find.byType(ClipRRect),
+                )
+                .first,
+          );
+
+      await tester.pumpWidget(
+        _wrap(TreinoBottomBar(currentIndex: 0, onTap: (_) {})),
+      );
+      await tester.pumpAndSettle();
+      final expanded = barRect();
+
+      await tester.pumpWidget(
+        _wrap(
+          TreinoBottomBar(currentIndex: 0, onTap: (_) {}, collapsed: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final compact = barRect();
+
+      // 800 de ancho de test: sobra lugar, así que se angosta el máximo.
+      expect(compact.width, closeTo(expanded.width - 2 * 28, 0.01));
+      expect(compact.center.dx, closeTo(expanded.center.dx, 0.01));
+    });
+
+    testWidgets('compactada, el pill activo sigue adentro de su tab', (
+      tester,
+    ) async {
+      // El pill se posiciona con el `tabWidth` del frame; si quedara atado al
+      // ancho expandido se saldría de la barra angostada.
+      await tester.pumpWidget(
+        _wrap(
+          TreinoBottomBar(currentIndex: 4, onTap: (_) {}, collapsed: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final bar = tester.getRect(
+        find
+            .descendant(
+              of: find.byType(TreinoBottomBar),
+              matching: find.byType(ClipRRect),
+            )
+            .first,
+      );
+      final pill = tester.getRect(find.byKey(TreinoBottomBar.pillKey));
+      expect(pill.right, lessThanOrEqualTo(bar.right - 6 + 0.01));
+      expect(pill.left, greaterThanOrEqualTo(bar.left + 6 - 0.01));
     });
 
     testWidgets('colapsar y expandir no desborda en ningún frame intermedio', (

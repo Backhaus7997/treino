@@ -31,6 +31,10 @@
  * datos partidos en dos entornos, que es exactamente el daño que se quiere
  * evitar.
  *
+ * (Lo del emulador de Storage ausente dejó de ser cierto con el #1434: desde el
+ * 2026-10-14 `emulator.sh` lo levanta en los dos modos. El primer motivo —no
+ * inventar un destino que el operador no pidió— sigue en pie solo.)
+ *
  * Entonces la regla es una sola y no admite grises: **Firestore y Storage
  * apuntan los dos al emulador, o los dos a la nube. Cualquier mezcla aborta
  * antes de la primera escritura.** Un script que escribe mitad en local y mitad
@@ -55,6 +59,13 @@ const {
   esProduccion,
   bannerDeProduccion,
 } = require('./firebase_projects');
+const {
+  PROJECT_ID_EMULADOR,
+  contraEmuladorDe,
+  emuladoresActivos: emuladoresPorServicio,
+  renglonesEnBlanco,
+  variablesEnBlanco,
+} = require('./target_project');
 
 /** `.firebaserc` de la raíz del repo — `scripts/lib/..` dos veces. */
 const FIREBASERC = path.join(__dirname, '..', '..', '.firebaserc');
@@ -111,7 +122,58 @@ function proyectoDeSaKey(ruta) {
  *   1. `--project=` explícito (lo que el operador pidió gana siempre)
  *   2. `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT` (las que mira el SDK)
  *   3. el `project_id` del `GOOGLE_APPLICATION_CREDENTIALS`
- *   4. `.firebaserc`
+ *   4. con Firestore Y Storage en el emulador: `PROJECT_ID_EMULADOR`
+ *   5. `.firebaserc`
+ *
+ * ─── EL PASO 4: CONTRA EL EMULADOR, EL NAMESPACE DEL EMULADOR ──────────────
+ *
+ * El default de `.firebaserc` es `demo-treino` desde el #840, y está ahí como
+ * TRAMPA para el CLI —un `deploy` sin `--project` tiene que fallar—, no como
+ * namespace. El emulador lo levanta `emulator.sh` con `--project treino-dev`,
+ * y ahí escriben la app y la semilla. Cayendo en `.firebaserc`, los cuatro
+ * scripts de Storage leían un namespace vacío. Medido el 2026-10-14 con un
+ * emulador levantado como `emulator.sh` (puertos alternos) y un ejercicio
+ * sembrado: `extract_exercise_thumbnails.js --upload` imprimió `destino:
+ * EMULADOR`, terminó en «subidos + patcheados: 0 · fallas: 1» («doc no existe
+ * en exercises») y salió con exit 0. El emulador no lo rechaza: sólo anota
+ * «Multiple projectIds are not recommended in single project mode» en
+ * `firestore-debug.log` —no en la consola del emulador— y sirve el namespace
+ * vacío.
+ *
+ * Lo que NO afloja del fail-safe del #840/#838:
+ *   - Exige las DOS variables. Con las dos, el SDK manda Firestore y Storage
+ *     a localhost por su cuenta y el id es una carpeta local. Sin ninguna, se
+ *     sigue cayendo en `demo-treino`; con una sola, `planDeStorage` aborta.
+ *   - Las exige con el criterio de `lib/target_project.js` —una variable en
+ *     blanco NO cuenta—, que es con el que `lib/credenciales.js` decide si
+ *     `lib/admin.js` arranca sin credencial. Si este paso viera emulador donde
+ *     `credenciales.js` ve nube, le daría el id de producción a una corrida que
+ *     `admin.js` manda a la NUBE, con el cartel apagado por `contraEmulador`.
+ *     (Pasaba con `' '` mientras `emuladoresActivos` tenía su propio
+ *     `Boolean()`; desde el #1445 delega allá, y una variable en blanco hace
+ *     abortar a `planDeStorage` antes de que el id importe.)
+ *   - Va después de 1-3: el que nombra un proyecto sigue ganando. Lo único que
+ *     cambia es el último recurso, y sólo contra el emulador.
+ *
+ * Medido contra el resolutor de `develop` con el #1444 y el #1445 adentro
+ * (019afc02), sobre 1080 combinaciones de argv y ambiente (las tres variables
+ * de emulador ausentes, vacías, en blanco o puestas, `GCLOUD_PROJECT`,
+ * `GOOGLE_APPLICATION_CREDENTIALS`, `--project=`, `--bucket=`): cambian 8,
+ * todas «emulador completo, nadie nombró proyecto», de `demo-treino` a
+ * `treino-dev`. Las 90 con las variables de emulador ausentes o vacías —la
+ * nube— dan idéntico, campo por campo. El script está en la descripción del
+ * PR #1442.
+ *
+ * Lo que NO se lee, a propósito: el `activeProjects` que escribe `firebase
+ * use`. El Admin SDK tampoco lo lee —`rg activeProjects` sobre `firebase-admin`,
+ * `google-auth-library`, `@google-cloud` y `google-gax` da 0—, así que seguirlo
+ * sería imprimir un destino distinto del que usa el SDK. Y es el pin que
+ * AGENTS.md (Entornos, corolario 4) muestra heredándose desde cualquier
+ * directorio padre: contra la nube haría que un `firebase use prod` olvidado
+ * en la raíz eligiera producción —con cartel, pero sin que nadie la pidiera—
+ * por una corrida que no la nombró; contra el
+ * emulador, `emulator.sh` lo pisa con su `--project` explícito, así que
+ * seguirlo volvería a separar los namespaces.
  */
 function resolverProjectId({ argv = [], env = process.env, rutaFirebaserc = FIREBASERC } = {}) {
   const porFlag = opcion(argv, 'project');
@@ -122,6 +184,10 @@ function resolverProjectId({ argv = [], env = process.env, rutaFirebaserc = FIRE
 
   const porSaKey = proyectoDeSaKey(env.GOOGLE_APPLICATION_CREDENTIALS);
   if (porSaKey) return { projectId: porSaKey, origen: 'GOOGLE_APPLICATION_CREDENTIALS' };
+
+  if (contraEmuladorDe(['firestore', 'storage'], env)) {
+    return { projectId: PROJECT_ID_EMULADOR, origen: 'namespace del emulador' };
+  }
 
   const porRc = proyectoDeFirebaserc(rutaFirebaserc);
   if (porRc) return { projectId: porRc, origen: '.firebaserc' };
@@ -231,12 +297,19 @@ function resolverBucket({ argv = [], env = process.env, projectId = null } = {})
  * Storage: `firebase-admin` acepta las dos, y normaliza
  * `FIREBASE_STORAGE_EMULATOR_HOST` a `STORAGE_EMULATOR_HOST`. Mirar sólo una de
  * las dos daría un falso negativo y abortaría una corrida que estaba bien.
+ *
+ * DELEGA en `target_project.js` y no decide. Acá había una copia propia con
+ * `Boolean(env.X)`, y `Boolean(' ')` es `true`: con las dos variables en blanco
+ * el plan decía `EMULADOR (Firestore + Storage)` y apagaba el cartel, mientras
+ * `credenciales.js` —con el `trim()` de allá— veía la nube y `lib/admin.js`
+ * cargaba la credencial. Dos definiciones de "emulador" en el mismo proceso es
+ * el hueco del #846 otra vez; la respuesta de entonces fue no tener copia, y es
+ * la misma acá. Lo que hace `planDeStorage` con una variable en blanco está en
+ * `variablesEnBlanco`, también de allá.
  */
 function emuladoresActivos(env = process.env) {
-  return {
-    firestore: Boolean(env.FIRESTORE_EMULATOR_HOST),
-    storage: Boolean(env.STORAGE_EMULATOR_HOST || env.FIREBASE_STORAGE_EMULATOR_HOST),
-  };
+  const { firestore, storage } = emuladoresPorServicio(env);
+  return { firestore, storage };
 }
 
 /**
@@ -253,13 +326,21 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
   const { projectId, origen: origenProyecto } = resolverProjectId({ argv, env, rutaFirebaserc });
   const { bucket, origen: origenBucket } = resolverBucket({ argv, env, projectId });
   const emu = emuladoresActivos(env);
+  const enBlanco = variablesEnBlanco(env);
 
-  const contraEmulador = emu.firestore && emu.storage;
-  const enLaNube = !emu.firestore && !emu.storage;
+  // Una variable en blanco no es emulador ni nube (`estadoDeVariable`, en
+  // `target_project.js`): con una sola, ninguno de los dos destinos es cierto.
+  const contraEmulador = enBlanco.length === 0 && emu.firestore && emu.storage;
+  const enLaNube = enBlanco.length === 0 && !emu.firestore && !emu.storage;
   const coherente = contraEmulador || enLaNube;
 
   let motivo = null;
-  if (emu.firestore && !emu.storage) {
+  if (enBlanco.length > 0) {
+    motivo =
+      `${enBlanco.join(', ')} ${enBlanco.length === 1 ? 'está exportada' : 'están exportadas'} ` +
+      'EN BLANCO. Ninguna es un host: ninguna lleva su servicio al emulador, y ' +
+      'el ambiente no dice a dónde quería ir quien lo armó. No hay destino que nombrar.';
+  } else if (emu.firestore && !emu.storage) {
     motivo =
       'Firestore apunta al EMULADOR (FIRESTORE_EMULATOR_HOST) pero Storage NO: ' +
       `las subidas irían al bucket real "${bucket}" y la URL de producción ` +
@@ -285,6 +366,7 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
     origenBucket,
     emuladorFirestore: emu.firestore,
     emuladorStorage: emu.storage,
+    variablesEnBlanco: enBlanco,
     contraEmulador,
     coherente,
     motivo,
@@ -327,6 +409,38 @@ function textoDeAbort(plan) {
   }
   if (renglon) motivo.push(`⛔  ${renglon}`);
 
+  // La variable en blanco tiene su propio texto: el de abajo empieza diciendo
+  // que los destinos "no coinciden", y acá no hay destino. Un abort que nombra
+  // mal el problema manda a arreglar otra cosa (§11.1).
+  const enBlanco = plan.variablesEnBlanco || [];
+  if (enBlanco.length > 0) {
+    return [
+      '',
+      '⛔ ─────────────────────────────────────────────────────────────────────',
+      '⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.',
+      '⛔',
+      ...motivo,
+      '⛔',
+      ...renglonesEnBlanco(enBlanco).map((r) => `⛔    ${r}`),
+      '⛔',
+      '⛔  Primero sacalas del ambiente:',
+      `⛔    unset ${enBlanco.join(' ')}`,
+      // Sólo si aplica: STORAGE_EMULATOR_HOST en blanco le gana a la otra
+      // dentro de firebase-admin, y exportar la de abajo no alcanzaría.
+      ...(enBlanco.includes('STORAGE_EMULATOR_HOST')
+        ? ['⛔  (STORAGE_EMULATOR_HOST en blanco le gana a FIREBASE_STORAGE_EMULATOR_HOST', '⛔   aunque ésa tenga host: sin el unset, exportarla no alcanza.)']
+        : []),
+      '⛔',
+      '⛔  Para el emulador, después exportá los hosts:',
+      '⛔    ./scripts/emulator.sh',
+      '⛔    export FIRESTORE_EMULATOR_HOST=localhost:8080',
+      '⛔    export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199',
+      '⛔  Para la nube, nada más; si el destino es producción, sale el cartel.',
+      '⛔ ─────────────────────────────────────────────────────────────────────',
+      '',
+    ].join('\n');
+  }
+
   return [
     '',
     '⛔ ─────────────────────────────────────────────────────────────────────',
@@ -337,13 +451,13 @@ function textoDeAbort(plan) {
     '⛔  Este script NO corre a medias: escribir mitad en local y mitad en la',
     '⛔  nube deja datos rotos en los dos lados (#838).',
     '⛔',
-    '⛔  Para correr entero contra el emulador, levantalo CON Storage y',
-    '⛔  exportá las dos variables:',
-    '⛔    firebase emulators:start --only firestore,auth,storage',
+    '⛔  Para correr entero contra el emulador, levantalo con emulator.sh',
+    '⛔  (desde el #1434 trae Storage en el 9199) y exportá las dos variables:',
+    '⛔    ./scripts/emulator.sh',
     '⛔    export FIRESTORE_EMULATOR_HOST=localhost:8080',
     '⛔    export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199',
-    '⛔  (ojo: scripts/emulator.sh NO levanta Storage — arranca --only',
-    '⛔   firestore,auth,functions.)',
+    '⛔  (no con un emulators:start a mano: se saltea strip_rules.js y',
+    '⛔   Firestore arranca sin reglas, en allow-all — #1435.)',
     '⛔',
     '⛔  Para correr entero contra la nube, sacá FIRESTORE_EMULATOR_HOST del',
     '⛔  ambiente. Leé el cartel que sale después: es producción.',

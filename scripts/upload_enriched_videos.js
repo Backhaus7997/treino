@@ -24,6 +24,9 @@
  * del proyecto activo), y antes de nada se exige que Firestore y Storage
  * apunten al mismo lado. Este script no tenía NINGÚN chequeo: la única salida
  * era acordarse de pasar `--dry-run`.
+ *
+ * Contra el EMULADOR sólo corre con `--dry-run`: lo que escribe es el JSON
+ * versionado de arriba, y una URL del emulador ahí adentro termina importada.
  */
 'use strict';
 
@@ -33,6 +36,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { armadorDeUrlDeDescarga } = require('./lib/url_de_descarga');
 const { inicializarAdmin } = require('./lib/admin');
 const { getStorage } = require('firebase-admin/storage');
 
@@ -69,6 +73,29 @@ async function main() {
   const destino = exigirDestinoCoherente({ argv: args });
   BUCKET = destino.bucket;
   if (DRY) console.log('DRY-RUN: no se escribe nada.');
+
+  // Contra el emulador este script no tiene dónde dejar su resultado. Las
+  // demás salidas de estos scripts son Firestore, y contra el emulador es el
+  // Firestore local; ésta es `enriched-catalog.json`, que está VERSIONADO y lo
+  // importa `import_enriched_catalog.js`. Una URL del emulador ahí adentro,
+  // commiteada o importada, es un video que no se reproduce para ningún
+  // usuario: un build sin USE_EMULATOR —el de todo usuario— ni lo intenta fuera
+  // del host de Google (ver lib/url_de_descarga.js). Antes de bajar o subir
+  // nada; `--dry-run` no escribe, así que sigue andando.
+  if (destino.contraEmulador && !DRY) {
+    console.error(
+      '\n⛔ ABORTADO: upload_enriched_videos.js no escribe contra el emulador.\n' +
+        `⛔  Su salida son las URLs de descarga, escritas en ${path.relative(process.cwd(), CATALOG)}:\n` +
+        '⛔  un archivo versionado que import_enriched_catalog.js importa. Con el\n' +
+        '⛔  emulador esas URLs apuntarían a él, y commiteadas o importadas rompen el\n' +
+        '⛔  video para todos.\n' +
+        '⛔  Para ensayar contra el emulador: --dry-run (no baja, no sube, no escribe).\n',
+    );
+    process.exit(1);
+  }
+
+  // La URL que se escribe sale del mismo plan (ver lib/url_de_descarga.js).
+  const urlDeDescarga = armadorDeUrlDeDescarga(destino);
 
   let bucket = null;
   if (!DRY) {
@@ -116,7 +143,7 @@ async function main() {
           metadata: { firebaseStorageDownloadTokens: token },
         },
       });
-      ex.videoUrl = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+      ex.videoUrl = urlDeDescarga({ destino: dest, token });
       fs.unlinkSync(local);
       // guardado incremental
       fs.writeFileSync(CATALOG, JSON.stringify(catalog, null, 2));

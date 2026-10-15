@@ -418,6 +418,55 @@ void main() {
       expect(slot.effectiveExerciseMode, equals(ExerciseMode.duration));
     });
 
+    const base = RoutineSlot(
+      exerciseId: 'sprint',
+      exerciseName: 'Sprint',
+      muscleGroup: 'legs',
+      targetSets: 2,
+      targetRepsMin: 0,
+      targetRepsMax: 0,
+      restSeconds: 30,
+    );
+
+    test('mode reps/ausente + metros en sets -> distance', () {
+      final slot = base.copyWith(sets: const [SetSpec(distanceMeters: 6)]);
+      expect(slot.exerciseMode, ExerciseMode.reps);
+      expect(slot.effectiveExerciseMode, ExerciseMode.distance);
+    });
+
+    test('mode reps + metros SOLO en weeklySets (cualquier semana) -> distance',
+        () {
+      final slot = base.copyWith(weeklySets: const [
+        [SetSpec(reps: 8)],
+        [SetSpec(distanceMeters: 10)],
+      ]);
+      expect(slot.effectiveExerciseMode, ExerciseMode.distance);
+    });
+
+    test('distanceMeters 0/null no infiere distance', () {
+      final slot = base.copyWith(sets: const [
+        SetSpec(distanceMeters: 0),
+        SetSpec(reps: 5),
+      ]);
+      expect(slot.effectiveExerciseMode, ExerciseMode.reps);
+    });
+
+    test(
+        'explicito duration gana sobre metros; distance gana sobre durationSeconds',
+        () {
+      final explicit = base.copyWith(
+        exerciseMode: ExerciseMode.duration,
+        sets: const [SetSpec(distanceMeters: 6)],
+      );
+      expect(explicit.effectiveExerciseMode, ExerciseMode.duration);
+
+      final legacy = base.copyWith(
+        durationSeconds: 30,
+        sets: const [SetSpec(distanceMeters: 6)],
+      );
+      expect(legacy.effectiveExerciseMode, ExerciseMode.distance);
+    });
+
     test(
         'SCENARIO-062: effectiveRepMode returns range when targetRepsMin != targetRepsMax',
         () {

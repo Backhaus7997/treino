@@ -683,13 +683,8 @@ class UserRepository {
   ///
   /// `distinct()` porque el listener recibe el documento ENTERO: un cambio de
   /// cualquier otro campo del perfil no tiene que despertar a la pantalla.
-  Stream<bool> watchCorreosPromocionales(String uid) {
-    return _users
-        .doc(uid)
-        .snapshotsSinCacheVacia()
-        .map((snap) => _correosPromocionalesDe(snap.data()))
-        .distinct();
-  }
+  Stream<bool> watchCorreosPromocionales(String uid) =>
+      _watchPrefDeNotificacion(uid, kPrefCorreosPromocionales, _canalEmail);
 
   /// Prende o apaga los correos promocionales del usuario.
   ///
@@ -707,11 +702,74 @@ class UserRepository {
   /// A diferencia de [registrarTopeTocado], **sí tira**: el que llama tiene
   /// que enterarse de que no se guardó para no dejarle al usuario un
   /// interruptor apagado sobre un correo que va a seguir llegando.
-  Future<void> setCorreosPromocionales(String uid, bool habilitado) {
+  Future<void> setCorreosPromocionales(String uid, bool habilitado) =>
+      _setPrefDeNotificacion(
+        uid,
+        kPrefCorreosPromocionales,
+        _canalEmail,
+        habilitado,
+      );
+
+  /// ¿El atleta acepta los recordatorios diarios de entrenamiento (racha en
+  /// riesgo / volvé a entrenar)? Se lee de
+  /// `users/{uid}.notificationPrefs.recordatorios_entrenamiento.push`.
+  ///
+  /// Mismo contrato que [watchCorreosPromocionales], con el canal `push` en vez
+  /// de `email`: **ausente = `true`** (el backend sólo frena con un `false`
+  /// EXPLÍCITO), un snapshot de caché de un documento que no existe todavía no
+  /// es una respuesta, y `distinct()` evita que un cambio de otro campo del
+  /// perfil despierte a la pantalla.
+  Stream<bool> watchRecordatoriosEntrenamiento(String uid) =>
+      _watchPrefDeNotificacion(
+        uid,
+        kPrefRecordatoriosEntrenamiento,
+        _canalPush,
+      );
+
+  /// Prende o apaga los recordatorios diarios de entrenamiento del atleta.
+  ///
+  /// Mismo contrato que [setCorreosPromocionales]: MAPA ANIDADO con
+  /// `merge: true` (no pisa la matriz de las demás filas ni el canal `email` de
+  /// esta misma fila), un `true` explícito al prender —el servidor sólo frena
+  /// con `false`, pero «eligió prender» no es lo mismo que «nunca eligió»— y
+  /// **sí tira** si la escritura falla.
+  Future<void> setRecordatoriosEntrenamiento(String uid, bool habilitado) =>
+      _setPrefDeNotificacion(
+        uid,
+        kPrefRecordatoriosEntrenamiento,
+        _canalPush,
+        habilitado,
+      );
+
+  static const String _canalEmail = 'email';
+  static const String _canalPush = 'push';
+
+  /// La preferencia `notificationPrefs.[fila].[canal]` como stream. Detalle del
+  /// contrato en [watchCorreosPromocionales], que es de donde salió.
+  Stream<bool> _watchPrefDeNotificacion(
+    String uid,
+    String fila,
+    String canal,
+  ) {
+    return _users
+        .doc(uid)
+        .snapshotsSinCacheVacia()
+        .map((snap) => _prefDeNotificacionDe(snap.data(), fila, canal))
+        .distinct();
+  }
+
+  /// Escribe `notificationPrefs.[fila].[canal] = [habilitado]` como mapa
+  /// anidado con merge. Detalle del contrato en [setCorreosPromocionales].
+  Future<void> _setPrefDeNotificacion(
+    String uid,
+    String fila,
+    String canal,
+    bool habilitado,
+  ) {
     return _users.doc(uid).set(
       <String, Object?>{
         'notificationPrefs': <String, Object?>{
-          kPrefCorreosPromocionales: <String, Object?>{'email': habilitado},
+          fila: <String, Object?>{canal: habilitado},
         },
       },
       SetOptions(merge: true),
@@ -721,12 +779,16 @@ class UserRepository {
   /// Lee la preferencia de un documento crudo. Sólo un `false` EXPLÍCITO es
   /// «no»: cualquier otra cosa —campo ausente, mapa vacío, un tipo inesperado—
   /// es «sí», que es lo que haría el servidor con ese mismo documento.
-  static bool _correosPromocionalesDe(Map<String, Object?>? data) {
+  static bool _prefDeNotificacionDe(
+    Map<String, Object?>? data,
+    String fila,
+    String canal,
+  ) {
     final prefs = data?['notificationPrefs'];
     if (prefs is! Map) return true;
-    final fila = prefs[kPrefCorreosPromocionales];
-    if (fila is! Map) return true;
-    return fila['email'] != false;
+    final filaPref = prefs[fila];
+    if (filaPref is! Map) return true;
+    return filaPref[canal] != false;
   }
 
   /// #1336 — espejo del nombre cuando el partial lleva `displayName` pero

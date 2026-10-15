@@ -40,6 +40,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { armadorDeUrlDeDescarga } = require('./lib/url_de_descarga');
 const { inicializarAdmin } = require('./lib/admin');
 const { getStorage } = require('firebase-admin/storage');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -56,6 +57,9 @@ const ONLY = onlyArg ? new Set(onlyArg.split('=')[1].split(',').map((s) => s.tri
 // operador decide si después corre en serio.
 const DESTINO = exigirDestinoCoherente({ argv: args });
 const BUCKET = DESTINO.bucket;
+// La URL que se estampa sale del mismo plan: contra el emulador nombra al
+// emulador, no a Google (ver lib/url_de_descarga.js).
+const urlDeDescarga = armadorDeUrlDeDescarga(DESTINO);
 if (DRY) console.log('DRY-RUN: no se escribe nada.');
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
@@ -114,7 +118,7 @@ async function uploadToStorage(localPath, id) {
       metadata: { firebaseStorageDownloadTokens: token },
     },
   });
-  return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(dest)}?alt=media&token=${token}`;
+  return urlDeDescarga({ destino: dest, token });
 }
 
 async function run() {

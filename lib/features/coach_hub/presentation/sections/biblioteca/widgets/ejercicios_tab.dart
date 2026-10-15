@@ -13,11 +13,14 @@ import '../../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
+import '../../../../../workout/application/exercise_providers.dart'
+    show exercisesProvider;
 import '../../../../../workout/domain/equipment_type.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
 import '../../../shell/responsive.dart' as rsp;
 import '../../../widgets/empty_state/empty_state.dart';
+import '../../../widgets/stale_data_notice.dart';
 import '../providers/biblioteca_providers.dart';
 import 'biblioteca_filter_chips.dart';
 import 'exercise_detail_dialog.dart';
@@ -93,9 +96,21 @@ class EjerciciosTab extends ConsumerWidget {
           onExerciseTap: openExercise,
         );
 
+        // Catálogo ya cargado cuyo stream falló después: la grilla sigue, pero
+        // avisamos que está desactualizada (`ref.invalidate` re-suscribe).
+        final staleNotice = !ref.watch(bibliotecaStaleProvider)
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s18),
+                child: StaleDataNotice(
+                  onRetry: () => ref.invalidate(exercisesProvider),
+                ),
+              );
+
         if (!isDesktop) {
           return Column(
             children: [
+              staleNotice,
               _SearchField(onChanged: results.onQueryChanged),
               TreinoFadeSlideIn(
                 delay: AppMotion.stagger(1),
@@ -116,6 +131,7 @@ class EjerciciosTab extends ConsumerWidget {
             Expanded(
               child: Column(
                 children: [
+                  staleNotice,
                   _SearchField(onChanged: results.onQueryChanged),
                   Expanded(child: results),
                 ],

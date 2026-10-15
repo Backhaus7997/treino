@@ -169,6 +169,35 @@ aborta**.
 Si querés el emulador, agregá la que falta. Si querés la nube, sacá las otras
 del ambiente y leé el cartel que sale después.
 
+**Una variable EN BLANCO tampoco es "ausente": aborta.** Cualquiera de las cinco
+exportada con sólo whitespace (`FIRESTORE_EMULATOR_HOST=' '`, un tab, un salto
+de línea) corta antes de escribir, en los dos guards (`lib/credenciales.js` y
+`lib/storage_target.js`):
+
+La única excepción es la que hace el propio SDK: firebase-admin sólo mira
+`FIREBASE_STORAGE_EMULATOR_HOST` si `STORAGE_EMULATOR_HOST` no tiene valor.
+Con `STORAGE_EMULATOR_HOST` puesta, la de Firebase en blanco se ignora (Storage
+va al host de la otra, medido) y no aborta nada.
+
+```
+⛔  ABORTADO: hay variables de emulador exportadas EN BLANCO.
+```
+
+Ninguna es un host, y ninguna lleva su servicio al emulador. Medido sin red
+contra firebase-admin 14.5.0 (Firestore 9.3.1, Storage 8.2.0): con
+`FIRESTORE_EMULATOR_HOST` en blanco `getFirestore()` tira «is not a valid
+host», y con cualquiera de las dos de Storage el cliente arma un endpoint
+inválido. O sea que el servicio que esa variable desvía no va al emulador **ni**
+a la nube; el abort dice, variable por variable, qué hace el SDK con cada una.
+Hasta este cambio cada guard la contaba distinto —`storage_target.js` como
+emulador, `credenciales.js` como nube— y la misma corrida salía etiquetada
+`destino: EMULADOR`, sin cartel, con `lib/admin.js` cargando la credencial.
+
+La variable **vacía** sí cuenta como ausente: `export FIRESTORE_EMULATOR_HOST=`
+sigue siendo una forma válida de apagarla, porque Firestore la ignora. Con una
+excepción: `STORAGE_EMULATOR_HOST=''` el cliente de Storage la lee igual (arma
+el endpoint `https:`), así que ésa se apaga con `unset`, no vaciándola.
+
 ### Por qué se mira la identidad y no el project id
 
 El guard viejo miraba el proyecto. El revisor de #843 encontró por dónde se
@@ -527,6 +556,14 @@ Publica `firestore.rules` **en producción**, y no por el CLI de Firebase: arma
 el ruleset y mueve el release contra la REST API de Firebase Rules
 (`firebaserules.googleapis.com`) autenticándose con `sa-key.json`.
 
+Sube lo **mismo que `firebase deploy --only firestore:rules`**: el fuente pasado
+por `stripComments()` de `strip_rules.js`, no el archivo crudo. El crudo pesa
+~340 KB y el tope de un ruleset es 256 KiB; hasta 2026-10-15 este script subía
+el crudo, así que la API lo rebotaba con un 400 sin decir el tamaño y su
+comparación contra lo desplegado (que sí está procesado) no daba igual nunca.
+Si el procesado se pasa del tope, frena antes de salir a la red. Lo prueba
+`test/deploy_rules_procesadas.test.js`.
+
 De ahí que sea su propia sección y no una fila más de la tabla:
 
 - **No lee `.firebaserc`.** El proyecto sale del `project_id` del service
@@ -540,6 +577,73 @@ De ahí que sea su propia sección y no una fila más de la tabla:
 Imprime el banner de producción antes del primer request (`lib/firebase_projects.js`),
 y a diferencia del resto lo imprime **siempre** que el destino sea producción:
 apagarlo con la variable del emulador sería mentir. (#826)
+
+### Sólo se deploya lo que está en `develop`
+
+El 2026-10-13 se deployaron las reglas desde un checkout 58 commits atrás de
+`main`, y producción perdió en silencio las reglas de #1387 y #1395: un
+rollback sin conflicto, sin aviso y con el deploy en verde. Desde entonces
+`guard_fuente_de_deploy.js` frena el deploy si lo que se va a subir **no es
+idéntico a `origin/develop`**, recién fetcheado. Corre en tres lugares:
+
+| camino | cómo |
+|---|---|
+| `firebase deploy` de firestore (reglas o índices) | primer `predeploy` de `firebase.json`, sobre `firestore.rules` y `firestore.indexes.json` |
+| `firebase deploy` de storage | `predeploy` de `firebase.json`, sobre `storage.rules` |
+| `node deploy_rules.js` | lo llama antes de leer las reglas, porque este script no pasa por los hooks |
+
+Frena una rama vieja (revierte reglas ya deployadas) y un cambio sin mergear
+(sube reglas que nadie revisó). Compara normalizando CRLF/LF, por la misma
+trampa de AGENTS.md §11.2. Si no puede fetchear, frena: comparar contra un
+`origin/develop` local viejo es comparar contra una mentira.
+
+Por qué `develop` y no `main`: todo cambio de reglas entra por `develop`, y
+producción puede ir adelante de `main` (#1431 y #1432 se deployaron desde
+`develop` antes del release). Un guard contra `main` dejaría pasar justo el
+rollback de esos fixes.
+
+Cómo deployar:
+
+```sh
+# Refspec explícito, igual que el guard: un `git fetch origin` pelado no mueve
+# origin/develop en un clon --single-branch, y el worktree saldría de reglas viejas.
+git fetch origin +refs/heads/develop:refs/remotes/origin/develop
+git worktree add .claude/worktrees/deploy origin/develop
+cd .claude/worktrees/deploy
+rg -l guard_fuente_de_deploy firebase.json scripts/deploy_rules.js   # tienen que salir los dos
+firebase deploy --only firestore:rules --project prod
+```
+
+Emergencia, a sabiendas: `TREINO_DEPLOY_FUERA_DE_DEVELOP=1`. Deja pasar, pero
+imprime igual qué difiere. Avisá al equipo qué subiste y por qué.
+
+**Un checkout viejo no tiene este guard.** El guard vive en el `firebase.json`
+y el `deploy_rules.js` del checkout desde el que deployás. Uno anterior a #1433
+trae los suyos, sin guard, y deploya como siempre: es exactamente el checkout
+que el guard existe para frenar, y es el único que no lo puede frenar. Esto
+protege a partir de que el checkout lo tenga; no antes. Medido el 2026-10-14: el
+checkout raíz del repo estaba en `c0881fcc`, anterior a #1433, sin guard.
+
+Antes de deployar desde un checkout que no sabés de cuándo es:
+
+```sh
+rg -l guard_fuente_de_deploy firebase.json scripts/deploy_rules.js
+```
+
+Tienen que salir los dos archivos. Si falta alguno, no deployes desde ahí: usá
+el worktree de `origin/develop` de arriba, y repetí el chequeo adentro de ese
+worktree. Ojo con lo que dice: que el checkout **tiene** el guard, no que
+tenga la última versión del guard.
+
+El fetch del guard no es un `git fetch origin develop` pelado: lleva refspec
+explícito, porque en un clon `--single-branch` el pelado no mueve
+`origin/develop` y el guard comparaba contra la copia vieja (con "✓ idéntico").
+Y se corta si una conexión ya establecida deja de transferir —menos de 1 KB/s
+durante 30 s—, donde antes el deploy se quedaba colgado sin decir nada. Lo que
+**no** cubre: un handshake TLS que nunca contesta (eso lo corta curl a los
+300 s), ni un remoto por ssh; y puede cortar a un servidor sano que tarde más
+de 30 s en armar el pack, en cuyo caso falla cerrado y se reintenta. Las
+mediciones, en el comentario de `FETCH_DEVELOP` en `guard_fuente_de_deploy.js`.
 
 ---
 
@@ -630,22 +734,69 @@ Los cuatro pasan por `lib/storage_target.js` antes de la primera escritura.
 **El bucket ya no está hardcodeado.** Se resuelve en este orden:
 `--bucket=<bucket>` → `FIREBASE_STORAGE_BUCKET` → derivado del proyecto activo
 (`--project=` → `GOOGLE_CLOUD_PROJECT` → `project_id` del
-`GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`).
+`GOOGLE_APPLICATION_CREDENTIALS` → **con Firestore Y Storage en el emulador**,
+el namespace del emulador → `.firebaserc`).
+
+El `activeProjects` que escribe `firebase use` **no** está en esa cadena, a
+propósito: el Admin SDK tampoco lo lee (`rg activeProjects` sobre
+`firebase-admin`, `google-auth-library`, `@google-cloud` y `google-gax` da 0), y
+es el pin que AGENTS.md (Entornos, corolario 4) muestra heredándose desde
+cualquier directorio padre. Seguirlo haría que un `firebase use prod` olvidado
+en la raíz eligiera producción —con cartel, pero sin que nadie la pidiera— por
+una corrida que no la nombró.
 
 **Firestore y Storage tienen que apuntar al mismo lado, o el script aborta.**
 Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
 imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
 `initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
+Tampoco corre una variable de emulador exportada en blanco: ver "Sin
+credencial: el emulador".
 
-Para correr entero contra el emulador hay que levantarlo **con Storage** —
-`scripts/emulator.sh` arranca `--only firestore,auth,functions`, así que el
-emulador de Storage (puerto 9199, declarado en `firebase.json`) no está:
+Para correr entero contra el emulador hay que levantarlo **con Storage**.
+`scripts/emulator.sh` lo levanta desde el 2026-10-14, en los dos modos (puerto
+9199, declarado en `firebase.json`):
 
 ```bash
-firebase emulators:start --only firestore,auth,storage
+./scripts/emulator.sh
 export FIRESTORE_EMULATOR_HOST=localhost:8080
 export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
+
+(Antes este párrafo decía que `emulator.sh` arrancaba sin Storage y mandaba a
+levantarlo a mano. Era cierto entonces; dejó de serlo cuando la app empezó a
+mandar Storage al emulador con `USE_EMULATOR=true`.)
+
+**Con las dos variables, y si nadie nombra otro proyecto, el proyecto es el
+namespace del emulador** (`PROJECT_ID_EMULADOR` de `lib/target_project.js`, hoy
+`treino-dev`): el mismo
+`--project` con el que `emulator.sh` levanta el emulador, el `projectId` de
+`lib/firebase_options.dart` y donde siembra `seed_emulator_full.js`. La primera
+línea lo dice: `Proyecto: treino-dev (namespace del emulador) · … · destino:
+EMULADOR (Firestore + Storage)`. Contra el emulador ese id es una carpeta local,
+y por eso no sale el cartel.
+
+Hasta el 2026-10-14 esa misma receta resolvía `demo-treino` —el default del
+`.firebaserc`— y los scripts leían un namespace vacío. Medido con un emulador
+levantado como `emulator.sh` (puertos alternos) y un ejercicio sembrado:
+`extract_exercise_thumbnails.js --upload` terminó en «subidos + patcheados: 0 ·
+fallas: 1» («doc no existe en exercises») **con exit 0**. El emulador no lo
+rechaza: anota «Multiple projectIds are not recommended in single project mode»
+en `firestore-debug.log` y sirve el namespace vacío. Lo ata
+`test/emulador_namespace.test.js`, que falla si `emulator.sh`,
+`firebase_options.dart` y `PROJECT_ID_EMULADOR` dejan de decir lo mismo.
+
+**No le agregues `--project=treino-dev` a la receta del emulador.** Era la única
+forma de alinear los namespaces antes de este cambio, y es justo el comando que,
+en una terminal donde no exportaste ninguna de las dos variables, escribe en
+producción: el guard deja pasar con cartel, porque nombrar producción es
+pedirla. Sin el flag, olvidarse las dos cae en `demo-treino`; olvidarse una
+aborta, con o sin flag.
+
+Las URLs que estampan contra el emulador nombran el bucket
+`treino-dev.firebasestorage.app`, pero con el host del emulador
+(`http://<FIREBASE_STORAGE_EMULATOR_HOST>/…`), así que no se confunden con una
+de producción. Ver «La URL que se estampa nombra el mismo lado que la subida»,
+más abajo.
 
 Sin ninguna de las dos variables el destino ya **no** es producción: desde el
 #840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la
@@ -701,6 +852,40 @@ archivo que copie el literal sería un cuarto destino que no responde ni a
 `test/storage_scripts_destination.test.js`, que barre `scripts/*.js` y
 `scripts/lib/*.js` y falla si la lista de archivos con el literal cambia o si
 alguno de ellos empieza a tocar Storage.
+
+**La URL que se estampa nombra el mismo lado que la subida.** Hasta el
+2026-10-14 los cuatro armaban la URL de descarga con el host de producción fijo
+(`https://firebasestorage.googleapis.com/v0/b/<bucket>/o/…`), también contra el
+emulador: el archivo quedaba en el emulador y la URL apuntaba a Google. Medido
+con `CachedNetworkImage` y HTTP real, esa URL da 404 (bucket `demo-treino…`) o
+**403 del Storage de producción** (bucket `treino-dev…`), y `ExerciseAssetImage`
+cae en silencio al asset local: la corrida parece andar.
+
+Ahora la arma `lib/url_de_descarga.js` desde el mismo plan que decide el
+destino: contra el emulador, `http://<FIREBASE_STORAGE_EMULATOR_HOST>/v0/b/<bucket>/o/…`
+(200 medido, con el token que el script subió); en la nube, la de siempre, byte
+a byte. Además:
+
+- **Los videos, sólo con la app en modo emulador.** La app reproduce un
+  `videoUrl` del emulador (`http://` + `localhost`, `127.0.0.1` o `10.0.2.2`,
+  puerto 9199, forma `/v0/b/…/o/…`) únicamente cuando corre con
+  `--dart-define=USE_EMULATOR=true`, y nunca en release
+  (`esUrlDeDescargaDelEmuladorDeStorage`, `lib/core/firebase/emuladores.dart`).
+  Medido en el simulador de iOS con una URL armada por este módulo: el detalle
+  pone el video en el hero y reproduce. Hasta ese cambio la app sólo aceptaba
+  `firebasestorage.googleapis.com` y el detalle se quedaba con la foto. Este
+  módulo estampa el host que exportes, cualquiera sea; con uno fuera de esos
+  tres (`[::1]`, `0.0.0.0`) la URL sale igual y la app no la reproduce.
+- **No usa `getDownloadURL` del SDK**: contra el emulador de este repo da
+  `403 No READ permission` (su GET de metadata lo deniega el catch-all de
+  `storage.rules`).
+- **El host va tal como lo exportaste.** `localhost` anduvo en la medición
+  (Mac). En el emulador de Android `localhost` es el propio dispositivo —la Mac
+  es `10.0.2.2`—, así que ahí esperá que no cargue; no está medido.
+- **`upload_enriched_videos.js` no corre contra el emulador**, salvo con
+  `--dry-run`: su salida es `enriched-catalog.json`, versionado y que se
+  importa. Y `test/storage_scripts_url.test.js` falla si aparece en
+  `docs/video-catalog-audit/` una URL de descarga que no sea de la nube.
 
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con

@@ -6,6 +6,8 @@
 //   - Empty list state when the PF has zero chats.
 //   - Tap on a chat row updates `selectedChatIdProvider`.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,6 +100,58 @@ void main() {
           find.textContaining('Todavía no tenés conversaciones'),
           findsOneWidget,
         );
+      },
+    );
+  });
+
+  group('ChatSectionScreen — stale-while-error', () {
+    testWidgets(
+      'rows persist through a transient stream error when data was already '
+      'loaded',
+      (tester) async {
+        final chat = _stubChat(lastMessageText: 'Hola PF');
+        final controller = StreamController<List<Chat>>();
+        addTearDown(controller.close);
+
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => controller.stream,
+            ),
+            userPublicProfileProvider(_athleteUid).overrideWith(
+              (ref) => Stream<UserPublicProfile?>.value(_stubPub()),
+            ),
+          ],
+        ));
+
+        controller.add([chat]);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+
+        // Riverpod preserva el value previo dentro del AsyncError
+        // (copyWithPrevious): con datos ya cargados no debe taparse la lista.
+        controller.addError('transient');
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'a first load that fails (no data yet) still shows the error state',
+      (tester) async {
+        await tester.pumpWidget(_wrap(
+          overrides: [
+            currentUidProvider.overrideWithValue(_pfUid),
+            chatsForCurrentUserProvider.overrideWith(
+              (ref) => Stream<List<Chat>>.error('boom'),
+            ),
+          ],
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('chat_row_$_chatId')), findsNothing);
       },
     );
   });

@@ -41,6 +41,9 @@ mixin _$SetSpec {
   /// Target duration in seconds — used when [ExerciseMode.duration].
   int? get durationSeconds => throw _privateConstructorUsedError;
 
+  /// Target distance in meters — used when [ExerciseMode.distance].
+  double? get distanceMeters => throw _privateConstructorUsedError;
+
   /// Serializes this SetSpec to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
 
@@ -61,7 +64,8 @@ abstract class $SetSpecCopyWith<$Res> {
       int? reps,
       int? repsMin,
       int? repsMax,
-      int? durationSeconds});
+      int? durationSeconds,
+      double? distanceMeters});
 }
 
 /// @nodoc
@@ -85,6 +89,7 @@ class _$SetSpecCopyWithImpl<$Res, $Val extends SetSpec>
     Object? repsMin = freezed,
     Object? repsMax = freezed,
     Object? durationSeconds = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(_value.copyWith(
       type: null == type
@@ -111,6 +116,10 @@ class _$SetSpecCopyWithImpl<$Res, $Val extends SetSpec>
           ? _value.durationSeconds
           : durationSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      distanceMeters: freezed == distanceMeters
+          ? _value.distanceMeters
+          : distanceMeters // ignore: cast_nullable_to_non_nullable
+              as double?,
     ) as $Val);
   }
 }
@@ -128,7 +137,8 @@ abstract class _$$SetSpecImplCopyWith<$Res> implements $SetSpecCopyWith<$Res> {
       int? reps,
       int? repsMin,
       int? repsMax,
-      int? durationSeconds});
+      int? durationSeconds,
+      double? distanceMeters});
 }
 
 /// @nodoc
@@ -150,6 +160,7 @@ class __$$SetSpecImplCopyWithImpl<$Res>
     Object? repsMin = freezed,
     Object? repsMax = freezed,
     Object? durationSeconds = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(_$SetSpecImpl(
       type: null == type
@@ -176,6 +187,10 @@ class __$$SetSpecImplCopyWithImpl<$Res>
           ? _value.durationSeconds
           : durationSeconds // ignore: cast_nullable_to_non_nullable
               as int?,
+      distanceMeters: freezed == distanceMeters
+          ? _value.distanceMeters
+          : distanceMeters // ignore: cast_nullable_to_non_nullable
+              as double?,
     ));
   }
 }
@@ -189,7 +204,8 @@ class _$SetSpecImpl implements _SetSpec {
       this.reps,
       this.repsMin,
       this.repsMax,
-      this.durationSeconds});
+      this.durationSeconds,
+      this.distanceMeters});
 
   factory _$SetSpecImpl.fromJson(Map<String, dynamic> json) =>
       _$$SetSpecImplFromJson(json);
@@ -221,9 +237,13 @@ class _$SetSpecImpl implements _SetSpec {
   @override
   final int? durationSeconds;
 
+  /// Target distance in meters — used when [ExerciseMode.distance].
+  @override
+  final double? distanceMeters;
+
   @override
   String toString() {
-    return 'SetSpec(type: $type, weightKg: $weightKg, reps: $reps, repsMin: $repsMin, repsMax: $repsMax, durationSeconds: $durationSeconds)';
+    return 'SetSpec(type: $type, weightKg: $weightKg, reps: $reps, repsMin: $repsMin, repsMax: $repsMax, durationSeconds: $durationSeconds, distanceMeters: $distanceMeters)';
   }
 
   @override
@@ -238,13 +258,15 @@ class _$SetSpecImpl implements _SetSpec {
             (identical(other.repsMin, repsMin) || other.repsMin == repsMin) &&
             (identical(other.repsMax, repsMax) || other.repsMax == repsMax) &&
             (identical(other.durationSeconds, durationSeconds) ||
-                other.durationSeconds == durationSeconds));
+                other.durationSeconds == durationSeconds) &&
+            (identical(other.distanceMeters, distanceMeters) ||
+                other.distanceMeters == distanceMeters));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType, type, weightKg, reps, repsMin, repsMax, durationSeconds);
+  int get hashCode => Object.hash(runtimeType, type, weightKg, reps, repsMin,
+      repsMax, durationSeconds, distanceMeters);
 
   /// Create a copy of SetSpec
   /// with the given fields replaced by the non-null parameter values.
@@ -269,7 +291,8 @@ abstract class _SetSpec implements SetSpec {
       final int? reps,
       final int? repsMin,
       final int? repsMax,
-      final int? durationSeconds}) = _$SetSpecImpl;
+      final int? durationSeconds,
+      final double? distanceMeters}) = _$SetSpecImpl;
 
   factory _SetSpec.fromJson(Map<String, dynamic> json) = _$SetSpecImpl.fromJson;
 
@@ -299,6 +322,10 @@ abstract class _SetSpec implements SetSpec {
   /// Target duration in seconds — used when [ExerciseMode.duration].
   @override
   int? get durationSeconds;
+
+  /// Target distance in meters — used when [ExerciseMode.distance].
+  @override
+  double? get distanceMeters;
 
   /// Create a copy of SetSpec
   /// with the given fields replaced by the non-null parameter values.

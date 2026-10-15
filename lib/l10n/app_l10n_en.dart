@@ -758,6 +758,23 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get workoutWeekCompletedTitle => 'Week complete! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'You\'re on a $count-week streak.',
+      one: 'Your first week complete!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'View week summary';
+
+  @override
   String get wellbeingTrendScreenTitle => 'HOW I FELT';
 
   @override
@@ -4883,7 +4900,7 @@ class AppL10nEn extends AppL10n {
       'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
 
   @override
-  String get privacyEntryTitle => 'Analytics and emails';
+  String get privacyEntryTitle => 'Analytics, emails and reminders';
 
   @override
   String get privacyPromoEmailsTitle => 'Promotional emails';
@@ -4894,6 +4911,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get privacyPromoEmailsSaveError =>
+      'We couldn\'t save the change. Try again.';
+
+  @override
+  String get privacyTrainingRemindersTitle => 'Training reminders';
+
+  @override
+  String get privacyTrainingRemindersSubtitle =>
+      'We\'ll let you know if your streak is at risk or you haven\'t trained in a few days.';
+
+  @override
+  String get privacyTrainingRemindersSaveError =>
       'We couldn\'t save the change. Try again.';
 
   @override
@@ -5200,4 +5228,18 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'This place is no longer available. Pick this place again so people can find you.';
+
+  @override
+  String get appUpdateTitle => 'Update the app';
+
+  @override
+  String get appUpdateBody =>
+      'This version of TREINO is no longer supported and could lose data from your routines. Update it to keep training.';
+
+  @override
+  String get appUpdateCta => 'UPDATE';
+
+  @override
+  String get appUpdateOpenError =>
+      'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
 }

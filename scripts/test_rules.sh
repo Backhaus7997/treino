@@ -120,6 +120,17 @@ asegurar_java21 || exit 1
 # `emulators:exec` además exporta el id resuelto como GCLOUD_PROJECT, que es de
 # donde lo lee el hermano de functions/ (session-feedback-storage-rules.test.ts).
 cd "${SCRIPT_DIR}/.."
+
+# --- firestore.deploy.rules, que firebase.json le hace cargar al emulador ----
+#
+# Es GENERADO y gitignoreado (#1132): en un checkout limpio no existe, y sin él
+# el emulador no falla, arranca en allow-all. Las suites de acá cargan sus
+# propias reglas con `initializeTestEnvironment`, así que hoy ninguna mide el
+# estado de arranque; se genera igual para que un test REST que llegue mañana
+# no herede un emulador abierto — que es lo que le pasaba a los dos del reloj
+# en `functions-test`.
+node scripts/strip_rules.js
+
 firebase emulators:exec \
   --only firestore,storage \
   --project treino-dev \

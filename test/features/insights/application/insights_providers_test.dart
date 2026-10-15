@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
@@ -61,6 +62,9 @@ void main() {
         currentUidProvider.overrideWithValue('u1'),
         sessionRepositoryProvider.overrideWithValue(repo),
         exercisesProvider.overrideWith((ref) async => const <Exercise>[]),
+        // Rutina activa de 3 días: el «planificado» de la semana es ESE
+        // objetivo, no un número fijo (#1449: antes era un 5 hardcodeado).
+        weeklyStreakTargetProvider.overrideWithValue(3),
       ]);
       addTearDown(container.dispose);
 
@@ -70,7 +74,7 @@ void main() {
       expect(result.daysTrained, equals(List<bool>.filled(7, false)));
       expect(result.setsByGroup, isEmpty);
       expect(result.targetByGroup, isEmpty);
-      expect(result.plannedSessionsCount, 5);
+      expect(result.plannedSessionsCount, 3);
     });
 
     test('SCENARIO-403: filtra sesiones por status=finished', () async {

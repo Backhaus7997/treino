@@ -11,6 +11,8 @@
 // Todas las strings son español hardcodeado + comentario // i18n (C-6) —
 // mismo contrato que los widgets bajo test.
 
+import 'dart:async';
+
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +122,47 @@ void main() {
       await firestore.collection('appointments').doc(a.id).set(a.toJson());
     }
   }
+
+  testWidgets('conserva los turnos ante un error transitorio', (tester) async {
+    var listens = 0;
+    final appointments = StreamController<List<Appointment>>.broadcast(
+      onListen: () => listens++,
+    );
+    addTearDown(appointments.close);
+
+    await tester.pumpWidget(_wrap(
+      firestore: firestore,
+      extraOverrides: [
+        trainerAppointmentsStreamProvider.overrideWith(
+          (ref, key) => appointments.stream,
+        ),
+        _noProfile(_kAthleteA),
+        _billingFor(_kAthleteA, null),
+      ],
+    ));
+    await tester.pump();
+
+    appointments.add([_confirmedAppt(id: 'stale', hour: 9)]);
+    await tester.pumpAndSettle();
+    expect(find.text('Ana López'), findsOneWidget);
+    expect(find.text('Datos desactualizados'), findsNothing);
+
+    appointments.addError(Exception('corte transitorio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ana López'), findsOneWidget);
+    expect(find.text('Error al cargar los turnos.'), findsNothing);
+    expect(find.text('Datos desactualizados'), findsOneWidget);
+
+    await tester.tap(find.text('Reintentar'));
+    await tester.pumpAndSettle();
+    expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+    appointments.add(const <Appointment>[]);
+    await tester.pumpAndSettle();
+    expect(find.text('No hay sesiones este día.'), findsOneWidget);
+    expect(find.text('Datos desactualizados'), findsNothing);
+  });
 
   group('modo selección — toggle y lock por alumno', () {
     testWidgets(

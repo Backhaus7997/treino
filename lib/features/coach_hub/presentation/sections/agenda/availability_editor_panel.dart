@@ -1,6 +1,8 @@
 // PR3a+PR3b — Panel de edición de reglas y excepciones de disponibilidad.
 // Strings en español hardcodeado + // i18n. NO se usa AppL10n (constraint C-6).
 // Dialogs: showDialog/AlertDialog (ADR-AGW-3). NO showModalBottomSheet.
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -92,7 +94,15 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Reglas ─────────────────────────────────────────────────
-                    rulesAsync.when(
+                    staleNoticeIf(
+                      rulesAsync.isStale,
+                      () => ref.invalidate(
+                          availabilityRulesStreamProvider(trainerId)),
+                    ),
+                    (rulesAsync.hasValue
+                            ? AsyncValue.data(rulesAsync.requireValue)
+                            : rulesAsync)
+                        .when(
                       loading: () => const Center(
                         child: CoachHubSkeleton(
                           filas: 3,
@@ -141,7 +151,15 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                     ),
 
                     // ── Overrides list ─────────────────────────────────────────
-                    overridesAsync.when(
+                    staleNoticeIf(
+                      overridesAsync.isStale,
+                      () =>
+                          ref.invalidate(overridesStreamProvider(overridesKey)),
+                    ),
+                    (overridesAsync.hasValue
+                            ? AsyncValue.data(overridesAsync.requireValue)
+                            : overridesAsync)
+                        .when(
                       // Skeleton y no spinner: lo que viene es la lista de
                       // excepciones, con su forma conocida. Además el padding
                       // de 24 estaba fuera de la escala 8·12·14·18·20 — el

@@ -175,8 +175,10 @@ class TreinoBarLayout {
 /// deja que la barra se quede con los íconos — a esa altura el problema es el
 /// textScale del usuario, y achicar el margen ya no lo arregla.
 ///
-/// Deliberadamente NO mira `collapsed`: si el margen dependiera del estado
-/// colapsado, la barra cambiaría de ANCHO al scrollear, no solo de alto.
+/// Deliberadamente NO mira `collapsed`. La barra SÍ se angosta al compactarse,
+/// pero eso lo resuelve aparte [resolveCollapsedInset]: si este margen mirara
+/// el estado, la decisión de si los labels entran —que se toma con la barra
+/// expandida— cambiaría con el scroll.
 TreinoBarLayout resolveBarLayout({
   required double totalWidth,
   required int itemCount,
@@ -201,6 +203,40 @@ TreinoBarLayout resolveBarLayout({
   }
 
   return TreinoBarLayout(sideMargin: _kSideMarginIdeal, metrics: ideal);
+}
+
+/// Cuánto se angosta la barra POR LADO al compactarse, como máximo.
+///
+/// Compactada se queda con los íconos, y los íconos no necesitan el ancho que
+/// pedían los labels: angostarla es lo que hace que se lea como "se hizo a un
+/// lado para que leas" y no sólo como "perdió los textos". En un iPhone 17 Pro
+/// la barra pasa de 362 a 306 pt, la misma proporción (~0,84) que la referencia
+/// de diseño que se tomó.
+const double _kCollapsedShrink = 28;
+
+/// Ancho mínimo de cada tab con la barra compactada.
+///
+/// Es el piso que frena a [_kCollapsedShrink] en pantallas angostas. 56 deja
+/// el pill activo en 44 de ancho —un poco más ancho que alto (40), que es lo
+/// que lo sigue leyendo como pill y no como punto— y el área tapeable bien por
+/// encima de los 44 de la HIG.
+const double _kCollapsedMinTabWidth = 56;
+
+/// Cuánto se mete la barra por lado cuando está compactada.
+///
+/// [barWidth] es el ancho de la barra EXPANDIDA (ya descontado el margen
+/// lateral de [resolveBarLayout]). Devuelve [_kCollapsedShrink], salvo que con
+/// eso los tabs queden por debajo de [_kCollapsedMinTabWidth]: ahí se angosta
+/// sólo lo que deja ese piso, y si ni siquiera expandida lo alcanza, nada.
+///
+/// Es una función pura por la misma razón que [resolveBarMetrics]: en un widget
+/// test la fuente es otra, y la cuenta tiene que poder verificarse sin ella.
+double resolveCollapsedInset({
+  required double barWidth,
+  required int itemCount,
+}) {
+  final room = (barWidth - itemCount * _kCollapsedMinTabWidth) / 2;
+  return room.clamp(0.0, _kCollapsedShrink);
 }
 
 /// Redondeo del pill activo.
@@ -284,9 +320,10 @@ class TreinoBottomBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  /// Cuando es `true` la barra se compacta: pierde alto y esconde los labels,
-  /// dejando solo los íconos. La dispara el shell al detectar scroll hacia
-  /// abajo en cualquier pantalla (ver `_ShellScaffold` en `app/router.dart`).
+  /// Cuando es `true` la barra se compacta: pierde alto, se angosta (ver
+  /// [resolveCollapsedInset]) y esconde los labels, dejando solo los íconos.
+  /// La dispara el shell al detectar scroll hacia abajo en cualquier pantalla
+  /// (ver `_ShellScaffold` en `app/router.dart`).
   ///
   /// **No es el único disparador del estado compacto**: la barra también se
   /// queda con los íconos cuando los labels no entran a lo ancho (ver
@@ -475,8 +512,12 @@ class TreinoBottomBar extends StatelessWidget {
           final metrics = layout.metrics;
           final barHeight = metrics.barHeight;
           final expanded = !collapsed && metrics.labelsFit;
+          final collapsedInset = resolveCollapsedInset(
+            barWidth: constraints.maxWidth - 2 * layout.sideMargin,
+            itemCount: _items.length,
+          );
 
-          // Una sola animación gobierna alto Y labels. Si fueran dos
+          // Una sola animación gobierna alto, ancho Y labels. Si fueran dos
           // (AnimatedContainer + AnimatedOpacity) podrían desincronizarse
           // un frame y el contenido desbordaría la caja mientras se achica.
           return Padding(
@@ -491,154 +532,162 @@ class TreinoBottomBar extends StatelessWidget {
               duration: AppMotion.resolve(context, AppMotion.base),
               curve: AppMotion.standard,
               builder: (context, expansion, _) {
-                return DecoratedBox(
-                  // Shadow lives OUTSIDE the ClipRRect — inside it gets
-                  // clipped.
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(_kBarRadius),
-                    boxShadow: [
-                      BoxShadow(
-                        color: palette.bg.withValues(alpha: 0.45),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(_kBarRadius),
-                    child: SizedBox(
-                      height: lerpDouble(collapsedHeight, barHeight, expansion),
-                      child: TreinoGlassSurface(
-                        borderRadius: BorderRadius.circular(_kBarRadius),
-                        // Filo REFORZADO, no el `palette.border` que trae por
-                        // defecto [TreinoGlassSurface].
-                        //
-                        // El pill activo siempre estuvo contenido: se separa
-                        // [_kPillInset] del borde del tab en los cuatro lados
-                        // y el test de contención lo mide. Lo que se reportó
-                        // en #821 —"el pill sobresale y tapa el contenido de
-                        // arriba"— no era geometría sino que la barra no se
-                        // veía: rasterizando el árbol, el relleno translúcido
-                        // daba 1,05:1 contra `palette.bg` en dark y el borde
-                        // 1,37:1. Con el fondo de la app casi negro y la
-                        // sombra de abajo pintada en `palette.bg` (negro sobre
-                        // negro), el contenedor entero era invisible y el pill
-                        // mint, a 9,3:1, quedaba como el único objeto de la
-                        // zona. El ojo lee eso como un elemento flotando
-                        // encima del contenido, no como un tab adentro de una
-                        // barra.
-                        //
-                        // Subir `fillOpacity` NO lo arregla: `bgCard` sobre
-                        // `bg` es `ink900` sobre `ink950`, 1,07:1 aun al 100%
-                        // de opacidad. Los dos tonos son casi el mismo color a
-                        // propósito, así que el límite tiene que venir del
-                        // filo. [AppPalette.borderStrong] lo lleva a ~3:1, el
-                        // piso de WCAG 2.2 SC 1.4.11 para el borde de un
-                        // componente.
-                        //
-                        // Va SOLO acá y no en el default de la superficie: las
-                        // burbujas del header del feed se apoyan sobre
-                        // contenido, no sobre el fondo desnudo, y con este filo
-                        // se leerían como botones delineados.
-                        borderColor: palette.borderStrong,
-                        child: LayoutBuilder(
-                          builder: (context, innerConstraints) {
-                            final tabWidth =
-                                innerConstraints.maxWidth / _items.length;
-                            return Stack(
-                              children: [
-                                // Lo que se anima es el ÍNDICE, no los
-                                // píxeles.
-                                //
-                                // Acá había un `AnimatedPositioned` que
-                                // interpolaba `left` y `width`, y eso mete en
-                                // la misma animación dos cosas de naturaleza
-                                // distinta: cambiar de tab —que SÍ tiene que
-                                // deslizarse— y cambiar de ancho la barra
-                                // —que NO, porque los tabs son un `Row` de
-                                // `Expanded` y se reacomodan en un frame—.
-                                // Ante una rotación o un fold el pill viajaba
-                                // los 320ms de `AppMotion.slow` hacia una
-                                // posición que sus tabs ya ocupaban desde el
-                                // primer frame: hasta 34pt de desvío (#734).
-                                //
-                                // Animando el índice, `left` y `width` se
-                                // derivan del `tabWidth` VIGENTE en cada
-                                // frame. Cambiar de tab sigue deslizando;
-                                // cambiar de ancho reacomoda pill y tabs
-                                // juntos, en el mismo frame. La regla general:
-                                // animar la magnitud LÓGICA que cambia por
-                                // decisión del usuario, nunca la geometría
-                                // que el layout puede redefinir sola.
-                                // 240ms, no los 320 de `AppMotion.slow` que
-                                // había: la tab bar es lo que más se toca en
-                                // toda la app —decenas de veces por día— y el
-                                // escalón `slow` está pensado para
-                                // transiciones de página y celebraciones, que
-                                // se ven una vez. A esta frecuencia, 320ms se
-                                // acumulan como sensación de lentitud general
-                                // aunque ninguna animación suelta se sienta
-                                // lenta. `base` deja el pill abajo del techo
-                                // de 300ms para UI.
-                                TweenAnimationBuilder<double>(
-                                  tween: Tween<double>(
-                                    end: currentIndex.toDouble(),
+                // El ancho se angosta con el mismo `expansion` que el alto.
+                // Pill y tabs lo siguen solos: el `LayoutBuilder` de adentro
+                // deriva `tabWidth` del ancho VIGENTE en cada frame (#734).
+                final inset = collapsedInset * (1 - expansion);
+                return Padding(
+                  padding: EdgeInsets.symmetric(horizontal: inset),
+                  child: DecoratedBox(
+                    // Shadow lives OUTSIDE the ClipRRect — inside it gets
+                    // clipped.
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(_kBarRadius),
+                      boxShadow: [
+                        BoxShadow(
+                          color: palette.bg.withValues(alpha: 0.45),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(_kBarRadius),
+                      child: SizedBox(
+                        height:
+                            lerpDouble(collapsedHeight, barHeight, expansion),
+                        child: TreinoGlassSurface(
+                          borderRadius: BorderRadius.circular(_kBarRadius),
+                          // Filo REFORZADO, no el `palette.border` que trae por
+                          // defecto [TreinoGlassSurface].
+                          //
+                          // El pill activo siempre estuvo contenido: se separa
+                          // [_kPillInset] del borde del tab en los cuatro lados
+                          // y el test de contención lo mide. Lo que se reportó
+                          // en #821 —"el pill sobresale y tapa el contenido de
+                          // arriba"— no era geometría sino que la barra no se
+                          // veía: rasterizando el árbol, el relleno translúcido
+                          // daba 1,05:1 contra `palette.bg` en dark y el borde
+                          // 1,37:1. Con el fondo de la app casi negro y la
+                          // sombra de abajo pintada en `palette.bg` (negro sobre
+                          // negro), el contenedor entero era invisible y el pill
+                          // mint, a 9,3:1, quedaba como el único objeto de la
+                          // zona. El ojo lee eso como un elemento flotando
+                          // encima del contenido, no como un tab adentro de una
+                          // barra.
+                          //
+                          // Subir `fillOpacity` NO lo arregla: `bgCard` sobre
+                          // `bg` es `ink900` sobre `ink950`, 1,07:1 aun al 100%
+                          // de opacidad. Los dos tonos son casi el mismo color a
+                          // propósito, así que el límite tiene que venir del
+                          // filo. [AppPalette.borderStrong] lo lleva a ~3:1, el
+                          // piso de WCAG 2.2 SC 1.4.11 para el borde de un
+                          // componente.
+                          //
+                          // Va SOLO acá y no en el default de la superficie: las
+                          // burbujas del header del feed se apoyan sobre
+                          // contenido, no sobre el fondo desnudo, y con este filo
+                          // se leerían como botones delineados.
+                          borderColor: palette.borderStrong,
+                          child: LayoutBuilder(
+                            builder: (context, innerConstraints) {
+                              final tabWidth =
+                                  innerConstraints.maxWidth / _items.length;
+                              return Stack(
+                                children: [
+                                  // Lo que se anima es el ÍNDICE, no los
+                                  // píxeles.
+                                  //
+                                  // Acá había un `AnimatedPositioned` que
+                                  // interpolaba `left` y `width`, y eso mete en
+                                  // la misma animación dos cosas de naturaleza
+                                  // distinta: cambiar de tab —que SÍ tiene que
+                                  // deslizarse— y cambiar de ancho la barra
+                                  // —que NO, porque los tabs son un `Row` de
+                                  // `Expanded` y se reacomodan en un frame—.
+                                  // Ante una rotación o un fold el pill viajaba
+                                  // los 320ms de `AppMotion.slow` hacia una
+                                  // posición que sus tabs ya ocupaban desde el
+                                  // primer frame: hasta 34pt de desvío (#734).
+                                  //
+                                  // Animando el índice, `left` y `width` se
+                                  // derivan del `tabWidth` VIGENTE en cada
+                                  // frame. Cambiar de tab sigue deslizando;
+                                  // cambiar de ancho reacomoda pill y tabs
+                                  // juntos, en el mismo frame. La regla general:
+                                  // animar la magnitud LÓGICA que cambia por
+                                  // decisión del usuario, nunca la geometría
+                                  // que el layout puede redefinir sola.
+                                  // 240ms, no los 320 de `AppMotion.slow` que
+                                  // había: la tab bar es lo que más se toca en
+                                  // toda la app —decenas de veces por día— y el
+                                  // escalón `slow` está pensado para
+                                  // transiciones de página y celebraciones, que
+                                  // se ven una vez. A esta frecuencia, 320ms se
+                                  // acumulan como sensación de lentitud general
+                                  // aunque ninguna animación suelta se sienta
+                                  // lenta. `base` deja el pill abajo del techo
+                                  // de 300ms para UI.
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(
+                                      end: currentIndex.toDouble(),
+                                    ),
+                                    // `resolve` faltaba: el pill era la única
+                                    // animación de la barra que ignoraba
+                                    // reduce-motion.
+                                    duration: AppMotion.resolve(
+                                      context,
+                                      AppMotion.base,
+                                    ),
+                                    curve: AppMotion.standard,
+                                    builder: (context, position, child) {
+                                      return Positioned(
+                                        // Mismo inset que usa
+                                        // `resolveBarMetrics` para decidir si el
+                                        // label entra. Si acá hubiera un número
+                                        // suelto, medir y pintar podrían
+                                        // separarse sin que nadie lo note.
+                                        left: tabWidth * position + _kPillInset,
+                                        top: _kPillInset,
+                                        bottom: _kPillInset,
+                                        width: tabWidth - 2 * _kPillInset,
+                                        child: child!,
+                                      );
+                                    },
+                                    child: _PillHighlight(
+                                      key: TreinoBottomBar.pillKey,
+                                      palette: palette,
+                                    ),
                                   ),
-                                  // `resolve` faltaba: el pill era la única
-                                  // animación de la barra que ignoraba
-                                  // reduce-motion.
-                                  duration: AppMotion.resolve(
-                                    context,
-                                    AppMotion.base,
-                                  ),
-                                  curve: AppMotion.standard,
-                                  builder: (context, position, child) {
-                                    return Positioned(
-                                      // Mismo inset que usa
-                                      // `resolveBarMetrics` para decidir si el
-                                      // label entra. Si acá hubiera un número
-                                      // suelto, medir y pintar podrían
-                                      // separarse sin que nadie lo note.
-                                      left: tabWidth * position + _kPillInset,
-                                      top: _kPillInset,
-                                      bottom: _kPillInset,
-                                      width: tabWidth - 2 * _kPillInset,
-                                      child: child!,
-                                    );
-                                  },
-                                  child: _PillHighlight(
-                                    key: TreinoBottomBar.pillKey,
-                                    palette: palette,
-                                  ),
-                                ),
-                                Row(
-                                  children: List.generate(_items.length, (i) {
-                                    final item = _items[i];
-                                    final active = i == currentIndex;
-                                    return Expanded(
-                                      child: Semantics(
-                                        button: true,
-                                        selected: active,
-                                        label: item.label,
-                                        excludeSemantics: true,
-                                        child: GestureDetector(
-                                          behavior: HitTestBehavior.opaque,
-                                          onTap: () => onTap(i),
-                                          child: _TabContent(
-                                            spec: item,
-                                            active: active,
-                                            palette: palette,
-                                            badgeCount: _badgeCountFor(i),
-                                            expansion: expansion,
+                                  Row(
+                                    children: List.generate(_items.length, (i) {
+                                      final item = _items[i];
+                                      final active = i == currentIndex;
+                                      return Expanded(
+                                        child: Semantics(
+                                          button: true,
+                                          selected: active,
+                                          label: item.label,
+                                          excludeSemantics: true,
+                                          child: GestureDetector(
+                                            behavior: HitTestBehavior.opaque,
+                                            onTap: () => onTap(i),
+                                            child: _TabContent(
+                                              spec: item,
+                                              active: active,
+                                              palette: palette,
+                                              badgeCount: _badgeCountFor(i),
+                                              expansion: expansion,
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  }),
-                                ),
-                              ],
-                            );
-                          },
+                                      );
+                                    }),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),

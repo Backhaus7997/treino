@@ -191,6 +191,84 @@ void main() {
 
       expect(container.read(nutricionEntriesProvider).isLoading, isTrue);
     });
+
+    // Regression (pulido-post-revision): trainerLinksStreamProvider is a
+    // live Firestore StreamProvider. Riverpod 2.5+ preserves the previous
+    // emitted value inside a subsequent AsyncError (copyWithPrevious /
+    // "seamless") — hasValue and hasError can both be true after a
+    // transient stream error. `.whenData()` dispatches by the AsyncValue's
+    // RUNTIME SUBTYPE (`.map()`), ignoring `hasValue`, so on that compound
+    // state it hit the `error:` branch and returned `hasValue: false`,
+    // dropping the already-computed entries. Locks in the hasValue-first
+    // fix (same defect class as the Chat pane, commit cdd41949).
+    test(
+        'SCENARIO-STALE — entries persist through a transient stream error '
+        'when data was already loaded (stale-while-refresh)', () async {
+      final links = [
+        _link(id: 'l1', athleteId: 'a1', status: TrainerLinkStatus.active),
+      ];
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+      final container = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue(_trainerId),
+          trainerLinksStreamProvider.overrideWith(
+            (ref) => controller.stream,
+          ),
+          nutritionPlanProvider(
+            (trainerId: _trainerId, athleteId: 'a1'),
+          ).overrideWith((ref) => Stream.value(_plan('a1'))),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final sub = container.listen(
+        nutricionEntriesProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      final staleSub = container.listen(
+        nutricionEntriesStaleProvider,
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(staleSub.close);
+
+      controller.add(links);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final afterData = container.read(nutricionEntriesProvider);
+      expect(afterData.hasValue, isTrue);
+      expect(afterData.value!.map((e) => e.link.athleteId), ['a1']);
+      expect(container.read(nutricionEntriesStaleProvider), isFalse);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await Future<void>.delayed(Duration.zero);
+      // Las entries se sostienen, pero el error queda observable.
+      expect(container.read(nutricionEntriesStaleProvider), isTrue);
+
+      final afterError = container.read(nutricionEntriesProvider);
+      expect(
+        afterError.hasValue,
+        isTrue,
+        reason: 'a transient stream error must not blank cached entries',
+      );
+      expect(afterError.value!.map((e) => e.link.athleteId), ['a1']);
+
+      // Reintentar = invalidar la fuente: re-suscribe y apaga el aviso.
+      container.invalidate(trainerLinksStreamProvider);
+      await Future<void>.delayed(Duration.zero);
+      expect(listens, 2);
+      controller.add(links);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(nutricionEntriesStaleProvider), isFalse);
+    });
   });
 
   group('SCENARIO-NP-04 — counts por chip', () {

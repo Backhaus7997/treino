@@ -1,7 +1,7 @@
 name: treino
 description: "TREINO — fitness app multiplataforma."
 publish_to: 'none'
-version: 1.0.2+57
+version: 1.1.0+58
 
 environment:
   sdk: ^3.5.0
@@ -61,6 +61,9 @@ dependencies:
   # server-side "real browser" check.
   url_launcher: ^6.3.0
   video_player: ^2.9.0
+  # Versión instalada para el gate de versión mínima (features/app_update).
+  # Ya estaba en el lock como transitiva (9.0.1); acá se declara directa.
+  package_info_plus: ^9.0.1
   shared_preferences: ^2.3.0
   fl_chart: ^1.2.0
   firebase_messaging: ^15.0.0

@@ -60,6 +60,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
+const { PROJECT_ID_EMULADOR } = require('../lib/target_project');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
@@ -210,6 +211,21 @@ for (const escritor of ESCRITORES) {
     assert.doesNotMatch(r.todo, /EMULADOR \(Firestore \+ Storage\)/);
   });
 
+  test(`${script}: con las dos variables EN BLANCO aborta y no dice EMULADOR (nota 3 del #1442)`, () => {
+    // La corrida del reporte, nombrando producción: antes salía
+    // `destino: EMULADOR (Firestore + Storage)`, sin cartel, y `lib/admin.js`
+    // inicializaba con la credencial porque para él `' '` no es emulador.
+    const r = correr(
+      { ...escritor, argv: [...escritor.argv, '--project=treino-dev'] },
+      { FIRESTORE_EMULATOR_HOST: ' ', FIREBASE_STORAGE_EMULATOR_HOST: ' ' },
+    );
+    assert.strictEqual(r.code, 1, `tenía que cortar con exit 1.\nSALIDA:\n${r.todo}`);
+    assert.match(r.stderr, /EN BLANCO/);
+    assert.doesNotMatch(r.todo, /destino: EMULADOR/);
+    assert.doesNotMatch(r.todo, /STUB_STORAGE_REACHED/);
+    assert.doesNotMatch(r.todo, /STUB_FIRESTORE_REACHED/);
+  });
+
   test(`${script}: SIN NADA cae en demo-treino y no llega al Storage de prod`, () => {
     // ÉSTE ES EL TEST DEL #840, y es el que antes decía lo contrario.
     //
@@ -355,9 +371,55 @@ for (const escritor of ESCRITORES) {
       FIRESTORE_EMULATOR_HOST: 'localhost:8080',
       FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
     });
-    assert.doesNotMatch(completo.stderr, /ABORTADO/, 'con los dos redirigidos tiene que dejar pasar');
+    // Cualquier ABORTADO salvo UNO: `upload_enriched_videos.js` aborta a
+    // propósito contra el emulador, porque su salida es un JSON versionado
+    // (ver storage_scripts_url.test.js). Ése no viola el invariante —el script
+    // muere, que es una de las dos salidas que permite— y con `/ABORTADO/` a
+    // secas lo ponía en rojo. La excepción nombra el texto entero: el abort de
+    // coherencia y el de "no pude resolver" siguen prohibidos acá.
+    assert.doesNotMatch(
+      completo.stderr,
+      /ABORTADO(?!: upload_enriched_videos\.js no escribe contra el emulador)/,
+      'con los dos redirigidos tiene que dejar pasar',
+    );
     assert.doesNotMatch(completo.stderr, /IS PRODUCTION/, 'contra emulador no se grita');
     assert.match(completo.todo, /EMULADOR \(Firestore \+ Storage\)/, 'esperaba la etiqueta de emulador');
+  });
+
+  test(`${script}: con las DOS variables y sin nombrar proyecto, escribe en el namespace del emulador`, () => {
+    // La receta del README (`./scripts/emulator.sh` + las dos variables) caía
+    // en el default de `.firebaserc` —`demo-treino`— y el emulador, la app y la
+    // semilla viven en `PROJECT_ID_EMULADOR`. El `update` sobre `exercises/{id}`
+    // no encontraba nada y el script salía con exit 0. Acá se mide por script,
+    // y no sólo en `lib/storage_target.js`: el `projectId` y el `storageBucket`
+    // que le llegan al SDK los arma cada uno.
+    const r = correr(escritor, {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    });
+
+    assert.ok(
+      r.stdout.includes(`Proyecto: ${PROJECT_ID_EMULADOR} (namespace del emulador)`),
+      `esperaba el namespace del emulador en stdout:\n${r.todo}`,
+    );
+    assert.doesNotMatch(r.todo, new RegExp(`${DEMO}\\.firebasestorage`), 'quedó el bucket de .firebaserc');
+    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, 'contra el emulador el id es una carpeta local: no se grita');
+
+    if (script === 'upload_enriched_videos.js') {
+      // Su salida es `enriched-catalog.json`, versionado, y desde el #1444 se
+      // niega a escribirlo contra el emulador: aborta después del guard —que
+      // ya imprimió el namespace— y antes de abrir Storage.
+      assert.strictEqual(r.code, 1, 'contra el emulador sin --dry-run tiene que abortar');
+      assert.match(r.stderr, /no escribe contra el emulador/);
+      assert.doesNotMatch(r.todo, /STUB_STORAGE_REACHED/);
+      return;
+    }
+
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${PROJECT_ID_EMULADOR}.firebasestorage.app`),
+      'el .bucket() no apuntó al bucket del namespace del emulador',
+    );
+    assert.doesNotMatch(r.stderr, /ABORTADO/);
   });
 }
 
@@ -449,6 +511,43 @@ for (const archivo of INERTES) {
       /admin\.storage\(\)|\.bucket\(/,
       'abrió Storage con el bucket de producción hardcodeado, sin pasar por ' +
         'exigirDestinoCoherente: ni --bucket= lo desvía ni sale cartel (#838/#840)',
+    );
+  });
+}
+
+// ── Los cuatro escritores sólo importan servicios que el emulador desvía ──
+//
+// Contra el emulador, `resolverProjectId` les da `PROJECT_ID_EMULADOR`, que es
+// el id de PRODUCCIÓN usado como namespace local. Es seguro porque con las dos
+// variables puestas firebase-admin manda Firestore y Storage a localhost, y los
+// cuatro no usan ningún otro servicio. Si uno sumara `firebase-admin/auth` (o
+// un cliente de `googleapis`) sin su variable de emulador, ese servicio saldría
+// a la nube con el id de producción y la credencial que encuentre — y en esta
+// máquina hay ADC de `gcloud` (AGENTS.md, Entornos). Con el default anterior
+// (`demo-treino`) esa misma regresión le pegaba a un proyecto que no existe.
+//
+// Lo que este test mira y lo que NO: los `require(...)` / `from '...'`
+// LITERALES de los cuatro archivos de entrada. No ve un `require` computado,
+// un `import()` dinámico, ni lo que se abra a través de `lib/*`. Hoy no hay
+// ninguno de esos tres; si aparece, este test no lo agarra.
+
+const SERVICIOS_DESVIADOS = new Set(['firebase-admin/firestore', 'firebase-admin/storage']);
+const MODULO_GOOGLE = /(?:require\(\s*|from\s+)['"]((?:firebase-admin|googleapis|google-auth-library|@google-cloud\/[\w-]+)(?:\/[\w-]+)?)['"]/g;
+
+for (const { script } of ESCRITORES) {
+  test(`${script}: sólo importa firebase-admin/firestore y /storage, los dos que el paso 4 exige emulados`, () => {
+    const src = fs.readFileSync(path.join(SCRIPTS_DIR, script), 'utf8');
+    const modulos = [...src.matchAll(MODULO_GOOGLE)].map((m) => m[1]);
+
+    // Si el regex dejara de ver los imports, el test pasaría sin mirar nada.
+    assert.ok(modulos.length > 0, `no encontré ningún import de firebase-admin en ${script}`);
+    const fuera = modulos.filter((m) => !SERVICIOS_DESVIADOS.has(m));
+    assert.deepStrictEqual(
+      fuera,
+      [],
+      `${script} importa ${fuera.join(', ')}: contra el emulador correría con el id de ` +
+        'producción como namespace y ese servicio no está desviado. Exigí su variable de ' +
+        'emulador en `resolverProjectId` antes de sumarlo.',
     );
   });
 }

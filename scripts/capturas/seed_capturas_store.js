@@ -19,11 +19,9 @@
  */
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
+const { exigirSoloEmulador } = require('../lib/solo_emulador');
 
-if (!process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error('ERROR: sin FIRESTORE_EMULATOR_HOST. Este script es solo para el emulador.');
-  process.exit(1);
-}
+exigirSoloEmulador(['firestore']);
 // API modular (`firebase-admin/app`, `firebase-admin/firestore`), no la
 // namespaced: firebase-admin 14 borró `admin.firestore()` y
 // `admin.firestore.Timestamp` enteros. Lo fija

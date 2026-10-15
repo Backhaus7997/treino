@@ -30,9 +30,11 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     #840 que protege del lado de Node:
 
     **Lee `.firebaserc` exactamente un módulo: `scripts/lib/storage_target.js`**
-    (`FIREBASERC` en la línea 60, leído por `proyectoDeFirebaserc`). Es el
+    (`FIREBASERC`, leído por `proyectoDeFirebaserc`). Es el
     último eslabón de su cadena `--project=` → `GOOGLE_CLOUD_PROJECT` →
-    `GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`, y de él dependen los
+    `GOOGLE_APPLICATION_CREDENTIALS` → (sólo con Firestore **y** Storage en el
+    emulador: el namespace del emulador, `treino-dev`) → `.firebaserc`, y de él
+    dependen los
     **cuatro scripts que suben a Storage** (los † de la lista de más abajo). Para
     esos cuatro, y sólo para esos, el default de `demo-treino` sí desvía la
     corrida sin variables: antes del #840 un `node scripts/upload_enriched_videos.js`
@@ -132,8 +134,22 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     script del repo lee `$TREINO_SA_KEY`, así que la variable sola no dispara
     nada — pero un `GOOGLE_APPLICATION_CREDENTIALS=$TREINO_SA_KEY node
     scripts/seed_gyms.js`, que es literalmente lo que dice el header de varios
-    de esos archivos, **escribe en producción**. (Las ADC de `gcloud` —
-    `~/.config/gcloud/application_default_credentials.json`— hoy no existen.)
+    de esos archivos, **escribe en producción**.
+
+    **Las ADC de `gcloud` SÍ existen** —
+    `~/.config/gcloud/application_default_credentials.json`, de la cuenta de
+    Google del dev, tipo `authorized_user`, desde el 2026-10-09—. Esta nota
+    decía que no, y era justo la frase que hacía parecer inofensivo al emulador
+    de Functions: un emulador de Functions sin Firestore/Auth/Storage emulados
+    escribe en producción **con esas ADC**, y si no hay ADC, con el login de
+    `firebase`, que el propio emulador le pasa al runtime (medido el
+    2026-10-14 con una función sonda; por eso `npm run serve` de `functions/`
+    ahora pasa por `scripts/emulator.sh`). Ese día no emitían token
+    (`invalid_rapt`), pero eso es una sesión vencida, no una barrera: vuelve
+    con `gcloud auth application-default login`. No des por sentado ni que
+    están ni que sirven: `ls` del archivo para lo primero, y
+    `gcloud auth application-default print-access-token >/dev/null` para lo
+    segundo.
 
     **El consejo de "leé qué proyecto imprime en la primera línea" vale sólo
     para la primera familia.** Los 22 del `initializeApp()` sin `credential` **no imprimen
@@ -142,15 +158,35 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     otra forma de saber a dónde van a escribir.
   - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
     explícito, y no es contradictorio. `emulators:*` no sale a la red de los
-    servicios emulados; ese id es sólo el *namespace* local donde escriben la
-    app (`lib/firebase_options.dart`) y las semillas
+    servicios emulados, y para ellos ese id es el *namespace* local donde
+    escriben la app (`lib/firebase_options.dart`) y las semillas
     (`scripts/seed_emulator_full.js`), y el proyecto al que
     `emulators.singleProjectMode: true` pinea el `firestore.get()`
     cross-service de las reglas de Storage. Con otro id la suite de reglas se
-    pone **roja** (medido: `chat-media-storage.test.js`, 2 tests). Ya está
-    resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`: **usalos** en
-    vez de escribir `firebase emulators:start` a mano, que ahora resolvería
-    `demo-treino` y te dejaría la UI de :4444 mirando un namespace vacío.
+    pone **roja** (medido: `chat-media-storage.test.js`, 2 tests).
+
+    **Para lo que NO está emulado, ese id es producción.** Esta nota decía que
+    era «sólo el namespace», y era la frase que hacía parecer inofensivo
+    nombrar `treino-dev`. El emulador de Functions le pide a Secret Manager
+    del proyecto de `--project` cada `defineSecret` al invocar una función, y
+    el valor llega a la función (medido el 2026-10-14 con un proyecto
+    `demo-`). Con `treino-dev` eso es la `RESEND_API_KEY` y el
+    `MP_ACCESS_TOKEN` reales (leído: contra producción no se invocó nada).
+    Y una función que llamaba una API de Google sin emulador —FCM— salía con
+    la credencial del dev: las ADC de gcloud o, sin ADC, el `firebase login`,
+    que el CLI le inyecta al runtime sin avisar (medido el 2026-10-14). Esta
+    nota decía «eso no lo cierra nada». Las dos cosas las cierra
+    `scripts/emulator.sh` a través de `scripts/lib/emulador_sin_produccion.sh`
+    (Secret Manager a un puerto muerto y una credencial falsa), y no arranca si
+    un `functions/.env*` o `.secret.local` define
+    `GOOGLE_APPLICATION_CREDENTIALS`, porque esa le gana a la falsa.
+
+    Ya está resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`:
+    **usalos** en vez de escribir `firebase emulators:start` a mano. Pelado
+    resolvería `demo-treino` y te dejaría la UI de :4444 mirando un namespace
+    vacío; con `--project treino-dev` y Functions, te saltea los dos cierres:
+    los secretos salen de Secret Manager de producción y FCM sale con tu
+    credencial.
   - Corolario 4 — **`firebase use` le gana al default, no deja rastro en el
     repo, y SE HEREDA DE LOS DIRECTORIOS PADRE**. `firebase use <alias>` escribe
     `activeProjects` en `~/.config/configstore/firebase-tools.json`, que **no
@@ -354,6 +390,29 @@ pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
   cuando se juntaron varios cambios probados, y ese merge es el release.
 - Rama → `develop`: **squash and merge**, branch auto-delete. `develop` → `main`:
   **merge commit** (un squash hace divergir las dos ramas).
+- **Mergeado el PR de una rama a `develop`, esa rama se borra: remota, local y
+  su worktree.** `develop` y `main` no se borran nunca — los rulesets las
+  protegen contra borrado, y por eso el merge `develop → main` no se lleva
+  `develop` aunque el auto-delete esté prendido.
+  - **La remota** la borra GitHub sola (`delete_branch_on_merge`). Verificá con
+    `git ls-remote --heads origin <rama>` que no quedó.
+  - **La local y el worktree son tuyos.** El `--delete-branch` de
+    `gh pr merge` no puede borrar la local mientras su worktree exista —
+    avisa y la saltea, aunque el PR ya quedó mergeado. Desde fuera del worktree:
+
+    ```bash
+    gh pr view <N> --json state --jq .state   # tiene que decir MERGED
+    git worktree remove .claude/worktrees/<wt>
+    git branch -D <rama>
+    ./scripts/agent-ledger.sh release <scope>
+    ```
+
+  - Es `-D` y no `-d` **a propósito**: con squash, la rama nunca queda como
+    ancestro de `develop` y `-d` se niega siempre. Por eso el `-D` va recién
+    después de confirmar MERGED, nunca antes.
+  - Si el worktree tiene procesos vivos (`lsof -a -d cwd | rg <wt>`), no lo
+    borres: puede ser otra sesión. El 2026-10-15 se juntaron 37 ramas locales y
+    18 worktrees, de los cuales 13 eran de PRs ya mergeados.
 - **No se exige approve**: hoy no hay otro dev que pueda darlo. El review lo cubren
   el CI, los bots (Codex, CodeQL) y la prueba en device sobre `develop`.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).

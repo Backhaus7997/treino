@@ -891,6 +891,48 @@ void main() {
     expect(find.text('8'), findsNWidgets(2));
   });
 
+  testWidgets(
+      'un doc con exerciseMode reps y metros en sets hidrata como DISTANCIA '
+      '(mismo criterio que el player y el editor web)', (tester) async {
+    const doc = Routine(
+      id: 'dist-1',
+      name: 'Mi Rutina',
+      split: null,
+      level: ExperienceLevel.beginner,
+      days: [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día 1',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'ex-bench',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 0,
+              targetRepsMax: 0,
+              restSeconds: 60,
+              sets: [SetSpec(distanceMeters: 6)],
+            ),
+          ],
+        ),
+      ],
+      source: RoutineSource.userCreated,
+      visibility: RoutineVisibility.private,
+    );
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById('dist-1')).thenAnswer((_) async => doc);
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCreating(existingRoutineId: 'dist-1'),
+      overrides: _overrides(repo: repo),
+    );
+
+    expect(find.text('DISTANCIA (M)'), findsOneWidget);
+    expect(find.text('REPS'), findsNothing);
+  });
+
   // ── Task 2.16 — cross-week validation attribution ─────────────────────────
 
   testWidgets(

@@ -161,13 +161,25 @@ El mismo set en ambas stores y ambos idiomas, ordenado por lo que vende:
 
 ### 4.1 Levantar el emulador
 
-`firebase-tools` 15+ necesita **Java 21**. El `java` del PATH de esta máquina
-es 17, pero el JDK 21 ya está instalado por Homebrew — apuntale `JAVA_HOME` en
-vez de tocar nada más:
+Desde la raíz del repo:
 
 ```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH firebase emulators:start --only firestore,auth --project treino-dev
+SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 ```
+
+Levanta Firestore, Auth y Storage con `--project treino-dev`, como la línea que
+estaba escrita acá a mano más Storage, que la app con `USE_EMULATOR=true` usa
+desde el #1434 (sin `SKIP_FUNCTIONS=1` suma Functions y compila `functions/`).
+Lo que el comando a mano no hacía:
+
+- **Genera `firestore.deploy.rules` antes de arrancar, y si no puede no
+  arranca.** `firebase.json` le hace cargar ese archivo —no `firestore.rules`—,
+  está en `.gitignore`, y si falta el emulador de Firestore no falla: arranca
+  en **allow-all**. En un clone o un worktree limpio eso era lo normal con el
+  comando a mano (#1435).
+- **Resuelve el JDK 21 solo.** `firebase-tools` 15+ no arranca con Java 17, que
+  es el `java` del PATH de esta máquina; el script encuentra el 21 de Homebrew
+  (`scripts/lib/java21.sh`) sin `JAVA_HOME` a mano.
 
 ⚠️ **No pinnees `firebase-tools@13` para esquivar el JDK.** Acá abajo decía eso
 y el atajo tiene un costo que no se ve desde este archivo: el emulador que trae
@@ -183,7 +195,7 @@ negativo que lo aísla, en la cabecera de `scripts/test_rules.sh`.
 
 Para levantar el emulador y sembrar datos de demo la 13 alcanza, porque nada de
 eso evalúa reglas. Igual no vale la pena tener dos versiones dando vueltas: el
-`JAVA_HOME` de arriba es una línea.
+JDK 21 ya lo resuelve `emulator.sh`.
 
 ### 4.2 Sembrar datos de demo
 

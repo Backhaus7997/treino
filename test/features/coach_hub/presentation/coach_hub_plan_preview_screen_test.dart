@@ -7,17 +7,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
-import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'periodized_draft_fixtures.dart';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -39,31 +42,22 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// A minimal ParsedPlan with one unmatched item for day 1.
-ParsedPlan _planWithUnmatched() => const ParsedPlan(
-      name: 'Test Plan',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Sentadilla',
-              exerciseId: null,
-              exerciseName: 'Sentadilla',
-              muscleGroup: null,
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-          ],
+/// Un renglón sin match en el DÍA 1.
+PeriodizedImportDraft _planWithUnmatched() => draftOf([
+      [1, 'Sentadilla', null, ...sameWeeks('3x10')],
+    ]);
+
+PeriodizedImportDraft _planWithSuggestion() => draftOf(
+      [
+        [1, 'Sentadilla búlgara', null, ...sameWeeks('3x10')],
+      ],
+      suggestions: {
+        'Sentadilla búlgara': MatcherExercise(
+          id: 'squat-bar',
+          name: 'Sentadilla con barra',
+          muscleGroup: 'Legs',
         ),
-      ],
-      unmatched: [
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla'),
-      ],
+      },
     );
 
 Exercise _exercise({String id = 'ex-1', String name = 'Sentadilla'}) =>
@@ -92,6 +86,8 @@ Widget _wrap(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 void main() {
+  useTallSurface();
+
   setUpAll(() {
     registerFallbackValue(<String, dynamic>{});
   });
@@ -138,7 +134,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -156,8 +152,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap "Asignar manualmente" to trigger manual mapping
-      await tester.tap(find.text('Asignar manualmente'));
+      // Tap "Vincular con la biblioteca" to trigger manual mapping
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
 
       // Pick the exercise from the bottom sheet
@@ -197,7 +193,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -215,7 +211,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Asignar manualmente'));
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();
@@ -252,7 +248,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -270,7 +266,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Asignar manualmente'));
+      await tester.tap(find.text('Vincular con la biblioteca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sentadilla').last);
       await tester.pumpAndSettle();
@@ -281,6 +277,210 @@ void main() {
       expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
       // Local mapping state preserved (unmatched badge gone)
       expect(find.text('sin match'), findsNothing);
+    });
+  });
+
+  group(
+      'SCENARIO-STALE — _AthletePicker sostiene el roster ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `_AthletePicker.build` despachaba con
+    // `linksAsync.when(loading:, error:, data:)` — dispatch por SUBTIPO
+    // runtime, ignora `hasValue`. `trainerLinksStreamProvider` es un
+    // StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo dentro
+    // de un AsyncError subsiguiente (copyWithPrevious/"seamless"), así que
+    // un error transitorio (con alumnos ya cargados) tapaba el picker con
+    // "No pudimos cargar tus alumnos.".
+    testWidgets(
+        'los alumnos ya cargados no desaparecen tras un error transitorio '
+        'del stream (stale-while-refresh)', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      final plan = _planWithUnmatched();
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            periodizedImportProvider.overrideWith((ref) => plan),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            exercisesProvider.overrideWith((ref) => Future.value(const [])),
+            trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          ],
+        ),
+      );
+      await tester.pump();
+
+      controller.add(const <TrainerLink>[]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('No pudimos cargar tus alumnos.'), findsNothing);
+      expect(
+        find.text(
+          'No tenés alumnos activos para asignarles este plan. '
+          'Esperá que un atleta acepte tu vínculo y volvé a importar.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.text('No pudimos cargar tus alumnos.'),
+        findsNothing,
+        reason: 'un error transitorio con alumnos ya cargados no debe tapar '
+            'el picker con el mensaje de error',
+      );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(const <TrainerLink>[]);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
+  group('sugerencias de match', () {
+    testWidgets(
+        'muestra texto original y sugerencia; confirmar resuelve y agrega alias',
+        (tester) async {
+      final mockFunctions = MockFirebaseFunctions();
+      final mockCallable = MockHttpsCallable();
+      final mockResult = MockHttpsCallableResult();
+      when(() => mockFunctions.httpsCallable('addAlias'))
+          .thenReturn(mockCallable);
+      when(() => mockCallable.call(any<Map<String, dynamic>>()))
+          .thenAnswer((_) async => mockResult);
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            cloudFunctionsProvider.overrideWithValue(mockFunctions),
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sentadilla búlgara'), findsOneWidget);
+      expect(find.text('Sugerencia: Sentadilla con barra'), findsOneWidget);
+      expect(find.text('sugerencia pendiente'), findsOneWidget);
+
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockCallable.call(<String, dynamic>{
+          'exerciseId': 'squat-bar',
+          'alias': 'Sentadilla búlgara',
+        }),
+      ).called(1);
+      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.text('Sentadilla con barra'), findsOneWidget);
+    });
+
+    testWidgets('cambiar abre el picker y guarda la elección como alias',
+        (tester) async {
+      final mockFunctions = MockFirebaseFunctions();
+      final mockCallable = MockHttpsCallable();
+      final mockResult = MockHttpsCallableResult();
+      when(() => mockFunctions.httpsCallable('addAlias'))
+          .thenReturn(mockCallable);
+      when(() => mockCallable.call(any<Map<String, dynamic>>()))
+          .thenAnswer((_) async => mockResult);
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            cloudFunctionsProvider.overrideWithValue(mockFunctions),
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            exercisesProvider.overrideWith(
+              (ref) => Future.value([
+                _exercise(
+                  id: 'bulgarian-assisted',
+                  name: 'Sentadilla búlgara asistida',
+                ),
+              ]),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cambiar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla búlgara asistida'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockCallable.call(<String, dynamic>{
+          'exerciseId': 'bulgarian-assisted',
+          'alias': 'Sentadilla búlgara',
+        }),
+      ).called(1);
+      expect(find.text('Sentadilla búlgara asistida'), findsOneWidget);
+      expect(find.text('sugerencia pendiente'), findsNothing);
+    });
+
+    testWidgets('una sugerencia pendiente bloquea la asignación',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ASIGNAR PLAN'));
+      await tester.pump();
+
+      expect(
+        find.text(
+          'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
+          'continuar.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

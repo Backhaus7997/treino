@@ -269,6 +269,110 @@ void main() {
     });
   });
 
+  group(
+      'SCENARIO-STALE — perfil público sostiene el perfil ante error '
+      'transitorio (pulido-post-revision)', () {
+    // Regression: `_stateKeyOf` chequeaba `hasError` antes de `hasValue`, y
+    // el `.when()` del contenido despacha por SUBTIPO runtime (ignora
+    // `hasValue`) — `userProfileProvider` es un StreamProvider en vivo,
+    // Riverpod 2.5+ preserva el valor previo dentro de un AsyncError
+    // subsiguiente (copyWithPrevious/"seamless"), así que un error
+    // transitorio (con perfil ya cargado) tapaba el contenido con el estado
+    // de error.
+    testWidgets(
+        'el perfil ya cargado no desaparece tras un error transitorio del '
+        'stream (stale-while-refresh)', (tester) async {
+      var listens = 0;
+      final controller = StreamController<UserProfile?>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await _pump(tester, profileStream: controller.stream, settle: false);
+
+      controller.add(_trainerProfile());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final plano = find.byKey(const Key('perfil_publico_plano'));
+      expect(
+        find.descendant(of: plano, matching: find.text('Joaquín Nadal')),
+        findsOneWidget,
+      );
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        find.descendant(of: plano, matching: find.text('Joaquín Nadal')),
+        findsOneWidget,
+        reason: 'un error transitorio con perfil ya cargado no debe tapar '
+            'el contenido de perfil público',
+      );
+      expect(find.byKey(const Key('perfil_publico_error')), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(_trainerProfile());
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    // `AsyncValue<UserProfile?>`: un `null` NO es «no existe» si hay error —
+    // es «no sé». Sin esto, el último valor `null` + un error mostraba
+    // «No encontramos tu perfil.» (desconocido disfrazado de «no hay»).
+    testWidgets(
+        'último valor null + error → error con Reintentar, NO «No '
+        'encontramos tu perfil»', (tester) async {
+      var listens = 0;
+      final controller = StreamController<UserProfile?>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await _pump(tester, profileStream: controller.stream, settle: false);
+
+      controller.add(null);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      // Control: null SIN error sí afirma que falta el perfil.
+      expect(find.byKey(const Key('perfil_publico_empty')), findsOneWidget);
+
+      controller.addError(Exception('permission-denied'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byKey(const Key('perfil_publico_empty')), findsNothing);
+      expect(find.text('No encontramos tu perfil.'), findsNothing);
+      expect(find.byKey(const Key('perfil_publico_error')), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TreinoButton, 'Reintentar'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(_trainerProfile());
+      await tester.pump();
+      // El cross-fade deja el hijo viejo montado hasta que termina.
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('perfil_publico_error')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('perfil_publico_plano')),
+          matching: find.text('Joaquín Nadal'),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('PerfilPublicoScreen — motion (WU-01)', () {
     testWidgets('dark y light: smoke sin crash en data/loading/error',
         (tester) async {

@@ -1,4 +1,4 @@
-/// Whether an exercise is completed by reps+weight or by duration.
+/// Whether an exercise is completed by reps+weight, duration, or distance.
 ///
 /// Serialized by enum name (json_serializable default). Unknown names on read
 /// are handled via [JsonKey(unknownEnumValue: ...)] at the field level.
@@ -8,6 +8,9 @@ enum ExerciseMode {
 
   /// Duration-based: each set has a time target (seconds). No reps tracked.
   duration,
+
+  /// Distance-based: each set has a target in meters. No reps tracked.
+  distance,
 }
 
 /// Whether a reps-based set targets a single rep count or a min–max range.

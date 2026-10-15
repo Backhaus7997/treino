@@ -1472,6 +1472,24 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Titulo de la tarjeta de felicitacion del resumen post-entreno. Aparece UNA sola vez por semana: en la sesion que hace que las sesiones que cuentan lleguen justo al objetivo semanal. No es un push, es in-app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Semana cumplida! 🔥'**
+  String get workoutWeekCompletedTitle;
+
+  /// Subtitulo de la tarjeta 'Semana cumplida'. count es la racha semanal que queda DESPUES de esta sesion (incluye la semana que acaba de cumplirse). Con 1 no hay racha todavia: se celebra la primera semana en vez de decir 'racha de 1 semana'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{¡Tu primera semana cumplida!} other{Llevás {count} semanas de racha.}}'**
+  String workoutWeekCompletedStreak(int count);
+
+  /// Boton de la tarjeta 'Semana cumplida'. Abre Insights, que siempre arranca en la semana en curso: por eso la tarjeta solo aparece cuando la sesion es de esta semana.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver resumen de la semana'**
+  String get workoutWeekCompletedAction;
+
   /// Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them.
   ///
   /// In es_AR, this message translates to:
@@ -8613,10 +8631,10 @@ abstract class AppL10n {
   /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
   String get privacyAnalyticsCrashNote;
 
-  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
+  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos; despues decia 'Analitica y correos' y con ese nadie iba a buscar ahi los recordatorios de entrenamiento. Un tema por interruptor del atleta en el titulo, para que el que busque cualquiera de los tres lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
   ///
   /// In es_AR, this message translates to:
-  /// **'Analítica y correos'**
+  /// **'Analítica, correos y recordatorios'**
   String get privacyEntryTitle;
 
   /// Titulo del interruptor de correos promocionales en la pantalla de privacidad. Es una preferencia de la CUENTA, no del dispositivo. Sin 'plan', 'pago', 'suscripcion', 'precio', 'oferta', 'web' ni 'Pro': Guideline 3.1.3 de Apple, ver test/features/paywall/.
@@ -8636,6 +8654,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
   String get privacyPromoEmailsSaveError;
+
+  /// Titulo del interruptor de recordatorios de entrenamiento en la pantalla de privacidad. Solo lo ve el atleta. Es una preferencia de la CUENTA (users/{uid}.notificationPrefs.recordatorios_entrenamiento.push), no del dispositivo. Mismas palabras prohibidas que privacyPromoEmailsTitle (Guideline 3.1.3 de Apple).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Recordatorios de entrenamiento'**
+  String get privacyTrainingRemindersTitle;
+
+  /// Subtitulo del interruptor de recordatorios de entrenamiento. Nombra los dos avisos que el backend manda hoy (racha en riesgo y volver a entrenar); si aparece un tercero, esta frase tiene que cubrirlo. Mismas palabras prohibidas que privacyPromoEmailsTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te avisamos si tu racha está en riesgo o si hace días que no entrenás.'**
+  String get privacyTrainingRemindersSubtitle;
+
+  /// Snackbar cuando falla la escritura del interruptor de recordatorios de entrenamiento. El interruptor vuelve solo al valor real.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
+  String get privacyTrainingRemindersSaveError;
 
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///
@@ -8946,6 +8982,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.'**
   String get coachHubOnboardingPfLocationStaleHint;
+
+  /// Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actualizá la app'**
+  String get appUpdateTitle;
+
+  /// No description provided for @appUpdateBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualizala para seguir entrenando.'**
+  String get appUpdateBody;
+
+  /// No description provided for @appUpdateCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTUALIZAR'**
+  String get appUpdateCta;
+
+  /// No description provided for @appUpdateOpenError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.'**
+  String get appUpdateOpenError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

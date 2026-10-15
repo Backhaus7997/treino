@@ -773,6 +773,23 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get workoutWeekCompletedTitle => '¡Semana cumplida! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Llevas $count semanas de racha.',
+      one: '¡Tu primera semana cumplida!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'Ver resumen de la semana';
+
+  @override
   String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
 
   @override
@@ -4981,7 +4998,7 @@ class AppL10nEs extends AppL10n {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get privacyEntryTitle => 'Analítica y correos';
+  String get privacyEntryTitle => 'Analítica, correos y recordatorios';
 
   @override
   String get privacyPromoEmailsTitle => 'Correos promocionales';
@@ -4992,6 +5009,17 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get privacyPromoEmailsSaveError =>
+      'No pudimos guardar el cambio. Inténtalo de nuevo.';
+
+  @override
+  String get privacyTrainingRemindersTitle => 'Recordatorios de entrenamiento';
+
+  @override
+  String get privacyTrainingRemindersSubtitle =>
+      'Te avisamos si tu racha está en riesgo o si llevas días sin entrenar.';
+
+  @override
+  String get privacyTrainingRemindersSaveError =>
       'No pudimos guardar el cambio. Inténtalo de nuevo.';
 
   @override
@@ -5299,6 +5327,20 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.';
+
+  @override
+  String get appUpdateTitle => 'Actualiza la app';
+
+  @override
+  String get appUpdateBody =>
+      'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.';
+
+  @override
+  String get appUpdateCta => 'ACTUALIZAR';
+
+  @override
+  String get appUpdateOpenError =>
+      'No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6068,6 +6110,23 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get workoutWeekCompletedTitle => '¡Semana cumplida! 🔥';
+
+  @override
+  String workoutWeekCompletedStreak(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Llevás $count semanas de racha.',
+      one: '¡Tu primera semana cumplida!',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get workoutWeekCompletedAction => 'Ver resumen de la semana';
 
   @override
   String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
@@ -10275,7 +10334,7 @@ class AppL10nEsAr extends AppL10nEs {
       'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.';
 
   @override
-  String get privacyEntryTitle => 'Analítica y correos';
+  String get privacyEntryTitle => 'Analítica, correos y recordatorios';
 
   @override
   String get privacyPromoEmailsTitle => 'Correos promocionales';
@@ -10286,6 +10345,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get privacyPromoEmailsSaveError =>
+      'No pudimos guardar el cambio. Intentá de nuevo.';
+
+  @override
+  String get privacyTrainingRemindersTitle => 'Recordatorios de entrenamiento';
+
+  @override
+  String get privacyTrainingRemindersSubtitle =>
+      'Te avisamos si tu racha está en riesgo o si hace días que no entrenás.';
+
+  @override
+  String get privacyTrainingRemindersSaveError =>
       'No pudimos guardar el cambio. Intentá de nuevo.';
 
   @override
@@ -10593,4 +10663,18 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.';
+
+  @override
+  String get appUpdateTitle => 'Actualizá la app';
+
+  @override
+  String get appUpdateBody =>
+      'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualizala para seguir entrenando.';
+
+  @override
+  String get appUpdateCta => 'ACTUALIZAR';
+
+  @override
+  String get appUpdateOpenError =>
+      'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.';
 }

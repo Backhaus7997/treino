@@ -11,7 +11,8 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
-import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -24,6 +25,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'periodized_draft_fixtures.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -51,30 +54,15 @@ TrainerLink _link(String athleteId) => TrainerLink(
       requestedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// Plan SIN `unmatched`: con ejercicios sin match `_assign` corta antes de
+/// Plan con TODO resuelto: con componentes sin match `_assign` corta antes de
 /// escribir y el test no probaría nada.
-ParsedPlan _plan() => const ParsedPlan(
-      name: 'Plan Test',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Sentadilla',
-              exerciseId: 'ex-1',
-              exerciseName: 'Sentadilla',
-              muscleGroup: 'Legs',
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-          ],
-        ),
+PeriodizedImportDraft _plan() => draftOf(
+      [
+        [1, 'Sentadilla', null, ...sameWeeks('3x10')],
       ],
-      unmatched: [],
+      catalog: [
+        MatcherExercise(id: 'ex-1', name: 'Sentadilla', muscleGroup: 'Legs'),
+      ],
     );
 
 GoRouter _router() => GoRouter(
@@ -108,7 +96,7 @@ List<Override> _overrides(RoutineRepository repo) => [
             UserPublicProfile(uid: entry.key, displayName: entry.value),
           ),
         ),
-      parsedPlanProvider.overrideWith((ref) => _plan()),
+      periodizedImportProvider.overrideWith((ref) => _plan()),
     ];
 
 Future<void> _pumpPreview(WidgetTester tester, RoutineRepository repo) async {
@@ -137,6 +125,8 @@ Future<void> _seleccionarTodosYAsignar(WidgetTester tester) async {
 }
 
 void main() {
+  useTallSurface();
+
   setUpAll(() => registerFallbackValue(
         const Routine(
             id: '', name: '', level: ExperienceLevel.beginner, days: []),
@@ -206,7 +196,7 @@ void main() {
       await _seleccionarTodosYAsignar(tester);
       await tester.pumpAndSettle();
 
-      // El bug: `_assign` limpia `parsedPlanProvider` y NAVEGA. El plan en
+      // El bug: `_assign` limpia `periodizedImportProvider` y NAVEGA. El plan en
       // null hacía que `build` leyera "entraron acá sin subir nada" y agendara
       // un `go('/upload-plan')` que le ganaba al `go('/dashboard')`. El PF
       // asignaba bien, veía el cartel de éxito, y volvía a la pantalla de
