@@ -184,9 +184,8 @@ pantalla bloqueante «Actualizá la app» con un botón a la tienda
   se ignoran (se compara solo el núcleo). Se configura por plataforma. Sin valor
   (o ilegible) para una plataforma, esa plataforma no se bloquea.
 - `storeUrl.<plataforma>`: opcional, `https://`. Sin él se usa el fallback del
-  código (Android: Play Store con `com.treino.app`; iOS: una búsqueda en la App
-  Store, porque el Apple ID no está en el repo). **Cargá el link real de iOS la
-  primera vez que crees el documento.**
+  código (Android: Play Store con `com.treino.app`; iOS:
+  `https://apps.apple.com/app/id6781307745`, el Apple ID de «TREINO Fitness»).
 
 **Quién y con qué lo escribe.** Los clientes NO pueden escribirlo (las rules lo
 deniegan a todos, y lo leen todos, incluso sin sesión). Lo edita una persona del
@@ -200,6 +199,21 @@ y solo cuando la versión que ya sabe leerlos esté **publicada y disponible** e
 las dos tiendas: si exigís una versión que la tienda todavía no sirve, dejás a
 los usuarios en una pantalla sin salida. Orden: 1) publicar el build, 2) verificar
 que está disponible, 3) subir `minVersion`.
+
+**El gate no alcanza a las apps que no lo tienen.** Una versión instalada antes
+de este gate no trae el código que lee `app_config/min_version`, así que nunca
+va a mostrar «Actualizá la app». Por eso el orden para un cambio de modelo es:
+1) publicar una versión CON el gate, 2) esperar a que la mayoría actualice,
+3) recién ahí subir `minVersion` y habilitar lo que escribe los campos nuevos.
+Las instalaciones anteriores al gate quedan sin cubrir; es un límite, no un bug.
+
+**Lo que el gate NO hace (aceptado).** Lee el documento una vez por arranque, sin
+bloquear: mientras carga (hasta el timeout de 5 s) la app funciona normal, y no
+se vuelve a chequear al volver del segundo plano. Tampoco frena los listeners
+globales (push, cola de avisos): sólo reemplaza la UI. Bloquear el arranque
+haría esperar a todos los que abren la app sin señal; para el objetivo —que una
+versión vieja no edite rutinas con campos nuevos— alcanza con que no pueda usar
+la UI.
 
 **Cómo se desactiva.** Borrá el documento o bajá los mínimos. Es la salida de
 emergencia: no hace falta deploy ni build.
