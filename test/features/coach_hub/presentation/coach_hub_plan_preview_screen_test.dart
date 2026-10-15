@@ -305,7 +305,7 @@ void main() {
         _wrap(
           const CoachHubPlanPreviewScreen(),
           overrides: [
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
