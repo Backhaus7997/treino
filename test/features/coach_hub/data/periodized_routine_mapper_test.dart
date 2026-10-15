@@ -80,6 +80,22 @@ void main() {
     expect(slot.muscleGroup, 'legs');
   });
 
+  test('6 columnas con 4 cargadas: la rutina sale con numWeeks 4', () {
+    final plan = _plan([
+      header1(weeks: 6),
+      [1, 'Ejercicio A', 90, '3x8', '3x9', '3x10', '3x11'],
+    ]);
+    final routine = mapPeriodizedPlanToRoutine(
+      plan,
+      matchPeriodizedPlan(plan, _catalog()).autoAssigned,
+      routineId: 'r',
+      routineName: 'n',
+      level: ExperienceLevel.beginner,
+    );
+    expect(routine.numWeeks, 4);
+    expect(routine.days.single.slots.single.weeklySets, hasLength(4));
+  });
+
   test('plan de una semana: weeklySets vacío y legacy en sets', () {
     final plan = _plan([
       header1(weeks: 1),

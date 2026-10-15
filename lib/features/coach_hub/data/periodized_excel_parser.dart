@@ -170,7 +170,8 @@ class _ProgramParser {
     final exerciseCol = first.exerciseCol;
     final restCol = exerciseCol + 1;
     final numberCol = exerciseCol - 1;
-    final weekCols = _weekColumns(first, restCol);
+    final allWeekCols = _weekColumns(first, restCol);
+    final weekCols = _trimTrailingEmptyWeeks(headers, allWeekCols, exerciseCol);
     final numWeeks = weekCols.length;
 
     // Renglones con nombre antes del primer encabezado: fuera de un bloque.
@@ -267,10 +268,71 @@ class _ProgramParser {
       );
     }
 
+    _warnEmptyMiddleWeeks(headers, weekCols, exerciseCol);
+
     return PeriodizedParseResult(
       plan: PeriodizedPlan(numWeeks: numWeeks, days: days),
       diagnostics: _diags,
     );
+  }
+
+  /// ¿Hay texto en [col] en algún renglón con nombre de algún día? Los
+  /// renglones sin nombre se ignoran en todo el import, tengan lo que tengan.
+  bool _weekHasContent(List<_Header> headers, int exerciseCol, int col) {
+    for (var i = 0; i < headers.length; i++) {
+      final end =
+          i + 1 < headers.length ? headers[i + 1].rowIndex : _grid.length;
+      for (var r = headers[i].rowIndex + 1; r < end; r++) {
+        if (_at(r, exerciseCol).isNotEmpty && _at(r, col).isNotEmpty) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// Las semanas del FINAL que están vacías en todo el plan no cuentan: la
+  /// plantilla trae 6 columnas y nadie las borra. `numWeeks` = la última
+  /// SEMANA con al menos una celda con texto. Si todas están vacías (plan sin
+  /// prescripciones) queda 1 semana, sin error.
+  List<int> _trimTrailingEmptyWeeks(
+    List<_Header> headers,
+    List<int> cols,
+    int exerciseCol,
+  ) {
+    var last = 0; // cantidad de semanas a conservar
+    for (var w = cols.length; w >= 1; w--) {
+      if (_weekHasContent(headers, exerciseCol, cols[w - 1])) {
+        last = w;
+        break;
+      }
+    }
+    if (last == 0) last = cols.isEmpty ? 0 : 1;
+    return cols.sublist(0, last);
+  }
+
+  /// Una semana vacía en el MEDIO no se recorta (sus celdas siguen la regla de
+  /// celda vacía); sólo se avisa una vez.
+  void _warnEmptyMiddleWeeks(
+    List<_Header> headers,
+    List<int> weekCols,
+    int exerciseCol,
+  ) {
+    // Con una sola semana no hay "medio"; y si ninguna tiene texto ya se
+    // avisa con missingReps en cada renglón.
+    if (weekCols.length < 2 ||
+        !weekCols.any((c) => _weekHasContent(headers, exerciseCol, c))) {
+      return;
+    }
+    for (var w = 0; w < weekCols.length; w++) {
+      if (_weekHasContent(headers, exerciseCol, weekCols[w])) continue;
+      _warn(
+        ImportDiagnosticCode.emptyWeek,
+        'SEMANA ${w + 1} está vacía en todo el plan.',
+        row: headers.first.rowIndex,
+        col: weekCols[w],
+      );
+    }
   }
 
   /// Columnas SEMANA a partir del encabezado del DÍA 1: tienen que ser

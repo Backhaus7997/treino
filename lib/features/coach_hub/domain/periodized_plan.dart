@@ -33,6 +33,7 @@ enum ImportDiagnosticCode {
   // ── Avisos ────────────────────────────────────────────────────────────────
   numberingGap,
   missingReps,
+  emptyWeek,
   qualifierSavedAsNote,
   mixedSetKinds,
 }

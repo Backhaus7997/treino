@@ -106,6 +106,7 @@ String importDiagnosticGroupTitle(ImportDiagnosticCode code) => switch (code) {
       ImportDiagnosticCode.noExercises => 'El plan no tiene ejercicios',
       ImportDiagnosticCode.numberingGap => 'Numeración salteada o repetida',
       ImportDiagnosticCode.missingReps => 'Falta cargar reps',
+      ImportDiagnosticCode.emptyWeek => 'Semanas vacías en todo el plan',
       ImportDiagnosticCode.qualifierSavedAsNote =>
         'Calificadores guardados como nota',
       ImportDiagnosticCode.mixedSetKinds => 'Modos mezclados entre semanas',

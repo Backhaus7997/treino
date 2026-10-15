@@ -48,21 +48,24 @@ void main() {
     });
 
     test(
-        'nombre sin ninguna prescripción se carga con 1 serie sin reps por '
-        'semana', () {
+        'nombre sin ninguna prescripción se carga con 1 serie sin reps, y el '
+        'plan queda en 1 semana', () {
       final r = parsePeriodizedExcel(programa([
         header1(),
         [1, 'Ejercicio A'],
       ]));
       expect(r.canImport, isTrue);
+      expect(r.plan!.numWeeks, 1);
       final ex = r.plan!.days.single.rows.single.exercises.single;
-      expect(ex.weeks, hasLength(3));
+      expect(ex.weeks, hasLength(1));
       expect(ex.weeks.every((w) => w.length == 1 && w.single.reps == null),
           isTrue);
-      expect(ex.emptyWeeks, {0, 1, 2});
+      expect(ex.emptyWeeks, {0});
       expect(
           r.warnings.where((d) => d.code == ImportDiagnosticCode.missingReps),
-          hasLength(3));
+          hasLength(1));
+      expect(r.warnings.where((d) => d.code == ImportDiagnosticCode.emptyWeek),
+          isEmpty);
     });
 
     test('sin N° = calentamiento: todas las series son warmup', () {
@@ -267,6 +270,89 @@ void main() {
       expect(r.plan!.days.single.rows.first.restSeconds, 60);
       final d = _only(r, ImportDiagnosticCode.invalidRest);
       expect([d.row, d.column, d.rawValue], [3, 'C', 'rápido']);
+    });
+  });
+
+  group('semanas vacías', () {
+    Iterable<ImportDiagnostic> codeOf(
+            PeriodizedParseResult r, ImportDiagnosticCode c) =>
+        r.diagnostics.where((d) => d.code == c);
+
+    test('6 columnas con 4 cargadas: numWeeks 4 y sin avisos de la 5 y 6', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 6),
+        [1, 'Ejercicio A', 90, '3x8', '3x9', '3x10', '3x11', null, null],
+        [],
+        header(2),
+        [1, 'Ejercicio B', null, '3x5', '3x5', '3x5', '3x5'],
+      ]));
+      expect(r.canImport, isTrue, reason: '${r.diagnostics}');
+      expect(r.plan!.numWeeks, 4);
+      for (final row in r.plan!.days.expand((d) => d.rows)) {
+        expect(row.exercises.single.weeks, hasLength(4));
+        expect(row.exercises.single.emptyWeeks, isEmpty);
+      }
+      expect(codeOf(r, ImportDiagnosticCode.missingReps), isEmpty);
+      expect(codeOf(r, ImportDiagnosticCode.emptyWeek), isEmpty);
+    });
+
+    test('una sola celda con texto en la semana 6 conserva las 6', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 6),
+        [1, 'Ejercicio A', 90, '3x8', '3x8', '3x8', '3x8', '3x8', '3x8'],
+        [2, 'Ejercicio B', 90, '3x8', '3x8', '3x8', '3x8', '3x8', null],
+      ]));
+      expect(r.plan!.numWeeks, 6);
+      // La celda vacía de la semana 6 sigue la regla normal (rojo).
+      expect(codeOf(r, ImportDiagnosticCode.missingReps), hasLength(1));
+    });
+
+    test('una celda en la semana 6 de otro día también la mantiene', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 6),
+        [1, 'Ejercicio A', 90, '3x8'],
+        header(2),
+        [1, 'Ejercicio B', 90, null, null, null, null, null, '3x8'],
+      ]));
+      expect(r.plan!.numWeeks, 6);
+    });
+
+    test('semana vacía en el medio: se conserva, con aviso y celdas en rojo',
+        () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 4),
+        [1, 'Ejercicio A', 90, '3x8', '3x9', null, '3x11'],
+        [2, 'Ejercicio B', 90, '3x8', '3x9', null, '3x11'],
+      ]));
+      expect(r.canImport, isTrue);
+      expect(r.plan!.numWeeks, 4);
+      final w = codeOf(r, ImportDiagnosticCode.emptyWeek).single;
+      expect(w.severity, ImportDiagnosticSeverity.warning);
+      expect(w.message, 'SEMANA 3 está vacía en todo el plan.');
+      expect(w.column, 'F');
+      expect(codeOf(r, ImportDiagnosticCode.missingReps), hasLength(2));
+      for (final row in r.plan!.days.single.rows) {
+        expect(row.exercises.single.emptyWeeks, {2});
+      }
+    });
+
+    test('un renglón sin nombre no cuenta como contenido de la semana', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 6),
+        [1, 'Ejercicio A', 90, '3x8', '3x8'],
+        [2, null, 90, null, null, null, null, null, '3x8'], // ignorado
+      ]));
+      expect(r.plan!.numWeeks, 2);
+    });
+
+    test('todas las semanas vacías: numWeeks 1, sin error', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 6),
+        [1, 'Ejercicio A'],
+      ]));
+      expect(r.canImport, isTrue, reason: '${r.diagnostics}');
+      expect(r.plan!.numWeeks, 1);
+      expect(codeOf(r, ImportDiagnosticCode.emptyWeek), isEmpty);
     });
   });
 

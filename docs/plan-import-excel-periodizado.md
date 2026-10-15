@@ -108,6 +108,15 @@ serie como incompleta.
 Consecuencia aceptada: no se puede quitar un ejercicio sólo en una semana desde
 el Excel; eso se hace después en el editor.
 
+**Semanas vacías al final.** La plantilla trae 6 columnas SEMANA y nadie las
+borra, así que las columnas del FINAL que están vacías en todos los renglones
+con nombre de todos los días no cuentan: `numWeeks` = la última SEMANA con al
+menos una celda con texto, y para esas semanas no se emite ningún aviso. Una
+semana vacía en el MEDIO (1, 2 y 4 cargadas, 3 vacía) no se recorta: sus celdas
+siguen la regla de arriba (rojo) y se suma un aviso `emptyWeek` ("SEMANA 3 está
+vacía en todo el plan"). Si TODAS las semanas están vacías, `numWeeks` = 1 y los
+ejercicios van sin reps (sin error).
+
 ## Ejercicios que no matchean
 
 Política de #1455: exacto o alias → se asigna solo; aproximado → sugerencia
@@ -121,7 +130,8 @@ hoy.
 ## Mapeo al modelo
 
 - Cada bloque `DÍA N` → `RoutineDay(dayNumber: N)`.
-- `Routine.numWeeks` = cantidad de columnas SEMANA.
+- `Routine.numWeeks` = cantidad de columnas SEMANA, sin contar las vacías del
+  final (ver «Semanas vacías al final»).
 - `RoutineSlot.weeklySets[w]` = series de la columna SEMANA w+1 (índice 0-based).
 - `activeWeeks` = vacío (todas las semanas): con la decisión de arriba, ningún
   slot falta en una semana.

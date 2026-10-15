@@ -76,10 +76,10 @@ void main() {
     });
 
     test(
-        'la plantilla vacía se lee: 7 días, 6 semanas y sólo el error de '
-        '"sin ejercicios"', () {
+        'la plantilla vacía se lee: 7 días, 1 semana (las 6 columnas vacías no '
+        'cuentan) y sólo el error de "sin ejercicios"', () {
       final r = parsePeriodizedExcel(template);
-      expect(r.plan!.numWeeks, 6);
+      expect(r.plan!.numWeeks, 1);
       expect(r.plan!.days.map((d) => d.dayNumber), [1, 2, 3, 4, 5, 6, 7]);
       expect(r.errors.map((d) => d.code), [ImportDiagnosticCode.noExercises]);
     });

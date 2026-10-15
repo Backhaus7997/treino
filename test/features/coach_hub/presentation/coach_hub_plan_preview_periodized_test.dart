@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -231,7 +232,15 @@ void main() {
         catalog: _catalog(),
       );
       await pumpPreview(tester, draft, repo);
-      expect(draft.warnings, hasLength(2));
+      // 2 celdas sin reps + el aviso de que las SEMANAS 2 y 3 están vacías en
+      // todo el plan (en el medio no se recortan).
+      expect(
+          draft.warnings
+              .where((d) => d.code == ImportDiagnosticCode.missingReps),
+          hasLength(2));
+      expect(
+          draft.warnings.where((d) => d.code == ImportDiagnosticCode.emptyWeek),
+          hasLength(2));
 
       await _selectAnaAndAssign(tester);
 
