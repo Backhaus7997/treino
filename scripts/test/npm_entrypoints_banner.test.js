@@ -58,6 +58,13 @@ function correr(script, args = [], { emulador = false, projectId = 'treino-dev',
   delete env.GOOGLE_CLOUD_PROJECT;
   delete env.GCLOUD_PROJECT;
 
+  // `deploy_rules.js` corre el guard de fuente ANTES de salir a la red, y el
+  // guard compara el `firestore.rules` del repo real contra origin/develop: en
+  // cualquier PR que toque reglas frena primero y el stub de red no se alcanza
+  // nunca. Lo que estos tests miden es el CARTEL, no el guard (ese tiene sus
+  // tests en fuente_de_deploy.test.js), así que se usa la salida documentada.
+  env.TREINO_DEPLOY_FUERA_DE_DEVELOP = '1';
+
   if (emulador) {
     env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
   } else {
