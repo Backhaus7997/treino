@@ -53,6 +53,9 @@ class _AthletePickerDialog extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final displayLinksAsync = linksAsync.hasValue
+        ? AsyncValue.data(linksAsync.requireValue)
+        : linksAsync;
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
@@ -68,7 +71,7 @@ class _AthletePickerDialog extends ConsumerWidget {
         width: 360,
         child: TreinoStateSwitcher(
           childKey: ValueKey(_stateKeyOf(linksAsync)),
-          child: linksAsync.when(
+          child: displayLinksAsync.when(
             loading: () => const _PickerSkeleton(),
             error: (e, _) => Text(
               'No pudimos cargar tus alumnos.', // i18n
@@ -90,9 +93,9 @@ class _AthletePickerDialog extends ConsumerWidget {
 }
 
 String _stateKeyOf(AsyncValue<Object?> value) {
+  if (value.hasValue) return 'data';
   if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+  return 'loading';
 }
 
 /// Skeleton de 3 filas placeholder mientras resuelve el stream de vínculos.

@@ -1309,17 +1309,19 @@ class _ProgressReading extends StatelessWidget {
     // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
     // (spinner hasta que ambas tengan valor, error si alguna falla). Así nunca
     // afirmamos que falta progreso cuando una de las fuentes es desconocida.
-    if (measurements.isLoading || performanceTests.isLoading) {
+    if (!measurements.hasValue || !performanceTests.hasValue) {
+      if (measurements.hasError || performanceTests.hasError) {
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('reading-error'),
+          child: _muted(
+            palette,
+            'No se pudo cargar el progreso.', // i18n: Fase W2
+          ),
+        );
+      }
       return const TreinoStateSwitcher(
         childKey: ValueKey('reading-loading'),
         child: CoachHubSkeleton(filas: 3),
-      );
-    }
-    if (measurements.hasError || performanceTests.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('reading-error'),
-        child:
-            _muted(palette, 'No se pudo cargar el progreso.'), // i18n: Fase W2
       );
     }
 
@@ -1466,9 +1468,17 @@ class _ResumenTab extends ConsumerWidget {
     // valor, y un único error si alguna falla. Si leyéramos routines/measurements
     // con valueOrNull, un error o un load lento se disfrazaría de «sin plan /
     // sin datos» — data trainer-facing engañosa.
-    if (sessionsAsync.isLoading ||
-        measAsync.isLoading ||
-        routinesAsync.isLoading) {
+    final sessionsPending = !sessionsAsync.hasValue && !sessionsAsync.hasError;
+    if (!measAsync.hasValue || !routinesAsync.hasValue || sessionsPending) {
+      if (measAsync.hasError || routinesAsync.hasError) {
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: _muted(
+            palette,
+            'No se pudo cargar el resumen.', // i18n: Fase W2
+          ),
+        );
+      }
       return const TreinoStateSwitcher(
         childKey: ValueKey('loading'),
         child: CoachHubSkeleton(filas: 3),
@@ -1482,14 +1492,6 @@ class _ResumenTab extends ConsumerWidget {
     // (mediciones, plan, próxima sesión, nota, datos personales). Los widgets
     // dependientes de sesiones (adherencia, última sesión) muestran su propio
     // estado vacío.
-    if (measAsync.hasError || routinesAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child:
-            _muted(palette, 'No se pudo cargar el resumen.'), // i18n: Fase W2
-      );
-    }
-
     final routines = routinesAsync.requireValue;
     final actives = routines.where((r) => r.status == RoutineStatus.active);
     final active =
@@ -1877,6 +1879,8 @@ class _NoteCard extends ConsumerWidget {
     final async = ref.watch(
       athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
     );
+    final displayAsync =
+        async.hasValue ? AsyncValue.data(async.requireValue) : async;
     // El layoutBuilder de TreinoStateSwitcher es un Stack(topCenter) con
     // StackFit.loose: le pasa al hijo minWidth:0, así que un Container con
     // contenido corto (esta card) se encoge y queda centrado. El fix real es
@@ -1885,12 +1889,12 @@ class _NoteCard extends ConsumerWidget {
     return SizedBox(
       width: double.infinity,
       child: TreinoStateSwitcher(
-        childKey: ValueKey(async.when(
+        childKey: ValueKey(displayAsync.when(
           loading: () => 'loading',
           error: (_, __) => 'error',
           data: (_) => 'data',
         )),
-        child: async.when(
+        child: displayAsync.when(
           loading: () => SizedBox(
             height: 48,
             child: Center(
@@ -1994,17 +1998,19 @@ class _ProxSesionCard extends ConsumerWidget {
         toDate: todayStart.add(const Duration(days: 60)),
       ),
     ));
+    final displayAsync =
+        async.hasValue ? AsyncValue.data(async.requireValue) : async;
     // width: infinity — ver nota en _NoteCard: el switcher encoge/centra su
     // hijo, sin esto la card queda angosta al medio.
     return SizedBox(
       width: double.infinity,
       child: TreinoStateSwitcher(
-        childKey: ValueKey(async.when(
+        childKey: ValueKey(displayAsync.when(
           loading: () => 'loading',
           error: (_, __) => 'error',
           data: (_) => 'data',
         )),
-        child: async.when(
+        child: displayAsync.when(
           loading: () => SizedBox(
             height: 48,
             child: Center(
@@ -2510,17 +2516,17 @@ class _PagosTab extends ConsumerWidget {
 
     Widget body;
     String stateKey;
-    if (paymentsAsync.isLoading || pendingAsync.isLoading) {
-      stateKey = 'loading';
-      body = const CoachHubSkeleton(filas: 3);
+    if (paymentsAsync.hasValue && pendingAsync.hasValue) {
+      stateKey = 'data';
+      body =
+          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
     } else if (paymentsAsync.hasError || pendingAsync.hasError) {
       stateKey = 'error';
       body =
           _muted(palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
     } else {
-      stateKey = 'data';
-      body =
-          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
+      stateKey = 'loading';
+      body = const CoachHubSkeleton(filas: 3);
     }
     return TreinoStateSwitcher(
       childKey: ValueKey(stateKey),
@@ -3387,14 +3393,17 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         (trainerId: trainerUid, athleteId: widget.athleteId),
       ),
     );
+    final displayNoteAsync = noteAsync.hasValue
+        ? AsyncValue.data(noteAsync.requireValue)
+        : noteAsync;
 
     return TreinoStateSwitcher(
-      childKey: ValueKey(noteAsync.when(
+      childKey: ValueKey(displayNoteAsync.when(
         loading: () => 'loading',
         error: (_, __) => 'error',
         data: (_) => 'data',
       )),
-      child: noteAsync.when(
+      child: displayNoteAsync.when(
         loading: () => const CoachHubSkeleton(filas: 3),
         error: (_, __) => Center(
           child: Text(

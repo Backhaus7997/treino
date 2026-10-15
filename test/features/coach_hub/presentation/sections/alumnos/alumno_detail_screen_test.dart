@@ -5,6 +5,8 @@
 // pumped with stubbed providers (no Firestore, no GoRouter needed since we
 // don't tap the back link).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -320,6 +322,7 @@ Future<void> _pump(
   List<Routine> routines = const [],
   List<Session> sessions = const [],
   List<Payment> payments = const [],
+  Stream<List<Payment>>? paymentsStream,
   List<CobroPendiente> pendingCobros = const [],
   PaymentRepository? paymentRepo,
   AthleteBilling? billing,
@@ -332,6 +335,7 @@ Future<void> _pump(
   ExerciseProgression? exerciseProgression,
   // PR9 — Resumen tab: nota fijada, próxima sesión, última sesión
   AthleteNote? athleteNote,
+  Stream<AthleteNote?>? athleteNoteStream,
   List<Appointment> appointments = const [],
   Map<String, double> lastWeightByExercise = const {},
   // PR2 (pagos) — trainer's own profile (for paymentAlias)
@@ -367,7 +371,9 @@ Future<void> _pump(
         trainerLinksStreamProvider
             .overrideWith((ref) => Stream.value(link == null ? [] : [link])),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(pendingCobros)),
-        trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
+        trainerPaymentsProvider.overrideWith(
+          (ref) => paymentsStream ?? Stream.value(payments),
+        ),
         athleteBillingProvider.overrideWith((ref, id) => Stream.value(billing)),
         measurementsForAthleteProvider
             .overrideWith((ref, id) => Stream.value(measurements)),
@@ -398,7 +404,7 @@ Future<void> _pump(
         ),
         // PR9 — nota fijada, próxima sesión, última sesión por ejercicio
         athleteNoteProvider.overrideWith(
-          (ref, key) => Stream.value(athleteNote),
+          (ref, key) => athleteNoteStream ?? Stream.value(athleteNote),
         ),
         trainerAppointmentsStreamProvider.overrideWith(
           (ref, key) => Stream.value(appointments),
@@ -2386,6 +2392,61 @@ void main() {
 
       // Exactly one Recordar button (only the pending row)
       expect(find.text('Recordar'), findsOneWidget);
+    });
+  });
+
+  group('errores transitorios conservan datos ya cargados', () {
+    testWidgets('Pagos conserva el historial', (tester) async {
+      final payments = StreamController<List<Payment>>();
+      addTearDown(payments.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        paymentsStream: payments.stream,
+        trainerProfile: _trainerProfile(),
+      );
+      await navigateAlumnoDetail(tester, group: 'Pagos');
+
+      payments.add([
+        _pago(
+          id: 'p-stale',
+          concept: 'Mensualidad visible',
+          amountArs: 28000,
+          status: PaymentStatus.paid,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('Mensualidad visible'), findsOneWidget);
+
+      payments.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Mensualidad visible'), findsOneWidget);
+      expect(find.text('No se pudieron cargar los pagos.'), findsNothing);
+    });
+
+    testWidgets('Resumen conserva la nota fijada', (tester) async {
+      final notes = StreamController<AthleteNote?>();
+      addTearDown(notes.close);
+
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        athleteNoteStream: notes.stream,
+      );
+
+      notes.add(_note(note: 'Nota que debe seguir visible'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nota que debe seguir visible'), findsOneWidget);
+
+      notes.addError(Exception('corte transitorio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nota que debe seguir visible'), findsOneWidget);
+      expect(find.text('No se pudo cargar la nota.'), findsNothing);
     });
   });
 }

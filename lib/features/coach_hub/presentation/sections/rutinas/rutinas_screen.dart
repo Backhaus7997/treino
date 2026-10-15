@@ -44,6 +44,9 @@ class RutinasScreen extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final uid = ref.watch(currentUidProvider) ?? '';
     final rutinasAsync = ref.watch(routinesAuthoredByProvider(uid));
+    final displayRutinasAsync = rutinasAsync.hasValue
+        ? AsyncValue.data(rutinasAsync.requireValue)
+        : rutinasAsync;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -59,12 +62,12 @@ class RutinasScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           TreinoStateSwitcher(
-            childKey: ValueKey(rutinasAsync.when(
+            childKey: ValueKey(displayRutinasAsync.when(
               loading: () => 'loading',
               error: (_, __) => 'error',
               data: (rs) => rs.isEmpty ? 'empty' : 'data',
             )),
-            child: rutinasAsync.when(
+            child: displayRutinasAsync.when(
               loading: () => const CoachHubSkeleton(
                 filas: 4,
                 padding: EdgeInsets.symmetric(vertical: 24, horizontal: 12),

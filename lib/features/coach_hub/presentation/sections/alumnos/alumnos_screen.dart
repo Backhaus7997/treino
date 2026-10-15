@@ -240,22 +240,26 @@ class _LinksLoaded extends ConsumerWidget {
     // si falló, el mensaje de perfiles sobra.
     final (String tableState, String? errorMessage, VoidCallback? onRetry) =
         switch ((linksAsync, profilesAsync)) {
-      (final l, _) when l.hasError => (
+      (final l, final p) when l.hasValue && p.hasValue => (
+          'data',
+          null,
+          null,
+        ),
+      (final l, _) when l.hasError && !l.hasValue => (
           'error',
           l10n.coachHubAlumnosLoadError,
           () => ref.invalidate(trainerLinksStreamProvider),
         ),
-      (_, final p) when p.hasError => (
+      (_, final p) when p.hasError && !p.hasValue => (
           'error',
           l10n.coachHubAlumnosProfilesLoadError,
           () => ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
         ),
-      (final l, final p) when !l.hasValue || !p.hasValue => (
+      _ => (
           'loading',
           null,
           null,
         ),
-      _ => ('data', null, null),
     };
 
     return _RosterFrame(

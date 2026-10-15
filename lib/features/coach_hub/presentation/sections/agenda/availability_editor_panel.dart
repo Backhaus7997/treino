@@ -92,7 +92,10 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Reglas ─────────────────────────────────────────────────
-                    rulesAsync.when(
+                    (rulesAsync.hasValue
+                            ? AsyncValue.data(rulesAsync.requireValue)
+                            : rulesAsync)
+                        .when(
                       loading: () => const Center(
                         child: CoachHubSkeleton(
                           filas: 3,
@@ -141,7 +144,10 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                     ),
 
                     // ── Overrides list ─────────────────────────────────────────
-                    overridesAsync.when(
+                    (overridesAsync.hasValue
+                            ? AsyncValue.data(overridesAsync.requireValue)
+                            : overridesAsync)
+                        .when(
                       // Skeleton y no spinner: lo que viene es la lista de
                       // excepciones, con su forma conocida. Además el padding
                       // de 24 estaba fuera de la escala 8·12·14·18·20 — el

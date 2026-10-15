@@ -177,14 +177,17 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
         ),
       ),
     );
+    final displayApptAsync = apptAsync.hasValue
+        ? AsyncValue.data(apptAsync.requireValue)
+        : apptAsync;
 
     return TreinoStateSwitcher(
-      childKey: ValueKey(apptAsync.when(
+      childKey: ValueKey(displayApptAsync.when(
         loading: () => 'loading',
         error: (_, __) => 'error',
         data: (_) => 'data',
       )),
-      child: apptAsync.when(
+      child: displayApptAsync.when(
         loading: () => const CoachHubSkeleton(
           filas: 3,
           padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),

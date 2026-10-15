@@ -1012,7 +1012,10 @@ class _AthletePicker extends ConsumerWidget {
     // Real-time stream (not the deprecated one-shot FutureProvider) so a link
     // accepted/paused/terminated elsewhere updates the list live. ADR-CHLM-03.
     final linksAsync = ref.watch(trainerLinksStreamProvider);
-    return linksAsync.when(
+    final displayLinksAsync = linksAsync.hasValue
+        ? AsyncValue.data(linksAsync.requireValue)
+        : linksAsync;
+    return displayLinksAsync.when(
       // Skeleton y no spinner: lo que viene es una LISTA de alumnos y su forma
       // ya la conocemos. El spinner medía 36px y la lista mide varios cientos,
       // así que al llegar los datos el bloque saltaba.

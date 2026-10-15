@@ -79,6 +79,7 @@ Future<void> _pump(
   List<Routine>? rutinas,
   Object? error,
   bool loading = false,
+  bool Function()? failOnRead,
 }) async {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -109,6 +110,9 @@ Future<void> _pump(
         currentUidProvider.overrideWithValue(_trainer),
         routinesAuthoredByProvider.overrideWith((ref, uid) {
           if (loading) return Completer<List<Routine>>().future;
+          if (failOnRead?.call() ?? false) {
+            return Future<List<Routine>>.error(Exception('corte transitorio'));
+          }
           if (error != null) return Future<List<Routine>>.error(error);
           return Future.value(rutinas ?? const <Routine>[]);
         }),
@@ -149,6 +153,27 @@ void main() {
     testWidgets('sin rutinas dice que no creó ninguna', (tester) async {
       await _pump(tester, rutinas: const []);
       expect(find.text('Todavía no creaste ninguna rutina.'), findsOneWidget);
+    });
+
+    testWidgets('un error transitorio conserva las rutinas cargadas',
+        (tester) async {
+      var fail = false;
+      await _pump(
+        tester,
+        rutinas: _mezcla(),
+        failOnRead: () => fail,
+      );
+      expect(find.text('Hipertrofia base'), findsOneWidget);
+
+      fail = true;
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RutinasScreen)),
+      );
+      container.invalidate(routinesAuthoredByProvider(_trainer));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hipertrofia base'), findsOneWidget);
+      expect(find.text('No pudimos cargar tus rutinas.'), findsNothing);
     });
   });
 

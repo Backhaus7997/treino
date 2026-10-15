@@ -207,6 +207,98 @@ void main() {
     });
   });
 
+  group(
+      'SCENARIO-STALE — catálogo sostiene ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `bibliotecaExercisesProvider`/`bibliotecaUnfilteredCountProvider`
+    // chequeaban `catalogAsync.isLoading` y `catalogAsync.hasError` ANTES de
+    // mirar el valor cacheado. `exercisesProvider` es un `FutureProvider` en
+    // vivo (re-corre con cada emisión de `authStateChangesProvider`) —
+    // Riverpod 2.5+ preserva el valor previo dentro de un `AsyncError`
+    // subsiguiente (copyWithPrevious/"seamless"), así que `hasValue == true`
+    // Y `hasError == true` pueden darse a la vez tras un error transitorio.
+    // El orden anterior (`isLoading` → `hasError` → data) tiraba el catálogo
+    // ya cargado — peor que en capa UI, porque acá se pierde el CACHE, no
+    // solo la pantalla.
+    test(
+        'bibliotecaExercisesProvider no descarta el catálogo tras un error '
+        'transitorio (copyWithPrevious)', () async {
+      final attempt = StateProvider<int>((ref) => 0);
+      final container = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue(_kTrainerId),
+          exercisesProvider.overrideWith((ref) async {
+            if (ref.watch(attempt) == 0) return const [_bench];
+            throw Exception('transient catalog hiccup');
+          }),
+          customExercisesForTrainerStreamProvider(_kTrainerId).overrideWith(
+            (ref) => Stream.value(<CustomExercise>[]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(exercisesProvider.future);
+      await Future.microtask(() {});
+
+      final loaded = container.read(bibliotecaExercisesProvider);
+      expect(loaded.hasValue, isTrue);
+      expect(loaded.requireValue.any((e) => e.id == _bench.id), isTrue);
+
+      container.read(attempt.notifier).state = 1;
+      await Future.microtask(() {});
+      await Future.microtask(() {});
+
+      final afterError = container.read(bibliotecaExercisesProvider);
+      expect(
+        afterError.hasValue,
+        isTrue,
+        reason: 'un error transitorio del catálogo no debe tirar el '
+            'catálogo ya cargado',
+      );
+      expect(afterError.requireValue.any((e) => e.id == _bench.id), isTrue);
+    });
+
+    test(
+        'bibliotecaUnfilteredCountProvider no descarta el conteo tras un '
+        'error transitorio (copyWithPrevious)', () async {
+      final attempt = StateProvider<int>((ref) => 0);
+      final container = ProviderContainer(
+        overrides: [
+          currentUidProvider.overrideWithValue(_kTrainerId),
+          exercisesProvider.overrideWith((ref) async {
+            if (ref.watch(attempt) == 0) return const [_bench, _curl];
+            throw Exception('transient catalog hiccup');
+          }),
+          customExercisesForTrainerStreamProvider(_kTrainerId).overrideWith(
+            (ref) => Stream.value(<CustomExercise>[]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(exercisesProvider.future);
+      await Future.microtask(() {});
+
+      final loaded = container.read(bibliotecaUnfilteredCountProvider);
+      expect(loaded.hasValue, isTrue);
+      expect(loaded.requireValue, equals(2));
+
+      container.read(attempt.notifier).state = 1;
+      await Future.microtask(() {});
+      await Future.microtask(() {});
+
+      final afterError = container.read(bibliotecaUnfilteredCountProvider);
+      expect(
+        afterError.hasValue,
+        isTrue,
+        reason: 'un error transitorio del catálogo no debe tirar el '
+            'conteo ya calculado',
+      );
+      expect(afterError.requireValue, equals(2));
+    });
+  });
+
   group('filter state providers', () {
     test('bibliotecaQueryProvider defaults to empty string', () {
       final container = _container();
