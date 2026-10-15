@@ -4,6 +4,12 @@
  * Deploys `../firestore.rules` to the active Firestore database using the
  * Firebase Rules REST API + la credencial que resuelve `lib/credenciales.js`.
  *
+ * Sube lo MISMO que `firebase deploy --only firestore:rules`: el fuente pasado
+ * por `stripComments()` de `strip_rules.js`, no el archivo crudo. El crudo pesa
+ * ~340 KB y el tope de un ruleset es 256 KiB; subiéndolo tal cual la API
+ * contestaba un 400 sin decir el tamaño, y la comparación del paso 1 (contra
+ * un ruleset desplegado que SÍ está procesado) no daba igual nunca.
+ *
  * No usa `firebase-admin`: `GoogleAuth` se autentica solo. Por eso pasa por el
  * resolutor DIRECTAMENTE y no por `lib/admin.js` (#834). Y por eso mismo era el
  * más fácil de dejar afuera: no hace `require('./sa-key.json')` ni menciona
@@ -32,6 +38,7 @@ const { bannerDeProduccion } = require('./lib/firebase_projects');
 
 const { ErrorDeCredencial, cargarCredencial } = require('./lib/credenciales');
 const { main: guardFuente } = require('./guard_fuente_de_deploy');
+const { stripComments, LIMIT, bytes } = require('./strip_rules');
 
 const RULES_PATH = path.join(__dirname, '..', 'firestore.rules');
 
@@ -65,10 +72,19 @@ function credencial() {
   // exacta para repetir el rollback de reglas del 2026-10-13.
   if (guardFuente(['firestore.rules']) !== 0) process.exit(1);
 
-  const rulesContent = fs.readFileSync(RULES_PATH, 'utf8');
+  const rulesContent = stripComments(fs.readFileSync(RULES_PATH, 'utf8'));
   console.log(`Project: ${projectId}`);
-  console.log(`Rules file: ${RULES_PATH}`);
-  console.log(`Rules size: ${rulesContent.length} bytes\n`);
+  console.log(`Rules file: ${RULES_PATH} (sin comentarios, como la CLI)`);
+  console.log(`Rules size: ${bytes(rulesContent)} bytes\n`);
+
+  // Antes de salir a la red: la API no dice el tamaño cuando rebota.
+  if (bytes(rulesContent) > LIMIT) {
+    console.error(
+      `✗ El ruleset procesado pesa ${bytes(rulesContent)} bytes y el tope es ` +
+        `${LIMIT}. Ver el encabezado de strip_rules.js.`,
+    );
+    process.exit(1);
+  }
 
   // `credentials` y no `keyFile`: la clave ya está leída y validada; no queremos
   // una segunda ruta al filesystem que se saltee la frontera.
