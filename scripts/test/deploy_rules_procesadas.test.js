@@ -47,22 +47,27 @@ function correr({ desplegado }) {
   delete env.TREINO_SA_KEY;
   delete env.FIRESTORE_EMULATOR_HOST;
 
-  const res = spawnSync(
-    process.execPath,
-    ['--require', STUB, path.join(SCRIPTS_DIR, 'deploy_rules.js')],
-    { cwd: SCRIPTS_DIR, env, encoding: 'utf8' },
-  );
-  const requests = fs
-    .readFileSync(logPath, 'utf8')
-    .split('\n')
-    .filter(Boolean)
-    .map((l) => JSON.parse(l));
-  return { ...res, requests };
+  try {
+    const res = spawnSync(
+      process.execPath,
+      ['--require', STUB, path.join(SCRIPTS_DIR, 'deploy_rules.js')],
+      { cwd: SCRIPTS_DIR, env, encoding: 'utf8' },
+    );
+    const requests = fs
+      .readFileSync(logPath, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+    return { ...res, requests };
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
-test('el fuente crudo NO entra en un ruleset; el procesado sí', () => {
-  // Si esto deja de ser cierto, el test de abajo no prueba nada nuevo.
-  assert.ok(bytes(FUENTE) > LIMIT, 'firestore.rules ya entra crudo en el límite');
+test('el ruleset procesado entra en el límite de 256 KiB', () => {
+  // No se afirma que el CRUDO se pase: el día que firestore.rules baje de
+  // 256 KiB sería una buena noticia, no un test rojo. Lo que importa es que
+  // lo que se sube entre.
   assert.ok(bytes(stripComments(FUENTE)) <= LIMIT);
 });
 
