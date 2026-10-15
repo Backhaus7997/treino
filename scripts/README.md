@@ -556,6 +556,14 @@ Publica `firestore.rules` **en producción**, y no por el CLI de Firebase: arma
 el ruleset y mueve el release contra la REST API de Firebase Rules
 (`firebaserules.googleapis.com`) autenticándose con `sa-key.json`.
 
+Sube lo **mismo que `firebase deploy --only firestore:rules`**: el fuente pasado
+por `stripComments()` de `strip_rules.js`, no el archivo crudo. El crudo pesa
+~340 KB y el tope de un ruleset es 256 KiB; hasta 2026-10-15 este script subía
+el crudo, así que la API lo rebotaba con un 400 sin decir el tamaño y su
+comparación contra lo desplegado (que sí está procesado) no daba igual nunca.
+Si el procesado se pasa del tope, frena antes de salir a la red. Lo prueba
+`test/deploy_rules_procesadas.test.js`.
+
 De ahí que sea su propia sección y no una fila más de la tabla:
 
 - **No lee `.firebaserc`.** El proyecto sale del `project_id` del service
