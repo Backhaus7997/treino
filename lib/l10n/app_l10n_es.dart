@@ -5327,6 +5327,20 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.';
+
+  @override
+  String get appUpdateTitle => 'Actualiza la app';
+
+  @override
+  String get appUpdateBody =>
+      'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.';
+
+  @override
+  String get appUpdateCta => 'ACTUALIZAR';
+
+  @override
+  String get appUpdateOpenError =>
+      'No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10649,4 +10663,18 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.';
+
+  @override
+  String get appUpdateTitle => 'Actualizá la app';
+
+  @override
+  String get appUpdateBody =>
+      'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualizala para seguir entrenando.';
+
+  @override
+  String get appUpdateCta => 'ACTUALIZAR';
+
+  @override
+  String get appUpdateOpenError =>
+      'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.';
 }

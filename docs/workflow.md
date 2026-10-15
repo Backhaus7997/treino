@@ -163,6 +163,54 @@ Sin excepciones. Un hot-fix crítico de prod también va por PR a `develop` y su
 `main` con un `develop → main` inmediato: así `main` nunca tiene un commit que
 `develop` no tenga.
 
+## Versión mínima de la app (force update)
+
+Una app vieja no puede completar series con campos nuevos del modelo y, si guarda
+la rutina, borra esos campos en silencio. Para cortar ese camino existe un gate de
+versión mínima: si la versión instalada es menor que la exigida, la app muestra una
+pantalla bloqueante «Actualizá la app» con un botón a la tienda
+(`lib/features/app_update/`).
+
+**Dónde vive.** Documento `app_config/min_version` en Firestore:
+
+```json
+{
+  "minVersion": { "ios": "1.4.0", "android": "1.4.0" },
+  "storeUrl":   { "ios": "https://apps.apple.com/...", "android": "https://play.google.com/store/apps/details?id=com.treino.app" }
+}
+```
+
+- `minVersion.<plataforma>`: `MAJOR.MINOR.PATCH`. El sufijo `+build` y el `-pre`
+  se ignoran (se compara solo el núcleo). Se configura por plataforma. Sin valor
+  (o ilegible) para una plataforma, esa plataforma no se bloquea.
+- `storeUrl.<plataforma>`: opcional, `https://`. Sin él se usa el fallback del
+  código (Android: Play Store con `com.treino.app`; iOS: una búsqueda en la App
+  Store, porque el Apple ID no está en el repo). **Cargá el link real de iOS la
+  primera vez que crees el documento.**
+
+**Quién y con qué lo escribe.** Los clientes NO pueden escribirlo (las rules lo
+deniegan a todos, y lo leen todos, incluso sin sesión). Lo edita una persona del
+equipo desde la **consola de Firebase** (Firestore → `app_config` → `min_version`)
+o con el Admin SDK. `treino-dev` es producción: el cambio rige para todos los
+usuarios en el siguiente arranque de la app.
+
+**Cuándo subirlo.** ANTES de que salga a las tiendas cualquier cambio que escriba
+campos nuevos del modelo (por ejemplo `distanceMeters` / `ExerciseMode.distance`),
+y solo cuando la versión que ya sabe leerlos esté **publicada y disponible** en
+las dos tiendas: si exigís una versión que la tienda todavía no sirve, dejás a
+los usuarios en una pantalla sin salida. Orden: 1) publicar el build, 2) verificar
+que está disponible, 3) subir `minVersion`.
+
+**Cómo se desactiva.** Borrá el documento o bajá los mínimos. Es la salida de
+emergencia: no hace falta deploy ni build.
+
+**Falla abierto.** Si el documento no se puede leer (sin red, timeout, error,
+ausente o malformado), la app arranca normal. Es una decisión de producto: este
+gate evita daño de datos, no controla acceso, y una caída de red o un typo no
+pueden dejar a todos afuera. Costo: un arranque sin conexión o con el documento
+roto deja pasar una versión vieja durante esa sesión. Web (Coach Hub) y relojes
+nunca se gatean.
+
 ## Pull Requests
 
 Usar el template `.github/pull_request_template.md` (se carga solo al abrir el PR).

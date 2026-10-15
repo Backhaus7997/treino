@@ -8982,6 +8982,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.'**
   String get coachHubOnboardingPfLocationStaleHint;
+
+  /// Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actualizá la app'**
+  String get appUpdateTitle;
+
+  /// No description provided for @appUpdateBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualizala para seguir entrenando.'**
+  String get appUpdateBody;
+
+  /// No description provided for @appUpdateCta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACTUALIZAR'**
+  String get appUpdateCta;
+
+  /// No description provided for @appUpdateOpenError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.'**
+  String get appUpdateOpenError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

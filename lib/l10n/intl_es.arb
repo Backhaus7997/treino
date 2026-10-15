@@ -1147,5 +1147,9 @@
   "eliminarCuentaWebReauthPasswordBody": "Por seguridad, introduce tu contraseña para confirmar que eres tú.",
   "eliminarCuentaWebReauthCta": "CONFIRMAR",
   "eliminarCuentaWebPopupHint": "Para confirmar que eres tú, se abrirá una ventana de {provider}.",
-  "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren."
+  "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Vuelve a elegir este lugar para que te encuentren.",
+  "appUpdateTitle": "Actualiza la app",
+  "appUpdateBody": "Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.",
+  "appUpdateCta": "ACTUALIZAR",
+  "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play."
 }

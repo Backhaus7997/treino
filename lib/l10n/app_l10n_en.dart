@@ -5228,4 +5228,18 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachHubOnboardingPfLocationStaleHint =>
       'This place is no longer available. Pick this place again so people can find you.';
+
+  @override
+  String get appUpdateTitle => 'Update the app';
+
+  @override
+  String get appUpdateBody =>
+      'This version of TREINO is no longer supported and could lose data from your routines. Update it to keep training.';
+
+  @override
+  String get appUpdateCta => 'UPDATE';
+
+  @override
+  String get appUpdateOpenError =>
+      'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
 }

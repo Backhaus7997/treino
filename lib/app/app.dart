@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/analytics/analytics_service.dart';
 import '../core/analytics/route_analytics.dart';
+import '../features/app_update/presentation/app_update_gate.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/cola_de_avisos.dart';
 import '../features/notifications/application/notification_providers.dart';
@@ -458,7 +459,11 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       builder: (context, child) => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: ThemeWatcher(child: child ?? const SizedBox.shrink()),
+        // El gate de versión mínima va ADENTRO del ThemeWatcher (necesita
+        // tema y l10n) y reemplaza al router solo si hay que actualizar.
+        child: ThemeWatcher(
+          child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
+        ),
       ),
     );
   }
