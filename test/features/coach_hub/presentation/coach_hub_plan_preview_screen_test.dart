@@ -66,6 +66,35 @@ ParsedPlan _planWithUnmatched() => const ParsedPlan(
       ],
     );
 
+ParsedPlan _planWithSuggestion() => const ParsedPlan(
+      name: 'Test Plan',
+      daysPerWeek: 1,
+      durationWeeks: 4,
+      level: ExperienceLevel.intermediate,
+      days: [
+        ParsedPlanDay(
+          dayNumber: 1,
+          items: [
+            ParsedPlanItem(
+              rowName: 'Sentadilla búlgara',
+              exerciseId: null,
+              exerciseName: 'Sentadilla búlgara',
+              muscleGroup: null,
+              suggestedExerciseId: 'squat-bar',
+              suggestedExerciseName: 'Sentadilla con barra',
+              suggestedMuscleGroup: 'Legs',
+              sets: 3,
+              repsMin: 10,
+              repsMax: 12,
+            ),
+          ],
+        ),
+      ],
+      unmatched: [
+        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla búlgara'),
+      ],
+    );
+
 Exercise _exercise({String id = 'ex-1', String name = 'Sentadilla'}) =>
     Exercise(
       id: id,
@@ -281,6 +310,133 @@ void main() {
       expect(find.byType(CoachHubPlanPreviewScreen), findsOneWidget);
       // Local mapping state preserved (unmatched badge gone)
       expect(find.text('sin match'), findsNothing);
+    });
+  });
+
+  group('sugerencias de match', () {
+    testWidgets(
+        'muestra texto original y sugerencia; confirmar resuelve y agrega alias',
+        (tester) async {
+      final mockFunctions = MockFirebaseFunctions();
+      final mockCallable = MockHttpsCallable();
+      final mockResult = MockHttpsCallableResult();
+      when(() => mockFunctions.httpsCallable('addAlias'))
+          .thenReturn(mockCallable);
+      when(() => mockCallable.call(any<Map<String, dynamic>>()))
+          .thenAnswer((_) async => mockResult);
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            cloudFunctionsProvider.overrideWithValue(mockFunctions),
+            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sentadilla búlgara'), findsOneWidget);
+      expect(find.text('Sugerencia: Sentadilla con barra'), findsOneWidget);
+      expect(find.text('sugerencia pendiente'), findsOneWidget);
+
+      await tester.tap(find.text('Confirmar'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockCallable.call(<String, dynamic>{
+          'exerciseId': 'squat-bar',
+          'alias': 'Sentadilla búlgara',
+        }),
+      ).called(1);
+      expect(find.text('sugerencia pendiente'), findsNothing);
+      expect(find.text('Sentadilla con barra'), findsOneWidget);
+    });
+
+    testWidgets('cambiar abre el picker y guarda la elección como alias',
+        (tester) async {
+      final mockFunctions = MockFirebaseFunctions();
+      final mockCallable = MockHttpsCallable();
+      final mockResult = MockHttpsCallableResult();
+      when(() => mockFunctions.httpsCallable('addAlias'))
+          .thenReturn(mockCallable);
+      when(() => mockCallable.call(any<Map<String, dynamic>>()))
+          .thenAnswer((_) async => mockResult);
+
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            cloudFunctionsProvider.overrideWithValue(mockFunctions),
+            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            exercisesProvider.overrideWith(
+              (ref) => Future.value([
+                _exercise(
+                  id: 'bulgarian-assisted',
+                  name: 'Sentadilla búlgara asistida',
+                ),
+              ]),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cambiar'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sentadilla búlgara asistida'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => mockCallable.call(<String, dynamic>{
+          'exerciseId': 'bulgarian-assisted',
+          'alias': 'Sentadilla búlgara',
+        }),
+      ).called(1);
+      expect(find.text('Sentadilla búlgara asistida'), findsOneWidget);
+      expect(find.text('sugerencia pendiente'), findsNothing);
+    });
+
+    testWidgets('una sugerencia pendiente bloquea la asignación',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const CoachHubPlanPreviewScreen(),
+          overrides: [
+            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            userProfileProvider.overrideWith(
+              (ref) => Stream.value(_trainerProfile()),
+            ),
+            trainerLinksStreamProvider.overrideWith(
+              (ref) => Stream.value(const []),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ASIGNAR PLAN'));
+      await tester.pump();
+
+      expect(
+        find.text(
+          'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
+          'continuar.',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }
