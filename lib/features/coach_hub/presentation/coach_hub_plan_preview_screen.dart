@@ -875,7 +875,7 @@ class _DayCard extends StatelessWidget {
                           ),
                         ),
                         if (hasSuggestion) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: AppSpacing.s8),
                           Text(
                             'Sugerencia: ${i.suggestedExerciseName}',
                             style: TextStyle(
