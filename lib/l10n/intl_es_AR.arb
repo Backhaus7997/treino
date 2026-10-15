@@ -4845,5 +4845,12 @@
   "coachHubOnboardingPfLocationStaleHint": "Este lugar ya no está disponible. Volvé a elegir este lugar para que te encuentren.",
   "@coachHubOnboardingPfLocationStaleHint": {
     "description": "Aviso bajo un lugar del Coach Hub que el servidor marcó vencido (stale): ya no se puede refrescar su ubicación y hay que volver a elegirlo."
+  },
+  "appUpdateTitle": "Actualizá la app",
+  "appUpdateBody": "Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualizala para seguir entrenando.",
+  "appUpdateCta": "ACTUALIZAR",
+  "appUpdateOpenError": "No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.",
+  "@appUpdateTitle": {
+    "description": "Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version)."
   }
 }

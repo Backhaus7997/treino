@@ -5168,6 +5168,20 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // La versión mínima de la app: `app_config/min_version`
+    // (`features/app_update`). Es EXACTAMENTE ese documento. A diferencia de
+    // `email_gate`, lo lee CUALQUIERA, también sin sesión: el gate corre al
+    // arrancar, antes (o sin) login, y un usuario con una versión vieja tiene
+    // que enterarse de que debe actualizar aunque no pueda loguearse. No hay
+    // nada sensible: versiones y links de tienda, públicos por definición.
+    // Solo `get`: listar `app_config` sigue denegado (no hay comodín). Lo
+    // escribe solo el equipo, desde la consola o el Admin SDK, nunca un
+    // cliente. Si la lectura falla, la app NO bloquea (falla abierto).
+    match /app_config/min_version {
+      allow get: if true;
+      allow write: if false;
+    }
+
     // ── Moderación: bloqueo de usuario (change `moderacion-reporte-y-bloqueo`) ──
     //
     // blocks/{blockerUid}_{blockedUid} — copia el molde de `follows` (:103,
