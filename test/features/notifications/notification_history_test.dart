@@ -140,6 +140,11 @@ void main() {
       NotificationKind.fromJson('comeback-reminder'),
       NotificationKind.comebackReminder,
     );
+    // "Hoy toca entrenar": el recordatorio a la hora habitual del atleta.
+    expect(
+      NotificationKind.fromJson('training-due'),
+      NotificationKind.trainingDue,
+    );
   });
 
   test('badge sums unread notifications and pending requests', () async {

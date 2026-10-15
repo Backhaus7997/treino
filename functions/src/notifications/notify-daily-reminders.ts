@@ -21,7 +21,7 @@
  * El despachante es además quien sabe lo que el planificador no puede: lo que
  * pasó DESPUÉS de las 06:00. Si el atleta ya arrancó una sesión, no manda nada.
  *
- * ─── Los dos recordatorios, en orden de prioridad ──────────────────────────
+ * ─── Los tres recordatorios, en orden de prioridad ─────────────────────────
  *
  * 1. `streak-at-risk` — "Hoy o se corta 🔥". El atleta tiene una racha semanal
  *    de 1 semana o más (semanas cumplidas consecutivas ANTERIORES a la actual),
@@ -30,15 +30,30 @@
  *    si hoy no entrena, matemáticamente ya no llega. Se excluye a quien ya
  *    completó una sesión hoy.
  *
- * 2. `comeback-reminder` — "Te extrañamos en el gym 💪". Su última sesión que
+ * 2. `training-due` — "Hoy toca entrenar 💪". La MISMA condición «al límite»
+ *    (la semana en curso no cumplió, faltan exactamente tantos como días quedan
+ *    contando hoy, no entrenó hoy), pero para quien NO tiene racha: la semana
+ *    anterior tampoco cumplió. No hay nada que sostener, sólo un objetivo que
+ *    todavía se alcanza si arranca hoy.
+ *
+ *    El 1 y el 2 son EXCLUYENTES y los separa una sola pregunta, la racha: con 1
+ *    semana o más sale `streak-at-risk`, con 0 sale `training-due`. Dado que
+ *    está al límite no hay un tercer caso: ningún atleta califica a los dos, y
+ *    ninguno queda al límite sin tipo. Es la misma cuenta (`weekLimitPlanFor`):
+ *    no hay dos reglas del «límite» que puedan diferir.
+ *
+ * 3. `comeback-reminder` — "Te extrañamos en el gym 💪". Su última sesión que
  *    cuenta tiene entre 4 y 17 días ART calendario, y no se le mandó este tipo
  *    en los últimos 7 días (se reintenta recién al día 7, no al 6). En la
  *    práctica son DOS avisos por período de inactividad —el día 4 y el día 11—
  *    y después silencio hasta que vuelva a entrenar (ver abajo).
  *
- * Si califica para los dos, el plan es el de racha y NO se planifica comeback ese
- * día: no se escribe `lastComebackReminderDate`, así que el cooldown de 7 días no
- * corre. Hay UN plan por atleta por día: un plan nuevo reemplaza al anterior.
+ * El 1 y el 2 le ganan al 3: si califica a cualquiera de los dos, el plan es ése
+ * y NO se planifica comeback ese día. No se escribe `lastComebackReminderDate`,
+ * así que el cooldown de 7 días no corre y el «volvé a entrenar» queda
+ * disponible mientras el atleta siga en la ventana [4, 17] (al día siguiente, si
+ * ya no está al límite). Hay UN plan por atleta por día: un plan nuevo
+ * reemplaza al anterior.
  *
  * ─── El "volvé a entrenar" tiene TOPE: dos avisos y silencio ───────────────
  *
@@ -61,15 +76,34 @@
  * envío falló todo el día) no consume nada del tope: mañana se vuelve a evaluar
  * con la misma ventana.
  *
+ * ─── A quién mira: el límite conocido del «hoy toca» ───────────────────────
+ *
+ * El planificador sólo ve a los atletas con AL MENOS UNA sesión que cuenta en la
+ * ventana del escaneo (8 semanas + la actual). Quien nunca entrenó, o cuya
+ * última sesión ya salió de la ventana, no aparece y no recibe `training-due`.
+ * Es el alcance decidido, no un descuido: verlo exigiría recorrer `users` entero
+ * en vez de las sesiones.
+ *
+ * Y el «hoy toca» es SÓLO para quien está en movimiento: entrenó hace menos de
+ * COMEBACK_MIN_DAYS (4) días o ya entrenó esta semana. Al que no hizo nada esta
+ * semana y lleva 4 o más sin entrenar lo maneja el comeback, con su tope de dos
+ * y después silencio. Sin esa guarda, quien dejó de
+ * entrenar recibía un «hoy toca» por semana —el día en que «faltan = quedan»—
+ * durante ~8 semanas, mientras su última sesión siguiera en la ventana: el
+ * churneado que #1449 decidió no perseguir. La guarda vive en `weekLimitPlanFor`
+ * y, como condición necesaria barata, en el filtro del handler.
+ *
  * ─── A qué hora sale cada uno ──────────────────────────────────────────────
  *
  * El horario habitual de entrenamiento se aprende de las sesiones del atleta
  * (`habitual-time.ts` tiene el algoritmo, la muestra de 12 y el desempate):
  *
- *   · Racha en riesgo: habitual + 60 minutos. Llega una hora después de cuando
- *     suele entrenar, o sea cuando "se colgó". Sin patrón claro: 18:00.
+ *   · Racha en riesgo y «hoy toca»: habitual + 60 minutos. Llega una hora
+ *     después de cuando suele entrenar, o sea cuando "se colgó". Sin patrón
+ *     claro: 18:00. Es la MISMA función (`streakSendMinute`) para los dos: son
+ *     el mismo momento de la semana, el último en que todavía se llega.
  *   · Volver a entrenar: a la hora habitual. Sin patrón claro: 09:00.
- *   · Los dos, acotados a [08:00, 22:30]. El piso es 08:00 porque este
+ *   · Los tres, acotados a [08:00, 22:30]. El piso es 08:00 porque este
  *     planificador corre a las 06:00 y tiene que terminar de escribir los planes
  *     antes de que el primero venza.
  *
@@ -83,9 +117,10 @@
  * ─── El plan: `users/{uid}.dailyReminderPlan` ──────────────────────────────
  *
  *   { date: "YYYY-MM-DD" (ART),
- *     kind: "streak-at-risk" | "comeback-reminder",
+ *     kind: "streak-at-risk" | "training-due" | "comeback-reminder",
  *     sendAtMinute: 0..1439 (minuto del día ART),
  *     missing, streakWeeks }   ← racha
+ *     missing                  ← hoy toca (sin racha: no lleva `streakWeeks`)
  *     daysSince                ← comeback
  *
  * Lleva los datos del texto, así que el despachante no vuelve a leer sesiones ni
@@ -101,7 +136,8 @@
  * `conformance/routine_selection.json`). Si el servidor tuviera su propia regla,
  * el push diría "tu racha de 4 semanas" y la app 3. El objetivo semanal sale de
  * la rutina ACTIVA del atleta, que se resuelve con la misma cadena de tres
- * niveles que usa el Home.
+ * niveles que usa el Home. Esa misma racha es la que decide, para quien está al
+ * límite, entre `streak-at-risk` (racha ≥ 1) y `training-due` (racha 0).
  *
  * ─── Costo de lecturas ─────────────────────────────────────────────────────
  *
@@ -113,16 +149,44 @@
  *    de entrenamiento, no con cuántos reciben push. Si algún día pesa, el
  *    remedio es denormalizar `lastSessionAt` en `users/{uid}`, no achicar la
  *    ventana.
- * 2. Un atleta pasa a ser CANDIDATO sólo si por las sesiones ya cargadas puede
- *    llegar a calificar (ver `summarizeActivity`). El resto no cuesta una lectura
- *    más. Para los candidatos: el doc del usuario, y una escritura si le toca plan.
+ * 2. Un atleta pasa a ser CANDIDATO si por las sesiones ya cargadas puede llegar
+ *    a calificar (ver `summarizeActivity`): para el «al límite» (racha u «hoy
+ *    toca») alcanza con que NO haya entrenado hoy; para el comeback, que lleve de
+ *    4 a 17 días. Para los candidatos: el doc del usuario, y una escritura si le
+ *    toca plan.
  * 3. Las lecturas de RUTINAS (2 queries, y 1 doc más si el marcador apunta al
- *    catálogo) se hacen SÓLO para el candidato a racha en riesgo que ya pasó los
- *    filtros baratos (es atleta, no apagó el push, no se le mandó hoy).
+ *    catálogo) se hacen para todo candidato que ya pasó los filtros baratos (es
+ *    atleta, no apagó el push, no se le mandó hoy). Ver el siguiente párrafo.
  * 4. Si la racha llega al borde de la ventana, se completa con una query extra
  *    sobre las sesiones de ESE usuario, para que el "racha de M semanas" del
- *    texto sea exacto y no un piso.
+ *    texto sea exacto y no un piso. Sólo para `streak-at-risk`.
  * 5. El horario habitual no cuesta lecturas: sale de las sesiones del punto 1.
+ *
+ * ⚠️  Por qué el «al límite» NO tiene pre-filtro por sesiones. Antes la racha
+ * tenía uno gratis: `previousWeekCount >= currentWeekCount + daysLeft`, condición
+ * NECESARIA para racha ≥ 1 (al límite el objetivo vale `currentWeekCount +
+ * daysLeft`, y la semana anterior tiene que haberlo cumplido). El «hoy toca» es
+ * justo el COMPLEMENTO —racha 0 es `previousWeekCount < objetivo`—, así que ese
+ * filtro lo deja afuera y no hay que reusarlo. Lo que falta es el objetivo, y el
+ * objetivo es la rutina. Desde las sesiones no se acota: es cualquier entero ≥ 1
+ * (sin rutina, 1). Se evaluó `currentWeekCount + daysLeft <= 7`
+ * (`kMaxRoutineDays`) y se descartó: a las 06:00 sólo descarta a quien ya hizo
+ * dos sesiones en un mismo día, o sea casi a nadie, y se apoya en un tope que
+ * sólo impone el editor del cliente —las reglas no se lo exigen a un PF ni a un
+ * Pro—. No ahorra nada que valga el riesgo de perder un positivo.
+ *
+ * El costo, entonces: la rutina se lee para TODO atleta con una sesión en la
+ * ventana que no entrenó antes de las 06:00 y no apagó el push (casi todos los
+ * activos), no sólo para los que traían una semana anterior buena. Por atleta:
+ * 1 doc de usuario (ya se leía), 2 queries de rutinas (la de asignadas trae
+ * hasta 20 docs) y 1 doc si el marcador apunta al catálogo. El otro costo es el
+ * TIEMPO, no las lecturas: el bucle es secuencial (varios viajes a Firestore por
+ * atleta) y corre bajo `timeoutSeconds: 540`; un timeout a mitad de la corrida
+ * deja sin plan a los que quedaron. A modo de cuenta, a ~200 ms por atleta
+ * caben unos 2.700 en 540 s. No está medido contra la base real. Si se acerca,
+ * el remedio es procesar a los atletas en tandas con concurrencia acotada, o
+ * denormalizar el objetivo semanal en `users/{uid}` cuando se escribe la
+ * rutina; NO volver a un filtro que pierda positivos.
  *
  * Despachante (cada 15 minutos): UNA query a `users` por igualdad sobre
  * `dailyReminderPlan.date` (sólo los planes de HOY), más, por cada plan VENCIDO,
@@ -170,7 +234,7 @@
  *
  * ─── Deep link ─────────────────────────────────────────────────────────────
  *
- * Los dos tipos aterrizan en `/home`: la pestaña Inicio del atleta, que es donde
+ * Los tres tipos aterrizan en `/home`: la pestaña Inicio del atleta, que es donde
  * vive `EmpezarEntrenamientoCard` ("EMPEZAR ENTRENAMIENTO", con el día de hoy ya
  * resuelto y un toque a la sesión). `/workout` también es válido, pero deja al
  * atleta frente a la lista de rutinas a elegir, un paso más lejos de entrenar.
@@ -229,7 +293,7 @@ import {
  */
 export const DAILY_REMINDERS_PREF_KEY = "recordatorios_entrenamiento";
 
-/** Adónde llevan los dos tipos de push. Ver «Deep link» en la cabecera. */
+/** Adónde llevan los tres tipos de push. Ver «Deep link» en la cabecera. */
 export const DAILY_REMINDER_DEEP_LINK = "/home";
 
 /** El campo de `users/{uid}` donde el planificador deja el plan del día. */
@@ -268,7 +332,7 @@ const MAX_EXTENSION_PAGES = 20;
 
 type Db = ReturnType<typeof getFirestore>;
 
-export type DailyReminderKind = "streak-at-risk" | "comeback-reminder";
+export type DailyReminderKind = "streak-at-risk" | "training-due" | "comeback-reminder";
 
 /**
  * El plan del día de UN atleta: lo escribe este planificador en
@@ -287,6 +351,13 @@ export type DailyReminderPlan =
     }
   | {
       date: string;
+      kind: "training-due";
+      sendAtMinute: number;
+      /** Entrenamientos que faltan; al límite, también los días que quedan contando hoy. */
+      missing: number;
+    }
+  | {
+      date: string;
       kind: "comeback-reminder";
       sendAtMinute: number;
       daysSince: number;
@@ -296,6 +367,7 @@ export interface NotifyDailyRemindersResult {
   /** Planes escritos. El planificador NO manda pushes: eso es del despachante. */
   planned: number;
   plannedStreakAtRisk: number;
+  plannedTrainingDue: number;
   plannedComeback: number;
   /** Candidatos que terminaron sin plan por una razón de negocio. */
   skipped: number;
@@ -303,6 +375,7 @@ export interface NotifyDailyRemindersResult {
   skippedOptedOut: number;
   skippedAlreadySent: number;
   skippedCooldown: number;
+  /** No estaba al límite (ni racha ni «hoy toca») y tampoco le tocaba comeback. */
   skippedNotAtRisk: number;
   /** Candidatos que tiraron un error. */
   failed: number;
@@ -342,6 +415,21 @@ export function streakAtRiskCopy(
   };
 }
 
+/**
+ * Título y cuerpo del "hoy toca entrenar". Al límite, los entrenamientos que
+ * faltan son también los días que quedan contando hoy: el texto usa el mismo
+ * número para las dos cosas. Con 1 falta, hoy es el último día de la semana.
+ */
+export function trainingDueCopy(missing: number): { title: string; body: string } {
+  const body =
+    missing === 1 ?
+      "Te falta 1 entrenamiento y hoy es el último día. " +
+        "Si entrenás hoy, llegás a tu objetivo de la semana." :
+      `Te faltan ${missing} entrenamientos y quedan ${missing} días. ` +
+        "Si arrancás hoy, llegás a tu objetivo de la semana.";
+  return { title: "Hoy toca entrenar 💪", body };
+}
+
 /** Título y cuerpo del "volvé a entrenar". */
 export function comebackCopy(daysSince: number): { title: string; body: string } {
   const dias = daysSince === 1 ? "día" : "días";
@@ -353,9 +441,14 @@ export function comebackCopy(daysSince: number): { title: string; body: string }
 
 /** El texto de un plan. Lo arma el despachante, que es quien manda. */
 export function reminderCopy(plan: DailyReminderPlan): { title: string; body: string } {
-  return plan.kind === "streak-at-risk"
-    ? streakAtRiskCopy(plan.missing, plan.streakWeeks)
-    : comebackCopy(plan.daysSince);
+  switch (plan.kind) {
+  case "streak-at-risk":
+    return streakAtRiskCopy(plan.missing, plan.streakWeeks);
+  case "training-due":
+    return trainingDueCopy(plan.missing);
+  case "comeback-reminder":
+    return comebackCopy(plan.daysSince);
+  }
 }
 
 // ─── Fechas ART como texto ────────────────────────────────────────────────────
@@ -426,6 +519,15 @@ function summarizeActivity(startsMs: readonly number[], cal: Calendar): Activity
     trainedToday,
     daysSinceLast: cal.todayNumber - artDayNumber(lastMs),
   };
+}
+
+/**
+ * ¿Está «en movimiento»? Entrenó hace menos de COMEBACK_MIN_DAYS días, o ya
+ * entrenó esta semana. Es la condición del «hoy toca»: separa al que va a mitad
+ * de su semana del que dejó de entrenar (ése es del comeback).
+ */
+function isInMotion(activity: Activity): boolean {
+  return activity.daysSinceLast < COMEBACK_MIN_DAYS || activity.currentWeekCount > 0;
 }
 
 // ─── Lecturas de rutinas → objetivo semanal ──────────────────────────────────
@@ -584,11 +686,6 @@ async function exactStreakWeeks(
 
 // ─── Decisión por atleta ──────────────────────────────────────────────────────
 
-interface StreakReminder {
-  missing: number;
-  streakWeeks: number;
-}
-
 type SkipReason = "not-athlete" | "opted-out" | "already-sent" | "cooldown" | "not-at-risk";
 
 type Outcome =
@@ -617,19 +714,25 @@ export function pushOptedOut(user: DocumentData): boolean {
 }
 
 /**
- * ¿Está la racha en riesgo HOY? Devuelve los datos del texto o `null`.
+ * ¿Está el atleta AL LÍMITE hoy? Si lo está, devuelve el plan —de racha si tiene
+ * racha, de «hoy toca» si no— y si no, `null`.
  *
- * El pre-filtro del que sale el candidato ya garantiza una condición necesaria
- * (`previousWeekCount >= currentWeekCount + daysLeft`, ver `handler`); acá se
- * confirma con el objetivo REAL del atleta, que es lo único que no se sabía.
+ * «Al límite» es que le falten exactamente tantos entrenamientos como días le
+ * quedan contando hoy: si hoy no entrena, ya no llega. Lo único que no se sabe
+ * hasta acá es el objetivo REAL (la rutina), y sin él no hay ningún pre-filtro
+ * por sesiones que sirva para los dos tipos (ver «Costo de lecturas»), así que
+ * todo atleta que no entrenó hoy pasa por esta lectura.
+ *
+ * La racha separa los dos tipos: la semana en curso no cuenta (nunca rompe la
+ * racha), así que `streak < 1` es que la semana ANTERIOR no cumplió.
  */
-async function streakReminderFor(
+async function weekLimitPlanFor(
   ctx: RunContext,
   uid: string,
   user: DocumentData,
   startsMs: readonly number[],
   activity: Activity,
-): Promise<StreakReminder | null> {
+): Promise<DailyReminderPlan | null> {
   const target = await loadWeeklyTarget(ctx.db, uid, user.activeRoutineId);
 
   // «Faltan exactamente tantos como días quedan»: el objetivo tiene que ser lo
@@ -643,7 +746,31 @@ async function streakReminderFor(
     now: ctx.now,
     dataStart: new Date(ctx.windowStartMs),
   });
-  if (detail.currentWeekMet || detail.streak < 1) return null;
+  // Con `missing > 0` la semana en curso no cumplió; es una guarda, no un caso.
+  if (detail.currentWeekMet) return null;
+
+  // Los dos tipos salen a la misma hora: la de la racha. Ver «A qué hora sale».
+  const date = ctx.cal.todayKey;
+  const sendAtMinute = streakSendMinute(habitualStartMinute(startsMs));
+
+  // Racha 0: la semana anterior tampoco cumplió. No hay nada que sostener, pero
+  // sí un objetivo semanal que todavía se alcanza si entrena hoy. SÓLO para quien
+  // está en movimiento: entrenó en los últimos 3 días o ya entrenó ESTA semana
+  // (el que hizo lunes y martes y llega al domingo con 1 por hacer va a mitad de
+  // su semana, no abandonó). Al que no hizo nada esta semana y lleva 4 o más sin
+  // entrenar lo maneja el comeback, con su tope de dos y después silencio. Sin
+  // esta guarda, quien dejó de entrenar recibía un «hoy toca» por semana durante
+  // ~8 semanas (mientras su última sesión siguiera en la ventana): perseguir al
+  // churneado que #1449 decidió no perseguir.
+  //
+  // Hoy el filtro barato del handler ya garantiza esto (quien no está en
+  // movimiento y pasa ese filtro sólo puede tener racha ≥ 1), así que esta guarda
+  // no cambia el resultado: es LA REGLA, y aquel filtro es la optimización. Se
+  // dejan las dos para que tocar el filtro no reabra la persecución.
+  if (detail.streak < 1) {
+    if (!isInMotion(activity)) return null;
+    return { date, kind: "training-due", sendAtMinute, missing };
+  }
 
   // La corrida llegó al borde de la ventana: el número real puede ser mayor.
   let streakWeeks = detail.streak;
@@ -656,7 +783,7 @@ async function streakReminderFor(
     });
   }
 
-  return { missing, streakWeeks };
+  return { date, kind: "streak-at-risk", sendAtMinute, missing, streakWeeks };
 }
 
 /**
@@ -674,8 +801,9 @@ async function planCandidate(
   uid: string,
   startsMs: readonly number[],
   activity: Activity,
-  flags: { streakCandidate: boolean; comebackCandidate: boolean },
+  flags: { limitCandidate: boolean; comebackCandidate: boolean },
 ): Promise<Outcome> {
+  const { limitCandidate, comebackCandidate } = flags;
   const userRef = ctx.db.collection("users").doc(uid);
 
   // Lectura previa, sólo para descartar barato ANTES de leer rutinas.
@@ -691,23 +819,17 @@ async function planCandidate(
 
   const date = ctx.cal.todayKey;
 
-  // Racha primero: si califica, el plan es de racha y NO hay comeback hoy.
-  if (flags.streakCandidate) {
-    const streak = await streakReminderFor(ctx, uid, user, startsMs, activity);
-    if (streak) {
-      const plan: DailyReminderPlan = {
-        date,
-        kind: "streak-at-risk",
-        sendAtMinute: streakSendMinute(habitualStartMinute(startsMs)),
-        missing: streak.missing,
-        streakWeeks: streak.streakWeeks,
-      };
-      await userRef.update({ [DAILY_REMINDER_PLAN_FIELD]: plan });
-      return { status: "planned", kind: plan.kind };
-    }
+  // «Al límite» primero (racha u «hoy toca»): si califica, el plan es ése y NO
+  // hay comeback hoy, ni se consume su cooldown.
+  const limitPlan = limitCandidate ?
+    await weekLimitPlanFor(ctx, uid, user, startsMs, activity) :
+    null;
+  if (limitPlan) {
+    await userRef.update({ [DAILY_REMINDER_PLAN_FIELD]: limitPlan });
+    return { status: "planned", kind: limitPlan.kind };
   }
 
-  if (flags.comebackCandidate) {
+  if (comebackCandidate) {
     if (!comebackCooldownElapsed(user.lastComebackReminderDate, date)) {
       return { status: "skipped", reason: "cooldown" };
     }
@@ -789,6 +911,7 @@ export async function notifyDailyRemindersHandler(
   const result: NotifyDailyRemindersResult = {
     planned: 0,
     plannedStreakAtRisk: 0,
+    plannedTrainingDue: 0,
     plannedComeback: 0,
     skipped: 0,
     skippedNotAthlete: 0,
@@ -806,33 +929,38 @@ export async function notifyDailyRemindersHandler(
   for (const [uid, startsMs] of startsByUid) {
     const activity = summarizeActivity(startsMs, cal);
 
-    // Filtros baratos, sólo con lo que ya está en memoria: un atleta que no
-    // puede calificar a ninguno de los dos no cuesta una lectura más.
+    // Filtro barato, sólo con lo que ya está en memoria. Quien ya entrenó hoy no
+    // recibe nada: ni el «al límite» (racha u «hoy toca», que lo excluyen) ni el
+    // comeback (tendría `daysSinceLast = 0`).
     //
-    // Racha: tiene que haber cumplido la semana anterior con el objetivo que
-    // haría que hoy «le falten tantos como días quedan». Ese objetivo es
-    // `semana en curso + días que quedan`; si la semana anterior no llegó ni a
-    // eso, ninguna rutina posible lo pone en riesgo. Es una condición NECESARIA
-    // (la racha ≥ 1 exige `previousWeekCount >= objetivo`), calculada sin leer
-    // rutinas, y la decisión final se toma con el objetivo real.
-    const streakCandidate =
-      !activity.trainedToday &&
+    // El «al límite» puede ser racha (≥ 1) u «hoy toca» (racha 0), y cada uno
+    // tiene su condición NECESARIA barata:
+    //   - racha ≥ 1 exige haber cumplido la semana anterior con el objetivo que
+    //     hoy lo pondría al límite (`semana en curso + días que quedan`);
+    //   - «hoy toca» exige estar en movimiento (`isInMotion`; ver
+    //     `weekLimitPlanFor`).
+    // Si no cumple ninguna, no se leen rutinas: el inactivo sin racha sólo puede
+    // recibir el comeback, y el que pasó el tope del comeback ni se lee.
+    if (activity.trainedToday) continue;
+    const canBeStreak =
       activity.previousWeekCount >= activity.currentWeekCount + cal.daysLeft;
+    const limitCandidate = canBeStreak || isInMotion(activity);
     const comebackCandidate =
       activity.daysSinceLast >= COMEBACK_MIN_DAYS &&
       activity.daysSinceLast <= COMEBACK_MAX_DAYS;
-    if (!streakCandidate && !comebackCandidate) continue;
+    if (!limitCandidate && !comebackCandidate) continue;
 
     result.candidates++;
     try {
       const outcome = await planCandidate(ctx, uid, startsMs, activity, {
-        streakCandidate,
+        limitCandidate,
         comebackCandidate,
       });
 
       if (outcome.status === "planned") {
         result.planned++;
         if (outcome.kind === "streak-at-risk") result.plannedStreakAtRisk++;
+        else if (outcome.kind === "training-due") result.plannedTrainingDue++;
         else result.plannedComeback++;
         continue;
       }

@@ -47,7 +47,8 @@ export type NotificationKind =
   | "reaction"
   | "review"
   | "session-finished"
-  | "streak-at-risk";
+  | "streak-at-risk"
+  | "training-due";
 
 /** Input shape accepted by sendFcm. */
 export interface SendFcmInput {

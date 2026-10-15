@@ -7,6 +7,13 @@
  * hora. Lee el porqué del diseño, los horarios y el tope del "volvé a entrenar"
  * en la cabecera de ese archivo: acá sólo va lo propio del despachante.
  *
+ * Despacha los tres tipos de plan: `streak-at-risk` ("Hoy o se corta"),
+ * `training-due` ("Hoy toca entrenar") y `comeback-reminder` ("Te extrañamos").
+ * Todos pasan por el MISMO camino y las mismas reglas —no manda si el atleta
+ * arrancó cualquier sesión hoy, reserva en una transacción, tope de reintentos—;
+ * lo único que cambia por tipo es el texto (`reminderCopy`) y que el cooldown de
+ * 7 días y su marcador son sólo del comeback.
+ *
  * ─── Qué hace en cada tick ─────────────────────────────────────────────────
  *
  * 1. Antes de las 08:00 ART no hace nada, ni siquiera lee: ningún plan puede
@@ -24,7 +31,8 @@
  *       abandonada—, no manda NADA y borra el plan. Ni la racha (ya está
  *       entrenando) ni el "volvé a entrenar" (ya volvió). Un `sessionCountsAsWorkout`
  *       acá sería un error: una sesión en curso a las 18:05 es justo el atleta
- *       al que NO hay que escribirle.
+ *       al que NO hay que escribirle. Vale para los tres tipos: la racha y el
+ *       «hoy toca» ya están entrenando, el comeback ya volvió.
  *    c. Si no, RESERVA en una transacción (ver abajo) y manda con `sendFcm`.
  *    d. Si el envío falla, restaura los marcadores previos Y el plan, y el
  *       próximo tick reintenta.
@@ -45,9 +53,10 @@
  *   · y, sólo para el comeback, que haya pasado el cooldown de 7 días.
  *
  * Si todo pasa escribe `lastDailyReminderDate` (y `lastComebackReminderDate` si
- * es comeback) y borra el plan. Si algo falla por una razón terminal (opt-out,
- * ya enviado, cooldown, plan malformado) también borra el plan, para no
- * releerlo y reintentarlo en cada tick del resto del día.
+ * es comeback; la racha y el «hoy toca» NO tocan el cooldown) y borra el plan.
+ * Si algo falla por una razón terminal (opt-out, ya enviado, cooldown, plan
+ * malformado) también borra el plan, para no releerlo y reintentarlo en cada
+ * tick del resto del día.
  *
  * ⚠️  Queda una ventana entre el paso (a) y el envío: un atleta que arranca una
  * sesión JUSTO ahí recibe igual el push. No es un descuido de orden sino algo que
@@ -59,11 +68,14 @@
  *
  * ─── Reintentos ────────────────────────────────────────────────────────────
  *
- * Un envío fallido deja el plan en pie, así que se reintenta en cada tick hasta
- * que sale o se acaba el día. No hay tope de reintentos: cada uno cuesta una
- * query de sesiones, una transacción y el intento de envío. Un `sendFcm` que
- * tira de verdad (no un token muerto: eso lo absorbe `sendFcm`) significa FCM o
- * la red caídos, y ahí reintentar cada 15 minutos es lo correcto.
+ * Un envío fallido deja el plan en pie (con un contador `attempts`), así que se
+ * reintenta en el tick siguiente. El tope es {@link MAX_SEND_ATTEMPTS} = 3: al
+ * tercer fallo el plan se descarta y ese día no hay aviso. No es solo por costo
+ * (cada intento es una query de sesiones, una transacción y el envío): `sendFcm`
+ * escribe la fila del historial in-app ANTES de llamar a FCM, así que cada
+ * intento fallido deja una fila repetida en la campanita. Un `sendFcm` que tira
+ * de verdad (no un token muerto: eso lo absorbe `sendFcm`) significa FCM o la
+ * red caídos. Ver el punto «d.» en `dispatchOne`.
  *
  * ─── Planes viejos ─────────────────────────────────────────────────────────
  *
@@ -110,6 +122,7 @@ export interface DispatchDailyRemindersResult {
   /** Pushes despachados (`sendFcm` no tiró). */
   notified: number;
   notifiedStreakAtRisk: number;
+  notifiedTrainingDue: number;
   notifiedComeback: number;
   /** Planes de hoy que devolvió la query. */
   plans: number;
@@ -204,6 +217,10 @@ export function parseDailyReminderPlan(raw: unknown): DailyReminderPlan | null {
   if (kind === "streak-at-risk") {
     if (!isCount(plan.missing) || !isCount(plan.streakWeeks)) return null;
     return { date, kind, sendAtMinute, missing: plan.missing, streakWeeks: plan.streakWeeks };
+  }
+  if (kind === "training-due") {
+    if (!isCount(plan.missing)) return null;
+    return { date, kind, sendAtMinute, missing: plan.missing };
   }
   if (kind === "comeback-reminder") {
     if (!isCount(plan.daysSince)) return null;
@@ -313,9 +330,9 @@ async function dispatchOne(
     // marcado sin push, y sin el plan el próximo tick no tiene nada que reintentar.
     //
     // Pero con TOPE: `sendFcm` escribe la fila del historial in-app ANTES de
-    // llamar a FCM, así que cada intento fallido deja una fila "Hoy o se corta"
-    // en la campanita. Sin tope, una caída de FCM de una tarde eran hasta ~60
-    // filas iguales. Al [MAX_SEND_ATTEMPTS]-ésimo fallo el plan se descarta: ese
+    // llamar a FCM, así que cada intento fallido deja una fila del mismo
+    // recordatorio en la campanita. Sin tope, una caída de FCM de una tarde eran
+    // hasta ~60 filas iguales. Al [MAX_SEND_ATTEMPTS]-ésimo fallo el plan se descarta: ese
     // día no hay aviso, y los marcadores igual se restauran.
     const previous = claim.previousPlan as Record<string, unknown>;
     const attempts = (typeof previous.attempts === "number" ? previous.attempts : 0) + 1;
@@ -354,6 +371,7 @@ function tally(result: DispatchDailyRemindersResult, outcome: Outcome): void {
   if (outcome.status === "notified") {
     result.notified++;
     if (outcome.kind === "streak-at-risk") result.notifiedStreakAtRisk++;
+    else if (outcome.kind === "training-due") result.notifiedTrainingDue++;
     else result.notifiedComeback++;
     return;
   }
@@ -397,6 +415,7 @@ export async function dispatchDailyRemindersHandler(
   const result: DispatchDailyRemindersResult = {
     notified: 0,
     notifiedStreakAtRisk: 0,
+    notifiedTrainingDue: 0,
     notifiedComeback: 0,
     plans: 0,
     notDue: 0,

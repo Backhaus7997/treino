@@ -36,6 +36,7 @@ enum NotificationKind {
   review('review'),
   sessionFinished('session-finished'),
   streakAtRisk('streak-at-risk'),
+  trainingDue('training-due'),
   unknown('unknown');
 
   const NotificationKind(this.value);

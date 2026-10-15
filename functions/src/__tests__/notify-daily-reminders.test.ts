@@ -84,6 +84,7 @@ import {
   notifyDailyReminders,
   notifyDailyRemindersHandler,
   streakAtRiskCopy,
+  trainingDueCopy,
 } from "../notifications/notify-daily-reminders";
 
 // ─── Un Firestore de mentira con subcolecciones, queries y transacciones ──────
@@ -569,6 +570,29 @@ function lapsedAthlete(uid: string, clocks: string[], over: Doc = {}): Entries {
   return out;
 }
 
+/**
+ * Un atleta con un plan de [planDays] días que la semana anterior (4–10 de mayo)
+ * NO la cumplió: entrenó [clocks.length] < [planDays] veces, a las [clocks], con
+ * la última el domingo 10. Racha 0. Un MIÉRCOLES (WED) quedan 5 días y la semana
+ * en curso está vacía, así que con [planDays] = 5 está AL LÍMITE (faltan 5,
+ * quedan 5) y le toca el «hoy toca entrenar». La última sesión fue hace 3 días:
+ * todavía no es candidato al comeback.
+ */
+function unmetWeekAthlete(
+  uid: string,
+  clocks: string[],
+  planDays: number,
+  over: Doc = {},
+): Entries {
+  const n = clocks.length;
+  const out: Entries = [user(uid, over), assignedPlan(`plan-${uid}`, uid, planDays)];
+  clocks.forEach((clock, i) => {
+    const day = Math.round(4 + (6 * i) / (n - 1)); // 4..10
+    out.push(sessionAt(uid, `2026-05-${String(day).padStart(2, "0")}T${clock}:00`));
+  });
+  return out;
+}
+
 const hm = (clock: string): number => {
   const [h, m] = clock.split(":").map(Number);
   return h * 60 + m;
@@ -607,14 +631,16 @@ describe("streak-at-risk", () => {
   });
 
   it("no dispara con UN día de margen (faltan menos de los que quedan)", async () => {
-    // Objetivo 4, quedan 5: puede saltear hoy y llegar igual. Ni siquiera es
-    // candidato — la semana anterior (4) no llega a `0 + 5`.
+    // Objetivo 4, quedan 5: puede saltear hoy y llegar igual. Es candidato (el
+    // «al límite» no tiene pre-filtro por sesiones, ver la cabecera) pero el
+    // objetivo REAL lo descarta: no sale ni la racha ni el «hoy toca».
     createFake(seed(atRiskAthlete("u1", 4, 2)));
 
     const { planner } = await runDay(WED);
 
     expect(mockedSendFcm).not.toHaveBeenCalled();
-    expect(planner.candidates).toBe(0);
+    expect(planner.candidates).toBe(1);
+    expect(planner.skippedNotAtRisk).toBe(1);
   });
 
   it("no dispara si ya es imposible (faltan MÁS de los que quedan)", async () => {
@@ -650,8 +676,10 @@ describe("streak-at-risk", () => {
     );
   });
 
-  it("no dispara sin racha previa: la semana anterior no cumplió", async () => {
-    // Objetivo 5 (plan de 5 días) pero la semana pasada sólo hizo 4.
+  it("sin racha previa (la semana anterior no cumplió) NO es racha en riesgo: sale el «hoy toca»", async () => {
+    // Objetivo 5 (plan de 5 días) pero la semana pasada sólo hizo 4: está al
+    // límite hoy, pero no hay racha que sostener. Antes de `training-due` este
+    // atleta no recibía nada; ahora recibe el otro aviso, nunca éste.
     createFake(seed(
       [user("u1")],
       [assignedPlan("p", "u1", 5)],
@@ -660,8 +688,9 @@ describe("streak-at-risk", () => {
 
     const { planner } = await runDay(WED);
 
-    expect(mockedSendFcm).not.toHaveBeenCalled();
-    expect(planner.candidates).toBe(0);
+    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
+    expect(lastCall().kind).toBe("training-due");
+    expect(planner).toMatchObject({ plannedStreakAtRisk: 0, plannedTrainingDue: 1 });
   });
 
   it("EXCLUYE a quien ya completó una sesión HOY (fecha ART)", async () => {
@@ -889,6 +918,263 @@ describe("el objetivo sale de la rutina ACTIVA, con la cadena de tres niveles", 
   });
 });
 
+// ─── Hoy toca entrenar ────────────────────────────────────────────────────────
+
+const DUE_TITLE = "Hoy toca entrenar 💪";
+const DUE_BODY_5 =
+  "Te faltan 5 entrenamientos y quedan 5 días. Si arrancás hoy, llegás a tu objetivo de la semana.";
+const DUE_BODY_1 =
+  "Te falta 1 entrenamiento y hoy es el último día. Si entrenás hoy, llegás a tu objetivo de la semana.";
+
+describe("training-due: al límite, pero sin racha que sostener", () => {
+  it("racha 0 al límite: el plan es «hoy toca» a la hora habitual + 60 (~18:08 → 19:08)", async () => {
+    const fake = createFake(seed(unmetWeekAthlete("u1", EVENING, 5)));
+
+    const result = await notifyDailyRemindersHandler(app, WED);
+
+    expect(mockedSendFcm).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      planned: 1, plannedTrainingDue: 1, plannedStreakAtRisk: 0, plannedComeback: 0,
+    });
+    // Sin `streakWeeks`: este aviso no habla de racha.
+    expect(fake.user("u1").dailyReminderPlan).toEqual({
+      date: "2026-05-13",
+      kind: "training-due",
+      sendAtMinute: hm("19:08"),
+      missing: 5,
+    });
+    expect(fake.user("u1")).not.toHaveProperty("lastDailyReminderDate");
+    expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+  });
+
+  it("sin patrón claro sale a las 18:00", async () => {
+    // Cuatro sesiones separadas por tres horas: ninguna ventana de una hora junta 4.
+    const fake = createFake(seed(
+      unmetWeekAthlete("u1", ["07:00", "10:00", "13:00", "16:00"], 5),
+    ));
+
+    await notifyDailyRemindersHandler(app, WED);
+
+    expect(fake.user("u1").dailyReminderPlan).toMatchObject({
+      kind: "training-due",
+      sendAtMinute: 1080,
+    });
+  });
+
+  it.each([
+    ["el piso es 08:00 aunque entrene a las 06:15", ["06:00", "06:10", "06:20", "06:30"], 480],
+    ["el techo es 22:30 aunque entrene a las 22:05", ["21:50", "22:00", "22:10", "22:20"], 1350],
+  ])("%s", async (_name, clocks, minute) => {
+    const fake = createFake(seed(unmetWeekAthlete("u1", clocks, 5)));
+
+    await notifyDailyRemindersHandler(app, WED);
+
+    expect(fake.user("u1").dailyReminderPlan).toMatchObject({
+      kind: "training-due",
+      sendAtMinute: minute,
+    });
+  });
+
+  it("sale del despachante con el texto exacto, el deepLink y la preferencia", async () => {
+    const fake = createFake(seed(unmetWeekAthlete("u1", EVENING, 5)));
+
+    const { planner, dispatch } = await runDay(WED);
+
+    expect(planner.plannedTrainingDue).toBe(1);
+    expect(dispatch).toMatchObject({
+      notified: 1, notifiedTrainingDue: 1, notifiedStreakAtRisk: 0, notifiedComeback: 0,
+    });
+    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
+    expect(mockedSendFcm).toHaveBeenCalledWith(
+      app,
+      {
+        uids: ["u1"],
+        kind: "training-due",
+        notification: { title: DUE_TITLE, body: DUE_BODY_5 },
+        data: { deepLink: "/home" },
+        prefKey: DAILY_REMINDERS_PREF_KEY,
+      },
+      messaging,
+    );
+    // Marca el día, pero NO toca el cooldown del comeback.
+    expect(fake.user("u1").lastDailyReminderDate).toBe("2026-05-13");
+    expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+    expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
+  });
+
+  it("sin rutina y sin nada esta semana: el que dejó de entrenar recibe el comeback, no el «hoy toca»", async () => {
+    // Domingo 17/5. Sin rutina el objetivo es 1 y está «al límite», pero la única
+    // sesión fue el sábado 2/5 (15 días) y esta semana no hizo nada: no está en
+    // movimiento. Es terreno del comeback, con su tope de dos.
+    createFake(seed([user("u1")], [sessionAt("u1", "2026-05-02T12:00:00")]));
+
+    await runDay(SUN);
+
+    expect(lastCall()).toMatchObject({
+      kind: "comeback-reminder",
+      notification: { body: "Hace 15 días que no entrenás. ¿Arrancamos hoy?" },
+    });
+  });
+
+  it("singular con rutina: plan de 3 días, 2 hechos esta semana, domingo → falta 1", async () => {
+    createFake(seed(
+      [user("u1"), assignedPlan("p", "u1", 3)],
+      weekEndingSunday("u1", "2026-05-04", 2), // la semana anterior: 2 de 3, no cumplió
+      [sessionAt("u1", "2026-05-11T12:00:00"), sessionAt("u1", "2026-05-12T12:00:00")],
+    ));
+
+    await runDay(SUN);
+
+    expect(lastCall()).toMatchObject({
+      kind: "training-due",
+      notification: { body: DUE_BODY_1 },
+    });
+  });
+
+  it("la racha decide el tipo: racha ≥ 1 es streak-at-risk, racha 0 es training-due, nunca los dos", async () => {
+    // Mismo plan (5 días), misma semana en curso vacía, mismo miércoles. Lo único
+    // que cambia es la semana pasada: 5 sesiones (cumplió) contra 4 (no).
+    createFake(seed(
+      atRiskAthlete("con-racha", 5, 1),
+      unmetWeekAthlete("sin-racha", EVENING, 5),
+    ));
+
+    const { planner } = await runDay(WED);
+
+    expect(planner).toMatchObject({ planned: 2, plannedStreakAtRisk: 1, plannedTrainingDue: 1 });
+    expect(mockedSendFcm).toHaveBeenCalledTimes(2);
+    const kindByUid = Object.fromEntries(
+      mockedSendFcm.mock.calls.map((c) => [c[1].uids[0], c[1].kind]),
+    );
+    expect(kindByUid).toEqual({ "con-racha": "streak-at-risk", "sin-racha": "training-due" });
+  });
+
+  it.each([1, 2, 3, 4, 6, 7])(
+    "objetivo %i con la semana vacía un miércoles (quedan 5): no está al límite, no sale nada",
+    async (target) => {
+      const fake = createFake(seed(
+        [user("u1"), assignedPlan("p", "u1", target)],
+        [sessionAt("u1", "2026-05-10T12:00:00")],
+      ));
+
+      const { planner } = await runDay(WED);
+
+      expect(mockedSendFcm).not.toHaveBeenCalled();
+      expect(planner).toMatchObject({ candidates: 1, planned: 0, skippedNotAtRisk: 1 });
+      expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
+    },
+  );
+
+  it("si ya cumplió el objetivo de la semana no sale nada", async () => {
+    // Plan de 2 días, dos sesiones lun-mar: faltan 0.
+    createFake(seed(
+      [user("u1"), assignedPlan("p", "u1", 2)],
+      [sessionAt("u1", "2026-05-11T12:00:00"), sessionAt("u1", "2026-05-12T12:00:00")],
+    ));
+
+    const { planner } = await runDay(WED);
+
+    expect(mockedSendFcm).not.toHaveBeenCalled();
+    expect(planner.skippedNotAtRisk).toBe(1);
+  });
+
+  it("EXCLUYE a quien ya completó una sesión HOY, y no le lee las rutinas", async () => {
+    // Plan de 6 días, una sesión hoy a las 05:00: faltan 5 y quedan 5, o sea que
+    // SIN la exclusión por «entrenó hoy» le tocaría. La semana anterior no
+    // cumplió (racha 0).
+    const fake = createFake(seed(
+      unmetWeekAthlete("u1", EVENING, 6),
+      [sessionAt("u1", "2026-05-13T05:00:00")],
+    ));
+
+    const { planner } = await runDay(WED);
+
+    expect(mockedSendFcm).not.toHaveBeenCalled();
+    expect(planner.candidates).toBe(0);
+    expect(fake.queryLog.some((q) => q.scope === "routines")).toBe(false);
+  });
+
+  it("'hoy' es el día ART: una sesión de las 23:30 de ayer NO cuenta como hoy", async () => {
+    // Plan de 6, una sesión el martes a las 23:30 ART (02:30 UTC del miércoles):
+    // faltan 5 y quedan 5. Con día UTC este atleta quedaría excluido por error.
+    createFake(seed(
+      unmetWeekAthlete("u1", EVENING, 6),
+      [sessionAt("u1", "2026-05-12T23:30:00")],
+    ));
+
+    await runDay(WED);
+
+    expect(lastCall().kind).toBe("training-due");
+  });
+
+  it("le gana al comeback y NO consume su cooldown: el comeback sale al día siguiente", async () => {
+    // Plan de 4. La semana pasada no hizo nada (racha 0) y esta semana entrenó el
+    // lunes 11/5. El viernes 15/5 los dos califican: lleva 4 días sin entrenar
+    // (comeback) y está al límite y en movimiento (faltan 3, quedan 3).
+    const FRI = at("2026-05-15T06:00:00");
+    const SAT = at("2026-05-16T06:00:00");
+    const fake = createFake(seed(
+      [user("u1"), assignedPlan("p", "u1", 4)],
+      [sessionAt("u1", "2026-05-11T12:00:00")],
+    ));
+
+    const fri = await runDay(FRI);
+
+    expect(fri.planner).toMatchObject({ plannedTrainingDue: 1, plannedComeback: 0 });
+    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
+    expect(lastCall().kind).toBe("training-due");
+    expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+
+    // Sábado: quedan 2 y faltan 3, ya no está al límite. El comeback sigue
+    // disponible porque el «hoy toca» no corrió su cooldown.
+    const sat = await runDay(SAT);
+
+    expect(sat.planner).toMatchObject({ plannedComeback: 1, plannedTrainingDue: 0 });
+    expect(mockedSendFcm).toHaveBeenCalledTimes(2);
+    expect(lastCall()).toMatchObject({
+      kind: "comeback-reminder",
+      notification: { body: "Hace 5 días que no entrenás. ¿Arrancamos hoy?" },
+    });
+    expect(fake.user("u1").lastComebackReminderDate).toBe("2026-05-16");
+  });
+
+  it("un comeback enviado hace 2 días no lo frena: el cooldown es sólo del comeback", async () => {
+    createFake(seed(unmetWeekAthlete("u1", EVENING, 5, { lastComebackReminderDate: "2026-05-11" })));
+
+    await runDay(WED);
+
+    expect(lastCall().kind).toBe("training-due");
+  });
+
+  it.each<[string, Doc, string]>([
+    ["el opt-out", { notificationPrefs: { [DAILY_REMINDERS_PREF_KEY]: { push: false } } }, "skippedOptedOut"],
+    ["ya haberle mandado hoy", { lastDailyReminderDate: "2026-05-13" }, "skippedAlreadySent"],
+  ])("%s lo saltea antes de leer rutinas y no deja plan", async (_name, over, counter) => {
+    const fake = createFake(seed(unmetWeekAthlete("u1", EVENING, 5, over)));
+
+    const { planner } = await runDay(WED);
+
+    expect(mockedSendFcm).not.toHaveBeenCalled();
+    expect(planner).toMatchObject({ planned: 0, [counter]: 1 });
+    expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
+    expect(fake.queryLog.some((q) => q.scope === "routines")).toBe(false);
+  });
+
+  it("COSTO documentado: se leen las rutinas de todo atleta que no entrenó hoy, esté o no al límite", async () => {
+    // Plan de 3 días, miércoles vacío: no está al límite (faltan 3, quedan 5).
+    // Aun así hubo que leer la rutina para saberlo: no hay pre-filtro por sesiones
+    // (ver «Costo de lecturas» en la cabecera del planificador).
+    const fake = createFake(seed(
+      [user("u1"), assignedPlan("p", "u1", 3)],
+      [sessionAt("u1", "2026-05-10T12:00:00")],
+    ));
+
+    await notifyDailyRemindersHandler(app, WED);
+
+    expect(fake.queryLog.filter((q) => q.scope === "routines")).toHaveLength(2);
+  });
+});
+
 // ─── El plan que escribe el planificador ──────────────────────────────────────
 
 describe("el planificador (06:00): escribe el plan, no manda nada", () => {
@@ -1090,6 +1376,23 @@ async function sendTimes(planAt: Date): Promise<string[]> {
   return times;
 }
 
+/**
+ * Como `sendTimes`, pero de cada push devuelve [hora ART, uid, kind]: sirve
+ * cuando hay varios atletas o varios tipos el mismo día.
+ */
+async function sendLog(planAt: Date): Promise<Array<[string, string, string]>> {
+  await notifyDailyRemindersHandler(app, planAt);
+  const log: Array<[string, string, string]> = [];
+  for (let t = planAt.getTime(); t <= endOfDay(planAt).getTime(); t += 15 * MIN) {
+    const before = mockedSendFcm.mock.calls.length;
+    await dispatchDailyRemindersHandler(app, new Date(t), messaging);
+    for (const call of mockedSendFcm.mock.calls.slice(before)) {
+      log.push([clockOf(new Date(t)), call[1].uids[0], call[1].kind]);
+    }
+  }
+  return log;
+}
+
 describe("comeback-reminder", () => {
   it("se planifica a los 4 días ART, sale del despachante y escribe los dos marcadores", async () => {
     const fake = createFake(seed(
@@ -1125,7 +1428,10 @@ describe("comeback-reminder", () => {
     const { planner } = await runDay(WED);
 
     expect(mockedSendFcm).not.toHaveBeenCalled();
-    expect(planner.candidates).toBe(0);
+    // Es candidato al «al límite» (no entrenó hoy) y ahí se descarta: objetivo 1,
+    // faltan 1 y quedan 5. Pero comeback no: 3 días no alcanzan.
+    expect(planner.skippedNotAtRisk).toBe(1);
+    expect(planner.plannedComeback).toBe(0);
   });
 
   it("cuenta DÍAS CALENDARIO ART, no horas corridas", async () => {
@@ -1313,11 +1619,32 @@ describe("tope del comeback-reminder: día 4 y día 11, después silencio", () =
     // tiene racha de 1. El domingo 17/5 (día 8) es su última chance de
     // sostenerla. En total, del día 4 al 30: volvé (4), racha (8), volvé (11).
     await runDays(4, 30);
-    expect(mockedSendFcm.mock.calls.map((c) => [c[1].kind, c[1].notification.body])).toEqual([
+    // Sin el «hoy toca» (`training-due`): éste es el orden de la racha y del
+    // comeback, que es lo que este test fija. El «hoy toca» tiene el suyo abajo.
+    expect(
+      mockedSendFcm.mock.calls
+        .filter((c) => c[1].kind !== "training-due")
+        .map((c) => [c[1].kind, c[1].notification.body]),
+    ).toEqual([
       ["comeback-reminder", "Hace 4 días que no entrenás. ¿Arrancamos hoy?"],
       ["streak-at-risk", "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana."],
       ["comeback-reminder", "Hace 11 días que no entrenás. ¿Arrancamos hoy?"],
     ]);
+  });
+
+  it("a quien dejó de entrenar NO lo persigue el «hoy toca»: sólo los dos comeback", async () => {
+    // Sin rutina (objetivo 1) el día «al límite» es el domingo: 24/5, 31/5 y
+    // 7/6 (días 15, 22 y 29 desde el 9/5), todos con racha 0. Pero ya lleva 4+
+    // días sin entrenar: es terreno del comeback, que tiene tope de dos. Antes
+    // de la guarda de actividad le llegaban esos tres «hoy toca» de más.
+    await runDays(4, 30);
+
+    expect(
+      mockedSendFcm.mock.calls.filter((c) => c[1].kind === "training-due"),
+    ).toHaveLength(0);
+    expect(
+      mockedSendFcm.mock.calls.filter((c) => c[1].kind === "comeback-reminder"),
+    ).toHaveLength(2);
   });
 
   it("día 17 todavía dispara, día 18 ya no (y no cuesta lecturas)", async () => {
@@ -1330,7 +1657,9 @@ describe("tope del comeback-reminder: día 4 y día 11, después silencio", () =
 
     expect(mockedSendFcm).toHaveBeenCalledTimes(1);
     expect(mockedSendFcm.mock.calls[0][1].uids).toEqual(["d17"]);
-    expect(planner.candidates).toBe(1);
+    // El del día 18 está inactivo, no puede tener racha y pasó el tope del
+    // comeback: ni siquiera es candidato (no se lee su doc ni sus rutinas).
+    expect(planner).toMatchObject({ candidates: 1, plannedComeback: 1 });
   });
 
   it("al volver a entrenar, la cuenta arranca de nuevo", async () => {
@@ -1495,6 +1824,9 @@ const STREAK_PLAN: Doc = {
 const COMEBACK_PLAN: Doc = {
   date: TODAY, kind: "comeback-reminder", sendAtMinute: 540, daysSince: 4,
 };
+const TRAINING_DUE_PLAN: Doc = {
+  date: TODAY, kind: "training-due", sendAtMinute: 1080, missing: 5,
+};
 
 /** Un atleta que ya tiene su plan del día escrito, como lo deja el planificador. */
 const planned = (uid: string, plan: Doc = STREAK_PLAN, over: Doc = {}): Entries =>
@@ -1560,6 +1892,38 @@ describe("dispatchDailyReminders", () => {
         title: "Hoy o se corta 🔥",
         body: "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana.",
       });
+    });
+
+    it("el «hoy toca»: texto exacto, el marcador del día y NO el del comeback", async () => {
+      const fake = createFake(seed(planned("u1", TRAINING_DUE_PLAN)));
+
+      const result = await tickAt("18:15");
+
+      expect(result).toMatchObject({
+        plans: 1, notified: 1, notifiedTrainingDue: 1, notifiedStreakAtRisk: 0, notifiedComeback: 0,
+      });
+      expect(mockedSendFcm).toHaveBeenCalledWith(
+        app,
+        {
+          uids: ["u1"],
+          kind: "training-due",
+          notification: { title: DUE_TITLE, body: DUE_BODY_5 },
+          data: { deepLink: "/home" },
+          prefKey: DAILY_REMINDERS_PREF_KEY,
+        },
+        messaging,
+      );
+      expect(fake.user("u1").lastDailyReminderDate).toBe(TODAY);
+      expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+      expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
+    });
+
+    it("el «hoy toca» concuerda en singular: 'Te falta 1 entrenamiento y hoy es el último día'", async () => {
+      createFake(seed(planned("u1", { ...TRAINING_DUE_PLAN, missing: 1 })));
+
+      await tickAt("18:15");
+
+      expect(lastCall().notification).toEqual({ title: DUE_TITLE, body: DUE_BODY_1 });
     });
 
     it("el comeback: texto exacto y los dos marcadores", async () => {
@@ -1654,6 +2018,7 @@ describe("dispatchDailyReminders", () => {
 
   describe.each<[string, Doc]>([
     ["racha", STREAK_PLAN],
+    ["hoy toca", TRAINING_DUE_PLAN],
     ["comeback", COMEBACK_PLAN],
   ])("si el atleta arrancó una sesión HOY, no manda el plan de %s", (_label, plan) => {
     it.each(sessionStates)("sesión %s: no manda, borra el plan y no gasta marcadores", async (_state, over) => {
@@ -1764,15 +2129,16 @@ describe("dispatchDailyReminders", () => {
       expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
     });
 
-    it("el cooldown del comeback pasa a los 7 días justos, y no aplica al plan de racha", async () => {
+    it("el cooldown del comeback pasa a los 7 días justos y no aplica a la racha ni al «hoy toca»", async () => {
       createFake(seed(
         planned("siete", COMEBACK_PLAN, { lastComebackReminderDate: "2026-05-06" }),
         planned("racha", STREAK_PLAN, { lastComebackReminderDate: TODAY }),
+        planned("hoy-toca", TRAINING_DUE_PLAN, { lastComebackReminderDate: TODAY }),
       ));
 
       const result = await tickAt("18:15");
 
-      expect(result.notified).toBe(2);
+      expect(result.notified).toBe(3);
     });
 
     it("si otro tick (o el planificador) consumió el plan, no manda: skippedPlanGone", async () => {
@@ -1827,6 +2193,11 @@ describe("dispatchDailyReminders", () => {
       ["missing no es un número", { ...STREAK_PLAN, missing: "5" }],
       ["missing es 0", { ...STREAK_PLAN, missing: 0 }],
       ["streakWeeks fraccionario", { ...STREAK_PLAN, streakWeeks: 1.5 }],
+      ["«hoy toca»: missing no es un número", { ...TRAINING_DUE_PLAN, missing: "5" }],
+      ["«hoy toca»: missing es 0", { ...TRAINING_DUE_PLAN, missing: 0 }],
+      ["«hoy toca»: missing negativo", { ...TRAINING_DUE_PLAN, missing: -2 }],
+      ["«hoy toca»: missing fraccionario", { ...TRAINING_DUE_PLAN, missing: 1.5 }],
+      ["«hoy toca»: missing falta", { date: TODAY, kind: "training-due", sendAtMinute: 1080 }],
       ["daysSince es 0", { ...COMEBACK_PLAN, daysSince: 0 }],
       ["daysSince falta", { date: TODAY, kind: "comeback-reminder", sendAtMinute: 540 }],
       ["kind desconocido", { ...STREAK_PLAN, kind: "otro" }],
@@ -1864,6 +2235,11 @@ describe("dispatchDailyReminders", () => {
     it("parseDailyReminderPlan devuelve sólo los campos conocidos", () => {
       expect(parseDailyReminderPlan({ ...STREAK_PLAN, extra: "<script>" })).toEqual(STREAK_PLAN);
       expect(parseDailyReminderPlan({ ...COMEBACK_PLAN, extra: 1 })).toEqual(COMEBACK_PLAN);
+      // El «hoy toca» no lleva `streakWeeks`: si alguien lo escribe a mano, se descarta.
+      expect(parseDailyReminderPlan({ ...TRAINING_DUE_PLAN, extra: "x", streakWeeks: 3 }))
+        .toEqual(TRAINING_DUE_PLAN);
+      expect(parseDailyReminderPlan({ ...TRAINING_DUE_PLAN, missing: 1 }))
+        .toEqual({ ...TRAINING_DUE_PLAN, missing: 1 });
       expect(parseDailyReminderPlan(null)).toBeNull();
       expect(parseDailyReminderPlan("plan")).toBeNull();
       expect(parseDailyReminderPlan(undefined)).toBeNull();
@@ -2239,6 +2615,17 @@ describe("si el envío falla", () => {
     expect(fake.user("u1").dailyReminderPlan).toMatchObject({ kind: "streak-at-risk" });
   });
 
+  it("en el «hoy toca» restaura sólo el marcador diario y no inventa el del comeback", async () => {
+    const fake = await planFor(seed(unmetWeekAthlete("u1", EVENING, 5)));
+    mockedSendFcm.mockRejectedValueOnce(new Error("FCM caído"));
+
+    await dispatchDailyRemindersHandler(app, endOfDay(WED), messaging);
+
+    expect(fake.user("u1")).not.toHaveProperty("lastDailyReminderDate");
+    expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+    expect(fake.user("u1").dailyReminderPlan).toMatchObject({ kind: "training-due", attempts: 1 });
+  });
+
   it("un atleta que falla no frena a los demás", async () => {
     await planFor(seed(
       [user("a")], [sessionAt("a", "2026-05-09T12:00:00")],
@@ -2405,11 +2792,59 @@ describe("de punta a punta: el planificador a las 06:00 y el despachante cada 15
 
     expect(sentTo).toEqual([["18:00", "sinpatron"], ["19:15", "tarde"]]);
   });
+
+  it("hoy toca: con horario habitual ~18:08 el aviso sale en el primer tick desde las 19:08 (19:15)", async () => {
+    const fake = createFake(seed(unmetWeekAthlete("u1", EVENING, 5)));
+
+    expect(await sendLog(WED)).toEqual([["19:15", "u1", "training-due"]]);
+    expect(mockedSendFcm).toHaveBeenCalledTimes(1);
+    expect(lastCall().notification).toEqual({ title: DUE_TITLE, body: DUE_BODY_5 });
+    expect(fake.user("u1").lastDailyReminderDate).toBe("2026-05-13");
+    expect(fake.user("u1")).not.toHaveProperty("lastComebackReminderDate");
+  });
+
+  it("hoy toca: sin patrón claro sale en el tick de las 18:00", async () => {
+    createFake(seed(unmetWeekAthlete("u1", ["07:00", "10:00", "13:00", "16:00"], 5)));
+
+    expect(await sendLog(WED)).toEqual([["18:00", "u1", "training-due"]]);
+  });
+
+  it("hoy toca: si entrena a media tarde (en curso) no le llega nada en todo el día", async () => {
+    const fake = createFake(seed(
+      unmetWeekAthlete("u1", EVENING, 5),
+      [sessionAt("u1", "2026-05-13T15:00:00", { status: "active", wasFullyCompleted: false })],
+    ));
+
+    expect(await sendLog(WED)).toEqual([]);
+    expect(fake.user("u1")).not.toHaveProperty("dailyReminderPlan");
+    expect(fake.user("u1")).not.toHaveProperty("lastDailyReminderDate");
+  });
+
+  it("racha y «hoy toca» el mismo día: uno por atleta, cada uno a SU hora", async () => {
+    createFake(seed(
+      atRiskAthlete("racha", 5, 1), // entrena a las 12:00 → 13:00
+      unmetWeekAthlete("hoy-toca", EVENING, 5), // ~18:08 → 19:08
+    ));
+
+    expect(await sendLog(WED)).toEqual([
+      ["13:00", "racha", "streak-at-risk"],
+      ["19:15", "hoy-toca", "training-due"],
+    ]);
+  });
 });
 
 // ─── Copy ─────────────────────────────────────────────────────────────────────
 
 describe("copy", () => {
+  it.each([
+    [1, DUE_BODY_1],
+    [2, "Te faltan 2 entrenamientos y quedan 2 días. Si arrancás hoy, llegás a tu objetivo de la semana."],
+    [5, DUE_BODY_5],
+    [7, "Te faltan 7 entrenamientos y quedan 7 días. Si arrancás hoy, llegás a tu objetivo de la semana."],
+  ])("trainingDueCopy(%i)", (missing, body) => {
+    expect(trainingDueCopy(missing)).toEqual({ title: DUE_TITLE, body });
+  });
+
   it.each([
     [1, 1, "Te falta 1 entrenamiento esta semana para sostener tu racha de 1 semana."],
     [1, 2, "Te falta 1 entrenamiento esta semana para sostener tu racha de 2 semanas."],

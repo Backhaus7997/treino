@@ -47,9 +47,11 @@
  *
  * ─── Del horario habitual a la hora del recordatorio ───────────────────────
  *
- *   · Racha en riesgo: habitual + {@link STREAK_REMINDER_OFFSET_MINUTES} (llega
- *     una hora DESPUÉS de cuando suele entrenar: si no se colgó, ya lo hizo y el
- *     despachante no manda nada). Sin patrón: 18:00.
+ *   · Racha en riesgo y «hoy toca entrenar» (`training-due`): habitual +
+ *     {@link STREAK_REMINDER_OFFSET_MINUTES} (llega una hora DESPUÉS de cuando
+ *     suele entrenar: si no se colgó, ya lo hizo y el despachante no manda
+ *     nada). Sin patrón: 18:00. Los dos usan la misma función,
+ *     {@link streakSendMinute}.
  *   · Volver a entrenar: habitual + {@link COMEBACK_REMINDER_OFFSET_MINUTES} (a
  *     la hora a la que suele entrenar). Sin patrón: 09:00.
  *   · Los dos quedan acotados a [{@link REMINDER_MIN_MINUTE},
@@ -185,7 +187,7 @@ export function clampReminderMinute(minute: number): number {
   return Math.min(REMINDER_MAX_MINUTE, Math.max(REMINDER_MIN_MINUTE, minute));
 }
 
-/** Minuto del día ART al que sale el aviso de racha en riesgo. */
+/** Minuto del día ART al que sale el aviso de racha en riesgo y el de «hoy toca entrenar». */
 export function streakSendMinute(habitualMinute: number | null): number {
   if (habitualMinute === null) return STREAK_REMINDER_FALLBACK_MINUTE;
   return clampReminderMinute(habitualMinute + STREAK_REMINDER_OFFSET_MINUTES);
