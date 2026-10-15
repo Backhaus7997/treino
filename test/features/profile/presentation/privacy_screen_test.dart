@@ -22,6 +22,8 @@ import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/application/correos_promocionales_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
+import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/profile/presentation/privacy_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -54,6 +56,22 @@ class _ToggleEspia {
 
 const _llaveCorreos = ValueKey('privacy-promo-emails-switch');
 const _llaveAnalitica = ValueKey('privacy-analytics-switch');
+const _llaveRecordatorios = ValueKey('privacy-training-reminders-switch');
+
+/// El perfil del usuario logueado, con el [rol] dado. Es lo único que la
+/// pantalla mira del perfil: decide si se dibuja la tarjeta de recordatorios.
+UserProfile _perfil(UserRole rol) => UserProfile(
+      uid: _uid,
+      email: 'ana@example.com',
+      displayName: 'Ana',
+      role: rol,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+
+/// El stream de `userProfileProvider` para un [rol] ya resuelto.
+Stream<UserProfile?> _comoAtleta() =>
+    Stream<UserProfile?>.value(_perfil(UserRole.athlete));
 
 Switch _switch(WidgetTester tester, Key key) =>
     tester.widget<Switch>(find.byKey(key));
@@ -98,6 +116,11 @@ Future<void> _montar(
   // esta barra como `bottomNavigationBar`, así la barra queda ENCIMA del cuerpo
   // y el `Scaffold` publica su alto en `padding.bottom`.
   Widget? barraFlotante,
+  // El stream de `userProfileProvider`. Sin él NO se pisa el provider real, que
+  // contra un repo mock queda en error: el rol es desconocido y la tarjeta de
+  // recordatorios (sólo atleta, falla cerrado) no se dibuja. Es el estado en el
+  // que corrían todos los tests anteriores a esa tarjeta.
+  Stream<UserProfile?>? perfil,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -115,6 +138,7 @@ Future<void> _montar(
         authStateChangesProvider
             .overrideWith((_) => auth ?? Stream.value(_MockUser())),
         userRepositoryProvider.overrideWithValue(repo),
+        if (perfil != null) userProfileProvider.overrideWith((_) => perfil),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -142,6 +166,9 @@ Future<void> _montar(
   // pase de «sin sesión» a escuchar el documento.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 500));
+  // El rol llega por OTRO stream, y recién con él se arma el provider de
+  // recordatorios: un ciclo más para que ese segundo listener emita.
+  if (perfil != null) await _alDocumento(tester);
 }
 
 void main() {
@@ -673,6 +700,523 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Recordatorios de entrenamiento: SÓLO el atleta ve la tarjeta. La pantalla
+  // también la abre el PF (desde `TrainerProfileView`) y a él los recordatorios
+  // de racha no le llegan nunca: un interruptor que apaga algo que no recibe es
+  // un control que miente. Falla CERRADO: sin rol conocido, no se dibuja.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — recordatorios de entrenamiento, quién la ve', () {
+    late _MockUserRepository repo;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+      when(() => repo.watchRecordatoriosEntrenamiento(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+    });
+
+    testWidgets('un ATLETA la ve: tres interruptores, el tercero es el nuevo',
+        (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      expect(find.byType(Switch), findsNWidgets(3));
+      expect(find.byKey(_llaveRecordatorios), findsOneWidget);
+      expect(find.text('Recordatorios de entrenamiento'), findsOneWidget);
+    });
+
+    testWidgets('un PF NO la ve, y ni siquiera se abre su listener',
+        (tester) async {
+      await _montar(
+        tester,
+        repo: repo,
+        perfil: Stream<UserProfile?>.value(_perfil(UserRole.trainer)),
+      );
+
+      expect(find.byKey(_llaveRecordatorios), findsNothing);
+      expect(find.byType(Switch), findsNWidgets(2));
+      verifyNever(() => repo.watchRecordatoriosEntrenamiento(any()));
+      // Las otras dos tarjetas siguen siendo las de siempre.
+      expect(find.byKey(_llaveAnalitica), findsOneWidget);
+      expect(find.byKey(_llaveCorreos), findsOneWidget);
+    });
+
+    testWidgets('mientras el perfil CARGA no se dibuja (falla cerrado)',
+        (tester) async {
+      // Un stream que no emite: el rol es «no sé», y «no sé» no es «atleta».
+      final sinRespuesta = StreamController<UserProfile?>();
+      addTearDown(sinRespuesta.close);
+      await _montar(tester, repo: repo, perfil: sinRespuesta.stream);
+
+      expect(find.byKey(_llaveRecordatorios), findsNothing);
+      verifyNever(() => repo.watchRecordatoriosEntrenamiento(any()));
+
+      // Y cuando llega el perfil de un atleta, aparece.
+      sinRespuesta.add(_perfil(UserRole.athlete));
+      await _alDocumento(tester);
+      await _alDocumento(tester);
+      expect(find.byKey(_llaveRecordatorios), findsOneWidget);
+    });
+
+    testWidgets('sin perfil (null) tampoco se dibuja', (tester) async {
+      await _montar(
+        tester,
+        repo: repo,
+        perfil: Stream<UserProfile?>.value(null),
+      );
+
+      expect(find.byKey(_llaveRecordatorios), findsNothing);
+      verifyNever(() => repo.watchRecordatoriosEntrenamiento(any()));
+    });
+
+    testWidgets(
+        'va DESPUÉS de la de correos: las dos son de la cuenta y la frase de '
+        '«este dispositivo» queda pegada a la analítica', (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      final l10n = AppL10n.of(tester.element(find.byType(PrivacyScreen)));
+
+      final yCrash =
+          tester.getTopLeft(find.text(l10n.privacyAnalyticsCrashNote)).dy;
+      final yCorreos = tester.getTopLeft(find.byKey(_llaveCorreos)).dy;
+      final yRecordatorios =
+          tester.getTopLeft(find.byKey(_llaveRecordatorios)).dy;
+
+      expect(yCrash, lessThan(yCorreos));
+      expect(yCorreos, lessThan(yRecordatorios));
+      expect(
+        l10n.privacyTrainingRemindersSubtitle,
+        isNot(anyOf(contains('dispositivo'), contains('Coach Hub'))),
+        reason: 'es una preferencia de la CUENTA, no de este dispositivo',
+      );
+    });
+
+    testWidgets('el copy es el de es_AR', (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      expect(find.text('Recordatorios de entrenamiento'), findsOneWidget);
+      expect(
+        find.text(
+          'Te avisamos si tu racha está en riesgo o si hace días que no '
+          'entrenás.',
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Contra Firestore (fake): lo que el atleta ve sale del documento de verdad,
+  // y apagarlo escribe `notificationPrefs.recordatorios_entrenamiento.push`.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — recordatorios de entrenamiento, contra el documento',
+      () {
+    late FakeFirebaseFirestore firestore;
+    late UserRepository repo;
+
+    setUp(() {
+      firestore = FakeFirebaseFirestore();
+      repo = UserRepository(
+        firestore: firestore,
+        gyms: GymRepository(firestore: firestore),
+      );
+    });
+
+    Future<void> sembrar(Map<String, Object?> extra) => firestore
+        .collection('users')
+        .doc(_uid)
+        .set(<String, Object?>{'uid': _uid, ...extra});
+
+    testWidgets('campo ausente → PRENDIDO (igual que el servidor)',
+        (tester) async {
+      await sembrar({});
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      final sw = _switch(tester, _llaveRecordatorios);
+      expect(sw.value, isTrue);
+      expect(sw.onChanged, isNotNull,
+          reason: 'ya leyó: tiene que poder tocarse');
+    });
+
+    testWidgets('push: false → APAGADO', (tester) async {
+      await sembrar({
+        'notificationPrefs': {
+          'recordatorios_entrenamiento': {'push': false},
+        },
+      });
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      final sw = _switch(tester, _llaveRecordatorios);
+      expect(sw.value, isFalse);
+      expect(sw.onChanged, isNotNull);
+    });
+
+    testWidgets(
+        'apagarlo escribe el MAPA ANIDADO del canal push con merge y no pisa '
+        'el resto del documento', (tester) async {
+      await sembrar({
+        'displayName': 'Ana',
+        'notificationPrefs': {
+          'mensaje_nuevo': {'push': true, 'email': false},
+          'novedades_plan': {'email': false},
+        },
+      });
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final data = (await firestore.collection('users').doc(_uid).get()).data();
+      expect(
+        data,
+        equals({
+          'uid': _uid,
+          'displayName': 'Ana',
+          'notificationPrefs': {
+            'mensaje_nuevo': {'push': true, 'email': false},
+            // Los correos que el atleta ya había apagado siguen apagados.
+            'novedades_plan': {'email': false},
+            'recordatorios_entrenamiento': {'push': false},
+          },
+        }),
+      );
+      // Y la pantalla lo muestra: el switch lee del documento, no de un
+      // estado local.
+      expect(_switch(tester, _llaveRecordatorios).value, isFalse);
+      // …sin arrastrar al de correos, que es otra preferencia.
+      expect(_switch(tester, _llaveCorreos).value, isFalse);
+    });
+
+    testWidgets('volver a prenderlo escribe true explícito', (tester) async {
+      await sembrar({
+        'notificationPrefs': {
+          'recordatorios_entrenamiento': {'push': false},
+        },
+      });
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final data = (await firestore.collection('users').doc(_uid).get()).data();
+      expect(
+        (data!['notificationPrefs'] as Map)['recordatorios_entrenamiento'],
+        {'push': true},
+      );
+      expect(_switch(tester, _llaveRecordatorios).value, isTrue);
+    });
+
+    testWidgets(
+        'si la escritura falla: avisa con un snackbar y el switch queda en el '
+        'valor real', (tester) async {
+      await sembrar({});
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      expect(_switch(tester, _llaveRecordatorios).value, isTrue);
+
+      whenCalling(Invocation.method(#set, null))
+          .on(firestore.collection('users').doc(_uid))
+          .thenThrow(FirebaseException(
+            plugin: 'cloud_firestore',
+            code: 'permission-denied',
+          ));
+
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.text('No pudimos guardar el cambio. Intentá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(
+        _switch(tester, _llaveRecordatorios).value,
+        isTrue,
+        reason: 'no se guardó nada: el valor real sigue siendo «prendido»',
+      );
+      final data = (await firestore.collection('users').doc(_uid).get()).data();
+      expect(data, equals({'uid': _uid}));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Contra un repo controlable: los estados que Firestore fake no da (cargando,
+  // error), el rebote optimista y el cambio de cuenta. Las reglas son las de la
+  // tarjeta de correos —«no sé» no es «sí»—, porque comparten el mismo guardado.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — recordatorios de entrenamiento, estados sin respuesta',
+      () {
+    late _MockUserRepository repo;
+    late StreamController<bool> doc;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      doc = StreamController<bool>.broadcast();
+      addTearDown(doc.close);
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+      when(() => repo.watchRecordatoriosEntrenamiento(any()))
+          .thenAnswer((_) => doc.stream);
+      when(() => repo.setRecordatoriosEntrenamiento(any(), any()))
+          .thenAnswer((_) async {});
+      when(() => repo.setCorreosPromocionales(any(), any()))
+          .thenAnswer((_) async {});
+    });
+
+    testWidgets('CARGANDO → deshabilitado, y tocarlo no escribe nada',
+        (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      // El stream del documento todavía no emitió.
+
+      final sw = _switch(tester, _llaveRecordatorios);
+      expect(sw.onChanged, isNull,
+          reason: '«no sé» no es «sí»: sin lectura no se puede accionar');
+      expect(sw.value, isFalse,
+          reason: 'y tampoco puede mostrarse PRENDIDO mientras carga');
+
+      await tester.tap(find.byKey(_llaveRecordatorios), warnIfMissed: false);
+      await tester.pump();
+      verifyNever(() => repo.setRecordatoriosEntrenamiento(any(), any()));
+    });
+
+    testWidgets('ERROR de lectura → deshabilitado', (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      doc.addError(FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      ));
+      await _alDocumento(tester);
+
+      expect(_switch(tester, _llaveRecordatorios).onChanged, isNull);
+      verifyNever(() => repo.setRecordatoriosEntrenamiento(any(), any()));
+    });
+
+    testWidgets('sin respuesta, el lector de pantalla NO oye «apagado»',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+
+      final sinRespuesta = tester.getSemantics(find.byKey(_llaveRecordatorios));
+      expect(
+        sinRespuesta.getSemanticsData().flagsCollection.isToggled,
+        Tristate.none,
+        reason: 'un switch que no leyó su valor no puede anunciar «apagado»',
+      );
+      expect(sinRespuesta.getSemanticsData().flagsCollection.isEnabled,
+          Tristate.isFalse);
+
+      doc.add(false);
+      await _alDocumento(tester);
+
+      final conRespuesta = tester.getSemantics(find.byKey(_llaveRecordatorios));
+      expect(
+        conRespuesta.getSemanticsData().flagsCollection.isToggled,
+        Tristate.isFalse,
+        reason: 'ya leyó `false`: ahora sí es «apagado»',
+      );
+      handle.dispose();
+    });
+
+    testWidgets(
+        'tocar el switch llama al repo de RECORDATORIOS con el valor NUEVO y '
+        'el uid, y no toca el de correos', (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      doc.add(true);
+      await _alDocumento(tester);
+
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump();
+      verify(() => repo.setRecordatoriosEntrenamiento(_uid, false)).called(1);
+
+      // Y de vuelta: el valor que llega por el stream es ahora `false`.
+      doc.add(false);
+      await _alDocumento(tester);
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump();
+      verify(() => repo.setRecordatoriosEntrenamiento(_uid, true)).called(1);
+
+      verifyNever(() => repo.setCorreosPromocionales(any(), any()));
+    });
+
+    testWidgets('tocar el de correos NO escribe recordatorios', (tester) async {
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      doc.add(true);
+      await _alDocumento(tester);
+
+      await tester.tap(find.byKey(_llaveCorreos));
+      await tester.pump();
+
+      verify(() => repo.setCorreosPromocionales(_uid, false)).called(1);
+      verifyNever(() => repo.setRecordatoriosEntrenamiento(any(), any()));
+    });
+
+    testWidgets(
+        'falla de escritura con rebote de la caché: snackbar y el switch '
+        'VUELVE al valor real', (tester) async {
+      // Lo que hace el SDK real: aplica la escritura en la caché local y el
+      // stream emite el valor nuevo al instante; cuando el servidor la
+      // rechaza, la deshace y re-emite el valor de verdad.
+      when(() => repo.setRecordatoriosEntrenamiento(any(), any()))
+          .thenAnswer((inv) async {
+        doc.add(inv.positionalArguments[1] as bool);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        doc.add(!(inv.positionalArguments[1] as bool));
+        throw FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'permission-denied',
+        );
+      });
+      await _montar(tester, repo: repo, perfil: _comoAtleta());
+      doc.add(true);
+      await _alDocumento(tester);
+      expect(_switch(tester, _llaveRecordatorios).value, isTrue);
+
+      await tester.tap(find.byKey(_llaveRecordatorios));
+      await tester.pump(); // el stream emite `false` (optimista)
+      expect(_switch(tester, _llaveRecordatorios).value, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 100)); // rebote + error
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.text('No pudimos guardar el cambio. Intentá de nuevo.'),
+        findsOneWidget,
+      );
+      expect(_switch(tester, _llaveRecordatorios).value, isTrue);
+    });
+
+    group('cambio de cuenta', () {
+      late StreamController<User?> auth;
+      late StreamController<bool> docA;
+      late StreamController<bool> docB;
+
+      setUp(() {
+        auth = StreamController<User?>.broadcast();
+        docA = StreamController<bool>.broadcast();
+        docB = StreamController<bool>.broadcast();
+        addTearDown(auth.close);
+        addTearDown(docA.close);
+        addTearDown(docB.close);
+        when(() => repo.watchRecordatoriosEntrenamiento('uid-a'))
+            .thenAnswer((_) => docA.stream);
+        when(() => repo.watchRecordatoriosEntrenamiento('uid-b'))
+            .thenAnswer((_) => docB.stream);
+      });
+
+      testWidgets(
+          'mientras carga el documento del uid NUEVO: deshabilitado y sin '
+          'escribir; después escribe sobre el uid nuevo', (tester) async {
+        await _montar(
+          tester,
+          repo: repo,
+          auth: auth.stream,
+          perfil: _comoAtleta(),
+        );
+        auth.add(_MockUser('uid-a'));
+        await _alDocumento(tester);
+        docA.add(true);
+        await _alDocumento(tester);
+        expect(_switch(tester, _llaveRecordatorios).onChanged, isNotNull);
+
+        auth.add(_MockUser('uid-b'));
+        await _alDocumento(tester);
+
+        // El provider arrastra el valor de A mientras carga B.
+        expect(_switch(tester, _llaveRecordatorios).onChanged, isNull);
+        await tester.tap(find.byKey(_llaveRecordatorios), warnIfMissed: false);
+        await tester.pump();
+        verifyNever(() => repo.setRecordatoriosEntrenamiento(any(), any()));
+
+        // Llega el documento de B —apagado— y recién ahí se puede tocar.
+        docB.add(false);
+        await _alDocumento(tester);
+        final sw = _switch(tester, _llaveRecordatorios);
+        expect(sw.onChanged, isNotNull);
+        expect(sw.value, isFalse, reason: 'el valor es el de B, no el de A');
+
+        await tester.tap(find.byKey(_llaveRecordatorios));
+        await tester.pump();
+        verify(() => repo.setRecordatoriosEntrenamiento('uid-b', true))
+            .called(1);
+        verifyNever(() => repo.setRecordatoriosEntrenamiento('uid-a', any()));
+      });
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Con la tarjeta de recordatorios, la pantalla tiene tres: el scroll y el
+  // margen inferior siguen valiendo.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('PrivacyScreen — con tres tarjetas, el scroll alcanza la última', () {
+    late _MockUserRepository repo;
+
+    setUp(() {
+      repo = _MockUserRepository();
+      when(() => repo.watchCorreosPromocionales(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+      when(() => repo.watchRecordatoriosEntrenamiento(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
+    });
+
+    testWidgets(
+        'con el texto del sistema al máximo y una pantalla chica no '
+        'desborda: la tarjeta de recordatorios se alcanza', (tester) async {
+      await _montar(
+        tester,
+        repo: repo,
+        perfil: _comoAtleta(),
+        size: const Size(320, 480),
+        textScale: 2.0,
+      );
+
+      await tester.scrollUntilVisible(
+        find.byKey(_llaveRecordatorios),
+        200,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(_llaveRecordatorios), findsOneWidget);
+    });
+
+    testWidgets(
+        'al final del scroll la última línea queda POR ENCIMA de la barra '
+        'flotante del shell', (tester) async {
+      await _calentarFuentes(tester);
+      const barraKey = ValueKey('barra-flotante-del-shell');
+      const altoBarra = 100.0;
+      await _montar(
+        tester,
+        repo: repo,
+        perfil: _comoAtleta(),
+        size: const Size(390, 700),
+        textScale: 3.0,
+        barraFlotante: const SizedBox(key: barraKey, height: altoBarra),
+      );
+      final l10n = AppL10n.of(tester.element(find.byType(PrivacyScreen)));
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -5000),
+      );
+      await tester.pumpAndSettle();
+
+      final finDelTexto = tester
+          .getBottomLeft(find.text(l10n.privacyTrainingRemindersSubtitle))
+          .dy;
+      final topeDeLaBarra = tester.getTopLeft(find.byKey(barraKey)).dy;
+      expect(
+        finDelTexto,
+        lessThanOrEqualTo(topeDeLaBarra),
+        reason: 'la última línea de la tarjeta de recordatorios no puede '
+            'quedar debajo del vidrio del shell',
+      );
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Texto de ACCESIBILIDAD. A tamaños normales la pantalla entra entera y no
   // scrollea, así que estos dos defectos sólo aparecían con la letra más grande.
   // ──────────────────────────────────────────────────────────────────────────
@@ -759,11 +1303,19 @@ void main() {
       repo = _MockUserRepository();
       when(() => repo.watchCorreosPromocionales(any()))
           .thenAnswer((_) => Stream<bool>.value(true));
+      when(() => repo.watchRecordatoriosEntrenamiento(any()))
+          .thenAnswer((_) => Stream<bool>.value(true));
     });
 
+    // Como ATLETA: es el único rol que ve las TRES tarjetas.
     Future<AppL10n> montarA(WidgetTester tester, double escala) async {
       await _calentarFuentes(tester);
-      await _montar(tester, repo: repo, textScale: escala);
+      await _montar(
+        tester,
+        repo: repo,
+        textScale: escala,
+        perfil: _comoAtleta(),
+      );
       return AppL10n.of(tester.element(find.byType(PrivacyScreen)));
     }
 
@@ -839,14 +1391,20 @@ void main() {
     // porque ahí la palabra mide ~287 px y el texto, si el ícono le sigue
     // quitando columna, tiene 280: con 3.0 entraría por 2 px y el test no
     // distinguiría «el ícono sube» de «el ícono se queda en la fila».
-    for (final escala in const [3.0, 3.1]) {
+    // Las dos tarjetas de la CUENTA (las de título largo): correos y
+    // recordatorios. La de analítica no tiene una palabra tan larga.
+    for (final (tarjeta, escala) in [
+      for (final t in _tarjetas.where((t) => t.llave != _llaveAnalitica))
+        for (final e in const [3.0, 3.1]) (t, e),
+    ]) {
       testWidgets(
-          'a ${escala}x el título «Correos promocionales» no parte ninguna '
-          'palabra', (tester) async {
+          'a ${escala}x el título de la tarjeta de ${tarjeta.nombre} no parte '
+          'ninguna palabra', (tester) async {
         final l10n = await montarA(tester, escala);
+        final titulo = tarjeta.titulo(l10n);
 
         final parrafo = tester.renderObject<RenderParagraph>(
-          find.text(l10n.privacyPromoEmailsTitle),
+          find.text(titulo),
         );
         double anchoDe(String palabra) {
           final pintor = TextPainter(
@@ -859,10 +1417,7 @@ void main() {
           return ancho;
         }
 
-        final palabraMasLarga = l10n.privacyPromoEmailsTitle
-            .split(' ')
-            .map(anchoDe)
-            .reduce(math.max);
+        final palabraMasLarga = titulo.split(' ').map(anchoDe).reduce(math.max);
 
         expect(
           parrafo.size.width,
@@ -906,5 +1461,12 @@ final _tarjetas = <_Tarjeta>[
     TreinoIcon.mail,
     (l10n) => l10n.privacyPromoEmailsTitle,
     (l10n) => l10n.privacyPromoEmailsSubtitle,
+  ),
+  _Tarjeta(
+    'recordatorios',
+    _llaveRecordatorios,
+    TreinoIcon.bell,
+    (l10n) => l10n.privacyTrainingRemindersTitle,
+    (l10n) => l10n.privacyTrainingRemindersSubtitle,
   ),
 ];

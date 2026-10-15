@@ -4883,7 +4883,7 @@ class AppL10nEn extends AppL10n {
       'Crash reports are not included: we keep receiving those so we can fix failures, and they do not describe what you do in the app.';
 
   @override
-  String get privacyEntryTitle => 'Analytics and emails';
+  String get privacyEntryTitle => 'Analytics, emails and reminders';
 
   @override
   String get privacyPromoEmailsTitle => 'Promotional emails';
@@ -4894,6 +4894,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get privacyPromoEmailsSaveError =>
+      'We couldn\'t save the change. Try again.';
+
+  @override
+  String get privacyTrainingRemindersTitle => 'Training reminders';
+
+  @override
+  String get privacyTrainingRemindersSubtitle =>
+      'We\'ll let you know if your streak is at risk or you haven\'t trained in a few days.';
+
+  @override
+  String get privacyTrainingRemindersSaveError =>
       'We couldn\'t save the change. Try again.';
 
   @override

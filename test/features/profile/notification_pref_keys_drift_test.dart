@@ -73,6 +73,39 @@ String extraerLiteralTs(String fuente, String constante, {String? archivo}) {
   return m.group(2)!;
 }
 
+/// Dónde declara el backend la clave de los recordatorios de entrenamiento.
+///
+/// A diferencia de las de arriba, acá el test NO fija el NOMBRE de la constante:
+/// pide que el archivo exporte ALGUNA `export const X = "<literal>"` cuyo valor
+/// sea el de Dart. Lo que importa es el literal —es lo que lee el backend de
+/// `notificationPrefs`—, no cómo se llame la variable que lo guarda.
+const _archivoDeRecordatorios =
+    'functions/src/notifications/notify-daily-reminders.ts';
+
+/// Los nombres de las constantes exportadas por [fuente] cuyo valor es,
+/// exactamente, el literal de texto [literal].
+///
+/// Mismas defensas que [extraerLiteralTs]: el ancla `^` va pegada a `export`,
+/// así que una línea comentada (`// export const …`) o un JSDoc que cite la
+/// declaración (` * export const …`) no cuentan. Tampoco cuenta una expresión
+/// (`PREFIJO + "x"`): el valor tiene que ser el literal y nada más, porque este
+/// scan no sabe evaluar nada.
+///
+/// Lista vacía = no hay ninguna. El que llama decide si eso es un fallo; acá
+/// nunca se devuelve «todo bien» por no haber encontrado nada.
+List<String> exportsConLiteral(String fuente, String literal) {
+  final declaracion = RegExp(
+    r'^export const (\w+)\s*(?::\s*string\s*)?=\s*(["\x27])'
+    '${RegExp.escape(literal)}'
+    r'\2\s*;?\s*(//.*)?$',
+    multiLine: true,
+  );
+  return declaracion
+      .allMatches(fuente)
+      .map((m) => m.group(1)!)
+      .toList(growable: false);
+}
+
 void main() {
   group('la clave de correos promocionales no deriva entre Dart y TypeScript',
       () {
@@ -102,6 +135,91 @@ void main() {
         );
       });
     }
+  });
+
+  // La fila de los recordatorios diarios de entrenamiento (push al atleta). La
+  // lee el backend de `notificationPrefs.recordatorios_entrenamiento.push` y la
+  // escribe el interruptor de Perfil › Privacidad: misma historia que arriba,
+  // otra clave. Si el literal diverge, el atleta apaga el recordatorio y el
+  // push sigue llegando.
+  group(
+      'la clave de recordatorios de entrenamiento no deriva entre Dart y '
+      'TypeScript', () {
+    test(
+        '$_archivoDeRecordatorios exporta una constante == '
+        'kPrefRecordatoriosEntrenamiento', () {
+      final archivo = File(_archivoDeRecordatorios);
+      if (!archivo.existsSync()) {
+        fail(
+          'No existe $_archivoDeRecordatorios (cwd: '
+          '${Directory.current.path}). Si el archivo se movió, actualizá '
+          '`_archivoDeRecordatorios`; si todavía no se escribió, el backend de '
+          'los recordatorios diarios no existe y el interruptor de la app '
+          'escribe una clave que nadie lee. Este test tiene que correr desde '
+          'la raíz del repo.',
+        );
+      }
+
+      final nombres = exportsConLiteral(
+        archivo.readAsStringSync(),
+        kPrefRecordatoriosEntrenamiento,
+      );
+
+      expect(
+        nombres,
+        isNotEmpty,
+        reason: 'No encontré ningún `export const X = '
+            '"$kPrefRecordatoriosEntrenamiento";` en $_archivoDeRecordatorios. '
+            'La app escribe `notificationPrefs.$kPrefRecordatoriosEntrenamiento'
+            '.push`: si el backend lee otra clave (o la arma con una expresión '
+            'que este scan no sabe leer), apagar el interruptor no frenaría '
+            'ningún push.',
+      );
+    });
+  });
+
+  // El lector de `exportsConLiteral` es lo que hace que ese test signifique
+  // algo: si devolviera siempre una lista no vacía, o contara comentarios, el
+  // test pasaría con el `.ts` roto.
+  group('exportsConLiteral — no pasa en verde cuando no encuentra', () {
+    const k = 'recordatorios_entrenamiento';
+
+    test('lee comillas dobles, simples, anotación de tipo y comentario final',
+        () {
+      expect(
+        exportsConLiteral('export const A = "$k";\n', k),
+        ['A'],
+      );
+      expect(
+        exportsConLiteral("export const B: string = '$k'; // la clave\n", k),
+        ['B'],
+      );
+    });
+
+    test('una línea comentada o un JSDoc NO cuentan', () {
+      const fuente = '''
+// export const VIEJA = "$k";
+/**
+ * export const TAMBIEN_VIEJA = "$k";
+ */
+''';
+      expect(exportsConLiteral(fuente, k), isEmpty);
+    });
+
+    test('otro literal, un literal que lo CONTIENE o una expresión, tampoco',
+        () {
+      expect(exportsConLiteral('export const A = "otra_clave";\n', k), isEmpty);
+      expect(exportsConLiteral('export const A = "${k}_v2";\n', k), isEmpty);
+      expect(exportsConLiteral('export const A = P + "$k";\n', k), isEmpty);
+    });
+
+    test('un `const` sin `export` no cuenta: el contrato es lo exportado', () {
+      expect(exportsConLiteral('const A = "$k";\n', k), isEmpty);
+    });
+
+    test('un archivo vacío devuelve lista vacía, no «todo bien»', () {
+      expect(exportsConLiteral('', k), isEmpty);
+    });
   });
 
   // El lector de arriba es lo que hace que el test de deriva signifique algo.

@@ -8613,10 +8613,10 @@ abstract class AppL10n {
   /// **'No incluye los reportes de errores: esos los seguimos recibiendo para poder arreglar fallas, y no describen lo que hacés en la app.'**
   String get privacyAnalyticsCrashNote;
 
-  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos. Dos temas en el titulo para que el que busque cualquiera de los dos lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
+  /// Titulo de la fila de Perfil que abre la pantalla de privacidad. Antes decia 'Analitica de uso' (privacyAnalyticsTitle) y con ese rotulo nadie buscaba ahi los correos; despues decia 'Analitica y correos' y con ese nadie iba a buscar ahi los recordatorios de entrenamiento. Un tema por interruptor del atleta en el titulo, para que el que busque cualquiera de los tres lo encuentre. NO reemplaza a privacyAnalyticsTitle, que sigue siendo el titulo del interruptor de analitica.
   ///
   /// In es_AR, this message translates to:
-  /// **'Analítica y correos'**
+  /// **'Analítica, correos y recordatorios'**
   String get privacyEntryTitle;
 
   /// Titulo del interruptor de correos promocionales en la pantalla de privacidad. Es una preferencia de la CUENTA, no del dispositivo. Sin 'plan', 'pago', 'suscripcion', 'precio', 'oferta', 'web' ni 'Pro': Guideline 3.1.3 de Apple, ver test/features/paywall/.
@@ -8636,6 +8636,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
   String get privacyPromoEmailsSaveError;
+
+  /// Titulo del interruptor de recordatorios de entrenamiento en la pantalla de privacidad. Solo lo ve el atleta. Es una preferencia de la CUENTA (users/{uid}.notificationPrefs.recordatorios_entrenamiento.push), no del dispositivo. Mismas palabras prohibidas que privacyPromoEmailsTitle (Guideline 3.1.3 de Apple).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Recordatorios de entrenamiento'**
+  String get privacyTrainingRemindersTitle;
+
+  /// Subtitulo del interruptor de recordatorios de entrenamiento. Nombra los dos avisos que el backend manda hoy (racha en riesgo y volver a entrenar); si aparece un tercero, esta frase tiene que cubrirlo. Mismas palabras prohibidas que privacyPromoEmailsTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te avisamos si tu racha está en riesgo o si hace días que no entrenás.'**
+  String get privacyTrainingRemindersSubtitle;
+
+  /// Snackbar cuando falla la escritura del interruptor de recordatorios de entrenamiento. El interruptor vuelve solo al valor real.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar el cambio. Intentá de nuevo.'**
+  String get privacyTrainingRemindersSaveError;
 
   /// Contador visible en 'Mis ejercicios' (docs/limite-ejercicios-pf.md PR3, 'El contador visible'). Solo se muestra si el usuario es PF y el limite no es null — Plan 3 y el alumno nunca lo ven.
   ///

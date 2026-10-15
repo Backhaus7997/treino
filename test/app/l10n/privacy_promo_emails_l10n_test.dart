@@ -45,7 +45,7 @@ final _prohibidas = RegExp(
 void main() {
   test('es_AR: el copy exacto', () async {
     final t = await _cargar(const Locale('es', 'AR'));
-    expect(t.entrada, 'Analítica y correos');
+    expect(t.entrada, 'Analítica, correos y recordatorios');
     expect(t.titulo, 'Correos promocionales');
     expect(
       t.subtitulo,
@@ -57,7 +57,7 @@ void main() {
 
   test('es: el copy exacto, en tuteo y no en voseo', () async {
     final t = await _cargar(const Locale('es'));
-    expect(t.entrada, 'Analítica y correos');
+    expect(t.entrada, 'Analítica, correos y recordatorios');
     expect(t.titulo, 'Correos promocionales');
     expect(
       t.subtitulo,
@@ -69,7 +69,7 @@ void main() {
 
   test('en: el copy exacto', () async {
     final t = await _cargar(const Locale('en'));
-    expect(t.entrada, 'Analytics and emails');
+    expect(t.entrada, 'Analytics, emails and reminders');
     expect(t.titulo, 'Promotional emails');
     expect(
       t.subtitulo,

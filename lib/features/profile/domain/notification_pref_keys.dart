@@ -19,3 +19,25 @@
 /// El nombre es del backend y no se toca acá: renombrarla es migrar los
 /// documentos de todos los usuarios que ya tengan la preferencia guardada.
 const String kPrefCorreosPromocionales = 'novedades_plan';
+
+/// La clave de `users/{uid}.notificationPrefs` que gobierna los recordatorios
+/// diarios de entrenamiento (racha en riesgo / volvé a entrenar), que le llegan
+/// al ATLETA como push:
+/// `notificationPrefs.recordatorios_entrenamiento.push === false` los frena, y
+/// una preferencia ausente los deja pasar (mismo criterio que el resto de las
+/// filas: sólo un `false` EXPLÍCITO apaga).
+///
+/// Vive en DOS lugares y los dos tienen que decir lo mismo:
+///
+///  - el backend, que la lee para decidir si manda
+///    (`functions/src/notifications/notify-daily-reminders.ts`);
+///  - esta constante, con la que la app la escribe desde Perfil › Privacidad.
+///
+/// Si divergen, el atleta apaga el interruptor y el push sigue llegando: un
+/// control que no controla nada. Por eso el mismo test de deriva que cuida
+/// [kPrefCorreosPromocionales] lee ese `.ts` y compara
+/// (`test/features/profile/notification_pref_keys_drift_test.dart`).
+///
+/// A diferencia de [kPrefCorreosPromocionales], el canal acá es `push` y no
+/// `email`: es un aviso del sistema operativo, no un correo.
+const String kPrefRecordatoriosEntrenamiento = 'recordatorios_entrenamiento';
