@@ -42,22 +42,17 @@ String normalize(String s) {
 }
 
 class _Index {
-  _Index._(this.byName, this.byToken);
+  _Index._(this.byName, this.exercises);
   final Map<String, MatcherExercise> byName;
-  final Map<String, List<MatcherExercise>> byToken;
+  final List<MatcherExercise> exercises;
 
   factory _Index.build(List<MatcherExercise> exercises) {
     final byName = <String, MatcherExercise>{};
-    final byToken = <String, List<MatcherExercise>>{};
 
     void indexLabel(String label, MatcherExercise ex) {
       final normalized = normalize(label);
       if (normalized.isEmpty) return;
       byName.putIfAbsent(normalized, () => ex);
-      for (final token in normalized.split(' ')) {
-        if (token.length < 3) continue;
-        byToken.putIfAbsent(token, () => []).add(ex);
-      }
     }
 
     for (final ex in exercises) {
@@ -66,39 +61,158 @@ class _Index {
         indexLabel(alias, ex);
       }
     }
-    return _Index._(byName, byToken);
+    return _Index._(byName, exercises);
   }
 }
 
-MatcherExercise? _bestFuzzyMatch(String query, _Index index) {
-  final tokens = query.split(' ').where((t) => t.length >= 3).toList();
-  if (tokens.isEmpty) return null;
+const _stopwords = <String>{
+  'con',
+  'de',
+  'del',
+  'en',
+  'la',
+  'el',
+  'los',
+  'las',
+  'a',
+  'al',
+  'y',
+  'para',
+  'por',
+};
+
+/// Términos de equipamiento canónicos. Los sinónimos comparten valor para que,
+/// por ejemplo, "pesa rusa" y "kettlebell" se consideren el mismo equipo.
+/// Esta es la única lista que gobierna compatibilidad de equipamiento.
+const _equipmentByToken = <String, String>{
+  'barra': 'barra',
+  'barbell': 'barra',
+  'mancuerna': 'mancuerna',
+  'mancuernas': 'mancuerna',
+  'dumbbell': 'mancuerna',
+  'dumbbells': 'mancuerna',
+  'banda': 'banda',
+  'bandas': 'banda',
+  'elastico': 'banda',
+  'elastica': 'banda',
+  'elasticos': 'banda',
+  'elasticas': 'banda',
+  'pesa': 'pesa-rusa',
+  'rusa': 'pesa-rusa',
+  'kettlebell': 'pesa-rusa',
+  'polea': 'polea',
+  'poleas': 'polea',
+  'cable': 'polea',
+  'cables': 'polea',
+  'maquina': 'maquina',
+  'maquinas': 'maquina',
+  'smith': 'smith',
+  'multipower': 'smith',
+  'disco': 'disco',
+  'discos': 'disco',
+  'trx': 'trx',
+  'bosu': 'bosu',
+  'fitball': 'fitball',
+  'pelota': 'fitball',
+  'landmine': 'landmine',
+};
+
+/// Variantes biomecánicas que no se pueden inferir por coincidencia parcial.
+/// La comparación es conservadora: query y candidato deben declarar el mismo
+/// conjunto; si el calificador aparece de un solo lado, no hay sugerencia.
+const _variantByToken = <String, String>{
+  'bulgara': 'bulgara',
+  'bulgaro': 'bulgara',
+  'rumano': 'rumano',
+  'rumana': 'rumano',
+  'inclinado': 'inclinado',
+  'inclinada': 'inclinado',
+  'declinado': 'declinado',
+  'declinada': 'declinado',
+  'goblet': 'goblet',
+  'frontal': 'frontal',
+  'sumo': 'sumo',
+  'convencional': 'convencional',
+  'unilateral': 'unilateral',
+  'plano': 'plano',
+  'plana': 'plano',
+  'zercher': 'zercher',
+  'hack': 'hack',
+};
+
+/// Tokens que cuentan para el score: sin stopwords ni palabras de < 3
+/// letras, y con el equipo en su forma canónica ("pesa rusa" y "kettlebell"
+/// valen lo mismo, y "pesa" + "rusa" cuentan una sola vez).
+Set<String> _meaningfulTokens(String normalized) => normalized
+    .split(' ')
+    .where((token) => token.length >= 3 && !_stopwords.contains(token))
+    .map((token) => _equipmentByToken[token] ?? token)
+    .toSet();
+
+Set<String> _classifiedTokens(
+  String normalized,
+  Map<String, String> classification,
+) =>
+    normalized
+        .split(' ')
+        .map((token) => classification[token])
+        .whereType<String>()
+        .toSet();
+
+/// Compatibilidad entre lo que escribió el entrenador y UNA etiqueta del
+/// catálogo (nombre o alias). Se evalúa por etiqueta, no sobre la unión de
+/// nombre + alias: si no, el alias "Sentadilla goblet" le prestaría su
+/// calificador al ejercicio "Sentadilla con barra".
+bool _isCompatibleLabel(String query, String normalizedLabel) {
+  final queryEquipment = _classifiedTokens(query, _equipmentByToken);
+  // Si el Excel declara equipo, la etiqueta debe declarar exactamente ese
+  // equipo: ni omitirlo ni sumar uno distinto.
+  if (queryEquipment.isNotEmpty &&
+      !_sameSet(
+        queryEquipment,
+        _classifiedTokens(normalizedLabel, _equipmentByToken),
+      )) {
+    return false;
+  }
+  // Variantes: el mismo conjunto de ambos lados (presente de un solo lado
+  // => no hay sugerencia).
+  return _sameSet(
+    _classifiedTokens(query, _variantByToken),
+    _classifiedTokens(normalizedLabel, _variantByToken),
+  );
+}
+
+bool _sameSet(Set<String> left, Set<String> right) =>
+    left.length == right.length && left.containsAll(right);
+
+MatcherExercise? _bestFuzzySuggestion(String query, _Index index) {
+  final queryTokens = _meaningfulTokens(query);
+  if (queryTokens.isEmpty) return null;
 
   final scores = <String, int>{};
-  for (final token in tokens) {
-    final cands = index.byToken[token] ?? const [];
-    for (final ex in cands) {
-      scores[ex.id] = (scores[ex.id] ?? 0) + 1;
+  for (final exercise in index.exercises) {
+    var best = 0;
+    for (final label in <String>[exercise.name, ...exercise.aliases]) {
+      final normalizedLabel = normalize(label);
+      if (!_isCompatibleLabel(query, normalizedLabel)) continue;
+      final score =
+          queryTokens.intersection(_meaningfulTokens(normalizedLabel)).length;
+      if (score > best) best = score;
     }
+    if (best > 0) scores[exercise.id] = best;
   }
 
-  String? bestId;
-  int bestScore = 0;
-  scores.forEach((id, score) {
-    if (score > bestScore) {
-      bestScore = score;
-      bestId = id;
-    }
-  });
-
-  if (bestId == null || bestScore < (tokens.length / 2).ceil()) return null;
-
-  for (final cands in index.byToken.values) {
-    for (final ex in cands) {
-      if (ex.id == bestId) return ex;
-    }
-  }
-  return null;
+  if (scores.isEmpty) return null;
+  final bestScore = scores.values.reduce((a, b) => a > b ? a : b);
+  if (bestScore < (queryTokens.length / 2).ceil()) return null;
+  final bestIds = scores.entries
+      .where((entry) => entry.value == bestScore)
+      .map((entry) => entry.key)
+      .toList();
+  // Empate => ninguna sugerencia: nunca se elige al azar.
+  if (bestIds.length != 1) return null;
+  return index.exercises
+      .firstWhere((exercise) => exercise.id == bestIds.single);
 }
 
 MatchResult matchExercises(
@@ -113,8 +227,9 @@ MatchResult matchExercises(
     final items = <ParsedPlanItem>[];
     for (final item in day.items) {
       final key = normalize(item.rowName);
-      MatcherExercise? exercise = index.byName[key];
-      exercise ??= _bestFuzzyMatch(key, index);
+      final exercise = index.byName[key];
+      final suggestion =
+          exercise == null ? _bestFuzzySuggestion(key, index) : null;
 
       if (exercise == null) {
         unmatched.add(ParsedPlanUnmatched(
@@ -132,6 +247,9 @@ MatchResult matchExercises(
           exerciseId: null,
           exerciseName: item.rowName,
           muscleGroup: null,
+          suggestedExerciseId: suggestion?.id,
+          suggestedExerciseName: suggestion?.name,
+          suggestedMuscleGroup: suggestion?.muscleGroup,
         ));
       } else {
         items.add(ParsedPlanItem(

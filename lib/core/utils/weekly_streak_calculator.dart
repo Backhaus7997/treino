@@ -53,6 +53,11 @@ int weeklyTargetFromRoutine(Routine? routine) {
 /// Ver `argentina_time.dart` para por qué todo concepto de calendario se
 /// ancla a ART.
 ///
+/// HAY UN PORT EN EL SERVIDOR: `functions/src/notifications/weekly-streak.ts`
+/// calcula esta misma racha para los recordatorios diarios (#1449). Si cambiás
+/// la regla acá, cambiala allá y en sus tests, o el push dice "racha de 4
+/// semanas" mientras la app muestra 3.
+///
 /// LIMITACIÓN CONOCIDA, y es real: [weeklyTarget] es el objetivo de la rutina
 /// activa **de hoy**, aplicado hacia atrás a todas las semanas. No guardamos
 /// historial de qué rutina cursaba el atleta en cada semana pasada, así que

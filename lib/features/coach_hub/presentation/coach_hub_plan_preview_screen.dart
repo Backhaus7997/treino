@@ -153,13 +153,23 @@ class _CoachHubPlanPreviewScreenState
   }
 
   Future<void> _assign(ParsedPlan plan, String trainerUid) async {
-    if (_selectedAthleteIds.isEmpty) {
-      setState(() => _error = 'Elegí al menos un atleta antes de asignar.');
+    final hasPendingSuggestion = plan.days.any(
+      (day) => day.items.any(
+        (item) => item.exerciseId == null && item.suggestedExerciseId != null,
+      ),
+    );
+    if (plan.days.any(
+      (day) => day.items.any((item) => item.exerciseId == null),
+    )) {
+      setState(() => _error = hasPendingSuggestion
+          ? 'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
+              'continuar.'
+          : 'Hay ejercicios sin match. Asignalos manualmente antes de '
+              'continuar.');
       return;
     }
-    if (plan.unmatched.isNotEmpty) {
-      setState(() => _error =
-          'Hay ejercicios sin match. Asignalos manualmente antes de continuar.');
+    if (_selectedAthleteIds.isEmpty) {
+      setState(() => _error = 'Elegí al menos un atleta antes de asignar.');
       return;
     }
 
@@ -322,8 +332,55 @@ class _CoachHubPlanPreviewScreenState
     );
     if (picked == null) return;
 
+    _resolveExercise(
+      dayNumber: dayNumber,
+      itemIndex: itemIndex,
+      rowName: rowName,
+      exerciseId: picked.id,
+      exerciseName: picked.name,
+      muscleGroup: picked.muscleGroup,
+    );
+  }
+
+  void _confirmSuggestion({
+    required int dayNumber,
+    required int itemIndex,
+    required ParsedPlanItem item,
+  }) {
+    final exerciseId = item.suggestedExerciseId;
+    final exerciseName = item.suggestedExerciseName;
+    if (exerciseId == null || exerciseName == null) return;
+
+    _resolveExercise(
+      dayNumber: dayNumber,
+      itemIndex: itemIndex,
+      rowName: item.rowName,
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      muscleGroup: item.suggestedMuscleGroup,
+    );
+  }
+
+  void _resolveExercise({
+    required int dayNumber,
+    required int itemIndex,
+    required String rowName,
+    required String exerciseId,
+    required String exerciseName,
+    required String? muscleGroup,
+  }) {
     final current = ref.read(parsedPlanProvider);
     if (current == null) return;
+
+    // Una fila ya resuelta no se resuelve dos veces: un doble tap llegaba hasta
+    // acá, sacaba el pendiente de OTRA fila con el mismo (día, rowName) y
+    // volvía a llamar a addAlias.
+    final day = current.days.where((d) => d.dayNumber == dayNumber).firstOrNull;
+    if (day == null ||
+        itemIndex >= day.items.length ||
+        day.items[itemIndex].exerciseId != null) {
+      return;
+    }
 
     // Match on the exact (day, item index) — keying on rowName alone would
     // resolve every same-named unmatched row in the day at once. ADR-CXP-006.
@@ -335,9 +392,12 @@ class _CoachHubPlanPreviewScreenState
                   for (var idx = 0; idx < d.items.length; idx++)
                     (idx == itemIndex && d.items[idx].exerciseId == null)
                         ? d.items[idx].copyWith(
-                            exerciseId: picked.id,
-                            exerciseName: picked.name,
-                            muscleGroup: picked.muscleGroup,
+                            exerciseId: exerciseId,
+                            exerciseName: exerciseName,
+                            muscleGroup: muscleGroup,
+                            suggestedExerciseId: null,
+                            suggestedExerciseName: null,
+                            suggestedMuscleGroup: null,
                           )
                         : d.items[idx],
                 ],
@@ -364,7 +424,7 @@ class _CoachHubPlanPreviewScreenState
       _hasManualMappings = true;
     });
     // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
-    unawaited(_addAlias(picked.id, rowName));
+    unawaited(_addAlias(exerciseId, rowName));
   }
 
   /// Fire-and-forget side effect: sends the manually mapped alias to
@@ -490,6 +550,12 @@ class _CoachHubPlanPreviewScreenState
                         child: _DayCard(
                           palette: palette,
                           day: d,
+                          onConfirmSuggestion: (index, item) =>
+                              _confirmSuggestion(
+                            dayNumber: d.dayNumber,
+                            itemIndex: index,
+                            item: item,
+                          ),
                           onPickManual: (index, item) => _pickExerciseFor(
                             dayNumber: d.dayNumber,
                             itemIndex: index,
@@ -672,6 +738,17 @@ class _UnmatchedWarning extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
+    final pendingSuggestions = plan.days
+        .expand((day) => day.items)
+        .where((item) =>
+            item.exerciseId == null && item.suggestedExerciseId != null)
+        .length;
+    final withoutSuggestion = plan.days
+        .expand((day) => day.items)
+        .where((item) =>
+            item.exerciseId == null && item.suggestedExerciseId == null)
+        .length;
+    final unresolved = pendingSuggestions + withoutSuggestion;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -693,7 +770,7 @@ class _UnmatchedWarning extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${plan.unmatched.length} ejercicio(s) sin match',
+                  '$unresolved ejercicio(s) por resolver',
                   style: TextStyle(
                     color: palette.textPrimary,
                     fontWeight: FontWeight.w700,
@@ -701,9 +778,9 @@ class _UnmatchedWarning extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'No los encontramos en el catálogo. Ajustá los nombres en el '
-                  'Excel y volvé a subirlo. No se puede asignar hasta que '
-                  'estén todos resueltos.',
+                  '${pendingSuggestions > 0 ? '$pendingSuggestions con sugerencia pendiente. ' : ''}'
+                  '${withoutSuggestion > 0 ? '$withoutSuggestion sin match. ' : ''}'
+                  'No se puede asignar hasta que estén todos resueltos.',
                   style: TextStyle(
                     color: palette.textMuted,
                     fontSize: 13,
@@ -723,10 +800,12 @@ class _DayCard extends StatelessWidget {
   const _DayCard({
     required this.palette,
     required this.day,
+    required this.onConfirmSuggestion,
     required this.onPickManual,
   });
   final AppPalette palette;
   final ParsedPlanDay day;
+  final void Function(int index, ParsedPlanItem item) onConfirmSuggestion;
   final Future<void> Function(int index, ParsedPlanItem item) onPickManual;
 
   @override
@@ -754,6 +833,9 @@ class _DayCard extends StatelessWidget {
           ...day.items.asMap().entries.map((entry) {
             final index = entry.key;
             final i = entry.value;
+            final hasSuggestion = i.exerciseId == null &&
+                i.suggestedExerciseId != null &&
+                i.suggestedExerciseName != null;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
@@ -767,7 +849,9 @@ class _DayCard extends StatelessWidget {
                           children: [
                             Flexible(
                               child: Text(
-                                i.exerciseName,
+                                i.exerciseId == null
+                                    ? i.rowName
+                                    : i.exerciseName,
                                 style: TextStyle(
                                   color: palette.textPrimary,
                                   fontWeight: FontWeight.w600,
@@ -777,7 +861,10 @@ class _DayCard extends StatelessWidget {
                             ),
                             if (i.exerciseId == null) ...[
                               const SizedBox(width: 8),
-                              _UnmatchedBadge(palette: palette),
+                              _UnmatchedBadge(
+                                palette: palette,
+                                hasSuggestion: hasSuggestion,
+                              ),
                             ],
                           ],
                         ),
@@ -789,14 +876,41 @@ class _DayCard extends StatelessWidget {
                             fontSize: 12,
                           ),
                         ),
+                        if (hasSuggestion) ...[
+                          const SizedBox(height: AppSpacing.s8),
+                          Text(
+                            'Sugerencia: ${i.suggestedExerciseName}',
+                            style: TextStyle(
+                              color: palette.accent,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                         if (i.exerciseId == null) ...[
                           const SizedBox(height: 6),
-                          TreinoButton(
-                            label: 'Asignar manualmente',
-                            icon: TreinoIcon.search,
-                            variant: TreinoButtonVariant.ghostAccent,
-                            size: TreinoButtonSize.sm,
-                            onPressed: () => onPickManual(index, i),
+                          Wrap(
+                            spacing: AppSpacing.s8,
+                            runSpacing: AppSpacing.s8,
+                            children: [
+                              if (hasSuggestion)
+                                TreinoButton(
+                                  label: 'Confirmar',
+                                  variant: TreinoButtonVariant.primary,
+                                  size: TreinoButtonSize.sm,
+                                  onPressed: () =>
+                                      onConfirmSuggestion(index, i),
+                                ),
+                              TreinoButton(
+                                label: hasSuggestion
+                                    ? 'Cambiar'
+                                    : 'Asignar manualmente',
+                                icon: TreinoIcon.search,
+                                variant: TreinoButtonVariant.ghostAccent,
+                                size: TreinoButtonSize.sm,
+                                onPressed: () => onPickManual(index, i),
+                              ),
+                            ],
                           ),
                         ],
                       ],
@@ -975,8 +1089,12 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
 }
 
 class _UnmatchedBadge extends StatelessWidget {
-  const _UnmatchedBadge({required this.palette});
+  const _UnmatchedBadge({
+    required this.palette,
+    required this.hasSuggestion,
+  });
   final AppPalette palette;
+  final bool hasSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -988,7 +1106,7 @@ class _UnmatchedBadge extends StatelessWidget {
         border: Border.all(color: palette.warning),
       ),
       child: Text(
-        'sin match',
+        hasSuggestion ? 'sugerencia pendiente' : 'sin match',
         style: TextStyle(
           color: palette.warning,
           fontSize: 11,

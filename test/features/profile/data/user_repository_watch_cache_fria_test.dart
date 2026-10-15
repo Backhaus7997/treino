@@ -118,4 +118,24 @@ void main() {
 
     await sub.cancel();
   });
+
+  test('watchRecordatoriosEntrenamiento: mismo cuelgue, mismo arreglo',
+      () async {
+    final emissions = <bool>[];
+    final sub = repo.watchRecordatoriosEntrenamiento(uid).listen(emissions.add);
+
+    final cache = inexistente(isFromCache: true);
+    final servidor = inexistente(isFromCache: false);
+    sinMetadata.add(cache);
+    conMetadata
+      ..add(cache)
+      ..add(servidor);
+    await Future<void>.delayed(Duration.zero);
+
+    // Comparte el filtro de caché con los correos: ausente = true, una sola
+    // emisión.
+    expect(emissions, [true]);
+
+    await sub.cancel();
+  });
 }

@@ -49,6 +49,9 @@ class ParsedPlanItem with _$ParsedPlanItem {
     String? exerciseId,
     required String exerciseName,
     String? muscleGroup,
+    String? suggestedExerciseId,
+    String? suggestedExerciseName,
+    String? suggestedMuscleGroup,
   }) = _ParsedPlanItem;
 
   factory ParsedPlanItem.fromJson(Map<String, Object?> json) =>

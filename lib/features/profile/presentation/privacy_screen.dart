@@ -12,10 +12,14 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../application/correos_promocionales_providers.dart';
+import '../application/recordatorios_entrenamiento_providers.dart';
 import '../application/user_providers.dart';
+import '../data/user_repository.dart' show UserRepository;
+import '../domain/user_role.dart';
 
-/// Los controles de privacidad del usuario: la analítica (por dispositivo) y
-/// los correos promocionales (por cuenta).
+/// Los controles de privacidad del usuario: la analítica (por dispositivo), los
+/// correos promocionales (por cuenta) y, sólo para el ATLETA, los recordatorios
+/// diarios de entrenamiento (por cuenta).
 ///
 /// Existe porque la Política de Privacidad promete que el consentimiento se
 /// puede **revocar en cualquier momento** y la app no tenía dónde. Un documento
@@ -23,31 +27,55 @@ import '../application/user_providers.dart';
 /// misma clase de afirmación falsa que persigue la §11.1 de AGENTS.md, sólo que
 /// publicada.
 ///
-/// Son DOS tarjetas separadas y no una lista, porque no son la misma clase de
+/// Son tarjetas separadas y no una lista, porque no son la misma clase de
 /// preferencia. La analítica vive en este dispositivo
 /// ([AnalyticsConsentNotifier]) y su explicación lo dice. Los correos
-/// promocionales viven en el documento del usuario y rigen para la cuenta
-/// entera, en cualquier dispositivo: si compartieran tarjeta, la frase «es una
-/// preferencia de ESTE dispositivo» les tocaría a los dos, y a los correos les
-/// sería falsa.
+/// promocionales y los recordatorios viven en el documento del usuario y rigen
+/// para la cuenta entera, en cualquier dispositivo: si compartieran tarjeta, la
+/// frase «es una preferencia de ESTE dispositivo» les tocaría a los dos, y a
+/// ellos les sería falsa.
+///
+/// ## Por qué los recordatorios están acá
+///
+/// No hay una pantalla de notificaciones del atleta (la superficie de ajustes
+/// quedó diferida, ver `profile_screen.dart`), y los correos —que son la misma
+/// clase de preferencia: un canal de avisos que se apaga por cuenta— ya viven
+/// acá. Crear una pantalla, una ruta y una sección de Perfil para UN interruptor
+/// sería más superficie que el cambio. El rótulo de la fila que lleva hasta acá
+/// (`privacyEntryTitle`) nombra los tres controles, por la razón que ya costó
+/// una vez: un control que existe pero que el rótulo esconde no se encuentra.
+///
+/// ## Por qué sólo el atleta
+///
+/// La pantalla también la abre el PF (desde `TrainerProfileView`), y a él los
+/// recordatorios de racha no le llegan nunca: un interruptor que apaga algo que
+/// no recibe es un control que miente. Se decide por el ROL del perfil y falla
+/// CERRADO —mientras el perfil no cargó, o si el rol no es `athlete`, no se
+/// dibuja—, al revés que `ProfileScreen`, que ante la duda asume atleta: acá
+/// mostrarlo de más es el error.
 ///
 /// Los interruptores aplican en el acto, no al próximo arranque: «en cualquier
 /// momento» quiere decir ahora.
 class PrivacyScreen extends ConsumerWidget {
   const PrivacyScreen({super.key});
 
-  /// Guarda la preferencia de correos. Si la escritura falla, avisa.
+  /// Guarda una preferencia de cuenta (correos o recordatorios). Si la
+  /// escritura falla, avisa.
+  ///
+  /// [lectura] es el provider del que el interruptor lee SU valor, y [escribir]
+  /// lo que persiste la elección; el resto del contrato es el mismo para todas.
   ///
   /// No hay estado local que revertir: el interruptor lee SIEMPRE del stream
-  /// del documento ([correosPromocionalesProvider]), y Firestore aplica la
-  /// escritura en su caché al instante —el switch se mueve— y la deshace sola
-  /// si el servidor la rechaza, re-emitiendo el valor real. Un `setState`
-  /// optimista acá sería una segunda fuente de verdad que puede quedar
-  /// desfasada de la primera.
-  Future<void> _guardarCorreos(
+  /// del documento ([lectura]), y Firestore aplica la escritura en su caché al
+  /// instante —el switch se mueve— y la deshace sola si el servidor la
+  /// rechaza, re-emitiendo el valor real. Un `setState` optimista acá sería una
+  /// segunda fuente de verdad que puede quedar desfasada de la primera.
+  Future<void> _guardarPreferencia(
     BuildContext context,
     WidgetRef ref, {
-    required bool habilitado,
+    required ProviderListenable<AsyncValue<bool>> lectura,
+    required String mensajeDeError,
+    required Future<void> Function(UserRepository repo, String uid) escribir,
   }) async {
     // Se vuelve a mirar AL TOCAR, no se confía en lo que dibujó el último
     // frame: si la cuenta cambió entre ese frame y este toque, el provider
@@ -55,23 +83,20 @@ class PrivacyScreen extends ConsumerWidget {
     // anterior. `ref.read` fuerza ese recálculo, así que si ya no hay una
     // lectura vigente NO se escribe — la elección se hizo mirando otro
     // documento.
-    if (!ref.read(correosPromocionalesProvider).tieneLecturaVigente) return;
+    if (!ref.read(lectura).tieneLecturaVigente) return;
     // El uid se lee acá, en el momento del toque, y no se captura en el build.
     final uid = ref.read(authStateChangesProvider).valueOrNull?.uid;
     // Sin sesión el interruptor ya está deshabilitado: es sólo un cinturón.
     if (uid == null) return;
     final messenger = ScaffoldMessenger.of(context);
-    final mensaje = AppL10n.of(context).privacyPromoEmailsSaveError;
     try {
-      await ref
-          .read(userRepositoryProvider)
-          .setCorreosPromocionales(uid, habilitado);
+      await escribir(ref.read(userRepositoryProvider), uid);
     } catch (_) {
       // Sin `action`: es un aviso que se va solo, así que el candado de
       // `persist` (snackbar_persist_scan_test) no aplica.
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(mensaje)));
+        ..showSnackBar(SnackBar(content: Text(mensajeDeError)));
     }
   }
 
@@ -81,6 +106,15 @@ class PrivacyScreen extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final habilitada = ref.watch(analyticsConsentProvider);
     final correos = ref.watch(correosPromocionalesProvider);
+    // Sólo el ATLETA ve los recordatorios (ver el dartdoc de la clase). El
+    // provider ni se observa para el resto: no se abre un listener de
+    // Firestore para un interruptor que no se dibuja.
+    final esAtleta = ref.watch(
+          userProfileProvider.select((perfil) => perfil.valueOrNull?.role),
+        ) ==
+        UserRole.athlete;
+    final recordatorios =
+        esAtleta ? ref.watch(recordatoriosEntrenamientoProvider) : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,10 +232,54 @@ class PrivacyScreen extends ConsumerWidget {
                         : false,
                     sabeSuValor: correos.tieneLecturaVigente,
                     onChanged: correos.tieneLecturaVigente
-                        ? (v) => _guardarCorreos(context, ref, habilitado: v)
+                        ? (v) => _guardarPreferencia(
+                              context,
+                              ref,
+                              lectura: correosPromocionalesProvider,
+                              mensajeDeError: l10n.privacyPromoEmailsSaveError,
+                              escribir: (repo, uid) =>
+                                  repo.setCorreosPromocionales(uid, v),
+                            )
                         : null,
                   ),
                 ),
+
+                // ── Recordatorios de entrenamiento: preferencia de la CUENTA,
+                // sólo del atleta ────────────────────────────────────────────
+                //
+                // Última, después de los correos: las dos son preferencias de
+                // la cuenta y no heredan la frase «de ESTE dispositivo» de la
+                // analítica. Mismas reglas que la de correos para el estado de
+                // lectura: sin respuesta vigente el interruptor va
+                // deshabilitado y no anuncia un valor que nunca leyó.
+                if (recordatorios != null) ...[
+                  const SizedBox(height: 20),
+                  TreinoFadeSlideIn(
+                    child: _PrivacySwitchCard(
+                      switchKey: const ValueKey(
+                        'privacy-training-reminders-switch',
+                      ),
+                      icon: TreinoIcon.bell,
+                      title: l10n.privacyTrainingRemindersTitle,
+                      subtitle: l10n.privacyTrainingRemindersSubtitle,
+                      value: recordatorios.tieneLecturaVigente
+                          ? recordatorios.requireValue
+                          : false,
+                      sabeSuValor: recordatorios.tieneLecturaVigente,
+                      onChanged: recordatorios.tieneLecturaVigente
+                          ? (v) => _guardarPreferencia(
+                                context,
+                                ref,
+                                lectura: recordatoriosEntrenamientoProvider,
+                                mensajeDeError:
+                                    l10n.privacyTrainingRemindersSaveError,
+                                escribir: (repo, uid) =>
+                                    repo.setRecordatoriosEntrenamiento(uid, v),
+                              )
+                          : null,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
