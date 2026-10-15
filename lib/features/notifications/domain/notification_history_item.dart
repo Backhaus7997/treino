@@ -24,6 +24,7 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 enum NotificationKind {
   appointment('appointment'),
   chatMessage('chat-message'),
+  comebackReminder('comeback-reminder'),
   discomfort('discomfort'),
   friendAccepted('friend-accepted'),
   friendFollow('friend-follow'),
@@ -34,6 +35,7 @@ enum NotificationKind {
   reaction('reaction'),
   review('review'),
   sessionFinished('session-finished'),
+  streakAtRisk('streak-at-risk'),
   unknown('unknown');
 
   const NotificationKind(this.value);

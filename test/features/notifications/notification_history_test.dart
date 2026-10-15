@@ -129,6 +129,19 @@ void main() {
     expect(item.kind, NotificationKind.unknown);
   });
 
+  test('los kinds de los recordatorios diarios se reconocen', () {
+    // Los emite `notify-daily-reminders.ts` al atleta; sin estos valores en el
+    // enum caerían en `unknown` (ver `notification_kind_parity_test.dart`).
+    expect(
+      NotificationKind.fromJson('streak-at-risk'),
+      NotificationKind.streakAtRisk,
+    );
+    expect(
+      NotificationKind.fromJson('comeback-reminder'),
+      NotificationKind.comebackReminder,
+    );
+  });
+
   test('badge sums unread notifications and pending requests', () async {
     final container = ProviderContainer(
       overrides: [

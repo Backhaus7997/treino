@@ -76,6 +76,15 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // poda es inmediata para los usuarios reales.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
 export { notifyMonthlyReport } from "./notifications/notify-monthly-report";
+// Push diario de recordatorio al atleta (racha en riesgo / volvé a entrenar), a
+// las 10:00 ART. Todo se calcula acá, sin intervención del cliente. Interruptor:
+// `notificationPrefs.recordatorios_entrenamiento.push`. El porqué del diseño,
+// la ventana de 8 semanas y los gaps a propósito están en la cabecera.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826): es un schedule nuevo que le manda push a
+// usuarios reales todos los días. OK humano primero, y con filtro siempre:
+// `--only functions:notifyDailyReminders`.
+export { notifyDailyReminders } from "./notifications/notify-daily-reminders";
 // Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
 // de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
 // determinístico y esta función es la única que envía. Ver
