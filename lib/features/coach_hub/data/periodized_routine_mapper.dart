@@ -154,6 +154,17 @@ SetSpec _coerce(SetSpec s, ExerciseMode mode) => switch (mode) {
         SetSpec(type: s.type, distanceMeters: s.distanceMeters),
     };
 
+/// Una semana tiene prescripción si alguna serie trae reps, duración,
+/// distancia o un tipo que ya dice algo (fallo, drop). La celda vacía deja una
+/// serie normal/calentamiento sin ningún valor.
+bool _weekHasPrescription(List<SetSpec> week) => week.any((s) =>
+    s.reps != null ||
+    s.durationSeconds != null ||
+    s.distanceMeters != null ||
+    s.weightKg != null ||
+    s.type == SetType.failure ||
+    s.type == SetType.drop);
+
 RoutineSlot _mapSlot(
   PeriodizedExercise ex,
   MatcherExercise exercise, {
@@ -165,9 +176,13 @@ RoutineSlot _mapSlot(
   final weeks = [
     for (final w in ex.weeks) [for (final s in w) _coerce(s, mode)],
   ];
-  // Campos legacy = SEMANA 1, como el editor (los consumidores que no conocen
-  // las semanas leen la primera).
-  final week0 = weeks.first;
+  // Campos legacy = la primera semana CON prescripción (normalmente SEMANA 1,
+  // como el editor): los consumidores que no conocen `weeklySets` leen sólo
+  // estos campos, y una SEMANA 1 vacía los dejaría sin reps ni duración.
+  // `weeklySets` conserva todas las semanas tal cual. Sin datos en ninguna
+  // semana, queda SEMANA 1.
+  final week0 =
+      weeks.firstWhere(_weekHasPrescription, orElse: () => weeks.first);
 
   var targetRepsMin = 0;
   var targetRepsMax = 0;

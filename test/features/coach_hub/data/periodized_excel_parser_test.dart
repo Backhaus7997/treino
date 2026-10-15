@@ -486,6 +486,70 @@ void main() {
     });
   });
 
+  group('celdas que Excel convirtió', () {
+    const date = DateCellValue(year: 2026, month: 3, day: 4);
+    const time = TimeCellValue(hour: 1, minute: 30);
+
+    ImportDiagnostic cellError(PeriodizedParseResult r, String column) =>
+        r.errors.singleWhere((e) => e.column == column);
+
+    test('fecha u hora en SEMANA: error propio con la celda', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 3),
+        [1, 'Ejercicio A', 90, date, time, '3x8'],
+      ]));
+      expect(r.canImport, isFalse);
+      for (final col in ['D', 'E']) {
+        final d = cellError(r, col);
+        expect(d.code, ImportDiagnosticCode.unreadableCell);
+        expect(d.row, 2);
+        expect(d.message, kAutoConvertedCellMessage);
+      }
+      expect(r.errors, hasLength(2));
+    });
+
+    test('fecha u hora en DESCANSOS: error propio con la celda', () {
+      for (final v in <CellValue>[date, time]) {
+        final r = parsePeriodizedExcel(programa([
+          header1(weeks: 1),
+          [1, 'Ejercicio A', v, '3x8'],
+        ]));
+        final d = cellError(r, 'C');
+        expect(d.code, ImportDiagnosticCode.invalidRest);
+        expect(d.row, 2);
+        expect(d.message, kAutoConvertedCellMessage);
+        expect(r.errors, hasLength(1));
+      }
+    });
+
+    test('fórmula en SEMANA o DESCANSOS: pide pegar el valor', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 1),
+        [
+          1,
+          'Ejercicio A',
+          const FormulaCellValue('=60+30'),
+          const FormulaCellValue('=3*8')
+        ],
+      ]));
+      expect(cellError(r, 'C').message, kFormulaCellMessage);
+      expect(cellError(r, 'C').code, ImportDiagnosticCode.invalidRest);
+      expect(cellError(r, 'D').message, kFormulaCellMessage);
+      expect(cellError(r, 'D').code, ImportDiagnosticCode.unreadableCell);
+    });
+
+    test('un entero en DESCANSOS y en SEMANA se lee como número', () {
+      final r = parsePeriodizedExcel(programa([
+        header1(weeks: 1),
+        [1, 'Ejercicio A', const IntCellValue(90), const IntCellValue(10)],
+      ]));
+      expect(r.canImport, isTrue, reason: '${r.diagnostics}');
+      final row = r.plan!.days.single.rows.single;
+      expect(row.restSeconds, 90);
+      expect(row.exercises.single.weeks.single, hasLength(1));
+    });
+  });
+
   group('formato viejo y archivos ajenos', () {
     test(
         'el formato simple viejo (hojas Plan + Día N) se rechaza con el '

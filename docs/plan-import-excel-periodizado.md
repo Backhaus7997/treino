@@ -135,7 +135,7 @@ hoy.
 - `RoutineSlot.weeklySets[w]` = series de la columna SEMANA w+1 (índice 0-based).
 - `activeWeeks` = vacío (todas las semanas): con la decisión de arriba, ningún
   slot falta en una semana.
-- Campos legacy del slot (`sets`, reps objetivo) = semana 1, como hace el editor.
+- Campos legacy del slot (`sets`, `targetSets`, reps objetivo, duración) = la primera semana CON prescripción (normalmente la 1, como hace el editor); si SEMANA 1 está vacía y las siguientes no, leen de la primera con datos, para que los lectores que ignoran `weeklySets` no vean un ejercicio vacío. `weeklySets` conserva todas las semanas tal cual. Sin datos en ninguna, semana 1.
 - `restSeconds` = descanso del renglón (o 60).
 
 ## Errores y avisos

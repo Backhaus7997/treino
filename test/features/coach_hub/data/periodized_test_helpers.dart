@@ -5,6 +5,7 @@ import 'package:treino/features/coach_hub/data/periodized_excel_parser.dart';
 
 CellValue? _toCell(Object? v) {
   if (v == null) return null;
+  if (v is CellValue) return v;
   if (v is int) return IntCellValue(v);
   if (v is double) return DoubleCellValue(v);
   return TextCellValue(v.toString());

@@ -39,7 +39,12 @@ Uint8List buildPeriodizedTemplateBytes() {
   // celdas de descanso y de semana van centradas.
   final bandLeft = _bandStyle(HorizontalAlign.Left);
   final bandCenter = _bandStyle(HorizontalAlign.Center);
-  final centered = CellStyle(horizontalAlign: HorizontalAlign.Center);
+  // Formato Texto (`@`): sin él Excel convierte `3-4` o `1/2` en fecha y `1:30`
+  // en hora al escribir, y el valor original se pierde.
+  final centered = CellStyle(
+    horizontalAlign: HorizontalAlign.Center,
+    numberFormat: NumFormat.standard_49,
+  );
   const lastCol = 2 + kTemplateWeeks;
 
   var row = 0;

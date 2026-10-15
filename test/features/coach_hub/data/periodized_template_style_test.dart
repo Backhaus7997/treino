@@ -18,7 +18,18 @@ CellStyle? _style(Sheet s, int col, int row) => s
 /// `Excel.decodeBytes` no devuelve la alineación horizontal que el mismo
 /// paquete escribe (siempre lee `Left`), así que decodificar y comparar daría
 /// un falso rojo sobre un archivo bien armado: se verifica en el XML.
-String? _alignmentOf(String ref) {
+String? _alignmentOf(String ref) => _xfOf(ref)
+    ?.let((xf) => RegExp(r'horizontal="(\w+)"').firstMatch(xf)?.group(1));
+
+/// `numFmtId` del estilo de una celda, leído del XML (49 = Texto, `@`).
+String? _numFmtOf(String ref) => _xfOf(ref)
+    ?.let((xf) => RegExp(r'numFmtId="(\d+)"').firstMatch(xf)?.group(1));
+
+extension<T> on T {
+  R let<R>(R Function(T) f) => f(this);
+}
+
+String? _xfOf(String ref) {
   final zip = ZipDecoder().decodeBytes(buildPeriodizedTemplateBytes());
   String read(String name) =>
       utf8.decode(zip.findFile(name)!.content as List<int>);
@@ -32,7 +43,7 @@ String? _alignmentOf(String ref) {
       .allMatches(xfs)
       .elementAt(int.parse(cell.group(1)!))
       .group(0)!;
-  return RegExp(r'horizontal="(\w+)"').firstMatch(xf)?.group(1);
+  return xf;
 }
 
 String _ref(int col, int row) => '${columnLetter(col)}${row + 1}';
@@ -81,6 +92,20 @@ void main() {
       // El renglón del segundo bloque también.
       const second = 1 + kTemplateRowsPerDay + 1;
       expect(_alignmentOf(_ref(3, second)), 'center');
+    });
+
+    test(
+        'las celdas de descanso y de semana van con formato Texto (@) para '
+        'que Excel no las convierta en fecha u hora', () {
+      for (var day = 0; day < kTemplateDays; day++) {
+        final base = day * (1 + kTemplateRowsPerDay);
+        for (var r = 1; r <= kTemplateRowsPerDay; r++) {
+          for (var col = 2; col <= 2 + kTemplateWeeks; col++) {
+            expect(_numFmtOf(_ref(col, base + r)), '49',
+                reason: 'fila ${base + r + 1} col $col');
+          }
+        }
+      }
     });
 
     test('la columna del ejercicio es ancha', () {

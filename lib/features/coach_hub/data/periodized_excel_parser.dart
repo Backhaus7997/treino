@@ -47,8 +47,27 @@ String _text(Data? data) {
     final d = v.value;
     return d == d.truncateToDouble() ? d.toInt().toString() : d.toString();
   }
+  if (v is IntCellValue) return v.value.toString();
   return v.toString().trim();
 }
+
+const String kAutoConvertedCellMessage =
+    'Excel convirtió esta celda en fecha/hora. Formateala como texto y volvé '
+    'a escribir el valor.';
+const String kFormulaCellMessage = 'La celda tiene una fórmula; pegá el valor';
+
+/// Mensaje de error si Excel transformó la celda en algo que no es lo que
+/// escribió el PF (`3-4` o `1/2` → fecha, `1:30` → hora, o una fórmula). El
+/// paquete `excel` 4.0.6 no expone el valor cacheado de una fórmula, así que
+/// no hay nada que rescatar. `null` = la celda es legible.
+String? _unreadableKind(Data? data) => switch (data?.value) {
+      DateCellValue() ||
+      DateTimeCellValue() ||
+      TimeCellValue() =>
+        kAutoConvertedCellMessage,
+      FormulaCellValue() => kFormulaCellMessage,
+      _ => null,
+    };
 
 /// Lee la plantilla periodizada y devuelve el borrador MÁS todos los
 /// diagnósticos (no corta en el primer error).
@@ -107,6 +126,14 @@ class _ProgramParser {
     final r = _grid[row];
     if (col < 0 || col >= r.length) return '';
     return _text(r[col]);
+  }
+
+  /// Ver [_unreadableKind]; sólo para celdas DESCANSOS y SEMANA.
+  String? _unreadableAt(int row, int col) {
+    if (row < 0 || row >= _grid.length) return null;
+    final r = _grid[row];
+    if (col < 0 || col >= r.length) return null;
+    return _unreadableKind(r[col]);
   }
 
   void _add(
@@ -462,8 +489,13 @@ class _ProgramParser {
 
     // Descanso.
     final rawRest = _at(r, restCol);
-    final rest = parseRest(rawRest);
-    if (!rest.isOk) {
+    final restUnreadable = _unreadableAt(r, restCol);
+    final rest = restUnreadable == null ? parseRest(rawRest) : null;
+    if (restUnreadable != null) {
+      _error(ImportDiagnosticCode.invalidRest, restUnreadable,
+          row: r, col: restCol, raw: rawRest);
+      ok = false;
+    } else if (!rest!.isOk) {
       _error(ImportDiagnosticCode.invalidRest, rest.error!,
           row: r, col: restCol, raw: rawRest);
       ok = false;
@@ -499,7 +531,7 @@ class _ProgramParser {
     return PeriodizedRow(
       excelRow: r + 1,
       number: number,
-      restSeconds: rest.seconds!,
+      restSeconds: rest!.seconds!,
       exercises: exercises,
     );
   }
@@ -545,6 +577,13 @@ class _ProgramParser {
     for (var w = 0; w < weekCols.length; w++) {
       final col = weekCols[w];
       final raw = _at(r, col);
+      final unreadable = _unreadableAt(r, col);
+      if (unreadable != null) {
+        _error(ImportDiagnosticCode.unreadableCell, unreadable,
+            row: r, col: col, raw: raw);
+        failed = true;
+        continue;
+      }
       if (raw.isEmpty) {
         emptyWeeks.add(w);
         for (var i = 0; i < names.length; i++) {

@@ -4,6 +4,7 @@ import 'package:treino/features/coach_hub/data/periodized_excel_parser.dart';
 import 'package:treino/features/coach_hub/data/periodized_routine_mapper.dart';
 import 'package:treino/features/coach_hub/domain/periodized_plan.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
@@ -174,5 +175,70 @@ void main() {
     expect(slot.sets, List.filled(2, const SetSpec(type: SetType.failure)));
     expect(slot.targetReps, [0, 0]);
     expect(slot.weeklySets[1], List.filled(3, const SetSpec(reps: 8)));
+  });
+
+  group('campos legacy desde la primera semana con datos', () {
+    List<RoutineSlot> slotsOf(List<List<Object?>> rows) {
+      final plan = _plan(rows);
+      return mapPeriodizedPlanToRoutine(
+        plan,
+        matchPeriodizedPlan(plan, _catalog()).autoAssigned,
+        routineId: 'r',
+        routineName: 'n',
+        level: ExperienceLevel.beginner,
+      ).days.single.slots;
+    }
+
+    RoutineSlot slotOf(List<List<Object?>> rows) => slotsOf(rows).first;
+
+    test('reps: SEMANA 1 vacía y 2-3 con reps leen la semana 2', () {
+      final slot = slotOf([
+        header1(weeks: 3),
+        [1, 'Ejercicio A', 90, null, '3x8', '4x10'],
+      ]);
+      expect(slot.sets, List.filled(3, const SetSpec(reps: 8)));
+      expect(slot.targetSets, 3);
+      expect(slot.targetReps, [8, 8, 8]);
+      expect(slot.targetRepsMin, 8);
+      expect(slot.targetRepsMax, 8);
+      // weeklySets queda intacto: la semana 0 conserva su placeholder.
+      expect(slot.weeklySets, hasLength(3));
+      expect(slot.weeklySets[0], const [SetSpec()]);
+      expect(slot.weeklySets[1], List.filled(3, const SetSpec(reps: 8)));
+    });
+
+    test('duración: SEMANA 1 vacía lee la duración de la semana 2', () {
+      final slot = slotOf([
+        header1(weeks: 3),
+        [1, 'Ejercicio A', 90, null, "8'", "10'"],
+      ]);
+      expect(slot.exerciseMode, ExerciseMode.duration);
+      expect(slot.durationSeconds, 480);
+      expect(slot.sets, const [SetSpec(durationSeconds: 480)]);
+      expect(slot.weeklySets[0], const [SetSpec()]);
+    });
+
+    test('distancia: SEMANA 1 vacía lee la distancia de la semana 2', () {
+      final slot = slotOf([
+        header1(weeks: 3),
+        [1, 'Ejercicio A', 90, null, '2x20m', '4x30m'],
+      ]);
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(slot.sets, List.filled(2, const SetSpec(distanceMeters: 20)));
+      expect(slot.targetSets, 2);
+      expect(slot.weeklySets[0], const [SetSpec()]);
+    });
+
+    test('sin datos en ninguna semana: queda la semana 1 como antes', () {
+      final slot = slotOf([
+        header1(weeks: 3),
+        [1, 'Ejercicio A', 90, null, null, null],
+        [2, 'Ejercicio B', 90, '3x8', '3x8', '3x8'],
+      ]);
+      expect(slot.sets, const [SetSpec()]);
+      expect(slot.targetSets, 1);
+      expect(slot.targetReps, [0]);
+      expect(slot.durationSeconds, isNull);
+    });
   });
 }
