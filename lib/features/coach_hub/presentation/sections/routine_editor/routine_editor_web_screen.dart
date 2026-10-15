@@ -29,6 +29,7 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/analytics/analytics_service.dart';
 import '../../../../../core/moderation/moderation_guard.dart';
 import '../../../../../core/utils/firestore_error.dart';
+import '../../../../../core/utils/kg_format.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
@@ -124,6 +125,7 @@ class _EditorSet {
   int? repsMin; // used when repMode == range
   int? repsMax; // used when repMode == range
   int? durationSeconds; // used when exerciseMode == duration
+  double? distanceMeters; // used when exerciseMode == distance
 
   /// Deep copy — used when padding a slot's `weeklySets` to a new week count
   /// ([_RoutineEditorWebScreenState._normalizeSlotWeeks]). Preserves [type],
@@ -135,7 +137,17 @@ class _EditorSet {
     ..reps = reps
     ..repsMin = repsMin
     ..repsMax = repsMax
-    ..durationSeconds = durationSeconds;
+    ..durationSeconds = durationSeconds
+    ..distanceMeters = distanceMeters;
+}
+
+/// Resumen de una prescripción por distancia: `3 × 6 m`, o `3 × —` si los
+/// sets no tienen la misma meta (mismo criterio que mobile).
+String _resumenDeDistancia(List<_EditorSet> sets) {
+  final values = sets.map((s) => s.distanceMeters).toList();
+  final first = values.isEmpty ? null : values.first;
+  final uniform = first != null && values.every((v) => v == first);
+  return '${sets.length} × ${uniform ? '${formatWeightKg(first)} m' : '—'}';
 }
 
 /// Maps a persisted [SetSpec] into its mutable editor row.
@@ -145,6 +157,7 @@ _EditorSet _editorSetFromSpec(SetSpec spec) => _EditorSet()
   ..repsMin = spec.repsMin
   ..repsMax = spec.repsMax
   ..durationSeconds = spec.durationSeconds
+  ..distanceMeters = spec.distanceMeters
   ..weightKg = spec.weightKg;
 
 /// Leading chip label for a set row: the running count of NORMAL sets up to
@@ -482,9 +495,16 @@ class _RoutineEditorWebScreenState
     // exerciseMode/repMode fields (mirrors mobile's _repModeFromHydratedSets),
     // applied to week 0 only since mode is per-slot, not per-week.
     final week0 = weeklySets.first;
-    final isDuration = week0.any((s) => (s.durationSeconds ?? 0) > 0);
-    final isRange =
-        !isDuration && week0.any((s) => s.repsMin != null || s.repsMax != null);
+    // La distancia sale de `effectiveExerciseMode` (fuente única, la misma
+    // que usan el móvil y el player): modo explícito o metros en cualquier
+    // set/semana. Sin esto, abrir en la web una rutina con distancia y
+    // guardarla la reseteaba a reps y borraba los metros.
+    final isDistance = slot.effectiveExerciseMode == ExerciseMode.distance;
+    final isDuration =
+        !isDistance && week0.any((s) => (s.durationSeconds ?? 0) > 0);
+    final isRange = !isDistance &&
+        !isDuration &&
+        week0.any((s) => s.repsMin != null || s.repsMax != null);
 
     final editorSlot = _EditorSlot()
       // Synthesize a minimal Exercise from the slot's denormalized fields —
@@ -496,7 +516,11 @@ class _RoutineEditorWebScreenState
         category: '',
       )
       ..restSeconds = slot.restSeconds
-      ..exerciseMode = isDuration ? ExerciseMode.duration : ExerciseMode.reps
+      ..exerciseMode = isDistance
+          ? ExerciseMode.distance
+          : isDuration
+              ? ExerciseMode.duration
+              : ExerciseMode.reps
       ..repMode = isRange ? RepMode.range : RepMode.single
       ..notes = slot.notes ?? ''
       ..weeklySets = weeklySets
@@ -1717,6 +1741,7 @@ class _RoutineEditorWebScreenState
           ..repsMin = last?.repsMin
           ..repsMax = last?.repsMax
           ..durationSeconds = last?.durationSeconds
+          ..distanceMeters = last?.distanceMeters
           ..weightKg = last?.weightKg,
       );
     });
@@ -1792,7 +1817,25 @@ class _RoutineEditorWebScreenState
     );
   }
 
-  /// Switches an exercise between fixed reps, a min–max range, and duration.
+  void _onSetDistanceChanged(
+    int dayIndex,
+    int slotIndex,
+    int setIndex,
+    String v,
+  ) {
+    _markDirty();
+    // Acepta coma decimal (teclado es-AR): `6,5` es 6,5 m.
+    final value = double.tryParse(v.trim().replaceAll(',', '.'));
+    setState(
+      () => _days[dayIndex]
+          .slots[slotIndex]
+          .weeklySets[_selectedWeek][setIndex]
+          .distanceMeters = value != null && value > 0 ? value : null,
+    );
+  }
+
+  /// Switches an exercise between fixed reps, a min–max range, duration and
+  /// distance.
   /// Reps ↔ range values carry across so the trainer doesn't retype. Mode is
   /// per-slot (not per-week, REQ-PERIOD-017/ADR-PB-03), so the carry-across
   /// runs over EVERY week's sets — not just `_selectedWeek` — otherwise a
@@ -1920,6 +1963,8 @@ class _RoutineEditorWebScreenState
             if (_isSetValid(slot, set)) continue;
             if (slot.exerciseMode == ExerciseMode.duration) {
               return '$name tiene una serie sin duración$wk.'; // i18n
+            } else if (slot.exerciseMode == ExerciseMode.distance) {
+              return '$name tiene una serie sin distancia$wk.'; // i18n
             } else if (slot.repMode == RepMode.range) {
               return '$name tiene un rango de reps inválido (mín ≤ máx)$wk.'; // i18n
             } else {
@@ -1943,6 +1988,9 @@ class _RoutineEditorWebScreenState
     if (set.type == SetType.failure) return true;
     if (slot.exerciseMode == ExerciseMode.duration) {
       return set.durationSeconds != null && set.durationSeconds! > 0;
+    }
+    if (slot.exerciseMode == ExerciseMode.distance) {
+      return set.distanceMeters != null && set.distanceMeters! > 0;
     }
     if (slot.repMode == RepMode.range) {
       final min = set.repsMin, max = set.repsMax;
@@ -1985,6 +2033,9 @@ class _RoutineEditorWebScreenState
       final wk = _numWeeks > 1 ? ' (Semana ${w + 1})' : ''; // i18n
       if (slot.exerciseMode == ExerciseMode.duration) {
         return 'Falta la duración de una serie$wk.'; // i18n
+      }
+      if (slot.exerciseMode == ExerciseMode.distance) {
+        return 'Falta la distancia de una serie$wk.'; // i18n
       }
       if (slot.repMode == RepMode.range) {
         return 'Rango de reps inválido, mín ≤ máx$wk.'; // i18n
@@ -2073,7 +2124,8 @@ class _RoutineEditorWebScreenState
   RoutineSlot _buildSlot(_EditorSlot slot, int? supersetGroup) {
     final exercise = slot.exercise!;
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
-    final isRange = !isDuration && slot.repMode == RepMode.range;
+    final isDistance = slot.exerciseMode == ExerciseMode.distance;
+    final isRange = !isDuration && !isDistance && slot.repMode == RepMode.range;
 
     // Legacy fields + the `sets:` list stay derived from WEEK 0, mirroring
     // mobile's buildRoutineSlot — every non-week-aware consumer keeps reading
@@ -2090,6 +2142,11 @@ class _RoutineEditorWebScreenState
       targetRepsMax = 0;
       targetReps = const [];
       durationSeconds = week0.isEmpty ? null : week0.first.durationSeconds;
+    } else if (isDistance) {
+      // La distancia vive en cada SetSpec; no hay campo legacy que derivar.
+      targetRepsMin = 0;
+      targetRepsMax = 0;
+      targetReps = const [];
     } else if (isRange) {
       final mins = week0.map((s) => s.repsMin ?? 0).toList();
       final maxs = week0.map((s) => s.repsMax ?? 0).toList();
@@ -2108,6 +2165,9 @@ class _RoutineEditorWebScreenState
     SetSpec toSpec(_EditorSet s) {
       if (isDuration) {
         return SetSpec(type: s.type, durationSeconds: s.durationSeconds);
+      }
+      if (isDistance) {
+        return SetSpec(type: s.type, distanceMeters: s.distanceMeters);
       }
       if (isRange) {
         return SetSpec(
@@ -2132,8 +2192,9 @@ class _RoutineEditorWebScreenState
       targetRepsMax: targetRepsMax,
       restSeconds: slot.restSeconds,
       supersetGroup: supersetGroup,
-      targetWeightKg:
-          isDuration || week0Specs.isEmpty ? null : week0Specs.first.weightKg,
+      targetWeightKg: isDuration || isDistance || week0Specs.isEmpty
+          ? null
+          : week0Specs.first.weightKg,
       targetReps: targetReps,
       durationSeconds: durationSeconds,
       exerciseMode: slot.exerciseMode,
@@ -3258,6 +3319,8 @@ class _RoutineEditorWebScreenState
                                           _onSetRepsMaxChanged(i, s, set, v),
                                       onSetDurationChanged: (s, set, v) =>
                                           _onSetDurationChanged(i, s, set, v),
+                                      onSetDistanceChanged: (s, set, v) =>
+                                          _onSetDistanceChanged(i, s, set, v),
                                       onSetWeightChanged: (s, set, v) =>
                                           _onSetWeightChanged(i, s, set, v),
                                       onSetTypeChanged: (s, set, t) =>
@@ -3785,6 +3848,7 @@ class _DayCard extends StatelessWidget {
     required this.onSetRepsMinChanged,
     required this.onSetRepsMaxChanged,
     required this.onSetDurationChanged,
+    required this.onSetDistanceChanged,
     required this.onSetWeightChanged,
     required this.onModeChanged,
     required this.onNotesChanged,
@@ -3863,6 +3927,8 @@ class _DayCard extends StatelessWidget {
       onSetRepsMaxChanged;
   final void Function(int slotIndex, int setIndex, String value)
       onSetDurationChanged;
+  final void Function(int slotIndex, int setIndex, String value)
+      onSetDistanceChanged;
   final void Function(int slotIndex, int setIndex, String value)
       onSetWeightChanged;
   final void Function(int slotIndex, int setIndex, SetType type)
@@ -4123,6 +4189,7 @@ class _DayCard extends StatelessWidget {
       onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
       onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
       onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
+      onSetDistanceChanged: (set, v) => onSetDistanceChanged(i, set, v),
       onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
       onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
       onModeChanged: (em, rm) => onModeChanged(i, em, rm),
@@ -4163,6 +4230,7 @@ class _SlotCard extends StatelessWidget {
     required this.onSetRepsMinChanged,
     required this.onSetRepsMaxChanged,
     required this.onSetDurationChanged,
+    required this.onSetDistanceChanged,
     required this.onSetWeightChanged,
     required this.onModeChanged,
     required this.onNotesChanged,
@@ -4214,6 +4282,7 @@ class _SlotCard extends StatelessWidget {
   final void Function(int setIndex, String value) onSetRepsMinChanged;
   final void Function(int setIndex, String value) onSetRepsMaxChanged;
   final void Function(int setIndex, String value) onSetDurationChanged;
+  final void Function(int setIndex, String value) onSetDistanceChanged;
   final void Function(int setIndex, String value) onSetWeightChanged;
   final void Function(int setIndex, SetType type) onSetTypeChanged;
   final void Function(ExerciseMode exerciseMode, RepMode repMode) onModeChanged;
@@ -4290,18 +4359,20 @@ class _SlotCard extends StatelessWidget {
     final card = ExerciseCard(
       title: exercise?.name ?? '—',
       summary: PrescriptionChips(
-        prescription: resumenDePrescripcion(
-          modo: slot.exerciseMode,
-          sets: [
-            for (final set in weekSets)
-              (
-                reps: set.reps,
-                durationSeconds: set.durationSeconds,
-                weightKg: set.weightKg,
+        prescription: slot.exerciseMode == ExerciseMode.distance
+            ? _resumenDeDistancia(weekSets)
+            : resumenDePrescripcion(
+                modo: slot.exerciseMode,
+                sets: [
+                  for (final set in weekSets)
+                    (
+                      reps: set.reps,
+                      durationSeconds: set.durationSeconds,
+                      weightKg: set.weightKg,
+                    ),
+                ],
+                unidadDePeso: 'kg', // i18n
               ),
-          ],
-          unidadDePeso: 'kg', // i18n
-        ),
       ),
       expanded: slot.expandido,
       onToggle: onToggleExpanded,
@@ -4323,8 +4394,8 @@ class _SlotCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 6),
-              // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
-              // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
+              // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo / distancia
+              // (paridad con mobile). exerciseMode + repMode combinados en 4 chips.
               Row(
                 children: [
                   _ModeChip(
@@ -4351,6 +4422,14 @@ class _SlotCard extends StatelessWidget {
                     palette: palette,
                     onTap: () =>
                         onModeChanged(ExerciseMode.duration, RepMode.single),
+                  ),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Distancia', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.distance,
+                    palette: palette,
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.distance, RepMode.single),
                   ),
                 ],
               ),
@@ -4460,6 +4539,7 @@ class _SlotCard extends StatelessWidget {
                   onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
                   onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
                   onDurationChanged: (v) => onSetDurationChanged(i, v),
+                  onDistanceChanged: (v) => onSetDistanceChanged(i, v),
                   onWeightChanged: (v) => onSetWeightChanged(i, v),
                   chipLabel: _setChipLabel(weekSets, i),
                   onTypeChanged: (t) => onSetTypeChanged(i, t),
@@ -4608,6 +4688,7 @@ class _SetRow extends StatelessWidget {
     required this.onRepsMinChanged,
     required this.onRepsMaxChanged,
     required this.onDurationChanged,
+    required this.onDistanceChanged,
     required this.onWeightChanged,
     required this.chipLabel,
     required this.onTypeChanged,
@@ -4628,6 +4709,7 @@ class _SetRow extends StatelessWidget {
   final ValueChanged<String> onRepsMinChanged;
   final ValueChanged<String> onRepsMaxChanged;
   final ValueChanged<String> onDurationChanged;
+  final ValueChanged<String> onDistanceChanged;
   final ValueChanged<String> onWeightChanged;
 
   /// Precomputed leading label: the running set number, or W/D/F for a typed
@@ -4639,11 +4721,14 @@ class _SetRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDuration = exerciseMode == ExerciseMode.duration;
-    final isRange = !isDuration && repMode == RepMode.range;
+    final isDistance = exerciseMode == ExerciseMode.distance;
+    final isRange = !isDuration && !isDistance && repMode == RepMode.range;
     // Failure sets have no countable target, so their fields never flag red.
     final flag = showErrors && set.type != SetType.failure;
     final durationInvalid =
         flag && (set.durationSeconds == null || set.durationSeconds! <= 0);
+    final distanceInvalid =
+        flag && (set.distanceMeters == null || set.distanceMeters! <= 0);
     final repsInvalid = flag && (set.reps == null || set.reps! <= 0);
     final rangeInvalid = flag &&
         (set.repsMin == null ||
@@ -4668,6 +4753,17 @@ class _SetRow extends StatelessWidget {
                 hint: 'seg', // i18n
                 onChanged: onDurationChanged,
                 invalid: durationInvalid,
+              ),
+            )
+          else if (isDistance)
+            // Distancia (sled, carry, sprint): sólo metros, sin peso.
+            Expanded(
+              child: _numberField(
+                initial: formatWeightKg(set.distanceMeters),
+                hint: 'm', // i18n
+                decimal: true,
+                onChanged: onDistanceChanged,
+                invalid: distanceInvalid,
               ),
             )
           else ...[

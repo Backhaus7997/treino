@@ -151,7 +151,7 @@ List<BlockStatus> computeBlockStatuses(
 /// bare row has no prescription, so this returns 0 (no planned target).
 int plannedRepsForSpec(SetSpec? spec, ExerciseMode mode) {
   if (spec == null) return 0;
-  if (mode == ExerciseMode.duration) return 0;
+  if (mode != ExerciseMode.reps) return 0;
   if (spec.reps != null) return spec.reps!;
   if (spec.repsMax != null) return spec.repsMax!;
   if (spec.repsMin != null) return spec.repsMin!;
@@ -169,6 +169,14 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (mode == ExerciseMode.duration) {
     final secs = spec.durationSeconds ?? 0;
     return formatMMSS(secs);
+  }
+  if (mode == ExerciseMode.distance) {
+    final meters = spec.distanceMeters;
+    if (meters == null) return '— m';
+    final text = meters == meters.roundToDouble()
+        ? meters.toInt().toString()
+        : meters.toStringAsFixed(1);
+    return '$text m';
   }
   if (spec.reps != null) return '${spec.reps} reps';
   final min = spec.repsMin;
@@ -551,9 +559,11 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// (su métrica es el tiempo; el `_DurationSetRow` loguea vía
   /// `onSetCheck(setNumber, 0, 0.0)` cuando el countdown llega a 0). Ahí el guard
   /// NO aplica — si no, el set nunca se marca hecho y un día con cualquier
-  /// ejercicio por tiempo jamás puede terminarse.
+  /// ejercicio por tiempo jamás puede terminarse. Idem DISTANCIA
+  /// (`_DistanceSetRow` llama `onSetCheck(n, 0, 0)`): `effectiveExerciseMode`
+  /// la infiere de los metros aunque el doc diga `exerciseMode: reps`.
   void _logSet(RoutineSlot slot, int setNumber, int reps, double weightKg) {
-    if (slot.effectiveExerciseMode != ExerciseMode.duration && reps <= 0) {
+    if (slot.effectiveExerciseMode == ExerciseMode.reps && reps <= 0) {
       return;
     }
     ref.read(sessionNotifierProvider(widget.init).notifier).logSet(
@@ -2132,6 +2142,10 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
           (mode == ExerciseMode.duration ||
               (specDurationSeconds != null && specDurationSeconds > 0));
       final targetSeconds = isDurationSet ? (specDurationSeconds ?? 0) : 0;
+      // El modo sale de `effectiveExerciseMode` (fuente única): ya infiere
+      // distancia de los metros en sets/semanas, así que la fila y el guard de
+      // `_logSet` nunca pueden discrepar.
+      final isDistanceSet = spec != null && mode == ExerciseMode.distance;
 
       final isFutureSet = !isRowDone && !isCurrent;
       // live-set-editing AD-6: the delete icon shows on LOGGED rows and on
@@ -2152,29 +2166,41 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
               // la cuenta llega a cero, esté esta fila montada o no.
               enabled: isCurrent,
             )
-          : _RepsSetRow(
-              key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
-              setNumber: setNumber,
-              spec: spec,
-              mode: mode,
-              plannedReps: plannedReps,
-              // For done rows preserve the athlete's original entry so
-              // re-editing does not silently snap back to the planned
-              // value; for pending rows preload with the planned target.
-              initialReps: isRowDone ? logged.reps : plannedReps,
-              initialWeightKg: initialWeight,
-              isDone: isRowDone,
-              isExpanded: isExpanded,
-              onCheck: isCurrent
-                  ? (reps, weightKg) =>
-                      widget.onSetCheck(setNumber, reps, weightKg)
-                  : null,
-              onSetUpdate: isRowDone
-                  ? (reps, weightKg) =>
-                      widget.onSetUpdate(logged, reps, weightKg)
-                  : null,
-              onSummaryTap: isRowDone ? () => _toggleDoneRow(setNumber) : null,
-            );
+          : isDistanceSet
+              ? _DistanceSetRow(
+                  key: ValueKey(
+                      'distance-$setNumber-${logged?.id ?? "pending"}'),
+                  setNumber: setNumber,
+                  distanceMeters: spec.distanceMeters ?? 0,
+                  isDone: isRowDone,
+                  onCheck: isCurrent
+                      ? () => widget.onSetCheck(setNumber, 0, 0)
+                      : null,
+                )
+              : _RepsSetRow(
+                  key: ValueKey('set-$setNumber-${logged?.id ?? "pending"}'),
+                  setNumber: setNumber,
+                  spec: spec,
+                  mode: mode,
+                  plannedReps: plannedReps,
+                  // For done rows preserve the athlete's original entry so
+                  // re-editing does not silently snap back to the planned
+                  // value; for pending rows preload with the planned target.
+                  initialReps: isRowDone ? logged.reps : plannedReps,
+                  initialWeightKg: initialWeight,
+                  isDone: isRowDone,
+                  isExpanded: isExpanded,
+                  onCheck: isCurrent
+                      ? (reps, weightKg) =>
+                          widget.onSetCheck(setNumber, reps, weightKg)
+                      : null,
+                  onSetUpdate: isRowDone
+                      ? (reps, weightKg) =>
+                          widget.onSetUpdate(logged, reps, weightKg)
+                      : null,
+                  onSummaryTap:
+                      isRowDone ? () => _toggleDoneRow(setNumber) : null,
+                );
 
       if (showRemoveIcon) {
         innerRow = Row(
@@ -2482,6 +2508,89 @@ class _RemoveSetConfirmDialog extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── _DistanceSetRow ───────────────────────────────────────────────────────────
+
+/// Fila de una serie por distancia. La distancia es la prescripción; marcarla
+/// registra que el atleta completó ese tramo, igual que el reloj.
+class _DistanceSetRow extends StatelessWidget {
+  const _DistanceSetRow({
+    super.key,
+    required this.setNumber,
+    required this.distanceMeters,
+    required this.isDone,
+    required this.onCheck,
+  });
+
+  final int setNumber;
+  final double distanceMeters;
+  final bool isDone;
+  final VoidCallback? onCheck;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final color = isDone ? palette.textMuted : palette.textPrimary;
+    final text = distanceMeters == distanceMeters.roundToDouble()
+        ? distanceMeters.toInt().toString()
+        : distanceMeters.toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            child: Text(
+              '$setNumber',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '$text m',
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: color,
+              ),
+            ),
+          ),
+          Semantics(
+            button: true,
+            label: l10n.sessionPlayerSetCompleteA11y(setNumber),
+            child: TreinoTappable(
+              onTap: isDone ? null : onCheck,
+              child: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                child: Icon(
+                  isDone
+                      ? TreinoIcon.checkCircleFill
+                      : TreinoIcon.checkCircleEmpty,
+                  color: isDone ? palette.accent : palette.textMuted,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
