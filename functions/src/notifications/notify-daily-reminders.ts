@@ -1,9 +1,25 @@
 /**
- * notifyDailyReminders — el push diario de recordatorio para el atleta.
+ * notifyDailyReminders — el PLANIFICADOR de los recordatorios diarios del atleta.
  *
- * Corre todos los días a las 10:00 ART y manda COMO MÁXIMO UN push por atleta
- * por día. Todo se calcula en el servidor: el cliente no participa, así que un
- * teléfono apagado, una app sin abrir o una versión vieja no cambian nada.
+ * Corre todos los días a las 06:00 ART y NO manda nada. Para cada atleta decide
+ * si hoy le toca un recordatorio, de qué tipo y a QUÉ HORA, y lo deja escrito en
+ * `users/{uid}.dailyReminderPlan`. Quien lo manda es `dispatchDailyReminders`
+ * (`dispatch-daily-reminders.ts`), que corre cada 15 minutos y despacha los
+ * planes que ya vencieron. COMO MÁXIMO UN push por atleta por día.
+ *
+ * Todo se calcula en el servidor: el cliente no participa, así que un teléfono
+ * apagado, una app sin abrir o una versión vieja no cambian nada.
+ *
+ * ─── Por qué dos funciones y no una ────────────────────────────────────────
+ *
+ * El recordatorio sale a la hora en que ESE atleta suele entrenar (ver «A qué
+ * hora sale cada uno»), no a una hora fija para todos. Una sola corrida diaria
+ * no puede hacerlo: la hora cambia por atleta. Planificar una vez (el escaneo de
+ * 9 semanas es la parte cara) y despachar cada 15 minutos (barato: sólo lee los
+ * planes de hoy) separa el costo del cálculo del costo de la puntualidad.
+ *
+ * El despachante es además quien sabe lo que el planificador no puede: lo que
+ * pasó DESPUÉS de las 06:00. Si el atleta ya arrancó una sesión, no manda nada.
  *
  * ─── Los dos recordatorios, en orden de prioridad ──────────────────────────
  *
@@ -20,8 +36,9 @@
  *    práctica son DOS avisos por período de inactividad —el día 4 y el día 11—
  *    y después silencio hasta que vuelva a entrenar (ver abajo).
  *
- * Si califica para los dos, gana el 1 y el 2 NO se consume: no se escribe
- * `lastComebackReminderDate`, así que el cooldown de 7 días no corre.
+ * Si califica para los dos, el plan es el de racha y NO se planifica comeback ese
+ * día: no se escribe `lastComebackReminderDate`, así que el cooldown de 7 días no
+ * corre. Hay UN plan por atleta por día: un plan nuevo reemplaza al anterior.
  *
  * ─── El "volvé a entrenar" tiene TOPE: dos avisos y silencio ───────────────
  *
@@ -38,6 +55,45 @@
  * caído, un opt-out que se prendió después). Al volver a entrenar, la cuenta
  * arranca desde la nueva última sesión.
  *
+ * El cooldown se evalúa al PLANIFICAR y se vuelve a verificar al RESERVAR (en el
+ * despachante), y `lastComebackReminderDate` se escribe cuando el push sale, no
+ * cuando se planifica. Por eso un plan que no se despacha (el atleta entrenó, el
+ * envío falló todo el día) no consume nada del tope: mañana se vuelve a evaluar
+ * con la misma ventana.
+ *
+ * ─── A qué hora sale cada uno ──────────────────────────────────────────────
+ *
+ * El horario habitual de entrenamiento se aprende de las sesiones del atleta
+ * (`habitual-time.ts` tiene el algoritmo, la muestra de 12 y el desempate):
+ *
+ *   · Racha en riesgo: habitual + 60 minutos. Llega una hora después de cuando
+ *     suele entrenar, o sea cuando "se colgó". Sin patrón claro: 18:00.
+ *   · Volver a entrenar: a la hora habitual. Sin patrón claro: 09:00.
+ *   · Los dos, acotados a [08:00, 22:30]. El piso es 08:00 porque este
+ *     planificador corre a las 06:00 y tiene que terminar de escribir los planes
+ *     antes de que el primero venza.
+ *
+ * El horario NO se guarda: se recalcula en cada corrida con las sesiones que el
+ * escaneo ya trajo, así que cuando el atleta cambia de hábito se adapta solo.
+ * Esas sesiones son las de la ventana de 9 semanas, no el historial entero: quien
+ * entrena pocas veces por semana puede tener menos de 12 ahí, y la muestra es lo
+ * que haya (hace falta un grupo de 4 dentro de una hora para que haya patrón).
+ * Traer más historial costaría una lectura por sesión extra por candidato.
+ *
+ * ─── El plan: `users/{uid}.dailyReminderPlan` ──────────────────────────────
+ *
+ *   { date: "YYYY-MM-DD" (ART),
+ *     kind: "streak-at-risk" | "comeback-reminder",
+ *     sendAtMinute: 0..1439 (minuto del día ART),
+ *     missing, streakWeeks }   ← racha
+ *     daysSince                ← comeback
+ *
+ * Lleva los datos del texto, así que el despachante no vuelve a leer sesiones ni
+ * rutinas para armarlo. Se escribe SÓLO si el atleta pasó el opt-out y no tiene
+ * `lastDailyReminderDate === hoy`. Un plan de un día anterior que haya quedado en
+ * el doc no hace daño y no hace falta limpiarlo: el despachante consulta por la
+ * fecha de HOY, así que no lo ve; se pisa solo el día que haya otro plan.
+ *
  * ─── La racha: port, no reglas propias ─────────────────────────────────────
  *
  * El cálculo vive en `weekly-streak.ts`, un port de la lógica de Dart contrastado
@@ -49,6 +105,8 @@
  *
  * ─── Costo de lecturas ─────────────────────────────────────────────────────
  *
+ * Planificador (una vez por día):
+ *
  * 1. UNA collectionGroup query paginada sobre `sessions` (ventana de 9 semanas),
  *    filtrada y agrupada en memoria por uid. Cuesta una lectura por sesión de la
  *    ventana, todos los días: crece con la base de usuarios y con la frecuencia
@@ -57,13 +115,25 @@
  *    ventana.
  * 2. Un atleta pasa a ser CANDIDATO sólo si por las sesiones ya cargadas puede
  *    llegar a calificar (ver `summarizeActivity`). El resto no cuesta una lectura
- *    más. Para los candidatos: el doc del usuario.
+ *    más. Para los candidatos: el doc del usuario, y una escritura si le toca plan.
  * 3. Las lecturas de RUTINAS (2 queries, y 1 doc más si el marcador apunta al
  *    catálogo) se hacen SÓLO para el candidato a racha en riesgo que ya pasó los
  *    filtros baratos (es atleta, no apagó el push, no se le mandó hoy).
  * 4. Si la racha llega al borde de la ventana, se completa con una query extra
  *    sobre las sesiones de ESE usuario, para que el "racha de M semanas" del
  *    texto sea exacto y no un piso.
+ * 5. El horario habitual no cuesta lecturas: sale de las sesiones del punto 1.
+ *
+ * Despachante (cada 15 minutos): UNA query a `users` por igualdad sobre
+ * `dailyReminderPlan.date` (sólo los planes de HOY), más, por cada plan VENCIDO,
+ * una query de una lectura a las sesiones de ese atleta y la transacción de la
+ * reserva. Los planes que todavía no vencieron cuestan su lectura en cada tick
+ * desde las 08:00 hasta que les toca (un doc entero de `users`): ≈ planes
+ * pendientes × ticks de espera (a modo de cuenta: 1.000 planes que esperan 20
+ * ticks de promedio son 20.000 lecturas por día). No está medido contra la base
+ * real. Si pesara, el remedio es un índice compuesto (`date ==`, `sendAtMinute
+ * <=`) que filtre en el servidor, y por eso mismo NO se agrega ahora: es un
+ * deploy de índices a producción.
  *
  * ⚠️  ÍNDICE: la collectionGroup query exige el single-field index de scope
  * COLLECTION_GROUP sobre `sessions.startedAt`, que ya existe como `fieldOverrides`
@@ -72,26 +142,31 @@
  * un fieldOverride REEMPLAZA la configuración del campo en vez de sumarse, y
  * declarar uno nuevo le borraría a `startedAt` los índices que ya sostienen
  * `SessionRepository.listByUid`, los contadores del finish y `ranking-aggregate`.
- * Las queries de rutinas usan los tres compuestos que el cliente ya declara.
+ * Las queries de rutinas usan los tres compuestos que el cliente ya declara. La
+ * query del despachante es una igualdad sobre un campo de un mapa, que Firestore
+ * indexa solo: no hace falta ni compuesto ni override.
  *
  * ─── Idempotencia ──────────────────────────────────────────────────────────
  *
- * `users/{uid}.lastDailyReminderDate` (YYYY-MM-DD ART) guarda el día del último
- * push; si ya vale hoy, el atleta se saltea. `lastComebackReminderDate` guarda el
- * último "volvé a entrenar" para el cooldown. Mismo patrón que `notifyMonthlyReport`:
- * el día se RESERVA en una transacción ANTES de despachar —dos corridas solapadas
- * no pueden mandar las dos— y se SUELTA, restaurando los valores previos, si el
- * envío falla, para que el reintento no se lo trague.
+ * El planificador es idempotente: correrlo dos veces el mismo día reescribe el
+ * mismo plan. El que MANDA es el despachante, y ahí `users/{uid}.lastDailyReminderDate`
+ * (YYYY-MM-DD ART) guarda el día del último push; si ya vale hoy, el atleta se
+ * saltea tanto al planificar como al despachar. `lastComebackReminderDate` guarda
+ * el último "volvé a entrenar" para el cooldown. Mismo patrón que
+ * `notifyMonthlyReport`: el día se RESERVA en una transacción ANTES de despachar
+ * —dos corridas solapadas no pueden mandar las dos— y se SUELTA, restaurando los
+ * valores previos y el plan, si el envío falla, para que el próximo tick reintente.
  *
  * ─── Opt-out: ANTES de reservar, y no sólo en sendFcm ──────────────────────
  *
  * `notificationPrefs.recordatorios_entrenamiento.push === false` saltea al
- * usuario antes de reservar y antes de llamar a `sendFcm`. No es redundante con
- * el `prefKey` que se le pasa igual: `sendFcm` con una preferencia apagada frena
- * el banner del sistema pero SÍ escribe la entrada de `users/{uid}/notifications`
- * (el historial in-app es otro canal). Sin este corte, quien apagó los
- * recordatorios se encontraría una fila nueva por día en su bandeja. Una
- * preferencia ausente cuenta como encendida.
+ * usuario antes de planificar, y se vuelve a verificar en la reserva del
+ * despachante, antes de llamar a `sendFcm`. No es redundante con el `prefKey`
+ * que se le pasa igual: `sendFcm` con una preferencia apagada frena el banner del
+ * sistema pero SÍ escribe la entrada de `users/{uid}/notifications` (el historial
+ * in-app es otro canal). Sin este corte, quien apagó los recordatorios se
+ * encontraría una fila nueva por día en su bandeja. Una preferencia ausente
+ * cuenta como encendida.
  *
  * ─── Deep link ─────────────────────────────────────────────────────────────
  *
@@ -102,31 +177,33 @@
  *
  * ─── Reglas de Firestore ───────────────────────────────────────────────────
  *
- * Los dos marcadores los escribe este backend con el Admin SDK, pero
+ * Los tres campos (`dailyReminderPlan`, `lastDailyReminderDate`,
+ * `lastComebackReminderDate`) los escribe este backend con el Admin SDK, pero
  * `firestore.rules` NO los pinea: el dueño puede actualizar cualquier campo no
  * protegido de su propio `users/{uid}`. No importa: el único perjudicado por
  * pisarlos es el propio dueño. Con `lastDailyReminderDate` futuro se silencia a
  * sí mismo; borrándolo, o borrando `lastComebackReminderDate`, se saltea el
- * cooldown, pero igual recibe a lo sumo UN push por corrida del scheduler. Y
- * apagar los recordatorios ya tiene su interruptor oficial en
- * `notificationPrefs`. Nadie puede tocar el doc de OTRO, y `role` SÍ está
- * pineado (inmutable), así que el filtro "sólo atletas" no se puede falsear.
+ * cooldown, pero igual recibe a lo sumo UN push por día. Escribiéndose un
+ * `dailyReminderPlan` a mano lo único que logra es mandarse un push a sí mismo:
+ * el despachante valida la forma del plan (un plan malformado se borra sin
+ * mandar) y arma el texto sólo con enteros. Y apagar los recordatorios ya tiene
+ * su interruptor oficial en `notificationPrefs`. Nadie puede tocar el doc de
+ * OTRO, y `role` SÍ está pineado (inmutable), así que el filtro "sólo atletas" no
+ * se puede falsear.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import {
   DocumentData,
-  FieldValue,
   Query,
   QueryDocumentSnapshot,
   Timestamp,
   getFirestore,
 } from "firebase-admin/firestore";
-import { Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { artDateKey } from "../mail/format";
-import { sendFcm } from "./send-fcm";
+import { comebackSendMinute, habitualStartMinute, streakSendMinute } from "./habitual-time";
 import {
   DAY_MS,
   WEEK_MS,
@@ -154,6 +231,15 @@ export const DAILY_REMINDERS_PREF_KEY = "recordatorios_entrenamiento";
 
 /** Adónde llevan los dos tipos de push. Ver «Deep link» en la cabecera. */
 export const DAILY_REMINDER_DEEP_LINK = "/home";
+
+/** El campo de `users/{uid}` donde el planificador deja el plan del día. */
+export const DAILY_REMINDER_PLAN_FIELD = "dailyReminderPlan";
+
+/**
+ * La ruta que consulta el despachante (`where(…, "==", hoy)`). Va aparte de la
+ * anterior para que los dos archivos no armen el string cada uno por su lado.
+ */
+export const DAILY_REMINDER_PLAN_DATE_PATH = `${DAILY_REMINDER_PLAN_FIELD}.date`;
 
 /** Cuántos días calendario ART sin entrenar disparan el "volvé a entrenar". */
 export const COMEBACK_MIN_DAYS = 4;
@@ -184,12 +270,34 @@ type Db = ReturnType<typeof getFirestore>;
 
 export type DailyReminderKind = "streak-at-risk" | "comeback-reminder";
 
+/**
+ * El plan del día de UN atleta: lo escribe este planificador en
+ * `users/{uid}.dailyReminderPlan` y lo consume `dispatchDailyReminders`. Lleva
+ * los datos del texto para que el despachante no tenga que recalcular la racha ni
+ * releer rutinas. Ver «El plan» en la cabecera.
+ */
+export type DailyReminderPlan =
+  | {
+      date: string;
+      kind: "streak-at-risk";
+      /** Minuto del día ART (0..1439) a partir del cual puede salir. */
+      sendAtMinute: number;
+      missing: number;
+      streakWeeks: number;
+    }
+  | {
+      date: string;
+      kind: "comeback-reminder";
+      sendAtMinute: number;
+      daysSince: number;
+    };
+
 export interface NotifyDailyRemindersResult {
-  /** Pushes despachados (`sendFcm` no tiró). */
-  notified: number;
-  notifiedStreakAtRisk: number;
-  notifiedComeback: number;
-  /** Candidatos que terminaron sin push por una razón de negocio. */
+  /** Planes escritos. El planificador NO manda pushes: eso es del despachante. */
+  planned: number;
+  plannedStreakAtRisk: number;
+  plannedComeback: number;
+  /** Candidatos que terminaron sin plan por una razón de negocio. */
   skipped: number;
   skippedNotAthlete: number;
   skippedOptedOut: number;
@@ -198,12 +306,12 @@ export interface NotifyDailyRemindersResult {
   skippedNotAtRisk: number;
   /** Candidatos que tiraron un error. */
   failed: number;
-  /** Atletas que pasaron el filtro barato por sesiones: notified + skipped + failed. */
+  /** Atletas que pasaron el filtro barato por sesiones: planned + skipped + failed. */
   candidates: number;
   scannedSessions: number;
   /** Atletas con al menos una sesión que cuenta en la ventana. */
   athletesWithSessions: number;
-  /** Hoy en ART, YYYY-MM-DD: el valor que se estampa en `lastDailyReminderDate`. */
+  /** Hoy en ART, YYYY-MM-DD: el `date` de los planes y lo que mira `lastDailyReminderDate`. */
   dateKey: string;
 }
 
@@ -241,6 +349,13 @@ export function comebackCopy(daysSince: number): { title: string; body: string }
     title: "Te extrañamos en el gym 💪",
     body: `Hace ${daysSince} ${dias} que no entrenás. ¿Arrancamos hoy?`,
   };
+}
+
+/** El texto de un plan. Lo arma el despachante, que es quien manda. */
+export function reminderCopy(plan: DailyReminderPlan): { title: string; body: string } {
+  return plan.kind === "streak-at-risk"
+    ? streakAtRiskCopy(plan.missing, plan.streakWeeks)
+    : comebackCopy(plan.daysSince);
 }
 
 // ─── Fechas ART como texto ────────────────────────────────────────────────────
@@ -469,27 +584,31 @@ async function exactStreakWeeks(
 
 // ─── Decisión por atleta ──────────────────────────────────────────────────────
 
-type Reminder =
-  | { kind: "streak-at-risk"; missing: number; streakWeeks: number }
-  | { kind: "comeback-reminder"; daysSince: number };
+interface StreakReminder {
+  missing: number;
+  streakWeeks: number;
+}
 
 type SkipReason = "not-athlete" | "opted-out" | "already-sent" | "cooldown" | "not-at-risk";
 
 type Outcome =
-  | { status: "notified"; kind: DailyReminderKind }
+  | { status: "planned"; kind: DailyReminderKind }
   | { status: "skipped"; reason: SkipReason };
 
 interface RunContext {
-  app: App;
   db: Db;
-  messaging?: Messaging;
   now: Date;
   cal: Calendar;
   windowStartMs: number;
 }
 
-/** Sólo un `push === false` EXPLÍCITO apaga; igual criterio que `sendFcm`. */
-function pushOptedOut(user: DocumentData): boolean {
+/**
+ * Sólo un `push === false` EXPLÍCITO apaga; igual criterio que `sendFcm`. Se
+ * exporta porque el despachante tiene que aplicar EXACTAMENTE el mismo criterio
+ * al reservar: dos copias de un predicado de preferencias es cómo uno de los dos
+ * lados se queda mandando lo que el otro ya no.
+ */
+export function pushOptedOut(user: DocumentData): boolean {
   const prefs = user.notificationPrefs as
     | Record<string, { push?: unknown } | undefined>
     | null
@@ -498,7 +617,7 @@ function pushOptedOut(user: DocumentData): boolean {
 }
 
 /**
- * ¿Está la racha en riesgo HOY? Devuelve el recordatorio o `null`.
+ * ¿Está la racha en riesgo HOY? Devuelve los datos del texto o `null`.
  *
  * El pre-filtro del que sale el candidato ya garantiza una condición necesaria
  * (`previousWeekCount >= currentWeekCount + daysLeft`, ver `handler`); acá se
@@ -510,7 +629,7 @@ async function streakReminderFor(
   user: DocumentData,
   startsMs: readonly number[],
   activity: Activity,
-): Promise<Reminder | null> {
+): Promise<StreakReminder | null> {
   const target = await loadWeeklyTarget(ctx.db, uid, user.activeRoutineId);
 
   // «Faltan exactamente tantos como días quedan»: el objetivo tiene que ser lo
@@ -537,10 +656,20 @@ async function streakReminderFor(
     });
   }
 
-  return { kind: "streak-at-risk", missing, streakWeeks };
+  return { missing, streakWeeks };
 }
 
-async function processCandidate(
+/**
+ * Decide el plan de UN atleta y, si le toca uno, lo escribe. No manda nada y no
+ * reserva nada: el marcador `lastDailyReminderDate` lo escribe el despachante
+ * cuando el push sale de verdad.
+ *
+ * La escritura es un `update` simple y no una transacción: lo que podría cambiar
+ * entre la lectura previa y la escritura (el opt-out, un envío del mismo día) lo
+ * vuelve a verificar el despachante dentro de SU transacción antes de mandar. Un
+ * plan de más es inofensivo; un push de más no.
+ */
+async function planCandidate(
   ctx: RunContext,
   uid: string,
   startsMs: readonly number[],
@@ -549,8 +678,7 @@ async function processCandidate(
 ): Promise<Outcome> {
   const userRef = ctx.db.collection("users").doc(uid);
 
-  // Lectura previa, sólo para descartar barato ANTES de leer rutinas. La
-  // autoridad es la transacción de abajo, que vuelve a verificar todo.
+  // Lectura previa, sólo para descartar barato ANTES de leer rutinas.
   const snap = await userRef.get();
   const user = snap.data();
   if (!snap.exists || !user || user.role !== "athlete") {
@@ -561,107 +689,50 @@ async function processCandidate(
     return { status: "skipped", reason: "already-sent" };
   }
 
-  let reminder: Reminder | null = null;
+  const date = ctx.cal.todayKey;
+
+  // Racha primero: si califica, el plan es de racha y NO hay comeback hoy.
   if (flags.streakCandidate) {
-    reminder = await streakReminderFor(ctx, uid, user, startsMs, activity);
+    const streak = await streakReminderFor(ctx, uid, user, startsMs, activity);
+    if (streak) {
+      const plan: DailyReminderPlan = {
+        date,
+        kind: "streak-at-risk",
+        sendAtMinute: streakSendMinute(habitualStartMinute(startsMs)),
+        missing: streak.missing,
+        streakWeeks: streak.streakWeeks,
+      };
+      await userRef.update({ [DAILY_REMINDER_PLAN_FIELD]: plan });
+      return { status: "planned", kind: plan.kind };
+    }
   }
-  const cooldownOk = comebackCooldownElapsed(user.lastComebackReminderDate, ctx.cal.todayKey);
-  if (!reminder && flags.comebackCandidate && cooldownOk) {
-    reminder = { kind: "comeback-reminder", daysSince: activity.daysSinceLast };
-  }
-  if (!reminder) {
-    return {
-      status: "skipped",
-      reason: flags.comebackCandidate && !cooldownOk ? "cooldown" : "not-at-risk",
+
+  if (flags.comebackCandidate) {
+    if (!comebackCooldownElapsed(user.lastComebackReminderDate, date)) {
+      return { status: "skipped", reason: "cooldown" };
+    }
+    const plan: DailyReminderPlan = {
+      date,
+      kind: "comeback-reminder",
+      sendAtMinute: comebackSendMinute(habitualStartMinute(startsMs)),
+      daysSince: activity.daysSinceLast,
     };
-  }
-  const chosen = reminder;
-
-  // Se RESERVA el día en una transacción ANTES de despachar, no después.
-  //
-  // Con el marcador escrito al final, dos corridas solapadas —el scheduler
-  // reintenta ante un timeout parcial— podían leer las dos el marcador viejo,
-  // mandar las dos el push y recién ahí escribirlo: dos notificaciones y dos
-  // filas de historial por el mismo día. La transacción hace que sólo una gane.
-  //
-  // El riesgo se invierte: si el envío falla DESPUÉS de reservar, el día queda
-  // marcado sin push. Por eso el catch de abajo suelta la reserva.
-  const claim = await ctx.db.runTransaction(async (tx) => {
-    const fresh = await tx.get(userRef);
-    const data = fresh.data();
-    if (!fresh.exists || !data || data.role !== "athlete") {
-      return { status: "not-athlete" as const };
-    }
-    if (pushOptedOut(data)) return { status: "opted-out" as const };
-    if (data.lastDailyReminderDate === ctx.cal.todayKey) {
-      return { status: "already-sent" as const };
-    }
-    if (
-      chosen.kind === "comeback-reminder" &&
-      !comebackCooldownElapsed(data.lastComebackReminderDate, ctx.cal.todayKey)
-    ) {
-      return { status: "cooldown" as const };
-    }
-
-    const update: Record<string, unknown> = { lastDailyReminderDate: ctx.cal.todayKey };
-    if (chosen.kind === "comeback-reminder") {
-      update.lastComebackReminderDate = ctx.cal.todayKey;
-    }
-    tx.update(userRef, update);
-    return {
-      status: "claimed" as const,
-      previousDaily: data.lastDailyReminderDate as unknown,
-      previousComeback: data.lastComebackReminderDate as unknown,
-    };
-  });
-
-  if (claim.status !== "claimed") return { status: "skipped", reason: claim.status };
-
-  const copy =
-    chosen.kind === "streak-at-risk"
-      ? streakAtRiskCopy(chosen.missing, chosen.streakWeeks)
-      : comebackCopy(chosen.daysSince);
-
-  try {
-    await sendFcm(
-      ctx.app,
-      {
-        uids: [uid],
-        kind: chosen.kind,
-        notification: copy,
-        data: { deepLink: DAILY_REMINDER_DEEP_LINK },
-        // El opt-out ya se resolvió arriba, ANTES de reservar. Se pasa igual por
-        // consistencia con el resto de los productores: si alguien lo apaga entre
-        // la transacción y el envío, `sendFcm` todavía frena el banner.
-        prefKey: DAILY_REMINDERS_PREF_KEY,
-      },
-      ctx.messaging,
-    );
-  } catch (sendError: unknown) {
-    // Soltar la reserva restaurando lo que había: sin esto el día queda marcado
-    // y el atleta no recibe el aviso, ni en el reintento.
-    const restore: Record<string, unknown> = {
-      lastDailyReminderDate:
-        claim.previousDaily === undefined ? FieldValue.delete() : claim.previousDaily,
-    };
-    if (chosen.kind === "comeback-reminder") {
-      restore.lastComebackReminderDate =
-        claim.previousComeback === undefined ? FieldValue.delete() : claim.previousComeback;
-    }
-    await userRef.update(restore).catch(() => undefined);
-    throw sendError;
+    await userRef.update({ [DAILY_REMINDER_PLAN_FIELD]: plan });
+    return { status: "planned", kind: plan.kind };
   }
 
-  return { status: "notified", kind: chosen.kind };
+  return { status: "skipped", reason: "not-at-risk" };
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-/** Handler con el reloj y Messaging inyectados para que los tests no toquen FCM. */
+/**
+ * Handler con el reloj inyectado. Ya no recibe `Messaging`: el planificador no
+ * manda nada, así que no hay FCM que reemplazar (eso quedó en el despachante).
+ */
 export async function notifyDailyRemindersHandler(
   app: App,
   now: Date,
-  messaging?: Messaging,
 ): Promise<NotifyDailyRemindersResult> {
   const db = getFirestore(app);
   const nowMs = now.getTime();
@@ -714,11 +785,11 @@ export async function notifyDailyRemindersHandler(
   } while (cursor);
 
   // ── 2. Por atleta ──
-  const ctx: RunContext = { app, db, messaging, now, cal, windowStartMs };
+  const ctx: RunContext = { db, now, cal, windowStartMs };
   const result: NotifyDailyRemindersResult = {
-    notified: 0,
-    notifiedStreakAtRisk: 0,
-    notifiedComeback: 0,
+    planned: 0,
+    plannedStreakAtRisk: 0,
+    plannedComeback: 0,
     skipped: 0,
     skippedNotAthlete: 0,
     skippedOptedOut: 0,
@@ -754,15 +825,15 @@ export async function notifyDailyRemindersHandler(
 
     result.candidates++;
     try {
-      const outcome = await processCandidate(ctx, uid, startsMs, activity, {
+      const outcome = await planCandidate(ctx, uid, startsMs, activity, {
         streakCandidate,
         comebackCandidate,
       });
 
-      if (outcome.status === "notified") {
-        result.notified++;
-        if (outcome.kind === "streak-at-risk") result.notifiedStreakAtRisk++;
-        else result.notifiedComeback++;
+      if (outcome.status === "planned") {
+        result.planned++;
+        if (outcome.kind === "streak-at-risk") result.plannedStreakAtRisk++;
+        else result.plannedComeback++;
         continue;
       }
 
@@ -799,13 +870,16 @@ export async function notifyDailyRemindersHandler(
 }
 
 /**
- * Corre todos los días a las 10:00 ART, en la misma región que el resto de las
- * CFs de TREINO. `timeoutSeconds: 540` porque, a diferencia del reporte mensual,
- * el escaneo es de 9 semanas todos los días y el envío es secuencial.
+ * Corre todos los días a las 06:00 ART, en la misma región que el resto de las
+ * CFs de TREINO. Sólo planifica; `dispatchDailyReminders` es quien manda.
+ * `timeoutSeconds: 540` porque, a diferencia del reporte mensual, el escaneo es
+ * de 9 semanas todos los días y las lecturas por candidato son secuenciales. Las
+ * 06:00 dejan dos horas de margen hasta el primer horario posible de envío
+ * (08:00).
  */
 export const notifyDailyReminders = onSchedule(
   {
-    schedule: "0 10 * * *",
+    schedule: "0 6 * * *",
     timeZone: "America/Argentina/Buenos_Aires",
     region: "southamerica-east1",
     timeoutSeconds: 540,

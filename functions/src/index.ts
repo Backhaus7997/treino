@@ -76,15 +76,24 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // poda es inmediata para los usuarios reales.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
 export { notifyMonthlyReport } from "./notifications/notify-monthly-report";
-// Push diario de recordatorio al atleta (racha en riesgo / volvé a entrenar), a
-// las 10:00 ART. Todo se calcula acá, sin intervención del cliente. Interruptor:
-// `notificationPrefs.recordatorios_entrenamiento.push`. El porqué del diseño,
-// la ventana de 8 semanas y los gaps a propósito están en la cabecera.
+// Recordatorios diarios al atleta (racha en riesgo / volvé a entrenar), a la hora
+// en que ESE atleta suele entrenar. Son DOS funciones que van juntas:
+//   · notifyDailyReminders (06:00 ART): PLANIFICA. No manda nada; escribe
+//     `users/{uid}.dailyReminderPlan` con el tipo, el texto y la hora.
+//   · dispatchDailyReminders (cada 15 min): MANDA los planes que ya vencieron, salvo
+//     que el atleta haya arrancado una sesión hoy.
+// Todo se calcula acá, sin intervención del cliente. Interruptor:
+// `notificationPrefs.recordatorios_entrenamiento.push`. El porqué del diseño, la
+// ventana de 8 semanas y los gaps a propósito están en la cabecera de
+// notify-daily-reminders.ts; el horario aprendido, en habitual-time.ts.
 //
-// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826): es un schedule nuevo que le manda push a
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826): son schedules nuevos que le mandan push a
 // usuarios reales todos los días. OK humano primero, y con filtro siempre:
-// `--only functions:notifyDailyReminders`.
+// `--only functions:notifyDailyReminders,functions:dispatchDailyReminders`.
+// Desplegá las DOS: sin el despachante los planes se escriben y no sale ningún push
+// (inofensivo pero inútil); sin el planificador el despachante no encuentra nada.
 export { notifyDailyReminders } from "./notifications/notify-daily-reminders";
+export { dispatchDailyReminders } from "./notifications/dispatch-daily-reminders";
 // Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
 // de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
 // determinístico y esta función es la única que envía. Ver
