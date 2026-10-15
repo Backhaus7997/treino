@@ -21,6 +21,7 @@ import 'package:treino/features/workout/application/session_highlights.dart';
 import 'package:treino/features/workout/application/session_muscle_distribution.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_recognition.dart';
+import 'package:treino/features/workout/application/week_completion.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -106,6 +107,7 @@ Widget _buildWithRouter({
   SessionMuscleDistribution muscleDistribution = emptySessionMuscleDistribution,
   bool muscleError = false,
   SessionHighlights highlights = emptySessionHighlights,
+  WeekCompletion? weekCompletion,
   bool reduceMotion = false,
   double? textScale,
   List<CheckIn> dayCheckIns = const [],
@@ -133,6 +135,20 @@ Widget _buildWithRouter({
           body: Center(child: Text('composer-screen')),
         ),
       ),
+      // Stub de Insights: acá sólo importa adónde lleva el botón de "Semana
+      // cumplida" y que volver deje el resumen debajo (Insights real, con su
+      // flecha atrás, hace `context.pop()`).
+      GoRoute(
+        path: '/home/insights',
+        builder: (context, __) => Scaffold(
+          body: Center(
+            child: TextButton(
+              onPressed: context.pop,
+              child: const Text('insights-screen'),
+            ),
+          ),
+        ),
+      ),
     ],
   );
 
@@ -152,6 +168,11 @@ Widget _buildWithRouter({
     // history (Firestore) from inside a widget test.
     sessionHighlightsProvider.overrideWith(
       (ref, key) => Future.value(highlights),
+    ),
+    // Always overridden: el real lee el historial de sesiones y la rutina
+    // activa (Firestore) para decidir si la sesión cumplió la semana.
+    sessionWeekCompletionProvider.overrideWith(
+      (ref, key) => Future.value(weekCompletion),
     ),
     // Always overridden: el paso de check-in (#643) lee los registros del día
     // y el provider real iría a Firestore desde un widget test.
@@ -439,6 +460,140 @@ void main() {
 
     expect(find.textContaining('RÉCORD'), findsNothing);
     expect(find.textContaining('SESIÓN DE LA SEMANA'), findsNothing);
+  });
+
+  // ── Felicitación "Semana cumplida" ───────────────────────────────────────
+  //
+  // La decisión de cuándo aparece (cuenta, es la que llega al objetivo, semana
+  // en curso) vive en `deriveWeekCompletion` y se testea en
+  // week_completion_test.dart. Acá sólo lo que dibuja y adónde lleva.
+
+  testWidgets(
+      'semana cumplida: la tarjeta muestra título, racha y el botón al '
+      'resumen de la semana', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      weekCompletion: (streak: 4),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¡Semana cumplida! 🔥'), findsOneWidget);
+    expect(find.text('Llevás 4 semanas de racha.'), findsOneWidget);
+    expect(find.text('Ver resumen de la semana'), findsOneWidget);
+  });
+
+  testWidgets('semana cumplida: con racha 1 celebra la primera semana',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      weekCompletion: (streak: 1),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¡Tu primera semana cumplida!'), findsOneWidget);
+    expect(find.textContaining('de racha'), findsNothing);
+  });
+
+  testWidgets('semana cumplida: sin felicitación → no hay tarjeta ni hueco',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¡Semana cumplida! 🔥'), findsNothing);
+    expect(find.text('Ver resumen de la semana'), findsNothing);
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
+  });
+
+  testWidgets(
+      'semana cumplida: va ARRIBA del banner de reconocimiento y no lo '
+      'reemplaza', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        exercises: [_exercise()],
+        recognition: (
+          kind: SessionRecognitionKind.nthSessionOfWeek,
+          count: 3,
+        ),
+      ),
+      weekCompletion: (streak: 2),
+    ));
+    await tester.pumpAndSettle();
+
+    final card = find.text('¡Semana cumplida! 🔥');
+    final banner = find.text('3ª SESIÓN DE LA SEMANA');
+    expect(card, findsOneWidget);
+    expect(banner, findsOneWidget);
+    expect(
+      tester.getTopLeft(card).dy,
+      lessThan(tester.getTopLeft(banner).dy),
+    );
+  });
+
+  testWidgets(
+      'semana cumplida: el botón abre Insights y volver deja el resumen '
+      'debajo', (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      weekCompletion: (streak: 2),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Ver resumen de la semana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver resumen de la semana'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('insights-screen'), findsOneWidget);
+
+    // `push`, no `go`: la flecha atrás de Insights vuelve al resumen que el
+    // atleta estaba mirando en vez de dejarlo en otro lado.
+    await tester.tap(find.text('insights-screen'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('BUEN ENTRENO'), findsOneWidget);
+    expect(find.text('¡Semana cumplida! 🔥'), findsOneWidget);
+  });
+
+  testWidgets(
+      'semana cumplida: con reduce-motion y font scale 3x no desborda '
+      'horizontalmente', (tester) async {
+    tester.view.physicalSize = const Size(390, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    final horizontalOverflows = <FlutterErrorDetails>[];
+    final originalOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      final message = details.exceptionAsString();
+      if (message.contains('overflowed')) {
+        if (message.contains('on the right')) {
+          horizontalOverflows.add(details);
+        }
+        return;
+      }
+      originalOnError?.call(details);
+    };
+    try {
+      await tester.pumpWidget(_buildWithRouter(
+        textScale: 3.0,
+        reduceMotion: true,
+        summaryOverride: () => (session: _makeSession(), setLogs: []),
+        weekCompletion: (streak: 12),
+      ));
+      await tester.pumpAndSettle();
+    } finally {
+      FlutterError.onError = originalOnError;
+    }
+
+    expect(
+      horizontalOverflows.map((d) => d.exceptionAsString()).toList(),
+      isEmpty,
+    );
+    expect(find.text('¡Semana cumplida! 🔥'), findsOneWidget);
+    expect(find.text('Ver resumen de la semana'), findsOneWidget);
   });
 
   // ── Sección EJERCICIOS ───────────────────────────────────────────────────

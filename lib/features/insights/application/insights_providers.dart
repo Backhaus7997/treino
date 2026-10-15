@@ -196,8 +196,12 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
     weekEnd: weekEndExclusive.subtract(const Duration(milliseconds: 1)),
     daysTrained: daysTrained,
     sessionsCount: weekSessions.length,
-    // Hardcoded 5 — decisión 5. Refinar cuando Coach exponga plannedDays.
-    plannedSessionsCount: 5,
+    // El objetivo semanal REAL (días con ejercicios de la rutina activa), el
+    // mismo que usa la racha. Antes era un 5 fijo: con una rutina de 3 días la
+    // tarjeta "¡Semana cumplida!" del resumen post-entreno llevaba a un "3 / 5"
+    // (#1449). Todos los callers pasan el uid del usuario logueado, que es de
+    // quien es `weeklyStreakTargetProvider`.
+    plannedSessionsCount: weeklyTarget,
     setsByGroup: setsByGroup,
     targetByGroup: targetByGroup,
     streak: streak,

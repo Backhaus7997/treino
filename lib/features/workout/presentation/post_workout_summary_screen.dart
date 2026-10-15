@@ -20,11 +20,13 @@ import '../application/session_highlights.dart';
 import '../application/session_muscle_distribution.dart';
 import '../application/session_providers.dart';
 import '../application/session_recognition.dart';
+import '../application/week_completion.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'widgets/session_highlights_section.dart';
 import 'widgets/session_muscle_distribution_section.dart';
 import 'widgets/session_stats_card.dart';
+import 'widgets/session_week_completion_card.dart';
 import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -179,6 +181,10 @@ class _LoadedBody extends StatelessWidget {
               ],
             ),
           ),
+          // La felicitación de semana va ARRIBA del banner de reconocimiento y
+          // no lo reemplaza: son dos celebraciones distintas (una por la
+          // semana, otra por la sesión) y pueden darse juntas.
+          _WeekCompletionSlot(sessionId: session.id),
           _RecognitionSlot(highlights: highlights),
           const SizedBox(height: 32),
 
@@ -277,6 +283,43 @@ class _LoadedBody extends StatelessWidget {
 // Cada slot es un hijo fijo del Column que renderiza SizedBox.shrink hasta que
 // su data llega; el contenido monta con su propia entrada TreinoFadeSlideIn y
 // lleva su spacing adentro (así "ausente" no deja huecos).
+
+/// Tarjeta "¡Semana cumplida!" — sólo en la sesión que completa el objetivo
+/// semanal de la semana en curso (ver [deriveWeekCompletion]).
+///
+/// Best-effort como el resto de los slots: mientras el provider carga, si
+/// falla, o si la sesión no cumple la regla, queda en shrink y no deja hueco.
+/// Se suscribe sólo al valor (`select`), así el slot no se reconstruye por los
+/// estados de carga.
+class _WeekCompletionSlot extends ConsumerWidget {
+  const _WeekCompletionSlot({required this.sessionId});
+
+  final String sessionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final completion = ref.watch(
+      sessionWeekCompletionProvider((uid: uid, sessionId: sessionId))
+          .select((async) => async.valueOrNull),
+    );
+    if (completion == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: TreinoFadeSlideIn(
+        distance: AppMotion.slideSm,
+        child: SessionWeekCompletionCard(
+          streak: completion.streak,
+          // `push` y no `go`: Insights tiene su propia flecha atrás
+          // (`context.pop()`), y volver tiene que dejar al atleta en el
+          // resumen que estaba mirando. Insights abre SIEMPRE en la semana en
+          // curso, que es la única semana en la que esta tarjeta aparece.
+          onViewWeek: () => context.push('/home/insights'),
+        ),
+      ),
+    );
+  }
+}
 
 class _RecognitionSlot extends StatelessWidget {
   const _RecognitionSlot({required this.highlights});
