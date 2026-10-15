@@ -391,6 +391,33 @@
       }
     },
     {
+      "name": "fila explicita por distancia conserva metros",
+      "given": {
+        "week": 0,
+        "activeWeeks": [],
+        "weeklySets": [],
+        "sets": [
+          {
+            "distanceMeters": 6
+          }
+        ],
+        "targetSets": 1,
+        "durationSeconds": null,
+        "targetReps": [],
+        "targetRepsMin": 0,
+        "targetRepsMax": 0,
+        "targetWeightKg": null
+      },
+      "expect": {
+        "isActive": true,
+        "sets": [
+          {
+            "distanceMeters": 6
+          }
+        ]
+      }
+    },
+    {
       "name": "semana negativa: ausente con mascara, presente sin ella",
       "why": "Nunca tira excepcion, en ninguno de los dos casos.",
       "given": {

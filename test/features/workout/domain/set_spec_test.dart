@@ -20,6 +20,7 @@ void main() {
       expect(decoded.repsMin, isNull);
       expect(decoded.repsMax, isNull);
       expect(decoded.durationSeconds, isNull);
+      expect(decoded.distanceMeters, isNull);
       expect(decoded, equals(spec));
     });
 
@@ -106,6 +107,27 @@ void main() {
       const spec = SetSpec(type: SetType.warmup);
       final json = spec.toJson();
       expect(json['type'], equals('warmup'));
+    });
+
+    test('SCENARIO-SET-10: distance set round-trips through JSON', () {
+      const spec = SetSpec(distanceMeters: 6.5);
+
+      final json = spec.toJson();
+      final decoded = SetSpec.fromJson(json);
+
+      expect(json['distanceMeters'], 6.5);
+      expect(decoded.distanceMeters, 6.5);
+      expect(decoded, spec);
+    });
+
+    test('SCENARIO-SET-11: old document without distance decodes null', () {
+      final decoded = SetSpec.fromJson(<String, Object?>{
+        'type': 'normal',
+        'reps': 8,
+      });
+
+      expect(decoded.distanceMeters, isNull);
+      expect(decoded.reps, 8);
     });
   });
 }

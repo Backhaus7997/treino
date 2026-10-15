@@ -54,6 +54,34 @@ void main() {
     });
   });
 
+  group('isSetValid — distance mode', () {
+    test('distanceMeters null or zero is invalid', () {
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.distance,
+          repMode: RepMode.single,
+        ),
+        isFalse,
+      );
+      expect(
+        RoutineEditorTestBridge.isSetValidBridge(
+          exerciseMode: ExerciseMode.distance,
+          repMode: RepMode.single,
+          distanceMeters: 0,
+        ),
+        isFalse,
+      );
+    });
+
+    test('editor stores the entered distance in every SetSpec', () {
+      final slot = RoutineEditorTestBridge.buildDistanceSlotBridge([6, 8.5]);
+
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(slot.sets.map((s) => s.distanceMeters), [6, 8.5]);
+      expect(slot.weeklySets.single.map((s) => s.distanceMeters), [6, 8.5]);
+    });
+  });
+
   // ── isSetValid — failure sets (al fallo) ───────────────────────────────────
   // A failure set has no countable target by definition — the athlete works
   // to failure. Requiring reps/duration for it was a conceptual bug

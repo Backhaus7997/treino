@@ -117,6 +117,7 @@ class _EditableSet {
   int? repsMin;
   int? repsMax;
   int? durationSeconds;
+  double? distanceMeters;
 
   _EditableSet({
     this.type = SetType.normal,
@@ -125,6 +126,7 @@ class _EditableSet {
     this.repsMin,
     this.repsMax,
     this.durationSeconds,
+    this.distanceMeters,
   });
 
   /// Returns a copy with the same values — used when duplicating the last set.
@@ -135,6 +137,7 @@ class _EditableSet {
         repsMin: repsMin,
         repsMax: repsMax,
         durationSeconds: durationSeconds,
+        distanceMeters: distanceMeters,
       );
 
   /// True deep copy preserving [type] — "Duplicar semana" must replicate the
@@ -147,6 +150,7 @@ class _EditableSet {
         repsMin: repsMin,
         repsMax: repsMax,
         durationSeconds: durationSeconds,
+        distanceMeters: distanceMeters,
       );
 
   SetSpec toSetSpec() => SetSpec(
@@ -156,6 +160,7 @@ class _EditableSet {
         repsMin: repsMin,
         repsMax: repsMax,
         durationSeconds: durationSeconds,
+        distanceMeters: distanceMeters,
       );
 }
 
@@ -283,6 +288,7 @@ _EditableSet _editableSetFromSpec(SetSpec spec) => _EditableSet(
       repsMin: spec.repsMin,
       repsMax: spec.repsMax,
       durationSeconds: spec.durationSeconds,
+      distanceMeters: spec.distanceMeters,
     );
 
 /// Picks the rep mode that matches the hydrated set data: REP RANGE only when at
@@ -315,6 +321,9 @@ bool isSetValid(_EditableSet s, ExerciseMode exerciseMode, RepMode repMode) {
   if (s.type == SetType.failure) return true;
   if (exerciseMode == ExerciseMode.duration) {
     return s.durationSeconds != null && s.durationSeconds! > 0;
+  }
+  if (exerciseMode == ExerciseMode.distance) {
+    return s.distanceMeters != null && s.distanceMeters! > 0;
   }
   if (repMode == RepMode.range) {
     return s.repsMin != null &&
@@ -439,6 +448,10 @@ RoutineSlot buildRoutineSlot(_EditableSlot s, int? effectiveGroup) {
   if (s.exerciseMode == ExerciseMode.duration) {
     legacyDurationSeconds =
         week0.isNotEmpty ? week0.first.durationSeconds : null;
+    legacyRepsMin = 0;
+    legacyRepsMax = 0;
+    legacyTargetReps = [];
+  } else if (s.exerciseMode == ExerciseMode.distance) {
     legacyRepsMin = 0;
     legacyRepsMax = 0;
     legacyTargetReps = [];
@@ -5700,8 +5713,15 @@ class _SlotEditorState extends State<_SlotEditor> {
     _EditableSlot slot,
     List<_EditableSet> sets,
     AppL10n l10n,
-  ) =>
-      resumenDePrescripcion(
+  ) {
+    if (slot.exerciseMode == ExerciseMode.distance) {
+      final values = sets.map((s) => s.distanceMeters).toList();
+      final first = values.isEmpty ? null : values.first;
+      final uniform = first != null && values.every((v) => v == first);
+      final target = uniform ? '${formatWeightKg(first)} m' : '—';
+      return '${sets.length} × $target';
+    }
+    return resumenDePrescripcion(
         modo: slot.exerciseMode,
         sets: [
           for (final set in sets)
@@ -5713,6 +5733,7 @@ class _SlotEditorState extends State<_SlotEditor> {
         ],
         unidadDePeso: l10n.monthlyReportVolumeUnit,
       );
+  }
 
   String _restSummary(int seconds) {
     final display = secondsToMmss(seconds);
@@ -5851,6 +5872,14 @@ class _SetTableState extends State<_SetTable> {
                 color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
+        PopupMenuItem(
+          value: ExerciseMode.distance,
+          child: Text(
+            'Distancia',
+            style: GoogleFonts.barlow(
+                color: widget.palette.textPrimary, fontSize: 13),
+          ),
+        ),
       ],
     );
     if (result != null) {
@@ -5936,6 +5965,7 @@ class _SetTableState extends State<_SetTable> {
     final sets = widget.sets;
     final palette = widget.palette;
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
+    final isDistance = slot.exerciseMode == ExerciseMode.distance;
     _filas.removeWhere((set, _) => !sets.contains(set));
 
     return Column(
@@ -5963,6 +5993,7 @@ class _SetTableState extends State<_SetTable> {
               exerciseMode: slot.exerciseMode,
               repMode: slot.repMode,
               isDuration: isDuration,
+              isDistance: isDistance,
               isInvalid: widget.showSetErrors &&
                   !isSetValid(sets[i], slot.exerciseMode, slot.repMode),
               onTypeChanged: (type) {
@@ -5979,7 +6010,7 @@ class _SetTableState extends State<_SetTable> {
               exerciseName: slot.exercise?.name,
               // Sin KG no hay columna que replicar, y con un solo set no hay
               // dónde: en los dos casos el botón no se dibuja.
-              onFillColumn: !isDuration && sets.length > 1
+              onFillColumn: !isDuration && !isDistance && sets.length > 1
                   ? (_) => _fillKgColumn(i)
                   : null,
             ),
@@ -6009,6 +6040,7 @@ class _SetTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
+    final isDistance = slot.exerciseMode == ExerciseMode.distance;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
           fontSize: 10.5,
@@ -6058,6 +6090,8 @@ class _SetTableHeader extends StatelessWidget {
         const SizedBox(width: AppSpacing.s8),
         if (isDuration) ...[
           cell('TIEMPO', tappable: true),
+        ] else if (isDistance) ...[
+          cell('DISTANCIA (M)', tappable: true),
         ] else ...[
           cell('KG'),
           const SizedBox(width: AppSpacing.s8),
@@ -6084,7 +6118,7 @@ class _SetTableHeader extends StatelessWidget {
 
 /// Qué celda de una fila de set tiene el foco. Es lo que decide el paso del
 /// stepper (2,5 en kilos, 1 en repeticiones) y qué columna replica "A TODAS".
-enum _SetField { kg, reps, repsMin, repsMax }
+enum _SetField { kg, reps, repsMin, repsMax, distance }
 
 class _SetRow extends StatefulWidget {
   const _SetRow({
@@ -6096,6 +6130,7 @@ class _SetRow extends StatefulWidget {
     required this.exerciseMode,
     required this.repMode,
     required this.isDuration,
+    required this.isDistance,
     required this.onTypeChanged,
     required this.onChanged,
     this.onRemove,
@@ -6112,6 +6147,7 @@ class _SetRow extends StatefulWidget {
   final ExerciseMode exerciseMode;
   final RepMode repMode;
   final bool isDuration;
+  final bool isDistance;
   final void Function(SetType) onTypeChanged;
   final VoidCallback onChanged;
   final VoidCallback? onRemove;
@@ -6141,6 +6177,7 @@ class _SetRowState extends State<_SetRow> {
   late final TextEditingController _repsCtrl;
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
+  late final TextEditingController _distanceCtrl;
 
   /// Un focus node por celda. Antes sólo lo tenía KG, porque los steppers
   /// vivían dentro de la fila y sólo servían para el peso; desde #867 la barra
@@ -6159,6 +6196,8 @@ class _SetRowState extends State<_SetRow> {
         text: s.repsMin != null ? s.repsMin.toString() : '');
     _repsMaxCtrl = TextEditingController(
         text: s.repsMax != null ? s.repsMax.toString() : '');
+    _distanceCtrl = TextEditingController(
+        text: s.distanceMeters == null ? '' : formatWeightKg(s.distanceMeters));
     for (final campo in _SetField.values) {
       _focos[campo] = FocusNode()..addListener(() => _onFocoCambiado(campo));
     }
@@ -6183,7 +6222,9 @@ class _SetRowState extends State<_SetRow> {
   @override
   void didUpdateWidget(_SetRow old) {
     super.didUpdateWidget(old);
-    if (old.isDuration != widget.isDuration || old.repMode != widget.repMode) {
+    if (old.isDuration != widget.isDuration ||
+        old.isDistance != widget.isDistance ||
+        old.repMode != widget.repMode) {
       _soltarFocosAusentes();
     }
   }
@@ -6191,6 +6232,7 @@ class _SetRowState extends State<_SetRow> {
   /// Qué celdas renderiza esta fila con la configuración actual del slot.
   Set<_SetField> get _camposVisibles {
     if (widget.isDuration) return const {};
+    if (widget.isDistance) return const {_SetField.distance};
     return widget.repMode == RepMode.range
         ? const {_SetField.kg, _SetField.repsMin, _SetField.repsMax}
         : const {_SetField.kg, _SetField.reps};
@@ -6267,6 +6309,7 @@ class _SetRowState extends State<_SetRow> {
     _repsCtrl.dispose();
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
+    _distanceCtrl.dispose();
     for (final foco in _focos.values) {
       foco.dispose();
     }
@@ -6283,11 +6326,16 @@ class _SetRowState extends State<_SetRow> {
   double? get _currentKg =>
       parseEditorWeight(_kgCtrl.text) ?? widget.editableSet.weightKg;
 
+  double? get _currentDistance =>
+      parseEditorWeight(_distanceCtrl.text) ??
+      widget.editableSet.distanceMeters;
+
   TextEditingController _controllerDe(_SetField campo) => switch (campo) {
         _SetField.kg => _kgCtrl,
         _SetField.reps => _repsCtrl,
         _SetField.repsMin => _repsMinCtrl,
         _SetField.repsMax => _repsMaxCtrl,
+        _SetField.distance => _distanceCtrl,
       };
 
   /// El valor que la celda muestra AHORA. El controller le gana al modelo: a
@@ -6301,7 +6349,7 @@ class _SetRowState extends State<_SetRow> {
       _SetField.reps => s.reps,
       _SetField.repsMin => s.repsMin,
       _SetField.repsMax => s.repsMax,
-      _SetField.kg => null,
+      _SetField.kg || _SetField.distance => null,
     };
   }
 
@@ -6363,6 +6411,7 @@ class _SetRowState extends State<_SetRow> {
       case _SetField.repsMax:
         s.repsMax = next;
       case _SetField.kg:
+      case _SetField.distance:
         return;
     }
     final text = '$next';
@@ -6372,6 +6421,19 @@ class _SetRowState extends State<_SetRow> {
     );
     widget.onChanged();
     _republicar(campo);
+  }
+
+  void _stepDistance(double delta) {
+    final next = ((_currentDistance ?? 0) + delta).clamp(0, kMaxWeightKg);
+    final value = next <= 0 ? null : double.parse(next.toStringAsFixed(2));
+    final text = value == null ? '' : formatWeightKg(value);
+    widget.editableSet.distanceMeters = value;
+    _distanceCtrl.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    widget.onChanged();
+    _republicar(_SetField.distance);
   }
 
   /// Vuelve a publicar la celda enfocada después de un paso.
@@ -6388,26 +6450,42 @@ class _SetRowState extends State<_SetRow> {
   FocusedSetCell _celdaEnfocada(_SetField campo) {
     final l10n = AppL10n.of(context);
     final esKg = campo == _SetField.kg;
+    final esDistancia = campo == _SetField.distance;
     return FocusedSetCell(
       cellId: _idDe(campo),
       contextLabel: l10n.routineEditorAccessoryContext(
         widget.exerciseName ?? l10n.coachExercisePicker,
         widget.index + 1,
-        esKg ? l10n.routineEditorFieldKg : l10n.routineEditorFieldReps,
+        esKg
+            ? l10n.routineEditorFieldKg
+            : esDistancia
+                ? 'distancia en metros'
+                : l10n.routineEditorFieldReps,
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
       stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
-      canDecrease:
-          esKg ? (_currentKg ?? 0) > 0 : (_repsActuales(campo) ?? 0) > 1,
-      onStep: (delta) => esKg ? _stepKg(delta) : _stepReps(campo, delta),
+      canDecrease: esKg
+          ? (_currentKg ?? 0) > 0
+          : esDistancia
+              ? (_currentDistance ?? 0) > 0
+              : (_repsActuales(campo) ?? 0) > 1,
+      onStep: (delta) => esKg
+          ? _stepKg(delta)
+          : esDistancia
+              ? _stepDistance(delta)
+              : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
           ? l10n
               .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
-          : l10n.routineEditorRepsStepIncreaseA11y('1'),
+          : esDistancia
+              ? 'Aumentar distancia en 1 metro'
+              : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
           ? l10n
               .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
-          : l10n.routineEditorRepsStepDecreaseA11y('1'),
+          : esDistancia
+              ? 'Reducir distancia en 1 metro'
+              : l10n.routineEditorRepsStepDecreaseA11y('1'),
       onFillColumn: esKg && widget.onFillColumn != null
           ? () => widget.onFillColumn!(campo)
           : null,
@@ -6484,6 +6562,23 @@ class _SetRowState extends State<_SetRow> {
               onChanged: (v) {
                 s.durationSeconds = v > 0 ? v : null;
                 widget.onChanged();
+              },
+            ),
+          ),
+        ] else if (widget.isDistance) ...[
+          Expanded(
+            child: SetCellField(
+              key: Key('distance_meters_field_${widget.index}'),
+              controller: _distanceCtrl,
+              focusNode: _focos[_SetField.distance],
+              palette: palette,
+              hint: 'm',
+              decimal: true,
+              hasError: widget.isInvalid,
+              onDecimalChanged: (v) {
+                s.distanceMeters = v != null && v > 0 ? v : null;
+                widget.onChanged();
+                _republicar(_SetField.distance);
               },
             ),
           ),
@@ -6717,6 +6812,7 @@ class RoutineEditorTestBridge {
     int? repsMin,
     int? repsMax,
     int? durationSeconds,
+    double? distanceMeters,
   }) {
     final s = _EditableSet(
       type: type,
@@ -6725,8 +6821,25 @@ class RoutineEditorTestBridge {
       repsMin: repsMin,
       repsMax: repsMax,
       durationSeconds: durationSeconds,
+      distanceMeters: distanceMeters,
     );
     return isSetValid(s, exerciseMode, repMode);
+  }
+
+  /// Builds a distance prescription through the real mutable editor model.
+  static RoutineSlot buildDistanceSlotBridge(List<double?> distances) {
+    final slot = _EditableSlot()
+      ..exercise = const Exercise(
+        id: 'test-ex',
+        name: 'Test Exercise',
+        muscleGroup: 'chest',
+        category: 'compound',
+      )
+      ..exerciseMode = ExerciseMode.distance
+      ..weeklySets = [
+        [for (final distance in distances) _EditableSet(distanceMeters: distance)],
+      ];
+    return buildRoutineSlot(slot, null);
   }
 
   /// Delegates to [buildRoutineSlot] after constructing a minimal

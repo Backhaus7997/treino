@@ -876,6 +876,13 @@ void main() {
       const durSpec = SetSpec(durationSeconds: 30);
       expect(plannedRepsForSpec(durSpec, ExerciseMode.duration), 0);
     });
+
+    test('distance prescription renders in meters and has no planned reps', () {
+      const spec = SetSpec(distanceMeters: 6);
+
+      expect(plannedRepsForSpec(spec, ExerciseMode.distance), 0);
+      expect(repsDisplayText(spec, ExerciseMode.distance), '6 m');
+    });
   });
 
   // ── Duration set detection ────────────────────────────────────────────────
@@ -958,6 +965,42 @@ void main() {
       // After starting, "Iniciar" is gone and "Listo" still must not appear.
       expect(find.text('Iniciar'), findsNothing);
       expect(find.text('Listo'), findsNothing);
+    });
+  });
+
+  group('distance set rendering', () {
+    testWidgets('session player shows meters and a direct completion control',
+        (tester) async {
+      const slot = RoutineSlot(
+        exerciseId: 'sprint-1',
+        exerciseName: 'Sprint',
+        muscleGroup: 'legs',
+        targetSets: 1,
+        targetRepsMin: 0,
+        targetRepsMax: 0,
+        restSeconds: 60,
+        exerciseMode: ExerciseMode.distance,
+        sets: [SetSpec(distanceMeters: 6)],
+      );
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const [slot]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('6 m'), findsOneWidget);
+      expect(find.text('Iniciar'), findsNothing);
+      expect(find.byIcon(TreinoIcon.checkCircleEmpty), findsWidgets);
     });
   });
 
