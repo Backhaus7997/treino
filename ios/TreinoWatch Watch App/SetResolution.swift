@@ -14,6 +14,7 @@ struct SetSpec: Equatable {
     var repsMax: Int?
     var weightKg: Double?
     var durationSeconds: Int?
+    var distanceMeters: Double?
 }
 
 /// Los campos de un `RoutineSlot` que intervienen en resolver las series.

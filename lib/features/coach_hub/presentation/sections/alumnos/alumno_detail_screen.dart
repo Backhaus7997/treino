@@ -1125,6 +1125,21 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     );
   }
 
+  /// Aviso «Datos desactualizados» de Progreso: mediciones o pruebas ya
+  /// cargadas cuyo stream falló después. Reintenta sólo la fuente rota.
+  Widget _staleProgressNotice(
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) =>
+      staleNoticeIf(measAsync.isStale || perfAsync.isStale, () {
+        if (measAsync.isStale) {
+          ref.invalidate(measurementsForAthleteProvider(widget.athleteId));
+        }
+        if (perfAsync.isStale) {
+          ref.invalidate(performanceTestsForAthleteProvider(widget.athleteId));
+        }
+      });
+
   Widget _buildAntropometria(
     AppPalette palette,
     AsyncValue<List<Measurement>> measAsync,
@@ -1158,6 +1173,7 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
                   palette: palette,
                 ),
                 const SizedBox(height: 20),
+                _staleProgressNotice(measAsync, perfAsync),
                 _ProgressReading(
                   measurements: measAsync,
                   performanceTests: perfAsync,
@@ -1215,6 +1231,7 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
                   palette: palette,
                 ),
                 const SizedBox(height: 20),
+                _staleProgressNotice(measAsync, perfAsync),
                 _ProgressReading(
                   measurements: measAsync,
                   performanceTests: perfAsync,
@@ -1309,17 +1326,19 @@ class _ProgressReading extends StatelessWidget {
     // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
     // (spinner hasta que ambas tengan valor, error si alguna falla). Así nunca
     // afirmamos que falta progreso cuando una de las fuentes es desconocida.
-    if (measurements.isLoading || performanceTests.isLoading) {
+    if (!measurements.hasValue || !performanceTests.hasValue) {
+      if (measurements.hasError || performanceTests.hasError) {
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('reading-error'),
+          child: _muted(
+            palette,
+            'No se pudo cargar el progreso.', // i18n: Fase W2
+          ),
+        );
+      }
       return const TreinoStateSwitcher(
         childKey: ValueKey('reading-loading'),
         child: CoachHubSkeleton(filas: 3),
-      );
-    }
-    if (measurements.hasError || performanceTests.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('reading-error'),
-        child:
-            _muted(palette, 'No se pudo cargar el progreso.'), // i18n: Fase W2
       );
     }
 
@@ -1466,9 +1485,17 @@ class _ResumenTab extends ConsumerWidget {
     // valor, y un único error si alguna falla. Si leyéramos routines/measurements
     // con valueOrNull, un error o un load lento se disfrazaría de «sin plan /
     // sin datos» — data trainer-facing engañosa.
-    if (sessionsAsync.isLoading ||
-        measAsync.isLoading ||
-        routinesAsync.isLoading) {
+    final sessionsPending = !sessionsAsync.hasValue && !sessionsAsync.hasError;
+    if (!measAsync.hasValue || !routinesAsync.hasValue || sessionsPending) {
+      if (measAsync.hasError || routinesAsync.hasError) {
+        return TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: _muted(
+            palette,
+            'No se pudo cargar el resumen.', // i18n: Fase W2
+          ),
+        );
+      }
       return const TreinoStateSwitcher(
         childKey: ValueKey('loading'),
         child: CoachHubSkeleton(filas: 3),
@@ -1482,14 +1509,6 @@ class _ResumenTab extends ConsumerWidget {
     // (mediciones, plan, próxima sesión, nota, datos personales). Los widgets
     // dependientes de sesiones (adherencia, última sesión) muestran su propio
     // estado vacío.
-    if (measAsync.hasError || routinesAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child:
-            _muted(palette, 'No se pudo cargar el resumen.'), // i18n: Fase W2
-      );
-    }
-
     final routines = routinesAsync.requireValue;
     final actives = routines.where((r) => r.status == RoutineStatus.active);
     final active =
@@ -1649,6 +1668,25 @@ class _ResumenTab extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Fuentes del resumen ya cargadas cuyo stream falló después
+            // (incluidas las sesiones: un link pausado las corta). Reintenta
+            // sólo las rotas.
+            staleNoticeIf(
+              measAsync.isStale ||
+                  routinesAsync.isStale ||
+                  sessionsAsync.isStale,
+              () {
+                if (measAsync.isStale) {
+                  ref.invalidate(measurementsForAthleteProvider(athleteId));
+                }
+                if (routinesAsync.isStale) {
+                  ref.invalidate(assignedRoutinesByTrainerProvider);
+                }
+                if (sessionsAsync.isStale) {
+                  ref.invalidate(sessionsByUidProvider(athleteId));
+                }
+              },
+            ),
             kpiRow,
             const SizedBox(height: 20),
             heatmapBlock,
@@ -1877,6 +1915,8 @@ class _NoteCard extends ConsumerWidget {
     final async = ref.watch(
       athleteNoteProvider((trainerId: trainerId, athleteId: athleteId)),
     );
+    final displayAsync =
+        async.hasValue ? AsyncValue.data(async.requireValue) : async;
     // El layoutBuilder de TreinoStateSwitcher es un Stack(topCenter) con
     // StackFit.loose: le pasa al hijo minWidth:0, así que un Container con
     // contenido corto (esta card) se encoge y queda centrado. El fix real es
@@ -1884,66 +1924,78 @@ class _NoteCard extends ConsumerWidget {
     // branch abajo); el SizedBox externo solo mantiene el maxWidth completo.
     return SizedBox(
       width: double.infinity,
-      child: TreinoStateSwitcher(
-        childKey: ValueKey(async.when(
-          loading: () => 'loading',
-          error: (_, __) => 'error',
-          data: (_) => 'data',
-        )),
-        child: async.when(
-          loading: () => SizedBox(
-            height: 48,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            async.isStale,
+            () => ref.invalidate(athleteNoteProvider(
+                (trainerId: trainerId, athleteId: athleteId))),
+          ),
+          TreinoStateSwitcher(
+            childKey: ValueKey(displayAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: displayAsync.when(
+              loading: () => SizedBox(
+                height: 48,
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  ),
+                ),
               ),
+              error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
+              data: (note) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: palette.bgCard,
+                    border: Border.all(color: palette.border),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: note == null || note.note.trim().isEmpty
+                      ? Text(
+                          'Sin nota fijada.', // i18n: Fase W2
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              note.note,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontSize: 13,
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _haceDias(note.updatedAt), // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                );
+              },
             ),
           ),
-          error: (_, __) => _muted(palette, 'No se pudo cargar la nota.'),
-          data: (note) {
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: note == null || note.note.trim().isEmpty
-                  ? Text(
-                      'Sin nota fijada.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          note.note,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 13,
-                            height: 1.45,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _haceDias(note.updatedAt), // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-            );
-          },
-        ),
+        ],
       ),
     );
   }
@@ -1994,90 +2046,103 @@ class _ProxSesionCard extends ConsumerWidget {
         toDate: todayStart.add(const Duration(days: 60)),
       ),
     ));
+    final displayAsync =
+        async.hasValue ? AsyncValue.data(async.requireValue) : async;
     // width: infinity — ver nota en _NoteCard: el switcher encoge/centra su
     // hijo, sin esto la card queda angosta al medio.
     return SizedBox(
       width: double.infinity,
-      child: TreinoStateSwitcher(
-        childKey: ValueKey(async.when(
-          loading: () => 'loading',
-          error: (_, __) => 'error',
-          data: (_) => 'data',
-        )),
-        child: async.when(
-          loading: () => SizedBox(
-            height: 48,
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: palette.accent),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          staleNoticeIf(
+            async.isStale,
+            () => ref.invalidate(trainerAppointmentsStreamProvider),
+          ),
+          TreinoStateSwitcher(
+            childKey: ValueKey(displayAsync.when(
+              loading: () => 'loading',
+              error: (_, __) => 'error',
+              data: (_) => 'data',
+            )),
+            child: displayAsync.when(
+              loading: () => SizedBox(
+                height: 48,
+                child: Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: palette.accent),
+                  ),
+                ),
               ),
+              error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
+              data: (appointments) {
+                final upcoming = appointments
+                    .where((a) =>
+                        a.athleteId == athleteId &&
+                        a.status == AppointmentStatus.confirmed &&
+                        a.startsAt.isAfter(now))
+                    .toList()
+                  ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
+                final next = upcoming.firstOrNull;
+
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: palette.bgCard,
+                    border: Border.all(color: palette.border),
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                  ),
+                  child: next == null
+                      ? Text(
+                          'Sin sesiones próximas.', // i18n: Fase W2
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _fmtDate(next.startsAt), // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textPrimary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${next.durationMin} min', // i18n: Fase W2
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (next.noteBefore != null &&
+                                next.noteBefore!.trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                next.noteBefore!,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                );
+              },
             ),
           ),
-          error: (_, __) => _muted(palette, 'No se pudo cargar la agenda.'),
-          data: (appointments) {
-            final upcoming = appointments
-                .where((a) =>
-                    a.athleteId == athleteId &&
-                    a.status == AppointmentStatus.confirmed &&
-                    a.startsAt.isAfter(now))
-                .toList()
-              ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
-            final next = upcoming.firstOrNull;
-
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: palette.bgCard,
-                border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-              ),
-              child: next == null
-                  ? Text(
-                      'Sin sesiones próximas.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _fmtDate(next.startsAt), // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${next.durationMin} min', // i18n: Fase W2
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        if (next.noteBefore != null &&
-                            next.noteBefore!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            next.noteBefore!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: palette.textMuted,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-            );
-          },
-        ),
+        ],
       ),
     );
   }
@@ -2507,20 +2572,27 @@ class _PagosTab extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final paymentsAsync = ref.watch(trainerPaymentsProvider);
     final pendingAsync = ref.watch(pagosPorCobrarProvider);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     Widget body;
     String stateKey;
-    if (paymentsAsync.isLoading || pendingAsync.isLoading) {
-      stateKey = 'loading';
-      body = const CoachHubSkeleton(filas: 3);
+    if (paymentsAsync.hasValue && pendingAsync.hasValue) {
+      stateKey = 'data';
+      body = _buildPagosBody(
+        context,
+        ref,
+        palette,
+        paymentsAsync,
+        pendingAsync,
+        linksAsync,
+      );
     } else if (paymentsAsync.hasError || pendingAsync.hasError) {
       stateKey = 'error';
       body =
           _muted(palette, 'No se pudieron cargar los pagos.'); // i18n: Fase W2
     } else {
-      stateKey = 'data';
-      body =
-          _buildPagosBody(context, ref, palette, paymentsAsync, pendingAsync);
+      stateKey = 'loading';
+      body = const CoachHubSkeleton(filas: 3);
     }
     return TreinoStateSwitcher(
       childKey: ValueKey(stateKey),
@@ -2534,6 +2606,7 @@ class _PagosTab extends ConsumerWidget {
     AppPalette palette,
     AsyncValue<List<Payment>> paymentsAsync,
     AsyncValue<List<CobroPendiente>> pendingAsync,
+    AsyncValue<List<TrainerLink>> linksAsync,
   ) {
     final history = paymentsAsync.requireValue
         .where((p) => p.athleteId == athleteId)
@@ -2548,6 +2621,17 @@ class _PagosTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Pagos ya cargados cuyo stream (o el de vínculos) falló después.
+          // El historial sale de `trainerPaymentsProvider`; los pendientes
+          // derivan de `pagosPorCobrarProvider`, que es un Provider derivado
+          // y NUNCA lleva valor+error juntos (ante un stream roto con valor
+          // previo devuelve `AsyncData`): su `isStale` es código muerto. El
+          // aviso se maneja desde las fuentes reales, y Reintentar invalida
+          // la que falló (invalidar el derivado no re-suscribe nada).
+          staleNoticeIf(paymentsAsync.isStale || linksAsync.isStale, () {
+            if (paymentsAsync.isStale) ref.invalidate(trainerPaymentsProvider);
+            if (linksAsync.isStale) ref.invalidate(trainerLinksStreamProvider);
+          }),
           Row(
             children: [
               Expanded(
@@ -3387,14 +3471,17 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         (trainerId: trainerUid, athleteId: widget.athleteId),
       ),
     );
+    final displayNoteAsync = noteAsync.hasValue
+        ? AsyncValue.data(noteAsync.requireValue)
+        : noteAsync;
 
     return TreinoStateSwitcher(
-      childKey: ValueKey(noteAsync.when(
+      childKey: ValueKey(displayNoteAsync.when(
         loading: () => 'loading',
         error: (_, __) => 'error',
         data: (_) => 'data',
       )),
-      child: noteAsync.when(
+      child: displayNoteAsync.when(
         loading: () => const CoachHubSkeleton(filas: 3),
         error: (_, __) => Center(
           child: Text(
@@ -3412,6 +3499,14 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // La nota ya cargó pero su stream falló después: lo que se ve
+                // (y lo que se edita) puede no ser lo último guardado.
+                staleNoticeIf(
+                  noteAsync.isStale,
+                  () => ref.invalidate(athleteNoteProvider(
+                    (trainerId: trainerUid, athleteId: widget.athleteId),
+                  )),
+                ),
                 // ── Header row: title + last-updated timestamp ─────────────
                 Row(
                   children: [

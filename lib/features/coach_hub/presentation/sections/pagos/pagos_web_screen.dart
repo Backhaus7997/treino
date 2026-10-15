@@ -33,6 +33,7 @@ import '../../widgets/coach_hub_widgets.dart'
     show
         CoachHubPager,
         CoachHubSectionHero,
+        StaleDataNotice,
         TreinoFilterChips,
         TreinoPopupMenuButton,
         TreinoInteractiveState,
@@ -239,6 +240,16 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
               ),
             ),
           ),
+
+          // ── Pagos ya cargados cuyo stream falló después: avisamos ───────────
+          ref.watch(pagosBucketsStaleProvider)
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                  child: StaleDataNotice(
+                    onRetry: () => ref.invalidate(trainerPaymentsProvider),
+                  ),
+                )
+              : const SizedBox.shrink(),
 
           // ── KPI row ─────────────────────────────────────────────────────────
           Padding(

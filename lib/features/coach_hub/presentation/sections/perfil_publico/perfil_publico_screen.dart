@@ -77,23 +77,38 @@ class PerfilPublicoScreen extends ConsumerWidget {
           TreinoStateSwitcher(
             childKey:
                 ValueKey('perfil_publico_state_${_stateKeyOf(profileAsync)}'),
-            child: profileAsync.when(
-              loading: () => const _PerfilPublicoLoading(),
-              error: (_, __) => TreinoEmptyState(
-                key: const Key('perfil_publico_error'),
-                icon: TreinoIcon.errorState,
-                title: 'No pudimos cargar tu perfil público.', // i18n: Fase 11
-                ctaLabel: 'Reintentar', // i18n: Fase 11
-                onCtaTap: () => ref.invalidate(userProfileProvider),
-              ),
-              data: (profile) => profile == null
-                  ? const TreinoEmptyState(
-                      key: Key('perfil_publico_empty'),
-                      icon: TreinoIcon.emptyState,
-                      title: 'No encontramos tu perfil.', // i18n: Fase 11
-                    )
-                  : _PerfilPublicoContent(profile: profile),
-            ),
+            // hasValue-first (pulido-post-revision, mismo defecto que Chat,
+            // commit cdd41949): `userProfileProvider` es un StreamProvider en
+            // vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+            // `AsyncError` subsiguiente (`copyWithPrevious`/"seamless"), así
+            // que `hasValue == true` Y `hasError == true` pueden darse a la
+            // vez tras un error transitorio. `.when()` despacha por SUBTIPO
+            // runtime (ignora `hasValue`) — se prioriza el valor cacheado.
+            //
+            // `AsyncValue<UserProfile?>`: un `null` con error NO es «no existe»
+            // — es «no sé». Sólo un `null` SIN error afirma que falta el perfil
+            // (`_perfilPublicoErrorFor` gana cuando el valor es null y hay error).
+            child: _isUnknownProfile(profileAsync)
+                ? TreinoEmptyState(
+                    key: const Key('perfil_publico_error'),
+                    icon: TreinoIcon.errorState,
+                    title:
+                        'No pudimos cargar tu perfil público.', // i18n: Fase 11
+                    ctaLabel: 'Reintentar', // i18n: Fase 11
+                    onCtaTap: () => ref.invalidate(userProfileProvider),
+                  )
+                : profileAsync.hasValue
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          staleNoticeIf(
+                            profileAsync.isStale,
+                            () => ref.invalidate(userProfileProvider),
+                          ),
+                          _perfilPublicoContentFor(profileAsync.requireValue),
+                        ],
+                      )
+                    : const _PerfilPublicoLoading(),
           ),
         ],
       ),
@@ -101,10 +116,23 @@ class PerfilPublicoScreen extends ConsumerWidget {
   }
 }
 
-String _stateKeyOf(AsyncValue<Object?> value) {
-  if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
+Widget _perfilPublicoContentFor(UserProfile? profile) => profile == null
+    ? const TreinoEmptyState(
+        key: Key('perfil_publico_empty'),
+        icon: TreinoIcon.emptyState,
+        title: 'No encontramos tu perfil.', // i18n: Fase 11
+      )
+    : _PerfilPublicoContent(profile: profile);
+
+/// `true` cuando NO sabemos si el perfil existe: error y sin perfil (sea
+/// porque nunca cargó o porque el último valor conocido era `null`).
+bool _isUnknownProfile(AsyncValue<UserProfile?> value) =>
+    value.hasError && value.valueOrNull == null;
+
+String _stateKeyOf(AsyncValue<UserProfile?> value) {
+  if (_isUnknownProfile(value)) return 'error';
+  if (value.hasValue) return 'data';
+  return 'loading';
 }
 
 /// Skeleton de carga (WU-05) — imita la grilla real de dos columnas (dos

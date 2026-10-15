@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -170,6 +172,55 @@ void main() {
   // Desktop viewport for all tests
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
+  });
+
+  group('SCENARIO-STALE — PagosScreen sostiene los pagos (pulido)', () {
+    testWidgets(
+        'los pagos ya cargados sobreviven a un error del stream, avisan y '
+        'Reintentar re-suscribe', (tester) async {
+      await tester.binding.setSurfaceSize(_kDesktopSize);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      var listens = 0;
+      final controller = StreamController<List<Payment>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(_wrap(
+        const PagosScreen(),
+        overrides: [
+          trainerPaymentsProvider.overrideWith((ref) => controller.stream),
+          pagosPorCobrarProvider
+              .overrideWith((ref) => const AsyncValue.data([])),
+        ],
+      ));
+      controller.add([
+        _payment(
+          id: 'pv1',
+          concept: 'Cuota visible', // i18n
+          status: PaymentStatus.pending,
+          // Por vencer: es el filtro por defecto (#605).
+          createdAt: _periodStart,
+        ),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('Cuota visible'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('permission-denied'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cuota visible'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add(const <Payment>[]);
+      await tester.pumpAndSettle();
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
   });
 
   group('PagosScreen smoke (REQ-PAGW-SHELL-001/002, TAB-002, EMPTY-001)', () {

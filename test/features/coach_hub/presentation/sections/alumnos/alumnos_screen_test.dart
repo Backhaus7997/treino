@@ -9,6 +9,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -159,6 +160,11 @@ Future<void> _pump(
   // Repo de pagos — usado por el botón «Registrar pago» del roster (reusa
   // `registrarPago` de la sección Pagos).
   PaymentRepository? paymentRepo,
+  // SCENARIO-STALE (pulido-post-revision): override directo de
+  // `userPublicProfilesBatchProvider` — permite simular un error transitorio
+  // con data previa cacheada (copyWithPrevious de un FutureProvider.family)
+  // sin pasar por [profiles].
+  Override? profilesOverride,
   // `false` para casos donde el stream de links queda colgado en loading a
   // propósito (TreinoShimmer corre en loop infinito — pumpAndSettle no
   // termina nunca ahí; el caller pumpea manualmente en su lugar).
@@ -251,6 +257,8 @@ Future<void> _pump(
             (ref) => Stream.value(plansByAthleteId[athleteId]),
           ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
+        // Va al final: gana sobre el override genérico del batch de perfiles.
+        if (profilesOverride != null) profilesOverride,
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
@@ -848,6 +856,114 @@ void main() {
     });
   });
 
+  group(
+      'SCENARIO-STALE — roster sostiene filas ante error transitorio '
+      '(pulido-post-revision)', () {
+    // Regression: `AlumnosScreen.build` despachaba con `linksAsync.when(...)`
+    // — dispatch por SUBTIPO runtime, ignora `hasValue`. `trainerLinksStreamProvider`
+    // es un StreamProvider en vivo — Riverpod 2.5+ preserva el valor previo
+    // dentro de un `AsyncError` subsiguiente (copyWithPrevious/"seamless"),
+    // así que un error transitorio (sin estar en loading) caía en la rama
+    // `error:` y tapaba el roster ya cargado con el mensaje de error.
+    testWidgets(
+        'roster ya cargado no desaparece tras un error transitorio del '
+        'stream de vínculos (stale-while-refresh)', (tester) async {
+      var listens = 0;
+      final controller = StreamController<List<TrainerLink>>.broadcast(
+        onListen: () => listens++,
+      );
+      addTearDown(controller.close);
+
+      // settle:false — el shimmer de la tabla anima en loop mientras
+      // trainerLinksStreamProvider no emitió nada todavía.
+      await _pump(
+        tester,
+        linksStream: controller.stream,
+        profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Tomás')],
+        settle: false,
+      );
+
+      controller.add([_link('a1', TrainerLinkStatus.active)]);
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      controller.addError(Exception('transient stream hiccup'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'roster',
+      );
+      expect(find.text('No se pudieron cargar los alumnos.'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(listens, 2, reason: 'Reintentar tiene que re-suscribir el stream');
+
+      controller.add([_link('a2', TrainerLinkStatus.active)]);
+      await tester.pumpAndSettle();
+      expect(find.text('Tomás'), findsOneWidget);
+      expect(find.text('Sofía'), findsNothing);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+
+    // Regression: mismo defecto en `_LinksLoaded.build` — despachaba con
+    // `profilesAsync.when(...)` sobre `userPublicProfilesBatchProvider`
+    // (FutureProvider.family). El fan-out del batch puede lanzar en un
+    // rebuild posterior a un cómputo exitoso, y Riverpod preserva el valor
+    // previo (copyWithPrevious aplica también a FutureProvider, no solo
+    // StreamProvider — confirmado en `_InactivosSection`, dashboard).
+    testWidgets(
+        'roster ya cargado no desaparece tras un error transitorio del '
+        'batch de perfiles (stale-while-refresh)', (tester) async {
+      final attempt = StateProvider<int>((ref) => 0);
+      var recovered = false;
+
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profilesOverride: userPublicProfilesBatchProvider.overrideWith(
+          (ref, key) {
+            if (recovered) return {'a1': _prof('a1', 'Sofía Recuperada')};
+            if (ref.watch(attempt) == 0) {
+              return {'a1': _prof('a1', 'Sofía')};
+            }
+            throw Exception('transient batch hiccup');
+          },
+        ),
+      );
+
+      expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+
+      final element = tester.element(find.byType(AlumnosScreen));
+      ProviderScope.containerOf(element).read(attempt.notifier).state = 1;
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Sofía'),
+        findsOneWidget,
+        reason: 'un error transitorio con data ya cargada no debe tapar el '
+            'roster',
+      );
+      expect(find.text('Datos desactualizados'), findsOneWidget);
+
+      // Reintentar vuelve a correr el batch de perfiles (ahora sí resuelve).
+      recovered = true;
+      await tester.tap(find.text('Reintentar'));
+      await tester.pumpAndSettle();
+      expect(find.text('Sofía Recuperada'), findsOneWidget);
+      expect(find.text('Datos desactualizados'), findsNothing);
+    });
+  });
+
   group('AlumnosScreen roster — columna Rutina', () {
     testWidgets('alumno con rutina activa → chip "Activa"', (tester) async {
       await _pump(
@@ -1234,6 +1350,117 @@ void main() {
       await tester.pumpAndSettle();
 
       verifyNever(() => repo.add(any()));
+    });
+  });
+
+  group('AlumnosScreen roster — hover de fila (bug revisión en vivo)', () {
+    /// Color de fondo actual de la fila `data_table_row_a1`.
+    Color rowDecorationColor(WidgetTester tester) {
+      final container = tester.widget<AnimatedContainer>(
+        find.byKey(const Key('data_table_row_a1')),
+      );
+      return (container.decoration! as BoxDecoration).color!;
+    }
+
+    testWidgets(
+        'hover sobre el chip Rutina (InkWell propio) → el hover de la fila '
+        'NO se apaga', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+        routinesByAthleteId: {
+          'a1': [_routine('r1')],
+        },
+      );
+
+      final normalColor = rowDecorationColor(tester);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      final hoverColor = rowDecorationColor(tester);
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'entrar a la fila debe activar el hover');
+
+      // Mueve el puntero al chip "Activa" (Rutina) DENTRO de la misma fila.
+      await gesture.moveTo(tester.getCenter(find.text('Activa')));
+      await tester.pump();
+      final hoverColorOverChip = rowDecorationColor(tester);
+      expect(hoverColorOverChip, equals(hoverColor),
+          reason: 'el hover de la fila no debe apagarse al pasar sobre el '
+              'chip Rutina (InkWell propio de la celda)');
+    });
+
+    testWidgets(
+        'hover sobre un icon-button de Acciones (con tooltip) → el hover de '
+        'la fila NO se apaga', (tester) async {
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      final normalColor = rowDecorationColor(tester);
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      final hoverColor = rowDecorationColor(tester);
+      expect(hoverColor, isNot(equals(normalColor)),
+          reason: 'entrar a la fila debe activar el hover');
+
+      // Mueve el puntero al botón "Chat" DENTRO de la misma fila.
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Chat')));
+      await tester.pump();
+      final hoverColorOverButton = rowDecorationColor(tester);
+      expect(hoverColorOverButton, equals(hoverColor),
+          reason: 'el hover de la fila no debe apagarse al pasar sobre un '
+              'icon-button de Acciones');
+    });
+
+    testWidgets(
+        'mover el puntero de una fila a otra → apaga el hover de la primera '
+        'y prende el de la segunda', (tester) async {
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a2', TrainerLinkStatus.active),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a2', 'Diego')],
+      );
+
+      Color row2Color() {
+        final container = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_a2')),
+        );
+        return (container.decoration! as BoxDecoration).color!;
+      }
+
+      final row1Normal = rowDecorationColor(tester);
+      final row2Normal = row2Color();
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+
+      await gesture.moveTo(tester.getCenter(find.text('Sofía')));
+      await tester.pump();
+      expect(rowDecorationColor(tester), isNot(equals(row1Normal)));
+
+      await gesture.moveTo(tester.getCenter(find.text('Diego')));
+      await tester.pump();
+      expect(rowDecorationColor(tester), equals(row1Normal),
+          reason: 'la fila anterior debe apagar su hover');
+      expect(row2Color(), isNot(equals(row2Normal)),
+          reason: 'la fila nueva debe prender su hover');
     });
   });
 

@@ -59,6 +59,12 @@ class NutricionScreen extends ConsumerWidget {
             delay: AppMotion.stagger(1),
             child: _FiltroChips(filtro: filtro, counts: counts),
           ),
+          // Overview ya cargado cuyo stream de vínculos falló después: las
+          // filas siguen, pero avisamos que están desactualizadas.
+          staleNoticeIf(
+            ref.watch(nutricionEntriesStaleProvider),
+            () => ref.invalidate(trainerLinksStreamProvider),
+          ),
           const SizedBox(height: AppSpacing.s14),
           TreinoStateSwitcher(
             childKey: ValueKey(

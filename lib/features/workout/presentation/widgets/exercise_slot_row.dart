@@ -86,6 +86,9 @@ class ExerciseSlotRow extends StatelessWidget {
           final ss = (total % 60).toString().padLeft(2, '0');
           return '$count · $mm:$ss';
         }
+        if (first.distanceMeters != null && first.distanceMeters! > 0) {
+          return '$count · ${_distance(first.distanceMeters!)} m';
+        }
         if (first.reps != null) {
           // Homogeneous per-set reps list.
           final allSame = specs.every((s) => s.reps == first.reps);
@@ -124,6 +127,9 @@ class ExerciseSlotRow extends StatelessWidget {
       final ss = (total % 60).toString().padLeft(2, '0');
       return '$count · $mm:$ss';
     }
+    if (first.distanceMeters != null && first.distanceMeters! > 0) {
+      return '$count · ${_distance(first.distanceMeters!)} m';
+    }
     if (first.reps != null) {
       final allSame = specs.every((s) => s.reps == first.reps);
       if (allSame) return '$count · ${first.reps}';
@@ -134,6 +140,10 @@ class ExerciseSlotRow extends StatelessWidget {
     }
     return '$count sets';
   }
+
+  static String _distance(double meters) => meters == meters.roundToDouble()
+      ? meters.toInt().toString()
+      : meters.toStringAsFixed(1);
 
   /// Formats rest seconds: "1:30" when >= 60, "45s" when < 60.
   static String _restDisplay(int restSeconds) {

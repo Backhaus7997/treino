@@ -4826,4 +4826,171 @@ void main() {
       expect(slot.sets.every((s) => s.weightKg == 40), isTrue);
     });
   });
+
+  group('RoutineEditorWebScreen — distancia', () {
+    // Plan de 3 semanas con un slot por DISTANCIA (trineo): week 0 con dos
+    // sets, y metros distintos en cada semana.
+    Routine distanceRoutine() => const Routine(
+          id: 'r-dist',
+          name: 'Trineo',
+          split: 'Full Body',
+          level: ExperienceLevel.intermediate,
+          source: RoutineSource.trainerAssigned,
+          assignedBy: _trainerId,
+          assignedTo: _athleteId,
+          visibility: RoutineVisibility.private,
+          numWeeks: 3,
+          days: [
+            RoutineDay(
+              dayNumber: 1,
+              name: 'Día A',
+              slots: [
+                RoutineSlot(
+                  exerciseId: 'bench-press',
+                  exerciseName: 'Press de Banca',
+                  muscleGroup: 'chest',
+                  targetSets: 2,
+                  targetRepsMin: 0,
+                  targetRepsMax: 0,
+                  restSeconds: 90,
+                  exerciseMode: ExerciseMode.distance,
+                  sets: [
+                    SetSpec(distanceMeters: 6),
+                    SetSpec(distanceMeters: 6),
+                  ],
+                  weeklySets: [
+                    [
+                      SetSpec(distanceMeters: 6),
+                      SetSpec(distanceMeters: 6),
+                    ],
+                    [SetSpec(distanceMeters: 8.5)],
+                    [SetSpec(distanceMeters: 10)],
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+
+    testWidgets(
+        're-guardar sin tocar conserva modo y metros de TODAS las '
+        'semanas', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => distanceRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r-dist');
+
+      await _tapGuardar(tester);
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(
+        slot.weeklySets
+            .map((w) => w.map((s) => s.distanceMeters).toList())
+            .toList(),
+        [
+          [6.0, 6.0],
+          [8.5],
+          [10.0],
+        ],
+      );
+      expect(
+        slot.sets.map((s) => s.distanceMeters).toList(),
+        [6.0, 6.0],
+        reason: 'sets: es la semana 0, el fallback de los lectores viejos',
+      );
+      expect(slot.sets.every((s) => s.reps == null), isTrue);
+      expect(slot.targetWeightKg, isNull);
+      expect(draft.days, distanceRoutine().days);
+    });
+
+    testWidgets(
+        'doc con exerciseMode reps y metros SOLO en weeklySets hidrata como '
+        'distancia y re-guardar conserva el modo (fuente: effectiveExerciseMode)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      final doc = distanceRoutine();
+      final slot0 = doc.days.single.slots.single;
+      final stale = doc.copyWith(days: [
+        doc.days.single.copyWith(slots: [
+          slot0.copyWith(exerciseMode: ExerciseMode.reps, sets: const []),
+        ]),
+      ]);
+      when(() => repo.getById(any())).thenAnswer((_) async => stale);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r-dist');
+
+      await _tapGuardar(tester);
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(slot.weeklySets.first.map((s) => s.distanceMeters), [6.0, 6.0]);
+    });
+
+    testWidgets(
+        'el chip Distancia convierte un slot de reps y guarda los '
+        'metros tipeados', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _twoNormalSetsRoutine());
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: 'r13');
+      await expandirEjercicios(tester);
+
+      await tester.tap(find.text('Distancia'));
+      await tester.pumpAndSettle();
+      final campos = find.widgetWithText(TextFormField, 'm');
+      expect(campos, findsNWidgets(2));
+      await tester.enterText(campos.at(0), '6,5');
+      await tester.enterText(campos.at(1), '12');
+      await tester.pumpAndSettle();
+
+      await _tapGuardar(tester);
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseMode, ExerciseMode.distance);
+      expect(slot.sets.map((s) => s.distanceMeters).toList(), [6.5, 12.0]);
+      expect(
+          slot.sets.every((s) => s.reps == null && s.weightKg == null), isTrue);
+    });
+  });
 }

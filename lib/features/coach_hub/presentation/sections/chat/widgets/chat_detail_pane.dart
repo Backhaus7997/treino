@@ -23,6 +23,8 @@ import '../../../../../workout/application/session_providers.dart'
 import 'avatar_color.dart';
 import 'chat_message_bubble.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 
 /// Panel derecho del split-pane: header con el otro user + lista invertida
 /// de mensajes + composer de texto + foto + video (V3, 2026-07-01).
@@ -304,14 +306,32 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             peerNameInitial: widget.peerNameInitial,
           ),
           Divider(height: 1, color: palette.border),
+          // Hilo ya cargado cuyo stream falló después: los mensajes siguen,
+          // pero avisamos que no se están actualizando.
+          messagesAsync.isStale
+              ? Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
+                  child: StaleDataNotice(
+                    onRetry: () =>
+                        ref.invalidate(messagesProvider(widget.chatId)),
+                  ),
+                )
+              : const SizedBox.shrink(),
           Expanded(
             child: TreinoStateSwitcher(
               childKey: ValueKey(messagesAsync.when(
+                skipError: true,
                 loading: () => 'loading',
                 error: (_, __) => 'error',
                 data: (_) => 'data',
               )),
+              // `skipError`: stale-while-error. Riverpod preserva el último
+              // valor dentro del AsyncError (copyWithPrevious); si el hilo ya
+              // tenía mensajes, un error transitorio del stream no lo vacía.
+              // El estado de error queda sólo para el primer load fallido.
               child: messagesAsync.when(
+                skipError: true,
                 loading: () => const Padding(
                   padding: EdgeInsets.all(AppSpacing.s14),
                   child: _FilasSkeleton(filas: 4),

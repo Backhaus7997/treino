@@ -32,11 +32,15 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart'
+    show trainerLinksStreamProvider;
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
+import 'package:treino/features/payments/application/payment_providers.dart'
+    show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -182,8 +186,21 @@ class DashboardProximasSesionesCard extends ConsumerWidget {
     );
     final appointmentsAsync = ref.watch(trainerAppointmentsStreamProvider(key));
 
+    // hasValue-first (pulido-post-revision, mismo defecto que Chat, commit
+    // cdd41949): trainerAppointmentsStreamProvider es un StreamProvider en
+    // vivo — Riverpod 2.5+ preserva el valor previo dentro de un
+    // AsyncError subsiguiente (copyWithPrevious/"seamless"), así que
+    // `hasValue == true` Y `hasError == true` pueden darse a la vez tras
+    // un error transitorio. La extracción anterior usaba `.whenData()`
+    // (== `.map()`, despacha por SUBTIPO RUNTIME e ignora `hasValue`): en
+    // ese estado compuesto caía en la rama `error:` y NO ejecutaba el
+    // callback `data:`, dejando `rows` en null — tapaba las sesiones ya
+    // cargadas con el error de pantalla completa. Se usa `valueOrNull`
+    // directamente para que un error transitorio nunca tire las filas ya
+    // calculadas.
     List<Appointment>? rows;
-    appointmentsAsync.whenData((appointments) {
+    final appointments = appointmentsAsync.valueOrNull;
+    if (appointments != null) {
       final upcoming = appointments
           .where(
             (a) =>
@@ -193,7 +210,7 @@ class DashboardProximasSesionesCard extends ConsumerWidget {
           .toList()
         ..sort((a, b) => a.startsAt.compareTo(b.startsAt));
       rows = upcoming.take(4).toList();
-    });
+    }
 
     return _SectionCard(
       child: Column(
@@ -203,6 +220,10 @@ class DashboardProximasSesionesCard extends ConsumerWidget {
             title: l10n.dashboardProximasSesionesSectionLabel,
           ),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            appointmentsAsync.isStale,
+            () => ref.invalidate(trainerAppointmentsStreamProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(appointmentsAsync, rows)),
             child: _ProximasSesionesContent(
@@ -220,10 +241,9 @@ class DashboardProximasSesionesCard extends ConsumerWidget {
     AsyncValue<List<Appointment>> async,
     List<Appointment>? rows,
   ) {
+    if (rows != null) return rows.isEmpty ? 'empty' : 'data';
     if (async.hasError) return 'error';
-    if (rows == null) return 'loading';
-    if (rows.isEmpty) return 'empty';
-    return 'data';
+    return 'loading';
   }
 }
 
@@ -242,15 +262,17 @@ class _ProximasSesionesContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
 
-    if (hasError) {
-      return _SectionError(
-        message: l10n.coachHubSectionLoadError,
-        onRetry: onRetry,
-      );
-    }
-
+    // hasValue-first: `rows` no-null ya implica data cargada — se muestra
+    // siempre. El error de pantalla completa queda solo para el primer
+    // load sin datos todavía (ver doc de `_stateKey` arriba).
     final list = rows;
     if (list == null) {
+      if (hasError) {
+        return _SectionError(
+          message: l10n.coachHubSectionLoadError,
+          onRetry: onRetry,
+        );
+      }
       return const _RowsSkeleton();
     }
 
@@ -343,11 +365,17 @@ class DashboardVencimientos7dCard extends ConsumerWidget {
         children: [
           TreinoSectionHeader(title: l10n.dashboardVencimientosTitle),
           const SizedBox(height: AppSpacing.s12),
+          staleNoticeIf(
+            ref.watch(pagosBucketsStaleProvider),
+            () => ref.invalidate(trainerPaymentsProvider),
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(bucketsAsync)),
             child: _VencimientosContent(
               bucketsAsync: bucketsAsync,
-              onRetry: () => ref.invalidate(pagosBucketsProvider),
+              // El stream vive en `trainerPaymentsProvider`: invalidar sólo el
+              // derivado no re-suscribe nada.
+              onRetry: () => ref.invalidate(trainerPaymentsProvider),
             ),
           ),
         ],
@@ -355,11 +383,19 @@ class DashboardVencimientos7dCard extends ConsumerWidget {
     );
   }
 
+  // hasValue-first (defensa en profundidad, pulido-post-revision):
+  // pagosBucketsProvider ya está corregido a nivel provider (commit
+  // b3a14117) para nunca emitir un AsyncValue compuesto (hasValue &&
+  // hasError) — pero el widget se flipea igual al mismo orden que el
+  // resto del dashboard (_ProximasSesiones/_InactivosSection) para que un
+  // futuro cambio de provider no reintroduzca el flicker de error.
   String _stateKey(AsyncValue<PagosBuckets> async) {
+    if (async.hasValue) {
+      final vencidos = async.value!.vencidos;
+      return vencidos.isEmpty ? 'empty' : 'data';
+    }
     if (async.hasError) return 'error';
-    if (async.isLoading && !async.hasValue) return 'loading';
-    final vencidos = async.valueOrNull?.vencidos ?? const <Payment>[];
-    return vencidos.isEmpty ? 'empty' : 'data';
+    return 'loading';
   }
 }
 
@@ -376,15 +412,15 @@ class _VencimientosContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
 
-    if (bucketsAsync.hasError) {
-      return _SectionError(
-        message: l10n.coachHubSectionLoadError,
-        onRetry: onRetry,
-      );
-    }
-
+    // hasValue-first: ver doc de `_stateKey` arriba.
     final buckets = bucketsAsync.valueOrNull;
     if (buckets == null) {
+      if (bucketsAsync.hasError) {
+        return _SectionError(
+          message: l10n.coachHubSectionLoadError,
+          onRetry: onRetry,
+        );
+      }
       return const _RowsSkeleton();
     }
 
@@ -488,6 +524,7 @@ class DashboardInactivosCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final inactivosAsync = ref.watch(inactivosProvider);
+    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     return _SectionCard(
       child: Column(
@@ -495,6 +532,19 @@ class DashboardInactivosCard extends ConsumerWidget {
         children: [
           TreinoSectionHeader(title: l10n.dashboardInactivosTitle),
           const SizedBox(height: AppSpacing.s12),
+          // `inactivosProvider` lee `trainerLinksStreamProvider` con
+          // `valueOrNull`: si el stream de vínculos se rompe tras cargar, el
+          // future se recomputa OK y nunca marca error. Por eso el aviso
+          // también sale de la fuente real, y Reintentar la re-suscribe.
+          staleNoticeIf(
+            inactivosAsync.isStale || linksAsync.isStale,
+            () {
+              if (linksAsync.isStale) {
+                ref.invalidate(trainerLinksStreamProvider);
+              }
+              if (inactivosAsync.isStale) ref.invalidate(inactivosProvider);
+            },
+          ),
           TreinoStateSwitcher(
             childKey: ValueKey(_stateKey(inactivosAsync)),
             child: _InactivosContent(
@@ -507,11 +557,21 @@ class DashboardInactivosCard extends ConsumerWidget {
     );
   }
 
+  // hasValue-first (pulido-post-revision): inactivosProvider es un
+  // FutureProvider que hace fan-out sobre finishedInWindowByUidProvider —
+  // si ese fan-out lanza en un rebuild posterior a un cómputo exitoso,
+  // Riverpod preserva el valor previo dentro del AsyncError resultante
+  // (copyWithPrevious/"seamless", no exclusivo de StreamProvider). Se
+  // chequea el resultado ya cargado ANTES que hasError para que un error
+  // transitorio del fan-out nunca tape la lista de inactivos ya
+  // calculada.
   String _stateKey(AsyncValue<InactivosResult> async) {
+    if (async.hasValue) {
+      final ids = async.value!.inactiveAthleteIds;
+      return ids.isEmpty ? 'empty' : 'data';
+    }
     if (async.hasError) return 'error';
-    if (async.isLoading && !async.hasValue) return 'loading';
-    final ids = async.valueOrNull?.inactiveAthleteIds ?? const <String>[];
-    return ids.isEmpty ? 'empty' : 'data';
+    return 'loading';
   }
 }
 
@@ -528,15 +588,15 @@ class _InactivosContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
 
-    if (inactivosAsync.hasError) {
-      return _SectionError(
-        message: l10n.coachHubSectionLoadError,
-        onRetry: onRetry,
-      );
-    }
-
+    // hasValue-first: ver doc de `_stateKey` arriba.
     final result = inactivosAsync.valueOrNull;
     if (result == null) {
+      if (inactivosAsync.hasError) {
+        return _SectionError(
+          message: l10n.coachHubSectionLoadError,
+          onRetry: onRetry,
+        );
+      }
       return const _RowsSkeleton();
     }
 
