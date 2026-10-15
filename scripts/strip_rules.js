@@ -180,4 +180,9 @@ function main() {
   }
 }
 
-main();
+// `deploy_rules.js` usa la MISMA función para armar lo que sube por la REST
+// API: si hubiera dos stripper, el camino de la CLI y el del script podrían
+// publicar rulesets distintos a partir del mismo fuente.
+if (require.main === module) main();
+
+module.exports = { stripComments, LIMIT, bytes };
