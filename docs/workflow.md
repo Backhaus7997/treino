@@ -106,9 +106,14 @@ Ejemplos:
 4. git push -u origin <branch>
 5. gh pr create --base develop         ← SIEMPRE contra develop
 6. CI verde + leer bots y anotaciones (Codex, CodeQL)
-7. Merge SQUASH desde GitHub
-8. git branch -d <branch>
+7. Merge SQUASH desde GitHub        ← la remota se borra sola
+8. gh pr view <N> --json state --jq .state   ← tiene que decir MERGED
+9. git worktree remove .claude/worktrees/<wt>   ← si trabajaste en uno
+10. git branch -D <branch>          ← -D: con squash, -d se niega siempre
+11. ./scripts/agent-ledger.sh release <scope>
 ```
+
+`develop` y `main` no se borran nunca. Detalle y por qué en `AGENTS.md` §8.
 
 ### Ramas: develop y main
 
