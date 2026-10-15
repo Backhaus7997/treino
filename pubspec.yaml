@@ -1,7 +1,7 @@
 name: treino
 description: "TREINO — fitness app multiplataforma."
 publish_to: 'none'
-version: 1.0.2+57
+version: 1.1.0+58
 
 environment:
   sdk: ^3.5.0
