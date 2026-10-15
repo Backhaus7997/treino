@@ -168,7 +168,11 @@ void main() {
         await _pumpBar(tester, index: 2);
         await tester.pumpAndSettle();
         final margin = (w - _tabRect(tester, _labels.first).width * 5) / 2;
-        if (w > 320 && (margin - previousMargin).abs() > 0.01) {
+        // Umbral de 4 y no de 0,01: con la barra en íconos, el angostamiento
+        // compacto (`resolveCollapsedInset`) frena en un piso de ancho por
+        // tab, así que mientras está frenado este "margen" deducido crece
+        // 0,5 por punto de pantalla. El flip de verdad salta 8 por lado.
+        if (w > 320 && (margin - previousMargin).abs() > 4) {
           flipFrom = w - 1;
           break;
         }
