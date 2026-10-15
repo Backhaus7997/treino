@@ -140,36 +140,46 @@ const _variantByToken = <String, String>{
   'hack': 'hack',
 };
 
+/// Tokens que cuentan para el score: sin stopwords ni palabras de < 3
+/// letras, y con el equipo en su forma canónica ("pesa rusa" y "kettlebell"
+/// valen lo mismo, y "pesa" + "rusa" cuentan una sola vez).
 Set<String> _meaningfulTokens(String normalized) => normalized
     .split(' ')
     .where((token) => token.length >= 3 && !_stopwords.contains(token))
+    .map((token) => _equipmentByToken[token] ?? token)
     .toSet();
 
 Set<String> _classifiedTokens(
-  Iterable<String> labels,
+  String normalized,
   Map<String, String> classification,
 ) =>
-    labels
-        .expand((label) => normalize(label).split(' '))
+    normalized
+        .split(' ')
         .map((token) => classification[token])
         .whereType<String>()
         .toSet();
 
-bool _isCompatible(String query, MatcherExercise candidate) {
-  final labels = <String>[candidate.name, ...candidate.aliases];
-  final queryEquipment = _classifiedTokens([query], _equipmentByToken);
-  final candidateEquipment = _classifiedTokens(labels, _equipmentByToken);
-
-  // Si el Excel declara equipo, el catálogo debe declarar exactamente ese
+/// Compatibilidad entre lo que escribió el entrenador y UNA etiqueta del
+/// catálogo (nombre o alias). Se evalúa por etiqueta, no sobre la unión de
+/// nombre + alias: si no, el alias "Sentadilla goblet" le prestaría su
+/// calificador al ejercicio "Sentadilla con barra".
+bool _isCompatibleLabel(String query, String normalizedLabel) {
+  final queryEquipment = _classifiedTokens(query, _equipmentByToken);
+  // Si el Excel declara equipo, la etiqueta debe declarar exactamente ese
   // equipo: ni omitirlo ni sumar uno distinto.
   if (queryEquipment.isNotEmpty &&
-      !_sameSet(queryEquipment, candidateEquipment)) {
+      !_sameSet(
+        queryEquipment,
+        _classifiedTokens(normalizedLabel, _equipmentByToken),
+      )) {
     return false;
   }
-
-  final queryVariants = _classifiedTokens([query], _variantByToken);
-  final candidateVariants = _classifiedTokens(labels, _variantByToken);
-  return _sameSet(queryVariants, candidateVariants);
+  // Variantes: el mismo conjunto de ambos lados (presente de un solo lado
+  // => no hay sugerencia).
+  return _sameSet(
+    _classifiedTokens(query, _variantByToken),
+    _classifiedTokens(normalizedLabel, _variantByToken),
+  );
 }
 
 bool _sameSet(Set<String> left, Set<String> right) =>
@@ -181,14 +191,15 @@ MatcherExercise? _bestFuzzySuggestion(String query, _Index index) {
 
   final scores = <String, int>{};
   for (final exercise in index.exercises) {
-    if (!_isCompatible(query, exercise)) continue;
-    final labels = <String>[exercise.name, ...exercise.aliases];
-    final score = labels
-        .map((label) => queryTokens
-            .intersection(_meaningfulTokens(normalize(label)))
-            .length)
-        .fold<int>(0, (best, value) => value > best ? value : best);
-    if (score > 0) scores[exercise.id] = score;
+    var best = 0;
+    for (final label in <String>[exercise.name, ...exercise.aliases]) {
+      final normalizedLabel = normalize(label);
+      if (!_isCompatibleLabel(query, normalizedLabel)) continue;
+      final score =
+          queryTokens.intersection(_meaningfulTokens(normalizedLabel)).length;
+      if (score > best) best = score;
+    }
+    if (best > 0) scores[exercise.id] = best;
   }
 
   if (scores.isEmpty) return null;
@@ -198,6 +209,7 @@ MatcherExercise? _bestFuzzySuggestion(String query, _Index index) {
       .where((entry) => entry.value == bestScore)
       .map((entry) => entry.key)
       .toList();
+  // Empate => ninguna sugerencia: nunca se elige al azar.
   if (bestIds.length != 1) return null;
   return index.exercises
       .firstWhere((exercise) => exercise.id == bestIds.single);

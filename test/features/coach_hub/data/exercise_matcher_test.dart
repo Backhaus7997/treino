@@ -211,5 +211,59 @@ void main() {
       expect(result.days.single.items.single.exerciseId, isNull);
       expect(result.days.single.items.single.suggestedExerciseId, isNull);
     });
+
+    test('catálogo medido: ningún caso conocido cae en la variante equivocada',
+        () {
+      final catalog = [
+        MatcherExercise(id: 'sq-barra', name: 'Sentadilla con barra'),
+        MatcherExercise(id: 'pb-barra', name: 'Press de banca con barra'),
+        MatcherExercise(id: 'pm-rumano', name: 'Peso muerto rumano'),
+        MatcherExercise(
+          id: 'sq-goblet',
+          name: 'Sentadilla goblet con mancuerna',
+        ),
+      ];
+      final result = matchExercises(
+        _dayWith([
+          'Sentadilla con banda',
+          'Sentadilla con pesa rusa',
+          'Sentadilla búlgara',
+          'Press de banca inclinado',
+          'Peso muerto convencional',
+          'Remo con mancuerna',
+        ]),
+        catalog,
+      );
+      for (final item in result.days.single.items) {
+        expect(item.exerciseId, isNull, reason: item.rowName);
+        expect(item.suggestedExerciseId, isNull, reason: item.rowName);
+      }
+      expect(result.unmatched, hasLength(6));
+    });
+
+    test('la compatibilidad se evalúa por etiqueta, no por la unión', () {
+      final result = matchExercises(
+        _dayWith(['Sentadilla pesada']),
+        [
+          MatcherExercise(
+            id: 'sq',
+            name: 'Sentadilla',
+            aliases: const ['Sentadilla goblet'],
+          ),
+        ],
+      );
+      // El alias goblet no contamina el nombre base: "Sentadilla" sí es
+      // compatible con una consulta sin calificador.
+      expect(result.days.single.items.single.suggestedExerciseId, 'sq');
+    });
+
+    test('alias exacto ("Back squat") se autoasigna', () {
+      final result = matchExercises(
+        _dayWith(['Squat trasero']),
+        _exercisesWithAliases,
+      );
+      expect(result.unmatched, isEmpty);
+      expect(result.days.single.items.single.exerciseId, 'back-squat');
+    });
   });
 }
