@@ -34,17 +34,34 @@ Uint8List buildPeriodizedTemplateBytes() {
     sheet.setColumnWidth(3 + w, kProgramWeekWidth);
   }
 
-  final headerStyle = CellStyle(bold: true);
+  // Estilo de la planilla del PF: el encabezado de cada día es una banda
+  // negra con texto blanco; DÍA N, DESCANSOS y SEMANA van en negrita y las
+  // celdas de descanso y de semana van centradas.
+  final bandLeft = _bandStyle(HorizontalAlign.Left);
+  final bandCenter = _bandStyle(HorizontalAlign.Center);
+  final centered = CellStyle(horizontalAlign: HorizontalAlign.Center);
+  const lastCol = 2 + kTemplateWeeks;
+
   var row = 0;
   for (var day = 1; day <= kTemplateDays; day++) {
-    _put(sheet, 0, row, 'N°', headerStyle);
-    _put(sheet, 1, row, 'DÍA $day', headerStyle);
-    _put(sheet, 2, row, 'DESCANSOS', headerStyle);
+    // La banda cubre la fila entera (A hasta la última semana), también en los
+    // días 2..7 donde las etiquetas SEMANA no se repiten.
+    for (var col = 0; col <= lastCol; col++) {
+      _put(sheet, col, row, null, col <= 1 ? bandLeft : bandCenter);
+    }
+    _put(sheet, 0, row, 'N°', bandLeft);
+    _put(sheet, 1, row, 'DÍA $day', bandLeft);
+    _put(sheet, 2, row, 'DESCANSOS', bandCenter);
     // Las etiquetas SEMANA van sólo en el encabezado del DÍA 1: el parser fija
     // las columnas con el primer encabezado.
     if (day == 1) {
       for (var w = 1; w <= kTemplateWeeks; w++) {
-        _put(sheet, 2 + w, row, 'SEMANA $w', headerStyle);
+        _put(sheet, 2 + w, row, 'SEMANA $w', bandCenter);
+      }
+    }
+    for (var r = 1; r <= kTemplateRowsPerDay; r++) {
+      for (var col = 2; col <= lastCol; col++) {
+        _put(sheet, col, row + r, null, centered);
       }
     }
     row += 1 + kTemplateRowsPerDay;
@@ -59,10 +76,19 @@ Uint8List buildPeriodizedTemplateBytes() {
   return Uint8List.fromList(bytes);
 }
 
-void _put(Sheet sheet, int col, int row, String value, [CellStyle? style]) {
+/// Banda de encabezado de día: fondo negro, texto blanco en negrita.
+CellStyle _bandStyle(HorizontalAlign align) => CellStyle(
+      bold: true,
+      fontColorHex: ExcelColor.white,
+      backgroundColorHex: ExcelColor.black,
+      horizontalAlign: align,
+      verticalAlign: VerticalAlign.Center,
+    );
+
+void _put(Sheet sheet, int col, int row, String? value, [CellStyle? style]) {
   final cell =
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-  cell.value = TextCellValue(value);
+  if (value != null) cell.value = TextCellValue(value);
   if (style != null) cell.cellStyle = style;
 }
 

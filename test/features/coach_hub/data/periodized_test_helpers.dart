@@ -45,3 +45,16 @@ List<Object?> header1({int weeks = 3}) => [
     ];
 
 List<Object?> header(int day) => ['N°', 'DÍA $day', 'DESCANSOS'];
+
+/// Escribe celdas en una plantilla ya construida (fila/columna base 0).
+/// Enteros como número, el resto como texto; conserva los estilos.
+Uint8List fillTemplate(Uint8List template, Map<(int, int), Object> cells) {
+  final excel = Excel.decodeBytes(template);
+  final sheet = excel[kProgramSheet];
+  cells.forEach((rc, v) {
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: rc.$2, rowIndex: rc.$1))
+        .value = v is int ? IntCellValue(v) : TextCellValue(v.toString());
+  });
+  return Uint8List.fromList(excel.save()!);
+}

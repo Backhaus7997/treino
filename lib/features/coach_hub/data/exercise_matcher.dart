@@ -1,6 +1,3 @@
-import '../domain/parsed_plan.dart';
-import 'excel_parser.dart';
-
 /// Catálogo mínimo del lado matcher — sólo lo que necesita para mapear.
 class MatcherExercise {
   MatcherExercise({
@@ -18,12 +15,6 @@ class MatcherExercise {
   /// alongside `name`, so "Sentadilla con barra" matches the same exercise
   /// as "Back Squat".
   final List<String> aliases;
-}
-
-class MatchResult {
-  MatchResult({required this.days, required this.unmatched});
-  final List<ParsedPlanDay> days;
-  final List<ParsedPlanUnmatched> unmatched;
 }
 
 // NORMALIZE-PARITY: see ADR-CXP-006 — TS port lives in functions/src/add-alias.ts
@@ -239,60 +230,4 @@ class ExerciseNameMatcher {
     if (exercise != null) return ExerciseNameMatch(exercise: exercise);
     return ExerciseNameMatch(suggestion: _bestFuzzySuggestion(key, _index));
   }
-}
-
-MatchResult matchExercises(
-  List<RawParsedDay> rawDays,
-  List<MatcherExercise> exercises,
-) {
-  final matcher = ExerciseNameMatcher(exercises);
-  final unmatched = <ParsedPlanUnmatched>[];
-  final days = <ParsedPlanDay>[];
-
-  for (final day in rawDays) {
-    final items = <ParsedPlanItem>[];
-    for (final item in day.items) {
-      final verdict = matcher.match(item.rowName);
-      final exercise = verdict.exercise;
-      final suggestion = verdict.suggestion;
-
-      if (exercise == null) {
-        unmatched.add(ParsedPlanUnmatched(
-          dayNumber: day.dayNumber,
-          rowName: item.rowName,
-        ));
-        items.add(ParsedPlanItem(
-          rowName: item.rowName,
-          sets: item.sets,
-          repsMin: item.repsMin,
-          repsMax: item.repsMax,
-          weightKg: item.weightKg,
-          restSec: item.restSec,
-          notes: item.notes,
-          exerciseId: null,
-          exerciseName: item.rowName,
-          muscleGroup: null,
-          suggestedExerciseId: suggestion?.id,
-          suggestedExerciseName: suggestion?.name,
-          suggestedMuscleGroup: suggestion?.muscleGroup,
-        ));
-      } else {
-        items.add(ParsedPlanItem(
-          rowName: item.rowName,
-          sets: item.sets,
-          repsMin: item.repsMin,
-          repsMax: item.repsMax,
-          weightKg: item.weightKg,
-          restSec: item.restSec,
-          notes: item.notes,
-          exerciseId: exercise.id,
-          exerciseName: exercise.name,
-          muscleGroup: exercise.muscleGroup,
-        ));
-      }
-    }
-    days.add(ParsedPlanDay(dayNumber: day.dayNumber, items: items));
-  }
-
-  return MatchResult(days: days, unmatched: unmatched);
 }

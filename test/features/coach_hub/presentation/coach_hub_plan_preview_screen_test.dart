@@ -9,15 +9,17 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
-import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'periodized_draft_fixtures.dart';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -39,60 +41,22 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// A minimal ParsedPlan with one unmatched item for day 1.
-ParsedPlan _planWithUnmatched() => const ParsedPlan(
-      name: 'Test Plan',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Sentadilla',
-              exerciseId: null,
-              exerciseName: 'Sentadilla',
-              muscleGroup: null,
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-          ],
-        ),
-      ],
-      unmatched: [
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla'),
-      ],
-    );
+/// Un renglón sin match en el DÍA 1.
+PeriodizedImportDraft _planWithUnmatched() => draftOf([
+      [1, 'Sentadilla', null, ...sameWeeks('3x10')],
+    ]);
 
-ParsedPlan _planWithSuggestion() => const ParsedPlan(
-      name: 'Test Plan',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Sentadilla búlgara',
-              exerciseId: null,
-              exerciseName: 'Sentadilla búlgara',
-              muscleGroup: null,
-              suggestedExerciseId: 'squat-bar',
-              suggestedExerciseName: 'Sentadilla con barra',
-              suggestedMuscleGroup: 'Legs',
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-          ],
+PeriodizedImportDraft _planWithSuggestion() => draftOf(
+      [
+        [1, 'Sentadilla búlgara', null, ...sameWeeks('3x10')],
+      ],
+      suggestions: {
+        'Sentadilla búlgara': MatcherExercise(
+          id: 'squat-bar',
+          name: 'Sentadilla con barra',
+          muscleGroup: 'Legs',
         ),
-      ],
-      unmatched: [
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla búlgara'),
-      ],
+      },
     );
 
 Exercise _exercise({String id = 'ex-1', String name = 'Sentadilla'}) =>
@@ -121,6 +85,8 @@ Widget _wrap(
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 void main() {
+  useTallSurface();
+
   setUpAll(() {
     registerFallbackValue(<String, dynamic>{});
   });
@@ -167,7 +133,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -226,7 +192,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -281,7 +247,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -330,7 +296,8 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -374,7 +341,8 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
@@ -415,7 +383,8 @@ void main() {
         _wrap(
           const CoachHubPlanPreviewScreen(),
           overrides: [
-            parsedPlanProvider.overrideWith((ref) => _planWithSuggestion()),
+            periodizedImportProvider
+                .overrideWith((ref) => _planWithSuggestion()),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),

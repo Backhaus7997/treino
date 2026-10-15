@@ -65,11 +65,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 81;
+    const allowlistCeiling = 80;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 244;
+    const rawRadiusDebtCeiling = 237;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -98,7 +98,6 @@ void main() {
       'features/coach/presentation/widgets/trainers_map_view.dart',
       'features/coach_hub/presentation/coach_hub_login_screen.dart',
       'features/coach_hub/presentation/coach_hub_plan_preview_screen.dart',
-      'features/coach_hub/presentation/coach_hub_upload_plan_screen.dart',
       'features/coach_hub/presentation/sections/agenda/agenda_web_day_list.dart',
       'features/coach_hub/presentation/sections/agenda/appointment_detail_dialog.dart',
       'features/coach_hub/presentation/sections/agenda/override_form_dialog.dart',

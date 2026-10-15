@@ -4,23 +4,24 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../application/plan_import_providers.dart';
-import '../data/plan_import_repository.dart';
-import '../data/template_builder.dart';
+import '../data/periodized_template_builder.dart';
+import '../domain/periodized_plan.dart';
 import '../infrastructure/browser_download.dart';
-import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
-import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'widgets/import_plan_widgets.dart';
 
 /// Upload screen del Coach Hub — paso 1 del flujo de import.
 ///
-/// 1. Botón "Descargar template" → genera xlsx en memoria + browser download
+/// 1. Botón "Descargar plantilla" → genera el xlsx periodizado en memoria +
+///    browser download
 /// 2. File picker para que el PF elija un xlsx
-/// 3. Botón "Procesar" → parseAndMatch (client-side) → preview screen
+/// 3. Botón "Procesar" → parseo + match (client-side) → vista previa. Si el
+///    parser encuentra errores se muestran TODOS con su celda y no se avanza.
 class CoachHubUploadPlanScreen extends ConsumerStatefulWidget {
   const CoachHubUploadPlanScreen({super.key});
 
@@ -35,9 +36,13 @@ class _CoachHubUploadPlanScreenState
   bool _submitting = false;
   bool _downloadingTemplate = false;
   String? _error;
+  List<ImportDiagnostic> _diagnostics = const [];
 
   Future<void> _pickFile() async {
-    setState(() => _error = null);
+    setState(() {
+      _error = null;
+      _diagnostics = const [];
+    });
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
@@ -55,18 +60,26 @@ class _CoachHubUploadPlanScreenState
     });
 
     try {
-      final bytes = buildPlanTemplateBytes();
+      final bytes = buildPeriodizedTemplateBytes();
       triggerBrowserDownload(
         bytes: bytes,
-        filename: 'treino-plan-template.xlsx',
+        filename: 'treino-plantilla-plan.xlsx',
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     } catch (_) {
-      if (mounted) setState(() => _error = 'No pudimos generar el template.');
+      if (mounted) setState(() => _error = 'No pudimos generar la plantilla.');
     } finally {
       if (mounted) setState(() => _downloadingTemplate = false);
     }
+  }
+
+  /// Nombre inicial de la rutina: el del archivo sin la extensión.
+  static String _routineNameOf(String fileName) {
+    final base =
+        fileName.replaceFirst(RegExp(r'\.xlsx$', caseSensitive: false), '');
+    final clean = base.trim();
+    return clean.isEmpty ? 'Plan importado' : clean;
   }
 
   Future<void> _processFile() async {
@@ -82,23 +95,30 @@ class _CoachHubUploadPlanScreenState
     setState(() {
       _submitting = true;
       _error = null;
+      _diagnostics = const [];
     });
 
     try {
-      final parsed = await ref
-          .read(planImportRepositoryProvider)
-          .parseAndMatch(bytes: Uint8List.fromList(bytes));
-      ref.read(parsedPlanProvider.notifier).state = parsed;
+      final outcome =
+          await ref.read(planImportRepositoryProvider).parseAndMatch(
+                bytes: Uint8List.fromList(bytes),
+                defaultName: _routineNameOf(file.name),
+              );
+      final draft = outcome.draft;
+      if (draft == null) {
+        if (!mounted) return;
+        setState(() {
+          _diagnostics = outcome.diagnostics;
+          _submitting = false;
+        });
+        return;
+      }
+      ref.read(periodizedImportProvider.notifier).state = draft;
       if (!mounted) return;
+      setState(() => _submitting = false);
       // push (not go): preview is a sub-step, so pop() from it returns here
       // with the picked file still in state and the browser Back works.
       context.push('/upload-plan/preview');
-    } on PlanImportException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _submitting = false;
-      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -112,6 +132,7 @@ class _CoachHubUploadPlanScreenState
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final file = _pickedFile;
+    final errors = _diagnostics.where((d) => d.isError).toList();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -120,32 +141,40 @@ class _CoachHubUploadPlanScreenState
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20,
+                vertical: AppSpacing.s18,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _Header(palette: palette),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.s20),
                   _TemplateCard(
                     palette: palette,
                     onDownload: _downloadTemplate,
                     loading: _downloadingTemplate,
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.s18),
                   _UploadCard(
                     palette: palette,
                     file: file,
                     onPick: _pickFile,
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.s14),
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: palette.danger, fontSize: 13),
+                      style: importText(palette.danger,
+                          size: AppTextSize.bodyDense),
                     ),
                   ],
-                  const SizedBox(height: 18),
+                  if (errors.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.s14),
+                    _ErrorsCard(palette: palette, errors: errors),
+                  ],
+                  const SizedBox(height: AppSpacing.s18),
                   TreinoButton(
                     label: 'PROCESAR PLAN',
                     expand: true,
@@ -157,6 +186,38 @@ class _CoachHubUploadPlanScreenState
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorsCard extends StatelessWidget {
+  const _ErrorsCard({required this.palette, required this.errors});
+  final AppPalette palette;
+  final List<ImportDiagnostic> errors;
+
+  @override
+  Widget build(BuildContext context) {
+    return ImportCard(
+      borderColor: palette.danger,
+      background: palette.danger.withValues(alpha: 0.08),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            errors.length == 1
+                ? 'Hay 1 error en el archivo. Corregilo y volvé a subirlo.'
+                : 'Hay ${errors.length} errores en el archivo. Corregilos y '
+                    'volvé a subirlo.',
+            style: importText(
+              palette.textPrimary,
+              size: AppTextSize.body,
+              weight: AppFonts.w700,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          ImportDiagnosticsList(diagnostics: errors),
+        ],
       ),
     );
   }
@@ -179,27 +240,29 @@ class _Header extends StatelessWidget {
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/dashboard'),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.s8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'TREINO COACH HUB',
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: palette.highlight,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+                  fontSize: AppTextSize.caption,
+                  fontWeight: AppFonts.w700,
                   letterSpacing: 1.8,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.hairline),
               Text(
                 'IMPORTAR PLAN',
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: palette.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  fontSize: AppTextSize.heading,
+                  fontWeight: AppFonts.w700,
                   letterSpacing: 1.2,
                   height: 1,
                 ),
@@ -224,43 +287,39 @@ class _TemplateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
+    return ImportCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(TreinoIcon.download, color: palette.accent, size: 28),
-          const SizedBox(width: 14),
+          Icon(TreinoIcon.download, color: palette.accent),
+          const SizedBox(width: AppSpacing.s14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¿No tenés el template?',
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
+                  '¿No tenés la plantilla?',
+                  style: importText(
+                    palette.textPrimary,
+                    size: AppTextSize.bodyLarge,
+                    weight: AppFonts.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.hairline),
                 Text(
-                  'Descargá el Excel base con las hojas y columnas '
-                  'que esperamos: Plan + Día 1, Día 2…',
-                  style: TextStyle(
-                    color: palette.textMuted,
-                    fontSize: 13,
+                  'Descargá la plantilla: una hoja "Programa" con un bloque '
+                  'por día y una columna por semana, y una hoja '
+                  '"Instrucciones" con la notación. Es la única que '
+                  'aceptamos.',
+                  style: importText(
+                    palette.textMuted,
+                    size: AppTextSize.bodyDense,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.s12),
                 TreinoButton(
-                  label: 'Descargar template',
+                  label: 'Descargar plantilla',
                   variant: TreinoButtonVariant.secondaryAccent,
                   loading: loading,
                   onPressed: onDownload,
@@ -286,31 +345,26 @@ class _UploadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
+    final picked = file;
+    return ImportCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Subí tu plan',
-            style: TextStyle(
-              color: palette.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
+            style: importText(
+              palette.textPrimary,
+              size: AppTextSize.bodyLarge,
+              weight: AppFonts.w700,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.hairline),
           Text(
             'Archivo .xlsx, hasta 10 MB.',
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: importText(palette.textMuted, size: AppTextSize.bodyDense),
           ),
-          const SizedBox(height: 14),
-          if (file == null)
+          const SizedBox(height: AppSpacing.s14),
+          if (picked == null)
             TreinoButton(
               label: 'Elegir archivo',
               icon: TreinoIcon.upload,
@@ -319,36 +373,32 @@ class _UploadCard extends StatelessWidget {
               onPressed: onPick,
             )
           else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: palette.bg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: palette.border),
-              ),
+            ImportCard(
+              padding: AppSpacing.s12,
+              background: palette.bg,
               child: Row(
                 children: [
-                  Icon(TreinoIcon.fileXls, color: palette.accent, size: 20),
-                  const SizedBox(width: 12),
+                  Icon(TreinoIcon.fileXls, color: palette.accent),
+                  const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          file!.name,
-                          style: TextStyle(
-                            color: palette.textPrimary,
-                            fontWeight: FontWeight.w600,
+                          picked.name,
+                          style: importText(
+                            palette.textPrimary,
+                            weight: AppFonts.w600,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          _formatBytes(file!.size),
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 12,
+                          _formatBytes(picked.size),
+                          style: importText(
+                            palette.textMuted,
+                            size: AppTextSize.caption,
                           ),
                         ),
                       ],

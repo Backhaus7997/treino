@@ -8,11 +8,12 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
-import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'periodized_draft_fixtures.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
@@ -38,42 +39,11 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// A ParsedPlan whose day 1 has TWO identically-named unmatched rows.
-ParsedPlan _planWithDuplicateUnmatched() => const ParsedPlan(
-      name: 'Test Plan',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Sentadilla X',
-              exerciseId: null,
-              exerciseName: 'Sentadilla X',
-              muscleGroup: null,
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-            ParsedPlanItem(
-              rowName: 'Sentadilla X',
-              exerciseId: null,
-              exerciseName: 'Sentadilla X',
-              muscleGroup: null,
-              sets: 4,
-              repsMin: 6,
-              repsMax: 8,
-            ),
-          ],
-        ),
-      ],
-      unmatched: [
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla X'),
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Sentadilla X'),
-      ],
-    );
+/// Un plan cuyo DÍA 1 tiene DOS renglones sin match con el mismo nombre.
+PeriodizedImportDraft _planWithDuplicateUnmatched() => draftOf([
+      [1, 'Sentadilla X', null, ...sameWeeks('3x10')],
+      [2, 'Sentadilla X', null, ...sameWeeks('4x6')],
+    ]);
 
 Exercise _exercise({String id = 'ex-1', String name = 'Sentadilla'}) =>
     Exercise(
@@ -99,6 +69,8 @@ Widget _wrap(
     );
 
 void main() {
+  useTallSurface();
+
   setUpAll(() {
     registerFallbackValue(<String, dynamic>{});
   });
@@ -125,7 +97,7 @@ void main() {
           const CoachHubPlanPreviewScreen(),
           overrides: [
             cloudFunctionsProvider.overrideWithValue(mockFunctions),
-            parsedPlanProvider.overrideWith((ref) => plan),
+            periodizedImportProvider.overrideWith((ref) => plan),
             userProfileProvider.overrideWith(
               (ref) => Stream.value(_trainerProfile()),
             ),
