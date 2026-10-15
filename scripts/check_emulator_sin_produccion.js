@@ -1,37 +1,52 @@
 #!/usr/bin/env node
 /**
- * check_emulator_secret_manager.js
+ * check_emulator_sin_produccion.js
  *
- * ¿La firebase-tools del PATH todavía manda los secretos del emulador a
- * CLOUD_SECRET_MANAGER_URL?
+ * ¿La firebase-tools del PATH todavía respeta los dos cierres de
+ * `scripts/emulator.sh` que la dejan sin acceso a producción?
  *
  *   npm --prefix functions ci     # la función de prueba usa su firebase-functions
- *   node scripts/check_emulator_secret_manager.js
+ *   node scripts/check_emulator_sin_produccion.js
  *
- * `scripts/emulator.sh` cierra el acceso a Secret Manager de producción
- * apuntando esa variable a un puerto local muerto (bloque "Secretos"). La
- * variable no está documentada: si una versión nueva de firebase-tools la deja
- * de leer, el emulador vuelve a traer los secretos de treino-dev y nada se
- * pone rojo. Esto es lo que se pone rojo. Corre en el job `functions-test` de
- * CI, que instala la firebase-tools de la última versión en cada corrida.
+ * Los dos cierres dependen de comportamiento NO documentado de firebase-tools,
+ * y el job `functions-test` de CI instala la última versión en cada corrida.
+ * Si una versión cambia alguno, el cierre desaparece en silencio. Esto es lo
+ * que se pone rojo:
  *
- * Mide de punta a punta, igual que la sonda con la que se encontró el bug:
- * un emulador de Functions REAL, proyecto `demo-`, puertos alternos, una
- * función con un `defineSecret`, y Secret Manager apuntado a un servidor falso
- * en 127.0.0.1 que registra cada pedido. Pasa si, al invocar la función, el
- * pedido del secreto llega al servidor falso SIN credencial (token "owner") y
- * el valor que devolvió es el que ve la función.
+ * Los dos viven en `lib/emulador_sin_produccion.sh`:
  *
- * Cuando pasa, nada sale de 127.0.0.1. El emulador arranca con un entorno de
- * lista blanca (no le llega ninguna variable de credencial) y con HOME en un
- * directorio vacío, y esto falla si igual avisa que encontró ADC. Cuando la
- * variable dejó de leerse —el caso que busca—, el pedido SÍ sale a
- * secretmanager.googleapis.com: sin la credencial del dev, y por un proyecto
- * `demo-` que no existe.
+ *   1. Secretos: el emulador le pide los
+ *      `defineSecret` a CLOUD_SECRET_MANAGER_URL. Si la deja de leer, vuelve a
+ *      traerlos de Secret Manager de treino-dev.
+ *   2. Credenciales: con GOOGLE_APPLICATION_CREDENTIALS
+ *      apuntando a la credencial falsa del repo, el runtime usa ésa y el CLI NO
+ *      le inyecta el `firebase login`. Si la inyectara igual, FCM volvería a
+ *      salir a producción con la cuenta del dev.
+ *
+ * Mide de punta a punta, igual que las sondas con que se encontraron: un
+ * emulador de Functions REAL, puertos alternos, una función con un
+ * `defineSecret` que además informa con qué credencial corre, y Secret Manager
+ * apuntado a un servidor falso en 127.0.0.1 que registra cada pedido.
+ *
+ * El emulador arranca a través de `cerrar_produccion` de
+ * `lib/emulador_sin_produccion.sh`, el MISMO helper que usa emulator.sh: lo que
+ * se mide es ese código, no una copia. Lo único que se pisa después es
+ * CLOUD_SECRET_MANAGER_URL, para que apunte a un servidor que registre el
+ * pedido en vez de a un puerto muerto; que el helper la ponga en un puerto
+ * muerto lo fija `test/emulator_secretos_locales.test.js`.
+ *
+ * El CLI corre con HOME en un directorio vacío, un entorno de lista blanca y un
+ * `firebase login` INVENTADO en ese HOME: para que tenga un login que inyectar,
+ * y para que no encuentre ninguno real. El proyecto es `demo-`: la inyección
+ * pasa igual (la cuenta sale de `getProjectDefaultAccount`, sin guarda para
+ * `demo-`; medido), y con `demo-` el CLI no sale a leer la config del proyecto.
+ * Cuando pasa, nada sale de 127.0.0.1. (Una versión anterior de este canario
+ * usaba un proyecto no-`demo-` porque decía que con `demo-` no había
+ * inyección. Era falso; lo encontró el review del PR.)
  *
  * Espera a la función pegándole a su URL hasta que deja de dar 404, no a una
  * línea del log: un cambio de redacción de la CLI no tiene por qué ponerlo
- * rojo. Las dos líneas de log que sí mira son para fallar ANTES, no para pasar.
+ * rojo.
  */
 
 'use strict';
@@ -44,9 +59,15 @@ const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 
 const REPO = path.join(__dirname, '..');
-const PROYECTO = 'demo-canario-secretos';
+const FUNCION = path.join(__dirname, 'test', 'fixtures', 'funcion_del_canario.js');
+const PROYECTO = 'demo-canario-emulador';
+// El client_id de la credencial falsa, ESCRITO acá y no leído del JSON: si
+// alguien pegara una credencial real en ese archivo, el canario no la
+// aceptaría como "la falsa".
+const CLIENT_ID_FALSO = 'credencial-falsa-del-emulador.apps.googleusercontent.com';
 const SECRETO = 'CANARIO_SECRETO_FALSO';
 const VALOR = 'VALOR-DEL-SECRET-MANAGER-FALSO';
+const EMAIL_FALSO = 'login-falso@canario.invalid';
 // Lejos de los del emulador real (5001, 4400, 4500), por si hay uno corriendo.
 const PUERTOS = { functions: 5181, hub: 4581, logging: 4681 };
 const ESPERA_MS = 120_000;
@@ -77,7 +98,7 @@ async function main() {
     if (!(await puertoLibre(port))) return fallar(`el puerto ${port} (${nombre}) está ocupado.`);
   }
 
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'canario-secretos-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'canario-emulador-'));
   const fn = path.join(dir, 'fn');
   fs.mkdirSync(fn);
   fs.symlinkSync(modulos, path.join(fn, 'node_modules'));
@@ -99,15 +120,13 @@ async function main() {
     // el mismo (el `firebase` de nvm en 22 y otro `node` antes en el PATH).
     JSON.stringify({ name: 'canario', main: 'index.js', engines: require(path.join(REPO, 'functions', 'package.json')).engines }),
   );
-  fs.writeFileSync(
-    path.join(fn, 'index.js'),
-    [
-      "const { onRequest } = require('firebase-functions/v2/https');",
-      "const { defineSecret } = require('firebase-functions/params');",
-      `const S = defineSecret('${SECRETO}');`,
-      'exports.canario = onRequest({ secrets: [S] }, (req, res) => res.send(JSON.stringify(S.value())));',
-    ].join('\n'),
-  );
+  // La función vive en un fixture y no en un string de este archivo: corre en
+  // el emulador, no acá, y su `initializeApp()` es del runtime.
+  const funcion = fs.readFileSync(FUNCION, 'utf8');
+  if (!funcion.includes(`defineSecret('${SECRETO}')`)) {
+    return fallar(`${FUNCION} no declara el secreto ${SECRETO}: el canario no mediría nada.`);
+  }
+  fs.writeFileSync(path.join(fn, 'index.js'), funcion);
 
   const pedidos = [];
   const sm = http.createServer((req, res) => {
@@ -119,23 +138,33 @@ async function main() {
   const smUrl = `http://127.0.0.1:${sm.address().port}`;
 
   // Lista blanca, no `process.env` menos lo peligroso: una variable de
-  // credencial que nadie anotó acá no llega al emulador.
-  const env = { CLOUD_SECRET_MANAGER_URL: smUrl };
+  // credencial que nadie anotó acá no llega al emulador. La credencial la pone
+  // el helper, no este archivo.
+  const env = {};
   for (const v of ['PATH', 'TMPDIR', 'LANG', 'CI']) {
     if (process.env[v] !== undefined) env[v] = process.env[v];
   }
-  // HOME también, y no sólo CLOUDSDK_CONFIG: google-auth-library busca las ADC
-  // en `$HOME/.config/gcloud/application_default_credentials.json` y no mira
-  // CLOUDSDK_CONFIG. Con sólo ésa, el emulador avisaba "Application Default
-  // Credentials detected" (medido).
+  // HOME, y no sólo CLOUDSDK_CONFIG: google-auth-library busca las ADC en
+  // `$HOME/.config/gcloud/` y no mira CLOUDSDK_CONFIG (medido). Y en ese HOME,
+  // un `firebase login` inventado, para que el CLI TENGA un login que inyectar.
   env.HOME = path.join(dir, 'home');
-  env.XDG_CONFIG_HOME = path.join(dir, 'home', '.config');
-  env.CLOUDSDK_CONFIG = path.join(dir, 'home', '.config', 'gcloud');
-  fs.mkdirSync(env.CLOUDSDK_CONFIG, { recursive: true });
+  const configstore = path.join(env.HOME, '.config', 'configstore');
+  fs.mkdirSync(configstore, { recursive: true });
+  fs.writeFileSync(
+    path.join(configstore, 'firebase-tools.json'),
+    JSON.stringify({
+      user: { email: EMAIL_FALSO },
+      tokens: { refresh_token: 'refresh-token-falso', access_token: 'access-token-falso', expires_at: Date.now() + 3600e3 },
+    }),
+  );
 
   const logPath = path.join(dir, 'emulador.log');
   const fd = fs.openSync(logPath, 'w');
-  const emu = spawn('firebase', ['emulators:start', '--only', 'functions', '--project', PROYECTO], {
+  const helper = path.join(__dirname, 'lib', 'emulador_sin_produccion.sh');
+  const arranque =
+    'source "$1" && cerrar_produccion "$4" && export CLOUD_SECRET_MANAGER_URL="$2" && ' +
+    'exec firebase emulators:start --only functions --project "$3"';
+  const emu = spawn('bash', ['-c', arranque, '_', helper, smUrl, PROYECTO, fn], {
     cwd: dir,
     env,
     detached: true,
@@ -155,8 +184,6 @@ async function main() {
       req.on('timeout', () => req.destroy(new Error('sin respuesta en 30 s')));
       req.on('error', (e) => resolve({ error: e.message }));
     });
-  const conAdc = () => /Application Default Credentials detected/.test(log());
-  const ADC = 'el emulador encontró credenciales reales; el aislamiento no alcanza';
 
   try {
     const t0 = Date.now();
@@ -166,7 +193,6 @@ async function main() {
       if (emu.exitCode !== null) return fallar(`el emulador terminó solo (${emu.exitCode}):\n${log()}`);
       // Si no carga la función, el emulador queda "ready" igual y esto esperaría hasta el timeout.
       if (/Failed to load function definition/.test(log())) return fallar(`no cargó la función:\n${log()}`);
-      if (conAdc()) return fallar(`${ADC}:\n${log()}`);
       r = await pegar();
       if (r.status !== undefined && r.status !== 404) break;
       if (Date.now() - t0 > ESPERA_MS) {
@@ -174,11 +200,10 @@ async function main() {
       }
       await new Promise((res) => setTimeout(res, 500));
     }
-    // El aviso de ADC pudo llegar entre la última mirada al log y el GET.
-    if (conAdc()) return fallar(`${ADC}:\n${log()}`);
     if (r.status !== 200) return fallar(`la función respondió ${r.status}: ${r.body}\n${log()}`);
-    const visto = r.body;
+    const visto = JSON.parse(r.body);
 
+    // ── 1. Secretos ──
     const esperado = `/v1/projects/${PROYECTO}/secrets/${SECRETO}/versions/latest:access`;
     const delSecreto = pedidos.filter((p) => p.url === esperado);
     if (delSecreto.length === 0) {
@@ -197,10 +222,22 @@ async function main() {
           'emulator.sh confía en que un origin http: no cargue ninguna.',
       );
     }
-    if (visto !== JSON.stringify(VALOR)) {
-      return fallar(`la función vio ${visto}, no el valor del Secret Manager falso.\n${log()}`);
+    if (visto.secreto !== VALOR) {
+      return fallar(`la función vio ${JSON.stringify(visto.secreto)}, no el valor del Secret Manager falso.\n${log()}`);
+    }
+
+    // ── 2. Credenciales ──
+    if (visto.clientId !== CLIENT_ID_FALSO) {
+      return fallar(
+        `el runtime corre con otra credencial (${visto.credencial}, client_id ` +
+          `${JSON.stringify(visto.clientId)}), no con la falsa del repo.\n` +
+          'Si es el del cliente OAuth de firebase-tools, el CLI le inyectó el `firebase login`\n' +
+          'aunque el helper le pasó una credencial: el cierre de `scripts/emulator.sh` ya no\n' +
+          `cierra nada y FCM vuelve a salir a producción con la cuenta del dev.\n${log()}`,
+      );
     }
     console.log(`OK: el secreto se pidió a ${smUrl}, sin credencial, y la función vio ese valor.`);
+    console.log('OK: el runtime corre con la credencial falsa del repo, aunque el CLI tenía un login para inyectarle.');
   } finally {
     try {
       process.kill(-emu.pid, 'SIGINT');

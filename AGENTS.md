@@ -171,16 +171,22 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     del proyecto de `--project` cada `defineSecret` al invocar una función, y
     el valor llega a la función (medido el 2026-10-14 con un proyecto
     `demo-`). Con `treino-dev` eso es la `RESEND_API_KEY` y el
-    `MP_ACCESS_TOKEN` reales (leído: contra producción no se invocó nada). Lo
-    cierra `scripts/emulator.sh`, bloque «Secretos».
-    Y una función que llama una API de Google sin emulador —FCM— sale con la
-    credencial del dev; eso no lo cierra nada (leído, no medido).
+    `MP_ACCESS_TOKEN` reales (leído: contra producción no se invocó nada).
+    Y una función que llamaba una API de Google sin emulador —FCM— salía con
+    la credencial del dev: las ADC de gcloud o, sin ADC, el `firebase login`,
+    que el CLI le inyecta al runtime sin avisar (medido el 2026-10-14). Esta
+    nota decía «eso no lo cierra nada». Las dos cosas las cierra
+    `scripts/emulator.sh` a través de `scripts/lib/emulador_sin_produccion.sh`
+    (Secret Manager a un puerto muerto y una credencial falsa), y no arranca si
+    un `functions/.env*` o `.secret.local` define
+    `GOOGLE_APPLICATION_CREDENTIALS`, porque esa le gana a la falsa.
 
     Ya está resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`:
     **usalos** en vez de escribir `firebase emulators:start` a mano. Pelado
     resolvería `demo-treino` y te dejaría la UI de :4444 mirando un namespace
-    vacío; con `--project treino-dev` y Functions, te saltea el cierre de
-    Secret Manager.
+    vacío; con `--project treino-dev` y Functions, te saltea los dos cierres:
+    los secretos salen de Secret Manager de producción y FCM sale con tu
+    credencial.
   - Corolario 4 — **`firebase use` le gana al default, no deja rastro en el
     repo, y SE HEREDA DE LOS DIRECTORIOS PADRE**. `firebase use <alias>` escribe
     `activeProjects` en `~/.config/configstore/firebase-tools.json`, que **no

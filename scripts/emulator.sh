@@ -74,12 +74,13 @@ set -euo pipefail
 # emulado sí sale, y sale al proyecto que se nombra acá. Este bloque decía que
 # nombrar treino-dev "no alcanza producción", y era falso en dos lugares:
 #   - Secret Manager: el CLI le pide a treino-dev cada `defineSecret` que una
-#     función necesita al invocarla. Se cierra más abajo, con
-#     CLOUD_SECRET_MANAGER_URL (ver "Secretos").
+#     función necesita al invocarla. Se cierra con CLOUD_SECRET_MANAGER_URL.
 #   - Las APIs de Google sin emulador que llama una función —FCM, con
-#     `functions/src/notifications/send-fcm.ts`— salen con la credencial del
-#     dev: las ADC de gcloud (medido en el #1441) o, sin ADC, el `firebase
-#     login` (leído). Eso NO lo cierra este script. Para FCM: leído, no medido.
+#     `functions/src/notifications/send-fcm.ts`— salían con la credencial del
+#     dev: las ADC de gcloud o, sin ADC, el `firebase login`. Se cierra con una
+#     credencial falsa.
+#   Las dos, en `lib/emulador_sin_produccion.sh` (ver "Secretos y credenciales"
+#   más abajo).
 #
 # --------------------------------------------------------------------------
 # Qué reglas carga el emulador de Firestore, y por qué este script las genera
@@ -158,54 +159,28 @@ abortar_sin_reglas() {
 node "$(dirname "$0")/strip_rules.js" || abortar_sin_reglas
 
 # --------------------------------------------------------------------------
-# Secretos: el emulador de Functions los leía de Secret Manager de PRODUCCIÓN
+# Secretos y credenciales: lo que NO está emulado no alcanza producción
 # --------------------------------------------------------------------------
-# Medido el 2026-10-14 contra firebase-tools 15.19.0, con un proyecto
-# `demo-sonda-secretos`, una función con un `defineSecret` falso y Secret
-# Manager apuntado a un servidor local que registraba cada pedido:
-#
-#   - Al arrancar el emulador no pide nada. Al INVOCAR la función, el CLI hace
-#     `GET /v1/projects/<--project>/secrets/<nombre>/versions/latest:access`, y
-#     el valor que devuelve llega al proceso de la función.
-#     (`resolveSecretEnvs`, `lib/emulator/functionsEmulator.js`.)
-#   - El cartel de proyecto `demo-` ("attempts to access non-emulated services
-#     for this project will fail") no aplica: con el proyecto demo el pedido
-#     salió igual. Lo hace el CLI, no el runtime de la función.
-#   - `functions/.secret.local` lo evita sólo para las claves que tienen valor
-#     NO vacío: `SECRETO=` sin valor sale a Secret Manager igual.
-#
-# Leído, no medido —con treino-dev no se invocó nada—: `<--project>` es
-# `getProjectId()`, o sea el `--project` de abajo, o sea producción. Un trigger
-# como `sendQueuedMail` sobre datos sembrados recibiría la RESEND_API_KEY real
-# y podría mandar mails de verdad; las funciones de Mercado Pago, lo mismo con
-# MP_ACCESS_TOKEN. Los secretos de hoy: `rg -n 'defineSecret\(' functions/src
-# -g '!__tests__'`.
-#
-# Por eso Secret Manager se redirige a un puerto local donde no escucha nadie:
-# todo secreto que no tenga valor en `.secret.local` falla en vez de traer el
-# de producción, se declare como se declare —no depende de barrer los
-# `defineSecret` y acertarles a todos—. Y como el origin es `http:`, el CLI ni
-# siquiera carga una credencial: manda el token literal "owner"
-# (`isLocalInsecureRequest`, `lib/apiv2.js`). Medido: la función recibe "" y
-# el emulador loguea "Unable to access secret environment variables from
-# Google Cloud Secret Manager", que acá es lo ESPERADO, no algo para arreglar
-# con credenciales.
+# El emulador de Functions le pedía los `defineSecret` a Secret Manager de
+# treino-dev, y las APIs sin emulador (FCM) salían con las ADC o el `firebase
+# login` del dev. `cerrar_produccion` cierra las dos cosas; el detalle, lo
+# medido y lo que queda abierto están en `lib/emulador_sin_produccion.sh`.
 #
 # Va antes del branch de SKIP_FUNCTIONS aunque el modo liviano no levante
 # Functions: si algún día las suma, el cierre ya está, y el test lo mide en
 # los dos modos.
-#
-# Para probar un flujo que necesita un secreto: un valor DE PRUEBA en
-# `functions/.secret.local` (gitignoreado). Nunca el de producción.
-#
-# ⚠ CLOUD_SECRET_MANAGER_URL no está documentada: la lee `secretManagerOrigin()`
-# de `lib/api.js`. Si una versión de firebase-tools la deja de leer, este
-# cierre desaparece en silencio. Lo vigila `scripts/check_emulator_secret_manager.js`
-# en el job `functions-test` de CI, contra la firebase-tools que instala ahí.
-# Lo fija `scripts/test/emulator_secretos_locales.test.js`.
-export CLOUD_SECRET_MANAGER_URL="http://127.0.0.1:1"
-echo "Secret Manager -> $CLOUD_SECRET_MANAGER_URL (nadie escucha, a propósito):"
-echo "  un defineSecret sin valor en functions/.secret.local llega VACÍO a la función."
+# El directorio de las Functions, relativo a este script y no al cwd: el
+# chequeo de los archivos de env tiene que mirar los que el emulador va a leer.
+# shellcheck source=lib/emulador_sin_produccion.sh
+source "$(dirname "$0")/lib/emulador_sin_produccion.sh"
+cerrar_produccion "$(dirname "$0")/../functions" || exit 1
+
+# El bucket de Storage del runtime, si el CLI no puede leer la config del
+# proyecto (sin `firebase login` y sin caché): sin esto cae a
+# `treino-dev.appspot.com`, que no es el de la app, y los triggers de Storage
+# no disparan en local. Es el de `lib/firebase_options.dart`; lo fija
+# `scripts/test/emulator_secretos_locales.test.js`. Detalle en el helper.
+export STORAGE_BUCKET_URL="treino-dev.firebasestorage.app"
 
 if [ "${SKIP_FUNCTIONS:-0}" = "1" ]; then
   echo "SKIP_FUNCTIONS=1 -> Firestore + Auth + Storage (sin Functions)."
