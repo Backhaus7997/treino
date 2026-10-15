@@ -157,6 +157,10 @@ void main() {
     // cuando la garantía vive en un archivo que nadie mira al revisar un PR,
     // el test lo mira.
     const permitidos = <String, String>{
+      'lib/features/app_update/presentation/update_required_screen.dart':
+          'abre la ficha de TREINO en App Store / Play Store para actualizar '
+              'la app (gate de versión mínima) — la tienda del sistema, no un '
+              'checkout',
       'lib/features/workout/presentation/widgets/exercise_video_player.dart':
           'abre el video del ejercicio en el reproductor del sistema cuando '
               'el embebido no puede — contenido, no compra',
