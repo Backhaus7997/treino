@@ -51,7 +51,7 @@ class SessionWeekCompletionCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
-              fontSize: 24,
+              fontSize: AppTextSize.heading,
               height: 1.05,
               color: palette.textPrimary,
             ),
@@ -60,7 +60,10 @@ class SessionWeekCompletionCard extends StatelessWidget {
           Text(
             l10n.workoutWeekCompletedStreak(streak),
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.bodyDense,
+              color: palette.textMuted,
+            ),
           ),
           const SizedBox(height: AppSpacing.s14),
           OutlinedButton(
@@ -78,7 +81,7 @@ class SessionWeekCompletionCard extends StatelessWidget {
               textAlign: TextAlign.center,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
                 letterSpacing: 0.8,
               ),
             ),
