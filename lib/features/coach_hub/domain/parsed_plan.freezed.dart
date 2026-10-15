@@ -484,6 +484,9 @@ mixin _$ParsedPlanItem {
   String? get exerciseId => throw _privateConstructorUsedError;
   String get exerciseName => throw _privateConstructorUsedError;
   String? get muscleGroup => throw _privateConstructorUsedError;
+  String? get suggestedExerciseId => throw _privateConstructorUsedError;
+  String? get suggestedExerciseName => throw _privateConstructorUsedError;
+  String? get suggestedMuscleGroup => throw _privateConstructorUsedError;
 
   /// Serializes this ParsedPlanItem to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -511,7 +514,10 @@ abstract class $ParsedPlanItemCopyWith<$Res> {
       String? notes,
       String? exerciseId,
       String exerciseName,
-      String? muscleGroup});
+      String? muscleGroup,
+      String? suggestedExerciseId,
+      String? suggestedExerciseName,
+      String? suggestedMuscleGroup});
 }
 
 /// @nodoc
@@ -539,6 +545,9 @@ class _$ParsedPlanItemCopyWithImpl<$Res, $Val extends ParsedPlanItem>
     Object? exerciseId = freezed,
     Object? exerciseName = null,
     Object? muscleGroup = freezed,
+    Object? suggestedExerciseId = freezed,
+    Object? suggestedExerciseName = freezed,
+    Object? suggestedMuscleGroup = freezed,
   }) {
     return _then(_value.copyWith(
       rowName: null == rowName
@@ -581,6 +590,18 @@ class _$ParsedPlanItemCopyWithImpl<$Res, $Val extends ParsedPlanItem>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String?,
+      suggestedExerciseId: freezed == suggestedExerciseId
+          ? _value.suggestedExerciseId
+          : suggestedExerciseId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      suggestedExerciseName: freezed == suggestedExerciseName
+          ? _value.suggestedExerciseName
+          : suggestedExerciseName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      suggestedMuscleGroup: freezed == suggestedMuscleGroup
+          ? _value.suggestedMuscleGroup
+          : suggestedMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -603,7 +624,10 @@ abstract class _$$ParsedPlanItemImplCopyWith<$Res>
       String? notes,
       String? exerciseId,
       String exerciseName,
-      String? muscleGroup});
+      String? muscleGroup,
+      String? suggestedExerciseId,
+      String? suggestedExerciseName,
+      String? suggestedMuscleGroup});
 }
 
 /// @nodoc
@@ -629,6 +653,9 @@ class __$$ParsedPlanItemImplCopyWithImpl<$Res>
     Object? exerciseId = freezed,
     Object? exerciseName = null,
     Object? muscleGroup = freezed,
+    Object? suggestedExerciseId = freezed,
+    Object? suggestedExerciseName = freezed,
+    Object? suggestedMuscleGroup = freezed,
   }) {
     return _then(_$ParsedPlanItemImpl(
       rowName: null == rowName
@@ -671,6 +698,18 @@ class __$$ParsedPlanItemImplCopyWithImpl<$Res>
           ? _value.muscleGroup
           : muscleGroup // ignore: cast_nullable_to_non_nullable
               as String?,
+      suggestedExerciseId: freezed == suggestedExerciseId
+          ? _value.suggestedExerciseId
+          : suggestedExerciseId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      suggestedExerciseName: freezed == suggestedExerciseName
+          ? _value.suggestedExerciseName
+          : suggestedExerciseName // ignore: cast_nullable_to_non_nullable
+              as String?,
+      suggestedMuscleGroup: freezed == suggestedMuscleGroup
+          ? _value.suggestedMuscleGroup
+          : suggestedMuscleGroup // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -688,7 +727,10 @@ class _$ParsedPlanItemImpl implements _ParsedPlanItem {
       this.notes,
       this.exerciseId,
       required this.exerciseName,
-      this.muscleGroup});
+      this.muscleGroup,
+      this.suggestedExerciseId,
+      this.suggestedExerciseName,
+      this.suggestedMuscleGroup});
 
   factory _$ParsedPlanItemImpl.fromJson(Map<String, dynamic> json) =>
       _$$ParsedPlanItemImplFromJson(json);
@@ -713,10 +755,16 @@ class _$ParsedPlanItemImpl implements _ParsedPlanItem {
   final String exerciseName;
   @override
   final String? muscleGroup;
+  @override
+  final String? suggestedExerciseId;
+  @override
+  final String? suggestedExerciseName;
+  @override
+  final String? suggestedMuscleGroup;
 
   @override
   String toString() {
-    return 'ParsedPlanItem(rowName: $rowName, sets: $sets, repsMin: $repsMin, repsMax: $repsMax, weightKg: $weightKg, restSec: $restSec, notes: $notes, exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup)';
+    return 'ParsedPlanItem(rowName: $rowName, sets: $sets, repsMin: $repsMin, repsMax: $repsMax, weightKg: $weightKg, restSec: $restSec, notes: $notes, exerciseId: $exerciseId, exerciseName: $exerciseName, muscleGroup: $muscleGroup, suggestedExerciseId: $suggestedExerciseId, suggestedExerciseName: $suggestedExerciseName, suggestedMuscleGroup: $suggestedMuscleGroup)';
   }
 
   @override
@@ -737,13 +785,32 @@ class _$ParsedPlanItemImpl implements _ParsedPlanItem {
             (identical(other.exerciseName, exerciseName) ||
                 other.exerciseName == exerciseName) &&
             (identical(other.muscleGroup, muscleGroup) ||
-                other.muscleGroup == muscleGroup));
+                other.muscleGroup == muscleGroup) &&
+            (identical(other.suggestedExerciseId, suggestedExerciseId) ||
+                other.suggestedExerciseId == suggestedExerciseId) &&
+            (identical(other.suggestedExerciseName, suggestedExerciseName) ||
+                other.suggestedExerciseName == suggestedExerciseName) &&
+            (identical(other.suggestedMuscleGroup, suggestedMuscleGroup) ||
+                other.suggestedMuscleGroup == suggestedMuscleGroup));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, rowName, sets, repsMin, repsMax,
-      weightKg, restSec, notes, exerciseId, exerciseName, muscleGroup);
+  int get hashCode => Object.hash(
+      runtimeType,
+      rowName,
+      sets,
+      repsMin,
+      repsMax,
+      weightKg,
+      restSec,
+      notes,
+      exerciseId,
+      exerciseName,
+      muscleGroup,
+      suggestedExerciseId,
+      suggestedExerciseName,
+      suggestedMuscleGroup);
 
   /// Create a copy of ParsedPlanItem
   /// with the given fields replaced by the non-null parameter values.
@@ -773,7 +840,10 @@ abstract class _ParsedPlanItem implements ParsedPlanItem {
       final String? notes,
       final String? exerciseId,
       required final String exerciseName,
-      final String? muscleGroup}) = _$ParsedPlanItemImpl;
+      final String? muscleGroup,
+      final String? suggestedExerciseId,
+      final String? suggestedExerciseName,
+      final String? suggestedMuscleGroup}) = _$ParsedPlanItemImpl;
 
   factory _ParsedPlanItem.fromJson(Map<String, dynamic> json) =
       _$ParsedPlanItemImpl.fromJson;
@@ -798,6 +868,12 @@ abstract class _ParsedPlanItem implements ParsedPlanItem {
   String get exerciseName;
   @override
   String? get muscleGroup;
+  @override
+  String? get suggestedExerciseId;
+  @override
+  String? get suggestedExerciseName;
+  @override
+  String? get suggestedMuscleGroup;
 
   /// Create a copy of ParsedPlanItem
   /// with the given fields replaced by the non-null parameter values.

@@ -98,5 +98,172 @@ void main() {
       expect(result.days.first.items[0].exerciseId, 'back-squat');
       expect(result.days.first.items[1].exerciseId, 'bench-press');
     });
+
+    test('fuzzy queda pendiente como sugerencia y nunca se autoasigna', () {
+      final result = matchExercises(
+        _dayWith(['Press banca pesado']),
+        _exercises,
+      );
+      final item = result.days.single.items.single;
+
+      expect(item.exerciseId, isNull);
+      expect(item.exerciseName, 'Press banca pesado');
+      expect(item.suggestedExerciseId, 'press-banca');
+      expect(item.suggestedExerciseName, 'Press banca');
+      expect(result.unmatched, hasLength(1));
+    });
+
+    test('stopwords no suman coincidencias', () {
+      final result = matchExercises(
+        _dayWith(['Remo con']),
+        [MatcherExercise(id: 'sentadilla', name: 'Sentadilla con')],
+      );
+
+      expect(result.days.single.items.single.suggestedExerciseId, isNull);
+    });
+
+    test('no sugiere el falso positivo medido de remo con mancuerna', () {
+      final result = matchExercises(
+        _dayWith(['Remo con mancuerna']),
+        [
+          MatcherExercise(
+            id: 'sentadilla-goblet',
+            name: 'Sentadilla goblet con mancuerna',
+          ),
+        ],
+      );
+
+      expect(result.days.single.items.single.suggestedExerciseId, isNull);
+    });
+
+    test('equipo distinto o ausente impide sugerir', () {
+      final result = matchExercises(
+        _dayWith([
+          'Sentadilla con banda',
+          'Sentadilla con pesa rusa',
+          'Remo con mancuerna',
+        ]),
+        [
+          MatcherExercise(
+            id: 'sentadilla-barra',
+            name: 'Sentadilla con barra',
+          ),
+          MatcherExercise(id: 'remo', name: 'Remo'),
+        ],
+      );
+
+      for (final item in result.days.single.items) {
+        expect(item.exerciseId, isNull);
+        expect(item.suggestedExerciseId, isNull, reason: item.rowName);
+      }
+    });
+
+    test('sinónimos del mismo equipo sí son compatibles', () {
+      final result = matchExercises(
+        _dayWith(['Swing con pesa rusa pesado']),
+        [
+          MatcherExercise(id: 'swing', name: 'Swing con kettlebell'),
+        ],
+      );
+
+      expect(result.days.single.items.single.exerciseId, isNull);
+      expect(result.days.single.items.single.suggestedExerciseId, 'swing');
+    });
+
+    test('calificador de variante presente de un solo lado impide sugerir', () {
+      final result = matchExercises(
+        _dayWith([
+          'Sentadilla búlgara',
+          'Press de banca inclinado',
+          'Peso muerto convencional',
+        ]),
+        [
+          MatcherExercise(
+            id: 'sentadilla-barra',
+            name: 'Sentadilla con barra',
+          ),
+          MatcherExercise(
+            id: 'press-barra',
+            name: 'Press de banca con barra',
+          ),
+          MatcherExercise(
+            id: 'peso-rumano',
+            name: 'Peso muerto rumano',
+          ),
+        ],
+      );
+
+      for (final item in result.days.single.items) {
+        expect(item.exerciseId, isNull);
+        expect(item.suggestedExerciseId, isNull, reason: item.rowName);
+      }
+    });
+
+    test('empate de score no elige candidato arbitrariamente', () {
+      final result = matchExercises(
+        _dayWith(['Press de pecho']),
+        [
+          MatcherExercise(id: 'press-1', name: 'Press pecho máquina'),
+          MatcherExercise(id: 'press-2', name: 'Press pecho polea'),
+        ],
+      );
+
+      expect(result.days.single.items.single.exerciseId, isNull);
+      expect(result.days.single.items.single.suggestedExerciseId, isNull);
+    });
+
+    test('catálogo medido: ningún caso conocido cae en la variante equivocada',
+        () {
+      final catalog = [
+        MatcherExercise(id: 'sq-barra', name: 'Sentadilla con barra'),
+        MatcherExercise(id: 'pb-barra', name: 'Press de banca con barra'),
+        MatcherExercise(id: 'pm-rumano', name: 'Peso muerto rumano'),
+        MatcherExercise(
+          id: 'sq-goblet',
+          name: 'Sentadilla goblet con mancuerna',
+        ),
+      ];
+      final result = matchExercises(
+        _dayWith([
+          'Sentadilla con banda',
+          'Sentadilla con pesa rusa',
+          'Sentadilla búlgara',
+          'Press de banca inclinado',
+          'Peso muerto convencional',
+          'Remo con mancuerna',
+        ]),
+        catalog,
+      );
+      for (final item in result.days.single.items) {
+        expect(item.exerciseId, isNull, reason: item.rowName);
+        expect(item.suggestedExerciseId, isNull, reason: item.rowName);
+      }
+      expect(result.unmatched, hasLength(6));
+    });
+
+    test('la compatibilidad se evalúa por etiqueta, no por la unión', () {
+      final result = matchExercises(
+        _dayWith(['Sentadilla pesada']),
+        [
+          MatcherExercise(
+            id: 'sq',
+            name: 'Sentadilla',
+            aliases: const ['Sentadilla goblet'],
+          ),
+        ],
+      );
+      // El alias goblet no contamina el nombre base: "Sentadilla" sí es
+      // compatible con una consulta sin calificador.
+      expect(result.days.single.items.single.suggestedExerciseId, 'sq');
+    });
+
+    test('alias exacto ("Back squat") se autoasigna', () {
+      final result = matchExercises(
+        _dayWith(['Squat trasero']),
+        _exercisesWithAliases,
+      );
+      expect(result.unmatched, isEmpty);
+      expect(result.days.single.items.single.exerciseId, 'back-squat');
+    });
   });
 }

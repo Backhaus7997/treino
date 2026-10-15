@@ -64,6 +64,9 @@ _$ParsedPlanItemImpl _$$ParsedPlanItemImplFromJson(Map<String, dynamic> json) =>
       exerciseId: json['exerciseId'] as String?,
       exerciseName: json['exerciseName'] as String,
       muscleGroup: json['muscleGroup'] as String?,
+      suggestedExerciseId: json['suggestedExerciseId'] as String?,
+      suggestedExerciseName: json['suggestedExerciseName'] as String?,
+      suggestedMuscleGroup: json['suggestedMuscleGroup'] as String?,
     );
 
 Map<String, dynamic> _$$ParsedPlanItemImplToJson(
@@ -79,6 +82,9 @@ Map<String, dynamic> _$$ParsedPlanItemImplToJson(
       'exerciseId': instance.exerciseId,
       'exerciseName': instance.exerciseName,
       'muscleGroup': instance.muscleGroup,
+      'suggestedExerciseId': instance.suggestedExerciseId,
+      'suggestedExerciseName': instance.suggestedExerciseName,
+      'suggestedMuscleGroup': instance.suggestedMuscleGroup,
     };
 
 _$ParsedPlanUnmatchedImpl _$$ParsedPlanUnmatchedImplFromJson(

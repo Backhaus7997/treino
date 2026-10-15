@@ -182,10 +182,7 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-  // coach_hub-11 (P1) — fuzzy matching ignores tokens shorter than 3 chars.
-  // Query 'el de barra' → tokens 'el'(2,skip), 'de'(2,skip), 'barra'(5).
-  // Only 'barra' is scored; it is shared with catalog 'Remo con barra'
-  // (score 1, threshold ceil(1/2)=1) → the item resolves to that exercise.
+  // coach_hub-11 (P1) — fuzzy matching ignores stopwords and never auto-maps.
   // -------------------------------------------------------------------------
   test('coach_hub-11: skips tokens shorter than 3 chars in fuzzy matching', () {
     final catalog = [
@@ -195,9 +192,12 @@ void main() {
 
     final result = matchExercises(_dayWith(['el de barra']), catalog);
 
-    expect(result.unmatched, isEmpty);
-    expect(result.days.first.items.first.exerciseId, 'remo-con-barra');
-    expect(result.days.first.items.first.exerciseName, 'Remo con barra');
+    expect(result.unmatched, hasLength(1));
+    expect(result.days.first.items.first.exerciseId, isNull);
+    expect(
+      result.days.first.items.first.suggestedExerciseId,
+      'remo-con-barra',
+    );
   });
 
   // -------------------------------------------------------------------------
