@@ -34,13 +34,19 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 ///
 /// [initialName] precarga el campo NOMBRE (el import de Excel pasa el texto
 /// original del entrenador); sigue siendo editable y es el mismo formulario.
+///
+/// [canSave], si se pasa, se consulta justo antes de llamar al repo: si
+/// devuelve false el diálogo se cierra con `null` SIN crear nada (el import usa
+/// esto para no dejar un ejercicio huérfano si la fila ya no lo necesita).
 Future<CustomExercise?> showCreateCustomExerciseDialog(
   BuildContext context, {
   String? initialName,
+  bool Function()? canSave,
 }) {
   return showDialog<CustomExercise>(
     context: context,
-    builder: (_) => _CustomExerciseFormDialog(initialName: initialName),
+    builder: (_) =>
+        _CustomExerciseFormDialog(initialName: initialName, canSave: canSave),
   );
 }
 
@@ -59,7 +65,14 @@ Future<CustomExercise?> showEditCustomExerciseDialog(
 }
 
 class _CustomExerciseFormDialog extends ConsumerStatefulWidget {
-  const _CustomExerciseFormDialog({this.existing, this.initialName});
+  const _CustomExerciseFormDialog({
+    this.existing,
+    this.initialName,
+    this.canSave,
+  });
+
+  /// Sólo en modo creación; ver [showCreateCustomExerciseDialog].
+  final bool Function()? canSave;
 
   /// Sólo en modo creación: texto con el que arranca el campo NOMBRE.
   final String? initialName;
@@ -126,6 +139,10 @@ class _CustomExerciseFormDialogState
     try {
       final repo = ref.read(customExerciseRepositoryProvider);
       final existing = widget.existing;
+      if (existing == null && !(widget.canSave?.call() ?? true)) {
+        Navigator.of(context).pop();
+        return;
+      }
       final CustomExercise result;
       if (existing != null) {
         // copyWith keeps video / description / secondary muscle intact — the

@@ -10,7 +10,11 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/custom_exercise_quota_provider.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
 import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
+import 'package:treino/features/coach_hub/data/periodized_routine_mapper.dart';
+import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -207,5 +211,72 @@ void main() {
     verify(() =>
             userRepo.registrarTopeDelPlanPf(kTrainerUid, 'customExercises'))
         .called(1);
+  });
+
+  testWidgets(
+      'doble tap en "Crear como propio": un solo diálogo y un solo ejercicio '
+      'creado', (tester) async {
+    await pump(tester);
+
+    // Dos activaciones seguidas, sin frame en medio: la segunda llega mientras
+    // la primera todavía espera el embudo del tope (un tap real no la alcanza
+    // porque el diálogo ya tapó el botón).
+    final onPressed = tester
+        .widget<TreinoButton>(
+          find.widgetWithText(TreinoButton, 'Crear como propio').first,
+        )
+        .onPressed!;
+    onPressed();
+    onPressed();
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('create_exercise_name_field')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+    await tester.pumpAndSettle();
+
+    verify(() => customRepo.create(
+          trainerId: any(named: 'trainerId'),
+          name: any(named: 'name'),
+          muscleGroup: any(named: 'muscleGroup'),
+          secondaryMuscleGroup: any(named: 'secondaryMuscleGroup'),
+          description: any(named: 'description'),
+          videoUrl: any(named: 'videoUrl'),
+          defaultRestSeconds: any(named: 'defaultRestSeconds'),
+          equipment: any(named: 'equipment'),
+        )).called(1);
+    // Y nada queda abierto: no hay un segundo diálogo detrás.
+    expect(find.byKey(const Key('create_exercise_name_field')), findsNothing);
+  });
+
+  testWidgets(
+      'si la fila se resuelve con el diálogo abierto, guardar no crea nada',
+      (tester) async {
+    await pump(tester);
+
+    await tester.tap(find.text('Crear como propio').first);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('create_exercise_name_field')), findsOneWidget);
+
+    // La fila (y sus homónimos) se resuelve por otro camino.
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(CoachHubPlanPreviewScreen)));
+    var draft = container.read(periodizedImportProvider)!;
+    final key = [
+      for (final day in draft.plan.days)
+        for (final row in day.rows)
+          for (final ex in row.exercises)
+            if (ex.rawName == 'Press Raro') exerciseKeyOf(day, row, ex)
+    ].first;
+    draft = draft.resolveWithSameName(
+        key, MatcherExercise(id: 'ex-X', name: 'Press Raro'));
+    container.read(periodizedImportProvider.notifier).state = draft;
+
+    await tester.tap(find.byKey(const Key('create_exercise_submit_button')));
+    await tester.pumpAndSettle();
+
+    _verifyNeverCreated(customRepo);
+    expect(find.byKey(const Key('create_exercise_name_field')), findsNothing);
   });
 }

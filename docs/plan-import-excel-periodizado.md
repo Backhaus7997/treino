@@ -121,7 +121,10 @@ ejercicios van sin reps (sin error).
 
 Política de #1455: exacto o alias → se asigna solo; aproximado → sugerencia
 confirmable; sin candidato → rojo. **Ambos bloquean la asignación** hasta
-resolverse.
+resolverse. El catálogo del matcher incluye también los **ejercicios propios del PF**
+(`customExercisesForTrainerStreamProvider`): si el nombre ya existe como propio, se
+asigna solo (id crudo, sin alias) y no se ofrece «Crear como propio»; si ese stream
+falla o tarda (5 s), se importa sólo con la biblioteca.
 
 Acciones de una fila **sin candidato** (decisión del PO, 2026-10-15):
 

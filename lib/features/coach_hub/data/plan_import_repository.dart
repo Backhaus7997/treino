@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../../workout/data/exercise_repository.dart';
+import '../../workout/domain/custom_exercise.dart';
 import 'periodized_import_draft.dart';
 import '../domain/periodized_plan.dart';
 import 'exercise_matcher.dart';
@@ -29,10 +30,20 @@ class PlanImportOutcome {
 ///
 /// La seguridad real está en Firestore rules — este repo solo hace UX.
 class PlanImportRepository {
-  PlanImportRepository({required ExerciseRepository exerciseRepository})
-      : _exerciseRepository = exerciseRepository;
+  PlanImportRepository({
+    required ExerciseRepository exerciseRepository,
+    Future<List<CustomExercise>> Function()? customExercises,
+  })  : _exerciseRepository = exerciseRepository,
+        _customExercises = customExercises;
 
   final ExerciseRepository _exerciseRepository;
+
+  /// Ejercicios propios del PF. Entran al catálogo del matcher para que
+  /// re-importar una hoja con un ejercicio ya creado como propio se asigne
+  /// solo (exacto → auto; aproximado → sugerencia) y no invite a duplicarlo
+  /// (cada duplicado consume el tope del plan). Si falla, se importa sólo
+  /// con la biblioteca: nunca bloquea el import.
+  final Future<List<CustomExercise>> Function()? _customExercises;
 
   /// [defaultName] es el nombre inicial de la rutina (el del archivo).
   Future<PlanImportOutcome> parseAndMatch({
@@ -53,6 +64,20 @@ class PlanImportRepository {
               aliases: e.aliases,
             ))
         .toList();
+
+    // Mismo id crudo que usa el picker web para un propio: el atleta lo
+    // resuelve por el dueño de la rutina (`assignedBy`).
+    List<CustomExercise> customs = const [];
+    try {
+      customs = await _customExercises?.call() ?? const [];
+    } catch (_) {
+      // Sin propios: sólo biblioteca.
+    }
+    catalog.addAll(customs.map((c) => MatcherExercise(
+          id: c.id,
+          name: c.name,
+          muscleGroup: c.muscleGroup,
+        )));
 
     final match = matchPeriodizedPlan(plan, catalog);
     return PlanImportOutcome(

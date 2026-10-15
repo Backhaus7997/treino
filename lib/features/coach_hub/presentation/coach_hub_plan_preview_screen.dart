@@ -18,7 +18,11 @@ import '../../coach/domain/trainer_link_status.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
+import '../../workout/application/custom_exercise_providers.dart';
 import '../../workout/application/exercise_filter.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../../workout/domain/custom_exercise.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
 import '../../workout/domain/muscle_group.dart';
@@ -77,6 +81,9 @@ class _CoachHubPlanPreviewScreenState
   /// Used to warn before leaving the preview, since the parsed+mapped plan lives
   /// in an ephemeral autoDispose provider and is lost on back-navigation.
   bool _hasManualMappings = false;
+
+  /// Hay un «Crear como propio» en curso (quota, diálogo o guardado).
+  bool _creatingCustom = false;
 
   /// Semana mostrada en las tarjetas de día (0-based).
   int _week = 0;
@@ -362,25 +369,45 @@ class _CoachHubPlanPreviewScreenState
     required ExerciseKey key,
     required String rowName,
   }) async {
-    // En el tope muestra el MISMO aviso que el resto de la app y corta: la
-    // fila queda en rojo y «Vincular con la biblioteca» sigue disponible.
-    final canCreate = await intentarCrearEjercicioPropio(context, ref);
-    if (!canCreate || !mounted) return;
-    final created =
-        await showCreateCustomExerciseDialog(context, initialName: rowName);
-    if (created == null || !mounted) return;
+    // Un solo «Crear como propio» a la vez: el doble clic abría dos diálogos y
+    // el segundo guardado dejaba un ejercicio huérfano (la fila ya estaba
+    // resuelta) que consume el tope del plan del PF.
+    if (_creatingCustom) return;
+    if (ref.read(periodizedImportProvider)?.isResolved(key) ?? true) return;
+    _creatingCustom = true;
+    try {
+      // En el tope muestra el MISMO aviso que el resto de la app y corta: la
+      // fila queda en rojo y «Vincular con la biblioteca» sigue disponible.
+      final canCreate = await intentarCrearEjercicioPropio(context, ref);
+      if (!canCreate || !mounted) return;
+      // Durante el await de arriba la fila pudo resolverse por otro camino.
+      if (_isResolvedNow(key)) return;
+      final created = await showCreateCustomExerciseDialog(
+        context,
+        initialName: rowName,
+        // Último control antes de que el diálogo llame al repo: si la pantalla
+        // se desmontó o la fila ya está resuelta, no se crea nada.
+        canSave: () => mounted && !_isResolvedNow(key),
+      );
+      if (created == null || !mounted) return;
 
-    _resolveExercise(
-      key: key,
-      rowName: rowName,
-      exercise: MatcherExercise(
-        id: created.id,
-        name: created.name,
-        muscleGroup: created.muscleGroup,
-      ),
-      custom: true,
-    );
+      _resolveExercise(
+        key: key,
+        rowName: rowName,
+        exercise: MatcherExercise(
+          id: created.id,
+          name: created.name,
+          muscleGroup: created.muscleGroup,
+        ),
+        custom: true,
+      );
+    } finally {
+      _creatingCustom = false;
+    }
   }
+
+  bool _isResolvedNow(ExerciseKey key) =>
+      ref.read(periodizedImportProvider)?.isResolved(key) ?? true;
 
   void _confirmSuggestion({
     required ExerciseKey key,
@@ -388,7 +415,19 @@ class _CoachHubPlanPreviewScreenState
   }) {
     final suggestion = ref.read(periodizedImportProvider)?.suggestions[key];
     if (suggestion == null) return;
-    _resolveExercise(key: key, rowName: rowName, exercise: suggestion);
+    // La sugerencia puede ser un ejercicio PROPIO del PF (entra al catálogo del
+    // matcher): no se registra alias, `addAlias` indexa sólo el global.
+    final uid = ref.read(currentUidProvider) ?? '';
+    final isCustom = uid.isNotEmpty &&
+        (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+                const <CustomExercise>[])
+            .any((c) => c.id == suggestion.id);
+    _resolveExercise(
+      key: key,
+      rowName: rowName,
+      exercise: suggestion,
+      custom: isCustom,
+    );
   }
 
   void _resolveExercise({
