@@ -423,11 +423,10 @@ El módulo de Personal Trainer (PF). Esta fase introduce un segundo tipo de usua
 
 ### Plantilla `.xlsx` oficial TREINO
 
-Definida durante Etapa 8. Contrato implementado en `lib/features/coach_hub/data/excel_parser.dart` + `template_builder.dart`:
+Definida durante Etapa 8 y reemplazada por el import periodizado: contrato en `docs/plan-import-excel-periodizado.md`, implementado en `lib/features/coach_hub/data/periodized_excel_parser.dart` (lectura) + `periodized_template_builder.dart` (plantilla descargable, hojas `Programa` e `Instrucciones`).
 
-- Hoja 1: `Plan` → `name, daysPerWeek, durationWeeks, level` (level acepta `principiante / intermedio / avanzado`, mapeado a `beginner / intermediate / advanced` antes de serializar).
-- Hoja 2..N: `Día 1`, `Día 2`, etc → columnas `Ejercicio, Series, Reps Min, Reps Max, Peso Kg, Descanso Seg, Notas`.
-- Las filas vacías se ignoran. `Ejercicio` se matchea contra el catálogo `exercises` por nombre + aliases en español. Los no matcheados se resuelven via dropdown manual en el preview (sin bloquear).
+- Hoja `Programa`: un bloque `DÍA N` + `DESCANSOS` + columnas `SEMANA 1…N` por día (hasta 7 días y 16 semanas); el ejercicio se matchea contra el catálogo `exercises` y los no matcheados se resuelven en el preview. Hoja `Instrucciones`: notación de las celdas.
+- El formato simple viejo (hojas `Plan` + `Día N`) se rechaza con un mensaje que manda a bajar la plantilla nueva.
 
 **Polish entregado** (Fase 6 Etapa 5, 2026-06-09 via SDD `coach-excel-polish`): anchos de columna del template + hoja "Instrucciones" con guía de columnas y valores válidos (`principiante / intermedio / avanzado`) + ejemplo pre-cargado. Validation dropdown nativo del paquete `excel: ^4.0.6` no existe → reemplazado por texto referencial en Instrucciones (scope tradeoff documentado). Archive en `openspec/changes/archive/2026-06-09-coach-excel-polish/`.
 

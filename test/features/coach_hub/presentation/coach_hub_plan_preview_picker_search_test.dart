@@ -8,15 +8,16 @@ import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
 import 'package:treino/features/coach_hub/application/plan_import_providers.dart';
-import 'package:treino/features/coach_hub/domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/data/periodized_import_draft.dart';
 import 'package:treino/features/coach_hub/presentation/coach_hub_plan_preview_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'periodized_draft_fixtures.dart';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -38,33 +39,11 @@ UserProfile _trainerProfile() => UserProfile(
       updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-/// A ParsedPlan with a single unmatched row so the preview shows one
-/// "Asignar manualmente" button that opens the picker sheet under test.
-ParsedPlan _planWithOneUnmatched() => const ParsedPlan(
-      name: 'Test Plan',
-      daysPerWeek: 1,
-      durationWeeks: 4,
-      level: ExperienceLevel.intermediate,
-      days: [
-        ParsedPlanDay(
-          dayNumber: 1,
-          items: [
-            ParsedPlanItem(
-              rowName: 'Misterioso',
-              exerciseId: null,
-              exerciseName: 'Misterioso',
-              muscleGroup: null,
-              sets: 3,
-              repsMin: 10,
-              repsMax: 12,
-            ),
-          ],
-        ),
-      ],
-      unmatched: [
-        ParsedPlanUnmatched(dayNumber: 1, rowName: 'Misterioso'),
-      ],
-    );
+/// Un plan con un único renglón sin match, así la vista previa muestra UN
+/// botón "Vincular con la biblioteca" que abre el picker bajo prueba.
+PeriodizedImportDraft _planWithOneUnmatched() => draftOf([
+      [1, 'Misterioso', null, ...sameWeeks('3x10')],
+    ]);
 
 /// Catalogue exercising the three match dimensions: multi-word names with
 /// filler words, accented names, aliases, and an English muscleGroup key
@@ -128,7 +107,7 @@ Future<void> _pumpPreviewAndOpenPicker(WidgetTester tester) async {
       const CoachHubPlanPreviewScreen(),
       overrides: [
         cloudFunctionsProvider.overrideWithValue(mockFunctions),
-        parsedPlanProvider.overrideWith((ref) => _planWithOneUnmatched()),
+        periodizedImportProvider.overrideWith((ref) => _planWithOneUnmatched()),
         userProfileProvider.overrideWith(
           (ref) => Stream.value(_trainerProfile()),
         ),
@@ -143,16 +122,26 @@ Future<void> _pumpPreviewAndOpenPicker(WidgetTester tester) async {
   );
   await tester.pumpAndSettle();
 
-  await tester.tap(find.text('Asignar manualmente'));
+  await tester.tap(find.text('Vincular con la biblioteca'));
   await tester.pumpAndSettle();
 }
 
 Future<void> _search(WidgetTester tester, String query) async {
-  await tester.enterText(find.byType(TextField), query);
+  // La vista previa tiene su propio campo (nombre de la rutina): el de
+  // búsqueda es el que vive dentro del sheet.
+  await tester.enterText(
+    find.descendant(
+      of: find.byType(DraggableScrollableSheet),
+      matching: find.byType(TextField),
+    ),
+    query,
+  );
   await tester.pumpAndSettle();
 }
 
 void main() {
+  useTallSurface();
+
   setUpAll(() {
     registerFallbackValue(<String, dynamic>{});
   });

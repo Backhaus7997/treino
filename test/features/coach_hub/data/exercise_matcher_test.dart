@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:treino/features/coach_hub/data/excel_parser.dart';
 import 'package:treino/features/coach_hub/data/exercise_matcher.dart';
+
+import 'match_names_helper.dart';
 
 final _exercises = [
   MatcherExercise(
@@ -27,19 +28,7 @@ final _exercisesWithAliases = [
   ),
 ];
 
-List<RawParsedDay> _dayWith(List<String> names) => [
-      RawParsedDay(
-        dayNumber: 1,
-        items: names
-            .map((n) => RawParsedItem(
-                  rowName: n,
-                  sets: 4,
-                  repsMin: 8,
-                  repsMax: 10,
-                ))
-            .toList(),
-      ),
-    ];
+List<String> _dayWith(List<String> names) => namesOf(names);
 
 void main() {
   group('normalize', () {

@@ -1,104 +1,86 @@
-import 'dart:typed_data';
+// El catálogo del matcher incluye los ejercicios PROPIOS del PF: re-importar
+// una hoja con un ejercicio ya creado como propio se asigna solo (y no invita
+// a duplicarlo). Si el stream de propios falla, se importa sólo con la
+// biblioteca.
 
-import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach_hub/data/plan_import_repository.dart';
-import 'package:treino/features/coach_hub/data/template_builder.dart';
-import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/data/exercise_repository.dart';
+import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 
-class _MockExerciseRepository extends Mock implements ExerciseRepository {}
+import 'periodized_test_helpers.dart';
 
-Exercise _ex(String id, String name, String muscle) => Exercise(
+class _MockExerciseRepo extends Mock implements ExerciseRepository {}
+
+CustomExercise _custom(String id, String name) => CustomExercise(
       id: id,
+      ownerId: 'trainer-1',
       name: name,
-      muscleGroup: muscle,
-      category: 'compound',
+      muscleGroup: 'legs',
+      createdAt: DateTime.utc(2026, 1, 1),
+      updatedAt: DateTime.utc(2026, 1, 1),
     );
 
-Uint8List _buildValidXlsx() => buildPlanTemplateBytes();
-
-Uint8List _buildXlsxMissingPlanSheet() {
-  // Excel vacío con solo la sheet default → no tiene hoja "Plan",
-  // fuerza el error del parser.
-  final excel = Excel.createExcel();
-  final defaultSheet = excel.getDefaultSheet();
-  if (defaultSheet != null && defaultSheet != 'Día 1') {
-    excel.rename(defaultSheet, 'Día 1');
-  }
-  return Uint8List.fromList(excel.save()!);
-}
-
 void main() {
-  late _MockExerciseRepository exerciseRepo;
-  late PlanImportRepository repo;
+  late _MockExerciseRepo exerciseRepo;
+
+  final bytes = programa([
+    header1(weeks: 3),
+    [1, 'Sentadilla con banda', 60, '3x8', '3x8', '3x8'],
+    [2, 'Press de banca', 60, '3x8', '3x8', '3x8'],
+  ]);
 
   setUp(() {
-    exerciseRepo = _MockExerciseRepository();
-    repo = PlanImportRepository(exerciseRepository: exerciseRepo);
+    exerciseRepo = _MockExerciseRepo();
+    when(() => exerciseRepo.listAll()).thenAnswer((_) async => [
+          const Exercise(
+            id: 'lib-press',
+            name: 'Press de banca',
+            muscleGroup: 'chest',
+            category: 'compound',
+          ),
+        ]);
   });
 
   test(
-      'parseAndMatch: template default matchea contra catálogo y devuelve plan',
+      'un ejercicio propio con el mismo nombre se asigna solo, con su id crudo',
       () async {
-    when(() => exerciseRepo.listAll()).thenAnswer((_) async => [
-          _ex('sentadilla-barra', 'Sentadilla con barra', 'Piernas'),
-          _ex('press-banca', 'Press banca', 'Pecho'),
-          _ex('remo-barra', 'Remo con barra', 'Espalda'),
-        ]);
-
-    final plan = await repo.parseAndMatch(bytes: _buildValidXlsx());
-
-    expect(plan.name, 'Mi plan');
-    expect(plan.daysPerWeek, 3);
-    expect(plan.durationWeeks, 8);
-    expect(plan.level, ExperienceLevel.intermediate);
-    expect(plan.days, hasLength(3));
-    expect(plan.unmatched, isEmpty);
-    expect(plan.days.first.items.first.exerciseId, 'sentadilla-barra');
-    expect(plan.days.first.items.first.muscleGroup, 'Piernas');
-  });
-
-  test('parseAndMatch: ejercicios no catalogados van a unmatched', () async {
-    // Catálogo completamente disjunto del template (que usa Sentadilla,
-    // Press banca, Remo) → todos los items quedan unmatched.
-    when(() => exerciseRepo.listAll()).thenAnswer((_) async => [
-          _ex('curl-biceps', 'Curl bíceps con mancuerna', 'Bíceps'),
-        ]);
-
-    final plan = await repo.parseAndMatch(bytes: _buildValidXlsx());
-
-    expect(plan.unmatched, isNotEmpty);
-    expect(
-      plan.unmatched.map((u) => u.dayNumber).toSet(),
-      equals({1, 2, 3}),
+    final repo = PlanImportRepository(
+      exerciseRepository: exerciseRepo,
+      customExercises: () async =>
+          [_custom('custom-7', 'Sentadilla con banda')],
     );
-    for (final day in plan.days) {
-      for (final item in day.items) {
-        expect(item.exerciseId, isNull,
-            reason: 'Item ${item.rowName} should be unmatched');
-      }
-    }
+
+    final outcome = await repo.parseAndMatch(bytes: bytes);
+    final draft = outcome.draft!;
+
+    expect(draft.unresolved, isEmpty,
+        reason: 'nada en rojo: no hay "Crear como propio" que ofrecer');
+    final ids = draft.assignments.values.map((e) => e.id).toSet();
+    expect(ids, {'custom-7', 'lib-press'});
   });
 
-  test('parseAndMatch: archivo sin hoja "Plan" → PlanImportException',
+  test('si el stream de propios falla, el import sigue con la biblioteca',
       () async {
-    when(() => exerciseRepo.listAll()).thenAnswer((_) async => const []);
-
-    expect(
-      () => repo.parseAndMatch(bytes: _buildXlsxMissingPlanSheet()),
-      throwsA(isA<PlanImportException>()),
+    final repo = PlanImportRepository(
+      exerciseRepository: exerciseRepo,
+      customExercises: () async => throw Exception('permission-denied'),
     );
+
+    final outcome = await repo.parseAndMatch(bytes: bytes);
+    final draft = outcome.draft!;
+
+    expect(draft.assignments.values.map((e) => e.id), ['lib-press']);
+    expect(draft.unresolved, hasLength(1));
   });
 
-  test('parseAndMatch: bytes corruptos → PlanImportException', () async {
-    when(() => exerciseRepo.listAll()).thenAnswer((_) async => const []);
+  test('sin lector de propios (null) se comporta como antes', () async {
+    final repo = PlanImportRepository(exerciseRepository: exerciseRepo);
 
-    expect(
-      () => repo.parseAndMatch(bytes: Uint8List.fromList([1, 2, 3, 4, 5])),
-      throwsA(isA<PlanImportException>()),
-    );
+    final draft = (await repo.parseAndMatch(bytes: bytes)).draft!;
+
+    expect(draft.assignments.values.map((e) => e.id), ['lib-press']);
   });
 }

@@ -1,6 +1,3 @@
-import '../domain/parsed_plan.dart';
-import 'excel_parser.dart';
-
 /// Catálogo mínimo del lado matcher — sólo lo que necesita para mapear.
 class MatcherExercise {
   MatcherExercise({
@@ -18,12 +15,6 @@ class MatcherExercise {
   /// alongside `name`, so "Sentadilla con barra" matches the same exercise
   /// as "Back Squat".
   final List<String> aliases;
-}
-
-class MatchResult {
-  MatchResult({required this.days, required this.unmatched});
-  final List<ParsedPlanDay> days;
-  final List<ParsedPlanUnmatched> unmatched;
 }
 
 // NORMALIZE-PARITY: see ADR-CXP-006 — TS port lives in functions/src/add-alias.ts
@@ -215,59 +206,28 @@ MatcherExercise? _bestFuzzySuggestion(String query, _Index index) {
       .firstWhere((exercise) => exercise.id == bestIds.single);
 }
 
-MatchResult matchExercises(
-  List<RawParsedDay> rawDays,
-  List<MatcherExercise> exercises,
-) {
-  final index = _Index.build(exercises);
-  final unmatched = <ParsedPlanUnmatched>[];
-  final days = <ParsedPlanDay>[];
+/// Veredicto del matcher para UN nombre: coincidencia exacta/alias
+/// ([exercise]), sugerencia confirmable ([suggestion]) o ninguna de las dos.
+class ExerciseNameMatch {
+  const ExerciseNameMatch({this.exercise, this.suggestion});
+  final MatcherExercise? exercise;
+  final MatcherExercise? suggestion;
+}
 
-  for (final day in rawDays) {
-    final items = <ParsedPlanItem>[];
-    for (final item in day.items) {
-      final key = normalize(item.rowName);
-      final exercise = index.byName[key];
-      final suggestion =
-          exercise == null ? _bestFuzzySuggestion(key, index) : null;
+/// Matcher de nombres sueltos sobre un catálogo ya indexado. Es la misma
+/// política de [matchExercises] (#1455: exacto o alias se asigna solo,
+/// aproximado sólo sugiere, nunca se adivina una variante), pero por nombre,
+/// para que cada componente de una superserie pase por separado.
+class ExerciseNameMatcher {
+  ExerciseNameMatcher(List<MatcherExercise> exercises)
+      : _index = _Index.build(exercises);
 
-      if (exercise == null) {
-        unmatched.add(ParsedPlanUnmatched(
-          dayNumber: day.dayNumber,
-          rowName: item.rowName,
-        ));
-        items.add(ParsedPlanItem(
-          rowName: item.rowName,
-          sets: item.sets,
-          repsMin: item.repsMin,
-          repsMax: item.repsMax,
-          weightKg: item.weightKg,
-          restSec: item.restSec,
-          notes: item.notes,
-          exerciseId: null,
-          exerciseName: item.rowName,
-          muscleGroup: null,
-          suggestedExerciseId: suggestion?.id,
-          suggestedExerciseName: suggestion?.name,
-          suggestedMuscleGroup: suggestion?.muscleGroup,
-        ));
-      } else {
-        items.add(ParsedPlanItem(
-          rowName: item.rowName,
-          sets: item.sets,
-          repsMin: item.repsMin,
-          repsMax: item.repsMax,
-          weightKg: item.weightKg,
-          restSec: item.restSec,
-          notes: item.notes,
-          exerciseId: exercise.id,
-          exerciseName: exercise.name,
-          muscleGroup: exercise.muscleGroup,
-        ));
-      }
-    }
-    days.add(ParsedPlanDay(dayNumber: day.dayNumber, items: items));
+  final _Index _index;
+
+  ExerciseNameMatch match(String rawName) {
+    final key = normalize(rawName);
+    final exercise = _index.byName[key];
+    if (exercise != null) return ExerciseNameMatch(exercise: exercise);
+    return ExerciseNameMatch(suggestion: _bestFuzzySuggestion(key, _index));
   }
-
-  return MatchResult(days: days, unmatched: unmatched);
 }

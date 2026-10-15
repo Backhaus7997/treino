@@ -12,7 +12,6 @@ import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hu
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/moderation/moderation_guard.dart';
-import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/application/trainer_link_providers.dart';
@@ -21,19 +20,29 @@ import '../../coach/domain/trainer_link_status.dart';
 import '../../profile/application/user_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/experience_level.dart';
+import '../../workout/application/custom_exercise_providers.dart';
 import '../../workout/application/exercise_filter.dart';
+import '../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../../workout/domain/custom_exercise.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/domain/exercise.dart';
 import '../../workout/domain/muscle_group.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/domain/routine.dart';
-import '../../workout/domain/routine_day.dart';
-import '../../workout/domain/routine_slot.dart';
 import '../../workout/domain/routine_source.dart';
 import '../../workout/domain/routine_visibility.dart';
+import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../application/cf_providers.dart';
 import '../application/plan_import_providers.dart';
-import '../domain/parsed_plan.dart';
+import '../data/exercise_matcher.dart';
+import '../data/periodized_import_draft.dart';
+import '../data/periodized_routine_mapper.dart';
+import '../domain/periodized_plan.dart';
+import 'widgets/create_custom_exercise_dialog.dart';
+import 'widgets/filter_chips/filter_chips.dart';
+import 'widgets/import_plan_widgets.dart';
+import 'widgets/periodized_plan_preview.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Preview del plan importado. Muestra:
@@ -75,10 +84,28 @@ class _CoachHubPlanPreviewScreenState
   /// in an ephemeral autoDispose provider and is lost on back-navigation.
   bool _hasManualMappings = false;
 
+  /// Hay un «Crear como propio» en curso (quota, diálogo o guardado).
+  bool _creatingCustom = false;
+
+  /// Semana mostrada en las tarjetas de día (0-based).
+  int _week = 0;
+
+  /// Nivel de la rutina. La plantilla no lo trae: lo elige el PF.
+  ExperienceLevel _level = ExperienceLevel.intermediate;
+
+  late final TextEditingController _nameController = TextEditingController();
+  bool _nameSeeded = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   /// Se prende cuando la asignación salió bien y esta pantalla se está yendo
   /// al dashboard por decisión propia.
   ///
-  /// Existe porque el éxito hace DOS cosas: limpia `parsedPlanProvider` y
+  /// Existe porque el éxito hace DOS cosas: limpia `periodizedImportProvider` y
   /// navega. Limpiarlo deja el plan en `null`, y `build` trata "plan null"
   /// como "alguien entró acá sin haber subido nada" y agenda un
   /// `go('/upload-plan')` en un post-frame. Esa red de seguridad le ganaba al
@@ -152,19 +179,14 @@ class _CoachHubPlanPreviewScreenState
     });
   }
 
-  Future<void> _assign(ParsedPlan plan, String trainerUid) async {
-    final hasPendingSuggestion = plan.days.any(
-      (day) => day.items.any(
-        (item) => item.exerciseId == null && item.suggestedExerciseId != null,
-      ),
-    );
-    if (plan.days.any(
-      (day) => day.items.any((item) => item.exerciseId == null),
-    )) {
-      setState(() => _error = hasPendingSuggestion
+  Future<void> _assign(PeriodizedImportDraft draft, String trainerUid) async {
+    // Bloquean la asignación (#1455): sugerencias sin confirmar y componentes
+    // sin match. Las celdas de semana vacías NO bloquean: son un aviso.
+    if (draft.unresolved.isNotEmpty) {
+      setState(() => _error = draft.pendingSuggestions > 0
           ? 'Hay sugerencias pendientes. Confirmalas o cambialas antes de '
               'continuar.'
-          : 'Hay ejercicios sin match. Asignalos manualmente antes de '
+          : 'Hay ejercicios sin match. Vinculalos con la biblioteca o creá el propio antes de '
               'continuar.');
       return;
     }
@@ -208,7 +230,7 @@ class _CoachHubPlanPreviewScreenState
     // en vez de `String?` y romper la forma que espera `_FalloAsignacion`.
     Future<_FalloAsignacion?> intentarAsignar(String athleteId) async {
       final routine = _buildRoutine(
-        plan: plan,
+        draft: draft,
         trainerUid: trainerUid,
         athleteId: athleteId,
       );
@@ -296,7 +318,7 @@ class _CoachHubPlanPreviewScreenState
     // rebuild con `plan == null`, y sin `_saliendoAlDashboard` la red de
     // seguridad de `build` nos manda a `/upload-plan` pisando este `go`.
     _saliendoAlDashboard = true;
-    ref.read(parsedPlanProvider.notifier).state = null;
+    ref.read(periodizedImportProvider.notifier).state = null;
     final msg = athleteIds.length == 1
         ? 'Plan asignado correctamente.'
         : 'Plan asignado a ${athleteIds.length} atletas.';
@@ -307,12 +329,10 @@ class _CoachHubPlanPreviewScreenState
   }
 
   /// Abre un modal con el catálogo de ejercicios para que el PF asigne
-  /// manualmente uno de los ejercicios "sin match". Una vez elegido,
-  /// actualiza el `parsedPlanProvider` con el item mapeado y lo saca de
-  /// la lista `unmatched`.
+  /// manualmente uno de los componentes "sin match". Una vez elegido,
+  /// actualiza el borrador del import con la asignación.
   Future<void> _pickExerciseFor({
-    required int dayNumber,
-    required int itemIndex,
+    required ExerciseKey key,
     required String rowName,
   }) async {
     final exercises = await ref.read(exercisesProvider.future);
@@ -333,98 +353,114 @@ class _CoachHubPlanPreviewScreenState
     if (picked == null) return;
 
     _resolveExercise(
-      dayNumber: dayNumber,
-      itemIndex: itemIndex,
+      key: key,
       rowName: rowName,
-      exerciseId: picked.id,
-      exerciseName: picked.name,
-      muscleGroup: picked.muscleGroup,
+      exercise: MatcherExercise(
+        id: picked.id,
+        name: picked.name,
+        muscleGroup: picked.muscleGroup,
+      ),
     );
   }
 
-  void _confirmSuggestion({
-    required int dayNumber,
-    required int itemIndex,
-    required ParsedPlanItem item,
-  }) {
-    final exerciseId = item.suggestedExerciseId;
-    final exerciseName = item.suggestedExerciseName;
-    if (exerciseId == null || exerciseName == null) return;
+  /// «Crear como propio»: el ejercicio propio se crea acá, al confirmar el
+  /// formulario, NUNCA al subir el Excel. Mismo camino que el resto del Coach
+  /// Hub: el embudo del tope del plan y el diálogo de ejercicio propio (con el
+  /// texto original del PF precargado) sobre `CustomExerciseRepository`.
+  Future<void> _createCustomFor({
+    required ExerciseKey key,
+    required String rowName,
+  }) async {
+    // Un solo «Crear como propio» a la vez: el doble clic abría dos diálogos y
+    // el segundo guardado dejaba un ejercicio huérfano (la fila ya estaba
+    // resuelta) que consume el tope del plan del PF.
+    if (_creatingCustom) return;
+    if (ref.read(periodizedImportProvider)?.isResolved(key) ?? true) return;
+    _creatingCustom = true;
+    try {
+      // En el tope muestra el MISMO aviso que el resto de la app y corta: la
+      // fila queda en rojo y «Vincular con la biblioteca» sigue disponible.
+      final canCreate = await intentarCrearEjercicioPropio(context, ref);
+      if (!canCreate || !mounted) return;
+      // Durante el await de arriba la fila pudo resolverse por otro camino.
+      if (_isResolvedNow(key)) return;
+      final created = await showCreateCustomExerciseDialog(
+        context,
+        initialName: rowName,
+        // Último control antes de que el diálogo llame al repo: si la pantalla
+        // se desmontó o la fila ya está resuelta, no se crea nada.
+        canSave: () => mounted && !_isResolvedNow(key),
+      );
+      if (created == null || !mounted) return;
 
+      _resolveExercise(
+        key: key,
+        rowName: rowName,
+        exercise: MatcherExercise(
+          id: created.id,
+          name: created.name,
+          muscleGroup: created.muscleGroup,
+        ),
+        custom: true,
+      );
+    } finally {
+      _creatingCustom = false;
+    }
+  }
+
+  bool _isResolvedNow(ExerciseKey key) =>
+      ref.read(periodizedImportProvider)?.isResolved(key) ?? true;
+
+  void _confirmSuggestion({
+    required ExerciseKey key,
+    required String rowName,
+  }) {
+    final suggestion = ref.read(periodizedImportProvider)?.suggestions[key];
+    if (suggestion == null) return;
+    // La sugerencia puede ser un ejercicio PROPIO del PF (entra al catálogo del
+    // matcher): no se registra alias, `addAlias` indexa sólo el global.
+    final uid = ref.read(currentUidProvider) ?? '';
+    final isCustom = uid.isNotEmpty &&
+        (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+                const <CustomExercise>[])
+            .any((c) => c.id == suggestion.id);
     _resolveExercise(
-      dayNumber: dayNumber,
-      itemIndex: itemIndex,
-      rowName: item.rowName,
-      exerciseId: exerciseId,
-      exerciseName: exerciseName,
-      muscleGroup: item.suggestedMuscleGroup,
+      key: key,
+      rowName: rowName,
+      exercise: suggestion,
+      custom: isCustom,
     );
   }
 
   void _resolveExercise({
-    required int dayNumber,
-    required int itemIndex,
+    required ExerciseKey key,
     required String rowName,
-    required String exerciseId,
-    required String exerciseName,
-    required String? muscleGroup,
+    required MatcherExercise exercise,
+    bool custom = false,
   }) {
-    final current = ref.read(parsedPlanProvider);
+    final current = ref.read(periodizedImportProvider);
     if (current == null) return;
 
-    // Una fila ya resuelta no se resuelve dos veces: un doble tap llegaba hasta
-    // acá, sacaba el pendiente de OTRA fila con el mismo (día, rowName) y
-    // volvía a llamar a addAlias.
-    final day = current.days.where((d) => d.dayNumber == dayNumber).firstOrNull;
-    if (day == null ||
-        itemIndex >= day.items.length ||
-        day.items[itemIndex].exerciseId != null) {
-      return;
-    }
+    // Un componente ya resuelto no se resuelve dos veces: un doble tap llegaba
+    // hasta acá y volvía a llamar a addAlias.
+    if (current.isResolved(key)) return;
 
-    // Match on the exact (day, item index) — keying on rowName alone would
-    // resolve every same-named unmatched row in the day at once. ADR-CXP-006.
-    final updatedDays = current.days
-        .map((d) => d.dayNumber != dayNumber
-            ? d
-            : d.copyWith(
-                items: [
-                  for (var idx = 0; idx < d.items.length; idx++)
-                    (idx == itemIndex && d.items[idx].exerciseId == null)
-                        ? d.items[idx].copyWith(
-                            exerciseId: exerciseId,
-                            exerciseName: exerciseName,
-                            muscleGroup: muscleGroup,
-                            suggestedExerciseId: null,
-                            suggestedExerciseName: null,
-                            suggestedMuscleGroup: null,
-                          )
-                        : d.items[idx],
-                ],
-              ))
-        .toList();
-
-    // Remove exactly one matching unmatched entry, not every same-named row.
-    final updatedUnmatched = <ParsedPlanUnmatched>[];
-    var removedOne = false;
-    for (final u in current.unmatched) {
-      if (!removedOne && u.dayNumber == dayNumber && u.rowName == rowName) {
-        removedOne = true;
-        continue;
-      }
-      updatedUnmatched.add(u);
-    }
-
-    ref.read(parsedPlanProvider.notifier).state = current.copyWith(
-      days: updatedDays,
-      unmatched: updatedUnmatched,
-    );
+    // Se resuelve por la clave EXACTA (día, fila, componente): keyed por el
+    // nombre solo se resolverían de una vez todos los renglones homónimos.
+    // Un ejercicio propio recién creado además resuelve los homónimos EXACTOS
+    // (mismo nombre normalizado): son el mismo ejercicio repetido en el plan.
+    ref.read(periodizedImportProvider.notifier).state = custom
+        ? current.resolveWithSameName(key, exercise)
+        : current.resolve(key, exercise);
     setState(() {
       _error = null;
       _hasManualMappings = true;
     });
+    // Un ejercicio propio NO se registra como alias: `addAlias` indexa contra
+    // el catálogo global y el propio vive en `users/{uid}/customExercises`.
+    if (custom) return;
     // FIRE-AND-FORGET: see ADR-CXP-006 // i18n: Fase 6 Etapa 5
-    unawaited(_addAlias(exerciseId, rowName));
+    unawaited(_addAlias(exercise.id, rowName));
   }
 
   /// Fire-and-forget side effect: sends the manually mapped alias to
@@ -444,55 +480,35 @@ class _CoachHubPlanPreviewScreenState
   }
 
   Routine _buildRoutine({
-    required ParsedPlan plan,
+    required PeriodizedImportDraft draft,
     required String trainerUid,
     required String athleteId,
   }) {
-    final days = plan.days
-        .map(
-          (d) => RoutineDay(
-            dayNumber: d.dayNumber,
-            name: 'Día ${d.dayNumber}',
-            slots: d.items
-                .map(
-                  (i) => RoutineSlot(
-                    exerciseId: i.exerciseId ?? '',
-                    exerciseName: i.exerciseName,
-                    muscleGroup: i.muscleGroup ?? '',
-                    targetSets: i.sets,
-                    targetRepsMin: i.repsMin,
-                    targetRepsMax: i.repsMax,
-                    restSeconds: i.restSec ?? 60,
-                    targetWeightKg: i.weightKg,
-                    notes: i.notes,
-                  ),
-                )
-                .toList(),
-          ),
-        )
-        .toList();
-
-    return Routine(
-      id: '',
-      name: plan.name,
+    final name = _nameController.text.trim();
+    final routine = mapPeriodizedPlanToRoutine(
+      draft.plan,
+      draft.assignments,
+      routineId: '',
+      routineName: name.isEmpty ? 'Plan importado' : name,
+      level: _level,
+    );
+    // Procedencia: igual que la asignación de siempre.
+    return routine.copyWith(
       split: 'Custom',
-      level: plan.level,
-      days: days,
       source: RoutineSource.trainerAssigned,
       assignedBy: trainerUid,
       assignedTo: athleteId,
       visibility: RoutineVisibility.private,
-      numWeeks: plan.durationWeeks,
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final plan = ref.watch(parsedPlanProvider);
+    final draft = ref.watch(periodizedImportProvider);
     final profile = ref.watch(userProfileProvider).valueOrNull;
 
-    if (plan == null) {
+    if (draft == null) {
       // El `return` de abajo va SIEMPRE —sin plan no hay nada que dibujar—,
       // pero el rebote a subir archivo sólo si no nos estamos yendo solos.
       if (!_saliendoAlDashboard) {
@@ -513,6 +529,14 @@ class _CoachHubPlanPreviewScreenState
       );
     }
 
+    if (!_nameSeeded) {
+      _nameSeeded = true;
+      _nameController.text = draft.name;
+    }
+    final plan = draft.plan;
+    final week = _week.clamp(0, plan.numWeeks - 1);
+    final days = plan.days.where((d) => d.rows.isNotEmpty).toList();
+
     return PopScope(
       // Block the implicit pop so manual mappings aren't silently lost; route
       // the system/hardware back through the same confirm flow as the header.
@@ -528,64 +552,86 @@ class _CoachHubPlanPreviewScreenState
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s20,
+                  vertical: AppSpacing.s18,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _Header(
                         palette: palette,
-                        planName: plan.name,
+                        planName: _nameController.text.isEmpty
+                            ? draft.name
+                            : _nameController.text,
                         onBack: _handleBack),
-                    const SizedBox(height: 18),
-                    _PlanMetaCard(palette: palette, plan: plan),
-                    const SizedBox(height: 18),
-                    if (plan.unmatched.isNotEmpty) ...[
-                      _UnmatchedWarning(palette: palette, plan: plan),
-                      const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.s18),
+                    _PlanMetaCard(
+                      palette: palette,
+                      daysCount: days.length,
+                      numWeeks: plan.numWeeks,
+                      nameController: _nameController,
+                      level: _level,
+                      onNameChanged: () => setState(() {}),
+                      onLevelChanged: (l) => setState(() => _level = l),
+                    ),
+                    const SizedBox(height: AppSpacing.s18),
+                    if (draft.unresolved.isNotEmpty) ...[
+                      _UnmatchedWarning(palette: palette, draft: draft),
+                      const SizedBox(height: AppSpacing.s18),
                     ],
-                    ...plan.days.map(
-                      (d) => Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: _DayCard(
-                          palette: palette,
+                    if (draft.warnings.isNotEmpty) ...[
+                      _WarningsCard(palette: palette, warnings: draft.warnings),
+                      const SizedBox(height: AppSpacing.s18),
+                    ],
+                    if (plan.numWeeks > 1) ...[
+                      PeriodizedWeekSelector(
+                        numWeeks: plan.numWeeks,
+                        selected: week,
+                        onChanged: (w) => setState(() => _week = w),
+                      ),
+                      const SizedBox(height: AppSpacing.s14),
+                    ],
+                    for (final d in days)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.s14),
+                        child: PeriodizedDayPreviewCard(
                           day: d,
-                          onConfirmSuggestion: (index, item) =>
-                              _confirmSuggestion(
-                            dayNumber: d.dayNumber,
-                            itemIndex: index,
-                            item: item,
-                          ),
-                          onPickManual: (index, item) => _pickExerciseFor(
-                            dayNumber: d.dayNumber,
-                            itemIndex: index,
-                            rowName: item.rowName,
-                          ),
+                          week: week,
+                          draft: draft,
+                          onConfirmSuggestion: (key) {
+                            final raw = _rawNameOf(plan, key);
+                            _confirmSuggestion(key: key, rowName: raw);
+                          },
+                          onPickManual: (key, rawName) =>
+                              _pickExerciseFor(key: key, rowName: rawName),
+                          onCreateCustom: (key, rawName) =>
+                              _createCustomFor(key: key, rowName: rawName),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.s8),
                     _AthletePicker(
                       palette: palette,
                       selectedAthleteIds: _selectedAthleteIds,
                       onToggle: _toggleAthlete,
                     ),
                     if (_error != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.s14),
                       Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: palette.danger, fontSize: 13),
+                        style: importText(palette.danger,
+                            size: AppTextSize.bodyDense),
                       ),
                     ],
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.s18),
                     TreinoButton(
                       label: _selectedAthleteIds.length > 1
                           ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
                           : 'ASIGNAR PLAN',
                       expand: true,
                       loading: _saving,
-                      onPressed: () => _assign(plan, profile.uid),
+                      onPressed: () => _assign(draft, profile.uid),
                     ),
                   ],
                 ),
@@ -595,6 +641,21 @@ class _CoachHubPlanPreviewScreenState
         ),
       ),
     );
+  }
+
+  /// Nombre tal cual lo escribió el PF para el componente [key] (es lo que se
+  /// guarda como alias al confirmar).
+  static String _rawNameOf(PeriodizedPlan plan, ExerciseKey key) {
+    for (final day in plan.days) {
+      if (day.dayNumber != key.dayNumber) continue;
+      for (final row in day.rows) {
+        if (row.excelRow != key.row) continue;
+        for (final ex in row.exercises) {
+          if (ex.component == key.component) return ex.rawName;
+        }
+      }
+    }
+    return '';
   }
 }
 
@@ -654,37 +715,77 @@ class _Header extends StatelessWidget {
 }
 
 class _PlanMetaCard extends StatelessWidget {
-  const _PlanMetaCard({required this.palette, required this.plan});
+  const _PlanMetaCard({
+    required this.palette,
+    required this.daysCount,
+    required this.numWeeks,
+    required this.nameController,
+    required this.level,
+    required this.onNameChanged,
+    required this.onLevelChanged,
+  });
   final AppPalette palette;
-  final ParsedPlan plan;
+  final int daysCount;
+  final int numWeeks;
+  final TextEditingController nameController;
+  final ExperienceLevel level;
+  final VoidCallback onNameChanged;
+  final ValueChanged<ExperienceLevel> onLevelChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
-      child: Wrap(
-        spacing: 20,
-        runSpacing: 12,
+    return ImportCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _MetaTile(
-            palette: palette,
-            label: 'Días/semana',
-            value: '${plan.daysPerWeek}',
+          TextField(
+            controller: nameController,
+            style: importText(palette.textPrimary, size: AppTextSize.bodyLarge),
+            decoration: InputDecoration(
+              labelText: 'Nombre de la rutina',
+              labelStyle: importText(palette.textMuted),
+            ),
+            onChanged: (_) => onNameChanged(),
           ),
-          _MetaTile(
-            palette: palette,
-            label: 'Duración',
-            value: '${plan.durationWeeks} sem',
+          const SizedBox(height: AppSpacing.s14),
+          Wrap(
+            spacing: AppSpacing.s20,
+            runSpacing: AppSpacing.s12,
+            children: [
+              _MetaTile(
+                palette: palette,
+                label: 'Días/semana',
+                value: '$daysCount',
+              ),
+              _MetaTile(
+                palette: palette,
+                label: 'Duración',
+                value: '$numWeeks sem',
+              ),
+            ],
           ),
-          _MetaTile(
-            palette: palette,
-            label: 'Nivel',
-            value: plan.level.displayNameEs,
+          const SizedBox(height: AppSpacing.s14),
+          Text(
+            'NIVEL',
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
+              color: palette.textMuted,
+              fontSize: AppTextSize.caption,
+              fontWeight: AppFonts.w700,
+              letterSpacing: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          TreinoFilterChips(
+            options: [for (final l in ExperienceLevel.values) l.displayNameEs],
+            selected: {level.displayNameEs},
+            onChanged: (next) {
+              if (next.isEmpty) return;
+              onLevelChanged(
+                ExperienceLevel.values
+                    .firstWhere((l) => l.displayNameEs == next.first),
+              );
+            },
           ),
         ],
       ),
@@ -731,31 +832,20 @@ class _MetaTile extends StatelessWidget {
 }
 
 class _UnmatchedWarning extends StatelessWidget {
-  const _UnmatchedWarning({required this.palette, required this.plan});
+  const _UnmatchedWarning({required this.palette, required this.draft});
   final AppPalette palette;
-  final ParsedPlan plan;
+  final PeriodizedImportDraft draft;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final pendingSuggestions = plan.days
-        .expand((day) => day.items)
-        .where((item) =>
-            item.exerciseId == null && item.suggestedExerciseId != null)
-        .length;
-    final withoutSuggestion = plan.days
-        .expand((day) => day.items)
-        .where((item) =>
-            item.exerciseId == null && item.suggestedExerciseId == null)
-        .length;
+    final pendingSuggestions = draft.pendingSuggestions;
+    final withoutSuggestion = draft.withoutSuggestion;
     final unresolved = pendingSuggestions + withoutSuggestion;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.warning.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.warning),
-      ),
+    return ImportCard(
+      padding: AppSpacing.s14,
+      borderColor: palette.warning,
+      background: palette.warning.withValues(alpha: 0.12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -764,26 +854,23 @@ class _UnmatchedWarning extends StatelessWidget {
             color: palette.warning,
             semanticLabel: l10n.commonWarning,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.s12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   '$unresolved ejercicio(s) por resolver',
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: importText(palette.textPrimary, weight: AppFonts.w700),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.hairline),
                 Text(
                   '${pendingSuggestions > 0 ? '$pendingSuggestions con sugerencia pendiente. ' : ''}'
                   '${withoutSuggestion > 0 ? '$withoutSuggestion sin match. ' : ''}'
                   'No se puede asignar hasta que estén todos resueltos.',
-                  style: TextStyle(
-                    color: palette.textMuted,
-                    fontSize: 13,
+                  style: importText(
+                    palette.textMuted,
+                    size: AppTextSize.bodyDense,
                     height: 1.4,
                   ),
                 ),
@@ -796,142 +883,28 @@ class _UnmatchedWarning extends StatelessWidget {
   }
 }
 
-class _DayCard extends StatelessWidget {
-  const _DayCard({
-    required this.palette,
-    required this.day,
-    required this.onConfirmSuggestion,
-    required this.onPickManual,
-  });
+/// Avisos del parser, cada uno con su celda. No bloquean la asignación.
+class _WarningsCard extends StatelessWidget {
+  const _WarningsCard({required this.palette, required this.warnings});
   final AppPalette palette;
-  final ParsedPlanDay day;
-  final void Function(int index, ParsedPlanItem item) onConfirmSuggestion;
-  final Future<void> Function(int index, ParsedPlanItem item) onPickManual;
+  final List<ImportDiagnostic> warnings;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: palette.border),
-      ),
+    return ImportCard(
+      padding: AppSpacing.s14,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'DÍA ${day.dayNumber}',
-            style: GoogleFonts.barlowCondensed(
-              color: palette.highlight,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-            ),
+            warnings.length == 1 ? '1 aviso' : '${warnings.length} avisos',
+            style: importText(palette.textPrimary, weight: AppFonts.w700),
           ),
-          const SizedBox(height: 8),
-          ...day.items.asMap().entries.map((entry) {
-            final index = entry.key;
-            final i = entry.value;
-            final hasSuggestion = i.exerciseId == null &&
-                i.suggestedExerciseId != null &&
-                i.suggestedExerciseName != null;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                i.exerciseId == null
-                                    ? i.rowName
-                                    : i.exerciseName,
-                                style: TextStyle(
-                                  color: palette.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (i.exerciseId == null) ...[
-                              const SizedBox(width: 8),
-                              _UnmatchedBadge(
-                                palette: palette,
-                                hasSuggestion: hasSuggestion,
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _itemSubtitle(i),
-                          style: TextStyle(
-                            color: palette.textMuted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        if (hasSuggestion) ...[
-                          const SizedBox(height: AppSpacing.s8),
-                          Text(
-                            'Sugerencia: ${i.suggestedExerciseName}',
-                            style: TextStyle(
-                              color: palette.accent,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                        if (i.exerciseId == null) ...[
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: AppSpacing.s8,
-                            runSpacing: AppSpacing.s8,
-                            children: [
-                              if (hasSuggestion)
-                                TreinoButton(
-                                  label: 'Confirmar',
-                                  variant: TreinoButtonVariant.primary,
-                                  size: TreinoButtonSize.sm,
-                                  onPressed: () =>
-                                      onConfirmSuggestion(index, i),
-                                ),
-                              TreinoButton(
-                                label: hasSuggestion
-                                    ? 'Cambiar'
-                                    : 'Asignar manualmente',
-                                icon: TreinoIcon.search,
-                                variant: TreinoButtonVariant.ghostAccent,
-                                size: TreinoButtonSize.sm,
-                                onPressed: () => onPickManual(index, i),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+          const SizedBox(height: AppSpacing.s8),
+          ImportDiagnosticsList(diagnostics: warnings),
         ],
       ),
     );
-  }
-
-  String _itemSubtitle(ParsedPlanItem i) {
-    final reps =
-        i.repsMin == i.repsMax ? '${i.repsMin}' : '${i.repsMin}-${i.repsMax}';
-    final base = '${i.sets} × $reps';
-    final rest = i.restSec != null ? ' · ${i.restSec}s' : '';
-    final w = i.weightKg != null ? ' · ${formatWeightKg(i.weightKg)} kg' : '';
-    return '$base$rest$w';
   }
 }
 
@@ -1082,35 +1055,6 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                     ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _UnmatchedBadge extends StatelessWidget {
-  const _UnmatchedBadge({
-    required this.palette,
-    required this.hasSuggestion,
-  });
-  final AppPalette palette;
-  final bool hasSuggestion;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: palette.warning.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: palette.warning),
-      ),
-      child: Text(
-        hasSuggestion ? 'sugerencia pendiente' : 'sin match',
-        style: TextStyle(
-          color: palette.warning,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );
