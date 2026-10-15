@@ -112,7 +112,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('Pago recibido'), findsOneWidget);
+      expect(find.text('Mensaje nuevo'), findsOneWidget);
       expect(
         find.text('No se pudieron cargar tus preferencias.'),
         findsNothing,
@@ -122,7 +122,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('Pago recibido'),
+        find.text('Mensaje nuevo'),
         findsOneWidget,
         reason: 'un error transitorio con prefs ya cargadas no debe tapar '
             'la matriz',

@@ -257,6 +257,8 @@ Future<void> _pump(
             (ref) => Stream.value(plansByAthleteId[athleteId]),
           ),
         if (repo != null) trainerLinkRepositoryProvider.overrideWithValue(repo),
+        // Va al final: gana sobre el override genérico del batch de perfiles.
+        if (profilesOverride != null) profilesOverride,
       ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),

@@ -323,6 +323,9 @@ Future<void> _pump(
   List<Session> sessions = const [],
   List<Payment> payments = const [],
   Stream<List<Payment>>? paymentsStream,
+  // `false` cuando un stream queda en loading a propósito: el shimmer anima
+  // en loop y `pumpAndSettle` no termina nunca; se pumpea a mano.
+  bool settle = true,
   List<CobroPendiente> pendingCobros = const [],
   PaymentRepository? paymentRepo,
   AthleteBilling? billing,
@@ -444,7 +447,11 @@ Future<void> _pump(
       ),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 void main() {
@@ -2436,6 +2443,7 @@ void main() {
         profile: _prof(),
         link: _link(TrainerLinkStatus.active),
         athleteNoteStream: notes.stream,
+        settle: false,
       );
 
       notes.add(_note(note: 'Nota que debe seguir visible'));
