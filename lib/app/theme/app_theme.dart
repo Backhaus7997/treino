@@ -129,6 +129,16 @@ class AppTheme {
             ),
           ),
         ),
+        // #1503: el switch APAGADO era el default de M3 — pulgar y contorno en
+        // `colorScheme.outline`, que se lee casi negro y grueso, al lado del
+        // encendido del kit. Sólo se toca el estado apagado (y habilitado): el
+        // encendido lo siguen pintando los llamadores, y el deshabilitado
+        // queda en el default.
+        switchTheme: SwitchThemeData(
+          thumbColor: _SoloApagado(palette.textMuted),
+          trackColor: _SoloApagado(palette.bgCard),
+          trackOutlineColor: _SoloApagado(palette.border),
+        ),
         // #1513: sin estos dos, `FilledButton` y `OutlinedButton` caían al
         // default de Material — Barlow regular fina, y el outlined con texto
         // `primary` (mint sobre blanco, ~1,6:1) y borde `outline` casi negro.
@@ -239,6 +249,29 @@ class _TextoDeAcento implements WidgetStateProperty<Color> {
 
   @override
   int get hashCode => Object.hash(habilitado, deshabilitado);
+}
+
+/// Color sólo para el switch APAGADO y habilitado; en cualquier otro estado
+/// devuelve null y rige el default (o lo que pase el llamador). Con igualdad
+/// de VALOR, por la misma razón que [_TextoDeAcento].
+class _SoloApagado implements WidgetStateProperty<Color?> {
+  const _SoloApagado(this.color);
+
+  final Color color;
+
+  @override
+  Color? resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.selected) ||
+              states.contains(WidgetState.disabled)
+          ? null
+          : color;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _SoloApagado && other.color == color;
+
+  @override
+  int get hashCode => color.hashCode;
 }
 
 /// Color del thumb del scrollbar, con igualdad de VALOR.
