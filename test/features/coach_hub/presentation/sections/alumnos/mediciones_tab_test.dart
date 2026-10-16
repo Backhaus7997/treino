@@ -313,9 +313,9 @@ void main() {
     // Se scrollea al final porque la lista es perezosa: con el chart arriba, la
     // segunda fila no está en el árbol hasta llegar. Que haya que scrollear ES
     // la prueba de que el viewport quedó perezoso.
-    // La lista va DESC, así que la segunda fila es m1 (72). Su summary usa el
-    // double crudo — '72 kg' — a diferencia de la card de lectura, que lo
-    // recorta a '72 kg'.
+    // La lista va DESC, así que la segunda fila es m1 (72). La card de lectura
+    // de arriba muestra la ÚLTIMA medición (70), así que «72 kg» sólo lo dice
+    // esa fila.
     await _scrollHasta(tester, find.textContaining('72 kg'));
     expect(find.byIcon(TreinoIcon.edit), findsNWidgets(2));
   });
