@@ -4888,5 +4888,7 @@
   "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
   "@agendaRuleDeleteBody": {"description": "Cuerpo de la confirmación de borrado de una franja."},
   "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
-  "@agendaOverrideDeleteTitle": {"description": "Título de la confirmación de borrado de una excepción de agenda."}
+  "@agendaOverrideDeleteTitle": {"description": "Título de la confirmación de borrado de una excepción de agenda."},
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "@onboardingCustomExerciseNotNow": {"description": "Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489)."}
 }

@@ -2283,5 +2283,6 @@
   "commonDelete": "Delete",
   "agendaRuleDeleteTitle": "Delete this time slot?",
   "agendaRuleDeleteBody": "Existing bookings are kept.",
-  "agendaOverrideDeleteTitle": "Delete this exception?"
+  "agendaOverrideDeleteTitle": "Delete this exception?",
+  "onboardingCustomExerciseNotNow": "NOT NOW"
 }

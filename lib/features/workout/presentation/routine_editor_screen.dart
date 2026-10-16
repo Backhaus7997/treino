@@ -3825,15 +3825,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 // tiene en pantalla.
                 final primerDia =
                     problemas.map((p) => p.dia).whereType<_EditableDay>();
-                return EditorFooterBar(
-                  summary: _resumenPie(l10n),
-                  problems: visibles,
-                  submitLabel: _submitLabelFor(widget.mode, l10n),
-                  submitting: _submitting,
-                  onSubmit: () => _submit(),
-                  onGoToProblem: primerDia.isEmpty
-                      ? null
-                      : () => _irAlDia(primerDia.first),
+                return _PieSinTeclado(
+                  builder: (acceptsTaps) => EditorFooterBar(
+                    summary: _resumenPie(l10n),
+                    problems: visibles,
+                    submitLabel: _submitLabelFor(widget.mode, l10n),
+                    submitting: _submitting,
+                    acceptsTaps: acceptsTaps,
+                    onSubmit: () => _submit(),
+                    onGoToProblem: primerDia.isEmpty
+                        ? null
+                        : () => _irAlDia(primerDia.first),
+                  ),
                 );
               }),
             ],
@@ -7323,5 +7326,80 @@ class _ShareOnProfileTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// El pie del editor (aviso + guardar) se esconde mientras el teclado está
+/// abierto, y cuando vuelve ignora los taps un momento (#1487).
+///
+/// Con el teclado arriba el pie subía pegado a él: tapaba las sugerencias de
+/// la entrada rápida y, al cerrarlo, ASIGNAR PLAN quedaba justo donde estaba
+/// el ✓ del teclado — un tap de más asignaba el plan sin querer.
+class _PieSinTeclado extends StatefulWidget {
+  const _PieSinTeclado({required this.builder});
+
+  /// Arma el pie; recibe si acepta taps todavía.
+  final Widget Function(bool acceptsTaps) builder;
+
+  @override
+  State<_PieSinTeclado> createState() => _PieSinTecladoState();
+}
+
+class _PieSinTecladoState extends State<_PieSinTeclado>
+    with WidgetsBindingObserver {
+  /// Cuánto tiempo el pie recién vuelto no acepta taps: lo que tarda un
+  /// segundo toque involuntario, no lo que tarda alguien en decidir guardar.
+  static const _resguardo = Duration(milliseconds: 500);
+
+  bool _hayTeclado = false;
+  bool _enResguardo = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hayTeclado = _tecladoAbierto();
+  }
+
+  /// `View` y no `MediaQuery`: dentro del body de un Scaffold el inset del
+  /// teclado ya viene consumido (el Scaffold achica el body) y vale 0 siempre.
+  bool _tecladoAbierto() => View.of(context).viewInsets.bottom > 0;
+
+  /// El teclado cambia las métricas de la ventana, no las dependencias de este
+  /// widget: sin el observer nada lo reconstruye al abrirse o cerrarse.
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final abierto = _tecladoAbierto();
+    if (abierto == _hayTeclado) return;
+    setState(() {
+      if (_hayTeclado && !abierto) {
+        _enResguardo = true;
+        _timer?.cancel();
+        _timer = Timer(_resguardo, () {
+          if (mounted) setState(() => _enResguardo = false);
+        });
+      }
+      _hayTeclado = abierto;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hayTeclado) return const SizedBox.shrink();
+    return widget.builder(!_enResguardo);
   }
 }

@@ -1168,5 +1168,6 @@
   "commonDelete": "Eliminar",
   "agendaRuleDeleteTitle": "¿Borrar este horario?",
   "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
-  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?"
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
+  "onboardingCustomExerciseNotNow": "AHORA NO"
 }

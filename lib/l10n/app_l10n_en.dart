@@ -5300,4 +5300,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get agendaOverrideDeleteTitle => 'Delete this exception?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'NOT NOW';
 }
