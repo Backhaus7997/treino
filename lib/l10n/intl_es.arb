@@ -1155,7 +1155,6 @@
   "timePickerHelpText": "Elige una hora",
   "logFieldRange": "Entre {min} y {max} {unit}",
   "inputMaxReached": "Máximo {max} {unit}",
-  "logFieldRangeAbove": "Más de {min} y hasta {max} {unit}",
   "performanceLogTitleEdit": "Editar evaluación",
   "performanceLogUpdateCta": "GUARDAR CAMBIOS",
   "performanceLogUpdateSuccess": "Evaluación actualizada",

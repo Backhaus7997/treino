@@ -313,6 +313,9 @@ describe("performance_tests: un resultado legacy negativo sigue siendo editable"
   // tuvo NINGUN validador hasta 2026-06-17 (737cb5f3 agrego `parsed <= 0`), y
   // la regla `optPositiveNum` llego el 2026-07-23. Entre 2026-06-02 y
   // 2026-06-17 un PF podia registrar -5 desde la app oficial.
+  // Desde #1485 (2026-10-16) la regla acepta sitAndReachCm de -40 a 60, asi
+  // que -5 ya no es legacy: es un valor valido. El test sigue cubriendo que
+  // editar las notas no rebote.
   it("sitAndReachCm negativo legacy no bloquea editar las notas", async () => {
     await seedRole(TRAINER, "trainer");
     const recordedAt = new Date("2026-06-10T10:00:00Z");
@@ -352,7 +355,9 @@ describe("performance_tests: un resultado legacy negativo sigue siendo editable"
       db(TRAINER)
         .collection("performance_tests")
         .doc(DOC)
-        .set({ ...BASE, recordedAt: new Date(), sitAndReachCm: -5 }),
+        // -41: apenas afuera del piso de -40 (#1485). Con -5 ya no prueba
+        // nada, es un resultado valido.
+        .set({ ...BASE, recordedAt: new Date(), sitAndReachCm: -41 }),
     );
   });
 
