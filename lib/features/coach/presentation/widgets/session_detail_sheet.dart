@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/form_inline_error.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
@@ -37,6 +39,12 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
   late final TextEditingController _afterController;
   bool _saving = false;
 
+  // Error de la última acción (guardar notas / cancelar) DENTRO del sheet: un
+  // SnackBar queda tapado por el propio sheet (abierto con
+  // `useRootNavigator: true`). Ver [FormInlineError].
+  String? _error;
+  final _errorKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -53,9 +61,28 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     super.dispose();
   }
 
+  /// Muestra [message] junto a las acciones y lo trae a la vista: en un celular
+  /// chico las acciones están al fondo del scroll y el error aparece arriba de
+  /// ellas.
+  void _fail(String message) {
+    setState(() => _error = message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final errorContext = _errorKey.currentContext;
+      if (!mounted || errorContext == null) return;
+      Scrollable.ensureVisible(
+        errorContext,
+        duration: AppMotion.resolve(context, AppMotion.base),
+        curve: AppMotion.standard,
+      );
+    });
+  }
+
   Future<void> _saveNotes() async {
     if (_saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       final before = _beforeController.text.trim();
       final after = _afterController.text.trim();
@@ -70,9 +97,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
-      );
+      _fail('No pudimos guardar. Probá de nuevo.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -91,6 +116,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     );
     if (!confirmed || !mounted) return;
 
+    setState(() => _error = null);
     try {
       await ref.read(appointmentRepositoryProvider).cancel(
             appointment: widget.appointment,
@@ -104,14 +130,10 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
       );
     } on CancellationTooLateException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
-      );
+      _fail(l10n.agendaCancellationTooLate);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
-      );
+      _fail(l10n.agendaGenericError);
     }
   }
 
@@ -129,6 +151,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
     );
     if (!confirmed || !mounted) return;
 
+    setState(() => _error = null);
     try {
       final n =
           await ref.read(appointmentRepositoryProvider).cancelFutureSeries(
@@ -148,9 +171,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
-      );
+      _fail(l10n.agendaGenericError);
     }
   }
 
@@ -397,6 +418,11 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              if (_error != null) ...[
+                FormInlineError(key: _errorKey, message: _error!),
+                const SizedBox(height: 12),
+              ],
 
               // ── Save button ────────────────────────────────────────────
               ElevatedButton(

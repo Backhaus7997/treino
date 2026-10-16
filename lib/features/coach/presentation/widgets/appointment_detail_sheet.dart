@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
+import '../../../../core/widgets/form_inline_error.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -59,6 +61,11 @@ class _AppointmentDetailSheetState
   bool _showCobrarForm = false;
   bool _billing = false;
   String? _billingError;
+
+  // Error de la cancelación DENTRO del sheet: un SnackBar queda tapado por el
+  // propio sheet (abierto con `useRootNavigator: true`). Ver [FormInlineError].
+  String? _cancelError;
+  final _cancelErrorKey = GlobalKey();
 
   /// ART calendar day the charge is due (optional) — same idiom as
   /// _AddSueltoSheet (Slice 1): only y/m/d are meaningful, [_confirmCobrar]
@@ -300,6 +307,10 @@ class _AppointmentDetailSheetState
                 ),
                 const SizedBox(height: 12),
               ],
+              if (_cancelError != null) ...[
+                FormInlineError(key: _cancelErrorKey, message: _cancelError!),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -349,6 +360,7 @@ class _AppointmentDetailSheetState
     );
     if (!confirmed || !context.mounted) return;
 
+    setState(() => _cancelError = null);
     try {
       await ref.read(appointmentRepositoryProvider).cancel(
             appointment: widget.appointment,
@@ -361,16 +373,27 @@ class _AppointmentDetailSheetState
         SnackBar(content: Text(l10n.agendaCancellationSuccess)),
       );
     } on CancellationTooLateException {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
-      );
+      if (!mounted) return;
+      _failCancel(l10n.agendaCancellationTooLate);
     } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
-      );
+      if (!mounted) return;
+      _failCancel(l10n.agendaGenericError);
     }
+  }
+
+  /// Muestra el error de la cancelación arriba del botón y lo trae a la vista
+  /// (el botón está al fondo del scroll).
+  void _failCancel(String message) {
+    setState(() => _cancelError = message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final errorContext = _cancelErrorKey.currentContext;
+      if (!mounted || errorContext == null) return;
+      Scrollable.ensureVisible(
+        errorContext,
+        duration: AppMotion.resolve(context, AppMotion.base),
+        curve: AppMotion.standard,
+      );
+    });
   }
 
   // ── Cobrar (Slice 2a) ─────────────────────────────────────────────────────
