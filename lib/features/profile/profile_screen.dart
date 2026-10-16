@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/features/auth/presentation/confirmar_cerrar_sesion.dart';
 import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,7 +10,6 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
-import '../auth/application/auth_providers.dart';
 import 'application/profile_stats_providers.dart';
 import 'application/user_providers.dart';
 import 'domain/user_role.dart';
@@ -244,8 +244,8 @@ class _AthleteProfile extends ConsumerWidget {
                     icon: TreinoIcon.signOut,
                     title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
                     inGroup: true,
-                    onTap: () =>
-                        ref.read(authNotifierProvider.notifier).signOut(),
+                    // Pregunta antes de salir (#1504).
+                    onTap: () => confirmarCerrarSesion(context, ref),
                   ),
                 ),
                 Semantics(
