@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,7 +65,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 /// the current trainer to this athlete. Provides a "CREAR PLAN" CTA that
 /// navigates to the RoutineEditorScreen.
 ///
-/// Lives under ShellRoute — NO own Scaffold (bottom bar provided by shell).
+/// Full-screen route with its OWN Scaffold: MENSAJE / CREAR PLAN live in its
+/// `bottomNavigationBar` so SnackBars land above them (#1484).
 /// REQ-COACH-PLANS-020, 021, 022 · SCENARIO-454, 455, 456.
 class AthleteDetailScreen extends ConsumerWidget {
   const AthleteDetailScreen({super.key, required this.athleteId});
@@ -81,61 +83,77 @@ class AthleteDetailScreen extends ConsumerWidget {
       (trainerId: trainerUid, athleteId: athleteId),
     ));
 
-    return Column(
-      children: [
-        // ── Header bar ────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-          child: Row(
+    // Scaffold PROPIO (el router ya no lo envuelve en `_immersive`): los
+    // botones van en `bottomNavigationBar` para que los SnackBar salgan
+    // arriba de ellos (#1484). El fondo liso de la barra es `palette.bg`, el
+    // mismo color al que funde el velo del pie del scroll.
+    return Scaffold(
+      backgroundColor: palette.bg,
+      bottomNavigationBar: _AthleteDetailActions(
+        athleteId: athleteId,
+        trainerUid: trainerUid,
+      ),
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
             children: [
-              IconButton(
-                icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-                onPressed: () =>
-                    context.canPop() ? context.pop() : context.go('/coach'),
+              // ── Header bar ────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/coach'),
+                    ),
+                    // #1482: sin el nombre acá. Ya va en el header con avatar, y
+                    // repetido en la barra se leía duplicado.
+                  ],
+                ),
               ),
-              // #1482: sin el nombre acá. Ya va en el header con avatar, y
-              // repetido en la barra se leía duplicado.
-            ],
-          ),
-        ),
 
-        // ── Body ─────────────────────────────────────────────────────────
-        Expanded(
-          child: Stack(
-            children: [
-              _AthleteDetailBody(
-                athleteId: athleteId,
-                trainerUid: trainerUid,
-                profileAsync: profileAsync,
-                plansAsync: plansAsync,
-              ),
-              // #1482: velo al pie del scroll para que el contenido no se
-              // corte en seco contra los botones fijos de abajo.
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: AppSpacing.s20,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    key: const Key('athlete_detail_bottom_fade'),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          palette.bg.withValues(alpha: 0),
-                          palette.bg,
-                        ],
+              // ── Body ─────────────────────────────────────────────────────────
+              Expanded(
+                child: Stack(
+                  children: [
+                    _AthleteDetailBody(
+                      athleteId: athleteId,
+                      trainerUid: trainerUid,
+                      profileAsync: profileAsync,
+                      plansAsync: plansAsync,
+                    ),
+                    // #1482: velo al pie del scroll para que el contenido no se
+                    // corte en seco contra los botones fijos de abajo.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: AppSpacing.s20,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          key: const Key('athlete_detail_bottom_fade'),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                palette.bg.withValues(alpha: 0),
+                                palette.bg,
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -232,110 +250,8 @@ class _AthleteDetailBody extends ConsumerWidget {
             ),
           ),
         ),
-
-        // ── MENSAJE + CREAR PLAN buttons ──────────────────────────────
-        // Full-screen route (no nav bar); _immersive's SafeArea handles the
-        // home-indicator inset, so a plain bottom padding sits the buttons at
-        // the bottom of the screen.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Column(
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _onMessage(context, ref),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.accent, width: 1),
-                        foregroundColor: palette.accentText,
-                        minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.full),
-                        ),
-                      ),
-                      icon: Icon(TreinoIcon.chat,
-                          size: 18, color: palette.accent),
-                      label: Text(
-                        AppL10n.of(context).athleteDetailMessageCta,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  // Unread dot on the chat button when the alumno has written.
-                  if (ref.watch(hasUnreadFromProvider(athleteId)))
-                    Positioned(
-                      top: -3,
-                      right: -3,
-                      child: Semantics(
-                        label: 'Mensajes sin leer',
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: palette.bg, width: 2),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () =>
-                      context.push('/workout/routine-editor/$athleteId'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                  ),
-                  child: Text(
-                    AppL10n.of(context).coachCreatePlanCta,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
-  }
-
-  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
-    if (trainerUid.isEmpty) return;
-    try {
-      final chat = await ref.read(chatRepositoryProvider).getOrCreate(
-            selfId: trainerUid,
-            otherId: athleteId,
-          );
-      if (!context.mounted) return;
-      context.push('/coach/chat/${chat.chatId}?other=$athleteId');
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
-        ),
-      );
-    }
   }
 }
 
@@ -2690,5 +2606,127 @@ class _PlanCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// MENSAJE + CREAR PLAN. Va en el `bottomNavigationBar` del Scaffold de la
+/// pantalla y no al pie del body: el Scaffold dibuja los SnackBar ARRIBA de
+/// esa barra. Al pie del body, el «Medición guardada» que vuelve de Cargar
+/// medición tapaba CREAR PLAN (#1484).
+class _AthleteDetailActions extends ConsumerWidget {
+  const _AthleteDetailActions({
+    required this.athleteId,
+    required this.trainerUid,
+  });
+
+  final String athleteId;
+  final String trainerUid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          // En `bottomNavigationBar` la barra recibe el alto entero: sin esto
+          // se come la pantalla y el scroll queda en 0 px.
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _onMessage(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.accent, width: 1),
+                      foregroundColor: palette.accentText,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                      ),
+                    ),
+                    icon:
+                        Icon(TreinoIcon.chat, size: 18, color: palette.accent),
+                    label: Text(
+                      AppL10n.of(context).athleteDetailMessageCta,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+                // Unread dot on the chat button when the alumno has written.
+                if (ref.watch(hasUnreadFromProvider(athleteId)))
+                  Positioned(
+                    top: -3,
+                    right: -3,
+                    child: Semantics(
+                      label: 'Mensajes sin leer',
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: palette.accent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: palette.bg, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () =>
+                    context.push('/workout/routine-editor/$athleteId'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.accent,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                  ),
+                ),
+                child: Text(
+                  AppL10n.of(context).coachCreatePlanCta,
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onMessage(BuildContext context, WidgetRef ref) async {
+    if (trainerUid.isEmpty) return;
+    try {
+      final chat = await ref.read(chatRepositoryProvider).getOrCreate(
+            selfId: trainerUid,
+            otherId: athleteId,
+          );
+      if (!context.mounted) return;
+      context.push('/coach/chat/${chat.chatId}?other=$athleteId');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
+        ),
+      );
+    }
   }
 }
