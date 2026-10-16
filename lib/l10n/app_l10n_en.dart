@@ -621,6 +621,11 @@ class AppL10nEn extends AppL10n {
   String get agendaRuleInvalidWindow => '';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'This time overlaps one you already added: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach => '';
 
   @override

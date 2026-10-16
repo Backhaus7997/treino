@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
@@ -26,6 +29,7 @@ class _StubAvailabilityRepository extends Fake
   final List<Future<void> Function()> deleteOverrideCalls = [];
 
   AvailabilityRule? addedRule;
+  AvailabilityRule? updatedRule;
   String? deletedRuleId;
   AvailabilityOverride? addedOverride;
   String? deletedOverrideId;
@@ -36,7 +40,9 @@ class _StubAvailabilityRepository extends Fake
   }
 
   @override
-  Future<void> updateRule(AvailabilityRule rule) async {}
+  Future<void> updateRule(AvailabilityRule rule) async {
+    updatedRule = rule;
+  }
 
   @override
   Future<void> deleteRule(String trainerId, String ruleId) async {
@@ -71,14 +77,16 @@ class _StubAvailabilityRepository extends Fake
 AvailabilityRule _makeRule({
   String id = 'rule-1',
   int dayOfWeek = DateTime.monday,
+  int startHour = 9,
+  int endHour = 11,
 }) =>
     AvailabilityRule(
       id: id,
       trainerId: 'trainer-1',
       dayOfWeek: dayOfWeek,
-      startHour: 9,
+      startHour: startHour,
       startMinute: 0,
-      endHour: 11,
+      endHour: endHour,
       endMinute: 0,
       slotDurationMin: 60,
     );
@@ -154,7 +162,8 @@ void main() {
         await tester.pumpWidget(_editor());
         await tester.pump();
 
-        expect(find.text('Mis horarios'), findsOneWidget);
+        // El título va en mayúsculas, como el resto de las pantallas (#1495).
+        expect(find.text('MIS HORARIOS'), findsOneWidget);
         expect(find.text('AGREGAR HORARIO'), findsOneWidget);
       },
     );
@@ -186,8 +195,9 @@ void main() {
         await tester.tap(find.text('AGREGAR HORARIO'));
         await tester.pumpAndSettle();
 
-        // Form sheet must appear with a save/confirm action
-        expect(find.text('Confirmar'), findsOneWidget);
+        // Form sheet must appear with a save/confirm action (en mayúsculas,
+        // como el resto de los botones primarios: #1495)
+        expect(find.text('CONFIRMAR'), findsOneWidget);
       },
     );
   });
@@ -207,8 +217,8 @@ void main() {
         await tester.pump();
 
         // Find and tap the delete icon for the rule
-        expect(find.byIcon(Icons.delete_outline), findsOneWidget);
-        await tester.tap(find.byIcon(Icons.delete_outline));
+        expect(find.byIcon(TreinoIcon.trash), findsOneWidget);
+        await tester.tap(find.byIcon(TreinoIcon.trash));
         await tester.pumpAndSettle();
 
         // Confirmation dialog should show
@@ -288,7 +298,7 @@ void main() {
 
         // Find delete icons — there might be one for each override row
         // The override should have a delete action
-        final deleteIcons = find.byIcon(Icons.delete_outline);
+        final deleteIcons = find.byIcon(TreinoIcon.trash);
         expect(deleteIcons, findsWidgets);
 
         // Tap the first delete icon (for the override)
@@ -302,5 +312,153 @@ void main() {
         expect(stubRepo.deletedOverrideId, equals('override-to-delete'));
       },
     );
+  });
+
+  // ── #1495: franjas superpuestas ───────────────────────────────────────────
+  group('#1495 — franjas superpuestas', () {
+    testWidgets(
+      'el default de "Agregar horario" no choca con lo ya cargado: '
+      'con lunes 09–13 propone lunes 13–15',
+      (tester) async {
+        final stubRepo = _StubAvailabilityRepository();
+        await tester.pumpWidget(_editor(
+          rules: [_makeRule(startHour: 9, endHour: 13)],
+          repoOverride: stubRepo,
+        ));
+        await tester.pump();
+
+        await tester.tap(find.text('AGREGAR HORARIO'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('CONFIRMAR'));
+        await tester.pumpAndSettle();
+
+        final added = stubRepo.addedRule;
+        expect(added, isNotNull, reason: 'el default debería poder guardarse');
+        expect(added!.dayOfWeek, DateTime.monday);
+        expect(added.startHour, 13);
+        expect(added.endHour, 15);
+      },
+    );
+
+    testWidgets(
+      'editar una regla sin tocar nada no choca consigo misma',
+      (tester) async {
+        final stubRepo = _StubAvailabilityRepository();
+        await tester.pumpWidget(_editor(
+          rules: [_makeRule(id: 'solo')],
+          repoOverride: stubRepo,
+        ));
+        await tester.pump();
+
+        await tester.tap(find.byIcon(TreinoIcon.edit));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('CONFIRMAR'));
+        await tester.pumpAndSettle();
+
+        expect(stubRepo.updatedRule?.id, 'solo');
+      },
+    );
+
+    testWidgets(
+      'mover una regla encima de otra se rechaza ADENTRO del sheet, '
+      'con el horario que pisa, y no guarda',
+      (tester) async {
+        final stubRepo = _StubAvailabilityRepository();
+        await tester.pumpWidget(_editor(
+          rules: [
+            _makeRule(id: 'lunes', dayOfWeek: DateTime.monday),
+            _makeRule(id: 'martes', dayOfWeek: DateTime.tuesday),
+          ],
+          repoOverride: stubRepo,
+        ));
+        await tester.pump();
+
+        // Editar la del martes (la segunda) y pasarla al lunes 09–11.
+        await tester.tap(find.byIcon(TreinoIcon.edit).last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Lun'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('CONFIRMAR'));
+        await tester.pumpAndSettle();
+
+        const mensaje = 'Ese horario se superpone con otro que ya cargaste: '
+            'Lunes, 09:00 – 11:00.';
+        expect(find.text(mensaje), findsOneWidget);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(stubRepo.updatedRule, isNull);
+        expect(stubRepo.addedRule, isNull);
+
+        // En cuanto cambia algo, el aviso se va.
+        await tester.tap(find.text('Mar'));
+        await tester.pumpAndSettle();
+        expect(find.text(mensaje), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'franjas pegadas (11:00 fin / 11:00 inicio) no se consideran superpuestas',
+      (tester) async {
+        final stubRepo = _StubAvailabilityRepository();
+        // Lunes 07–09 cargado: el default (09–11) arranca justo donde termina.
+        await tester.pumpWidget(_editor(
+          rules: [_makeRule(startHour: 7, endHour: 9)],
+          repoOverride: stubRepo,
+        ));
+        await tester.pump();
+
+        await tester.tap(find.text('AGREGAR HORARIO'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('CONFIRMAR'));
+        await tester.pumpAndSettle();
+
+        expect(stubRepo.addedRule?.startHour, 9);
+        expect(stubRepo.addedRule?.dayOfWeek, DateTime.monday);
+      },
+    );
+  });
+
+  // ── #1495: la pantalla habla el idioma del resto de la app ────────────────
+  group('#1495 — restyle', () {
+    testWidgets('chevron en vez de la flecha, y tachos rojos (no magenta)',
+        (tester) async {
+      await tester.pumpWidget(_editor(
+        rules: [_makeRule()],
+        overridesList: [_makeBlockOverride()],
+      ));
+      await tester.pump();
+
+      expect(find.byIcon(TreinoIcon.chevronLeft), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_back), findsNothing);
+
+      final palette = AppPalette.of(tester.element(find.byType(Scaffold)));
+      final tachos = tester.widgetList<Icon>(find.byIcon(TreinoIcon.trash));
+      expect(tachos, hasLength(2));
+      for (final tacho in tachos) {
+        expect(tacho.color, palette.danger);
+        expect(tacho.color, isNot(palette.highlight));
+      }
+    });
+
+    testWidgets(
+        'el texto de los chips seleccionados se lee sobre el mint '
+        '(color de botón, no el fondo de la pantalla)', (tester) async {
+      await tester.pumpWidget(_editor());
+      await tester.pump();
+
+      await tester.tap(find.text('AGREGAR HORARIO'));
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.text('Lun'));
+      final esperado = TreinoButtonTokens.foreground(context);
+
+      // «Lun» (día) y «60 min» (duración) arrancan seleccionados.
+      for (final etiqueta in ['Lun', '60 min']) {
+        final texto = tester.widget<Text>(find.text(etiqueta));
+        expect(texto.style?.color, esperado, reason: etiqueta);
+      }
+      // Uno NO seleccionado conserva el color de texto normal.
+      final noSel = tester.widget<Text>(find.text('Mar'));
+      expect(noSel.style?.color, AppPalette.of(context).textPrimary);
+    });
   });
 }

@@ -421,4 +421,46 @@ void main() {
     expect(morning['feeling'], 'bad');
     expect(morning['painAreas'], ['back']);
   });
+
+  // ── Falla de guardado ────────────────────────────────────────────────────
+  //
+  // El sheet se abre con `useRootNavigator: true`: un SnackBar del Scaffold de
+  // atrás queda TAPADO por el propio sheet, y el usuario daba por guardado un
+  // registro que no se guardó. El aviso va adentro del sheet.
+
+  testWidgets(
+      'si guardar falla, el aviso se ve ADENTRO del sheet y el sheet sigue '
+      'abierto con lo que escribió', (tester) async {
+    var cerrado = false;
+    await tester.pumpWidget(_host(
+      firestore: FakeFirebaseFirestore(),
+      onClosed: (_) => cerrado = true,
+      // Sin usuario autenticado el notifier lanza: es la falla más simple.
+      uid: null,
+    ));
+    await _openSheet(tester);
+
+    await tester.tap(find.text('Muy bien'));
+    await tester.pump();
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    const mensaje = 'No pudimos guardar tu registro. Probá de nuevo.';
+    expect(
+      find.descendant(
+        of: find.byType(WellbeingCheckInSheet),
+        matching: find.text(mensaje),
+      ),
+      findsOneWidget,
+    );
+    // Se ve de verdad: nada lo tapa.
+    expect(find.text(mensaje).hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(cerrado, isFalse);
+    // Puede reintentar: el botón volvió a estar habilitado.
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNotNull,
+    );
+  });
 }

@@ -387,6 +387,7 @@
   "agendaNoUpcomingSessions": "Tu entrenador todavía no te agendó sesiones.",
   "agendaSaveError": "No pudimos guardar. Inténtalo de nuevo.",
   "agendaSaveSuccess": "Horario guardado.",
+  "agendaRuleOverlap": "Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.",
   "agendaCobrarCta": "COBRAR",
   "agendaCobradoLabel": "Cobrado",
   "agendaCobrarMontoLabel": "MONTO (ARS)",

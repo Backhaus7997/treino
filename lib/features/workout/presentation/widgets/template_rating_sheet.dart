@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/form_inline_error.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../reviews/presentation/widgets/star_rating_input.dart';
@@ -57,6 +58,9 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
   late int _rating;
   late TextEditingController _commentController;
   bool _submitting = false;
+  // Error de envío DENTRO del sheet: un SnackBar queda tapado por el propio
+  // sheet. Ver [FormInlineError].
+  String? _error;
 
   @override
   void initState() {
@@ -77,7 +81,10 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     final comment = _commentController.text.trim();
     // `createdAt` is preserved by the repository on edits (the Firestore rule
     // pins it), so sending "now" on both is correct for create AND edit.
@@ -100,10 +107,10 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.templateRatingSheetError)),
-      );
+      setState(() {
+        _submitting = false;
+        _error = l10n.templateRatingSheetError;
+      });
     }
   }
 
@@ -154,7 +161,10 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
             Center(
               child: StarRatingInput(
                 rating: _rating,
-                onRatingChanged: (v) => setState(() => _rating = v),
+                onRatingChanged: (v) => setState(() {
+                  _rating = v;
+                  _error = null;
+                }),
               ),
             ),
             const SizedBox(height: 18),
@@ -178,6 +188,10 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
               ),
             ),
             const SizedBox(height: 18),
+            if (_error != null) ...[
+              FormInlineError(message: _error!),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(

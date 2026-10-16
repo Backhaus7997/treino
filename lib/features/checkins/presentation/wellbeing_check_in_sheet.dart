@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/form_inline_error.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -77,6 +78,9 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
   late Set<MuscleGroup> _painAreas;
   late final TextEditingController _noteController;
   bool _saving = false;
+  // Error de guardado DENTRO del sheet: un SnackBar queda tapado por el propio
+  // sheet (abierto con `useRootNavigator: true`). Ver [FormInlineError].
+  String? _error;
 
   @override
   void initState() {
@@ -97,7 +101,10 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
   Future<void> _save() async {
     final feeling = _feeling;
     if (feeling == null || _saving) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await ref.read(checkInNotifierProvider.notifier).submit(
             feeling: feeling,
@@ -111,13 +118,14 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
       Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _saving = false);
       // El sheet queda abierto: lo que el usuario escribió no se pierde y
       // puede reintentar. Avisar el fallo es obligatorio — dar por guardado un
-      // registro que no se guardó es peor que no ofrecer el registro.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppL10n.of(context).wellbeingSaveError)),
-      );
+      // registro que no se guardó es peor que no ofrecer el registro. Va
+      // inline: el SnackBar de acá quedaba tapado por el sheet.
+      setState(() {
+        _saving = false;
+        _error = AppL10n.of(context).wellbeingSaveError;
+      });
     }
   }
 
@@ -296,6 +304,10 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_error != null) ...[
+                    FormInlineError(message: _error!),
+                    const SizedBox(height: 12),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(

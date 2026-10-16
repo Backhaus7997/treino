@@ -7,9 +7,12 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/form_inline_error.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../application/agenda_providers.dart';
+import '../domain/availability_overlap.dart';
 import '../domain/availability_override.dart';
 import '../domain/availability_rule.dart';
 import '../../../l10n/app_l10n.dart';
@@ -46,11 +49,11 @@ class AvailabilityEditorScreen extends ConsumerWidget {
         backgroundColor: palette.bg,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: palette.textPrimary),
+          icon: Icon(TreinoIcon.chevronLeft, color: palette.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          AppL10n.of(context).agendaEditorTitle,
+          AppL10n.of(context).agendaEditorTitle.toUpperCase(),
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 20,
@@ -324,13 +327,12 @@ class _RuleTile extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.edit_outlined, size: 20, color: palette.textMuted),
+            icon: Icon(TreinoIcon.edit, size: 20, color: palette.textMuted),
             onPressed: onEdit,
             tooltip: 'Editar',
           ),
           IconButton(
-            icon:
-                Icon(Icons.delete_outline, size: 20, color: palette.highlight),
+            icon: Icon(TreinoIcon.trash, size: 20, color: palette.danger),
             onPressed: onDelete,
             tooltip: 'Eliminar',
           ),
@@ -403,8 +405,7 @@ class _OverrideTile extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon:
-                Icon(Icons.delete_outline, size: 20, color: palette.highlight),
+            icon: Icon(TreinoIcon.trash, size: 20, color: palette.danger),
             onPressed: onDelete,
             tooltip: 'Eliminar',
           ),
@@ -436,19 +437,41 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
 
   bool _saving = false;
 
+  // Error mostrado DENTRO del sheet (#1495): un SnackBar queda tapado por el
+  // propio sheet. Ver [FormInlineError].
+  String? _error;
+
   static const _kDurations = [30, 60, 90, 120];
 
   @override
   void initState() {
     super.initState();
     final e = widget.existing;
-    _dayOfWeek = e?.dayOfWeek ?? DateTime.monday;
-    _startHour = e?.startHour ?? 9;
-    _startMinute = e?.startMinute ?? 0;
-    _endHour = e?.endHour ?? 11;
-    _endMinute = e?.endMinute ?? 0;
+    // Una regla nueva arranca en la primera ventana libre y no en "lunes
+    // 09–11" fijo: con un horario ya cargado, ese default chocaba (#1495).
+    final free = e == null
+        ? suggestFreeRuleWindow(_currentRules())
+        : (
+            dayOfWeek: e.dayOfWeek,
+            startMinutes: e.startHour * 60 + e.startMinute,
+            endMinutes: e.endHour * 60 + e.endMinute,
+          );
+    _dayOfWeek = free.dayOfWeek;
+    _startHour = free.startMinutes ~/ 60;
+    _startMinute = free.startMinutes % 60;
+    _endHour = free.endMinutes ~/ 60;
+    _endMinute = free.endMinutes % 60;
     _slotDurationMin = e?.slotDurationMin ?? 60;
   }
+
+  /// Las reglas ya cargadas, leídas del stream que el editor tiene abierto.
+  /// Si todavía no hay valor se trata como "sin reglas": el sheet sólo se abre
+  /// con el editor ya cargado, y fallar abierto es mejor que bloquear el alta.
+  List<AvailabilityRule> _currentRules() =>
+      ref.read(availabilityRulesStreamProvider(widget.trainerId)).valueOrNull ??
+      const <AvailabilityRule>[];
+
+  void _fail(String message) => setState(() => _error = message);
 
   @override
   Widget build(BuildContext context) {
@@ -494,7 +517,10 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
             const SizedBox(height: 6),
             _DayPicker(
               value: _dayOfWeek,
-              onChanged: (v) => setState(() => _dayOfWeek = v),
+              onChanged: (v) => setState(() {
+                _dayOfWeek = v;
+                _error = null;
+              }),
               palette: palette,
             ),
             const SizedBox(height: 16),
@@ -508,6 +534,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
               onChanged: (h, m) => setState(() {
                 _startHour = h;
                 _startMinute = m;
+                _error = null;
               }),
               palette: palette,
             ),
@@ -522,6 +549,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
               onChanged: (h, m) => setState(() {
                 _endHour = h;
                 _endMinute = m;
+                _error = null;
               }),
               palette: palette,
             ),
@@ -540,7 +568,9 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: selected ? palette.bg : palette.textPrimary,
+                      color: selected
+                          ? TreinoButtonTokens.foreground(context)
+                          : palette.textPrimary,
                     ),
                   ),
                   selected: selected,
@@ -549,11 +579,19 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                   side: BorderSide(
                     color: selected ? palette.accent : palette.border,
                   ),
-                  onSelected: (_) => setState(() => _slotDurationMin = d),
+                  onSelected: (_) => setState(() {
+                    _slotDurationMin = d;
+                    _error = null;
+                  }),
                 );
               }).toList(),
             ),
             const SizedBox(height: 24),
+
+            if (_error != null) ...[
+              FormInlineError(message: _error!),
+              const SizedBox(height: 12),
+            ],
 
             SizedBox(
               width: double.infinity,
@@ -568,7 +606,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                   ),
                 ),
                 child: Text(
-                  l10n.agendaBookingConfirmCta,
+                  l10n.agendaBookingConfirmCta.toUpperCase(),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -583,18 +621,40 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
   }
 
   Future<void> _save(BuildContext context) async {
+    final l10n = AppL10n.of(context);
     final startTotalMinutes = _startHour * 60 + _startMinute;
     final endTotalMinutes = _endHour * 60 + _endMinute;
     // The window must end after it starts AND be wide enough to fit at least
     // one slot, otherwise compute_free_slots generates zero bookable slots and
     // the published rule silently produces an empty day.
     if (endTotalMinutes < startTotalMinutes + _slotDurationMin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppL10n.of(context).agendaRuleInvalidWindow)),
+      _fail(l10n.agendaRuleInvalidWindow);
+      return;
+    }
+    // Una franja que pisa a otra publicaría turnos duplicados (#1495): acá es
+    // un bloqueo, no un aviso. Al editar, la regla no choca consigo misma.
+    final clash = findOverlappingRule(
+      rules: _currentRules(),
+      dayOfWeek: _dayOfWeek,
+      startMinutes: startTotalMinutes,
+      endMinutes: endTotalMinutes,
+      ignoreRuleId: widget.existing?.id,
+    );
+    if (clash != null) {
+      _fail(
+        l10n.agendaRuleOverlap(
+          AgendaFormatters.dayOfWeekLabels[clash.dayOfWeek] ??
+              '${clash.dayOfWeek}',
+          _hhmm(clash.startHour, clash.startMinute),
+          _hhmm(clash.endHour, clash.endMinute),
+        ),
       );
       return;
     }
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       final repo = ref.read(availabilityRepositoryProvider);
       if (widget.existing != null) {
@@ -628,11 +688,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
     } catch (_) {
       // Surface the failure and keep the sheet open so the trainer can retry —
       // popping silently would let them believe the rule was published.
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppL10n.of(context).agendaSaveError)),
-        );
-      }
+      if (mounted) _fail(l10n.agendaSaveError);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -655,6 +711,12 @@ class _BlockOverrideFormSheetState
     extends ConsumerState<_BlockOverrideFormSheet> {
   DateTime _date = DateTime.now().toUtc().add(const Duration(days: 1));
   bool _saving = false;
+
+  // Error mostrado DENTRO del sheet: un SnackBar queda tapado por el propio
+  // sheet. Ver [FormInlineError].
+  String? _error;
+
+  void _fail(String message) => setState(() => _error = message);
 
   @override
   Widget build(BuildContext context) {
@@ -705,7 +767,7 @@ class _BlockOverrideFormSheetState
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined,
+                    Icon(TreinoIcon.calendar,
                         size: 18, color: palette.textMuted),
                     const SizedBox(width: 8),
                     Text(
@@ -720,6 +782,10 @@ class _BlockOverrideFormSheetState
               ),
             ),
             const SizedBox(height: 24),
+            if (_error != null) ...[
+              FormInlineError(message: _error!),
+              const SizedBox(height: 12),
+            ],
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -733,7 +799,7 @@ class _BlockOverrideFormSheetState
                   ),
                 ),
                 child: Text(
-                  l10n.agendaBookingConfirmCta,
+                  l10n.agendaBookingConfirmCta.toUpperCase(),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -758,12 +824,17 @@ class _BlockOverrideFormSheetState
     if (picked != null) {
       setState(() {
         _date = DateTime.utc(picked.year, picked.month, picked.day);
+        _error = null;
       });
     }
   }
 
   Future<void> _save(BuildContext context) async {
-    setState(() => _saving = true);
+    final l10n = AppL10n.of(context);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await ref.read(availabilityRepositoryProvider).addOverride(
             AvailabilityOverride.block(
@@ -781,11 +852,7 @@ class _BlockOverrideFormSheetState
     } catch (_) {
       // Surface the failure and keep the sheet open so the trainer can retry —
       // popping silently would let them believe the day was blocked.
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppL10n.of(context).agendaSaveError)),
-        );
-      }
+      if (mounted) _fail(l10n.agendaSaveError);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -898,7 +965,7 @@ class _AddButton extends StatelessWidget {
       width: double.infinity,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(Icons.add, size: 18, color: palette.accent),
+        icon: Icon(TreinoIcon.plus, size: 18, color: palette.accent),
         label: Text(
           label,
           style: GoogleFonts.barlowCondensed(
@@ -962,7 +1029,9 @@ class _DayPicker extends StatelessWidget {
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
               fontSize: 12,
-              color: selected ? palette.bg : palette.textPrimary,
+              color: selected
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
             ),
           ),
           selected: selected,
@@ -1002,8 +1071,7 @@ class _TimePicker extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.access_time_outlined,
-                size: 18, color: palette.textMuted),
+            Icon(TreinoIcon.clock, size: 18, color: palette.textMuted),
             const SizedBox(width: 8),
             Text(
               '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}',
@@ -1087,6 +1155,9 @@ class _ConfirmDialog extends StatelessWidget {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+String _hhmm(int hour, int minute) =>
+    '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
 String _generateId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
