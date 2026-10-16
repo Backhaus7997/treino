@@ -2401,7 +2401,11 @@ class AppL10nEn extends AppL10n {
   String get searchUsersClearA11y => 'Clear search';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Message (coming soon)';
+  String get publicProfileMessageDisabledA11y =>
+      'Message (unavailable: this person needs to follow you)';
+
+  @override
+  String get publicProfileStatWorkouts => 'WORKOUTS';
 
   @override
   String a11yAvatarLabel(String name) {

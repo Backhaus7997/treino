@@ -290,7 +290,8 @@
   "feedFriendRequestsWithCountA11y": "Solicitudes de seguidores, {count} pendientes",
   "feedPublishingA11y": "Publicando…",
   "searchUsersClearA11y": "Limpiar búsqueda",
-  "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
+  "publicProfileMessageDisabledA11y": "Mensaje (no disponible: esta persona tiene que seguirte)",
+  "publicProfileStatWorkouts": "ENTRENOS",
   "a11yAvatarLabel": "Foto de perfil de {name}",
   "@a11yAvatarLabel": {
     "placeholders": {
