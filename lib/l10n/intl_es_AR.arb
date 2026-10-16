@@ -4856,5 +4856,7 @@
   "logFieldRange": "Entre {min} y {max} {unit}",
   "@logFieldRange": {"description": "Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.", "placeholders": {"min": {"type": "String"}, "max": {"type": "String"}, "unit": {"type": "String"}}},
   "inputMaxReached": "Máximo {max} {unit}",
-  "@inputMaxReached": {"description": "Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).", "placeholders": {"max": {"type": "String"}, "unit": {"type": "String"}}}
+  "@inputMaxReached": {"description": "Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).", "placeholders": {"max": {"type": "String"}, "unit": {"type": "String"}}},
+  "logFieldRangeAbove": "Más de {min} y hasta {max} {unit}",
+  "@logFieldRangeAbove": {"description": "Como logFieldRange, pero el mínimo NO es válido (las reglas de performance_tests exigen > 0).", "placeholders": {"min": {"type": "String"}, "max": {"type": "String"}, "unit": {"type": "String"}}}
 }

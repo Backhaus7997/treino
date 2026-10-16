@@ -9018,6 +9018,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Máximo {max} {unit}'**
   String inputMaxReached(String max, String unit);
+
+  /// Como logFieldRange, pero el mínimo NO es válido (las reglas de performance_tests exigen > 0).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más de {min} y hasta {max} {unit}'**
+  String logFieldRangeAbove(String min, String max, String unit);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

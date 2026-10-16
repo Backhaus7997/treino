@@ -46,13 +46,13 @@ void main() {
     await tester.enterText(cmj, '999');
     await tester.pump();
 
-    expect(find.text('Entre 0 y 150 cm'), findsOneWidget);
+    expect(find.text('Más de 0 y hasta 150 cm'), findsOneWidget);
     expect(guardar().onPressed, isNull);
 
     await tester.enterText(cmj, '42,5');
     await tester.pump();
 
-    expect(find.text('Entre 0 y 150 cm'), findsNothing);
+    expect(find.text('Más de 0 y hasta 150 cm'), findsNothing);
     expect(guardar().onPressed, isNotNull);
   });
 }

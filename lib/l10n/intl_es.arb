@@ -1153,5 +1153,6 @@
   "appUpdateCta": "ACTUALIZAR",
   "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.",
   "logFieldRange": "Entre {min} y {max} {unit}",
-  "inputMaxReached": "Máximo {max} {unit}"
+  "inputMaxReached": "Máximo {max} {unit}",
+  "logFieldRangeAbove": "Más de {min} y hasta {max} {unit}"
 }

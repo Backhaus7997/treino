@@ -5252,4 +5252,9 @@ class AppL10nEn extends AppL10n {
   String inputMaxReached(String max, String unit) {
     return 'Maximum $max $unit';
   }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Above $min and up to $max $unit';
+  }
 }
