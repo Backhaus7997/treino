@@ -965,8 +965,10 @@ class _SessionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    // #1510: ABANDONAR quedaba a 12 del borde; 20, alineado con las cards
+    // de abajo.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, AppSpacing.s20, 8),
       child: Row(
         children: [
           Semantics(
@@ -1115,7 +1117,10 @@ class _SessionStatsCard extends StatelessWidget {
     final palette = AppPalette.of(context);
     final total = state.day.slots.length;
     final completed = state.completedExerciseCount;
-    final progress = total > 0 ? completed / total : 0.0;
+    // #1510: la barra avanza por SERIE, no por ejercicio — antes no se movía
+    // hasta cerrar el ejercicio entero. El texto sigue contando ejercicios.
+    final setsTotal = state.totalPlannedSets;
+    final progress = setsTotal > 0 ? state.completedSetCount / setsTotal : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1718,42 +1723,44 @@ class _FutureBlockPreview extends StatelessWidget {
     final palette = AppPalette.of(context);
     return TreinoTappable(
       onTap: onActivate,
-      child: Opacity(
-        opacity: 0.75,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exerciseName.toUpperCase(),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        letterSpacing: 0.5,
-                        color: palette.textMuted,
-                      ),
+      // Sin Opacity de bloque (#1510): bajaba el hint por debajo de AA. Lo
+      // «futuro» ya lo dice el nombre en `textMuted`.
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    exerciseName.toUpperCase(),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                      color: palette.textMuted,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tocá para adelantar este bloque',
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 11,
-                        color: palette.accent,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tocá para adelantar este bloque',
+                    // #1510: era `accent` a 11 px bajo un Opacity(0.75):
+                    // mint lavado sobre blanco. `accentText` a 12 y sin
+                    // opacidad encima pasa AA.
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: AppTextSize.caption,
+                      color: palette.accentText,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Icon(TreinoIcon.play, color: palette.accent, size: 16),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Icon(TreinoIcon.play, color: palette.accent, size: 16),
+          ],
         ),
       ),
     );
@@ -1779,56 +1786,58 @@ class _FutureSupersetPreview extends StatelessWidget {
     final names = joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ');
     return TreinoTappable(
       onTap: onActivate,
-      child: Opacity(
-        opacity: 0.75,
-        child: Container(
-          decoration: BoxDecoration(
-            color: palette.highlight.withValues(alpha: 0.04),
-            border: Border(
-              left: BorderSide(color: palette.highlight, width: 3),
-            ),
+      // Sin Opacity de bloque (#1510): bajaba el hint por debajo de AA. Lo
+      // «futuro» ya lo dice el nombre en `textMuted`.
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.highlight.withValues(alpha: 0.04),
+          border: Border(
+            left: BorderSide(color: palette.highlight, width: 3),
           ),
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SUPERSERIE',
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 10,
-                        letterSpacing: 1.0,
-                        color: palette.highlight,
-                      ),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SUPERSERIE',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                      letterSpacing: 1.0,
+                      color: palette.highlight,
                     ),
-                    Text(
-                      names.toUpperCase(),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
-                        letterSpacing: 0.5,
-                        color: palette.textMuted,
-                      ),
+                  ),
+                  Text(
+                    names.toUpperCase(),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      letterSpacing: 0.5,
+                      color: palette.textMuted,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Tocá para adelantar este bloque',
-                      style: GoogleFonts.barlow(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 11,
-                        color: palette.accent,
-                      ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Tocá para adelantar este bloque',
+                    // #1510: era `accent` a 11 px bajo un Opacity(0.75):
+                    // mint lavado sobre blanco. `accentText` a 12 y sin
+                    // opacidad encima pasa AA.
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w500,
+                      fontSize: AppTextSize.caption,
+                      color: palette.accentText,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Icon(TreinoIcon.play, color: palette.accent, size: 16),
-            ],
-          ),
+            ),
+            const SizedBox(width: 12),
+            Icon(TreinoIcon.play, color: palette.accent, size: 16),
+          ],
         ),
       ),
     );

@@ -352,6 +352,70 @@ void main() {
     });
   });
 
+  // #1484: «Medición guardada» vuelve a esta pantalla y el SnackBar tapaba
+  // CREAR PLAN: los botones estaban al pie del body. Ahora van en el
+  // `bottomNavigationBar` del Scaffold de la pantalla, que dibuja los SnackBar
+  // arriba de esa barra. Se monta como en el router: ruta top-level, sin
+  // Scaffold de afuera.
+  testWidgets('#1484: un SnackBar sale arriba de CREAR PLAN', (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        userPublicProfileProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+        ),
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async => const [],
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const AthleteDetailScreen(athleteId: 'athlete-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    ScaffoldMessenger.of(tester.element(find.text('MENSAJE'))).showSnackBar(
+      const SnackBar(content: Text('Medición guardada')),
+    );
+    await tester.pumpAndSettle();
+
+    final snack = tester.getRect(find.byType(SnackBar));
+    final crearPlan = tester.getRect(find.text('CREAR PLAN'));
+    expect(snack.bottom, lessThanOrEqualTo(crearPlan.top),
+        reason: 'el SnackBar (${snack.top}–${snack.bottom}) tapa CREAR PLAN '
+            '(${crearPlan.top})');
+  });
+
+  testWidgets('#1484: con el teclado abierto la barra de acciones se saca',
+      (tester) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        userPublicProfileProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+        ),
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async => const [],
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const AthleteDetailScreen(athleteId: 'athlete-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('CREAR PLAN'), findsNothing);
+  });
+
   // ── Issue #399 — plan-card tap must land on the top-level plan route ──────
   //
   // The bug: AthleteDetailScreen lives OUTSIDE the ShellRoute (top-level,

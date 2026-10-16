@@ -234,6 +234,21 @@ void main() {
     });
   });
 
+  // #1516: los labels SESIONES/VOLUMEN KG/RACHA iban en Barlow regular.
+  testWidgets('#1516: labels de stats en Barlow Condensed 700', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 1, totalVolumeKg: 1, streak: 1)),
+    ]));
+    await tester.pump();
+    for (final label in ['SESIONES', 'VOLUMEN KG', 'RACHA']) {
+      final style = tester.widget<Text>(find.text(label)).style!;
+      expect(style.fontFamily, contains('BarlowCondensed'), reason: label);
+      expect(style.fontWeight, FontWeight.w700, reason: label);
+    }
+  });
+
   // #1504: «Cerrar sesión» cerraba la sesión al primer toque, sin confirmar.
   testWidgets('#1504: cerrar sesión pide confirmación', (tester) async {
     _signOuts = 0;

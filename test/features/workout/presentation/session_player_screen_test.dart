@@ -508,6 +508,43 @@ void main() {
   // llevan (su tap significa "adelantar el bloque" y ya tienen hint + play
   // propio) ni el resumen de superserie completa (no es tocable).
 
+  // #1510: la barra avanzaba sólo al cerrar un ejercicio entero, y el hint
+  // «Tocá para adelantar este bloque» iba lavado bajo un Opacity(0.75).
+  group('#1510', () {
+    testWidgets('la barra de progreso avanza por serie', (tester) async {
+      final state = _defaultState().copyWith(setLogs: [
+        makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+      ]);
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(state),
+      ));
+      await tester.pump();
+      final bar = tester.widget<LinearProgressIndicator>(
+          find.byType(LinearProgressIndicator).first);
+      expect(bar.value, closeTo(1 / 6, 1e-9),
+          reason: '1 serie de 6 planificadas (2 ejercicios × 3)');
+    });
+
+    testWidgets('el hint de adelantar no queda bajo un Opacity',
+        (tester) async {
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        _stateOverride(_defaultState()),
+      ));
+      await tester.pump();
+      final hint = find.text('Tocá para adelantar este bloque');
+      await tester.scrollUntilVisible(hint, 200,
+          scrollable: find.byType(Scrollable).first);
+      expect(hint, findsWidgets);
+      final dims = tester
+          .widgetList<Opacity>(
+              find.ancestor(of: hint.first, matching: find.byType(Opacity)))
+          .where((o) => o.opacity < 1);
+      expect(dims, isEmpty);
+    });
+  });
+
   group('tap indicator (chevron junto al nombre)', () {
     testWidgets(
         'ejercicio activo lleva chevron junto al nombre; el preview future '
