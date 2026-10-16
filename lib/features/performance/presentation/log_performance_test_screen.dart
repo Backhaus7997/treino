@@ -107,6 +107,9 @@ class _LogPerformanceTestScreenState
   /// Hay al menos una métrica fuera de rango o no numérica (#1485).
   bool _hasInvalid = false;
 
+  /// Las notas tienen texto. Sólo cuenta en edición — ver [_hasContent].
+  bool _hasNotes = false;
+
   /// Every metric controller (excludes [_notesCtrl]) — used to detect whether
   /// at least one metric has a value so empty evaluations can't be saved.
   late final List<TextEditingController> _metricCtrls;
@@ -165,6 +168,8 @@ class _LogPerformanceTestScreenState
     for (final ctrl in _metricCtrls) {
       ctrl.addListener(_recomputeHasAnyMetric);
     }
+    _notesCtrl.addListener(_recomputeHasAnyMetric);
+    _hasNotes = _notesCtrl.text.trim().isNotEmpty;
     // En edición los campos ya traen valores: GUARDAR tiene que reflejarlo
     // desde el primer frame.
     _hasAnyMetric = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
@@ -184,19 +189,32 @@ class _LogPerformanceTestScreenState
   void _recomputeHasAnyMetric() {
     final hasAny = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
     final invalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
-    if (hasAny != _hasAnyMetric || invalid != _hasInvalid) {
+    final notes = _notesCtrl.text.trim().isNotEmpty;
+    if (hasAny != _hasAnyMetric ||
+        invalid != _hasInvalid ||
+        notes != _hasNotes) {
       setState(() {
         _hasAnyMetric = hasAny;
         _hasInvalid = invalid;
+        _hasNotes = notes;
       });
     }
   }
+
+  /// Hay algo que guardar. Un ALTA exige al menos una métrica (una evaluación
+  /// vacía no aporta nada). Una EDICIÓN acepta también sólo notas: el Coach
+  /// Hub crea evaluaciones con todos los campos opcionales, y sin esto el
+  /// lápiz del historial abría un form que nunca habilitaba GUARDAR (Codex,
+  /// #1532).
+  bool get _hasContent =>
+      _hasAnyMetric || (widget.initial != null && _hasNotes);
 
   @override
   void dispose() {
     for (final ctrl in _metricCtrls) {
       ctrl.removeListener(_recomputeHasAnyMetric);
     }
+    _notesCtrl.removeListener(_recomputeHasAnyMetric);
     _cmjCtrl.dispose();
     _squatJumpCtrl.dispose();
     _abalakovCtrl.dispose();
@@ -272,7 +290,7 @@ class _LogPerformanceTestScreenState
     // Block empty evaluations: at least one metric must be filled before save.
     // The Save button is already disabled while [_hasAnyMetric] is false
     // (see `canSave` in build), so this is a defensive guard only.
-    if (!_hasAnyMetric) return;
+    if (!_hasContent) return;
 
     // Surface inline errors for any non-numeric / non-positive field instead of
     // silently dropping the value via tryParse.
@@ -362,7 +380,7 @@ class _LogPerformanceTestScreenState
     final trainerUid = ref.watch(currentUidProvider);
     // Deshabilitado mientras haya un valor fuera de rango (#1485).
     final canSave =
-        trainerUid != null && !_saving && _hasAnyMetric && !_hasInvalid;
+        trainerUid != null && !_saving && _hasContent && !_hasInvalid;
     // Real instant; _formatDateTime localizes it for display (#392). The record
     // is still persisted as UTC in _save — same instant, shown in local time.
     // Alta muestra «ahora»; edición, la fecha original de la evaluación.
