@@ -1152,27 +1152,6 @@ void main() {
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
     expect(find.text('BUEN ENTRENO'), findsOneWidget);
   });
-}
-
-// ── Stub notifiers ────────────────────────────────────────────────────────────
-
-class _TrackingNotifier extends PostWorkoutNotifier {
-  _TrackingNotifier({required this.onShare});
-  final void Function() onShare;
-  int? capturedExerciseCount;
-
-  @override
-  Future<void> shareWorkout(
-    Session session, {
-    required String text,
-    required int exerciseCount,
-    required PostPrivacy privacy,
-    String? localPhotoPath,
-  }) async {
-    capturedExerciseCount = exerciseCount;
-    onShare();
-    state = const AsyncData(null);
-  }
 
   // #1512: «Mejor serie 560 kg·reps» era jerga. Se muestra la serie.
   testWidgets('#1512: la mejor serie se lee «82,5 kg × 5», sin kg·reps',
@@ -1203,6 +1182,27 @@ class _TrackingNotifier extends PostWorkoutNotifier {
     expect(find.textContaining('kg·reps'), findsNothing);
     expect(find.textContaining('412'), findsNothing);
   });
+}
+
+// ── Stub notifiers ────────────────────────────────────────────────────────────
+
+class _TrackingNotifier extends PostWorkoutNotifier {
+  _TrackingNotifier({required this.onShare});
+  final void Function() onShare;
+  int? capturedExerciseCount;
+
+  @override
+  Future<void> shareWorkout(
+    Session session, {
+    required String text,
+    required int exerciseCount,
+    required PostPrivacy privacy,
+    String? localPhotoPath,
+  }) async {
+    capturedExerciseCount = exerciseCount;
+    onShare();
+    state = const AsyncData(null);
+  }
 }
 
 // Los stubs de éxito/error del share vivían acá para SCENARIO-351/352; esos
