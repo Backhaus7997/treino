@@ -77,6 +77,27 @@
       }
     }
   },
+  "homeEstaSemanaMusclesTitle": "MÚSCULOS DE LA SEMANA",
+  "@homeEstaSemanaMusclesTitle": {
+    "description": "Title of the muscle map in the Home 'Esta Semana' card. The map paints the sets the athlete already logged THIS WEEK (finished sessions), not today's routine (#1508)."
+  },
+  "homeEstaSemanaMusclesLegend": "Más color = más cerca de las series que pide tu rutina esta semana.",
+  "@homeEstaSemanaMusclesLegend": {
+    "description": "Legend under the Home muscle map: opacity = sets done this week / weekly target sets of the active routine."
+  },
+  "homeGreeting": "¡HOLA!",
+  "@homeGreeting": {
+    "description": "Home header greeting when the athlete has no display name yet."
+  },
+  "homeGreetingNamed": "¡HOLA, {name}!",
+  "@homeGreetingNamed": {
+    "description": "Home header greeting. [name] is the athlete's FIRST name, already uppercased (#1508).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA ACÁ",
   "@homeEstaSemanaEmptyTitle": {
     "description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."

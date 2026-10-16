@@ -95,6 +95,21 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get homeEstaSemanaMusclesTitle => 'MUSCLES THIS WEEK';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'More color = closer to the sets your routine asks for this week.';
+
+  @override
+  String get homeGreeting => 'HELLO!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return 'HELLO, $name!';
+  }
+
+  @override
   String get homeEstaSemanaEmptyTitle => 'YOUR STREAK\nSTARTS HERE';
 
   @override
