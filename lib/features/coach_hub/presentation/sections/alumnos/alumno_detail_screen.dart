@@ -30,6 +30,7 @@ import 'package:treino/features/coach/domain/athlete_file.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/follow_up_entry.dart';
 import 'package:treino/features/coach/domain/nutrition_plan.dart';
+import 'package:treino/features/coach/domain/nutrition_plan_ids.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -6222,8 +6223,9 @@ class _NuevaEntradaSeguimientoDialogState
 /// vegetales…) y cada grupo con opciones que el alumno elige.
 ///
 /// Modelo: `NutritionPlan → Meal → FoodGroup → FoodOption`. Ver
-/// `nutrition_plan.dart` para detalle. En este MVP solo el PF arma el plan;
-/// el alumno NO lo ve todavía en mobile (feature scoped aparte).
+/// `nutrition_plan.dart` para detalle. El PF arma el plan (acá o, desde
+/// #1538, en la ficha del alumno mobile) y el alumno lo ve en su app, en MI
+/// PLAN NUTRICIONAL.
 ///
 /// Comportamiento:
 /// - Al abrir por primera vez muestra 6 comidas preset (desayuno, media
@@ -6232,6 +6234,11 @@ class _NuevaEntradaSeguimientoDialogState
 /// - Cambios locales viven en `_draft` — el stream de Firestore se lee al
 ///   entrar y cuando el PF guarda vuelve a persistir todo el doc.
 /// - Sin auto-save (evitamos writes innecesarios y forms rotos).
+/// - Si la lectura falla NO arranca de los presets: un GUARDAR PLAN sobre ese
+///   borrador pisaría el plan real que no se pudo leer (#1553).
+/// - Los ids salen del plan (`nextFreeId`) y no de un contador de sesión, y
+///   cada comida, grupo y opción lleva su id como `Key` (#1553): ver
+///   `nutrition_plan_ids.dart`.
 class _NutricionTab extends ConsumerStatefulWidget {
   const _NutricionTab({required this.athleteId});
 
@@ -6245,21 +6252,18 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
   NutritionPlan? _draft;
   bool _loadedOnce = false;
   bool _saving = false;
-  int _idCounter = 0;
 
-  String _newId(String prefix) {
-    _idCounter++;
-    // Sin Date.now() porque en tests / hot reload no queremos ids
-    // dependientes de tiempo real. El id solo tiene que ser único en la
-    // sesión — Firestore acepta cualquier string.
-    return '$prefix-$_idCounter';
-  }
+  /// Un id que no usa ningún ítem del borrador. Antes era un contador que
+  /// arrancaba en 0 en cada sesión: sobre un plan con `meal-1` guardado, la
+  /// comida nueva salía con el mismo id y editarla editaba también la otra.
+  String _newId(String prefix) => _draft!.nextFreeId(prefix);
 
   void _seedIfNeeded(NutritionPlan? persisted, String trainerUid) {
     if (_loadedOnce) return;
     _loadedOnce = true;
     if (persisted != null) {
-      _draft = persisted;
+      // Un plan guardado con el contador viejo puede traer ids repetidos.
+      _draft = persisted.withUniqueIds();
     } else {
       _draft = NutritionPlan(
         id: '${trainerUid}_${widget.athleteId}',
@@ -6279,7 +6283,6 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     if (oldWidget.athleteId != widget.athleteId) {
       _draft = null;
       _loadedOnce = false;
-      _idCounter = 0;
     }
   }
 
@@ -6365,19 +6368,36 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
     if (trainerUid == null) return const SizedBox.shrink();
-    final planAsync = ref.watch(
-      nutritionPlanProvider(
-        (trainerId: trainerUid, athleteId: widget.athleteId),
-      ),
+    final provider = nutritionPlanProvider(
+      (trainerId: trainerUid, athleteId: widget.athleteId),
     );
+    final planAsync = ref.watch(provider);
 
     if (planAsync.hasValue) {
       _seedIfNeeded(planAsync.requireValue, trainerUid);
-    } else if (planAsync.hasError && !_loadedOnce) {
-      // Error al leer — dejamos que el PF arme el plan igual (arranca desde
-      // presets). El save intentará persistir; si sigue fallando el error
-      // se muestra en el snackbar.
-      _seedIfNeeded(null, trainerUid);
+    }
+
+    if (_draft == null && planAsync.hasError) {
+      // NO arrancamos de los presets: guardar ese borrador pisaría el plan
+      // real que no se pudo leer. Antes lo hacía (#1553).
+      return TreinoStateSwitcher(
+        childKey: const ValueKey('error'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _muted(
+              palette,
+              'No pudimos cargar el plan nutricional.', // i18n: Fase W2
+            ),
+            TreinoButton(
+              label: 'Reintentar', // i18n: Fase W2
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
+              onPressed: () => ref.invalidate(provider),
+            ),
+          ],
+        ),
+      );
     }
 
     if (_draft == null) {
@@ -6410,7 +6430,9 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Armá el plan por comidas, grupos y opciones. Solo vos lo ves.', // i18n: Fase W2
+                        // Decía «Solo vos lo ves»: falso desde que el
+                        // alumno lo ve en mobile (#1553, AGENTS.md §11.1).
+                        'Armá el plan por comidas, grupos y opciones. Tu alumno lo ve en su app.', // i18n: Fase W2
                         style:
                             TextStyle(color: palette.textMuted, fontSize: 13),
                       ),
@@ -6458,8 +6480,14 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                       onChanged: _updateTitle,
                     ),
                     const SizedBox(height: 16),
+                    // La `Key` por id mantiene cada campo pegado a SU comida:
+                    // sin ella, al borrar la primera Flutter reusaba por
+                    // posición el estado del `TextFormField` (que lee
+                    // `initialValue` sólo al montar) y la card de arriba
+                    // mostraba el nombre de la borrada (#1553).
                     for (final meal in _draft!.meals)
                       Padding(
+                        key: ValueKey(meal.id),
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _MealEditor(
                           meal: meal,
@@ -6616,6 +6644,7 @@ class _MealEditor extends StatelessWidget {
           children: [
             for (final group in meal.groups)
               Padding(
+                key: ValueKey(group.id),
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _GroupEditor(
                   group: group,
@@ -6732,6 +6761,7 @@ class _GroupEditor extends StatelessWidget {
           const SizedBox(height: 6),
           for (final option in group.options)
             Padding(
+              key: ValueKey(option.id),
               padding: const EdgeInsets.only(top: 4),
               child: _OptionRow(
                 option: option,

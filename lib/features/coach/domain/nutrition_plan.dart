@@ -81,8 +81,9 @@ class Meal with _$Meal {
 /// overwrites the previous version. No history in the MVP.
 ///
 /// Stored in Firestore at `nutrition_plans/{trainerId}_{athleteId}`.
-/// Trainer-only in rules — the athlete does NOT see this in mobile yet;
-/// exposing to the athlete is scoped for a future feature.
+/// Only the PF writes it; the PF and the athlete of the pair can read it
+/// (see `firestore.rules`). The athlete sees it in mobile, under MI PLAN
+/// NUTRICIONAL (`AthleteNutritionPlanScreen`).
 @freezed
 class NutritionPlan with _$NutritionPlan {
   const factory NutritionPlan({
