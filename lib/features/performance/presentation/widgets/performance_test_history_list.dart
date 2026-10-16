@@ -16,6 +16,10 @@ import '../../domain/performance_test.dart';
 /// scrollea y no puede ser un builder perezoso propio.
 const int _kCollapsedCount = 5;
 
+/// Alto de la lista expandida: unas seis filas. Acotado para que el
+/// `ListView.builder` pueda ser perezoso dentro de la pantalla que scrollea.
+const double _kExpandedHeight = 360;
+
 String _formatRowDate(DateTime dt, String localeName) {
   // recordedAt es un instante real (UTC): localizar antes de formatear o la
   // fecha corre +3h y salta de día cerca de medianoche (#392).
@@ -129,6 +133,12 @@ class _PerformanceTestHistoryListState
       ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
     final visible = _showAll ? sorted : sorted.take(_kCollapsedCount).toList();
     final hiddenCount = sorted.length - visible.length;
+    Widget row(PerformanceTest t) => _HistoryRow(
+          test: t,
+          editable: t.recordedBy == widget.currentUid,
+          onEdit: () => widget.onEdit(t),
+          onDelete: () => _confirmDelete(t),
+        );
 
     return Container(
       width: double.infinity,
@@ -140,15 +150,26 @@ class _PerformanceTestHistoryListState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < visible.length; i++) ...[
-            if (i > 0) Divider(color: palette.border, height: 1, thickness: 1),
-            _HistoryRow(
-              test: visible[i],
-              editable: visible[i].recordedBy == widget.currentUid,
-              onEdit: () => widget.onEdit(visible[i]),
-              onDelete: () => _confirmDelete(visible[i]),
-            ),
-          ],
+          if (_showAll)
+            // Expandida, la lista puede ser de años: `ListView.builder` con
+            // alto acotado construye sólo las filas visibles (AGENTS §6). Va
+            // adentro de una pantalla que ya scrollea, por eso el alto fijo.
+            SizedBox(
+              height: _kExpandedHeight,
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                itemCount: sorted.length,
+                separatorBuilder: (_, __) =>
+                    Divider(color: palette.border, height: 1, thickness: 1),
+                itemBuilder: (_, i) => row(sorted[i]),
+              ),
+            )
+          else
+            for (var i = 0; i < visible.length; i++) ...[
+              if (i > 0)
+                Divider(color: palette.border, height: 1, thickness: 1),
+              row(visible[i]),
+            ],
           if (hiddenCount > 0 || _showAll)
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
