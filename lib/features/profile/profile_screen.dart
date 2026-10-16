@@ -497,7 +497,11 @@ class _StatTile extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               label,
-              style: theme.textTheme.labelSmall?.copyWith(
+              // #1516: label condensado 700 como el resto de los labels del
+              // sistema; `labelSmall` del tema es Barlow regular espaciada.
+              style: GoogleFonts.barlowCondensed(
+                textStyle: theme.textTheme.labelSmall,
+                fontWeight: FontWeight.w700,
                 color: palette.textMuted,
                 letterSpacing: 1.2,
               ),
