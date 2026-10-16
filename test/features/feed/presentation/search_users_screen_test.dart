@@ -111,6 +111,51 @@ void main() {
 
       expect(find.text('BUSCAR USUARIOS'), findsOneWidget);
     });
+
+    // #1478: la única razón para entrar acá es escribir.
+    testWidgets('el campo toma foco al abrir la pantalla', (tester) async {
+      await tester.pumpWidget(_wrapWithRouter(
+        overrides: [
+          userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
+        ],
+      ));
+      await tester.pump();
+
+      final editable = tester.widget<EditableText>(find.byType(EditableText));
+      expect(editable.focusNode.hasFocus, isTrue);
+    });
+
+    // #1479: mismo AppBar que Notificaciones y Mensajes. En iOS el AppBar
+    // centra el título; el Row armado a mano lo dejaba pegado a la flecha.
+    testWidgets(
+      'el título y la flecha viven en el AppBar, con el título centrado en iOS',
+      (tester) async {
+        await tester.pumpWidget(_wrapWithRouter(
+          overrides: [
+            userPublicProfileRepositoryProvider.overrideWithValue(mockRepo),
+          ],
+        ));
+        await tester.pump();
+
+        final appBar = find.byType(AppBar);
+        expect(
+          find.descendant(of: appBar, matching: find.text('BUSCAR USUARIOS')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: appBar, matching: find.byIcon(TreinoIcon.back)),
+          findsOneWidget,
+        );
+
+        final screenWidth =
+            tester.getSize(find.byType(SearchUsersScreen)).width;
+        expect(
+          tester.getCenter(find.text('BUSCAR USUARIOS')).dx,
+          moreOrLessEquals(screenWidth / 2, epsilon: 1),
+        );
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
   });
 
   // ---------------------------------------------------------------------------
