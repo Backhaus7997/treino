@@ -120,7 +120,10 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
   @override
   Widget build(BuildContext context) {
     final t = TreinoSegmentedPillTokens.of(context);
+    // #1514: Barlow Condensed como el resto de los labels del kit; el
+    // `labelLarge` del tema es Barlow regular («TU ENTRENO» salía ancho).
     final labelStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontFamily: TreinoSegmentedPillTokens.labelFamily,
           fontWeight: TreinoSegmentedPillTokens.labelWeight,
           letterSpacing: TreinoSegmentedPillTokens.labelTracking,
         );

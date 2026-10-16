@@ -15,9 +15,14 @@ class AuthFailureBanner extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      // #1505: era `errorContainer` de Material — rojo saturado, 3,6:1 con
+      // el texto en los dos temas. Ahora el rojo es un TINTE con borde (el
+      // patrón de los errores inline) y el texto va en `textPrimary`, que
+      // sobre el tinte pasa AA de sobra.
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer,
+        color: palette.danger.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: palette.danger.withValues(alpha: 0.5)),
       ),
       child: Text(
         failure.userMessage,
