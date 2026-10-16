@@ -432,9 +432,9 @@ class _PostTextField extends StatelessWidget {
           fontSize: 16,
           color: palette.textMuted,
         ),
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
+        // #1473: sin bordes propios. El tema fuerza `filled`, y con
+        // `InputBorder.none` el relleno quedaba como una banda de esquinas
+        // rectas; el borde del tema lo redondea como el resto de los inputs.
       ),
     );
   }

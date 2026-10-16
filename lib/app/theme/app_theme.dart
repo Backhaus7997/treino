@@ -129,6 +129,33 @@ class AppTheme {
             ),
           ),
         ),
+        // #1513: sin estos dos, `FilledButton` y `OutlinedButton` caían al
+        // default de Material — Barlow regular fina, y el outlined con texto
+        // `primary` (mint sobre blanco, ~1,6:1) y borde `outline` casi negro.
+        // LISTO/COMPARTIR del resumen y GUARDAR del check-in eran eso. Ahora
+        // hablan el idioma del CTA mobile (`HomeCtaButton`): Barlow Condensed
+        // 700 en mayúscula; el lleno con ink sobre acento (`onPrimary`), el
+        // de borde como `secondaryAccent` del kit: `accentText` + `border`.
+        filledButtonTheme: FilledButtonThemeData(
+          style:
+              ButtonStyle(textStyle: WidgetStatePropertyAll(_labelDeBoton())),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: ButtonStyle(
+            textStyle: WidgetStatePropertyAll(_labelDeBoton()),
+            foregroundColor: _TextoDeAcento(
+              habilitado: palette.accentText,
+              deshabilitado: palette.textPrimary.withValues(alpha: 0.38),
+            ),
+            side: WidgetStatePropertyAll(BorderSide(color: palette.border)),
+          ),
+        ),
+      );
+
+  static TextStyle _labelDeBoton() => GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: AppTextSize.bodyLarge,
+        letterSpacing: 1.0,
       );
 
   // Public factories

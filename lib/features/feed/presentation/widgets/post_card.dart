@@ -264,6 +264,8 @@ class PostCard extends ConsumerWidget {
 
     showModalBottomSheet<void>(
       context: context,
+      // #1471: arriba de la nav bar flotante, como el sheet de Reportar.
+      useRootNavigator: true,
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
