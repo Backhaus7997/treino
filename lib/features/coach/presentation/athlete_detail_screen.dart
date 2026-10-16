@@ -21,6 +21,7 @@ import '../application/athlete_note_providers.dart';
 import '../application/follow_up_entry_providers.dart';
 import '../domain/athlete_note.dart';
 import '../domain/follow_up_entry.dart';
+import 'widgets/trainer_nutrition_plan_section.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show groupThousands;
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
@@ -187,8 +188,13 @@ class _AthleteDetailBody extends ConsumerWidget {
                   plansAsync: plansAsync,
                 ),
 
-                // ── Antropometría section ────────────────────────────────
+                // ── Plan nutricional section (#1538) ─────────────────────
                 const SizedBox(height: 8),
+                TrainerNutritionPlanSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
+
+                // ── Antropometría section ────────────────────────────────
+                const SizedBox(height: 20),
                 _AntropometriaSection(
                     athleteId: athleteId, trainerUid: trainerUid),
 
