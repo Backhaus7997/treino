@@ -25,6 +25,9 @@ const double _kMaxMetricValue = 500;
 
 /// Rejects any character that cannot be part of a decimal metric at entry
 /// time, so the user never types a value that would be silently dropped.
+/// Carril de CANCELAR en el header, y margen del título a cada lado (#1484).
+const double _kHeaderSideLane = 96;
+
 final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
 ];
@@ -489,41 +492,68 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
+                  // CANCELAR tiene un carril propio de [_kHeaderSideLane] a la
+                  // izquierda, y el título se queda con el centro menos ese
+                  // carril de cada lado. Con texto grande cada uno se ACHICA
+                  // dentro de su lugar en vez de pisarse (lo marcó la revisión
+                  // de #1544). Estructural a propósito: no depende de cuánto
+                  // mida la fuente.
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed:
-                          _saving ? null : () => Navigator.of(context).pop(),
-                      child: Text(
-                        l10n.commonCancel.toUpperCase(),
-                        style: GoogleFonts.barlowCondensed(
-                          color: palette.textMuted,
-                          fontSize: AppTextSize.body,
-                          fontWeight: FontWeight.w700,
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(maxWidth: _kHeaderSideLane),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: Text(
+                            l10n.commonCancel.toUpperCase(),
+                            style: GoogleFonts.barlowCondensed(
+                              // Atenuado mientras guarda: deshabilitado tiene
+                              // que verse (también de la revisión de #1544).
+                              color: _saving
+                                  ? palette.textFaint
+                                  : palette.textMuted,
+                              fontSize: AppTextSize.body,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  Column(
-                    children: [
-                      Text(
-                        isEditing
-                            ? l10n.measurementLogTitleEdit
-                            : l10n.measurementLogTitleCreate,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: AppTextSize.title,
-                          color: palette.textPrimary,
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: _kHeaderSideLane,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        children: [
+                          Text(
+                            isEditing
+                                ? l10n.measurementLogTitleEdit
+                                : l10n.measurementLogTitleCreate,
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppTextSize.title,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            _formatDateTimeEs(headerDate, l10n.localeName),
+                            style: GoogleFonts.barlow(
+                              fontSize: AppTextSize.caption,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        _formatDateTimeEs(headerDate, l10n.localeName),
-                        style: GoogleFonts.barlow(
-                          fontSize: AppTextSize.caption,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),
