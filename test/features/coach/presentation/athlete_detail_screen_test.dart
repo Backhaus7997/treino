@@ -245,12 +245,25 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Athlete name in header (appears in AppBar title and in body header)
-      expect(find.text('Martín García'), findsWidgets);
+      // #1482: el nombre va UNA vez, en el header con avatar. Antes también
+      // era el título de la barra, y se leía duplicado.
+      expect(find.text('Martín García'), findsOneWidget);
       // Empty state text
       expect(find.text('Todavía no le asignaste planes.'), findsOneWidget);
       // CREAR PLAN button
       expect(find.text('CREAR PLAN'), findsOneWidget);
+
+      // #1482: sin planes, el texto vacío no queda pegado al título de
+      // ANTROPOMETRÍA: el mismo aire que entre las demás secciones.
+      final vacio =
+          tester.getRect(find.text('Todavía no le asignaste planes.'));
+      final antropometria = tester.getRect(find.text('ANTROPOMETRÍA'));
+      expect(antropometria.top - vacio.bottom, greaterThanOrEqualTo(20));
+
+      // #1482: el contenido no se corta en seco contra los botones fijos: hay
+      // un velo al pie del scroll.
+      expect(
+          find.byKey(const Key('athlete_detail_bottom_fade')), findsOneWidget);
     });
 
     testWidgets(
@@ -563,6 +576,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the session row to expand
+      // El historial queda abajo de todo: scrollear antes de tocar, como el
+      // usuario. Sin esto el tap caía sobre los botones fijos (#1482).
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -595,6 +612,10 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap to expand
+      // El historial queda abajo de todo: scrollear antes de tocar, como el
+      // usuario. Sin esto el tap caía sobre los botones fijos (#1482).
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -625,6 +646,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Plan Test'));
+
+      await tester.pumpAndSettle();
+
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -651,6 +676,10 @@ void main() {
               .overrideWith((ref) async => []),
         ],
       );
+
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Plan Test'));
 
       await tester.pumpAndSettle();
 
@@ -687,6 +716,8 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -721,6 +752,8 @@ void main() {
         ],
       );
 
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
@@ -757,6 +790,8 @@ void main() {
       );
 
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();
 
@@ -792,6 +827,8 @@ void main() {
         ],
       );
 
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Plan Test'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Plan Test'));
       await tester.pumpAndSettle();

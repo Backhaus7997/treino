@@ -92,36 +92,46 @@ class AthleteDetailScreen extends ConsumerWidget {
                 onPressed: () =>
                     context.canPop() ? context.pop() : context.go('/coach'),
               ),
-              const SizedBox(width: 4),
-              profileAsync.maybeWhen(
-                data: (profile) => Text(
-                  profile?.displayName ?? '...',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.textPrimary,
-                  ),
-                ),
-                orElse: () => Text(
-                  '...',
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 20,
-                    color: palette.textPrimary,
-                  ),
-                ),
-              ),
+              // #1482: sin el nombre acá. Ya va en el header con avatar, y
+              // repetido en la barra se leía duplicado.
             ],
           ),
         ),
 
         // ── Body ─────────────────────────────────────────────────────────
         Expanded(
-          child: _AthleteDetailBody(
-            athleteId: athleteId,
-            trainerUid: trainerUid,
-            profileAsync: profileAsync,
-            plansAsync: plansAsync,
+          child: Stack(
+            children: [
+              _AthleteDetailBody(
+                athleteId: athleteId,
+                trainerUid: trainerUid,
+                profileAsync: profileAsync,
+                plansAsync: plansAsync,
+              ),
+              // #1482: velo al pie del scroll para que el contenido no se
+              // corte en seco contra los botones fijos de abajo.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: AppSpacing.s20,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    key: const Key('athlete_detail_bottom_fade'),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          palette.bg.withValues(alpha: 0),
+                          palette.bg,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -190,7 +200,9 @@ class _AthleteDetailBody extends ConsumerWidget {
                 ),
 
                 // ── Antropometría section ────────────────────────────────
-                const SizedBox(height: 8),
+                // 20 como entre las demás secciones (#1482): con 8 el texto de
+                // «sin planes» quedaba pegado al título.
+                const SizedBox(height: 20),
                 _AntropometriaSection(
                     athleteId: athleteId, trainerUid: trainerUid),
 
@@ -414,6 +426,9 @@ class _PlanesSection extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final (i, plan) in myPlans.indexed) ...[
+                    // Separación ENTRE cards; el aire hasta la sección siguiente lo
+                    // pone la columna padre (#1482).
+                    if (i > 0) const SizedBox(height: 12),
                     TreinoFadeSlideIn(
                       delay: AppMotion.stagger(i),
                       child: _PlanCard(
@@ -428,7 +443,6 @@ class _PlanesSection extends ConsumerWidget {
                         onDelete: () => _onDeletePlan(context, ref, plan),
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
                 ],
               );
