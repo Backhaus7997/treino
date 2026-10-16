@@ -7,7 +7,7 @@ import '../application/auth_providers.dart';
 
 /// «Cerrar sesión» del usuario: pregunta antes de salir (#1504).
 ///
-/// Lo usan el perfil del atleta y el del PF. NO es para las salidas de
+/// Lo usa el perfil del atleta. NO es para las salidas de
 /// emergencia de las pantallas de error (verificar mail, perfil no
 /// disponible, edad): ahí salir ES la acción esperada y una pregunta de más
 /// sólo estorba.
