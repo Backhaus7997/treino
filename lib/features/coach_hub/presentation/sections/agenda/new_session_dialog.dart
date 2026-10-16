@@ -24,10 +24,14 @@ import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
+import '../../../../coach/application/session_conflict_check.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
+import '../../../../coach/domain/appointment.dart';
 import '../../../../coach/domain/compute_free_slots.dart' show isDayBlocked;
+import '../../../../coach/domain/session_conflicts.dart';
 import '../../../../coach/domain/trainer_link.dart';
 import '../../../../coach/domain/trainer_link_status.dart';
+import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -187,6 +191,25 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       if (!mounted || !proceed) return;
     }
 
+    // Superposición / fuera de la disponibilidad publicada (#1493): mismo
+    // criterio que el día bloqueado, aviso con "Cargar igual" y no freno. La
+    // detección es la misma función que usa el sheet mobile.
+    final conflicts = await checkSessionConflicts(
+      appointments: ref.read(appointmentRepositoryProvider),
+      availability: ref.read(availabilityRepositoryProvider),
+      trainerId: trainerId,
+      startsAt: startsAt,
+      durationMin: dur,
+    );
+    if (!mounted) return;
+    if (!conflicts.isEmpty) {
+      final proceed = await _confirmWarning(
+        title: 'Revisá el horario', // i18n
+        body: _conflictBody(conflicts),
+      );
+      if (!mounted || !proceed) return;
+    }
+
     setState(() {
       _saving = true;
       _errorMessage = null;
@@ -279,7 +302,43 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
 
   /// Shows the "Día bloqueado" confirm dialog. Returns true if the trainer
   /// chose to proceed anyway (soft warning — always offers a confirm path).
-  Future<bool> _confirmBlockedDay() async {
+  Future<bool> _confirmBlockedDay() => _confirmWarning(
+        title: 'Día bloqueado', // i18n
+        body: 'El ${_formatDate(_date)} está marcado como bloqueado en tus '
+            'horarios. ¿Querés cargar la sesión igual?', // i18n
+      );
+
+  /// Nombre de la sesión con la que se superpone: el del alumno, o "otra
+  /// sesión" si el doc no trae nombre.
+  String _conflictName(Appointment a) {
+    final raw = a.athleteDisplayName.trim();
+    return raw.isEmpty ? 'otra sesión' : raw; // i18n
+  }
+
+  /// Cuerpo del aviso de conflictos: qué pisa, si queda fuera de la
+  /// disponibilidad publicada, y la pregunta.
+  String _conflictBody(SessionConflicts c) {
+    final lines = <String>[
+      for (final a in c.overlapping.take(3))
+        'Se superpone con ${_conflictName(a)} ' // i18n
+            '(${AgendaFormatters.formatTime(a.startsAt)} – '
+            '${AgendaFormatters.formatTime(a.startsAt.add(Duration(minutes: a.durationMin)))}).',
+      if (c.overlapping.length > 3)
+        c.overlapping.length - 3 == 1
+            ? 'Y 1 sesión más.' // i18n
+            : 'Y ${c.overlapping.length - 3} sesiones más.', // i18n
+      if (c.outsideAvailability)
+        'Queda fuera de tu disponibilidad publicada.', // i18n
+    ];
+    return '${lines.join('\n')}\n\n¿Querés agendarla igual?'; // i18n
+  }
+
+  /// Dialog de aviso blando: siempre ofrece "Cargar igual", nunca es un freno.
+  /// Devuelve `true` si el PF eligió seguir.
+  Future<bool> _confirmWarning({
+    required String title,
+    required String body,
+  }) async {
     final palette = AppPalette.of(context);
     final result = await showDialog<bool>(
       context: context,
@@ -288,7 +347,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
-          'Día bloqueado', // i18n
+          title,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 18,
@@ -296,8 +355,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
           ),
         ),
         content: Text(
-          'El ${_formatDate(_date)} está marcado como bloqueado en tus '
-          'horarios. ¿Querés cargar la sesión igual?', // i18n
+          body,
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [

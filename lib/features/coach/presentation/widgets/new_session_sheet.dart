@@ -17,11 +17,16 @@ import '../agenda_formatters.dart';
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../application/agenda_providers.dart';
+import '../../application/session_conflict_check.dart';
 import '../../application/trainer_link_providers.dart';
+import '../../domain/appointment.dart';
 import '../../domain/compute_free_slots.dart'
     show blockedDatesAmong, isDayBlocked;
+import '../../domain/default_session_start.dart';
+import '../../domain/session_conflicts.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
+import '../../domain/wall_clock.dart';
 
 /// Modal bottom-sheet form for the TRAINER to register a new session with an
 /// athlete. Supports single ("Una vez") and recurring ("Se repite") modes.
@@ -55,6 +60,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   // Sin él, un doble tap durante ese chequeo creaba la sesión/serie dos veces.
   bool _submitting = false;
 
+  // Error de validación / de escritura, mostrado DENTRO del sheet (#1490). Un
+  // SnackBar acá no sirve: `ScaffoldMessenger` lo pinta en el Scaffold de
+  // atrás y el sheet (que vive en el overlay del root navigator) lo tapa, así
+  // que el PF tocaba REGISTRAR y no veía nada.
+  String? _error;
+  final _scrollController = ScrollController();
+
   // ── Single-mode fields ────────────────────────────────────────────────────
   late DateTime _date;
 
@@ -65,30 +77,62 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
-    _time = widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0);
+    // La hora default no puede caer en el pasado (#1490): ver
+    // [defaultSessionStart]. Una hora explícita (el "+" del timeline) se
+    // respeta tal cual; si es pasada, el submit lo avisa.
+    final now = nowWall();
+    final day = widget.initialDate ?? now;
+    final start = defaultSessionStart(day: day, nowWall: now);
+    final explicitTime = widget.initialTime;
+    if (explicitTime != null) {
+      _date = widget.initialDate ?? DateTime(day.year, day.month, day.day);
+      _time = explicitTime;
+    } else {
+      _date = DateTime(start.date.year, start.date.month, start.date.day);
+      _time = TimeOfDay(hour: start.hour, minute: start.minute);
+    }
+    _durationController.addListener(_clearError);
   }
 
   @override
   void dispose() {
+    _durationController.removeListener(_clearError);
     _durationController.dispose();
     _noteController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  // ── Inline error ──────────────────────────────────────────────────────────
+
+  /// Muestra [message] arriba del botón de envío, y baja el scroll hasta ahí
+  /// para que se vea aunque el sheet esté a la altura máxima.
+  void _fail(String message) {
+    setState(() => _error = message);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: AppMotion.resolve(context, AppMotion.base),
+        curve: AppMotion.standard,
+      );
+    });
+  }
+
+  /// El error describe el estado anterior del formulario: en cuanto el PF
+  /// cambia algo deja de ser verdad.
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   /// Parses duration from controller and validates 5–480. Returns null and
-  /// shows a SnackBar if invalid.
+  /// shows the inline error if invalid.
   int? _parsedDuration() {
     final val = int.tryParse(_durationController.text.trim());
     if (val == null || val < 5 || val > 480) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).newSessionSheetDurationError),
-        ),
-      );
+      _fail(AppL10n.of(context).newSessionSheetDurationError);
       return null;
     }
     return val;
@@ -127,6 +171,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
             ),
             Flexible(
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -148,7 +193,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                     _ModeToggle(
                       recurring: _recurring,
                       palette: palette,
-                      onChanged: (val) => setState(() => _recurring = val),
+                      onChanged: (val) => setState(() {
+                        _recurring = val;
+                        _error = null;
+                      }),
                     ),
                     const SizedBox(height: 18),
 
@@ -181,8 +229,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                         links: activeLinks,
                         selectedId: _selectedAthleteId,
                         palette: palette,
-                        onChanged: (id) =>
-                            setState(() => _selectedAthleteId = id),
+                        onChanged: (id) => setState(() {
+                          _selectedAthleteId = id;
+                          _error = null;
+                        }),
                       ),
                     const SizedBox(height: 14),
 
@@ -230,6 +280,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                                     selected: _weekdays,
                                     palette: palette,
                                     onToggle: (wd) => setState(() {
+                                      _error = null;
                                       if (_weekdays.contains(wd)) {
                                         _weekdays = {..._weekdays}..remove(wd);
                                       } else {
@@ -248,8 +299,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                                   _WeeksChips(
                                     selected: _weeks,
                                     palette: palette,
-                                    onChanged: (w) =>
-                                        setState(() => _weeks = w),
+                                    onChanged: (w) => setState(() {
+                                      _weeks = w;
+                                      _error = null;
+                                    }),
                                   ),
                                   const SizedBox(height: 14),
                                 ],
@@ -282,6 +335,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                       palette: palette,
                       onChipTap: (val) => setState(() {
                         _durationController.text = val.toString();
+                        _error = null;
                       }),
                     ),
                     const SizedBox(height: 14),
@@ -325,6 +379,12 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // ── Inline error (#1490) ──────────────────────────────────────
+                    if (_error != null) ...[
+                      _InlineError(message: _error!, palette: palette),
+                      const SizedBox(height: 12),
+                    ],
 
                     // ── Submit button ─────────────────────────────────────────────
                     SizedBox(
@@ -387,7 +447,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       lastDate: today.add(const Duration(days: 365)),
     );
     if (picked != null && mounted) {
-      setState(() => _date = picked);
+      setState(() {
+        _date = picked;
+        _error = null;
+      });
     }
   }
 
@@ -398,7 +461,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       helpText: AppL10n.of(context).timePickerHelpText,
     );
     if (picked != null && mounted) {
-      setState(() => _time = picked);
+      setState(() {
+        _time = picked;
+        _error = null;
+      });
     }
   }
 
@@ -470,14 +536,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     required int startHour,
     required int startMinute,
   }) {
-    final now = DateTime.now();
-    final nowWall = DateTime.utc(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute,
-    );
+    final nowWallClock = nowWall();
     final dates = <DateTime>[];
 
     var cursor = DateTime.utc(fromDate.year, fromDate.month, fromDate.day);
@@ -492,7 +551,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
           startHour,
           startMinute,
         );
-        if (startsAt.isAfter(nowWall)) {
+        if (startsAt.isAfter(nowWallClock)) {
           dates.add(cursor);
         }
       }
@@ -585,6 +644,60 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     return result ?? false;
   }
 
+  // ── Conflict warning (#1493) ──────────────────────────────────────────────
+
+  /// Nombre a mostrar de la sesión con la que se superpone: el del alumno, o
+  /// "otra sesión" si el doc trae un uid pelado en vez de un nombre.
+  String _conflictName(Appointment a, AppL10n l10n) {
+    final raw = a.athleteDisplayName.trim();
+    return raw.isEmpty || _looksLikeUid(raw)
+        ? l10n.agendaConflictSomeoneElse
+        : raw;
+  }
+
+  /// Texto del aviso para una sesión suelta: qué pisa, si está fuera de la
+  /// disponibilidad publicada, y la pregunta.
+  String _singleConflictBody(SessionConflicts c) {
+    final l10n = AppL10n.of(context);
+    final lines = <String>[
+      for (final a in c.overlapping.take(3))
+        l10n.agendaConflictOverlapLine(
+          _conflictName(a, l10n),
+          AgendaFormatters.formatTime(a.startsAt),
+          AgendaFormatters.formatTime(
+            a.startsAt.add(Duration(minutes: a.durationMin)),
+          ),
+        ),
+      if (c.overlapping.length > 3)
+        l10n.agendaConflictOverlapMore(c.overlapping.length - 3),
+      if (c.outsideAvailability) l10n.agendaConflictOutsideAvailability,
+    ];
+    return '${lines.join('\n')}\n\n${l10n.agendaConflictQuestion}';
+  }
+
+  /// Texto del aviso para una serie: en cuántas fechas pasa cada cosa.
+  String _seriesConflictBody(SeriesConflicts c) {
+    final l10n = AppL10n.of(context);
+    final lines = <String>[
+      if (c.overlapCount > 0) l10n.agendaConflictSeriesOverlap(c.overlapCount),
+      if (c.outsideCount > 0) l10n.agendaConflictSeriesOutside(c.outsideCount),
+    ];
+    return '${lines.join('\n')}\n\n${l10n.agendaConflictQuestion}';
+  }
+
+  /// Muestra el aviso de conflictos. Aviso, no bloqueo: un PF puede superponer
+  /// a propósito (sesión doble, grupo), así que siempre hay "Cargar igual".
+  /// Devuelve `true` si eligió seguir.
+  Future<bool> _confirmConflicts(String body) {
+    final l10n = AppL10n.of(context);
+    return _showBlockedDayDialog(
+      title: l10n.agendaConflictTitle,
+      body: body,
+      confirmLabel: l10n.agendaBlockedDayConfirm,
+      cancelLabel: l10n.commonCancel,
+    );
+  }
+
   // ── Single submit ─────────────────────────────────────────────────────────
 
   Future<void> _submitSingle() async {
@@ -603,14 +716,11 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitSingleInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      _fail('Elegí un alumno.');
       return;
     }
 
     // Past date+time guard (date picker blocks past dates but not past times today).
-    final now = DateTime.now();
     final startsAt = DateTime.utc(
       _date.year,
       _date.month,
@@ -618,19 +728,8 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       _time.hour,
       _time.minute,
     );
-    final nowWall = DateTime.utc(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute,
-    );
-    if (!startsAt.isAfter(nowWall)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No podés registrar una sesión en el pasado.'),
-        ),
-      );
+    if (!startsAt.isAfter(nowWall())) {
+      _fail('No podés registrar una sesión en el pasado.');
       return;
     }
 
@@ -639,11 +738,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
-      );
+      _fail('Error de autenticación. Intentá de nuevo.');
       return;
     }
 
@@ -655,6 +750,21 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (!mounted) return;
     if (blocked) {
       final proceed = await _confirmBlockedDaySingle(_date);
+      if (!mounted || !proceed) return;
+    }
+
+    // Superposición / fuera de la disponibilidad publicada (#1493): mismo
+    // criterio que el día bloqueado, aviso con "Cargar igual" y no freno.
+    final conflicts = await checkSessionConflicts(
+      appointments: ref.read(appointmentRepositoryProvider),
+      availability: ref.read(availabilityRepositoryProvider),
+      trainerId: trainerId,
+      startsAt: startsAt,
+      durationMin: dur,
+    );
+    if (!mounted) return;
+    if (!conflicts.isEmpty) {
+      final proceed = await _confirmConflicts(_singleConflictBody(conflicts));
       if (!mounted || !proceed) return;
     }
 
@@ -704,11 +814,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la sesión. Probá de nuevo.'),
-        ),
-      );
+      _fail('No pudimos registrar la sesión. Probá de nuevo.');
     }
   }
 
@@ -730,16 +836,12 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitRecurringInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      _fail('Elegí un alumno.');
       return;
     }
 
     if (_weekdays.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí al menos un día.')));
+      _fail('Elegí al menos un día.');
       return;
     }
 
@@ -748,18 +850,14 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
-      );
+      _fail('Error de autenticación. Intentá de nuevo.');
       return;
     }
 
     // Compute the same fromDate/untilDate window createRecurringByTrainer
     // uses, up front (pure sync — no await needed), so the blocked-day check
     // below and the actual creation call agree on the exact same window.
-    final today = DateTime.now();
+    final today = nowWall();
     final fromDate = DateTime(today.year, today.month, today.day);
     final untilDate = fromDate.add(Duration(days: _weeks * 7 - 1));
 
@@ -785,6 +883,24 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     if (!mounted) return;
     if (blockedDates.isNotEmpty) {
       final proceed = await _confirmBlockedDayRecurring(blockedDates.length);
+      if (!mounted || !proceed) return;
+    }
+
+    // Superposición / fuera de la disponibilidad publicada, fecha por fecha
+    // (#1493): un solo aviso con los conteos.
+    final series = await checkSeriesConflicts(
+      appointments: ref.read(appointmentRepositoryProvider),
+      availability: ref.read(availabilityRepositoryProvider),
+      trainerId: trainerId,
+      startsAts: [
+        for (final d in candidateDates)
+          DateTime.utc(d.year, d.month, d.day, _time.hour, _time.minute),
+      ],
+      durationMin: dur,
+    );
+    if (!mounted) return;
+    if (!series.isEmpty) {
+      final proceed = await _confirmConflicts(_seriesConflictBody(series));
       if (!mounted || !proceed) return;
     }
 
@@ -834,13 +950,9 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       if (count == 0) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No se creó ninguna sesión (todas caían en el pasado). '
-              'Revisá los días y la hora.',
-            ),
-          ),
+        _fail(
+          'No se creó ninguna sesión (todas caían en el pasado). '
+          'Revisá los días y la hora.',
         );
         return;
       }
@@ -856,12 +968,43 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la serie. Probá de nuevo.'),
-        ),
-      );
+      _fail('No pudimos registrar la serie. Probá de nuevo.');
     }
+  }
+}
+
+// ── Inline error ──────────────────────────────────────────────────────────────
+
+/// Aviso de error dentro del sheet (#1490). `liveRegion` hace que el lector de
+/// pantalla lo anuncie cuando aparece, que es lo que hacía el SnackBar.
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message, required this.palette});
+
+  final String message;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.warning, size: 16, color: palette.danger),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.barlow(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: palette.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
