@@ -118,6 +118,17 @@ class AppTheme {
         scrollbarTheme: ScrollbarThemeData(
           thumbColor: _ThumbDelScrollbar(palette.textMuted),
         ),
+        // Sin esto `TextButton` pinta su texto con `colorScheme.primary`: mint
+        // sobre blanco en claro (~1,6:1) — el Cancelar/ACEPTAR del time
+        // picker, entre otros (#1494). `accentText` es el acento para TEXTO.
+        textButtonTheme: TextButtonThemeData(
+          style: ButtonStyle(
+            foregroundColor: _TextoDeAcento(
+              habilitado: palette.accentText,
+              deshabilitado: palette.textPrimary.withValues(alpha: 0.38),
+            ),
+          ),
+        ),
       );
 
   // Public factories
@@ -134,7 +145,10 @@ class AppTheme {
       scaffoldBackgroundColor: palette.bg,
       colorScheme: ColorScheme.dark(
         primary: palette.accent,
-        onPrimary: palette.bg,
+        // Ink, no `palette.bg`: lo que Material pinta sobre el acento (texto
+        // de botón, número del picker, chip seleccionado) tiene que leerse en
+        // las DOS paletas. `palette.bg` es blanco en claro → 1,57:1 (#1504).
+        onPrimary: TreinoButtonTokens.ink,
         secondary: palette.highlight,
         onSecondary: palette.textPrimary,
         surface: palette.bgCard,
@@ -157,7 +171,10 @@ class AppTheme {
       scaffoldBackgroundColor: palette.bg,
       colorScheme: ColorScheme.light(
         primary: palette.accent,
-        onPrimary: palette.bg,
+        // Ink, no `palette.bg`: lo que Material pinta sobre el acento (texto
+        // de botón, número del picker, chip seleccionado) tiene que leerse en
+        // las DOS paletas. `palette.bg` es blanco en claro → 1,57:1 (#1504).
+        onPrimary: TreinoButtonTokens.ink,
         secondary: palette.highlight,
         onSecondary: palette.textPrimary,
         surface: palette.bgCard,
@@ -171,6 +188,30 @@ class AppTheme {
     );
     return _conEstadosDeInteraccion(tema, palette);
   }
+}
+
+/// Color del texto de `TextButton`, con igualdad de VALOR — por lo mismo que
+/// [_ThumbDelScrollbar]: una closure de `resolveWith` en el tema lo haría
+/// rebuildear en cada frame.
+@immutable
+class _TextoDeAcento implements WidgetStateProperty<Color> {
+  const _TextoDeAcento({required this.habilitado, required this.deshabilitado});
+
+  final Color habilitado;
+  final Color deshabilitado;
+
+  @override
+  Color resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.disabled) ? deshabilitado : habilitado;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _TextoDeAcento &&
+      other.habilitado == habilitado &&
+      other.deshabilitado == deshabilitado;
+
+  @override
+  int get hashCode => Object.hash(habilitado, deshabilitado);
 }
 
 /// Color del thumb del scrollbar, con igualdad de VALOR.

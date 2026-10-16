@@ -5244,6 +5244,9 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
 
   @override
+  String get timePickerHelpText => 'Select time';
+
+  @override
   String logFieldRange(String min, String max, String unit) {
     return 'Between $min and $max $unit';
   }
