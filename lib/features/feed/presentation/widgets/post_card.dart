@@ -211,7 +211,7 @@ class PostCard extends ConsumerWidget {
             Row(
               children: [
                 Text(
-                  '${formatVolumeKg(post.workoutStats!.volumeKg)} kg',
+                  '${formatVolumeKg(post.workoutStats!.volumeKg, AppL10n.of(context).localeName)} kg',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,

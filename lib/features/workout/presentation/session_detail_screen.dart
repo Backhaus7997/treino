@@ -240,7 +240,8 @@ class _DetailLoaded extends StatelessWidget {
                 StatTile(
                   icon: TreinoIcon.dumbbell,
                   label: l10n.workoutDetailStatVolumeKg,
-                  value: formatVolumeKg(session.totalVolumeKg),
+                  value: formatVolumeKg(
+                      session.totalVolumeKg, AppL10n.of(context).localeName),
                 ),
                 StatTile(
                   icon: TreinoIcon.statPr,

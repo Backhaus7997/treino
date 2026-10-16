@@ -226,7 +226,7 @@ class _HistorialCard extends StatelessWidget {
     final formattedDate = formatSessionDate(session.startedAt.toLocal());
     final useStackedLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final volume = Text(
-      '${formatVolumeKg(session.totalVolumeKg)}'
+      '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)}'
       '${AppL10n.of(context).workoutHistorialCardKgSuffix}',
       style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
     );

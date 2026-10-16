@@ -1,44 +1,64 @@
-import 'k_formatter.dart';
+import 'package:intl/intl.dart';
 
 /// Single source of truth for rendering masses (kg) across the app.
 ///
-/// Two families, two rules:
+/// Three helpers, two audiences:
 ///
-/// * **Weight** — the exact load of a set (player, editor prefill, targets,
-///   plan preview): [formatWeightKg]. Never compacted, no redundant `.0`.
-/// * **Volume** — an aggregate (session summary, historial, session detail,
-///   insights cards): [formatVolumeKg]. Full number below 10 000, floored
-///   one-decimal `k` from 10 000 up.
+/// * **Editable field** (editor prefill, measurement/evaluation forms):
+///   [formatWeightKg]. Locale-free on purpose: no grouping and a `.`
+///   decimal, because the field's parser accepts both separators and a
+///   grouped `5.000` would parse back as 5.
+/// * **Display weight** — the exact load of a set as READ (player, targets,
+///   plan preview, historial): [formatWeightDisplay]. Locale-aware: `12,5`
+///   and `1.234,5` in es (#1481, #1512). Never compacted.
+/// * **Display volume** — an aggregate (session summary, historial, session
+///   detail, insights cards, profile): [formatVolumeKg]. Locale-aware, full
+///   number below 10 000 (`9.600`, #1465), floored one-decimal `k` from
+///   10 000 up (`20,7k`; `66k`, never `66.0k` — #1516).
+///
+/// Before #1465 none of them knew the locale: every screen in Spanish showed
+/// `12.5 kg` and `9600 kg`.
 ///
 /// Neither helper appends the unit: the surface owns it (l10n label, suffix
 /// or its own `Text`) and must keep it visible — compact values exist
 /// precisely so the unit never gets ellipsized away.
 
-/// Formats an exact weight: whole numbers drop the decimal (`20.0` → `'20'`),
-/// fractional values keep theirs (`17.5` → `'17.5'`). Never compacted — a
-/// load must read exactly as lifted. `null` → `''` (empty editor field).
+/// Formats a weight for an EDITABLE field: whole numbers drop the decimal
+/// (`20.0` → `'20'`), fractional values keep theirs (`17.5` → `'17.5'`).
+/// Never grouped, never compacted, never localized — see the header.
+/// `null` → `''` (empty editor field). For text the user READS, use
+/// [formatWeightDisplay].
 String formatWeightKg(double? kg) {
   if (kg == null) return '';
   return kg == kg.truncateToDouble() ? kg.toInt().toString() : kg.toString();
 }
 
+/// Formats an exact weight for DISPLAY in [localeName]: up to two decimals
+/// with the locale's separator, grouped thousands, no redundant `,0`
+/// (`12.5` → `'12,5'`, `1234.5` → `'1.234,5'` in es). Never compacted — a
+/// load must read exactly as lifted.
+String formatWeightDisplay(double kg, String localeName) =>
+    NumberFormat('#,##0.##', localeName).format(kg);
+
 /// Volumes below this render in full; from here up they compact to `k` so
 /// they fit next to their unit in quarter-width stat cards.
 const double _compactVolumeFromKg = 10000;
 
-/// Formats an aggregated volume.
+/// Formats an aggregated volume for DISPLAY in [localeName].
 ///
-/// Below 10 000 the full number is kept — whole values drop the decimal
-/// (`600.0` → `'600'`), fractional values round to one (`1234.5` →
-/// `'1234.5'`). From 10 000 up it compacts via [kFormatMagnitude] — floored
-/// one decimal, because a headline must never inflate (`34 580` → `'34.5k'`)
-/// — dropping a redundant `.0` (`12 000` → `'12k'`).
-String formatVolumeKg(double kg) {
+/// Below 10 000 the full number is kept, grouped, one decimal at most
+/// (`9600` → `'9.600'`, `1234.5` → `'1.234,5'` in es). From 10 000 up it
+/// compacts to thousands with a `k`, FLOORED to one decimal because a
+/// headline must never inflate (`34 580` → `'34,5k'`), dropping a redundant
+/// `,0` (`66 057,5` → `'66k'`, not `'66.0k'`).
+///
+/// `k` and not «mil»: the compact form exists so the value fits next to its
+/// unit in quarter-width cards; « mil» is four characters wider.
+String formatVolumeKg(double kg, String localeName) {
+  final format = NumberFormat('#,##0.#', localeName);
   if (kg >= _compactVolumeFromKg) {
-    final compact = kFormatMagnitude(kg);
-    return compact.endsWith('.0k')
-        ? '${compact.substring(0, compact.length - 3)}k'
-        : compact;
+    final thousands = (kg / 100).floor() / 10;
+    return '${format.format(thousands)}k';
   }
-  return kg % 1 == 0 ? kg.toStringAsFixed(0) : kg.toStringAsFixed(1);
+  return format.format(kg);
 }

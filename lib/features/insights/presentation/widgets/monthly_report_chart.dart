@@ -280,7 +280,7 @@ class _Bars extends StatelessWidget {
           : hours.toStringAsFixed(1);
     }
     if (metric == MonthlyReportMetric.volume && value is double) {
-      return formatVolumeKg(value);
+      return formatVolumeKg(value, localeName);
     }
     return value.toString();
   }

@@ -1139,7 +1139,7 @@ class _SessionStatsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed / $total ejercicios · '
-                  '${formatVolumeKg(state.totalVolumeKg)} kg vol.',
+                  '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,

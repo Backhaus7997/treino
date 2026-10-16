@@ -203,9 +203,11 @@ class _LoadedBody extends StatelessWidget {
               StatTile(
                 icon: TreinoIcon.dumbbell,
                 label: l10n.workoutStatVolumeKg,
-                value: formatVolumeKg(session.totalVolumeKg),
+                value: formatVolumeKg(
+                    session.totalVolumeKg, AppL10n.of(context).localeName),
                 countUpValue: session.totalVolumeKg,
-                countUpFormatter: (v) => formatVolumeKg(v.toDouble()),
+                countUpFormatter: (v) => formatVolumeKg(
+                    v.toDouble(), AppL10n.of(context).localeName),
               ),
               StatTile(
                 icon: TreinoIcon.statSets,
