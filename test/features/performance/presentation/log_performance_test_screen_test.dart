@@ -124,4 +124,39 @@ void main() {
     expect(captured.notes, 'nota original');
     verifyNever(() => repo.add(any()));
   });
+
+  testWidgets(
+      '#1485 edición: el CMJ viejo de 999 muestra su error al abrir y GUARDAR '
+      'queda deshabilitado', (tester) async {
+    final initial = PerformanceTest(
+      id: 't1',
+      athleteId: 'athleteX',
+      recordedBy: 'trainerT',
+      recordedAt: DateTime.utc(2026, 3, 10, 14, 30),
+      cmjCm: 999,
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        performanceTestRepositoryProvider
+            .overrideWithValue(_MockPerformanceTestRepository()),
+        currentUidProvider.overrideWithValue('trainerT'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: LogPerformanceTestScreen(athleteId: 'athleteX', initial: initial),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Más de 0 y hasta 150 cm'), findsOneWidget,
+        reason: 'GUARDAR gris sin decir por qué no sirve (Codex en #1524)');
+    final guardar = tester.widget<ButtonStyleButton>(find.ancestor(
+      of: find.text('GUARDAR CAMBIOS'),
+      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    ));
+    expect(guardar.onPressed, isNull);
+  });
 }
