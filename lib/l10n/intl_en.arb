@@ -2269,7 +2269,6 @@
   "appUpdateOpenError": "We couldn't open the store. Search for TREINO on the App Store or Google Play.",
   "logFieldRange": "Between {min} and {max} {unit}",
   "inputMaxReached": "Maximum {max} {unit}",
-  "logFieldRangeAbove": "Above {min} and up to {max} {unit}",
   "performanceLogTitleEdit": "Edit assessment",
   "performanceLogUpdateCta": "SAVE CHANGES",
   "performanceLogUpdateSuccess": "Assessment updated",

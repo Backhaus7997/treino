@@ -5353,11 +5353,6 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String logFieldRangeAbove(String min, String max, String unit) {
-    return 'Más de $min y hasta $max $unit';
-  }
-
-  @override
   String get performanceLogTitleEdit => 'Editar evaluación';
 
   @override
@@ -10734,11 +10729,6 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String inputMaxReached(String max, String unit) {
     return 'Máximo $max $unit';
-  }
-
-  @override
-  String logFieldRangeAbove(String min, String max, String unit) {
-    return 'Más de $min y hasta $max $unit';
   }
 
   @override

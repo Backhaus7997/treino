@@ -5254,11 +5254,6 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String logFieldRangeAbove(String min, String max, String unit) {
-    return 'Above $min and up to $max $unit';
-  }
-
-  @override
   String get performanceLogTitleEdit => 'Edit assessment';
 
   @override

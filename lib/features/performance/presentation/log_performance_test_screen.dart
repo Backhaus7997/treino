@@ -575,6 +575,7 @@ class _LogPerformanceTestScreenState
                         label: l10n.performanceLogFieldSitAndReach,
                         controller: _sitAndReachCtrl,
                         validator: _validatorFor(_sitAndReachCtrl),
+                        allowNegative: true,
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -714,6 +715,7 @@ Widget _numericField({
   required AppPalette palette,
   String? suffix,
   String? Function(String?)? validator,
+  bool allowNegative = false,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -729,13 +731,20 @@ Widget _numericField({
       const SizedBox(height: 6),
       TextFormField(
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        // `signed` en iOS cambia el teclado numérico por uno con signo menos:
+        // sólo donde el rango admite negativos (sit and reach).
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: true,
+          signed: allowNegative,
+        ),
         // Allow digits and decimal separators (, or .) only; blocks letters and
         // stray symbols at the keyboard level. Multiple separators (e.g.
         // '1.2.3') can still be typed, so the validator is the source of truth
         // and rejects any value double.tryParse can't read.
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          FilteringTextInputFormatter.allow(
+            allowNegative ? RegExp(r'[-0-9.,]') : RegExp(r'[0-9.,]'),
+          ),
         ],
         validator: validator,
         style: GoogleFonts.barlow(
