@@ -64,8 +64,8 @@ class AppL10nEs extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }
@@ -5403,8 +5403,8 @@ class AppL10nEsAr extends AppL10nEs {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }

@@ -24,7 +24,7 @@
       }
     }
   },
-  "homeEstaSemanaStreakUnit": "{count, plural, =1{DAY} other{DAYS}}",
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{WEEK} other{WEEKS}}",
   "@homeEstaSemanaStreakUnit": {
     "placeholders": {
       "count": {

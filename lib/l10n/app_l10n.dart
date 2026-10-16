@@ -188,10 +188,10 @@ abstract class AppL10n {
   /// **'SEM {week} · {month}'**
   String homeEstaSemanaWeekMonth(int week, String month);
 
-  /// No description provided for @homeEstaSemanaStreakUnit.
+  /// Unit label next to the big streak number in the Home 'Esta Semana' card. The streak counts consecutive WEEKS in which the athlete met their routine's day target (computeWeeklyStreak, ADR-WRS-08), not days (#1507).
   ///
   /// In es_AR, this message translates to:
-  /// **'{count, plural, =1{DÍA} other{DÍAS}}'**
+  /// **'{count, plural, =1{SEMANA} other{SEMANAS}}'**
   String homeEstaSemanaStreakUnit(int count);
 
   /// Home 'Esta Semana' card streak subtext shown when the athlete already trained today.
