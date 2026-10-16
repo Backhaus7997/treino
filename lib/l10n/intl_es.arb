@@ -1169,5 +1169,7 @@
   "agendaRuleDeleteTitle": "¿Borrar este horario?",
   "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
   "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
-  "onboardingCustomExerciseNotNow": "AHORA NO"
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "authSignOutConfirmTitle": "¿Cerrar sesión?",
+  "authSignOutConfirmAction": "Salir"
 }

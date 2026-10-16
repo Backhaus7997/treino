@@ -5303,4 +5303,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get onboardingCustomExerciseNotNow => 'NOT NOW';
+
+  @override
+  String get authSignOutConfirmTitle => 'Sign out?';
+
+  @override
+  String get authSignOutConfirmAction => 'Sign out';
 }

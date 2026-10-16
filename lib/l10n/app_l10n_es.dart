@@ -5402,6 +5402,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10799,4 +10805,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }

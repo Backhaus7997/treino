@@ -9114,6 +9114,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'AHORA NO'**
   String get onboardingCustomExerciseNotNow;
+
+  /// Título de la confirmación de Cerrar sesión (#1504).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cerrar sesión?'**
+  String get authSignOutConfirmTitle;
+
+  /// Acción que confirma cerrar sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Salir'**
+  String get authSignOutConfirmAction;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

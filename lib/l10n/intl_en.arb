@@ -2284,5 +2284,7 @@
   "agendaRuleDeleteTitle": "Delete this time slot?",
   "agendaRuleDeleteBody": "Existing bookings are kept.",
   "agendaOverrideDeleteTitle": "Delete this exception?",
-  "onboardingCustomExerciseNotNow": "NOT NOW"
+  "onboardingCustomExerciseNotNow": "NOT NOW",
+  "authSignOutConfirmTitle": "Sign out?",
+  "authSignOutConfirmAction": "Sign out"
 }
