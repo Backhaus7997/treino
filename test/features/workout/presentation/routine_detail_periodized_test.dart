@@ -944,11 +944,14 @@ void main() {
       return tema.extension<AppPalette>()!;
     }
 
+    // El disco es el `Material` con `CircleBorder`; el más cercano al ícono es
+    // el interno del `IconButton`, siempre transparente.
     Color fondoDelBotonAtras(WidgetTester tester) => tester
-        .widget<Material>(find
-            .ancestor(
-                of: find.byTooltip('Volver'), matching: find.byType(Material))
-            .first)
+        .widget<Material>(find.ancestor(
+          of: find.byTooltip('Volver'),
+          matching: find.byWidgetPredicate(
+              (w) => w is Material && w.shape is CircleBorder),
+        ))
         .color!;
 
     testWidgets('sin foto, el botón atrás no lleva el disco gris',
