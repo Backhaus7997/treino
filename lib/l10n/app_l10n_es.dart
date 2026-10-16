@@ -5343,6 +5343,9 @@ class AppL10nEs extends AppL10n {
       'No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.';
 
   @override
+  String get timePickerHelpText => 'Elige una hora';
+
+  @override
   String logFieldRange(String min, String max, String unit) {
     return 'Entre $min y $max $unit';
   }
@@ -10725,6 +10728,9 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get appUpdateOpenError =>
       'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Elegí una hora';
 
   @override
   String logFieldRange(String min, String max, String unit) {

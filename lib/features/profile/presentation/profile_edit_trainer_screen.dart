@@ -905,7 +905,7 @@ class _GymsSection extends ConsumerWidget {
           icon: Icon(TreinoIcon.plus, size: 18, color: palette.accent),
           label: const Text('Agregar gimnasio'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: palette.accent,
+            foregroundColor: palette.accentText,
             side: BorderSide(color: palette.accent),
             minimumSize: const Size.fromHeight(44),
             shape: const StadiumBorder(),
@@ -967,7 +967,7 @@ class _CustomLocationsSection extends StatelessWidget {
           icon: Icon(TreinoIcon.plus, size: 18, color: palette.accent),
           label: const Text('Agregar lugar propio'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: palette.accent,
+            foregroundColor: palette.accentText,
             side: BorderSide(color: palette.accent),
             minimumSize: const Size.fromHeight(44),
             shape: const StadiumBorder(),

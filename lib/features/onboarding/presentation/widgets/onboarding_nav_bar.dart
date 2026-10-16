@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../../app/theme/tokens/primitives.dart';
 
 /// The bottom bar as the onboarding handoff draws it — a still, onboarding-only
 /// rendering.
@@ -130,9 +130,9 @@ class _ActiveTab extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Ink on accent — `onPrimary: palette.bg`. Dark in dark mode, NOT
-            // white, even though it sits on green.
-            Icon(item.iconFill, size: 25, color: palette.bg),
+            // Ink on accent — `TreinoButtonTokens.ink`, near-black in BOTH
+            // themes. `palette.bg` here was white on mint in light (1.57:1).
+            Icon(item.iconFill, size: 25, color: TreinoButtonTokens.ink),
             const SizedBox(height: 2),
             Text(
               item.label,

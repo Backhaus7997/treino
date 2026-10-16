@@ -9007,6 +9007,12 @@ abstract class AppL10n {
   /// **'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.'**
   String get appUpdateOpenError;
 
+  /// Encabezado del selector de hora de Material. Sin esto sale el de Material en tuteo (Selecciona una hora), #1494.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una hora'**
+  String get timePickerHelpText;
+
   /// Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.
   ///
   /// In es_AR, this message translates to:
