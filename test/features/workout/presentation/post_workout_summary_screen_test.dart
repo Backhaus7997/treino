@@ -639,8 +639,9 @@ void main() {
     expect(find.text('EJERCICIOS'), findsOneWidget);
     expect(find.text('Press banca'), findsWidgets);
     expect(find.text('4 sets · 80 kg × 5'), findsOneWidget);
-    // Bodyweight (#368): mejor set solo por reps.
-    expect(find.text('3 sets · 12 reps'), findsOneWidget);
+    // Bodyweight (#368): mejor set por reps, y dice que es peso corporal
+    // (#1513) en vez de dejarlo implícito.
+    expect(find.text('3 sets · 12 reps · peso corporal'), findsOneWidget);
     expect(find.text('PR'), findsOneWidget);
     expect(find.text('1ª VEZ'), findsOneWidget);
     // Destacado: e1 tiene el mayor volumen → una sola estrella.

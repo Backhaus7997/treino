@@ -428,6 +428,9 @@ class _OwnProfileStatsRow extends ConsumerWidget {
                   loading: () => '--',
                   error: (_, __) => '--',
                 ),
+                // #1516: la racha cuenta SEMANAS (computeWeeklyStreak); sin
+                // unidad, «4» se leía como días, que es lo que decía Inicio.
+                unit: statsAsync.hasValue ? 'sem' : null,
                 valueColor: palette.highlight,
                 theme: theme,
                 palette: palette,
@@ -465,10 +468,14 @@ class _StatTile extends StatelessWidget {
     required this.valueColor,
     required this.theme,
     required this.palette,
+    this.unit,
   });
 
   final String label;
   final String value;
+
+  /// Unidad chica a la derecha del número («sem»). Null = sin unidad.
+  final String? unit;
   final Color valueColor;
   final ThemeData theme;
   final AppPalette palette;
@@ -487,12 +494,28 @@ class _StatTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: valueColor,
-                fontWeight: FontWeight.w700,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    color: valueColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (unit != null) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    unit!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 4),
             Text(

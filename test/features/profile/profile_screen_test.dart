@@ -249,6 +249,18 @@ void main() {
     }
   });
 
+  // #1516: la racha cuenta SEMANAS; sin unidad, «4» se leía como días.
+  testWidgets('#1516: RACHA lleva la unidad «sem»', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 1, totalVolumeKg: 1, streak: 4)),
+    ]));
+    await tester.pump();
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('sem'), findsOneWidget);
+  });
+
   // #1504: «Cerrar sesión» cerraba la sesión al primer toque, sin confirmar.
   testWidgets('#1504: cerrar sesión pide confirmación', (tester) async {
     _signOuts = 0;
