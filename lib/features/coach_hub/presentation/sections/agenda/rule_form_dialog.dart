@@ -13,6 +13,7 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
+import '../../../../coach/domain/availability_overlap.dart';
 import '../../../../coach/domain/availability_rule.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
@@ -57,13 +58,29 @@ class _RuleFormDialogState extends ConsumerState<RuleFormDialog> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _dayOfWeek = e?.dayOfWeek ?? DateTime.monday;
-    _startHour = e?.startHour ?? 9;
-    _startMinute = e?.startMinute ?? 0;
-    _endHour = e?.endHour ?? 11;
-    _endMinute = e?.endMinute ?? 0;
+    // Una regla nueva arranca en la primera ventana libre y no en "lunes
+    // 09–11" fijo: con un horario ya cargado, ese default chocaba (#1495).
+    final free = e == null
+        ? suggestFreeRuleWindow(_currentRules())
+        : (
+            dayOfWeek: e.dayOfWeek,
+            startMinutes: e.startHour * 60 + e.startMinute,
+            endMinutes: e.endHour * 60 + e.endMinute,
+          );
+    _dayOfWeek = free.dayOfWeek;
+    _startHour = free.startMinutes ~/ 60;
+    _startMinute = free.startMinutes % 60;
+    _endHour = free.endMinutes ~/ 60;
+    _endMinute = free.endMinutes % 60;
     _slotDurationMin = e?.slotDurationMin ?? 60;
   }
+
+  /// Las reglas ya cargadas, leídas del stream que el panel tiene abierto. Sin
+  /// valor se trata como "sin reglas": fallar abierto es mejor que bloquear el
+  /// alta.
+  List<AvailabilityRule> _currentRules() =>
+      ref.read(availabilityRulesStreamProvider(widget.trainerId)).valueOrNull ??
+      const <AvailabilityRule>[];
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +225,27 @@ class _RuleFormDialogState extends ConsumerState<RuleFormDialog> {
       setState(() {
         _windowError =
             'La ventana debe ser suficiente para al menos un turno de $_slotDurationMin min.'; // i18n
+      });
+      return;
+    }
+
+    // Una franja que pisa a otra publicaría turnos duplicados (#1495): acá es
+    // un bloqueo, no un aviso. Al editar, la regla no choca consigo misma.
+    final clash = findOverlappingRule(
+      rules: _currentRules(),
+      dayOfWeek: _dayOfWeek,
+      startMinutes: startTotalMinutes,
+      endMinutes: endTotalMinutes,
+      ignoreRuleId: widget.existing?.id,
+    );
+    if (clash != null) {
+      final dia = AgendaFormatters.dayOfWeekLabels[clash.dayOfWeek] ??
+          '${clash.dayOfWeek}';
+      final desde = _hhmm(clash.startHour, clash.startMinute);
+      final hasta = _hhmm(clash.endHour, clash.endMinute);
+      setState(() {
+        _windowError =
+            'Ese horario se superpone con otro que ya cargaste: $dia, $desde – $hasta.'; // i18n
       });
       return;
     }
@@ -373,6 +411,9 @@ class _FormLabel extends StatelessWidget {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+String _hhmm(int hour, int minute) =>
+    '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
 String _generateId() {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';

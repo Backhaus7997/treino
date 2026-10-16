@@ -1220,6 +1220,12 @@ abstract class AppL10n {
   /// **'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.'**
   String get agendaRuleInvalidWindow;
 
+  /// Error inline del formulario Agregar/Editar horario cuando la franja se superpone con una regla semanal ya cargada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.'**
+  String agendaRuleOverlap(String day, String start, String end);
+
   /// No description provided for @agendaBookingCancelledByCoach.
   ///
   /// In es_AR, this message translates to:
