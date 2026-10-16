@@ -1250,6 +1250,54 @@ abstract class AppL10n {
   /// **'Cargar igual'**
   String get agendaBlockedDayConfirm;
 
+  /// No description provided for @agendaConflictTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Revisá el horario'**
+  String get agendaConflictTitle;
+
+  /// Línea del aviso de conflicto al agendar una sesión: la sesión nueva se superpone con una ya agendada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se superpone con {name} ({start} – {end}).'**
+  String agendaConflictOverlapLine(String name, String start, String end);
+
+  /// No description provided for @agendaConflictOverlapMore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Y 1 sesión más.} other{Y {count} sesiones más.}}'**
+  String agendaConflictOverlapMore(int count);
+
+  /// No description provided for @agendaConflictSomeoneElse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'otra sesión'**
+  String get agendaConflictSomeoneElse;
+
+  /// No description provided for @agendaConflictOutsideAvailability.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Queda fuera de tu disponibilidad publicada.'**
+  String get agendaConflictOutsideAvailability;
+
+  /// No description provided for @agendaConflictSeriesOverlap.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sesión de la serie se superpone con otra ya agendada.} other{{count} sesiones de la serie se superponen con otras ya agendadas.}}'**
+  String agendaConflictSeriesOverlap(int count);
+
+  /// No description provided for @agendaConflictSeriesOutside.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{1 sesión de la serie queda fuera de tu disponibilidad publicada.} other{{count} sesiones de la serie quedan fuera de tu disponibilidad publicada.}}'**
+  String agendaConflictSeriesOutside(int count);
+
+  /// No description provided for @agendaConflictQuestion.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Querés agendarla igual?'**
+  String get agendaConflictQuestion;
+
   /// No description provided for @agendaSlotFreeLabel.
   ///
   /// In es_AR, this message translates to:

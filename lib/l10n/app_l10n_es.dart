@@ -654,6 +654,59 @@ class AppL10nEs extends AppL10n {
   String get agendaBlockedDayConfirm => 'Cargar igual';
 
   @override
+  String get agendaConflictTitle => 'Revisa el horario';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'Se superpone con $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Y $count sesiones más.',
+      one: 'Y 1 sesión más.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'otra sesión';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'Queda fuera de tu disponibilidad publicada.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie se superponen con otras ya agendadas.',
+      one: '1 sesión de la serie se superpone con otra ya agendada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie quedan fuera de tu disponibilidad publicada.',
+      one: '1 sesión de la serie queda fuera de tu disponibilidad publicada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => '¿Quieres agendarla igualmente?';
+
+  @override
   String get agendaSlotFreeLabel => 'Disponible';
 
   @override
@@ -5991,6 +6044,59 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get agendaBlockedDayConfirm => 'Cargar igual';
+
+  @override
+  String get agendaConflictTitle => 'Revisá el horario';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'Se superpone con $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Y $count sesiones más.',
+      one: 'Y 1 sesión más.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'otra sesión';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'Queda fuera de tu disponibilidad publicada.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie se superponen con otras ya agendadas.',
+      one: '1 sesión de la serie se superpone con otra ya agendada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sesiones de la serie quedan fuera de tu disponibilidad publicada.',
+      one: '1 sesión de la serie queda fuera de tu disponibilidad publicada.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => '¿Querés agendarla igual?';
 
   @override
   String get agendaSlotFreeLabel => 'Disponible';

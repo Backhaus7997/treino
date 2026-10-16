@@ -377,6 +377,49 @@
     }
   },
   "agendaBlockedDayConfirm": "Cargar igual",
+  "agendaConflictTitle": "Revisá el horario",
+  "agendaConflictOverlapLine": "Se superpone con {name} ({start} – {end}).",
+  "@agendaConflictOverlapLine": {
+    "description": "Línea del aviso de conflicto al agendar una sesión: la sesión nueva se superpone con una ya agendada.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaConflictOverlapMore": "{count, plural, =1{Y 1 sesión más.} other{Y {count} sesiones más.}}",
+  "@agendaConflictOverlapMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictSomeoneElse": "otra sesión",
+  "agendaConflictOutsideAvailability": "Queda fuera de tu disponibilidad publicada.",
+  "agendaConflictSeriesOverlap": "{count, plural, =1{1 sesión de la serie se superpone con otra ya agendada.} other{{count} sesiones de la serie se superponen con otras ya agendadas.}}",
+  "@agendaConflictSeriesOverlap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictSeriesOutside": "{count, plural, =1{1 sesión de la serie queda fuera de tu disponibilidad publicada.} other{{count} sesiones de la serie quedan fuera de tu disponibilidad publicada.}}",
+  "@agendaConflictSeriesOutside": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictQuestion": "¿Querés agendarla igual?",
   "agendaSlotFreeLabel": "Disponible",
   "agendaSlotBlockedLabel": "Bloqueado",
   "agendaSlotBookedByLabel": "Reservado por {athleteName}",
