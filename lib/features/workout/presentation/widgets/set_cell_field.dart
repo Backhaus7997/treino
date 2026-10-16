@@ -141,9 +141,8 @@ class _SetCellFieldState extends State<SetCellField> {
         ).copyWith(
           hintStyle: GoogleFonts.barlow(
             fontSize: 13,
-            color: widget.hasError
-                ? palette.danger.withAlpha(180)
-                : palette.textMuted,
+            // Sin alpha: con 180 daba 3,2:1 (medido), abajo de AA.
+            color: widget.hasError ? palette.dangerText : palette.textMuted,
           ),
         ),
         onChanged: (value) {

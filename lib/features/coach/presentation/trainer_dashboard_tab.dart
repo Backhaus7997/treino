@@ -1163,7 +1163,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         _StatColumn(
           value: cancelled,
           label: l10n.dashboardStatCanceladas,
-          color: palette.danger,
+          color: palette.dangerText,
           palette: palette,
         ),
       ],
