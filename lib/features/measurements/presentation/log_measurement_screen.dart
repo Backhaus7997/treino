@@ -212,6 +212,16 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     // prefilled data (otherwise those values would start hidden).
     _hasValue = _hasAnyValue();
     _hasInvalid = _ranges.keys.any(_isMetricInvalid);
+    // Un valor viejo, válido con el tope anterior de 500 y fuera del rango
+    // nuevo (el 150 % de grasa del QA), deja GUARDAR deshabilitado desde el
+    // arranque. `onUserInteraction` no mostraría el error hasta que el PF
+    // tocara ESE campo: validar al primer frame para que diga qué corregir.
+    // Lo marcó Codex en #1524.
+    if (_hasInvalid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.validate();
+      });
+    }
     _circumferencesExpanded = _circumferenceCtrls.any((c) => c.text.isNotEmpty);
   }
 

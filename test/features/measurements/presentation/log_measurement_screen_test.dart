@@ -166,4 +166,35 @@ void main() {
         reason: 'el error se limpia al corregir (no repetir #1500)');
     expect(guardar().onPressed, isNotNull);
   });
+
+  testWidgets(
+      '#1483 edición: un valor viejo fuera de rango muestra su error al abrir, '
+      'sin esperar a que el PF toque el campo', (tester) async {
+    // Lo marcó Codex en #1524: válido con el tope viejo de 500, inválido con
+    // el rango nuevo. GUARDAR arrancaba deshabilitado sin decir por qué.
+    final initial = Measurement(
+      id: 'm1',
+      athleteId: 'athleteX',
+      recordedBy: 'trainerT',
+      recordedAt: DateTime.utc(2026, 3, 10, 14, 30),
+      fatPercentage: 150,
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider
+            .overrideWithValue(_MockMeasurementRepository()),
+        currentUidProvider.overrideWithValue('trainerT'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: LogMeasurementScreen(athleteId: 'athleteX', initial: initial),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entre 2 y 70 %'), findsOneWidget);
+  });
 }
