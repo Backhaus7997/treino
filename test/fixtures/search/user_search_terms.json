@@ -1,0 +1,93 @@
+{
+  "//": "Vectores de la busqueda de usuarios (#1478). Los leen los TRES lugares que pliegan un nombre: la app (Dart, la consulta), la Cloud Function que escribe userPublicProfiles.searchPrefixes (TS) y el backfill (JS). Si cambias el plegado en uno y no en los otros, la app busca 'martin' y el campo guarda otra cosa: este archivo es lo que lo hace fallar en CI. Los casos estan calculados A MANO, no generados con el codigo: generarlos con la implementacion los volveria tautologicos.",
+  "minPrefixLength": 2,
+  "maxPrefixLength": 15,
+  "maxTokens": 6,
+  "cases": [
+    {
+      "input": "Martín López",
+      "tokens": ["martin", "lopez"],
+      "prefixes": ["ma", "mar", "mart", "marti", "martin", "lo", "lop", "lope", "lopez"]
+    },
+    {
+      "input": "MARTÍN",
+      "tokens": ["martin"],
+      "prefixes": ["ma", "mar", "mart", "marti", "martin"]
+    },
+    {
+      "input": "Martín",
+      "tokens": ["martin"],
+      "prefixes": ["ma", "mar", "mart", "marti", "martin"]
+    },
+    {
+      "input": "tincho_33",
+      "tokens": ["tincho", "33"],
+      "prefixes": ["ti", "tin", "tinc", "tinch", "tincho", "33"]
+    },
+    {
+      "input": "  ÁLVARO   Núñez  ",
+      "tokens": ["alvaro", "nunez"],
+      "prefixes": ["al", "alv", "alva", "alvar", "alvaro", "nu", "nun", "nune", "nunez"]
+    },
+    {
+      "input": "José María Güemes",
+      "tokens": ["jose", "maria", "guemes"],
+      "prefixes": ["jo", "jos", "jose", "ma", "mar", "mari", "maria", "gu", "gue", "guem", "gueme", "guemes"]
+    },
+    {
+      "input": "Ñandú",
+      "tokens": ["nandu"],
+      "prefixes": ["na", "nan", "nand", "nandu"]
+    },
+    {
+      "input": "François Ça",
+      "tokens": ["francois", "ca"],
+      "prefixes": ["fr", "fra", "fran", "franc", "franco", "francoi", "francois", "ca"]
+    },
+    {
+      "input": "D'Alessandro",
+      "tokens": ["d", "alessandro"],
+      "prefixes": ["al", "ale", "ales", "aless", "alessa", "alessan", "alessand", "alessandr", "alessandro"]
+    },
+    {
+      "input": "Juan P.",
+      "tokens": ["juan", "p"],
+      "prefixes": ["ju", "jua", "juan"]
+    },
+    {
+      "input": "Ana Anabella ana",
+      "tokens": ["ana", "anabella"],
+      "prefixes": ["an", "ana", "anab", "anabe", "anabel", "anabell", "anabella"]
+    },
+    {
+      "input": "Supercalifragilistico",
+      "tokens": ["supercalifragilistico"],
+      "prefixes": ["su", "sup", "supe", "super", "superc", "superca", "supercal", "supercali", "supercalif", "supercalifr", "supercalifra", "supercalifrag", "supercalifragi", "supercalifragil"]
+    },
+    {
+      "input": "uno dos tres cuatro cinco seis siete",
+      "tokens": ["uno", "dos", "tres", "cuatro", "cinco", "seis", "siete"],
+      "prefixes": ["un", "uno", "do", "dos", "tr", "tre", "tres", "cu", "cua", "cuat", "cuatr", "cuatro", "ci", "cin", "cinc", "cinco", "se", "sei", "seis"]
+    },
+    {
+      "input": "a b c",
+      "tokens": ["a", "b", "c"],
+      "prefixes": []
+    },
+    {
+      "input": "Иван Petrov",
+      "tokens": ["petrov"],
+      "prefixes": ["pe", "pet", "petr", "petro", "petrov"]
+    },
+    {
+      "input": "🔥💪",
+      "tokens": [],
+      "prefixes": []
+    },
+    {
+      "input": "",
+      "tokens": [],
+      "prefixes": []
+    }
+  ]
+}
