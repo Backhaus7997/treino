@@ -43,6 +43,7 @@ import 'package:treino/features/insights/presentation/widgets/daily_heatmap_sect
 import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
+import 'package:treino/features/measurements/domain/measurement_ranges.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
@@ -50,6 +51,7 @@ import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/domain/performance_test.dart';
+import 'package:treino/features/performance/domain/performance_test_ranges.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -73,6 +75,8 @@ import 'package:treino/features/workout/presentation/widgets/feedback_load_error
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/core/utils/metric_range.dart';
+import 'package:treino/core/utils/metric_range_message.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../infrastructure/browser_download.dart';
@@ -4775,16 +4779,19 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Peso',
                                 suffix: 'kg',
                                 controller: _weightC,
+                                range: MeasurementRanges.weightKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: '% grasa',
                                 suffix: '%',
                                 controller: _fatC,
+                                range: MeasurementRanges.fatPercentage,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Masa muscular',
                                 suffix: 'kg',
                                 controller: _muscleC,
+                                range: MeasurementRanges.muscleMassKg,
                                 palette: palette),
                           ],
                         ),
@@ -4800,26 +4807,31 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Hombros',
                                 suffix: 'cm',
                                 controller: _shouldersC,
+                                range: MeasurementRanges.shouldersCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Pecho',
                                 suffix: 'cm',
                                 controller: _chestC,
+                                range: MeasurementRanges.chestCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cintura',
                                 suffix: 'cm',
                                 controller: _waistC,
+                                range: MeasurementRanges.waistCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cadera',
                                 suffix: 'cm',
                                 controller: _hipsC,
+                                range: MeasurementRanges.hipsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Glúteos',
                                 suffix: 'cm',
                                 controller: _glutesC,
+                                range: MeasurementRanges.glutesCm,
                                 palette: palette),
                           ],
                         ),
@@ -4835,31 +4847,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Bíceps izq.',
                                 suffix: 'cm',
                                 controller: _bicepsLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps der.',
                                 suffix: 'cm',
                                 controller: _bicepsRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. izq.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. der.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo izq.',
                                 suffix: 'cm',
                                 controller: _forearmLC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo der.',
                                 suffix: 'cm',
                                 controller: _forearmRC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                           ],
                         ),
@@ -4875,31 +4893,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Muslo sup. izq.',
                                 suffix: 'cm',
                                 controller: _upperThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo sup. der.',
                                 suffix: 'cm',
                                 controller: _upperThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. izq.',
                                 suffix: 'cm',
                                 controller: _midThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. der.',
                                 suffix: 'cm',
                                 controller: _midThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo izq.',
                                 suffix: 'cm',
                                 controller: _calfLC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo der.',
                                 suffix: 'cm',
                                 controller: _calfRC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                           ],
                         ),
@@ -5036,17 +5060,25 @@ class _NuevaMedicionSection extends StatelessWidget {
 }
 
 /// Campo numérico del dialog. Acepta coma o punto como decimal.
+///
+/// Lo comparten los dialogs de medición y de evaluación del Hub, y valida
+/// contra el [range] de SU campo — los mismos `MeasurementRanges` /
+/// `PerformanceTestRanges` que mobile y que `firestore.rules`. Antes era un
+/// 0–500 genérico para todo: aceptaba 150 % de grasa (#1483) y un CMJ de
+/// 200 cm que la regla deniega (lo marcó Codex en #1540).
 class _NuevaMedicionField extends StatelessWidget {
   const _NuevaMedicionField({
     required this.label,
     required this.suffix,
     required this.controller,
+    required this.range,
     required this.palette,
   });
 
   final String label;
   final String suffix;
   final TextEditingController controller;
+  final MetricRange range;
   final AppPalette palette;
 
   @override
@@ -5078,16 +5110,7 @@ class _NuevaMedicionField extends StatelessWidget {
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         ),
-        validator: (v) {
-          final s = v?.trim().replaceAll(',', '.') ?? '';
-          if (s.isEmpty) return null; // opcional
-          final parsed = double.tryParse(s);
-          if (parsed == null) return 'Número inválido'; // i18n: Fase W2
-          if (parsed < 0 || parsed > 500) {
-            return 'Fuera de rango'; // i18n: Fase W2
-          }
-          return null;
-        },
+        validator: (v) => metricRangeError(range, v, AppL10n.of(context)),
       ),
     );
   }
@@ -5571,21 +5594,25 @@ class _NuevoRendimientoDialogState
                                 label: 'CMJ',
                                 suffix: 'cm',
                                 controller: _cmjC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Squat Jump',
                                 suffix: 'cm',
                                 controller: _squatJumpC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Abalakov',
                                 suffix: 'cm',
                                 controller: _abalakovC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Salto largo',
                                 suffix: 'cm',
                                 controller: _broadJumpC,
+                                range: PerformanceTestRanges.broadJumpCm,
                                 palette: palette),
                           ],
                         ),
@@ -5601,21 +5628,25 @@ class _NuevoRendimientoDialogState
                                 label: 'Sprint 10m',
                                 suffix: 's',
                                 controller: _sprint10C,
+                                range: PerformanceTestRanges.sprint10mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 20m',
                                 suffix: 's',
                                 controller: _sprint20C,
+                                range: PerformanceTestRanges.sprint20mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 30m',
                                 suffix: 's',
                                 controller: _sprint30C,
+                                range: PerformanceTestRanges.sprint30mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 40m',
                                 suffix: 's',
                                 controller: _sprint40C,
+                                range: PerformanceTestRanges.sprint40mS,
                                 palette: palette),
                           ],
                         ),
@@ -5631,26 +5662,31 @@ class _NuevoRendimientoDialogState
                                 label: 'Sentadilla',
                                 suffix: 'kg',
                                 controller: _squat1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press banca',
                                 suffix: 'kg',
                                 controller: _bench1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Peso muerto',
                                 suffix: 'kg',
                                 controller: _deadlift1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press militar',
                                 suffix: 'kg',
                                 controller: _overhead1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Dominada',
                                 suffix: 'kg',
                                 controller: _pullUp1rmC,
+                                range: PerformanceTestRanges.pullUpLoadKg,
                                 palette: palette),
                           ],
                         ),
@@ -5666,21 +5702,25 @@ class _NuevoRendimientoDialogState
                                 label: 'VO2 máx',
                                 suffix: 'ml/kg/min',
                                 controller: _vo2maxC,
+                                range: PerformanceTestRanges.vo2maxMlKgMin,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Course Navette',
                                 suffix: 'nivel',
                                 controller: _courseNavetteC,
+                                range: PerformanceTestRanges.courseNavetteLevel,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cooper',
                                 suffix: 'm',
                                 controller: _cooperC,
+                                range: PerformanceTestRanges.cooperMeters,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sit & Reach',
                                 suffix: 'cm',
                                 controller: _sitAndReachC,
+                                range: PerformanceTestRanges.sitAndReachCm,
                                 palette: palette),
                           ],
                         ),
