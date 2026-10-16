@@ -5242,4 +5242,7 @@ class AppL10nEn extends AppL10n {
   @override
   String get appUpdateOpenError =>
       'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Select time';
 }

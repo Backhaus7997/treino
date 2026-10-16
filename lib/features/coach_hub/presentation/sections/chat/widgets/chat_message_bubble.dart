@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
@@ -11,6 +11,10 @@ import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 /// y videos se renderean con [FirebaseStorageVideoPlayer] (pasás [videoUrl]),
 /// mismo widget que mobile. Attachments desconocidos siguen como
 /// [mediaPlaceholderLabel] ("📎 Adjunto") — defensivo.
+/// Opacidad del ink de la metadata (hora, check) en la burbuja propia. El
+/// test de contraste del tema la mide sobre el acento en las dos paletas.
+const double kChatOwnMetaAlpha = 0.7;
+
 class ChatMessageBubble extends StatelessWidget {
   const ChatMessageBubble({
     super.key,
@@ -47,9 +51,12 @@ class ChatMessageBubble extends StatelessWidget {
     // del alumno gris `bgCard` sólido SIN borde. Alto contraste, sin el look
     // "lavado" translúcido anterior.
     final bg = isOwn ? palette.accent : palette.bgCard;
-    final fg = isOwn ? palette.bg : palette.textPrimary;
-    final metaColor =
-        isOwn ? palette.bg.withValues(alpha: 0.7) : palette.textMuted;
+    final fg = isOwn ? TreinoButtonTokens.ink : palette.textPrimary;
+    // Hora y doble check sobre el mint: ink atenuado, no `palette.bg` (que en
+    // claro es blanco: ~1,4:1). Lo marcó Codex en #1520.
+    final metaColor = isOwn
+        ? TreinoButtonTokens.ink.withValues(alpha: kChatOwnMetaAlpha)
+        : palette.textMuted;
     return Align(
       alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import 'onboarding_slide.dart';
 import 'widgets/onboarding_device_preview.dart';
-import '../../../app/theme/tokens/primitives.dart';
 
 /// The welcome tour shell: five slides, each pairing a shrunk-down view of an
 /// app screen with a headline, a line of copy, and a CTA.
@@ -372,10 +372,10 @@ class _PrimaryCta extends StatelessWidget {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          // Ink on accent, per AppTheme's `onPrimary: palette.bg`. In dark mode
-          // that is near-black on green — NOT white. Getting this wrong is the
-          // single most visible theme bug on this screen.
-          foregroundColor: palette.bg,
+          // Ink on accent — `TreinoButtonTokens.ink`, near-black in BOTH
+          // themes. It used to be `palette.bg`, which is white in light:
+          // SIGUIENTE at 1.57:1 (#1506).
+          foregroundColor: TreinoButtonTokens.ink,
           shape: const StadiumBorder(),
           padding: EdgeInsets.zero,
         ),

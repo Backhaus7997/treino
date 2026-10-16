@@ -5341,6 +5341,9 @@ class AppL10nEs extends AppL10n {
   @override
   String get appUpdateOpenError =>
       'No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Elige una hora';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10677,4 +10680,7 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get appUpdateOpenError =>
       'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Elegí una hora';
 }
