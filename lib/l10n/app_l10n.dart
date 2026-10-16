@@ -9013,6 +9013,84 @@ abstract class AppL10n {
   /// **'Elegí una hora'**
   String get timePickerHelpText;
 
+  /// Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entre {min} y {max} {unit}'**
+  String logFieldRange(String min, String max, String unit);
+
+  /// Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo {max} {unit}'**
+  String inputMaxReached(String max, String unit);
+
+  /// Como logFieldRange, pero el mínimo NO es válido (las reglas de performance_tests exigen > 0).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más de {min} y hasta {max} {unit}'**
+  String logFieldRangeAbove(String min, String max, String unit);
+
+  /// Título del form de evaluación en modo edición (#1485).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceLogTitleEdit;
+
+  /// CTA del form de evaluación en modo edición.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get performanceLogUpdateCta;
+
+  /// SnackBar tras editar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación actualizada'**
+  String get performanceLogUpdateSuccess;
+
+  /// Tooltip del lápiz en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceHistoryEditTooltip;
+
+  /// Tooltip del tacho en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar evaluación'**
+  String get performanceHistoryDeleteTooltip;
+
+  /// Fila del historial que cargó otro PF: las reglas sólo dejan editar/borrar al autor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por otro entrenador'**
+  String get performanceHistoryOtherTrainerTag;
+
+  /// Título del diálogo de borrado de una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar evaluación?'**
+  String get performanceDeleteConfirmTitle;
+
+  /// Cuerpo del diálogo de borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.'**
+  String performanceDeleteConfirmBody(String date);
+
+  /// SnackBar tras borrar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación eliminada'**
+  String get performanceDeleteSuccess;
+
+  /// SnackBar si falla el borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la evaluación. Probá de nuevo.'**
+  String get performanceDeleteError;
+
   /// Acción destructiva genérica de showTreinoConfirmDialog (#1496).
   ///
   /// In es_AR, this message translates to:

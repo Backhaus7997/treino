@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../l10n/app_l10n.dart';
+
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/set_limits.dart';
 import 'bounded_number_formatter.dart';
@@ -116,6 +118,14 @@ class _SetCellFieldState extends State<SetCellField> {
           BoundedNumberFormatter(
             max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
             decimal: widget.decimal,
+            // #1510: el tope no se traga la tecla en silencio.
+            onOverMax: () => avisarTopeAlcanzado(
+              context,
+              max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+              unit: widget.decimal
+                  ? 'kg'
+                  : AppL10n.of(context).routineEditorFieldReps,
+            ),
           ),
         ],
         style: GoogleFonts.barlow(

@@ -429,3 +429,36 @@ describe("performance_tests update — QA #508 value validation", () => {
     await assertSucceeds(ref().set(performanceDoc({ squat1rmKg: 185 })));
   });
 });
+
+// #1485 — la UI mobile ahora expone editar/borrar evaluaciones. El update del
+// autor ya está cubierto arriba ("allows a legit value correction"); faltaba
+// el delete, y que OTRO PF no pueda tocar una evaluación ajena: el historial
+// esconde el lápiz y el tacho en esas filas, pero la ley es la regla.
+describe("performance_tests delete y autoría — #1485", () => {
+  const OTHER_TRAINER = "trainer-1485-otro";
+
+  beforeEach(async () => {
+    await seedDoc(COL_PERFORMANCE, DOC, performanceDoc({ cmjCm: 999 }));
+  });
+
+  it("allows the author to delete a mistyped evaluation", async () => {
+    await assertSucceeds(
+      ctxDb(TRAINER).collection(COL_PERFORMANCE).doc(DOC).delete(),
+    );
+  });
+
+  it("DENIES another trainer deleting it", async () => {
+    await assertFails(
+      ctxDb(OTHER_TRAINER).collection(COL_PERFORMANCE).doc(DOC).delete(),
+    );
+  });
+
+  it("DENIES another trainer correcting it", async () => {
+    await assertFails(
+      ctxDb(OTHER_TRAINER)
+        .collection(COL_PERFORMANCE)
+        .doc(DOC)
+        .set(performanceDoc({ cmjCm: 45 })),
+    );
+  });
+});
