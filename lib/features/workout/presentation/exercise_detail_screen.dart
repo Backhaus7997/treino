@@ -361,7 +361,10 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
         const SizedBox(height: 12),
         _StatsCard(
           tiles: [
-            StatTile(label: '1RM', value: _oneRepMaxValue(progression)),
+            StatTile(
+                label: '1RM',
+                value: _oneRepMaxValue(
+                    progression, AppL10n.of(context).localeName)),
             StatTile(
               label: 'SESIONES',
               value: progression == null
@@ -382,21 +385,22 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
 // Personal stats derivations (display-side)
 // ---------------------------------------------------------------------------
 
-/// Formats a kg / kg·reps value the same way the chart and the records list
-/// do: whole numbers drop the decimals, fractional values keep one.
-String _formatStatValue(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+/// Formats a kg value the same way the chart and the records list do: whole
+/// numbers drop the decimals, fractional values keep one — with the locale's
+/// separator («112,5» in es).
+String _formatStatValue(double value, String localeName) =>
+    formatNumberDisplay(value, localeName);
 
 /// 1RM tile: best Epley estimate within the active period, rounded to 0.5kg
 /// at display only (AD2 — same convention as chart/records).
-String? _oneRepMaxValue(ExerciseProgression? progression) {
+String? _oneRepMaxValue(ExerciseProgression? progression, String localeName) {
   final series = progression?.oneRepMaxSeries;
   if (series == null || series.isEmpty) return null;
   var best = series.first.value;
   for (final point in series.skip(1)) {
     if (point.value > best) best = point.value;
   }
-  return '${_formatStatValue(roundToNearestHalfKg(best))} kg';
+  return '${_formatStatValue(roundToNearestHalfKg(best), localeName)} kg';
 }
 
 /// PROGRESO tile criterion: % delta first→last session over the period's 1RM
@@ -569,7 +573,7 @@ class _HistoryRow extends StatelessWidget {
     final isBodyweight = entry.bestWeightKg <= 0;
     final bestSet = isBodyweight
         ? '${entry.bestSetReps} reps'
-        : '${_formatStatValue(entry.bestWeightKg)} kg × ${entry.bestSetReps}';
+        : '${_formatStatValue(entry.bestWeightKg, AppL10n.of(context).localeName)} kg × ${entry.bestSetReps}';
 
     return Row(
       children: [

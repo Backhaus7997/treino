@@ -163,7 +163,11 @@ int plannedRepsForSpec(SetSpec? spec, ExerciseMode mode) {
 ///
 /// [spec] is null for an added-beyond-plan row (AD-4) — returns an empty
 /// string so no prescription hint text renders for a bare row.
-String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
+String repsDisplayText(
+  SetSpec? spec,
+  ExerciseMode mode, {
+  required String localeName,
+}) {
   if (spec == null) return '';
   if (spec.type == SetType.failure) return 'Al fallo';
   if (mode == ExerciseMode.duration) {
@@ -173,9 +177,7 @@ String repsDisplayText(SetSpec? spec, ExerciseMode mode) {
   if (mode == ExerciseMode.distance) {
     final meters = spec.distanceMeters;
     if (meters == null) return '— m';
-    final text = meters == meters.roundToDouble()
-        ? meters.toInt().toString()
-        : meters.toStringAsFixed(1);
+    final text = formatNumberDisplay(meters, localeName);
     return '$text m';
   }
   if (spec.reps != null) return '${spec.reps} reps';
@@ -2535,9 +2537,7 @@ class _DistanceSetRow extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final color = isDone ? palette.textMuted : palette.textPrimary;
-    final text = distanceMeters == distanceMeters.roundToDouble()
-        ? distanceMeters.toInt().toString()
-        : distanceMeters.toStringAsFixed(1);
+    final text = formatNumberDisplay(distanceMeters, l10n.localeName);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -2708,7 +2708,8 @@ class _RepsSetRowState extends State<_RepsSetRow> {
     widget.onCheck?.call(_reps, _weightKg);
   }
 
-  String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode);
+  String get _repsDisplayText => repsDisplayText(widget.spec, widget.mode,
+      localeName: AppL10n.of(context).localeName);
 
   /// Reps label for the always-visible summary row. When the athlete has
   /// touched the reps field (or logged the set) we show the actual [_reps];

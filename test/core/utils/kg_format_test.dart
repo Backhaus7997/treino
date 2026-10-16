@@ -118,4 +118,26 @@ void main() {
       expect(formatVolumeKg(20770, 'en'), '20.7k');
     });
   });
+
+  // Números que no son kg (cm, s, horas, niveles, deltas): mismo criterio que
+  // los helpers sueltos que reemplaza — entero sin decimal, si no uno — pero
+  // con el locale.
+  group('formatNumberDisplay', () {
+    test('es_AR: coma decimal, sin ,0 redundante, miles con punto', () {
+      expect(formatNumberDisplay(80, 'es_AR'), '80');
+      expect(formatNumberDisplay(78.5, 'es_AR'), '78,5');
+      expect(formatNumberDisplay(1.66, 'es_AR'),
+          '1,7'); // 1.65 es 1.6499… en binario
+      expect(formatNumberDisplay(3100, 'es_AR'), '3.100');
+      expect(formatNumberDisplay(-12.5, 'es_AR'), '-12,5');
+    });
+    test('maxDecimals', () {
+      expect(formatNumberDisplay(1.784, 'es_AR', maxDecimals: 2), '1,78');
+      expect(formatNumberDisplay(2.5, 'es_AR', maxDecimals: 0), '3');
+    });
+    test('en', () {
+      expect(formatNumberDisplay(78.5, 'en'), '78.5');
+      expect(formatNumberDisplay(3100, 'en'), '3,100');
+    });
+  });
 }

@@ -926,7 +926,7 @@ void main() {
       expect(find.text('100 kg'), findsOneWidget);
       expect(find.text('55 ml/kg/min'), findsOneWidget);
       // …a one-decimal value keeps its decimal (the helper trims to 1 dp).
-      expect(find.text('2.9 s'), findsOneWidget);
+      expect(find.text('2,9 s'), findsOneWidget);
       // Regression guard: the raw double interpolation ("30.0 cm") is gone.
       expect(find.text('30.0 cm'), findsNothing);
     });
