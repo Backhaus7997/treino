@@ -4852,5 +4852,9 @@
   "appUpdateOpenError": "No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.",
   "@appUpdateTitle": {
     "description": "Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version)."
+  },
+  "timePickerHelpText": "Elegí una hora",
+  "@timePickerHelpText": {
+    "description": "Encabezado del selector de hora de Material. Sin esto sale el de Material en tuteo (Selecciona una hora), #1494."
   }
 }

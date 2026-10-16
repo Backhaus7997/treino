@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
-import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/firebase_storage_video_player.dart';
 
 /// Burbuja de un mensaje individual en el detail pane.
@@ -47,7 +47,7 @@ class ChatMessageBubble extends StatelessWidget {
     // del alumno gris `bgCard` sólido SIN borde. Alto contraste, sin el look
     // "lavado" translúcido anterior.
     final bg = isOwn ? palette.accent : palette.bgCard;
-    final fg = isOwn ? palette.bg : palette.textPrimary;
+    final fg = isOwn ? TreinoButtonTokens.ink : palette.textPrimary;
     final metaColor =
         isOwn ? palette.bg.withValues(alpha: 0.7) : palette.textMuted;
     return Align(

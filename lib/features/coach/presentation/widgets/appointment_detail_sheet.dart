@@ -280,7 +280,7 @@ class _AppointmentDetailSheetState
                                 onPressed: () => _openCobrarForm(ref),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: palette.accent),
-                                  foregroundColor: palette.accent,
+                                  foregroundColor: palette.accentText,
                                   shape: RoundedRectangleBorder(
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.full),

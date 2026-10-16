@@ -9006,6 +9006,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.'**
   String get appUpdateOpenError;
+
+  /// Encabezado del selector de hora de Material. Sin esto sale el de Material en tuteo (Selecciona una hora), #1494.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una hora'**
+  String get timePickerHelpText;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

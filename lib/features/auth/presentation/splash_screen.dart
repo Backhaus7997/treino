@@ -196,7 +196,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                         TextButton(
                           onPressed: _navigate,
                           style: TextButton.styleFrom(
-                            foregroundColor: palette.accent,
+                            foregroundColor: palette.accentText,
                           ),
                           child: Text(l10n.coachRetryLabel),
                         ),

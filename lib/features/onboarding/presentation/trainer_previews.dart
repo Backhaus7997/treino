@@ -11,6 +11,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -18,7 +19,6 @@ import '../../../core/widgets/treino_icon.dart';
 import 'widgets/onboarding_nav_bar.dart';
 import 'widgets/onboarding_pulsing_dot.dart';
 import 'widgets/trainer_preview_kit.dart';
-import '../../../app/theme/tokens/primitives.dart';
 
 // ── 1 — Inicio · resumen del día ────────────────────────────────────────────
 
@@ -593,8 +593,9 @@ class TrainerFeedPreview extends StatelessWidget {
                 color: palette.accent,
                 shape: BoxShape.circle,
               ),
-              // "+" on accent — `palette.bg`.
-              child: Icon(TreinoIcon.plus, size: 16, color: palette.bg),
+              // "+" on accent — ink, invariant in both themes.
+              child: const Icon(TreinoIcon.plus,
+                  size: 16, color: TreinoButtonTokens.ink),
             ),
           ],
         ),
@@ -1010,7 +1011,8 @@ class _SegmentedPill extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                       // Label on accent — `palette.bg`.
-                      color: i == 0 ? palette.bg : palette.textMuted,
+                      color:
+                          i == 0 ? TreinoButtonTokens.ink : palette.textMuted,
                     ),
                   ),
                 ),

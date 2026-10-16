@@ -735,7 +735,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           TextButton(
             onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
-              foregroundColor: palette.accent,
+              foregroundColor: palette.accentText,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             ),
             child: _assigning
