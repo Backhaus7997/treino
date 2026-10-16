@@ -271,16 +271,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('52'), findsOneWidget);
-    expect(find.text('3.2'), findsOneWidget);
+    expect(find.text('3,2'), findsOneWidget); // coma en es (#1512)
     expect(find.text('22'), findsOneWidget);
     // PRS HOY ya es real: con highlights resueltos y sin récords muestra 0.
     expect(find.text('0'), findsOneWidget);
 
-    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
-    expect(find.text('DURACIÓN MIN'), findsOneWidget);
-    expect(find.text('VOLUMEN KG'), findsOneWidget);
-    expect(find.text('DURACIÓN'), findsNothing);
-    expect(find.text('VOLUMEN'), findsNothing);
+    // #1512 revierte #363: la unidad va al lado del número («52 min»), no en
+    // el label («DURACIÓN MIN 52» se leía al revés).
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('min'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
+    expect(find.text('DURACIÓN MIN'), findsNothing);
+    expect(find.text('VOLUMEN KG'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',

@@ -196,13 +196,15 @@ class _LoadedBody extends StatelessWidget {
             tiles: [
               StatTile(
                 icon: TreinoIcon.clock,
-                label: l10n.workoutStatDurationMin,
+                label: l10n.workoutStatDuration,
                 value: session.durationMin.toString(),
+                unit: 'min',
                 countUpValue: session.durationMin,
               ),
               StatTile(
                 icon: TreinoIcon.dumbbell,
-                label: l10n.workoutStatVolumeKg,
+                label: l10n.workoutStatVolume,
+                unit: 'kg',
                 value: formatVolumeKg(
                     session.totalVolumeKg, AppL10n.of(context).localeName),
                 countUpValue: session.totalVolumeKg,
