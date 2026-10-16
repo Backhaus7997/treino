@@ -5260,4 +5260,37 @@ class AppL10nEn extends AppL10n {
   String logFieldRangeAbove(String min, String max, String unit) {
     return 'Above $min and up to $max $unit';
   }
+
+  @override
+  String get performanceLogTitleEdit => 'Edit assessment';
+
+  @override
+  String get performanceLogUpdateCta => 'SAVE CHANGES';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Assessment updated';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Edit assessment';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Delete assessment';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Logged by another trainer';
+
+  @override
+  String get performanceDeleteConfirmTitle => 'Delete assessment?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'The assessment from $date will be deleted. This can\'t be undone.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Assessment deleted';
+
+  @override
+  String get performanceDeleteError =>
+      'We couldn\'t delete the assessment. Try again.';
 }

@@ -9030,6 +9030,66 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Más de {min} y hasta {max} {unit}'**
   String logFieldRangeAbove(String min, String max, String unit);
+
+  /// Título del form de evaluación en modo edición (#1485).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceLogTitleEdit;
+
+  /// CTA del form de evaluación en modo edición.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR CAMBIOS'**
+  String get performanceLogUpdateCta;
+
+  /// SnackBar tras editar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación actualizada'**
+  String get performanceLogUpdateSuccess;
+
+  /// Tooltip del lápiz en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar evaluación'**
+  String get performanceHistoryEditTooltip;
+
+  /// Tooltip del tacho en el historial de evaluaciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar evaluación'**
+  String get performanceHistoryDeleteTooltip;
+
+  /// Fila del historial que cargó otro PF: las reglas sólo dejan editar/borrar al autor.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargada por otro entrenador'**
+  String get performanceHistoryOtherTrainerTag;
+
+  /// Título del diálogo de borrado de una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar evaluación?'**
+  String get performanceDeleteConfirmTitle;
+
+  /// Cuerpo del diálogo de borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.'**
+  String performanceDeleteConfirmBody(String date);
+
+  /// SnackBar tras borrar una evaluación.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Evaluación eliminada'**
+  String get performanceDeleteSuccess;
+
+  /// SnackBar si falla el borrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos eliminar la evaluación. Probá de nuevo.'**
+  String get performanceDeleteError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
