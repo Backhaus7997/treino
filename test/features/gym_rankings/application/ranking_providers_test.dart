@@ -1,11 +1,12 @@
 // Phase 4 RED — SCENARIO-RANK-6
 //
 // Per-dimension ranking query providers wrap
-// UserPublicProfileRepository.leaderboard(gymId, dimension, limit) with a
-// Riverpod FutureProvider.family<List<UserPublicProfile>, String> (family key
+// UserPublicProfileRepository.watchLeaderboard(gymId, dimension, limit) with a
+// Riverpod StreamProvider.family<List<UserPublicProfile>, String> (family key
 // = gymId), one provider per RankingDimension (streak/volume/squat/bench/
 // deadlift). Mirrors the assignedRoutinesProvider pattern (thin provider,
-// query lives in the repository).
+// query lives in the repository). Stream y no Future (#1518): las métricas las
+// escribe una Cloud Function después del opt-in y el board tiene que enterarse.
 //
 // Spec `gym-rankings`:
 //   - Streak/Volume/Main-Lift Leaderboards: gymId + rankingOptIn==true,

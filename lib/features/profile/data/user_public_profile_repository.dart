@@ -189,7 +189,44 @@ class UserPublicProfileRepository {
     required String metricField,
     int limit = 20,
   }) async {
-    if (gymId.isEmpty || gymId == kNoGymId) return const [];
+    final query = _leaderboardQuery(gymId, metricField, limit);
+    if (query == null) return const [];
+
+    final snap = await query.get();
+    return _boardFrom(metricField, snap.docs);
+  }
+
+  /// Versión en vivo de [leaderboard] (#1518): misma query, mismo filtrado y
+  /// mismo decay de racha, pero escuchando los docs en vez de leerlos una vez.
+  ///
+  /// Con la lectura puntual, un atleta que recién activaba los rankings veía su
+  /// volumen en 0 hasta salir y volver a la pantalla: la Cloud Function
+  /// (`rankingAggregateOnOptIn`) escribe las métricas 1-3 s DESPUÉS de que el
+  /// board ya se había leído, y nadie volvía a leerlo. El stream emite de nuevo
+  /// cuando esa escritura llega (y cuando cualquier otro atleta del gym mueve
+  /// su fila), sin que haga falta refrescar a mano.
+  ///
+  /// Misma salvaguarda que [leaderboard]: sin gym real no hay board, y no se
+  /// abre ningún listener.
+  Stream<List<UserPublicProfile>> watchLeaderboard({
+    required String gymId,
+    required String metricField,
+    int limit = 20,
+  }) {
+    final query = _leaderboardQuery(gymId, metricField, limit);
+    if (query == null) return Stream.value(const []);
+
+    return query.snapshots().map((snap) => _boardFrom(metricField, snap.docs));
+  }
+
+  /// La query compartida por [leaderboard] y [watchLeaderboard], o `null` si
+  /// [gymId] no apunta a un gym real (en blanco o [kNoGymId]).
+  Query<Map<String, Object?>>? _leaderboardQuery(
+    String gymId,
+    String metricField,
+    int limit,
+  ) {
+    if (gymId.isEmpty || gymId == kNoGymId) return null;
 
     Query<Map<String, Object?>> query = _col
         .where('gymId', isEqualTo: gymId)
@@ -202,12 +239,18 @@ class UserPublicProfileRepository {
       query = query.where(metricField, isNull: false);
     }
 
-    final snap =
-        await query.orderBy(metricField, descending: true).limit(limit).get();
+    return query.orderBy(metricField, descending: true).limit(limit);
+  }
 
-    if (metricField == 'rachaSemanas') return _decayedStreakBoard(snap.docs);
+  List<UserPublicProfile> _boardFrom(
+    String metricField,
+    List<DocumentSnapshot<Map<String, Object?>>> docs,
+  ) {
+    if (metricField == 'rachaSemanas') return _decayedStreakBoard(docs);
 
-    return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
+    return docs
+        .map((d) => UserPublicProfile.fromJson(d.data() ?? const {}))
+        .toList();
   }
 
   /// #552 — read-time decay for the streak board. La `rachaSemanas` guardada
