@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../../../core/widgets/form_inline_error.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/exercise_feedback_submitter.dart';
@@ -92,6 +93,10 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
   ExerciseFeedbackKind _kind = ExerciseFeedbackKind.comment;
   String? _localPhotoPath;
   bool _submitting = false;
+  // Error DENTRO del sheet: un SnackBar queda tapado por el propio sheet (se
+  // abre en el navigator raíz, por encima del Scaffold de la sesión). Ver
+  // [FormInlineError].
+  String? _error;
 
   @override
   void initState() {
@@ -108,14 +113,13 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
     super.dispose();
   }
 
-  void _onTextChanged() => setState(() {});
+  void _onTextChanged() => setState(() => _error = null);
 
   bool get _hasContent =>
       _textController.text.trim().isNotEmpty || _localPhotoPath != null;
 
   Future<void> _pickPhoto(ImageSource source) async {
     final l10n = AppL10n.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final picker = widget.picker ?? ImagePicker();
     try {
       final file = await picker.pickImage(
@@ -127,12 +131,13 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
         imageQuality: 85,
       );
       if (file == null || !mounted) return;
-      setState(() => _localPhotoPath = file.path);
+      setState(() {
+        _localPhotoPath = file.path;
+        _error = null;
+      });
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.exerciseFeedbackPhotoError)),
-      );
+      setState(() => _error = l10n.exerciseFeedbackPhotoError);
     }
   }
 
@@ -141,7 +146,10 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
     try {
       await ref.read(exerciseFeedbackSubmitterProvider).submit(
             uid: widget.uid,
@@ -162,17 +170,16 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
       // Foto demasiado pesada o formato no soportado — el mensaje del guard
       // client-side es accionable; el permission-denied del server no.
       if (!mounted) return;
-      setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(
-            content: Text(e.message?.toString() ?? l10n.exerciseFeedbackError)),
-      );
+      setState(() {
+        _submitting = false;
+        _error = e.message?.toString() ?? l10n.exerciseFeedbackError;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.exerciseFeedbackError)),
-      );
+      setState(() {
+        _submitting = false;
+        _error = l10n.exerciseFeedbackError;
+      });
     }
   }
 
@@ -325,6 +332,11 @@ class _ExerciseFeedbackSheetState extends ConsumerState<ExerciseFeedbackSheet> {
                 removeLabel: l10n.exerciseFeedbackPhotoRemove,
               ),
             const SizedBox(height: 18),
+
+            if (_error != null) ...[
+              FormInlineError(message: _error!),
+              const SizedBox(height: 12),
+            ],
 
             Row(
               children: [

@@ -168,4 +168,53 @@ void main() {
       expect(field.maxLength, equals(500));
     });
   });
+
+  // El sheet se abre con `useRootNavigator: true`: un SnackBar del Scaffold de
+  // atrás queda TAPADO por el propio sheet. El error de envío va adentro.
+  group('ReviewBottomSheet — falla al enviar', () {
+    testWidgets(
+        'el aviso se ve ADENTRO del sheet, sin SnackBar, y se puede reintentar',
+        (tester) async {
+      final repo = _MockReviewRepository();
+      registerFallbackValue(_makeReview());
+      when(() => repo.upsert(any())).thenThrow(Exception('permission-denied'));
+
+      await tester.pumpWidget(_wrapSheet(mockRepo: repo));
+      await tester.pump();
+      final estrellas = find.descendant(
+        of: find.byType(StarRatingInput),
+        matching: find.byType(GestureDetector),
+      );
+      await tester.tap(estrellas.first);
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'ENVIAR'));
+      await tester.pumpAndSettle();
+
+      const mensaje = 'No pudimos guardar tu reseña. Probá de nuevo.';
+      expect(
+        find.descendant(
+          of: find.byType(ReviewBottomSheet),
+          matching: find.text(mensaje),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text(mensaje).hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      // El sheet sigue y ENVIAR vuelve a estar habilitado.
+      expect(
+        tester
+            .widget<ElevatedButton>(
+              find.widgetWithText(ElevatedButton, 'ENVIAR'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      // Cambiar la puntuación limpia el aviso: ya no describe el estado.
+      await tester.tap(estrellas.last);
+      await tester.pump();
+      expect(find.text(mensaje), findsNothing);
+    });
+  });
 }
