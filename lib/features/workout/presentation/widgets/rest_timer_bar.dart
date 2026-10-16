@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -57,6 +58,30 @@ class _RestTimerBarState extends State<RestTimerBar> {
   void initState() {
     super.initState();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => _onTick());
+    // Lector de pantalla: UN aviso al empezar y otro al terminar. Un
+    // `liveRegion` con la cuenta en el label anunciaría cada segundo — 90
+    // anuncios en un descanso de 1:30.
+    // Post-frame: en initState todavía no se puede leer Directionality.
+    final inicial = _restante;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _anunciar('Descanso de ${_hablado(inicial)}');
+    });
+  }
+
+  void _anunciar(String mensaje) {
+    final dir = Directionality.maybeOf(context) ?? TextDirection.ltr;
+    // ignore: deprecated_member_use
+    SemanticsService.announce(mensaje, dir);
+  }
+
+  static String _hablado(int segundos) {
+    final m = segundos ~/ 60;
+    final s = segundos % 60;
+    final partes = [
+      if (m > 0) '$m ${m == 1 ? 'minuto' : 'minutos'}',
+      if (s > 0 || m == 0) '$s ${s == 1 ? 'segundo' : 'segundos'}',
+    ];
+    return partes.join(' ');
   }
 
   @override
@@ -76,6 +101,7 @@ class _RestTimerBarState extends State<RestTimerBar> {
     if (_restante <= 0) {
       _tick?.cancel();
       HapticFeedback.vibrate();
+      _anunciar('Terminó el descanso');
       widget.onDone();
       return;
     }
@@ -92,9 +118,10 @@ class _RestTimerBarState extends State<RestTimerBar> {
         ? 0.0
         : (restante / widget.totalSeconds).clamp(0.0, 1.0);
 
+    // Label FIJO: la cuenta la anuncian [_anunciar] al empezar y al terminar.
     return Semantics(
-      liveRegion: true,
-      label: 'Descanso: $mm minutos $ss segundos',
+      container: true,
+      label: 'Descanso',
       child: Container(
         key: const Key('rest_timer_bar'),
         margin: const EdgeInsets.fromLTRB(
