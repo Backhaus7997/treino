@@ -1152,5 +1152,9 @@
   "appUpdateBody": "Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.",
   "appUpdateCta": "ACTUALIZAR",
   "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.",
-  "timePickerHelpText": "Elige una hora"
+  "timePickerHelpText": "Elige una hora",
+  "commonDelete": "Eliminar",
+  "agendaRuleDeleteTitle": "¿Borrar este horario?",
+  "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?"
 }

@@ -5245,4 +5245,16 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Select time';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get agendaRuleDeleteTitle => 'Delete this time slot?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Existing bookings are kept.';
+
+  @override
+  String get agendaOverrideDeleteTitle => 'Delete this exception?';
 }

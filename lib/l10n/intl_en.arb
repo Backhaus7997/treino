@@ -2267,5 +2267,9 @@
   "appUpdateBody": "This version of TREINO is no longer supported and could lose data from your routines. Update it to keep training.",
   "appUpdateCta": "UPDATE",
   "appUpdateOpenError": "We couldn't open the store. Search for TREINO on the App Store or Google Play.",
-  "timePickerHelpText": "Select time"
+  "timePickerHelpText": "Select time",
+  "commonDelete": "Delete",
+  "agendaRuleDeleteTitle": "Delete this time slot?",
+  "agendaRuleDeleteBody": "Existing bookings are kept.",
+  "agendaOverrideDeleteTitle": "Delete this exception?"
 }

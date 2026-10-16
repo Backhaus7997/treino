@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -311,25 +312,16 @@ class PostCard extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.postCardDeleteConfirmTitle),
-        content: Text(l10n.postCardDeleteConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(l10n.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.postCardMenuDelete),
-          ),
-        ],
-      ),
+    // #1474: era un AlertDialog pelado con Cancelar/Eliminar en mint sobre
+    // blanco y la acción destructiva sin rojo.
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.postCardDeleteConfirmTitle,
+      body: l10n.postCardDeleteConfirmBody,
+      confirmLabel: l10n.postCardMenuDelete,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await ref.read(postActionsProvider).deletePost(post);

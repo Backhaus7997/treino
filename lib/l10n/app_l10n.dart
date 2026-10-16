@@ -9012,6 +9012,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Elegí una hora'**
   String get timePickerHelpText;
+
+  /// Acción destructiva genérica de showTreinoConfirmDialog (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get commonDelete;
+
+  /// Título de la confirmación de borrado de una franja (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Borrar este horario?'**
+  String get agendaRuleDeleteTitle;
+
+  /// Cuerpo de la confirmación de borrado de una franja.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las reservas existentes se mantienen.'**
+  String get agendaRuleDeleteBody;
+
+  /// Título de la confirmación de borrado de una excepción de agenda.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar esta excepción?'**
+  String get agendaOverrideDeleteTitle;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

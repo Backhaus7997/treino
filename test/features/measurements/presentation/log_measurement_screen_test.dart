@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/data/measurement_repository.dart';
@@ -120,5 +121,38 @@ void main() {
     expect(captured.fatPercentage, 15.5);
     expect(captured.notes, 'nota original');
     verifyNever(() => repo.add(any()));
+  });
+
+  // #1484: el header iba con el título a la derecha y «Cancelar» en MAGENTA.
+  // Se alinea al de Nuevo post: CANCELAR neutro a la izquierda, título al
+  // centro.
+  testWidgets('#1484: header con CANCELAR neutro y título centrado',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider
+            .overrideWithValue(_MockMeasurementRepository()),
+        currentUidProvider.overrideWithValue('athleteX'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const LogMeasurementScreen.selfLog(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final cancelar = find.text('CANCELAR');
+    expect(cancelar, findsOneWidget);
+    expect(tester.widget<Text>(cancelar).style!.color,
+        AppPalette.mintMagentaLight.textMuted);
+
+    final titulo = find.text('Cargar medición');
+    final anchoPantalla =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getCenter(titulo).dx, closeTo(anchoPantalla / 2, 1));
+    expect(tester.getCenter(cancelar).dx, lessThan(anchoPantalla / 4));
   });
 }
