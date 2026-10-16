@@ -7,6 +7,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../../core/widgets/form_inline_error.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -1244,6 +1245,9 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
   late final TextEditingController _priceController;
   late BillingCadence _cadence;
   bool _saving = false;
+  // Error de guardado DENTRO del sheet: un SnackBar queda tapado por el propio
+  // sheet (abierto con `useRootNavigator: true`). Ver [FormInlineError].
+  String? _error;
 
   @override
   void initState() {
@@ -1255,23 +1259,38 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
       text: initialAmount > 0 ? groupThousands('$initialAmount') : '',
     );
     _cadence = widget.existing?.cadence ?? BillingCadence.mensual;
+    _priceController.addListener(_clearError);
   }
 
   @override
   void dispose() {
+    _priceController.removeListener(_clearError);
     _priceController.dispose();
     super.dispose();
+  }
+
+  /// El error describe el estado anterior del formulario: en cuanto el PF
+  /// cambia algo deja de ser verdad.
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   Future<void> _save() async {
     if (_saving) return;
     final amount = parseGroupedInt(_priceController.text);
-    if (amount == null || amount <= 0) return;
+    if (amount == null || amount <= 0) {
+      // Antes volvía sin decir nada: el botón parecía muerto.
+      setState(() => _error = AppL10n.of(context).dashboardMontoInvalido);
+      return;
+    }
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) return;
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       await ref.read(billingRepositoryProvider).setConfig(
             AthleteBilling(
@@ -1286,10 +1305,10 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
       Navigator.of(context).pop();
     } catch (_) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
-      );
+      setState(() {
+        _saving = false;
+        _error = 'No pudimos guardar. Probá de nuevo.';
+      });
     }
   }
 
@@ -1391,7 +1410,10 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
               return ChoiceChip(
                 label: Text(_kCadenceLabels[c] ?? c.name),
                 selected: selected,
-                onSelected: (_) => setState(() => _cadence = c),
+                onSelected: (_) => setState(() {
+                  _cadence = c;
+                  _error = null;
+                }),
                 selectedColor: palette.accent,
                 backgroundColor: palette.bgCard,
                 labelStyle: TextStyle(
@@ -1405,6 +1427,11 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
             }).toList(),
           ),
           const SizedBox(height: 20),
+
+          if (_error != null) ...[
+            FormInlineError(message: _error!),
+            const SizedBox(height: 12),
+          ],
 
           // ── Save button ──────────────────────────────────────────────
           ElevatedButton(

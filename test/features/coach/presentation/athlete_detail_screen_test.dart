@@ -11,6 +11,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
+import 'package:treino/features/payments/application/billing_providers.dart';
+import 'package:treino/features/payments/data/billing_repository.dart';
+import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -43,6 +46,18 @@ import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/measurements/presentation/log_measurement_screen.dart';
 
 class _MockSessionRepository extends Mock implements SessionRepository {}
+
+/// Billing sin config cargada y cuyo guardado siempre falla.
+class _FailingBillingRepository extends Fake implements BillingRepository {
+  @override
+  Stream<AthleteBilling?> watch(String trainerId, String athleteId) =>
+      Stream.value(null);
+
+  @override
+  Future<void> setConfig(AthleteBilling billing) async {
+    throw Exception('permission-denied');
+  }
+}
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -1257,6 +1272,78 @@ void main() {
       final yTerminada = tester.getTopLeft(find.text('Plan Test')).dy;
       expect(yEnCurso, lessThan(yTerminada),
           reason: 'es lo único que está pasando ahora; abajo no se ve');
+    });
+  });
+
+  // ── La config de cobro avisa ADENTRO del sheet ───────────────────────────
+  //
+  // El sheet se abre con `useRootNavigator: true`: un SnackBar del Scaffold de
+  // atrás queda tapado por el propio sheet. Antes el monto vacío ni siquiera
+  // avisaba (el botón volvía sin hacer nada).
+  group('AthleteDetailScreen — config de cobro (sheet)', () {
+    Future<void> abrirConfigDeCobro(
+      WidgetTester tester, {
+      required BillingRepository billing,
+    }) async {
+      final repo = _MockSessionRepository();
+      when(() => repo.listByUid('athlete-1')).thenAnswer((_) async => []);
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => const [],
+          ),
+          sessionRepositoryProvider.overrideWithValue(repo),
+          exercisesProvider.overrideWith((ref) async => const []),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
+          ),
+          billingRepositoryProvider.overrideWithValue(billing),
+        ],
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Configurar'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Configurar'));
+      await tester.pumpAndSettle();
+    }
+
+    Finder enElSheet(Finder f) =>
+        find.descendant(of: find.byType(BottomSheet), matching: f);
+
+    testWidgets('monto vacío: avisa adentro del sheet (antes no decía nada)',
+        (tester) async {
+      await abrirConfigDeCobro(tester, billing: _FailingBillingRepository());
+
+      await tester.tap(enElSheet(find.text('GUARDAR')));
+      await tester.pumpAndSettle();
+
+      expect(enElSheet(find.text('Ingresá un monto válido.')), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('si guardar falla, el aviso va adentro y el sheet sigue',
+        (tester) async {
+      await abrirConfigDeCobro(tester, billing: _FailingBillingRepository());
+
+      await tester.enterText(enElSheet(find.byType(TextField)), '5000');
+      await tester.pump();
+      await tester.tap(enElSheet(find.text('GUARDAR')));
+      await tester.pumpAndSettle();
+
+      final mensaje = find.text('No pudimos guardar. Probá de nuevo.');
+      expect(enElSheet(mensaje), findsOneWidget);
+      expect(mensaje.hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      expect(find.byType(BottomSheet), findsOneWidget);
     });
   });
 }
