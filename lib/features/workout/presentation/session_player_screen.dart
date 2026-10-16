@@ -2862,10 +2862,16 @@ class _WeightField extends StatelessWidget {
       child: TextField(
         controller: controller,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: const [
+        inputFormatters: [
           // QA-WKT-002/003: single separator + hard cap so the field text can
           // never diverge from the value that gets logged, nor exceed 500 kg.
-          BoundedNumberFormatter(max: kMaxWeightKg, decimal: true),
+          // #1510: and the rejected keystroke is announced, not swallowed.
+          BoundedNumberFormatter(
+            max: kMaxWeightKg,
+            decimal: true,
+            onOverMax: () =>
+                avisarTopeAlcanzado(context, max: kMaxWeightKg, unit: 'kg'),
+          ),
         ],
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(

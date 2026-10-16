@@ -9012,6 +9012,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Entre {min} y {max} {unit}'**
   String logFieldRange(String min, String max, String unit);
+
+  /// Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo {max} {unit}'**
+  String inputMaxReached(String max, String unit);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -2267,5 +2267,6 @@
   "appUpdateBody": "This version of TREINO is no longer supported and could lose data from your routines. Update it to keep training.",
   "appUpdateCta": "UPDATE",
   "appUpdateOpenError": "We couldn't open the store. Search for TREINO on the App Store or Google Play.",
-  "logFieldRange": "Between {min} and {max} {unit}"
+  "logFieldRange": "Between {min} and {max} {unit}",
+  "inputMaxReached": "Maximum {max} {unit}"
 }

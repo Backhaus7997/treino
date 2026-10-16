@@ -5247,4 +5247,9 @@ class AppL10nEn extends AppL10n {
   String logFieldRange(String min, String max, String unit) {
     return 'Between $min and $max $unit';
   }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Maximum $max $unit';
+  }
 }
