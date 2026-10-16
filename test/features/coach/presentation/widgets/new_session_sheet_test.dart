@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -146,6 +147,7 @@ Appointment _fakeAppointment({
 /// l10n + theme setup used by marcar_pagado_test.dart and the web dialog test.
 Widget _wrap({
   DateTime? initialDate,
+  TimeOfDay? initialTime,
   required List<Override> overrides,
 }) =>
     ProviderScope(
@@ -156,7 +158,10 @@ Widget _wrap({
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
         home: Scaffold(
-          body: NewSessionSheet(initialDate: initialDate),
+          body: NewSessionSheet(
+            initialDate: initialDate,
+            initialTime: initialTime,
+          ),
         ),
       ),
     );
@@ -896,6 +901,147 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
       // ...so a transient failure never claims the trainer has no athletes.
       expect(find.text('No tenés alumnos activos.'), findsNothing);
+    });
+  });
+
+  // ── #1490: los errores se ven DENTRO del sheet ─────────────────────────────
+  //
+  // En la app el sheet vive en el overlay del root navigator: un SnackBar del
+  // Scaffold de atrás queda tapado y el PF tocaba REGISTRAR sin ver nada. El
+  // test lo fija mirando que el texto sea DESCENDIENTE del sheet (un SnackBar
+  // vive en el Scaffold, no adentro) y que no haya ningún SnackBar.
+  group('Errores inline (#1490)', () {
+    // Jueves 16/10/2026 10:15, hora local del dispositivo.
+    setUp(() => AppClock.freeze(DateTime(2026, 10, 16, 10, 15)));
+    tearDown(AppClock.unfreeze);
+
+    final today = DateTime(2026, 10, 16);
+
+    Finder inSheet(String text) => find.descendant(
+          of: find.byType(NewSessionSheet),
+          matching: find.text(text),
+        );
+
+    Future<void> pumpWithAthlete(
+      WidgetTester tester, {
+      DateTime? initialDate,
+      TimeOfDay? initialTime,
+    }) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        initialDate: initialDate,
+        initialTime: initialTime,
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await _selectAthlete(tester, 'Carlos Pérez');
+    }
+
+    testWidgets(
+        'hora pasada: el aviso aparece adentro del sheet, no como SnackBar',
+        (tester) async {
+      await pumpWithAthlete(
+        tester,
+        initialDate: today,
+        initialTime: const TimeOfDay(hour: 9, minute: 0),
+      );
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(
+        inSheet('No podés registrar una sesión en el pasado.'),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
+      verifyNever(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          startsAt: any(named: 'startsAt'),
+          durationMin: any(named: 'durationMin'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      );
+    });
+
+    testWidgets('el aviso se va en cuanto el PF cambia algo del formulario',
+        (tester) async {
+      await pumpWithAthlete(
+        tester,
+        initialDate: today,
+        initialTime: const TimeOfDay(hour: 9, minute: 0),
+      );
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+      expect(
+        inSheet('No podés registrar una sesión en el pasado.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+
+      expect(
+        inSheet('No podés registrar una sesión en el pasado.'),
+        findsNothing,
+      );
+    });
+
+    testWidgets('sin hora explícita el default NO cae en el pasado: 11:00',
+        (tester) async {
+      // Son las 10:15: el viejo default (9:00) ya pasó.
+      await pumpWithAthlete(tester);
+
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No podés registrar una sesión en el pasado.'),
+          findsNothing);
+      verify(
+        () => mockAppointmentRepo.createByTrainer(
+          trainerId: _kTrainerId,
+          athleteId: _kAthleteId1,
+          athleteDisplayName: 'Carlos Pérez',
+          startsAt: DateTime.utc(2026, 10, 16, 11),
+          durationMin: 60,
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('serie sin días: "Elegí al menos un día." adentro del sheet',
+        (tester) async {
+      await pumpWithAthlete(tester, initialDate: today);
+
+      await tester.tap(find.text('Se repite'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('REGISTRAR SERIE'));
+      await tester.pumpAndSettle();
+
+      expect(inSheet('Elegí al menos un día.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('duración inválida: el error de duración va adentro del sheet',
+        (tester) async {
+      await pumpWithAthlete(tester, initialDate: today);
+
+      await tester.enterText(find.byType(TextField).first, '1');
+      await tester.pump();
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      expect(
+        inSheet('Ingresá una duración válida (5–480 min).'),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
     });
   });
 }
