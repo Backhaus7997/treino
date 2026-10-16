@@ -3559,8 +3559,10 @@ service cloud.firestore {
     // Create: athlete books their own slot, or the trainer registers a session
     //         (status must be 'confirmed').
     // Update: DOS caminos válidos —
-    //   Path 1 (cancelación): un miembro cancela con >24 h de anticipación.
-    //   Path 2 (PF): el PF edita las notas de coaching o linkea un Payment.
+    //   Path 1 (cancelación): el atleta cancela con >24 h de anticipación; el
+    //           PF, sin gate de tiempo (#1492).
+    //   Path 2 (PF): el PF edita las notas de coaching, linkea un Payment o
+    //           marca la asistencia (#1492).
     // Delete: never (audit trail preserved per ADR-1).
     //
     // ⚠️ #831 — acá había un TERCER camino, el flip `cancelled → confirmed` de
@@ -3611,13 +3613,33 @@ service cloud.firestore {
       // cancelarse nunca más. Es el error que #831 y #847 ya pagaron dos veces.
       // El cliente no puede escribir el campo, así que no hay nada que acotar
       // contra el cliente; contra la CF la cota la pone el code review.
+      //
+      // ─── #1492 — `attendance`, la clave 16 ──────────────────────────────────
+      //
+      // La asistencia que marca el PF sobre una sesión que ya pasó: `null` es
+      // "se dio" (el default, que el dashboard ya derivaba de `confirmed` + ya
+      // terminó) y `'absent'` es "el alumno faltó". NO es un `status` nuevo a
+      // propósito: las tres queries de `appointment_repository.dart` y el cobro
+      // exigen `status == 'confirmed'`, así que un estado `no_show` sacaba la
+      // sesión de la agenda de las dos partes y la volvía incobrable.
+      //
+      // Las tres puertas, igual que `reason`:
+      //   · `create`  → `d.get('attendance', null) == null`, acá abajo.
+      //   · `update`  → la ESCRIBE sólo el Path 2 (el PF); el Path 1 la pinea.
+      //   · `delete`  → `if false`.
+      //
+      // ⚠️ `Appointment.toJson()` la OMITE cuando es null
+      // (`includeIfNull: false`). No es estética: es lo que deja que la app
+      // nueva cree turnos contra las reglas VIEJAS, que no tienen la clave en
+      // `hasOnly()`. Las reglas se despliegan aparte del binario y en cualquier
+      // orden; sin eso, el PF se quedaba sin poder agendar hasta el deploy.
       function appointmentShapeOk(d) {
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId', 'reason'])
+                                 'paymentId', 'reason', 'attendance'])
                && d.keys().hasAll(['id', 'trainerId', 'athleteId',
                                    'athleteDisplayName', 'startsAt',
                                    'durationMin', 'status'])
@@ -3757,7 +3779,11 @@ service cloud.firestore {
                // turno nuevo no viene cancelado y no viene cobrado. La cota de
                // 128 que había acá antes era irrelevante — el daño no era el
                // tamaño, era que el valor existiera.
-               && d.get('paymentId', null) == null;
+               && d.get('paymentId', null) == null
+               // #1492 — …ni con la asistencia ya marcada. Una sesión que
+               // todavía no ocurrió no tiene a quién marcar ausente, y el
+               // `== null` fija el tipo de paso (ver `paymentId`, arriba).
+               && d.get('attendance', null) == null;
       }
 
       // Variante para `update`. Misma cota de claves y de texto, PERO sin el
@@ -3795,7 +3821,16 @@ service cloud.firestore {
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId', 'reason'])
+                                 'paymentId', 'reason', 'attendance'])
+               // #1492 — `attendance` vale `null` o `'absent'`, y nada más.
+               // Condicionado a que CAMBIE, como el resto de este bloque: valida
+               // la escritura, no el documento heredado. Hoy no puede haber un
+               // doc con otro valor (el create la exige null y sólo el Path 2
+               // la escribe, acotada acá), pero el día que alguien la siembre
+               // mal por Admin SDK el turno se tiene que poder seguir cerrando.
+               && (d.get('attendance', null) == resource.data.get('attendance', null)
+                   || d.get('attendance', null) == null
+                   || d.get('attendance', null) == 'absent')
                // ⚠️ #831 (quinta pasada) — estos dos chequeos estaban
                // INCONDICIONALES, que es el mismo error que los bloques de
                // `durationMin` y `startsAt` de acá abajo documentan. Corren
@@ -3965,11 +4000,13 @@ service cloud.firestore {
       // recurrencia llegan a ~449. El porqué entero está en
       // `appointmentShapeOk()`, sobre el borde mismo.
       //
-      // Lo que este cambio NO arregla, y conviene tener escrito: un turno
-      // legítimo creado a menos de 24 h tampoco se puede cancelar, porque el
-      // Path 1 de abajo exige >24 h. Eso es un hueco de PRODUCTO preexistente
-      // —el cliente permite reservar más cerca que eso— y apretarlo acá
-      // rompería reservas válidas. Ver §4.9.
+      // Lo que este cambio NO arregló, y conviene tener escrito: un turno
+      // legítimo creado a menos de 24 h tampoco se podía cancelar, porque el
+      // Path 1 de abajo exigía >24 h a los DOS miembros. Era un hueco de
+      // PRODUCTO —el cliente permite reservar más cerca que eso— y apretarlo
+      // acá rompería reservas válidas. Ver §4.9. Desde #1492 el gate es sólo
+      // del atleta: el PF cancela su turno en cualquier momento, así que ese
+      // turno siempre tiene una salida.
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
                     && appointmentShapeOk(request.resource.data)
@@ -4028,7 +4065,9 @@ service cloud.firestore {
       allow update: if request.auth != null
                     && appointmentUpdateShapeOk(request.resource.data)
                     && (
-        // Path 1: cancelación por un miembro con >24 h de anticipación.
+        // Path 1: cancelación por un miembro — el atleta con >24 h de
+        // anticipación, el PF en cualquier momento (#1492, ver el gate al
+        // final del camino).
         //
         // QA-SEC-014 residual (#831) — `cancelledBy` se pinea contra el actor.
         // Antes el camino no lo miraba: cualquiera de los dos miembros podía
@@ -4158,6 +4197,14 @@ service cloud.firestore {
          // imborrable de #781 otra vez, por la puerta que abre el fix.
          && request.resource.data.get('reason', null)
             == resource.data.get('reason', null)
+         // #1492 — la asistencia la escribe el PF por el Path 2, no una
+         // cancelación. Sin el pin, el ATLETA (que también es actor de este
+         // camino) se borraba un «faltó» de paso al cancelar, o se lo ponía a
+         // una sesión que no pasó: el vecino que escribe la misma variable de
+         // #831, de entrada. `.get()` en las dos mitades, como `reason`: el
+         // 99% de los turnos no tiene la clave.
+         && request.resource.data.get('attendance', null)
+            == resource.data.get('attendance', null)
          // ─── #847 — el gate de 24 h no puede ser la puerta que traba el doc ──
          //
          // Este gate lee `resource.data`, o sea el valor VIEJO, y lo leía con
@@ -4189,12 +4236,33 @@ service cloud.firestore {
          // El `.get()` cubre las dos formas del mismo daño —el campo con otro
          // tipo y el campo AUSENTE—, que es el residuo que quedó anotado junto
          // a éste y depende del mismo acceso directo.
-         && (!(resource.data.get('startsAt', null) is timestamp)
+         //
+         // ─── #1492 — el gate es del ATLETA, no del PF ──────────────────────
+         //
+         // Las 24 h protegen la agenda del PF de una baja de último momento
+         // del alumno. Aplicadas al PF lo dejaban sin salida: si se enfermaba
+         // a la mañana, no tenía cómo cancelar la sesión de la tarde, y el
+         // alumno se enteraba yendo al gimnasio. El PF es el dueño de la
+         // agenda —el mismo argumento por el que el Path 2 le deja corregir
+         // `durationMin`—, así que acá no hay gate de tiempo para él.
+         //
+         // Que no pueda cancelar una sesión que ya EMPEZÓ lo pone el cliente,
+         // no esta regla, y no por descuido: `startsAt` es wall-clock UTC
+         // (ADR-7), así que "ya empezó" depende de la zona del PF y la regla no
+         // la conoce. Y no custodia nada: cancelar una sesión propia pasada no
+         // mueve ni el cobro (`paymentId` pineado arriba) ni la firma.
+         //
+         // El disyunto lee `resource.data.trainerId`, el valor GUARDADO, que
+         // de todas formas está pineado más arriba: un atleta no puede
+         // pasar por acá reescribiéndose como PF del turno.
+         && (request.auth.uid == resource.data.trainerId
+             || !(resource.data.get('startsAt', null) is timestamp)
              || resource.data.startsAt.toMillis() - 86400000
                 > request.time.toMillis()))
         ||
         // Path 2: trainer edits coaching notes OR links a Payment on their own
-        // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
+        // appointment (Slice 2a, Agenda→cobro bridge, money-critical) OR marks
+        // attendance (#1492).
         // status / athleteId / trainerId / startsAt stay immutable.
         //
         // ─── #831 (cuarta pasada) — `cancelledBy` acá era el mismo error ────
@@ -4268,6 +4336,18 @@ service cloud.firestore {
          // lección de #831, aplicada de entrada esta vez.
          && request.resource.data.get('reason', null)
             == resource.data.get('reason', null)
+         // #1492 — la asistencia es del PF y es de este camino. El VALOR lo
+         // acota `appointmentUpdateShapeOk()` (`null` o `'absent'`); acá va el
+         // CUÁNDO: sólo sobre un turno que sigue `confirmed`. Un «faltó» sobre
+         // una sesión cancelada no significa nada, y como ninguna query de
+         // `lib/` lee cancelados, nadie lo vería para corregirlo.
+         //
+         // El "sólo después de que empezó" lo pone el cliente, por el mismo
+         // motivo que en el Path 1: `startsAt` es wall-clock y la regla no
+         // conoce la zona del PF.
+         && (request.resource.data.get('attendance', null)
+               == resource.data.get('attendance', null)
+             || resource.data.get('status', null) == 'confirmed')
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)
