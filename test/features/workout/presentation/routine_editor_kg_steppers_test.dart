@@ -298,6 +298,18 @@ Future<void> _cerrarTeclado(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Toca el botón de guardar del pie SIN simular teclado (a diferencia de
+/// [_tapVisible]): desde #1487 el pie se esconde con el teclado abierto, y al
+/// volver ignora los taps durante un resguardo — se espera a que pase.
+Future<void> _guardar(WidgetTester tester, String label) async {
+  await tester.pump(const Duration(milliseconds: 600));
+  final boton = find.widgetWithText(ElevatedButton, label);
+  await tester.ensureVisible(boton);
+  await tester.pumpAndSettle();
+  await tester.tap(boton);
+  await tester.pumpAndSettle();
+}
+
 String _kgText(WidgetTester tester, int index) =>
     tester.widget<TextField>(_kgField(index)).controller!.text;
 
@@ -544,8 +556,7 @@ void main() {
       expect(_kgText(tester, 0), '65');
 
       await _cerrarTeclado(tester);
-      await _tapVisible(
-          tester, find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+      await _guardar(tester, 'GUARDAR CAMBIOS');
 
       expect(captured, isNotNull,
           reason: 'el botón de guardar tiene que estar habilitado: el stepper '
@@ -796,8 +807,7 @@ void main() {
       expect(_kgText(tester, 0), '22.5');
 
       await _cerrarTeclado(tester);
-      await _tapVisible(
-          tester, find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+      await _guardar(tester, 'GUARDAR CAMBIOS');
 
       final slot = captured!.days.first.slots.first;
       expect(slot.repMode, RepMode.range,
