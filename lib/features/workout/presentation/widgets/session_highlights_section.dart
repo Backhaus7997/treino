@@ -410,7 +410,10 @@ class _SessionExerciseRow extends StatelessWidget {
     final bestSet = exercise.bestWeightKg > 0
         ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: AppL10n.of(context).localeName)} kg '
             '× ${exercise.bestSetReps}'
-        : '${exercise.bestSetReps} reps';
+        // #1513: «12 reps» a secas, al lado de filas con kg, se leía como un
+        // peso que faltaba. Dice que es peso corporal (y no «0 kg», que se lee
+        // como un error de carga).
+        : '${exercise.bestSetReps} reps · peso corporal';
     final stats = '${exercise.setCount} sets · $bestSet';
 
     return Column(
