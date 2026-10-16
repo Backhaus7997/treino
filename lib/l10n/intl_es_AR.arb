@@ -1803,6 +1803,10 @@
   "@commonCancel": {
     "description": "Generic accessibility/action label for a Cancel control."
   },
+  "commonDone": "Listo",
+  "@commonDone": {
+    "description": "[#1500] Label of the accessory bar above the iOS numeric keyboard; tapping it dismisses the keyboard."
+  },
   "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
   "@publicProfileLoadErrorA11y": {
     "description": "Live-region accessibility label for the public profile load-error state (finding 16)."

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/analytics/analytics_service.dart';
 import '../core/analytics/route_analytics.dart';
+import '../core/widgets/numeric_keyboard_done_bar.dart';
 import '../features/app_update/presentation/app_update_gate.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/notifications/application/cola_de_avisos.dart';
@@ -462,7 +463,11 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
         // El gate de versión mínima va ADENTRO del ThemeWatcher (necesita
         // tema y l10n) y reemplaza al router solo si hay que actualizar.
         child: ThemeWatcher(
-          child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
+          // "Listo" sobre el teclado numérico de iOS (#1500): una sola vez
+          // acá en vez de tocar los ~17 campos numéricos de la app.
+          child: NumericKeyboardDoneBar(
+            child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
     );

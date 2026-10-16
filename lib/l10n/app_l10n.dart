@@ -4634,6 +4634,12 @@ abstract class AppL10n {
   /// **'Cancelar'**
   String get commonCancel;
 
+  /// [#1500] Label of the accessory bar above the iOS numeric keyboard; tapping it dismisses the keyboard.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo'**
+  String get commonDone;
+
   /// Live-region accessibility label for the public profile load-error state (finding 16).
   ///
   /// In es_AR, this message translates to:

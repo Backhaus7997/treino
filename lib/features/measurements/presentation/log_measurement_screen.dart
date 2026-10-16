@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -367,7 +368,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
     // Reject invalid / out-of-range entries before building the model so a
     // mistyped value is surfaced inline instead of being silently dropped.
-    if (!(_formKey.currentState?.validate() ?? true)) return;
+    if (!validateAndRevealFirstError(_formKey)) return;
 
     if (!_hasAnyValue()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -521,6 +522,8 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
             Expanded(
               child: Form(
                 key: _formKey,
+                // El error se re-evalúa al editar el campo (#1500).
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                   child: Column(
