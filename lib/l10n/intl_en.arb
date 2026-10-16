@@ -331,6 +331,8 @@
   "wellbeingDailyTitle": "HOW ARE YOU FEELING TODAY?",
   "wellbeingDailyPrompt": "Log how you woke up, workout or not.",
   "wellbeingCheckInTitle": "HOW DID YOU FEEL?",
+  "wellbeingCheckInFromToday": "You already told us today on Home.",
+  "wellbeingCheckInUseForSession": "USE FOR THIS WORKOUT",
   "wellbeingCheckInOptional": "Optional. You can skip it.",
   "wellbeingFeelingVeryBad": "Very bad",
   "wellbeingFeelingBad": "Bad",

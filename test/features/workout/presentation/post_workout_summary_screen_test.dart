@@ -3,7 +3,9 @@
 
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:treino/features/checkins/data/check_in_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -111,6 +113,7 @@ Widget _buildWithRouter({
   bool reduceMotion = false,
   double? textScale,
   List<CheckIn> dayCheckIns = const [],
+  List<Override> extraOverrides = const [],
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -180,6 +183,7 @@ Widget _buildWithRouter({
       (ref, key) => Future.value(dayCheckIns),
     ),
     currentUidProvider.overrideWithValue('u1'),
+    ...extraOverrides,
     if (notifierOverride != null)
       postWorkoutNotifierProvider.overrideWith(notifierOverride),
   ];
@@ -823,6 +827,48 @@ void main() {
     for (final feeling in CheckInFeeling.displayOrder) {
       expect(find.text(feeling.emoji), findsOneWidget);
     }
+  });
+
+  // #1513: el ánimo se preguntaba dos veces el mismo día. Si ya se respondió
+  // en Inicio (registro sin sesión), el resumen lo ofrece en vez de la escala,
+  // y un toque lo ata a ESTA sesión sobre el mismo documento.
+  testWidgets(
+      '#1513: con el ánimo del día ya respondido no vuelve a preguntar y un '
+      'toque lo usa para este entreno', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final delDia = CheckIn(
+      id: 'del-dia',
+      date: checkInDateKey(DateTime.now()),
+      feeling: CheckInFeeling.bien,
+      recordedAt: DateTime.now().toUtc(),
+    );
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      dayCheckIns: [delDia],
+      extraOverrides: [
+        checkInRepositoryProvider
+            .overrideWithValue(CheckInRepository(firestore: firestore)),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ya lo contaste hoy en Inicio.'), findsOneWidget);
+    // No vuelve la escala completa: sólo la respuesta del día.
+    expect(find.text('😞'), findsNothing);
+
+    await tester.ensureVisible(find.text('USAR PARA ESTE ENTRENO'));
+    await tester.tap(find.text('USAR PARA ESTE ENTRENO'));
+    await tester.pumpAndSettle();
+
+    final docs = await firestore
+        .collection('users')
+        .doc('u1')
+        .collection('wellbeingCheckIns')
+        .get();
+    expect(docs.docs, hasLength(1));
+    expect(docs.docs.single.id, 'del-dia',
+        reason: 'edita el registro del día, no crea otro');
+    expect(docs.docs.single.data()['sessionId'], 's1');
   });
 
   // ── #456 regression: mood row must never overflow ────────────────────────

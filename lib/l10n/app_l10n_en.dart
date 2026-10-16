@@ -824,6 +824,12 @@ class AppL10nEn extends AppL10n {
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
 
   @override
+  String get wellbeingCheckInFromToday => 'You already told us today on Home.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USE FOR THIS WORKOUT';
+
+  @override
   String get wellbeingCheckInOptional => 'Optional. You can skip it.';
 
   @override

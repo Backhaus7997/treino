@@ -1574,6 +1574,18 @@ abstract class AppL10n {
   /// **'¿CÓMO TE SENTISTE?'**
   String get wellbeingCheckInTitle;
 
+  /// #1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya lo contaste hoy en Inicio.'**
+  String get wellbeingCheckInFromToday;
+
+  /// #1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'USAR PARA ESTE ENTRENO'**
+  String get wellbeingCheckInUseForSession;
+
   /// Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave.
   ///
   /// In es_AR, this message translates to:

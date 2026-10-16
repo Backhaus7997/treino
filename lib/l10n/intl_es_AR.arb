@@ -516,6 +516,14 @@
   "@wellbeingCheckInTitle": {
     "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
   },
+  "wellbeingCheckInFromToday": "Ya lo contaste hoy en Inicio.",
+  "@wellbeingCheckInFromToday": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
+  "wellbeingCheckInUseForSession": "USAR PARA ESTE ENTRENO",
+  "@wellbeingCheckInUseForSession": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
   "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
   "@wellbeingCheckInOptional": {
     "description": "Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave."
