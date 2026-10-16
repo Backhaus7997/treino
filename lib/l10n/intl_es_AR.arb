@@ -359,6 +359,30 @@
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
   "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
+  "agendaAttendanceMarkAbsent": "MARCAR AUSENTE",
+  "@agendaAttendanceMarkAbsent": {
+    "description": "Botón del detalle de una sesión que ya empezó: el PF marca que el alumno faltó (#1492)."
+  },
+  "agendaAttendanceUndoAbsent": "DESHACER AUSENTE",
+  "@agendaAttendanceUndoAbsent": {
+    "description": "Botón que vuelve a dejar como hecha una sesión marcada ausente."
+  },
+  "agendaAttendanceDefaultHint": "Si no marcás nada, la sesión cuenta como hecha.",
+  "@agendaAttendanceDefaultHint": {
+    "description": "Ayuda sobre el botón de asistencia: el default es que la sesión se dio."
+  },
+  "agendaAttendanceAbsentHint": "Marcaste que el alumno faltó.",
+  "@agendaAttendanceAbsentHint": {
+    "description": "Ayuda sobre el botón de asistencia cuando la sesión ya está marcada ausente."
+  },
+  "agendaAttendanceAbsentStatus": "Ausente",
+  "@agendaAttendanceAbsentStatus": {
+    "description": "Valor de la fila ESTADO del detalle del turno cuando el alumno faltó."
+  },
+  "agendaAttendanceError": "No pudimos guardar la asistencia. Probá de nuevo.",
+  "@agendaAttendanceError": {
+    "description": "Snackbar cuando falla marcar o deshacer el ausente."
+  },
   "agendaBlockedDayTitle": "Día bloqueado",
   "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",
   "@agendaBlockedDayBodySingle": {

@@ -231,7 +231,11 @@ class AppointmentRepository {
 
   // ─── cancel ───────────────────────────────────────────────────────────────
   //
-  // REQ-007: cancellation must be >24h before startsAt.
+  // REQ-007: the ATHLETE must cancel >24h before startsAt.
+  // #1492: the trainer has no time gate — it's their agenda, and the gate left
+  // them no way to call off a session they couldn't make (firestore.rules
+  // Path 1 exempts `resource.data.trainerId`). The UI is what keeps them from
+  // cancelling a session that already started.
   // ADR-1: appends to cancellationLog, sets cancelledAt/cancelledBy.
   // SCENARIO-492: cancellation succeeds when >24h ahead.
   // SCENARIO-493: throws CancellationTooLateException when <24h ahead.
@@ -245,7 +249,8 @@ class AppointmentRepository {
     // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
     // "now" so the 24h gate isn't 3h short in ART. Inject [now] in tests.
     final remaining = appointment.startsAt.difference(now ?? nowWall());
-    if (remaining < const Duration(hours: 24)) {
+    final isTrainer = actorUid == appointment.trainerId;
+    if (!isTrainer && remaining < const Duration(hours: 24)) {
       throw CancellationTooLateException(appointment.id);
     }
 
@@ -267,9 +272,11 @@ class AppointmentRepository {
   // ─── cancelFutureSeries ─────────────────────────────────────────────────────
   //
   // Cancels every FUTURE confirmed occurrence of the recurring series
-  // [recurringId] owned by [trainerId] that is still >24h away (same gate as the
-  // per-session cancel + Firestore rules Path 1). Occurrences within 24h or
-  // already past are left untouched. Returns how many were cancelled.
+  // [recurringId] owned by [trainerId]. When the trainer cancels (the only
+  // caller today) that is every occurrence that hasn't started yet — #1492
+  // took the 24h gate off the trainer. Any other actor keeps the >24h gate of
+  // the per-session cancel + Firestore rules Path 1. Returns how many were
+  // cancelled.
 
   Future<int> cancelFutureSeries({
     required String recurringId,
@@ -302,13 +309,19 @@ class AppointmentRepository {
     var batch = _firestore.batch();
     var opsInBatch = 0;
     var count = 0;
+    final isTrainer = actorUid == trainerId;
     for (final d in snap.docs) {
       final appt = Appointment.fromJson({...d.data(), 'id': d.id});
-      // Only the occurrences the rule will accept (>24h ahead). The batch is
-      // atomic, so a single <24h write would reject the whole commit — a small
-      // safety margin absorbs the client→server latency near the boundary.
-      if (appt.startsAt.difference(reference) <=
+      if (isTrainer) {
+        // #1492: no time gate in the rule for the trainer, so no boundary to
+        // guard either — only skip what already started.
+        if (!appt.startsAt.isAfter(reference)) continue;
+      } else if (appt.startsAt.difference(reference) <=
           const Duration(hours: 24, minutes: 2)) {
+        // Only the occurrences the rule will accept (>24h ahead). The batch is
+        // atomic, so a single <24h write would reject the whole commit — a
+        // small safety margin absorbs the client→server latency near the
+        // boundary.
         continue;
       }
       batch.update(d.reference, {
@@ -351,6 +364,22 @@ class AppointmentRepository {
       'noteBefore': noteBefore,
       'noteAfter': noteAfter,
     }).boundedWrite;
+  }
+
+  // ─── setAttendance ────────────────────────────────────────────────────────
+
+  /// Trainer-only (#1492): marks the session as missed by the athlete
+  /// ([AppointmentAttendance.absent]) or clears it back to "se dio" (`null`).
+  /// firestore.rules (Path 2) only lets the trainer write it, only `'absent'`
+  /// or `null`, and only on a `confirmed` appointment. Writing `null` instead
+  /// of deleting the key keeps the "deshacer" a single, symmetric update.
+  Future<void> setAttendance({
+    required String appointmentId,
+    required AppointmentAttendance? attendance,
+  }) async {
+    await _appointments
+        .doc(appointmentId)
+        .update({'attendance': attendance?.wire}).boundedWrite;
   }
 
   // ─── markBilled ───────────────────────────────────────────────────────────

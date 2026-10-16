@@ -226,6 +226,12 @@
   "agendaRuleDeleteConfirm": "",
   "agendaRuleInvalidWindow": "",
   "agendaBookingCancelledByCoach": "",
+  "agendaAttendanceMarkAbsent": "MARK AS NO-SHOW",
+  "agendaAttendanceUndoAbsent": "UNDO NO-SHOW",
+  "agendaAttendanceDefaultHint": "If you don't mark anything, the session counts as done.",
+  "agendaAttendanceAbsentHint": "You marked that the athlete didn't show up.",
+  "agendaAttendanceAbsentStatus": "No-show",
+  "agendaAttendanceError": "We couldn't save attendance. Try again.",
   "agendaBlockedDayTitle": "",
   "agendaBlockedDayBodySingle": "",
   "@agendaBlockedDayBodySingle": {

@@ -1226,6 +1226,42 @@ abstract class AppL10n {
   /// **'Reserva cancelada por el entrenador.'**
   String get agendaBookingCancelledByCoach;
 
+  /// Botón del detalle de una sesión que ya empezó: el PF marca que el alumno faltó (#1492).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MARCAR AUSENTE'**
+  String get agendaAttendanceMarkAbsent;
+
+  /// Botón que vuelve a dejar como hecha una sesión marcada ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER AUSENTE'**
+  String get agendaAttendanceUndoAbsent;
+
+  /// Ayuda sobre el botón de asistencia: el default es que la sesión se dio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si no marcás nada, la sesión cuenta como hecha.'**
+  String get agendaAttendanceDefaultHint;
+
+  /// Ayuda sobre el botón de asistencia cuando la sesión ya está marcada ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Marcaste que el alumno faltó.'**
+  String get agendaAttendanceAbsentHint;
+
+  /// Valor de la fila ESTADO del detalle del turno cuando el alumno faltó.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ausente'**
+  String get agendaAttendanceAbsentStatus;
+
+  /// Snackbar cuando falla marcar o deshacer el ausente.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar la asistencia. Probá de nuevo.'**
+  String get agendaAttendanceError;
+
   /// No description provided for @agendaBlockedDayTitle.
   ///
   /// In es_AR, this message translates to:

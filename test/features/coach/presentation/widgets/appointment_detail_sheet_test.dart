@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
@@ -308,6 +309,89 @@ void main() {
 
       expect(find.text('COBRAR'), findsNothing);
       expect(find.text('Cobrado'), findsNothing);
+    });
+  });
+
+  // #1492 — el PF cancela sin la regla de 24 h y, una vez que la sesión
+  // empezó, marca si el alumno vino. El turno es 2026-07-01 10:00 (wall-clock).
+  group('(f) #1492 — cancelar sin 24 h y asistencia', () {
+    tearDown(AppClock.unfreeze);
+
+    Future<Map<String, Object?>> docOf(String id) async =>
+        (await firestore.collection('appointments').doc(id).get()).data()!;
+
+    testWidgets('a 3 h de la sesión el PF puede cancelar', (tester) async {
+      AppClock.freeze(DateTime(2026, 7, 1, 7, 0));
+      final appt = _confirmedAppt(id: 'appt-1492-cancel');
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await tester.pumpWidget(
+        _wrap(appointment: appt, firestore: firestore, billing: null),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('CANCELAR TURNO (menos de 24h)'), findsNothing);
+      expect(find.text('MARCAR AUSENTE'), findsNothing,
+          reason: 'la sesión todavía no empezó');
+      await _tap(tester, find.text('CANCELAR TURNO'));
+      await _tap(tester, find.text('Sí, cancelar'));
+
+      final data = await docOf(appt.id);
+      expect(data['status'], 'cancelled');
+      expect(data['cancelledBy'], _kTrainerId);
+    });
+
+    testWidgets(
+        'con la sesión empezada no hay CANCELAR: hay MARCAR AUSENTE, y se '
+        'puede deshacer', (tester) async {
+      AppClock.freeze(DateTime(2026, 7, 1, 10, 30));
+      final appt = _confirmedAppt(id: 'appt-1492-ausente');
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await tester.pumpWidget(
+        _wrap(appointment: appt, firestore: firestore, billing: null),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('CANCELAR TURNO'), findsNothing);
+      expect(find.text('Si no marcás nada, la sesión cuenta como hecha.'),
+          findsOneWidget);
+
+      await _tap(tester, find.text('MARCAR AUSENTE'));
+      expect((await docOf(appt.id))['attendance'], 'absent');
+      expect((await docOf(appt.id))['status'], 'confirmed',
+          reason: 'ausente NO es un status: la sesión sigue en la agenda');
+      expect(find.text('DESHACER AUSENTE'), findsOneWidget);
+
+      await _tap(tester, find.text('DESHACER AUSENTE'));
+      expect((await docOf(appt.id))['attendance'], isNull);
+      expect(find.text('MARCAR AUSENTE'), findsOneWidget);
+    });
+
+    testWidgets('una sesión marcada ausente lo dice en ESTADO', (tester) async {
+      AppClock.freeze(DateTime(2026, 7, 1, 12, 0));
+      final appt = _confirmedAppt(id: 'appt-1492-estado')
+          .copyWith(attendance: AppointmentAttendance.absent);
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await tester.pumpWidget(
+        _wrap(appointment: appt, firestore: firestore, billing: null),
+      );
+      await _openSheet(tester);
+
+      expect(find.text('Ausente'), findsOneWidget);
+      expect(find.text('Confirmado'), findsNothing);
+      // Ausente sigue siendo cobrable: lo decide el PF.
+      expect(find.text('COBRAR'), findsOneWidget);
     });
   });
 }
