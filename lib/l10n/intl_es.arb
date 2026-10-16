@@ -1151,5 +1151,6 @@
   "appUpdateTitle": "Actualiza la app",
   "appUpdateBody": "Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.",
   "appUpdateCta": "ACTUALIZAR",
-  "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play."
+  "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.",
+  "logFieldRange": "Entre {min} y {max} {unit}"
 }

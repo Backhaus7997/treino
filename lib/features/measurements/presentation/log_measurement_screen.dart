@@ -9,7 +9,10 @@ import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/utils/metric_range.dart';
+import '../../../core/utils/metric_range_message.dart';
 import '../../../l10n/app_l10n.dart';
+import '../domain/measurement_ranges.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/measurement_providers.dart';
@@ -17,12 +20,6 @@ import '../domain/measurement.dart';
 
 /// Upper sanity bound for any logged metric (kg, %, or cm).
 ///
-/// Caps absurd entries (e.g. 9999 kg) without rejecting realistic values:
-/// the tallest measured circumferences and heaviest body weights stay well
-/// under 500. Combined with the `>= 0` floor this is an error-prevention
-/// guard, not a clinical range.
-const double _kMaxMetricValue = 500;
-
 /// Rejects any character that cannot be part of a decimal metric at entry
 /// time, so the user never types a value that would be silently dropped.
 final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
@@ -140,6 +137,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// be disabled live as the user types/clears fields (error prevention).
   bool _hasValue = false;
 
+  /// Hay al menos un campo fuera de rango o no numérico (#1483).
+  bool _hasInvalid = false;
+
   /// Every controller on the form — used to wire change listeners and to
   /// recompute [_hasValue] on each edit.
   late final List<TextEditingController> _allCtrls;
@@ -211,6 +211,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     // GUARDAR gate, and open the circumferences section when it holds
     // prefilled data (otherwise those values would start hidden).
     _hasValue = _hasAnyValue();
+    _hasInvalid = _ranges.keys.any(_isMetricInvalid);
     _circumferencesExpanded = _circumferenceCtrls.any((c) => c.text.isNotEmpty);
   }
 
@@ -218,8 +219,12 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// current form state without waiting for a submit attempt.
   void _onFieldChanged() {
     final has = _hasAnyValue();
-    if (has != _hasValue) {
-      setState(() => _hasValue = has);
+    final invalid = _ranges.keys.any(_isMetricInvalid);
+    if (has != _hasValue || invalid != _hasInvalid) {
+      setState(() {
+        _hasValue = has;
+        _hasInvalid = invalid;
+      });
     }
   }
 
@@ -258,27 +263,41 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     return double.tryParse(raw);
   }
 
-  /// Validator for every numeric field. Empty stays valid (all fields are
-  /// optional), but a non-empty value must parse and fall within sane bounds.
-  /// Surfaces the error inline instead of silently nulling the value.
-  String? _validateMetric(String? value, AppL10n l10n) {
-    final raw = value?.trim().replaceAll(',', '.') ?? '';
-    if (raw.isEmpty) return null;
-    final parsed = double.tryParse(raw);
-    if (parsed == null) return l10n.logFieldInvalidNumber;
-    if (parsed < 0 || parsed > _kMaxMetricValue) return l10n.logFieldOutOfRange;
-    return null;
-  }
+  /// Rango de cada campo numérico (#1483). Los bilaterales comparten rango.
+  late final Map<TextEditingController, MetricRange> _ranges = {
+    _weightCtrl: MeasurementRanges.weightKg,
+    _fatCtrl: MeasurementRanges.fatPercentage,
+    _muscleCtrl: MeasurementRanges.muscleMassKg,
+    _shouldersCtrl: MeasurementRanges.shouldersCm,
+    _chestCtrl: MeasurementRanges.chestCm,
+    _waistCtrl: MeasurementRanges.waistCm,
+    _hipsCtrl: MeasurementRanges.hipsCm,
+    _glutesCtrl: MeasurementRanges.glutesCm,
+    _bicepsLCtrl: MeasurementRanges.bicepsCm,
+    _bicepsRCtrl: MeasurementRanges.bicepsCm,
+    _bicepsFlexLCtrl: MeasurementRanges.bicepsCm,
+    _bicepsFlexRCtrl: MeasurementRanges.bicepsCm,
+    _forearmLCtrl: MeasurementRanges.forearmCm,
+    _forearmRCtrl: MeasurementRanges.forearmCm,
+    _upperThighLCtrl: MeasurementRanges.thighCm,
+    _upperThighRCtrl: MeasurementRanges.thighCm,
+    _midThighLCtrl: MeasurementRanges.thighCm,
+    _midThighRCtrl: MeasurementRanges.thighCm,
+    _calfLCtrl: MeasurementRanges.calfCm,
+    _calfRCtrl: MeasurementRanges.calfCm,
+  };
 
-  /// True when [ctrl] holds a non-empty value that fails [_validateMetric].
-  /// Used to detect invalid input inside the collapsed circumferences section,
-  /// whose fields are unmounted and therefore skipped by `Form.validate()`.
-  bool _isMetricInvalid(TextEditingController ctrl) {
-    final raw = ctrl.text.trim().replaceAll(',', '.');
-    if (raw.isEmpty) return false;
-    final parsed = double.tryParse(raw);
-    return parsed == null || parsed < 0 || parsed > _kMaxMetricValue;
-  }
+  /// Validator de un campo contra su [range]. Vacío es válido (todos los
+  /// campos son opcionales); un valor no numérico o fuera de rango muestra el
+  /// error inline en vez de anularse en silencio.
+  FormFieldValidator<String> _validatorFor(MetricRange range, AppL10n l10n) =>
+      (value) => metricRangeError(range, value, l10n);
+
+  /// True when [ctrl] holds a non-empty value outside its range or not a
+  /// number. Covers the collapsed circumferences section too, whose fields
+  /// are unmounted and therefore skipped by `Form.validate()`.
+  bool _isMetricInvalid(TextEditingController ctrl) =>
+      _ranges[ctrl]!.check(ctrl.text).isError;
 
   /// All circumference controllers (the collapsible section). Kept separate so
   /// the section can be force-expanded when one of them holds invalid input.
@@ -462,7 +481,9 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     final uid = ref.watch(currentUidProvider);
     // GUARDAR stays disabled until there is at least one value to save, so an
     // accidental tap cannot persist an all-null record.
-    final canSave = uid != null && !_saving && _hasValue;
+    // Y deshabilitado mientras haya un valor fuera de rango (#1483): el error
+    // inline dice qué corregir.
+    final canSave = uid != null && !_saving && _hasValue && !_hasInvalid;
     final isEditing = widget.initial != null;
     // Create shows "now" (the instant being recorded); edit shows the original
     // recordedAt of the measurement being corrected.
@@ -521,6 +542,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
             Expanded(
               child: Form(
                 key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
                   child: Column(
@@ -536,29 +558,35 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                         label: l10n.measurementLogFieldWeight,
                         controller: _weightCtrl,
                         palette: palette,
-                        validator: (v) => _validateMetric(v, l10n),
+                        validator:
+                            _validatorFor(MeasurementRanges.weightKg, l10n),
                       ),
                       const SizedBox(height: 12),
                       _numericField(
                         label: l10n.measurementLogFieldBodyFat,
                         controller: _fatCtrl,
                         palette: palette,
-                        validator: (v) => _validateMetric(v, l10n),
+                        validator: _validatorFor(
+                            MeasurementRanges.fatPercentage, l10n),
                       ),
                       const SizedBox(height: 12),
                       _numericField(
                         label: l10n.measurementLogFieldMuscleMass,
                         controller: _muscleCtrl,
                         palette: palette,
-                        validator: (v) => _validateMetric(v, l10n),
+                        validator:
+                            _validatorFor(MeasurementRanges.muscleMassKg, l10n),
                       ),
                       const SizedBox(height: 20),
 
                       // Circumferences — collapsible
                       _CircumferencesSection(
                         palette: palette,
-                        validateMetric: (v) => _validateMetric(v, l10n),
-                        expanded: _circumferencesExpanded,
+                        validatorFor: (range) => _validatorFor(range, l10n),
+                        // Un perímetro inválido no puede quedar plegado: GUARDAR
+                        // está deshabilitado y el error tiene que verse.
+                        expanded: _circumferencesExpanded ||
+                            _circumferenceCtrls.any(_isMetricInvalid),
                         onToggle: () => setState(
                           () => _circumferencesExpanded =
                               !_circumferencesExpanded,
@@ -822,7 +850,7 @@ Widget _bilateralField({
 class _CircumferencesSection extends StatelessWidget {
   const _CircumferencesSection({
     required this.palette,
-    required this.validateMetric,
+    required this.validatorFor,
     required this.expanded,
     required this.onToggle,
     required this.shouldersCtrl,
@@ -845,7 +873,9 @@ class _CircumferencesSection extends StatelessWidget {
   });
 
   final AppPalette palette;
-  final FormFieldValidator<String> validateMetric;
+
+  /// Validator para el rango de cada campo (#1483).
+  final FormFieldValidator<String> Function(MetricRange range) validatorFor;
   final bool expanded;
   final VoidCallback onToggle;
   final TextEditingController shouldersCtrl;
@@ -937,7 +967,7 @@ class _CircumferencesSection extends StatelessWidget {
                     controller: shouldersCtrl,
                     palette: p,
                     suffix: 'cm',
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.shouldersCm),
                   ),
                   const SizedBox(height: 12),
                   _numericField(
@@ -945,7 +975,7 @@ class _CircumferencesSection extends StatelessWidget {
                     controller: chestCtrl,
                     palette: p,
                     suffix: 'cm',
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.chestCm),
                   ),
                   const SizedBox(height: 12),
                   _numericField(
@@ -953,7 +983,7 @@ class _CircumferencesSection extends StatelessWidget {
                     controller: waistCtrl,
                     palette: p,
                     suffix: 'cm',
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.waistCm),
                   ),
                   const SizedBox(height: 12),
                   _numericField(
@@ -961,7 +991,7 @@ class _CircumferencesSection extends StatelessWidget {
                     controller: hipsCtrl,
                     palette: p,
                     suffix: 'cm',
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.hipsCm),
                   ),
                   const SizedBox(height: 12),
                   _numericField(
@@ -969,7 +999,7 @@ class _CircumferencesSection extends StatelessWidget {
                     controller: glutesCtrl,
                     palette: p,
                     suffix: 'cm',
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.glutesCm),
                   ),
                   const SizedBox(height: 20),
                   _subGroupLabel(l10n.measurementLogGroupUpperBody, p),
@@ -980,7 +1010,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: bicepsRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.bicepsCm),
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
@@ -989,7 +1019,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: bicepsFlexRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.bicepsCm),
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
@@ -998,7 +1028,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: forearmRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.forearmCm),
                   ),
                   const SizedBox(height: 20),
                   _subGroupLabel(l10n.measurementLogGroupLowerBody, p),
@@ -1009,7 +1039,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: upperThighRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.thighCm),
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
@@ -1018,7 +1048,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: midThighRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.thighCm),
                   ),
                   const SizedBox(height: 12),
                   _bilateralField(
@@ -1027,7 +1057,7 @@ class _CircumferencesSection extends StatelessWidget {
                     rightCtrl: calfRCtrl,
                     palette: p,
                     l10n: l10n,
-                    validator: validateMetric,
+                    validator: validatorFor(MeasurementRanges.calfCm),
                   ),
                 ],
               ),

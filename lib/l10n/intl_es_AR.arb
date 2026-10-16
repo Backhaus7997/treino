@@ -4852,5 +4852,7 @@
   "appUpdateOpenError": "No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.",
   "@appUpdateTitle": {
     "description": "Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version)."
-  }
+  },
+  "logFieldRange": "Entre {min} y {max} {unit}",
+  "@logFieldRange": {"description": "Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.", "placeholders": {"min": {"type": "String"}, "max": {"type": "String"}, "unit": {"type": "String"}}}
 }

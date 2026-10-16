@@ -9006,6 +9006,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.'**
   String get appUpdateOpenError;
+
+  /// Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entre {min} y {max} {unit}'**
+  String logFieldRange(String min, String max, String unit);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

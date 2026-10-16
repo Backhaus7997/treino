@@ -7,7 +7,10 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
+import '../../../core/utils/metric_range.dart';
+import '../../../core/utils/metric_range_message.dart';
 import '../../../l10n/app_l10n.dart';
+import '../domain/performance_test_ranges.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/performance_test_providers.dart';
@@ -87,6 +90,9 @@ class _LogPerformanceTestScreenState
   bool _saving = false;
   bool _hasAnyMetric = false;
 
+  /// Hay al menos una métrica fuera de rango o no numérica (#1485).
+  bool _hasInvalid = false;
+
   /// Every metric controller (excludes [_notesCtrl]) — used to detect whether
   /// at least one metric has a value so empty evaluations can't be saved.
   late final List<TextEditingController> _metricCtrls;
@@ -141,8 +147,12 @@ class _LogPerformanceTestScreenState
   /// reflects it. Cheap string check; only calls [setState] on a real change.
   void _recomputeHasAnyMetric() {
     final hasAny = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
-    if (hasAny != _hasAnyMetric) {
-      setState(() => _hasAnyMetric = hasAny);
+    final invalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
+    if (hasAny != _hasAnyMetric || invalid != _hasInvalid) {
+      setState(() {
+        _hasAnyMetric = hasAny;
+        _hasInvalid = invalid;
+      });
     }
   }
 
@@ -181,21 +191,32 @@ class _LogPerformanceTestScreenState
     return double.tryParse(raw);
   }
 
-  /// Validates a numeric metric field. Empty is valid (all fields optional);
-  /// non-numeric input or a non-positive value surfaces inline error text so a
-  /// typo like `12.x.3` is never silently dropped. Reuses the existing generic
-  /// "valid number" string — a non-parseable or non-positive measurement is not
-  /// a valid value, so the same message covers both cases.
-  String? _validateMetric(String? value) {
-    final l10n = AppL10n.of(context);
-    final raw = (value ?? '').trim().replaceAll(',', '.');
-    if (raw.isEmpty) return null;
-    final parsed = double.tryParse(raw);
-    if (parsed == null || parsed <= 0) {
-      return l10n.profileEditPersonalWeightInvalidNumber;
-    }
-    return null;
-  }
+  /// Rango de cada métrica (#1485).
+  late final Map<TextEditingController, MetricRange> _ranges = {
+    _cmjCtrl: PerformanceTestRanges.verticalJumpCm,
+    _squatJumpCtrl: PerformanceTestRanges.verticalJumpCm,
+    _abalakovCtrl: PerformanceTestRanges.verticalJumpCm,
+    _broadJumpCtrl: PerformanceTestRanges.broadJumpCm,
+    _sprint10Ctrl: PerformanceTestRanges.sprint10mS,
+    _sprint20Ctrl: PerformanceTestRanges.sprint20mS,
+    _sprint30Ctrl: PerformanceTestRanges.sprint30mS,
+    _sprint40Ctrl: PerformanceTestRanges.sprint40mS,
+    _squat1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _benchPress1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _deadlift1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _overheadPress1rmCtrl: PerformanceTestRanges.oneRepMaxKg,
+    _pullUp1rmCtrl: PerformanceTestRanges.pullUpLoadKg,
+    _vo2maxCtrl: PerformanceTestRanges.vo2maxMlKgMin,
+    _courseNavetteCtrl: PerformanceTestRanges.courseNavetteLevel,
+    _cooperCtrl: PerformanceTestRanges.cooperMeters,
+    _sitAndReachCtrl: PerformanceTestRanges.sitAndReachCm,
+  };
+
+  /// Validator de un campo contra su rango. Vacío es válido (todos los campos
+  /// son opcionales); un typo como `12.x.3` o un CMJ de 999 cm muestra el
+  /// error inline en vez de guardarse.
+  FormFieldValidator<String> _validatorFor(TextEditingController ctrl) =>
+      (value) => metricRangeError(_ranges[ctrl]!, value, AppL10n.of(context));
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
@@ -284,7 +305,9 @@ class _LogPerformanceTestScreenState
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final canSave = trainerUid != null && !_saving && _hasAnyMetric;
+    // Deshabilitado mientras haya un valor fuera de rango (#1485).
+    final canSave =
+        trainerUid != null && !_saving && _hasAnyMetric && !_hasInvalid;
     // Real instant; _formatDateTime localizes it for display (#392). The record
     // is still persisted as UTC in _save — same instant, shown in local time.
     final now = DateTime.now();
@@ -352,7 +375,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldCmj,
                         controller: _cmjCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_cmjCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -360,7 +383,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSquatJump,
                         controller: _squatJumpCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_squatJumpCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -368,7 +391,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldAbalakov,
                         controller: _abalakovCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_abalakovCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -376,7 +399,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldBroadJump,
                         controller: _broadJumpCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_broadJumpCtrl),
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -388,7 +411,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint10,
                         controller: _sprint10Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint10Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -396,7 +419,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint20,
                         controller: _sprint20Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint20Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -404,7 +427,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint30,
                         controller: _sprint30Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint30Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -412,7 +435,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSprint40,
                         controller: _sprint40Ctrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sprint40Ctrl),
                         palette: palette,
                         suffix: 's',
                       ),
@@ -425,7 +448,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSquat1rm,
                         controller: _squat1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_squat1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -433,7 +456,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldBenchPress,
                         controller: _benchPress1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_benchPress1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -441,7 +464,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldDeadlift,
                         controller: _deadlift1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_deadlift1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -449,7 +472,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldOverheadPress,
                         controller: _overheadPress1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_overheadPress1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -457,7 +480,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldPullUp,
                         controller: _pullUp1rmCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_pullUp1rmCtrl),
                         palette: palette,
                         suffix: 'kg',
                       ),
@@ -470,7 +493,7 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldVo2max,
                         controller: _vo2maxCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_vo2maxCtrl),
                         palette: palette,
                         suffix: 'ml/kg/min',
                       ),
@@ -478,14 +501,14 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldCourseNavette,
                         controller: _courseNavetteCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_courseNavetteCtrl),
                         palette: palette,
                       ),
                       const SizedBox(height: 12),
                       _numericField(
                         label: l10n.performanceLogFieldCooper,
                         controller: _cooperCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_cooperCtrl),
                         palette: palette,
                         suffix: 'm',
                       ),
@@ -493,7 +516,8 @@ class _LogPerformanceTestScreenState
                       _numericField(
                         label: l10n.performanceLogFieldSitAndReach,
                         controller: _sitAndReachCtrl,
-                        validator: _validateMetric,
+                        validator: _validatorFor(_sitAndReachCtrl),
+                        allowNegative: true,
                         palette: palette,
                         suffix: 'cm',
                       ),
@@ -631,6 +655,7 @@ Widget _numericField({
   required AppPalette palette,
   String? suffix,
   String? Function(String?)? validator,
+  bool allowNegative = false,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,13 +671,20 @@ Widget _numericField({
       const SizedBox(height: 6),
       TextFormField(
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        // `signed` en iOS cambia el teclado numérico por uno con signo menos:
+        // sólo donde el rango admite negativos (sit and reach).
+        keyboardType: TextInputType.numberWithOptions(
+          decimal: true,
+          signed: allowNegative,
+        ),
         // Allow digits and decimal separators (, or .) only; blocks letters and
         // stray symbols at the keyboard level. Multiple separators (e.g.
         // '1.2.3') can still be typed, so the validator is the source of truth
         // and rejects any value double.tryParse can't read.
         inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          FilteringTextInputFormatter.allow(
+            allowNegative ? RegExp(r'[-0-9.,]') : RegExp(r'[0-9.,]'),
+          ),
         ],
         validator: validator,
         style: GoogleFonts.barlow(
