@@ -72,6 +72,13 @@ const {
 // viva acá adentro tiene UN solo lugar donde cambiar.
 const E2E = require('./lib/e2e_seed_contract');
 
+// `searchPrefixes` de `userPublicProfiles` (#1478). En producción lo escribe
+// SÓLO la Cloud Function; acá se siembra con la misma decisión para que la
+// búsqueda de usuarios funcione aunque el emulador de Functions no esté
+// levantado o no tenga el trigger compilado. Si está, el trigger ve que ya
+// coincide y no escribe nada.
+const { searchPrefixesFor } = require('./lib/user_search_terms');
+
 // ────────────────────────────────────────────────────────────────────────────
 // Geohash5 — port of lib/core/utils/geohash.dart
 // ────────────────────────────────────────────────────────────────────────────
@@ -1280,6 +1287,7 @@ async function seedCoaches() {
       uid: c.uid,
       displayName: c.displayName,
       displayNameLowercase: c.displayName.trim().toLowerCase(),
+      searchPrefixes: searchPrefixesFor(c.displayName),
       avatarUrl: null,
       gymId: null,
       workoutsCount: 0,
@@ -1332,6 +1340,7 @@ async function seedAthletes() {
       uid: a.uid,
       displayName: a.displayName,
       displayNameLowercase: a.displayName.trim().toLowerCase(),
+      searchPrefixes: searchPrefixesFor(a.displayName),
       avatarUrl: null,
       gymId: a.gymId || null,
       workoutsCount: completedSessions,
