@@ -881,6 +881,38 @@ void main() {
     });
   });
 
+  // ── #1491: el menú del selector de alumno queda alineado con el campo ─────
+  group('Selector de alumno (#1491)', () {
+    testWidgets('el menú mide lo que el campo y arranca en su borde izquierdo',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(
+        overrides: _overrides(
+          links: [_activeLink(_kAthleteId1)],
+          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+          appointmentRepo: mockAppointmentRepo,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final campo =
+          tester.getRect(find.byType(DropdownButtonFormField<String>));
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      final menu = tester.getRect(
+        find.byWidgetPredicate(
+          (w) => w.runtimeType.toString().startsWith('_DropdownMenu<'),
+        ),
+      );
+
+      // Sin `alignedDropdown` Flutter infla el menú 16 px a la izquierda y 24
+      // a la derecha del campo: en el celular toca los dos bordes de la
+      // pantalla.
+      expect(menu.left, campo.left);
+      expect(menu.right, campo.right);
+    });
+  });
+
   // ── H3: a failed links read must not read as "no athletes" ─────────────────
   group('H3 — links error surfaces a retry, not a false "no athletes"', () {
     testWidgets(
