@@ -638,6 +638,26 @@ class AppL10nEs extends AppL10n {
       'Reserva cancelada por el entrenador.';
 
   @override
+  String get agendaAttendanceMarkAbsent => 'MARCAR AUSENTE';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'DESHACER AUSENTE';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'Si no marcas nada, la sesión cuenta como hecha.';
+
+  @override
+  String get agendaAttendanceAbsentHint => 'Marcaste que el alumno faltó.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'Ausente';
+
+  @override
+  String get agendaAttendanceError =>
+      'No pudimos guardar la asistencia. Inténtalo de nuevo.';
+
+  @override
   String get agendaBlockedDayTitle => 'Día bloqueado';
 
   @override
@@ -5975,6 +5995,26 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
+
+  @override
+  String get agendaAttendanceMarkAbsent => 'MARCAR AUSENTE';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'DESHACER AUSENTE';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'Si no marcás nada, la sesión cuenta como hecha.';
+
+  @override
+  String get agendaAttendanceAbsentHint => 'Marcaste que el alumno faltó.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'Ausente';
+
+  @override
+  String get agendaAttendanceError =>
+      'No pudimos guardar la asistencia. Probá de nuevo.';
 
   @override
   String get agendaBlockedDayTitle => 'Día bloqueado';

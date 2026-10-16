@@ -25,12 +25,14 @@ import '../../domain/agenda_exceptions.dart';
 import '../../domain/appointment.dart';
 import '../../domain/wall_clock.dart';
 import '../agenda_formatters.dart';
+import 'session_attendance_control.dart';
 
 /// Bottom-sheet content showing the full detail of a single [Appointment].
 ///
 /// Displays athlete info (resolved via live Firestore stream), date, time
-/// range, duration, and status. Provides "Ver perfil del alumno" and
-/// "Cancelar turno" actions (with the 24h gate).
+/// range, duration, and status. Provides "Ver perfil del alumno" and, for a
+/// confirmed session, "Cancelar turno" until it starts and the attendance
+/// toggle after (#1492 — the trainer has no 24h gate).
 class AppointmentDetailSheet extends ConsumerStatefulWidget {
   const AppointmentDetailSheet({
     super.key,
@@ -96,10 +98,14 @@ class _AppointmentDetailSheetState
     // counterpart (appointment_detail_dialog.dart).
     ref.watch(athleteBillingProvider(appointment.athleteId));
 
-    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against wall-clock
-    // "now" so the 24h cancel window isn't 3h short in ART.
-    final canCancel =
-        appointment.startsAt.difference(nowWall()) > const Duration(hours: 24);
+    // QA-COA-003: startsAt is wall-clock UTC (ADR-7); compare against
+    // wall-clock "now", not the real UTC instant (3h off in ART).
+    //
+    // #1492: no 24h gate for the trainer — that gate is the athlete's. Before
+    // the session starts the trainer can cancel it; once it started, what's
+    // left to say is whether the athlete showed up.
+    final isConfirmed = appointment.status == AppointmentStatus.confirmed;
+    final started = !appointment.startsAt.isAfter(nowWall());
 
     final endTime =
         appointment.startsAt.add(Duration(minutes: appointment.durationMin));
@@ -208,7 +214,11 @@ class _AppointmentDetailSheetState
                       palette: palette,
                     ),
                     _Divider(palette: palette),
-                    _StatusRow(palette: palette, status: appointment.status),
+                    _StatusRow(
+                      palette: palette,
+                      status: appointment.status,
+                      attendance: appointment.attendance,
+                    ),
                   ],
                 ),
               ),
@@ -300,36 +310,32 @@ class _AppointmentDetailSheetState
                 ),
                 const SizedBox(height: 12),
               ],
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton(
-                  onPressed:
-                      canCancel ? () => _cancelAppointment(context, ref) : null,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: canCancel ? palette.highlight : palette.border,
+              if (isConfirmed && started)
+                SessionAttendanceControl(appointment: appointment)
+              else if (isConfirmed)
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => _cancelAppointment(context, ref),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: palette.highlight),
+                      foregroundColor: palette.highlight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                      ),
                     ),
-                    foregroundColor:
-                        canCancel ? palette.highlight : palette.textMuted,
-                    disabledForegroundColor: palette.textMuted,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.full),
-                    ),
-                  ),
-                  child: Text(
-                    canCancel
-                        ? 'CANCELAR TURNO'
-                        : 'CANCELAR TURNO (menos de 24h)',
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      letterSpacing: 0.8,
-                      color: canCancel ? palette.highlight : palette.textMuted,
+                    child: Text(
+                      'CANCELAR TURNO',
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                        color: palette.highlight,
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -722,18 +728,30 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _StatusRow extends StatelessWidget {
-  const _StatusRow({required this.palette, required this.status});
+  const _StatusRow({
+    required this.palette,
+    required this.status,
+    required this.attendance,
+  });
 
   final AppPalette palette;
   final AppointmentStatus status;
+  final AppointmentAttendance? attendance;
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        status == AppointmentStatus.confirmed ? 'Confirmado' : 'Cancelado';
-    final color = status == AppointmentStatus.confirmed
-        ? palette.accent
-        : palette.textMuted;
+    // #1492: «ausente» no es un status (ver AppointmentAttendance), pero para
+    // el PF es la respuesta a "¿cómo quedó esta sesión?", así que va acá.
+    final absent = status == AppointmentStatus.confirmed &&
+        attendance == AppointmentAttendance.absent;
+    final label = absent
+        ? AppL10n.of(context).agendaAttendanceAbsentStatus
+        : (status == AppointmentStatus.confirmed ? 'Confirmado' : 'Cancelado');
+    final color = absent
+        ? palette.warning
+        : (status == AppointmentStatus.confirmed
+            ? palette.accent
+            : palette.textMuted);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),

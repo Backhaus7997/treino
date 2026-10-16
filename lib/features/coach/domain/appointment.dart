@@ -16,6 +16,23 @@ enum AppointmentStatus {
   cancelled,
 }
 
+/// Asistencia que el PF marca sobre una sesión que ya empezó (#1492).
+///
+/// No es un [AppointmentStatus] a propósito: las queries de la agenda y el
+/// cobro filtran `status == 'confirmed'`, así que un estado "ausente" sacaba
+/// la sesión de la agenda de las dos partes y la volvía incobrable. `null` en
+/// [Appointment.attendance] es "se dio", que es lo que el dashboard ya derivaba
+/// de `confirmed` + ya terminó.
+enum AppointmentAttendance {
+  @JsonValue('absent')
+  absent('absent');
+
+  const AppointmentAttendance(this.wire);
+
+  /// El valor que se guarda en Firestore (lo acota `firestore.rules`).
+  final String wire;
+}
+
 /// A single cancellation log entry — immutable audit trail. ADR-1.
 @freezed
 class CancellationEntry with _$CancellationEntry {
@@ -60,6 +77,20 @@ class Appointment with _$Appointment {
     // markBilled — never cleared client-side (see firestore.rules set-once
     // guard on this field).
     String? paymentId,
+    // #1492 — null = la sesión se dio; [AppointmentAttendance.absent] = el
+    // alumno faltó. Lo escribe sólo el PF (AppointmentRepository.setAttendance,
+    // Path 2 de firestore.rules).
+    //
+    // `includeIfNull: false` NO es estética: `createByTrainer` escribe
+    // `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
+    // clave en su allowlist. Omitirla cuando es null deja que esta versión de
+    // la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+    // ignore: invalid_annotation_target
+    @JsonKey(
+      includeIfNull: false,
+      unknownEnumValue: JsonKey.nullForUndefinedEnumValue,
+    )
+    AppointmentAttendance? attendance,
   }) = _Appointment;
 
   factory Appointment.fromJson(Map<String, Object?> json) =>
