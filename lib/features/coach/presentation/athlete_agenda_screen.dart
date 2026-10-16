@@ -1,24 +1,32 @@
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/utils/app_clock.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../chat/application/chat_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
+import '../application/trainer_link_providers.dart';
+import '../domain/agenda_exceptions.dart';
 import '../domain/appointment.dart';
 import '../domain/wall_clock.dart';
 import '../../../l10n/app_l10n.dart';
 import 'agenda_formatters.dart';
 
-/// Full-screen route for the athlete's agenda view — READ-ONLY.
+/// Full-screen route for the athlete's agenda view (MI AGENDA).
 ///
-/// The trainer now schedules all sessions; the athlete only views their own.
+/// The trainer schedules all sessions; the athlete views their own and, from
+/// the upcoming list, cancels (>24 h) or messages their PF (<24 h) — #1515.
+/// The calendar and its day sheet stay read-only.
 ///
 /// Reads:
 /// - [appointmentsForAthleteStreamProvider] — athlete's confirmed appointments
@@ -489,7 +497,13 @@ class _SessionRow extends ConsumerWidget {
 
 /// Displays a single confirmed appointment in the upcoming list.
 ///
-/// Read-only — no cancel control. SCENARIO-506 / 507.
+/// #1515 — ya no es read-only. Mientras la sesión no empezó, el alumno puede:
+///  · con más de 24 h: CANCELAR (Path 1 de `firestore.rules`; el PF recibe el
+///    push y el mail de cancelación que ya existen).
+///  · con menos: AVISAR A MI PF, que abre el chat con su PF. Decisión de
+///    producto: sin estado nuevo en el turno — el PF, que sí puede cancelar
+///    a menos de 24 h (#1492), decide qué hacer.
+/// SCENARIO-506 / 507.
 class AppointmentTile extends ConsumerWidget {
   const AppointmentTile({
     super.key,
@@ -498,14 +512,85 @@ class AppointmentTile extends ConsumerWidget {
   });
 
   final Appointment appointment;
+
+  /// Wall-clock "now" (ADR-7): decide si la sesión ya empezó.
   final DateTime now;
+
+  /// ¿El alumno todavía la puede cancelar?
+  ///
+  /// Mide contra el instante REAL y no contra [now], a propósito: es lo que
+  /// compara el gate de `firestore.rules` (`startsAt - 24 h > request.time`).
+  /// Como `startsAt` es wall-clock, en ART el servidor exige ~27 h de reloj;
+  /// medido en wall-clock, el botón aparecería entre las 24 y las 27 h y
+  /// fallaría con permission-denied. Mejor no ofrecer lo que el servidor va a
+  /// rechazar.
+  bool get _puedeCancelar =>
+      appointment.startsAt.difference(AppClock.now().toUtc()) >
+      const Duration(hours: 24);
+
+  Future<void> _cancelar(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    final confirmado = await _confirmarCancelacion(context);
+    if (!confirmado || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(appointmentRepositoryProvider).cancel(
+            appointment: appointment,
+            actorUid: appointment.athleteId,
+            reason: l10n.agendaBookingCancelledByAthlete,
+          );
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
+      );
+    } on CancellationTooLateException {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
+      );
+    } on FirebaseException catch (e) {
+      // El cliente y el servidor miden las 24 h con relojes distintos; si el
+      // tap cae justo en el borde, el que manda es el servidor.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'permission-denied'
+                ? l10n.agendaCancellationTooLate
+                : l10n.agendaGenericError,
+          ),
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.agendaGenericError)),
+      );
+    }
+  }
+
+  Future<void> _avisarAlPf(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    try {
+      final link = await ref.read(currentAthleteLinkProvider.future);
+      if (link == null) throw StateError('sin vínculo activo');
+      final chat = await ref.read(chatForLinkProvider(link).future);
+      if (!context.mounted) return;
+      context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.agendaAthleteChatError)),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
     final trainerAsync =
         ref.watch(userPublicProfileProvider(appointment.trainerId));
     final trainerName = trainerAsync.valueOrNull?.displayName ?? 'Tu PF';
+    final empezo = !appointment.startsAt.isAfter(now);
+    final puedeCancelar = !empezo && _puedeCancelar;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -515,39 +600,164 @@ class AppointmentTile extends ConsumerWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: palette.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            TreinoIcon.calendar,
-            size: 20,
-            color: palette.accent,
+          Row(
+            children: [
+              Icon(
+                TreinoIcon.calendar,
+                size: 20,
+                color: palette.accent,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AgendaFormatters.formatDate(appointment.startsAt),
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${AgendaFormatters.formatTime(appointment.startsAt)} · ${appointment.durationMin} min · $trainerName',
+                      style: GoogleFonts.barlow(
+                        fontSize: 13,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  AgendaFormatters.formatDate(appointment.startsAt),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: palette.textPrimary,
-                  ),
+          if (!empezo) ...[
+            const SizedBox(height: 12),
+            if (!puedeCancelar) ...[
+              Text(
+                l10n.agendaAthleteNotifyHint,
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.caption,
+                  color: palette.textMuted,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${AgendaFormatters.formatTime(appointment.startsAt)} · ${appointment.durationMin} min · $trainerName',
-                  style: GoogleFonts.barlow(
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            _AccionDelTurno(
+              icono: puedeCancelar ? TreinoIcon.close : TreinoIcon.chat,
+              etiqueta: puedeCancelar
+                  ? l10n.agendaAthleteCancelCta
+                  : l10n.agendaAthleteNotifyTrainerCta,
+              onPressed: puedeCancelar
+                  ? () => _cancelar(context, ref)
+                  : () => _avisarAlPf(context, ref),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// El único botón de la tarjeta de un turno: delineado y neutro. Cancelar no
+/// va en rojo a propósito — es una acción legítima del alumno, no un error, y
+/// el diálogo de confirmación ya pone el freno.
+class _AccionDelTurno extends StatelessWidget {
+  const _AccionDelTurno({
+    required this.icono,
+    required this.etiqueta,
+    required this.onPressed,
+  });
+
+  final IconData icono;
+  final String etiqueta;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final v = TreinoButtonTokens.of(context, TreinoButtonVariant.secondary);
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        backgroundColor: v.background,
+        side: BorderSide(color: v.borderColor),
+        foregroundColor: v.foreground,
+        minimumSize: const Size.fromHeight(44),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+      ),
+      icon: Icon(icono, size: 18, color: v.foreground),
+      label: Text(
+        etiqueta,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: AppTextSize.bodyDense,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+Future<bool> _confirmarCancelacion(BuildContext context) async {
+  final palette = AppPalette.of(context);
+  final l10n = AppL10n.of(context);
+  final resultado = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      title: Text(
+        l10n.agendaCancellationConfirmTitle,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: AppTextSize.title,
+          color: palette.textPrimary,
+        ),
+      ),
+      content: Text(
+        l10n.agendaAthleteCancelConfirmBody,
+        style: GoogleFonts.barlow(
+          fontSize: AppTextSize.body,
+          color: palette.textPrimary,
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: Text(
+            l10n.agendaCancellationKeep,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.bodyDense,
+              color: palette.textPrimary,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: palette.highlight,
+            foregroundColor: palette.bg,
+          ),
+          child: Text(
+            l10n.agendaCancellationConfirmCta,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.bodyDense,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+  return resultado ?? false;
 }

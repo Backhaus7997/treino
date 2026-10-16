@@ -399,6 +399,12 @@
   "agendaCobrarMontoInvalido": "Ingresa un monto válido.",
   "agendaCobrarSuccess": "Turno cobrado.",
   "agendaCobrarError": "No pudimos registrar el cobro. Inténtalo de nuevo.",
+  "agendaAthleteCancelCta": "CANCELAR",
+  "agendaAthleteCancelConfirmBody": "¿Cancelar esta sesión? Le avisamos a tu entrenador.",
+  "agendaBookingCancelledByAthlete": "Reserva cancelada por el alumno.",
+  "agendaAthleteNotifyTrainerCta": "AVISAR A MI ENTRENADOR",
+  "agendaAthleteNotifyHint": "Faltan menos de 24 h: si no puedes ir, avísale a tu entrenador.",
+  "agendaAthleteChatError": "No pudimos abrir el chat. Inténtalo de nuevo.",
   "agendaCobrarConceptoDefault": "Sesión {date}",
   "@agendaCobrarConceptoDefault": {
     "placeholders": {
