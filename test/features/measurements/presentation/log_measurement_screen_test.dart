@@ -155,4 +155,49 @@ void main() {
     expect(tester.getCenter(titulo).dx, closeTo(anchoPantalla / 2, 1));
     expect(tester.getCenter(cancelar).dx, lessThan(anchoPantalla / 4));
   });
+
+  // Lo marcó la revisión de #1544: el título centrado en un Stack no le
+  // reservaba lugar a CANCELAR, y con texto grande en un teléfono angosto
+  // podían pisarse.
+  testWidgets('#1484: con texto grande en 375 pt el título no pisa CANCELAR',
+      (tester) async {
+    tester.view.physicalSize = const Size(375 * 3, 812 * 3);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider
+            .overrideWithValue(_MockMeasurementRepository()),
+        currentUidProvider.overrideWithValue('athleteX'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.6)),
+          child: child!,
+        ),
+        home: LogMeasurementScreen(
+          athleteId: 'athleteX',
+          initial: Measurement(
+            id: 'm1',
+            athleteId: 'athleteX',
+            recordedBy: 'athleteX',
+            recordedAt: DateTime.utc(2026, 3, 10, 14, 30),
+            weightKg: 80,
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final cancelar = tester.getRect(find.text('CANCELAR'));
+    final titulo = tester.getRect(find.text('Editar medición'));
+    expect(titulo.overlaps(cancelar), isFalse,
+        reason: 'título $titulo pisa a CANCELAR $cancelar');
+  });
 }
