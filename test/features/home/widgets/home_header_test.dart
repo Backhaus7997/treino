@@ -36,42 +36,72 @@ UserProfile makeProfile({
 void main() {
   group('HomeHeader', () {
     testWidgets(
-        'REQ-HOME-HEADER-001: named greeting uppercased "HOLA, MARTÍN!"',
+        'REQ-HOME-HEADER-001: named greeting uppercased "¡HOLA, MARTÍN!"',
         (tester) async {
       await tester.pumpWidget(_wrap(
         HomeHeader(profile: makeProfile(displayName: 'Martín')),
       ));
       await tester.pump();
-      expect(find.text('HOLA, MARTÍN!'), findsOneWidget);
+      expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
     });
 
     testWidgets(
-        'REQ-HOME-HEADER-001: lowercase displayName is uppercased "HOLA, ANA!"',
+        'REQ-HOME-HEADER-001: lowercase displayName is uppercased "¡HOLA, ANA!"',
         (tester) async {
       await tester.pumpWidget(_wrap(
         HomeHeader(profile: makeProfile(displayName: 'ana')),
       ));
       await tester.pump();
-      expect(find.text('HOLA, ANA!'), findsOneWidget);
+      expect(find.text('¡HOLA, ANA!'), findsOneWidget);
     });
 
     testWidgets(
-        'REQ-HOME-HEADER-002: null profile → "HOLA!" fallback, no "HOLA, "',
+        '#1508: nombre y apellido → saluda sólo con el primer nombre '
+        '"¡HOLA, MARTÍN!"', (tester) async {
+      await tester.pumpWidget(_wrap(
+        HomeHeader(profile: makeProfile(displayName: 'Martín López')),
+      ));
+      await tester.pump();
+      expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
+      expect(find.textContaining('LÓPEZ'), findsNothing);
+    });
+
+    testWidgets(
+        '#1508: espacios de más alrededor y entre palabras no cambian el '
+        'primer nombre', (tester) async {
+      await tester.pumpWidget(_wrap(
+        HomeHeader(profile: makeProfile(displayName: '  ana   maría  ')),
+      ));
+      await tester.pump();
+      expect(find.text('¡HOLA, ANA!'), findsOneWidget);
+    });
+
+    testWidgets('#1508: displayName sólo con espacios → fallback "¡HOLA!"',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        HomeHeader(profile: makeProfile(displayName: '   ')),
+      ));
+      await tester.pump();
+      expect(find.text('¡HOLA!'), findsOneWidget);
+    });
+
+    testWidgets(
+        'REQ-HOME-HEADER-002: null profile → "¡HOLA!" fallback, no "HOLA, "',
         (tester) async {
       await tester.pumpWidget(_wrap(const HomeHeader(profile: null)));
       await tester.pump();
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.textContaining(RegExp(r'HOLA, ')), findsNothing);
     });
 
     testWidgets(
-        'REQ-HOME-HEADER-002: profile with null displayName → "HOLA!" fallback',
+        'REQ-HOME-HEADER-002: profile with null displayName → "¡HOLA!" fallback',
         (tester) async {
       await tester.pumpWidget(_wrap(
         HomeHeader(profile: makeProfile(displayName: null)),
       ));
       await tester.pump();
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.textContaining(RegExp(r'HOLA, ')), findsNothing);
     });
 

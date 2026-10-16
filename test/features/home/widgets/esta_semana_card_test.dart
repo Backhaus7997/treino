@@ -240,6 +240,30 @@ void main() {
       expect(find.text('MES'), findsOneWidget);
     });
 
+    // #1508: el mapa pinta los sets de la SEMANA (no lo que toca hoy) y antes
+    // no lo decía en ningún lado.
+    testWidgets('#1508: el mapa muscular tiene título y leyenda',
+        (tester) async {
+      final insights = _makeInsights();
+      await tester.pumpWidget(
+        _wrapCard(
+          overrides: [
+            weeklyInsightsProvider.overrideWith((_) async => insights),
+          ],
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.text('MÚSCULOS DE LA SEMANA'), findsOneWidget);
+      expect(
+        find.text(
+          'Más color = más cerca de las series que pide tu rutina esta semana.',
+        ),
+        findsOneWidget,
+      );
+    });
+
     // SCENARIO-307: trained today → shows trained-today copy
     testWidgets('SCENARIO-307: trained today → trained-today streak copy', (
       tester,

@@ -44,6 +44,10 @@
       }
     }
   },
+  "homeEstaSemanaMusclesTitle": "MUSCLES THIS WEEK",
+  "homeEstaSemanaMusclesLegend": "More color = closer to the sets your routine asks for this week.",
+  "homeGreeting": "HELLO!",
+  "homeGreetingNamed": "HELLO, {name}!",
   "homeEstaSemanaEmptyTitle": "YOUR STREAK\nSTARTS HERE",
   "homeEstaSemanaEmptyBody": "Every workout feeds your streak. Do your first one and start building your progress.",
   "homeEstaSemanaEmptyCta": "EXPLORE ROUTINES  →",
