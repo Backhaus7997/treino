@@ -150,11 +150,11 @@ void main() {
     expect(find.text('Peso máximo'), findsOneWidget);
     expect(find.text('100'), findsOneWidget);
     expect(find.text('1RM'), findsOneWidget);
-    expect(find.text('112.5'), findsOneWidget);
+    expect(find.text('112,5'), findsOneWidget);
     expect(find.text('Mejor serie'), findsOneWidget);
     expect(find.text('500'), findsOneWidget);
     expect(find.text('Volumen'), findsOneWidget);
-    expect(find.text('2400'), findsOneWidget);
+    expect(find.text('2.400'), findsOneWidget); // miles con punto (#1512)
     expect(find.text('kg'), findsNWidgets(2)); // heaviestWeight + oneRepMax
     expect(find.text('kg·reps'),
         findsNWidgets(2)); // bestSetVolume + bestSessionVolume
@@ -220,7 +220,7 @@ void main() {
 
     expect(overflows, isEmpty);
     // Las filas siguen presentes (escaladas, no descartadas).
-    expect(find.text('12487.5'), findsOneWidget);
+    expect(find.text('12.487,5'), findsOneWidget);
     expect(find.text('kg·reps'), findsNWidgets(2));
   });
 
@@ -240,7 +240,7 @@ void main() {
     });
 
     expect(overflows, isEmpty);
-    expect(find.text('12487.5'), findsOneWidget);
+    expect(find.text('12.487,5'), findsOneWidget);
   });
 
   testWidgets(
@@ -261,13 +261,13 @@ void main() {
       labels: _labels(),
     )));
     await tester.pumpAndSettle();
-    final unscaledHeight = tester.getRect(find.text('12487.5')).height;
+    final unscaledHeight = tester.getRect(find.text('12.487,5')).height;
 
     // Mismo contenido en un ancho de teléfono normal (iPhone 14/15, Pixel).
     tester.view.physicalSize = const Size(390, 900);
     await tester.pumpAndSettle();
 
-    expect(tester.getRect(find.text('12487.5')).height, unscaledHeight);
+    expect(tester.getRect(find.text('12.487,5')).height, unscaledHeight);
 
     // Pegado a la derecha: el `Expanded` del label absorbe todo el sobrante, así
     // que el bloque de valor termina contra el borde interno de la card (ancho

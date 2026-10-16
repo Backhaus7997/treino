@@ -6,7 +6,6 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:treino/l10n/app_l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -4357,13 +4356,16 @@ class _SlotCard extends StatelessWidget {
       ],
     );
 
+    // El locale sale de `Localizations`, NO de `AppL10n`: este archivo tiene
+    // prohibido llamarlo (constraint C-6, ver el header).
     final card = ExerciseCard(
       title: exercise?.name ?? '—',
       summary: PrescriptionChips(
         prescription: slot.exerciseMode == ExerciseMode.distance
-            ? _resumenDeDistancia(weekSets, AppL10n.of(context).localeName)
+            ? _resumenDeDistancia(
+                weekSets, Localizations.localeOf(context).toString())
             : resumenDePrescripcion(
-                localeName: AppL10n.of(context).localeName,
+                localeName: Localizations.localeOf(context).toString(),
                 modo: slot.exerciseMode,
                 sets: [
                   for (final set in weekSets)
