@@ -6,6 +6,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -143,11 +144,11 @@ class _EditorSet {
 
 /// Resumen de una prescripción por distancia: `3 × 6 m`, o `3 × —` si los
 /// sets no tienen la misma meta (mismo criterio que mobile).
-String _resumenDeDistancia(List<_EditorSet> sets) {
+String _resumenDeDistancia(List<_EditorSet> sets, String localeName) {
   final values = sets.map((s) => s.distanceMeters).toList();
   final first = values.isEmpty ? null : values.first;
   final uniform = first != null && values.every((v) => v == first);
-  return '${sets.length} × ${uniform ? '${formatWeightKg(first)} m' : '—'}';
+  return '${sets.length} × ${uniform ? '${formatWeightDisplay(first, localeName)} m' : '—'}';
 }
 
 /// Maps a persisted [SetSpec] into its mutable editor row.
@@ -4360,8 +4361,9 @@ class _SlotCard extends StatelessWidget {
       title: exercise?.name ?? '—',
       summary: PrescriptionChips(
         prescription: slot.exerciseMode == ExerciseMode.distance
-            ? _resumenDeDistancia(weekSets)
+            ? _resumenDeDistancia(weekSets, AppL10n.of(context).localeName)
             : resumenDePrescripcion(
+                localeName: AppL10n.of(context).localeName,
                 modo: slot.exerciseMode,
                 sets: [
                   for (final set in weekSets)

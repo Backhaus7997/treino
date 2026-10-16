@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
-import '../../core/utils/k_formatter.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
@@ -411,7 +411,8 @@ class _OwnProfileStatsRow extends ConsumerWidget {
               _StatTile(
                 label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
                 value: statsAsync.when(
-                  data: (s) => kFormatMagnitude(s.totalVolumeKg),
+                  data: (s) => formatVolumeKg(
+                      s.totalVolumeKg, AppL10n.of(context).localeName),
                   loading: () => '--',
                   error: (_, __) => '--',
                 ),

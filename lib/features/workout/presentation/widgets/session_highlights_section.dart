@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -19,11 +20,16 @@ import '../../domain/exercise_progression.dart';
 /// [AD2] Mismo redondeo de display que `PersonalRecordsList._formatValue`:
 /// el 1RM estimado (Epley, double pleno) se muestra al 0.5 kg más cercano;
 /// el resto muestra su valor con a lo sumo un decimal.
-String _formatRecordValue(double value, {required bool isOneRepMax}) {
+String _formatRecordValue(
+  double value, {
+  required bool isOneRepMax,
+  required String localeName,
+}) {
   final display = isOneRepMax ? roundToNearestHalfKg(value) : value;
-  return display % 1 == 0
-      ? display.toStringAsFixed(0)
-      : display.toStringAsFixed(1);
+  // Un decimal como máximo y con el separador del locale: «88,5» y
+  // «1.537,5» en es, no «88.5» (#1512). Sin compactar: un récord se lee
+  // exacto.
+  return NumberFormat('#,##0.#', localeName).format(display);
 }
 
 TextStyle _sectionTitleTextStyle(AppPalette palette) =>
@@ -205,9 +211,10 @@ class _SessionRecordRow extends StatelessWidget {
         'kg·reps',
     };
 
-    final newValue = _formatRecordValue(record.value, isOneRepMax: isOneRepMax);
-    final previous =
-        _formatRecordValue(record.previousBest, isOneRepMax: isOneRepMax);
+    final newValue = _formatRecordValue(record.value,
+        isOneRepMax: isOneRepMax, localeName: l10n.localeName);
+    final previous = _formatRecordValue(record.previousBest,
+        isOneRepMax: isOneRepMax, localeName: l10n.localeName);
 
     // El bloque de valores tiene ancho INTRÍNSECO, y un hijo no flexible de un
     // Row recibe ancho ILIMITADO: sin acotarlo el FittedBox nunca escala y la
@@ -391,7 +398,7 @@ class _SessionExerciseRow extends StatelessWidget {
     // TODO(l10n): "sets"/"reps" literales — mismo pendiente que tenían las
     // barras de distribución que este cambio reemplazó.
     final bestSet = exercise.bestWeightKg > 0
-        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false)} kg '
+        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: AppL10n.of(context).localeName)} kg '
             '× ${exercise.bestSetReps}'
         : '${exercise.bestSetReps} reps';
     final stats = '${exercise.setCount} sets · $bestSet';

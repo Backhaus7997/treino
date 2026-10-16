@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/workout/presentation/widgets/set_entry_sheet.dart';
@@ -11,6 +12,10 @@ import '../../application/stub_factories.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
+      // El objetivo escribe el peso con el locale: «17,5 kg» en es (#1481).
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(body: child),
     );
 
@@ -32,7 +37,7 @@ void main() {
       expect(find.text('20'), findsOneWidget);
     });
 
-    testWidgets('objetivo fraccionario conserva su decimal ("17.5 kg")',
+    testWidgets('objetivo fraccionario conserva su decimal ("17,5 kg" en es)',
         (tester) async {
       await tester.pumpWidget(_wrap(
         SetEntrySheet(
@@ -42,8 +47,9 @@ void main() {
         ),
       ));
 
-      expect(find.textContaining('· 17.5 kg'), findsOneWidget);
-      expect(find.text('17.5'), findsOneWidget);
+      expect(find.textContaining('· 17,5 kg'), findsOneWidget);
+      // El stepper es texto que se LEE, no un campo: también con coma.
+      expect(find.text('17,5'), findsOneWidget);
     });
 
     testWidgets('sin peso objetivo muestra el placeholder "– kg"',

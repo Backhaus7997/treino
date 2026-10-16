@@ -201,16 +201,16 @@ class _HistoryRow extends StatelessWidget {
   /// (peso, % grasa, masa muscular, cintura). Sin ninguna de ellas cae a las
   /// notas; "Sin datos de composición" queda sólo para registros que
   /// efectivamente no traen composición (p.ej. sólo circunferencias).
-  String _summary() {
+  String _summary(String localeName) {
     final m = measurement;
+    String n(double? v) => formatWeightDisplay(v!, localeName);
     final parts = <String>[
-      if (m.weightKg != null) '${formatWeightKg(m.weightKg)} kg',
+      if (m.weightKg != null) '${n(m.weightKg)} kg',
       if (m.fatPercentage != null)
-        '${formatWeightKg(m.fatPercentage)}% grasa', // i18n: Fase W2
+        '${n(m.fatPercentage)}% grasa', // i18n: Fase W2
       if (m.muscleMassKg != null)
-        'masa ${formatWeightKg(m.muscleMassKg)} kg', // i18n: Fase W2
-      if (m.waistCm != null)
-        'cintura ${formatWeightKg(m.waistCm)} cm', // i18n: Fase W2
+        'masa ${n(m.muscleMassKg)} kg', // i18n: Fase W2
+      if (m.waistCm != null) 'cintura ${n(m.waistCm)} cm', // i18n: Fase W2
     ];
     if (parts.isEmpty) {
       final notes = m.notes;
@@ -245,7 +245,7 @@ class _HistoryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _summary(),
+                  _summary(l10n.localeName),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.barlow(

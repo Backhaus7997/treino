@@ -139,8 +139,8 @@ void main() {
       expect(find.text('SESIONES'), findsOneWidget);
       expect(find.text('42'), findsOneWidget); // totalSessions
       expect(find.text('VOLUMEN KG'), findsOneWidget);
-      expect(find.text('15.0k'),
-          findsOneWidget); // kFormatMagnitude(15000), never overstates volume
+      // formatVolumeKg con el locale: 15 000 → «15k», no «15.0k» (#1516).
+      expect(find.text('15k'), findsOneWidget);
       expect(find.text('RACHA'), findsOneWidget);
       expect(find.text('7'), findsOneWidget); // streak
     });
