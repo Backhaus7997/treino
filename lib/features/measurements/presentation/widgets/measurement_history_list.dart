@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/measurement_providers.dart';
@@ -35,8 +36,7 @@ String _formatRowDate(DateTime dt, String localeName) {
 /// visto por el PF, o una carga del PF vista por el atleta — muestra
 /// [readOnlyLabel] en su lugar, explicando por qué no hay acciones.
 ///
-/// El borrado confirma con AlertDialog (patrón `_onDeletePlan` de
-/// athlete_detail_screen) y llama al repo directamente; los streams de
+/// El borrado confirma con [showTreinoConfirmDialog] (#1496) y llama al repo directamente; los streams de
 /// `snapshots()` refrescan la lista solos, sin invalidaciones manuales.
 class MeasurementHistoryList extends ConsumerStatefulWidget {
   const MeasurementHistoryList({
@@ -71,46 +71,15 @@ class _MeasurementHistoryListState
   bool _showAll = false;
 
   Future<void> _confirmDelete(Measurement m) async {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final dateLabel = _formatRowDate(m.recordedAt, l10n.localeName);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: palette.bgCard,
-        title: Text(
-          l10n.measurementDeleteConfirmTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            color: palette.textPrimary,
-          ),
-        ),
-        content: Text(
-          l10n.measurementDeleteConfirmBody(dateLabel),
-          style: GoogleFonts.barlow(fontSize: 13, color: palette.textPrimary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              l10n.commonCancel,
-              style: GoogleFonts.barlowCondensed(color: palette.textMuted),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.measurementDeleteConfirmAction,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                color: palette.danger,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.measurementDeleteConfirmTitle,
+      body: l10n.measurementDeleteConfirmBody(dateLabel),
+      confirmLabel: l10n.measurementDeleteConfirmAction,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
       if (!mounted) return;
