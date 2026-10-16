@@ -15,7 +15,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
@@ -123,9 +126,12 @@ Widget _wrap(
   Widget w, {
   required Routine routine,
   List<Session> sessions = const [],
+  ThemeData? theme,
+  List<Override> extra = const [],
 }) {
   return ProviderScope(
     overrides: [
+      ...extra,
       routineByIdStreamProvider(routine.id)
           .overrideWith((ref) => Stream.value(routine)),
       routineByIdProvider(routine.id).overrideWith((ref) async => routine),
@@ -135,7 +141,7 @@ Widget _wrap(
       sessionsByUidProvider(_uid).overrideWith((ref) async => sessions),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
@@ -915,6 +921,65 @@ void main() {
       await _settle(tester);
 
       expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget);
+    });
+  });
+
+  // ── #1509 (visual): detalle de un plan del PF en tema claro ──────────────
+  group('#1509 visual, tema claro', () {
+    Routine planDelPf() => _multiWeekRoutine(days: [_day(1), _day(2)])
+        .copyWith(source: RoutineSource.trainerAssigned, assignedBy: 'pf-1');
+
+    Future<AppPalette> abrir(WidgetTester tester, Routine routine) async {
+      final tema = AppTheme.light();
+      await tester.pumpWidget(_wrap(
+        RoutineDetailScreen(routineId: routine.id),
+        routine: routine,
+        theme: tema,
+        extra: [
+          userPublicProfileProvider('pf-1')
+              .overrideWith((ref) => Stream.value(null)),
+        ],
+      ));
+      await _settle(tester);
+      return tema.extension<AppPalette>()!;
+    }
+
+    Color fondoDelBotonAtras(WidgetTester tester) => tester
+        .widget<Material>(find
+            .ancestor(
+                of: find.byTooltip('Volver'), matching: find.byType(Material))
+            .first)
+        .color!;
+
+    testWidgets('sin foto, el botón atrás no lleva el disco gris',
+        (tester) async {
+      await abrir(tester, planDelPf());
+      expect(fondoDelBotonAtras(tester).a, 0,
+          reason: 'el scrim es para leer el ícono SOBRE una foto');
+    });
+
+    testWidgets('con foto, el botón atrás conserva el scrim', (tester) async {
+      await abrir(
+          tester,
+          planDelPf().copyWith(
+              id: 'atletico-4dias-avanzado',
+              source: RoutineSource.system,
+              assignedBy: null));
+      expect(fondoDelBotonAtras(tester).a, greaterThan(0));
+    });
+
+    testWidgets('«Asignado por» y el badge del día van en accentText',
+        (tester) async {
+      final palette = await abrir(tester, planDelPf());
+      final asignado = tester.widget<Text>(find.textContaining('signad'));
+      expect(asignado.style?.color, palette.accentText);
+    });
+
+    testWidgets('SEM/DÍA seleccionados: ink sobre mint, no blanco',
+        (tester) async {
+      await abrir(tester, planDelPf());
+      final sem1 = tester.widget<Text>(find.text('SEM 1'));
+      expect(sem1.style?.color, TreinoButtonTokens.ink);
     });
   });
 }
