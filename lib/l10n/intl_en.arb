@@ -2269,5 +2269,15 @@
   "appUpdateOpenError": "We couldn't open the store. Search for TREINO on the App Store or Google Play.",
   "logFieldRange": "Between {min} and {max} {unit}",
   "inputMaxReached": "Maximum {max} {unit}",
-  "logFieldRangeAbove": "Above {min} and up to {max} {unit}"
+  "logFieldRangeAbove": "Above {min} and up to {max} {unit}",
+  "performanceLogTitleEdit": "Edit assessment",
+  "performanceLogUpdateCta": "SAVE CHANGES",
+  "performanceLogUpdateSuccess": "Assessment updated",
+  "performanceHistoryEditTooltip": "Edit assessment",
+  "performanceHistoryDeleteTooltip": "Delete assessment",
+  "performanceHistoryOtherTrainerTag": "Logged by another trainer",
+  "performanceDeleteConfirmTitle": "Delete assessment?",
+  "performanceDeleteConfirmBody": "The assessment from {date} will be deleted. This can't be undone.",
+  "performanceDeleteSuccess": "Assessment deleted",
+  "performanceDeleteError": "We couldn't delete the assessment. Try again."
 }

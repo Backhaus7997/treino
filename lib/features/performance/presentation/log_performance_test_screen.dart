@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
+import '../../../core/utils/kg_format.dart';
 import '../../../core/utils/metric_range.dart';
 import '../../../core/utils/metric_range_message.dart';
 import '../../../l10n/app_l10n.dart';
@@ -45,10 +46,23 @@ String _formatDateTime(DateTime dt, String localeName) {
 /// ```
 ///
 /// All fields are optional — the trainer saves whatever metrics they tested.
+///
+/// Con [initial] EDITA una evaluación existente (#1485): pre-carga cada campo
+/// y guarda con `update()` preservando `id`/`athleteId`/`recordedBy`/
+/// `recordedAt` — lo que exige la regla de update de `performance_tests`.
+/// Sólo el autor (`initial.recordedBy == currentUid`) llega a este modo: el
+/// historial no ofrece el lápiz en filas ajenas.
 class LogPerformanceTestScreen extends ConsumerStatefulWidget {
-  const LogPerformanceTestScreen({super.key, required this.athleteId});
+  const LogPerformanceTestScreen({
+    super.key,
+    required this.athleteId,
+    this.initial,
+  });
 
   final String athleteId;
+
+  /// Evaluación a corregir; null = alta nueva.
+  final PerformanceTest? initial;
 
   @override
   ConsumerState<LogPerformanceTestScreen> createState() =>
@@ -100,24 +114,34 @@ class _LogPerformanceTestScreenState
   @override
   void initState() {
     super.initState();
-    _cmjCtrl = TextEditingController();
-    _squatJumpCtrl = TextEditingController();
-    _abalakovCtrl = TextEditingController();
-    _broadJumpCtrl = TextEditingController();
-    _sprint10Ctrl = TextEditingController();
-    _sprint20Ctrl = TextEditingController();
-    _sprint30Ctrl = TextEditingController();
-    _sprint40Ctrl = TextEditingController();
-    _squat1rmCtrl = TextEditingController();
-    _benchPress1rmCtrl = TextEditingController();
-    _deadlift1rmCtrl = TextEditingController();
-    _overheadPress1rmCtrl = TextEditingController();
-    _pullUp1rmCtrl = TextEditingController();
-    _vo2maxCtrl = TextEditingController();
-    _courseNavetteCtrl = TextEditingController();
-    _cooperCtrl = TextEditingController();
-    _sitAndReachCtrl = TextEditingController();
-    _notesCtrl = TextEditingController();
+    // Edición (#1485): cada campo arranca con el valor guardado, sin ".0".
+    final i = widget.initial;
+    _cmjCtrl = TextEditingController(text: formatWeightKg(i?.cmjCm));
+    _squatJumpCtrl =
+        TextEditingController(text: formatWeightKg(i?.squatJumpCm));
+    _abalakovCtrl = TextEditingController(text: formatWeightKg(i?.abalakovCm));
+    _broadJumpCtrl =
+        TextEditingController(text: formatWeightKg(i?.broadJumpCm));
+    _sprint10Ctrl = TextEditingController(text: formatWeightKg(i?.sprint10mS));
+    _sprint20Ctrl = TextEditingController(text: formatWeightKg(i?.sprint20mS));
+    _sprint30Ctrl = TextEditingController(text: formatWeightKg(i?.sprint30mS));
+    _sprint40Ctrl = TextEditingController(text: formatWeightKg(i?.sprint40mS));
+    _squat1rmCtrl = TextEditingController(text: formatWeightKg(i?.squat1rmKg));
+    _benchPress1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.benchPress1rmKg));
+    _deadlift1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.deadlift1rmKg));
+    _overheadPress1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.overheadPress1rmKg));
+    _pullUp1rmCtrl =
+        TextEditingController(text: formatWeightKg(i?.pullUp1rmKg));
+    _vo2maxCtrl = TextEditingController(text: formatWeightKg(i?.vo2maxMlKgMin));
+    _courseNavetteCtrl =
+        TextEditingController(text: formatWeightKg(i?.courseNavetteLevel));
+    _cooperCtrl = TextEditingController(text: formatWeightKg(i?.cooperMeters));
+    _sitAndReachCtrl =
+        TextEditingController(text: formatWeightKg(i?.sitAndReachCm));
+    _notesCtrl = TextEditingController(text: i?.notes ?? '');
 
     _metricCtrls = [
       _cmjCtrl,
@@ -141,6 +165,11 @@ class _LogPerformanceTestScreenState
     for (final ctrl in _metricCtrls) {
       ctrl.addListener(_recomputeHasAnyMetric);
     }
+    // En edición los campos ya traen valores: GUARDAR tiene que reflejarlo
+    // desde el primer frame, y un valor viejo fuera de rango (el CMJ de 999
+    // del QA) tiene que verse como error antes de que nadie toque nada.
+    _hasAnyMetric = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
+    _hasInvalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
   }
 
   /// Recomputes whether any metric field is non-empty so the Save button
@@ -244,11 +273,19 @@ class _LogPerformanceTestScreenState
 
     setState(() => _saving = true);
 
+    final initial = widget.initial;
+    assert(
+      initial == null || initial.recordedBy == trainerUid,
+      'sólo el autor edita: la regla de update pinea recordedBy',
+    );
+    // Edición: id, alumno, autor y fecha se conservan — la regla de update
+    // rechaza cualquier cambio de athleteId/recordedBy, y corregir un valor
+    // no mueve el punto en la línea de tiempo.
     final test = PerformanceTest(
-      id: '',
-      athleteId: widget.athleteId,
-      recordedBy: trainerUid,
-      recordedAt: DateTime.now().toUtc(),
+      id: initial?.id ?? '',
+      athleteId: initial?.athleteId ?? widget.athleteId,
+      recordedBy: initial?.recordedBy ?? trainerUid,
+      recordedAt: initial?.recordedAt ?? DateTime.now().toUtc(),
       cmjCm: _parseDouble(_cmjCtrl),
       squatJumpCm: _parseDouble(_squatJumpCtrl),
       abalakovCm: _parseDouble(_abalakovCtrl),
@@ -270,7 +307,12 @@ class _LogPerformanceTestScreenState
     );
 
     try {
-      await ref.read(performanceTestRepositoryProvider).add(test);
+      final repo = ref.read(performanceTestRepositoryProvider);
+      if (initial != null) {
+        await repo.update(test);
+      } else {
+        await repo.add(test);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,7 +324,13 @@ class _LogPerformanceTestScreenState
               // navegación.
               const TreinoSuccessCheck(size: 18, strokeWidth: 2),
               const SizedBox(width: 10),
-              Flexible(child: Text(l10n.performanceLogSaveSuccess)),
+              Flexible(
+                child: Text(
+                  initial != null
+                      ? l10n.performanceLogUpdateSuccess
+                      : l10n.performanceLogSaveSuccess,
+                ),
+              ),
             ],
           ),
         ),
@@ -310,7 +358,8 @@ class _LogPerformanceTestScreenState
         trainerUid != null && !_saving && _hasAnyMetric && !_hasInvalid;
     // Real instant; _formatDateTime localizes it for display (#392). The record
     // is still persisted as UTC in _save — same instant, shown in local time.
-    final now = DateTime.now();
+    // Alta muestra «ahora»; edición, la fecha original de la evaluación.
+    final now = widget.initial?.recordedAt ?? DateTime.now();
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -339,7 +388,9 @@ class _LogPerformanceTestScreenState
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        l10n.performanceLogTitle,
+                        widget.initial != null
+                            ? l10n.performanceLogTitleEdit
+                            : l10n.performanceLogTitle,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
@@ -575,7 +626,9 @@ class _LogPerformanceTestScreenState
                           ),
                         )
                       : Text(
-                          l10n.performanceLogSaveCta,
+                          widget.initial != null
+                              ? l10n.performanceLogUpdateCta
+                              : l10n.performanceLogSaveCta,
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,

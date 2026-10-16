@@ -31,6 +31,8 @@ import '../../insights/presentation/widgets/day_strip_labels.dart';
 import '../../performance/application/performance_test_providers.dart';
 import '../../performance/presentation/log_performance_test_screen.dart';
 import '../../performance/presentation/widgets/performance_progress_chart.dart';
+import '../../performance/presentation/widgets/performance_test_history_list.dart';
+import '../../performance/domain/performance_test.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../insights/domain/chart_period.dart';
@@ -194,7 +196,8 @@ class _AthleteDetailBody extends ConsumerWidget {
 
                 // ── Rendimiento section ──────────────────────────────────
                 const SizedBox(height: 20),
-                _RendimientoSection(athleteId: athleteId),
+                _RendimientoSection(
+                    athleteId: athleteId, trainerUid: trainerUid),
 
                 // ── Historial de sesiones section ─────────────────────────
                 const SizedBox(height: 20),
@@ -888,16 +891,25 @@ class _MetricChip extends StatelessWidget {
 ///
 /// When ≥2 tests exist a PROGRESO chart card is rendered below the summary
 /// card. With <2 tests a muted hint card is shown.
+///
+/// Debajo, un HISTORIAL con EDITAR/BORRAR por fila (#1485) vía
+/// [PerformanceTestHistoryList]: las acciones sólo aparecen en las filas que
+/// cargó este PF (`recordedBy == trainerUid`), como exigen las reglas.
 class _RendimientoSection extends ConsumerWidget {
-  const _RendimientoSection({required this.athleteId});
+  const _RendimientoSection({
+    required this.athleteId,
+    required this.trainerUid,
+  });
 
   final String athleteId;
+  final String trainerUid;
 
-  void _openLogForm(BuildContext context) {
+  void _openLogForm(BuildContext context, {PerformanceTest? initial}) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
-        builder: (_) => LogPerformanceTestScreen(athleteId: athleteId),
+        builder: (_) =>
+            LogPerformanceTestScreen(athleteId: athleteId, initial: initial),
       ),
     );
   }
@@ -1055,6 +1067,24 @@ class _RendimientoSection extends ConsumerWidget {
                         ),
                       ),
                     ),
+
+                  // ── Historial con editar/borrar por fila (#1485) ───────
+                  const SizedBox(height: 12),
+                  Text(
+                    AppL10n.of(context).measurementsHistoryTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  PerformanceTestHistoryList(
+                    tests: tests,
+                    currentUid: trainerUid,
+                    onEdit: (t) => _openLogForm(context, initial: t),
+                  ),
                 ],
               );
             },
