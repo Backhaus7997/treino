@@ -2279,5 +2279,6 @@
   "performanceDeleteConfirmTitle": "Delete assessment?",
   "performanceDeleteConfirmBody": "The assessment from {date} will be deleted. This can't be undone.",
   "performanceDeleteSuccess": "Assessment deleted",
-  "performanceDeleteError": "We couldn't delete the assessment. Try again."
+  "performanceDeleteError": "We couldn't delete the assessment. Try again.",
+  "onboardingCustomExerciseNotNow": "NOT NOW"
 }

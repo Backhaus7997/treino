@@ -9084,6 +9084,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar la evaluación. Probá de nuevo.'**
   String get performanceDeleteError;
+
+  /// Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AHORA NO'**
+  String get onboardingCustomExerciseNotNow;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

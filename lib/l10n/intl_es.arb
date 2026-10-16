@@ -1164,5 +1164,6 @@
   "performanceDeleteConfirmTitle": "¿Eliminar evaluación?",
   "performanceDeleteConfirmBody": "Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.",
   "performanceDeleteSuccess": "Evaluación eliminada",
-  "performanceDeleteError": "No pudimos eliminar la evaluación. Prueba de nuevo."
+  "performanceDeleteError": "No pudimos eliminar la evaluación. Prueba de nuevo.",
+  "onboardingCustomExerciseNotNow": "AHORA NO"
 }

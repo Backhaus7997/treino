@@ -5387,6 +5387,9 @@ class AppL10nEs extends AppL10n {
   @override
   String get performanceDeleteError =>
       'No pudimos eliminar la evaluación. Prueba de nuevo.';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10769,4 +10772,7 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get performanceDeleteError =>
       'No pudimos eliminar la evaluación. Probá de nuevo.';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
 }

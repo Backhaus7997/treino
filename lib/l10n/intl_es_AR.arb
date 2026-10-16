@@ -4880,5 +4880,7 @@
   "performanceDeleteSuccess": "Evaluación eliminada",
   "@performanceDeleteSuccess": {"description": "SnackBar tras borrar una evaluación."},
   "performanceDeleteError": "No pudimos eliminar la evaluación. Probá de nuevo.",
-  "@performanceDeleteError": {"description": "SnackBar si falla el borrado."}
+  "@performanceDeleteError": {"description": "SnackBar si falla el borrado."},
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "@onboardingCustomExerciseNotNow": {"description": "Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489)."}
 }

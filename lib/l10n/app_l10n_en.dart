@@ -5288,4 +5288,7 @@ class AppL10nEn extends AppL10n {
   @override
   String get performanceDeleteError =>
       'We couldn\'t delete the assessment. Try again.';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'NOT NOW';
 }
