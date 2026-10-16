@@ -159,4 +159,41 @@ void main() {
     ));
     expect(guardar.onPressed, isNull);
   });
+
+  testWidgets(
+      '#1485 edición: una evaluación sólo con notas (las crea el Coach Hub) se '
+      'puede guardar', (tester) async {
+    final repo = _MockPerformanceTestRepository();
+    when(() => repo.update(any())).thenAnswer((_) async {});
+    final initial = PerformanceTest(
+      id: 't1',
+      athleteId: 'athleteX',
+      recordedBy: 'trainerT',
+      recordedAt: DateTime.utc(2026, 3, 10, 14, 30),
+      notes: 'sólo una nota',
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        performanceTestRepositoryProvider.overrideWithValue(repo),
+        currentUidProvider.overrideWithValue('trainerT'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: LogPerformanceTestScreen(athleteId: 'athleteX', initial: initial),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.text('sólo una nota'), 'nota corregida');
+    await tester.pump();
+    await tester.tap(find.text('GUARDAR CAMBIOS'));
+    await tester.pump();
+
+    final saved = verify(() => repo.update(captureAny())).captured.single
+        as PerformanceTest;
+    expect(saved.notes, 'nota corregida');
+  });
 }

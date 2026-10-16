@@ -117,4 +117,21 @@ void main() {
     final y1 = tester.getTopLeft(find.textContaining('1 ').first).dy;
     expect(y20, lessThan(y1));
   });
+
+  testWidgets(
+      '"Ver todas" no construye todo el historial de una: la lista expandida '
+      'es perezosa (AGENTS §6)', (tester) async {
+    final tests = [
+      for (var i = 0; i < 200; i++) _test('t$i', day: 1 + i % 28),
+    ];
+    await _pump(tester, tests: tests, repo: _MockRepo());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Ver todas (200)'));
+    await tester.pumpAndSettle();
+
+    final filas = find.byTooltip('Editar evaluación').evaluate().length;
+    expect(filas, greaterThan(5), reason: 'se expandió');
+    expect(filas, lessThan(200), reason: 'pero sólo lo visible');
+  });
 }
