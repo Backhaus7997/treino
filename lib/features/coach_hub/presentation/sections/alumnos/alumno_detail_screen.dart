@@ -1540,7 +1540,7 @@ class _ResumenTab extends ConsumerWidget {
           : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
       deltaColor: pesoDelta == null
           ? null
-          : (pesoDelta >= 0 ? palette.accent : palette.danger),
+          : (pesoDelta >= 0 ? palette.accent : palette.dangerText),
       caption: pesoDelta == null ? null : '30 días',
     );
 
@@ -1577,7 +1577,7 @@ class _ResumenTab extends ConsumerWidget {
                           '${adhDelta.abs().round()} pts',
                   deltaColor: adhDelta == null
                       ? null
-                      : (adhDelta >= 0 ? palette.accent : palette.danger),
+                      : (adhDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       adh == null ? 'Todavía sin datos' : 'vs 30 días previos',
                 ),
@@ -1600,7 +1600,7 @@ class _ResumenTab extends ConsumerWidget {
                       : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
                   deltaColor: volDelta == null
                       ? null
-                      : (volDelta >= 0 ? palette.accent : palette.danger),
+                      : (volDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       volDelta == null ? 'esta semana' : 'vs semana pasada',
                 ),
@@ -4113,7 +4113,7 @@ class _ArchivoRow extends ConsumerWidget {
             TreinoIconButton(
               icon: TreinoIcon.trash,
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
-              color: palette.danger,
+              color: palette.dangerText,
               onPressed: onDelete,
             ),
           ],
@@ -4380,7 +4380,7 @@ class _MedicionRowState extends State<_MedicionRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -5198,7 +5198,7 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -5955,7 +5955,7 @@ class _SeguimientoEntryCard extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 onPressed: onDelete,
               ),
             ],
@@ -6607,7 +6607,7 @@ class _MealEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar comida', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6723,7 +6723,7 @@ class _GroupEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6903,7 +6903,7 @@ class _OptionRow extends StatelessWidget {
         TreinoIconButton(
           icon: TreinoIcon.trash,
           tooltip: 'Eliminar opción', // i18n: Fase W2
-          color: palette.danger,
+          color: palette.dangerText,
           size: TreinoButtonSize.xs,
           onPressed: onDelete,
         ),

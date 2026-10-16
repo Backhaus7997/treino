@@ -740,7 +740,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                   l10n.dashboardFeedbackSaveError,
                   style: GoogleFonts.barlow(
                     fontSize: 13,
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ),
               ],

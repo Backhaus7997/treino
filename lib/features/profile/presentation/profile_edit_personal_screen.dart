@@ -461,7 +461,7 @@ class _ProfileEditPersonalScreenState
             child: Text(
               'DESCARTAR', // i18n: Fase 6 Etapa 3
               style: GoogleFonts.barlowCondensed(
-                color: palette.danger,
+                color: palette.dangerText,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 1.0,
@@ -790,7 +790,7 @@ class _ProfileEditPersonalScreenState
         borderSide: BorderSide(color: palette.danger),
       ),
       errorStyle: GoogleFonts.barlow(
-        color: palette.danger,
+        color: palette.dangerText,
         fontSize: 12,
       ),
     );

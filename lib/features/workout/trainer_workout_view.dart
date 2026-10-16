@@ -505,7 +505,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
               'Eliminar',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                color: widget.palette.danger,
+                color: widget.palette.dangerText,
               ),
             ),
           ),
@@ -809,7 +809,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                 child: _MenuRow(
                   icon: TreinoIcon.trash,
                   label: 'Eliminar',
-                  color: palette.danger,
+                  color: palette.dangerText,
                 ),
               ),
             ],

@@ -198,7 +198,7 @@ class _StatCard extends StatelessWidget {
                 Icon(
                   delta! > 0 ? TreinoIcon.trendUp : TreinoIcon.trendDown,
                   size: 14,
-                  color: delta! > 0 ? palette.accent : palette.danger,
+                  color: delta! > 0 ? palette.accent : palette.dangerText,
                 ),
               ],
             ],

@@ -852,7 +852,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           key: const Key('invalid_week_hint'),
           style: GoogleFonts.barlow(
             fontSize: 11,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ],
@@ -2126,7 +2126,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
               child: Text(l10n.routineEditorScopeAllWeeks,
-                  style: TextStyle(color: palette.danger)),
+                  style: TextStyle(color: palette.dangerText)),
             ),
           ],
         );

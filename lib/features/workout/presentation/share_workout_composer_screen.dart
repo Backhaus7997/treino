@@ -472,7 +472,7 @@ class _PhotoField extends StatelessWidget {
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: 12,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ],

@@ -76,13 +76,13 @@ Future<void> showModerationMenu(
             },
           ),
           ListTile(
-            leading: Icon(TreinoIcon.block, color: palette.danger),
+            leading: Icon(TreinoIcon.block, color: palette.dangerText),
             title: Text(
               l10n.moderationBlockAction,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: AppTextSize.body,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
             onTap: () {

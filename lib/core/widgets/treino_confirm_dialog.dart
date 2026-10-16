@@ -96,7 +96,7 @@ class _TreinoConfirmDialog extends StatelessWidget {
               fontSize: AppTextSize.body,
               // Texto, no relleno: `accentText` y no `accent` (mint sobre
               // blanco da ~1,6:1 en claro).
-              color: destructive ? palette.danger : palette.accentText,
+              color: destructive ? palette.dangerText : palette.accentText,
             ),
           ),
         ),

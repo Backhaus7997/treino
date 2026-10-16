@@ -612,7 +612,7 @@ class _ProfileEditTrainerScreenState
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: palette.danger, fontSize: 13),
+                style: TextStyle(color: palette.dangerText, fontSize: 13),
               ),
             ],
             const SizedBox(height: 20),
@@ -843,7 +843,7 @@ class _GymsSection extends ConsumerWidget {
               children: [
                 Text(
                   l10n.profileLoadError,
-                  style: TextStyle(color: palette.danger, fontSize: 13),
+                  style: TextStyle(color: palette.dangerText, fontSize: 13),
                 ),
                 const SizedBox(height: 8),
                 Align(
@@ -1466,7 +1466,7 @@ class _CustomLocationSheetState extends ConsumerState<_CustomLocationSheet> {
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: palette.danger, fontSize: 13),
+              style: TextStyle(color: palette.dangerText, fontSize: 13),
             ),
           ],
           const SizedBox(height: 16),
