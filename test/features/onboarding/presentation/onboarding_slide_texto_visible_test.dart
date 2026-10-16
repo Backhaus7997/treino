@@ -18,12 +18,14 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../helpers/layout_failure.dart';
 
-Future<void> _pump(
-    WidgetTester tester, OnboardingSlide slide, Size size) async {
+Future<void> _pump(WidgetTester tester, OnboardingSlide slide, Size size,
+    {double textScale = 1.0}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  tester.platformDispatcher.textScaleFactorTestValue = textScale;
+  addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   await tester.pumpWidget(
     ProviderScope(
       child: MaterialApp(
@@ -76,5 +78,26 @@ void main() {
         });
       }
     }
+  }
+
+  // Si ni el texto solo entra (landscape, letra a 1,3×), la ilustración ya se
+  // achicó a 0: el texto tiene que SCROLLEAR, no desbordar abajo del CTA.
+  const extremos = {
+    'landscape 667×375': (Size(667, 375), 1.0),
+    'SE con letra a 1,3×': (Size(375, 667), 1.3),
+  };
+  for (final MapEntry(key: caso, value: (size, escala)) in extremos.entries) {
+    testWidgets('el texto no desborda: scrollea ($caso)', (tester) async {
+      final slide = athleteOnboardingSlides.first;
+      await _pump(tester, slide, size, textScale: escala);
+      expect(drainLayoutFailure(tester), isNull);
+      final scroll = find.ancestor(
+          of: find.text(slide.body),
+          matching: find.byType(SingleChildScrollView));
+      expect(scroll, findsOneWidget);
+      final visible =
+          tester.getRect(find.byKey(const Key('onboarding_page_view')));
+      expect(tester.getRect(scroll).bottom, lessThanOrEqualTo(visible.bottom));
+    });
   }
 }

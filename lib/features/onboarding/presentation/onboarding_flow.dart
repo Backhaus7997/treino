@@ -179,80 +179,89 @@ class _SlideView extends StatelessWidget {
     // renglón contra el CTA. Ahora el texto toma su alto natural primero, y la
     // ilustración se ACHICA para entrar en lo que queda (`FittedBox`); con
     // lugar de sobra, el bloque sigue centrado como antes.
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Flexible(
-          child: Padding(
-            // El aire de abajo era `s8`: 8px, el escalón más chico de la
-            // escala, para separar una ilustración de casi media pantalla
-            // del titular que la explica. La imagen y el texto se leían
-            // como un solo bloque pegoteado.
-            //
-            // Sube a `s20` y el de arriba baja de `s18` a `s12`: como el
-            // slide está centrado verticalmente entre la barra de progreso
-            // y el CTA, correr aire de arriba hacia abajo levanta la
-            // ilustración Y le abre espacio al texto con el mismo
-            // movimiento.
-            padding:
-                const EdgeInsets.fromLTRB(0, AppSpacing.s12, 0, AppSpacing.s20),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: OnboardingDevicePreview(child: slide.preview),
-              ),
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: palette.accent,
-                      borderRadius: BorderRadius.circular(
-                          AppDecorativeRadii.progressSegment),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Icon(slide.icon, size: 28, color: palette.accent),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      slide.title,
-                      style: GoogleFonts.barlowCondensed(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        height: 1.0,
-                        color: palette.textPrimary,
+    //
+    // Si ni el texto solo entra (landscape, split-screen, letra a 1,3×), el
+    // texto se topea al alto disponible y SCROLLEA, en vez de desbordar abajo
+    // del CTA: la ilustración ya quedó en 0 y no hay otra cosa que achicar.
+    return LayoutBuilder(
+        builder: (context, constraints) => Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Flexible(
+                  child: Padding(
+                    // El aire de abajo era `s8`: 8px, el escalón más chico de la
+                    // escala, para separar una ilustración de casi media pantalla
+                    // del titular que la explica. La imagen y el texto se leían
+                    // como un solo bloque pegoteado.
+                    //
+                    // Sube a `s20` y el de arriba baja de `s18` a `s12`: como el
+                    // slide está centrado verticalmente entre la barra de progreso
+                    // y el CTA, correr aire de arriba hacia abajo levanta la
+                    // ilustración Y le abre espacio al texto con el mismo
+                    // movimiento.
+                    padding: const EdgeInsets.fromLTRB(
+                        0, AppSpacing.s12, 0, AppSpacing.s20),
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: OnboardingDevicePreview(child: slide.preview),
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                slide.body,
-                style: GoogleFonts.barlow(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w400,
-                  height: 1.5,
-                  color: palette.textMuted,
                 ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: constraints.maxHeight),
+                  child: SingleChildScrollView(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: palette.accent,
+                                borderRadius: BorderRadius.circular(
+                                    AppDecorativeRadii.progressSegment),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Icon(slide.icon, size: 28, color: palette.accent),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Text(
+                                slide.title,
+                                style: GoogleFonts.barlowCondensed(
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                  height: 1.0,
+                                  color: palette.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          slide.body,
+                          style: GoogleFonts.barlow(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w400,
+                            height: 1.5,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ));
   }
 }
 
