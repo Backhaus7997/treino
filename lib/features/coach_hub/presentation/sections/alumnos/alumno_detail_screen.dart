@@ -77,6 +77,7 @@ import 'package:treino/features/profile/application/user_providers.dart'
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/core/utils/metric_range.dart';
 import 'package:treino/core/utils/metric_range_message.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../infrastructure/browser_download.dart';
@@ -1463,8 +1464,9 @@ String _trimNum(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 /// Volumen compacto: kg hasta 999, toneladas con un decimal de ahí en más.
-String _fmtVolKg(double kg) =>
-    kg >= 1000 ? '${(kg / 1000).toStringAsFixed(1)} t' : '${kg.round()} kg';
+String _fmtVolKg(double kg, String localeName) => kg >= 1000
+    ? '${formatNumberDisplay(kg / 1000, localeName)} t'
+    : '${formatNumberDisplay(kg.round(), localeName)} kg';
 
 /// Tab Resumen (W2 PR4): 4 métricas derivadas + heatmap de adherencia de 12
 /// semanas. Sólo usa data trainer-readable (sesiones, mediciones, plan
@@ -1598,7 +1600,8 @@ class _ResumenTab extends ConsumerWidget {
                   palette: palette,
                   icon: TreinoIcon.dumbbell,
                   label: 'VOLUMEN', // i18n: Fase W2
-                  value: _fmtVolKg(m.volumenSemanaActualKg),
+                  value: _fmtVolKg(
+                      m.volumenSemanaActualKg, AppL10n.of(context).localeName),
                   delta: volDelta == null
                       ? null
                       : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
@@ -4306,10 +4309,13 @@ class _MedicionRowState extends State<_MedicionRow> {
   /// Si alguno es null, se omite del summary.
   String _summary() {
     final m = widget.measurement;
+    // Con el locale: «78,5 kg», no el double crudo «78.5 kg» ni «78.0 kg».
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final parts = <String>[];
-    if (m.weightKg != null) parts.add('${m.weightKg} kg');
-    if (m.fatPercentage != null) parts.add('${m.fatPercentage}% grasa');
-    if (m.waistCm != null) parts.add('cintura ${m.waistCm} cm');
+    if (m.weightKg != null) parts.add('${n(m.weightKg)} kg');
+    if (m.fatPercentage != null) parts.add('${n(m.fatPercentage)}% grasa');
+    if (m.waistCm != null) parts.add('cintura ${n(m.waistCm)} cm');
     if (parts.isEmpty) return 'Sin datos de composición'; // i18n: Fase W2
     return parts.join(' · ');
   }
@@ -4412,33 +4418,37 @@ class _MedicionDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = measurement;
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final entries = <(String, String)>[
       // Composición
-      if (m.weightKg != null) ('Peso', '${m.weightKg} kg'),
-      if (m.fatPercentage != null) ('% grasa', '${m.fatPercentage}%'),
-      if (m.muscleMassKg != null) ('Masa muscular', '${m.muscleMassKg} kg'),
+      if (m.weightKg != null) ('Peso', '${n(m.weightKg)} kg'),
+      if (m.fatPercentage != null) ('% grasa', '${n(m.fatPercentage)}%'),
+      if (m.muscleMassKg != null) ('Masa muscular', '${n(m.muscleMassKg)} kg'),
       // Trunk
-      if (m.shouldersCm != null) ('Hombros', '${m.shouldersCm} cm'),
-      if (m.chestCm != null) ('Pecho', '${m.chestCm} cm'),
-      if (m.waistCm != null) ('Cintura', '${m.waistCm} cm'),
-      if (m.hipsCm != null) ('Cadera', '${m.hipsCm} cm'),
-      if (m.glutesCm != null) ('Glúteos', '${m.glutesCm} cm'),
+      if (m.shouldersCm != null) ('Hombros', '${n(m.shouldersCm)} cm'),
+      if (m.chestCm != null) ('Pecho', '${n(m.chestCm)} cm'),
+      if (m.waistCm != null) ('Cintura', '${n(m.waistCm)} cm'),
+      if (m.hipsCm != null) ('Cadera', '${n(m.hipsCm)} cm'),
+      if (m.glutesCm != null) ('Glúteos', '${n(m.glutesCm)} cm'),
       // Upper
-      if (m.bicepsLCm != null) ('Bíceps izq.', '${m.bicepsLCm} cm'),
-      if (m.bicepsRCm != null) ('Bíceps der.', '${m.bicepsRCm} cm'),
+      if (m.bicepsLCm != null) ('Bíceps izq.', '${n(m.bicepsLCm)} cm'),
+      if (m.bicepsRCm != null) ('Bíceps der.', '${n(m.bicepsRCm)} cm'),
       if (m.bicepsFlexedLCm != null)
-        ('Bíceps flex. izq.', '${m.bicepsFlexedLCm} cm'),
+        ('Bíceps flex. izq.', '${n(m.bicepsFlexedLCm)} cm'),
       if (m.bicepsFlexedRCm != null)
-        ('Bíceps flex. der.', '${m.bicepsFlexedRCm} cm'),
-      if (m.forearmLCm != null) ('Antebrazo izq.', '${m.forearmLCm} cm'),
-      if (m.forearmRCm != null) ('Antebrazo der.', '${m.forearmRCm} cm'),
+        ('Bíceps flex. der.', '${n(m.bicepsFlexedRCm)} cm'),
+      if (m.forearmLCm != null) ('Antebrazo izq.', '${n(m.forearmLCm)} cm'),
+      if (m.forearmRCm != null) ('Antebrazo der.', '${n(m.forearmRCm)} cm'),
       // Lower
-      if (m.upperThighLCm != null) ('Muslo sup. izq.', '${m.upperThighLCm} cm'),
-      if (m.upperThighRCm != null) ('Muslo sup. der.', '${m.upperThighRCm} cm'),
-      if (m.midThighLCm != null) ('Muslo med. izq.', '${m.midThighLCm} cm'),
-      if (m.midThighRCm != null) ('Muslo med. der.', '${m.midThighRCm} cm'),
-      if (m.calfLCm != null) ('Gemelo izq.', '${m.calfLCm} cm'),
-      if (m.calfRCm != null) ('Gemelo der.', '${m.calfRCm} cm'),
+      if (m.upperThighLCm != null)
+        ('Muslo sup. izq.', '${n(m.upperThighLCm)} cm'),
+      if (m.upperThighRCm != null)
+        ('Muslo sup. der.', '${n(m.upperThighRCm)} cm'),
+      if (m.midThighLCm != null) ('Muslo med. izq.', '${n(m.midThighLCm)} cm'),
+      if (m.midThighRCm != null) ('Muslo med. der.', '${n(m.midThighRCm)} cm'),
+      if (m.calfLCm != null) ('Gemelo izq.', '${n(m.calfLCm)} cm'),
+      if (m.calfRCm != null) ('Gemelo der.', '${n(m.calfRCm)} cm'),
     ];
 
     if (entries.isEmpty && (m.notes ?? '').isEmpty) {

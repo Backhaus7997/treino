@@ -97,7 +97,8 @@ class MonthlyReportSummaryCards extends StatelessWidget {
         ),
         _StatCard(
           label: labels.durationLabel,
-          value: _formatDurationHours(selectedMonth.durationMin),
+          value: _formatDurationHours(
+              selectedMonth.durationMin, labels.localeName),
           unit: labels.durationUnit,
           delta: previousMonth == null
               ? null
@@ -126,10 +127,8 @@ class MonthlyReportSummaryCards extends StatelessWidget {
   }
 }
 
-String _formatDurationHours(int minutes) {
-  final hours = minutes / 60;
-  return hours % 1 == 0 ? hours.toStringAsFixed(0) : hours.toStringAsFixed(1);
-}
+String _formatDurationHours(int minutes, String localeName) =>
+    formatNumberDisplay(minutes / 60, localeName);
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 

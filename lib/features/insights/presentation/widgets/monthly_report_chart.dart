@@ -275,9 +275,7 @@ class _Bars extends StatelessWidget {
     final value = _valueOf(point);
     if (metric == MonthlyReportMetric.duration) {
       final hours = value.toDouble();
-      return hours % 1 == 0
-          ? hours.toStringAsFixed(0)
-          : hours.toStringAsFixed(1);
+      return formatNumberDisplay(hours, localeName);
     }
     if (metric == MonthlyReportMetric.volume && value is double) {
       return formatVolumeKg(value, localeName);

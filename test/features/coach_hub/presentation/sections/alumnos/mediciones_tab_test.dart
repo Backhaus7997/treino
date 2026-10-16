@@ -279,14 +279,12 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: measurements)));
     await _selectMedicionesTab(tester);
 
-    // Summary de m1 → peso + %grasa (double `78` renderiza como "78.0")
-    await _scrollHasta(tester, find.textContaining('78.0 kg'));
-    expect(find.textContaining('78.0 kg'), findsOneWidget);
-    expect(find.textContaining('15.0% grasa'), findsOneWidget);
+    // Summary de m1 → peso + %grasa (con el locale: `78` → «78», sin ,0)
+    await _scrollHasta(tester, find.textContaining('78 kg · 15% grasa'));
+    expect(find.textContaining('78 kg · 15% grasa'), findsOneWidget);
     // Summary de m2 → peso + cintura
-    await _scrollHasta(tester, find.textContaining('80.0 kg'));
-    expect(find.textContaining('80.0 kg'), findsOneWidget);
-    expect(find.textContaining('cintura 82.0 cm'), findsOneWidget);
+    await _scrollHasta(tester, find.textContaining('80 kg · cintura 82 cm'));
+    expect(find.textContaining('80 kg · cintura 82 cm'), findsOneWidget);
   });
 
   testWidgets('Antropometría reúne gráfico de lectura y lista editable',
@@ -316,9 +314,9 @@ void main() {
     // segunda fila no está en el árbol hasta llegar. Que haya que scrollear ES
     // la prueba de que el viewport quedó perezoso.
     // La lista va DESC, así que la segunda fila es m1 (72). Su summary usa el
-    // double crudo — '72.0 kg' — a diferencia de la card de lectura, que lo
+    // double crudo — '72 kg' — a diferencia de la card de lectura, que lo
     // recorta a '72 kg'.
-    await _scrollHasta(tester, find.textContaining('72.0 kg'));
+    await _scrollHasta(tester, find.textContaining('72 kg'));
     expect(find.byIcon(TreinoIcon.edit), findsNWidgets(2));
   });
 
@@ -376,8 +374,11 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: [m])));
     await _selectMedicionesTab(tester);
 
-    // Antes del tap: solo summary visible.
-    expect(find.textContaining('78.0 kg'), findsOneWidget);
+    // Antes del tap: solo summary visible. Se busca la línea del summary
+    // entera: «78 kg» suelto también lo dice la card de lectura de arriba.
+    expect(find.textContaining('78 kg · 15% grasa'), findsOneWidget);
+    // Cuántos «82 cm» hay ANTES de expandir (la card de lectura ya lo dice).
+    final antes = find.text('82 cm').evaluate().length;
 
     // Tap en la row (usa el chevron).
     await tester.tap(find.byIcon(TreinoIcon.chevronRight));
@@ -388,11 +389,12 @@ void main() {
     // Ojo con qué se afirma acá. Desde que Progreso y Mediciones son una sola
     // vista, la card de lectura de arriba (`_MeasCard`) también rotula 'Peso' y
     // 'Cintura': afirmar esos dos daría verde aunque la expansión no hubiera
-    // abierto nada. Los dos de abajo no tienen esa ambigüedad — '% grasa' es
-    // minúscula sólo en el detalle (la card dice '% Graso'), y el detalle
-    // imprime el double crudo ('82.0 cm') donde la card lo recorta ('82 cm').
+    // abierto nada. '% grasa' es minúscula sólo en el detalle (la card dice
+    // '% Graso'). El detalle antes se distinguía porque imprimía el double
+    // crudo ('82.0 cm'); con el locale los dos dicen «82 cm», así que se mide
+    // que la expansión SUME uno.
     expect(find.text('% grasa'), findsOneWidget);
-    expect(find.text('82.0 cm'), findsOneWidget);
+    expect(find.text('82 cm').evaluate().length, antes + 1);
   });
 
   testWidgets('tap en trash → confirm dialog → repository.delete llamado',

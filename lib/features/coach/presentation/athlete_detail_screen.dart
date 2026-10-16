@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -577,8 +578,8 @@ String _formatMeasurementDate(DateTime dt, String localeName) {
 /// Formats a metric double for the summary cards. Mirrors the chart header
 /// formatting (see measurement_progress_chart.dart) so whole numbers render
 /// as '70' (not '70.0') and float tails are trimmed to one decimal.
-String _formatMetricValue(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+String _formatMetricValue(double value, String localeName) =>
+    formatNumberDisplay(value, localeName);
 
 /// Section that shows the latest anthropometric measurement for [athleteId]
 /// and a '+ Cargar' CTA to open the log form.
@@ -724,22 +725,22 @@ class _AntropometriaSection extends ConsumerWidget {
                             if (latest.weightKg != null)
                               _Metric(
                                 'Peso',
-                                '${_formatMetricValue(latest.weightKg!)} kg',
+                                '${_formatMetricValue(latest.weightKg!, localeName)} kg',
                               ),
                             if (latest.fatPercentage != null)
                               _Metric(
                                 '% Graso',
-                                '${_formatMetricValue(latest.fatPercentage!)}%',
+                                '${_formatMetricValue(latest.fatPercentage!, localeName)}%',
                               ),
                             if (latest.muscleMassKg != null)
                               _Metric(
                                 'Masa muscular',
-                                '${_formatMetricValue(latest.muscleMassKg!)} kg',
+                                '${_formatMetricValue(latest.muscleMassKg!, localeName)} kg',
                               ),
                             if (latest.waistCm != null)
                               _Metric(
                                 'Cintura',
-                                '${_formatMetricValue(latest.waistCm!)} cm',
+                                '${_formatMetricValue(latest.waistCm!, localeName)} cm',
                               ),
                           ],
                           palette: palette,
@@ -1026,16 +1027,16 @@ class _RendimientoSection extends ConsumerWidget {
                             // consistente con la card de MEDICIONES vecina.
                             if (latest.cmjCm != null)
                               _Metric('CMJ',
-                                  '${_formatMetricValue(latest.cmjCm!)} cm'),
+                                  '${_formatMetricValue(latest.cmjCm!, localeName)} cm'),
                             if (latest.squat1rmKg != null)
                               _Metric('Sentadilla 1RM',
-                                  '${_formatMetricValue(latest.squat1rmKg!)} kg'),
+                                  '${_formatMetricValue(latest.squat1rmKg!, localeName)} kg'),
                             if (latest.sprint20mS != null)
                               _Metric('Sprint 20m',
-                                  '${_formatMetricValue(latest.sprint20mS!)} s'),
+                                  '${_formatMetricValue(latest.sprint20mS!, localeName)} s'),
                             if (latest.vo2maxMlKgMin != null)
                               _Metric('VO2máx',
-                                  '${_formatMetricValue(latest.vo2maxMlKgMin!)} ml/kg/min'),
+                                  '${_formatMetricValue(latest.vo2maxMlKgMin!, localeName)} ml/kg/min'),
                           ],
                           palette: palette,
                         ),

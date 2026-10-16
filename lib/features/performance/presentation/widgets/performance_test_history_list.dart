@@ -180,14 +180,16 @@ class _HistoryRow extends StatelessWidget {
   /// Las mismas cuatro métricas clave que la card de resumen de RENDIMIENTO.
   /// Sin ninguna cae a las notas, y si tampoco hay notas, a cuántas métricas
   /// trae — una evaluación siempre tiene al menos una.
-  String _summary() {
+  String _summary(String localeName) {
+    // Con el locale: «42,5 cm», no «42.5 cm» (#1481).
+    String n(double? v) => formatNumberDisplay(v!, localeName, maxDecimals: 2);
     final t = test;
     final parts = <String>[
-      if (t.cmjCm != null) 'CMJ ${formatWeightKg(t.cmjCm)} cm',
+      if (t.cmjCm != null) 'CMJ ${n(t.cmjCm)} cm',
       if (t.squat1rmKg != null)
-        'Sentadilla ${formatWeightKg(t.squat1rmKg)} kg', // i18n: Fase W2
-      if (t.sprint20mS != null) '20m ${formatWeightKg(t.sprint20mS)} s',
-      if (t.vo2maxMlKgMin != null) 'VO2máx ${formatWeightKg(t.vo2maxMlKgMin)}',
+        'Sentadilla ${n(t.squat1rmKg)} kg', // i18n: Fase W2
+      if (t.sprint20mS != null) '20m ${n(t.sprint20mS)} s',
+      if (t.vo2maxMlKgMin != null) 'VO2máx ${n(t.vo2maxMlKgMin)}',
     ];
     if (parts.isNotEmpty) return parts.join(' · ');
     final notes = t.notes;
@@ -219,7 +221,7 @@ class _HistoryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _summary(),
+                  _summary(l10n.localeName),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.barlow(

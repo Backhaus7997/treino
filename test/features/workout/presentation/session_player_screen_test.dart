@@ -900,7 +900,8 @@ void main() {
       const spec = SetSpec(distanceMeters: 6);
 
       expect(plannedRepsForSpec(spec, ExerciseMode.distance), 0);
-      expect(repsDisplayText(spec, ExerciseMode.distance), '6 m');
+      expect(repsDisplayText(spec, ExerciseMode.distance, localeName: 'es_AR'),
+          '6 m');
     });
   });
 

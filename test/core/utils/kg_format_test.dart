@@ -126,7 +126,8 @@ void main() {
     test('es_AR: coma decimal, sin ,0 redundante, miles con punto', () {
       expect(formatNumberDisplay(80, 'es_AR'), '80');
       expect(formatNumberDisplay(78.5, 'es_AR'), '78,5');
-      expect(formatNumberDisplay(1.66, 'es_AR'), '1,7'); // 1.65 es 1.6499… en binario
+      expect(formatNumberDisplay(1.66, 'es_AR'),
+          '1,7'); // 1.65 es 1.6499… en binario
       expect(formatNumberDisplay(3100, 'es_AR'), '3.100');
       expect(formatNumberDisplay(-12.5, 'es_AR'), '-12,5');
     });
