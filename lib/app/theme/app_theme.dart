@@ -154,7 +154,7 @@ class AppTheme {
 
   static TextStyle _labelDeBoton() => GoogleFonts.barlowCondensed(
         fontWeight: FontWeight.w700,
-        fontSize: 16,
+        fontSize: AppTextSize.bodyLarge,
         letterSpacing: 1.0,
       );
 
