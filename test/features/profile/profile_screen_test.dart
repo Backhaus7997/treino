@@ -27,8 +27,11 @@ class _StubAuthNotifier extends AuthNotifier {
   Future<User?> build() async => _user;
 
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async => _signOuts++;
 }
+
+/// Cuántas veces se llamó a `signOut` en el test en curso (#1504).
+int _signOuts = 0;
 
 UserProfile _testProfile() => UserProfile(
       uid: 'uid-test',
@@ -229,5 +232,36 @@ void main() {
 
       completer.completeError(Exception('cleanup'));
     });
+  });
+
+  // #1504: «Cerrar sesión» cerraba la sesión al primer toque, sin confirmar.
+  testWidgets('#1504: cerrar sesión pide confirmación', (tester) async {
+    _signOuts = 0;
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 0, totalVolumeKg: 0, streak: 0)),
+    ]));
+    await tester.pump();
+
+    final tile = find.text('Cerrar sesión');
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+
+    // Cancelar no cierra la sesión.
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.text('¿Cerrar sesión?'), findsOneWidget);
+    expect(_signOuts, 0, reason: 'el primer toque sólo pregunta');
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(_signOuts, 0);
+
+    // Confirmar sí.
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Salir'));
+    await tester.pumpAndSettle();
+    expect(_signOuts, 1);
   });
 }
