@@ -5346,6 +5346,54 @@ class AppL10nEs extends AppL10n {
   String get timePickerHelpText => 'Elige una hora';
 
   @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Más de $min y hasta $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Prueba de nuevo.';
+
+  @override
   String get commonDelete => 'Eliminar';
 
   @override
@@ -10695,6 +10743,54 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get timePickerHelpText => 'Elegí una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Más de $min y hasta $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Probá de nuevo.';
 
   @override
   String get commonDelete => 'Eliminar';
