@@ -5344,6 +5344,21 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Elige una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Más de $min y hasta $max $unit';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -10683,4 +10698,19 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get timePickerHelpText => 'Elegí una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Más de $min y hasta $max $unit';
+  }
 }

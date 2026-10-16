@@ -5245,4 +5245,19 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Select time';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Between $min and $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Maximum $max $unit';
+  }
+
+  @override
+  String logFieldRangeAbove(String min, String max, String unit) {
+    return 'Above $min and up to $max $unit';
+  }
 }

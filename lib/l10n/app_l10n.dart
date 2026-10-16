@@ -9012,6 +9012,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Elegí una hora'**
   String get timePickerHelpText;
+
+  /// Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entre {min} y {max} {unit}'**
+  String logFieldRange(String min, String max, String unit);
+
+  /// Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Máximo {max} {unit}'**
+  String inputMaxReached(String max, String unit);
+
+  /// Como logFieldRange, pero el mínimo NO es válido (las reglas de performance_tests exigen > 0).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más de {min} y hasta {max} {unit}'**
+  String logFieldRangeAbove(String min, String max, String unit);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
