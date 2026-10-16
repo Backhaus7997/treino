@@ -390,6 +390,32 @@ void main() {
             '(${crearPlan.top})');
   });
 
+  testWidgets('#1484: con el teclado abierto la barra de acciones se saca',
+      (tester) async {
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        currentUidProvider.overrideWithValue('trainer-1'),
+        userPublicProfileProvider('athlete-1').overrideWith(
+          (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+        ),
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async => const [],
+        ),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const AthleteDetailScreen(athleteId: 'athlete-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('CREAR PLAN'), findsNothing);
+  });
+
   // ── Issue #399 — plan-card tap must land on the top-level plan route ──────
   //
   // The bug: AthleteDetailScreen lives OUTSIDE the ShellRoute (top-level,

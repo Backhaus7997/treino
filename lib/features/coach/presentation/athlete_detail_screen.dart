@@ -87,12 +87,20 @@ class AthleteDetailScreen extends ConsumerWidget {
     // botones van en `bottomNavigationBar` para que los SnackBar salgan
     // arriba de ellos (#1484). El fondo liso de la barra es `palette.bg`, el
     // mismo color al que funde el velo del pie del scroll.
+    //
+    // Con el teclado abierto (la NOTA DEL ALUMNO se edita inline) la barra se
+    // saca: subiría pegada al teclado y dejaría Cancelar/Guardar en una
+    // ventana mínima. El inset se lee ACÁ, arriba del Scaffold: adentro del
+    // body el Scaffold ya lo consumió.
+    final tecladoAbierto = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: palette.bg,
-      bottomNavigationBar: _AthleteDetailActions(
-        athleteId: athleteId,
-        trainerUid: trainerUid,
-      ),
+      bottomNavigationBar: tecladoAbierto
+          ? null
+          : _AthleteDetailActions(
+              athleteId: athleteId,
+              trainerUid: trainerUid,
+            ),
       body: AppBackground(
         child: SafeArea(
           child: Column(
