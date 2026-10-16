@@ -16,6 +16,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_message_bubble.dart'
+    show kChatOwnMetaAlpha;
 
 double _ratio(Color a, Color b) {
   final la = a.computeLuminance();
@@ -73,4 +76,23 @@ void main() {
       isNot(AppTheme.dark().textButtonTheme),
     );
   });
+
+  // La metadata de la burbuja propia del chat (hora, check) es ink ATENUADO
+  // sobre el acento: se mide la mezcla real, cuantizada a 8 bits, no el ink
+  // puro. Con `palette.bg` daba ~1,4:1 en claro (Codex en #1520).
+  for (final (nombre, p) in [
+    ('dark', AppPalette.mintMagenta),
+    ('light', AppPalette.mintMagentaLight),
+  ]) {
+    test('metadata de la burbuja propia ≥ 4,5:1 sobre el acento ($nombre)', () {
+      final mezcla = Color.alphaBlend(
+        TreinoButtonTokens.ink.withValues(alpha: kChatOwnMetaAlpha),
+        p.accent,
+      );
+      double q(double v) => (v * 255).round() / 255;
+      final pixel = Color.from(
+          alpha: 1, red: q(mezcla.r), green: q(mezcla.g), blue: q(mezcla.b));
+      expect(_ratio(pixel, p.accent), greaterThanOrEqualTo(4.5));
+    });
+  }
 }
