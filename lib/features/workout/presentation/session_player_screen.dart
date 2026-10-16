@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,6 +44,7 @@ import 'widgets/coach_note.dart';
 import 'widgets/duration_set_row.dart';
 import 'widgets/exercise_feedback_sheet.dart';
 import 'widgets/mmss.dart';
+import 'widgets/rest_timer_bar.dart';
 import 'widgets/set_entry_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../gyms/domain/gym.dart' show hasRealGym;
@@ -210,6 +212,32 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   // context.go() pide al Navigator un pop que PopScope intercepta y dispara
   // showDialog en paralelo a la navegación — produce `!_debugLocked` assertion.
   bool _isFinalizing = false;
+
+  /// Descanso en curso (#1510): cuándo termina y cuánto dura en total. Null =
+  /// no hay. Lo arranca [_logSet] con el `restSeconds` del slot.
+  DateTime? _descansoHasta;
+  int _descansoTotal = 0;
+
+  void _empezarDescanso(int segundos) {
+    setState(() {
+      _descansoHasta = clock.now().add(Duration(seconds: segundos));
+      _descansoTotal = segundos;
+    });
+  }
+
+  void _terminarDescanso() {
+    if (_descansoHasta == null) return;
+    setState(() => _descansoHasta = null);
+  }
+
+  void _sumarDescanso(int segundos) {
+    final hasta = _descansoHasta;
+    if (hasta == null) return;
+    setState(() {
+      _descansoHasta = hasta.add(Duration(seconds: segundos));
+      _descansoTotal += segundos;
+    });
+  }
 
   // Navegación libre (SCENARIO-ORDER): bloques `future` que el usuario destrabó
   // a mano para adelantarlos (p.ej. la máquina del sugerido está ocupada).
@@ -579,6 +607,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             completedAt: DateTime.now(),
           ),
         );
+    // #1510: el descanso configurado en la rutina arranca solo al marcar la
+    // serie. Una serie nueva reinicia la cuenta (no se apilan).
+    if (slot.restSeconds > 0) _empezarDescanso(slot.restSeconds);
   }
 
   /// Actualiza un set ya logueado con nuevos valores de reps y/o peso.
@@ -897,6 +928,18 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
               onAbandon: _showAbandonConfirm,
               onBack: _showAbandonConfirm,
             ),
+            // Fija bajo el header, fuera del scroll: el descanso se mira con
+            // el teléfono apoyado, sin buscarlo. Con la sesión completa no
+            // hay próxima serie que esperar.
+            if (_descansoHasta != null && !state.isFullyCompleted)
+              RestTimerBar(
+                key: ValueKey(_descansoHasta),
+                endsAt: _descansoHasta!,
+                totalSeconds: _descansoTotal,
+                onSkip: _terminarDescanso,
+                onAddSeconds: _sumarDescanso,
+                onDone: _terminarDescanso,
+              ),
             Expanded(
               child: ScrollConfiguration(
                 behavior: ScrollConfiguration.of(context).copyWith(
