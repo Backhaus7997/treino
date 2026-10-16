@@ -16,11 +16,11 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
-import '../../../../app/theme/tokens/primitives.dart';
 
 /// Card shell: `bgCard`, hairline border, r-20 by default.
 class TCard extends StatelessWidget {
@@ -225,8 +225,9 @@ class TButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final border = outlineColor ?? palette.border;
-    // Ink on accent — `onPrimary: palette.bg`.
-    final fg = filled ? palette.bg : (outlineColor ?? palette.textPrimary);
+    // Ink on accent — `TreinoButtonTokens.ink`.
+    final fg =
+        filled ? TreinoButtonTokens.ink : (outlineColor ?? palette.textPrimary);
 
     return Container(
       width: double.infinity,

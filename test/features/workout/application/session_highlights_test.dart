@@ -78,6 +78,14 @@ void main() {
       expect(byType[ProgressionRecordType.heaviestWeight]?.previousBest, 75);
       expect(byType[ProgressionRecordType.bestSetVolume]?.value, 400);
       expect(byType[ProgressionRecordType.bestSetVolume]?.previousBest, 375);
+      // #1512: la mejor serie se muestra como la serie («80 kg × 5»), no como
+      // el producto «400 kg·reps»: el récord lleva la de hoy y la anterior.
+      expect(byType[ProgressionRecordType.bestSetVolume]?.set,
+          (weightKg: 80.0, reps: 5));
+      expect(byType[ProgressionRecordType.bestSetVolume]?.previousSet,
+          (weightKg: 75.0, reps: 5));
+      // Los otros tipos no son «una serie»: no la llevan.
+      expect(byType[ProgressionRecordType.heaviestWeight]?.set, isNull);
       // Epley: 80·(1+5/30) vs 75·(1+5/30).
       expect(
         byType[ProgressionRecordType.oneRepMax]?.value,

@@ -221,14 +221,13 @@ void main() {
         await tester.tap(find.byIcon(TreinoIcon.trash));
         await tester.pumpAndSettle();
 
-        // Confirmation dialog should show
+        // Confirmation dialog should show — título + cuerpo desde #1496.
+        expect(find.text('¿Borrar este horario?'), findsOneWidget);
         expect(
-            find.text(
-                '¿Borrar este horario? Las reservas existentes se mantienen.'),
-            findsOneWidget);
+            find.text('Las reservas existentes se mantienen.'), findsOneWidget);
 
-        // Tap the confirm button
-        await tester.tap(find.text('Confirmar'));
+        // La acción destructiva dice «Eliminar», no «Confirmar» (#1496).
+        await tester.tap(find.text('Eliminar'));
         await tester.pumpAndSettle();
 
         expect(stubRepo.deletedRuleId, equals('rule-to-delete'));
@@ -306,7 +305,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Confirm deletion
-        await tester.tap(find.text('Confirmar'));
+        expect(find.text('¿Eliminar esta excepción?'), findsOneWidget);
+        await tester.tap(find.text('Eliminar'));
         await tester.pumpAndSettle();
 
         expect(stubRepo.deletedOverrideId, equals('override-to-delete'));

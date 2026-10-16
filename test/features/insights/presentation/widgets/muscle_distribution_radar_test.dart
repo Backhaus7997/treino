@@ -21,6 +21,7 @@ MuscleDistributionLabels _labels({
   String volumeUnit = 'kg',
 }) =>
     MuscleDistributionLabels(
+      localeName: 'es_AR',
       currentLabel: currentLabel,
       previousLabel: previousLabel,
       emptyStateText: emptyStateText,
@@ -296,7 +297,7 @@ void main() {
 
       // Formato compacto compartido (formatVolumeKg): 20770 → '20.7k' —
       // floored, nunca redondea para arriba (#378).
-      expect(find.text('20.7k kg'), findsOneWidget);
+      expect(find.text('20,7k kg'), findsOneWidget); // coma en es (#1516)
       expect(find.text('20770 kg'), findsNothing);
 
       // Las 4 cards comparten altura (IntrinsicHeight + CrossAxisAlignment
@@ -342,8 +343,8 @@ void main() {
         MuscleDistributionRadar(insights: insights, labels: _labels()),
       ));
 
-      // Floored: 49 480 → '49.4k kg', y el string llega ENTERO al widget.
-      final value = find.text('49.4k kg');
+      // Floored: 49 480 → '49,4k kg', y el string llega ENTERO al widget.
+      final value = find.text('49,4k kg');
       expect(value, findsOneWidget);
       // El valor vive dentro de un FittedBox(scaleDown): si no entra en la
       // card se achica el font — un ellipsis acá volvía a comerse la unidad.
@@ -351,7 +352,7 @@ void main() {
         find.ancestor(of: value, matching: find.byType(FittedBox)),
         findsOneWidget,
       );
-      expect(find.textContaining('→ 13.9k kg'), findsOneWidget);
+      expect(find.textContaining('→ 13,9k kg'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

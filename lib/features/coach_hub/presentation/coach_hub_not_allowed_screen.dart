@@ -170,7 +170,7 @@ class _CoachHubNotAllowedScreenState
                     _contactError!,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
-                      color: palette.danger,
+                      color: palette.dangerText,
                       fontSize: AppTextSize.bodyDense,
                     ),
                   ),
@@ -202,7 +202,7 @@ class _CoachHubNotAllowedScreenState
                     _error!,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
-                      color: palette.danger,
+                      color: palette.dangerText,
                       fontSize: AppTextSize.bodyDense,
                     ),
                   ),

@@ -171,7 +171,8 @@ class AuthService {
       );
       user = cred.user!;
     } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+      // `forSignIn` y no `fromFirebase`: no revelar si el email existe (#1505).
+      throw AuthFailure.forSignIn(e);
     }
 
     // Etapa 2 backfill — opportunistic, never blocks sign-in (REQ-PROF-037).

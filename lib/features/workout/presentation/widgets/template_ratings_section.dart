@@ -213,7 +213,7 @@ class _MyRatingRow extends StatelessWidget {
                 routineId: routine.id,
                 existing: mine,
               ),
-              style: TextButton.styleFrom(foregroundColor: palette.accent),
+              style: TextButton.styleFrom(foregroundColor: palette.accentText),
               child: Text(
                 mine == null
                     ? l10n.templateRatingsRateCta

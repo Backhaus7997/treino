@@ -197,7 +197,7 @@ class TrainerProfileView extends ConsumerWidget {
         _MenuRow(
           icon: TreinoIcon.trash,
           label: 'Eliminar cuenta',
-          color: palette.danger,
+          color: palette.dangerText,
           onTap: () => showModalBottomSheet<void>(
             context: context,
             useRootNavigator: true,
