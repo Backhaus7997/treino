@@ -12,11 +12,28 @@ import 'package:go_router/go_router.dart';
 /// - valid path → `context.go(deepLink)`.
 /// - link de CHAT (`/coach/chat/...`) → arma el stack
 ///   Feed → Mensajes → chat. Ver [abrirChatConStack].
+/// - link de CHAT con [sobreLaPilaActual] → `push` del chat encima de lo que
+///   ya está abierto, sin tocar el stack.
+///
+/// ## Cuándo va [sobreLaPilaActual]
+///
+/// El stack Feed → Mensajes de [abrirChatConStack] existe para el push: la app
+/// arranca en frío (o en otra pantalla) y el chat no tiene NADA debajo a donde
+/// volver. Desde la lista de Notificaciones in-app es al revés: la persona ya
+/// está en una pantalla a la que tiene que poder volver. Rearmar el stack ahí
+/// tiraba la lista, y «atrás» llevaba a Mensajes y después al Feed (#1468).
+///
+/// Sólo cambia el link de chat: el resto de los destinos son tabs o pantallas
+/// que reemplazan lo anterior igual que antes.
 ///
 /// Callers MUST check `context.mounted` before calling this function.
 ///
 /// REQ-PN-HANDLER-001, REQ-PN-HANDLER-002, REQ-PN-HANDLER-003, ADR-PN-009.
-void goDeepLink(BuildContext context, String? deepLink) {
+void goDeepLink(
+  BuildContext context,
+  String? deepLink, {
+  bool sobreLaPilaActual = false,
+}) {
   const fallback = '/coach';
 
   if (deepLink == null || deepLink.isEmpty) {
@@ -32,7 +49,12 @@ void goDeepLink(BuildContext context, String? deepLink) {
 
   if (Uri.tryParse(deepLink)?.path.startsWith(kPrefijoDeepLinkDeChat) ??
       false) {
-    abrirChatConStack(GoRouter.of(context), deepLink);
+    final router = GoRouter.of(context);
+    if (sobreLaPilaActual) {
+      unawaited(router.push<void>(deepLink));
+    } else {
+      abrirChatConStack(router, deepLink);
+    }
     return;
   }
 
