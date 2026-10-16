@@ -16,6 +16,8 @@ import 'package:treino/features/onboarding/presentation/onboarding_slide.dart';
 import 'package:treino/features/onboarding/presentation/trainer_onboarding_slides.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/layout_failure.dart';
+
 Future<void> _pump(
     WidgetTester tester, OnboardingSlide slide, Size size) async {
   tester.view.physicalSize = size;
@@ -61,6 +63,9 @@ void main() {
         testWidgets('$deck, slide ${i + 1}: el texto entra entero ($equipo)',
             (tester) async {
           await _pump(tester, slides[i], size);
+          // Overflow horizontal de fuentes de fallback adentro del mock (ej.
+          // HomeCtaButton): artefacto del harness. Cualquier otra falla, sí.
+          expect(drainLayoutFailure(tester), isNull);
           final visible =
               tester.getRect(find.byKey(const Key('onboarding_page_view')));
           final cuerpo = tester.getRect(find.text(slides[i].body));
