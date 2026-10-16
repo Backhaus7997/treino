@@ -347,6 +347,30 @@
   "agendaCancellationKeep": "No, mantener",
   "agendaCancellationSuccess": "Reserva cancelada.",
   "agendaCancellationTooLate": "No podés cancelar con menos de 24h de anticipación.",
+  "agendaAthleteCancelCta": "CANCELAR",
+  "@agendaAthleteCancelCta": {
+    "description": "Botón de una sesión en MI AGENDA del alumno, con más de 24 h de anticipación (#1515)."
+  },
+  "agendaAthleteCancelConfirmBody": "¿Cancelar esta sesión? Le avisamos a tu PF.",
+  "@agendaAthleteCancelConfirmBody": {
+    "description": "Cuerpo del diálogo de confirmación cuando el alumno cancela una sesión."
+  },
+  "agendaBookingCancelledByAthlete": "Reserva cancelada por el alumno.",
+  "@agendaBookingCancelledByAthlete": {
+    "description": "Motivo que queda en el registro de cancelación cuando cancela el alumno."
+  },
+  "agendaAthleteNotifyTrainerCta": "AVISAR A MI PF",
+  "@agendaAthleteNotifyTrainerCta": {
+    "description": "Botón de una sesión con menos de 24 h en MI AGENDA: abre el chat con el PF (#1515)."
+  },
+  "agendaAthleteNotifyHint": "Faltan menos de 24 h: si no podés ir, avisale a tu PF.",
+  "@agendaAthleteNotifyHint": {
+    "description": "Texto sobre el botón AVISAR A MI PF, que explica por qué no hay CANCELAR."
+  },
+  "agendaAthleteChatError": "No pudimos abrir el chat. Probá de nuevo.",
+  "@agendaAthleteChatError": {
+    "description": "Snackbar cuando AVISAR A MI PF no puede abrir el chat."
+  },
   "agendaUpcomingAppointmentsHeading": "TUS PRÓXIMAS RESERVAS",
   "agendaPastAppointmentsHeading": "TURNOS PASADOS",
   "agendaGenericError": "Hubo un problema. Intentá de nuevo.",
