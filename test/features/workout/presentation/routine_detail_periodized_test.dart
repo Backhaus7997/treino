@@ -954,11 +954,12 @@ void main() {
         ))
         .color!;
 
-    testWidgets('sin foto, el botón atrás no lleva el disco gris',
+    testWidgets('sin foto, el botón atrás es de superficie de card, no gris',
         (tester) async {
-      await abrir(tester, planDelPf());
-      expect(fondoDelBotonAtras(tester).a, 0,
-          reason: 'el scrim es para leer el ícono SOBRE una foto');
+      final palette = await abrir(tester, planDelPf());
+      // Ni el scrim gris (es para leer SOBRE una foto) ni transparente: la
+      // lista scrollea por debajo de los botones y el ícono se perdería.
+      expect(fondoDelBotonAtras(tester), palette.bgCard);
     });
 
     testWidgets('con foto, el botón atrás conserva el scrim', (tester) async {

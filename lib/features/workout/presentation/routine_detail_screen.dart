@@ -242,7 +242,7 @@ class _BackBar extends StatelessWidget {
       padding: const EdgeInsets.only(left: 12, top: 8),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: const CircleBorder(),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
@@ -291,7 +291,7 @@ class _EditBar extends ConsumerWidget {
       padding: const EdgeInsets.only(right: 12, top: 8),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: const CircleBorder(),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
@@ -436,7 +436,7 @@ class _FollowTemplateBar extends ConsumerWidget {
       padding: const EdgeInsets.only(right: 12, top: 8),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: const CircleBorder(),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
@@ -546,7 +546,7 @@ class _UseAsBaseBar extends ConsumerWidget {
       padding: const EdgeInsets.only(right: 12, top: 8),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
-        shape: const CircleBorder(),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
@@ -1053,14 +1053,22 @@ bool routineHasHeroPhoto(Routine routine) =>
 
 /// Fondo de los botones flotantes (atrás, editar, seguir, usar de base).
 ///
-/// #1509: el disco translúcido oscuro existe para que el ícono se lea SOBRE
-/// LA FOTO. Sin foto —planes del PF, rutinas propias, plantillas sin foto—
-/// quedaba como un círculo gris enorme sobre el fondo liso, fuera del
-/// lenguaje del resto de las pantallas. Ahí el botón va sin fondo.
+/// #1509: el disco translúcido oscuro existe para leer el ícono SOBRE LA
+/// FOTO. Sin foto —planes del PF, rutinas propias, plantillas sin foto—
+/// quedaba como un círculo gris enorme sobre el fondo liso. Ahí el disco es
+/// de superficie de card (con [_floatingShape] le pone el borde): sigue
+/// tapando lo que scrollea por debajo —la lista pasa bajo los botones— pero
+/// habla el idioma del resto de la pantalla.
 Color _floatingFill(AppPalette palette, Routine? routine) =>
     routine != null && routineHasHeroPhoto(routine)
         ? palette.scrimDark.withValues(alpha: 0.35)
-        : AppColorPrimitives.transparent;
+        : palette.bgCard;
+
+/// Forma del disco: con borde neutro cuando no hay foto (ver [_floatingFill]).
+ShapeBorder _floatingShape(AppPalette palette, Routine? routine) =>
+    routine != null && routineHasHeroPhoto(routine)
+        ? const CircleBorder()
+        : CircleBorder(side: BorderSide(color: palette.border));
 
 /// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.jpg`.
 ///
