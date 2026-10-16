@@ -852,7 +852,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           key: const Key('invalid_week_hint'),
           style: GoogleFonts.barlow(
             fontSize: 11,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ],
@@ -2126,7 +2126,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
               child: Text(l10n.routineEditorScopeAllWeeks,
-                  style: TextStyle(color: palette.danger)),
+                  style: TextStyle(color: palette.dangerText)),
             ),
           ],
         );
@@ -5744,10 +5744,13 @@ class _SlotEditorState extends State<_SlotEditor> {
       final values = sets.map((s) => s.distanceMeters).toList();
       final first = values.isEmpty ? null : values.first;
       final uniform = first != null && values.every((v) => v == first);
-      final target = uniform ? '${formatWeightKg(first)} m' : '—';
+      final target = uniform
+          ? '${formatWeightDisplay(first, AppL10n.of(context).localeName)} m'
+          : '—';
       return '${sets.length} × $target';
     }
     return resumenDePrescripcion(
+      localeName: AppL10n.of(context).localeName,
       modo: slot.exerciseMode,
       sets: [
         for (final set in sets)
@@ -6489,7 +6492,10 @@ class _SetRowState extends State<_SetRow> {
                 : l10n.routineEditorFieldReps,
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
-      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      stepLabel: esKg
+          ? formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName)
+          : '1',
       canDecrease: esKg
           ? (_currentKg ?? 0) > 0
           : esDistancia
@@ -6501,14 +6507,14 @@ class _SetRowState extends State<_SetRow> {
               ? _stepDistance(delta)
               : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepIncreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Aumentar distancia en 1 metro'
               : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepDecreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Reducir distancia en 1 metro'
               : l10n.routineEditorRepsStepDecreaseA11y('1'),

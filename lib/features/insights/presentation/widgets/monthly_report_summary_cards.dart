@@ -16,6 +16,7 @@ import '../../domain/monthly_report.dart';
 /// Plain-string label bag for [MonthlyReportSummaryCards].
 class MonthlyReportSummaryLabels {
   const MonthlyReportSummaryLabels({
+    required this.localeName,
     required this.workoutsLabel,
     required this.durationLabel,
     required this.volumeLabel,
@@ -23,6 +24,10 @@ class MonthlyReportSummaryLabels {
     required this.durationUnit,
     required this.volumeUnit,
   });
+
+  /// Locale con el que se formatean los números (`9.600`, `20,7k`). Viaja
+  /// en los labels porque este widget no lee AppL10n (ver el header).
+  final String localeName;
 
   /// E.g. 'Entrenos'.
   final String workoutsLabel;
@@ -101,7 +106,7 @@ class MonthlyReportSummaryCards extends StatelessWidget {
         ),
         _StatCard(
           label: labels.volumeLabel,
-          value: formatVolumeKg(selectedMonth.volumeKg),
+          value: formatVolumeKg(selectedMonth.volumeKg, labels.localeName),
           unit: labels.volumeUnit,
           delta: previousMonth == null
               ? null
@@ -198,7 +203,7 @@ class _StatCard extends StatelessWidget {
                 Icon(
                   delta! > 0 ? TreinoIcon.trendUp : TreinoIcon.trendDown,
                   size: 14,
-                  color: delta! > 0 ? palette.accent : palette.danger,
+                  color: delta! > 0 ? palette.accent : palette.dangerText,
                 ),
               ],
             ],

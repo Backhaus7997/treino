@@ -1151,7 +1151,7 @@ class TrainerProfilePreview extends StatelessWidget {
         _Tile(
           icon: TreinoIcon.trash,
           label: 'Eliminar cuenta',
-          color: palette.danger,
+          color: palette.dangerText,
         ),
       ],
     );

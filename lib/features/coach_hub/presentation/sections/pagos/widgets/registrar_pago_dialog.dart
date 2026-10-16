@@ -216,7 +216,7 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
             if (_error != null) ...[
               const SizedBox(height: 10),
               Text(_error!,
-                  style: TextStyle(color: palette.danger, fontSize: 12)),
+                  style: TextStyle(color: palette.dangerText, fontSize: 12)),
             ],
           ],
         ),
@@ -257,7 +257,7 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
         ),
       ),
       error: (_, __) => Text('No pudimos cargar los alumnos.', // i18n
-          style: TextStyle(color: palette.danger, fontSize: 13)),
+          style: TextStyle(color: palette.dangerText, fontSize: 13)),
       data: (links) {
         final seen = <String>{};
         final athletes = <TrainerLink>[];

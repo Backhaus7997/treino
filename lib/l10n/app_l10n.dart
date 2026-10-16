@@ -9085,6 +9085,30 @@ abstract class AppL10n {
   /// **'No pudimos eliminar la evaluación. Probá de nuevo.'**
   String get performanceDeleteError;
 
+  /// Acción destructiva genérica de showTreinoConfirmDialog (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Eliminar'**
+  String get commonDelete;
+
+  /// Título de la confirmación de borrado de una franja (#1496).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Borrar este horario?'**
+  String get agendaRuleDeleteTitle;
+
+  /// Cuerpo de la confirmación de borrado de una franja.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las reservas existentes se mantienen.'**
+  String get agendaRuleDeleteBody;
+
+  /// Título de la confirmación de borrado de una excepción de agenda.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Eliminar esta excepción?'**
+  String get agendaOverrideDeleteTitle;
+
   /// Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489).
   ///
   /// In es_AR, this message translates to:

@@ -271,16 +271,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('52'), findsOneWidget);
-    expect(find.text('3.2'), findsOneWidget);
+    expect(find.text('3,2'), findsOneWidget); // coma en es (#1512)
     expect(find.text('22'), findsOneWidget);
     // PRS HOY ya es real: con highlights resueltos y sin récords muestra 0.
     expect(find.text('0'), findsOneWidget);
 
-    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
-    expect(find.text('DURACIÓN MIN'), findsOneWidget);
-    expect(find.text('VOLUMEN KG'), findsOneWidget);
-    expect(find.text('DURACIÓN'), findsNothing);
-    expect(find.text('VOLUMEN'), findsNothing);
+    // #1512 revierte #363: la unidad va al lado del número («52 min»), no en
+    // el label («DURACIÓN MIN 52» se leía al revés).
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('min'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
+    expect(find.text('DURACIÓN MIN'), findsNothing);
+    expect(find.text('VOLUMEN KG'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -343,6 +346,8 @@ void main() {
               recordType: ProgressionRecordType.heaviestWeight,
               value: 80.0,
               previousBest: 75.0,
+              set: null,
+              previousSet: null,
             ),
           ]),
         ],
@@ -612,6 +617,8 @@ void main() {
                 recordType: ProgressionRecordType.heaviestWeight,
                 value: 80.0,
                 previousBest: 75.0,
+                set: null,
+                previousSet: null,
               ),
             ],
           ),
@@ -902,6 +909,8 @@ void main() {
                   recordType: ProgressionRecordType.bestSetVolume,
                   value: 412.5,
                   previousBest: 375.0,
+                  set: (weightKg: 82.5, reps: 5),
+                  previousSet: (weightKg: 75.0, reps: 5),
                 ),
               ],
             ),
@@ -964,6 +973,8 @@ void main() {
                   recordType: ProgressionRecordType.bestSetVolume,
                   value: 412.5,
                   previousBest: 375.0,
+                  set: (weightKg: 82.5, reps: 5),
+                  previousSet: (weightKg: 75.0, reps: 5),
                 ),
               ],
             ),
@@ -1140,6 +1151,36 @@ void main() {
 
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
     expect(find.text('BUEN ENTRENO'), findsOneWidget);
+  });
+
+  // #1512: «Mejor serie 560 kg·reps» era jerga. Se muestra la serie.
+  testWidgets('#1512: la mejor serie se lee «82,5 kg × 5», sin kg·reps',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 1,
+        exercises: [
+          _exercise(
+            records: const [
+              (
+                recordType: ProgressionRecordType.bestSetVolume,
+                value: 412.5,
+                previousBest: 375.0,
+                set: (weightKg: 82.5, reps: 5),
+                previousSet: (weightKg: 75.0, reps: 5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('82,5 kg × 5'), findsOneWidget);
+    expect(find.textContaining('75 kg × 5'), findsOneWidget);
+    expect(find.textContaining('kg·reps'), findsNothing);
+    expect(find.textContaining('412'), findsNothing);
   });
 }
 

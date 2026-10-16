@@ -1139,7 +1139,7 @@ class _SessionStatsCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed / $total ejercicios · '
-                  '${formatVolumeKg(state.totalVolumeKg)} kg vol.',
+                  '${formatVolumeKg(state.totalVolumeKg, AppL10n.of(context).localeName)} kg vol.',
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
@@ -2751,7 +2751,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
             // planned display when the row is not done and _reps still equals
             // plannedReps, so the range hint stays visible pre-check.
             child: Text(
-              '${_summaryReps()} · ${formatWeightKg(_weightKg)} kg',
+              '${_summaryReps()} · ${formatWeightDisplay(_weightKg, AppL10n.of(context).localeName)} kg',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w500,
                 fontSize: 14,

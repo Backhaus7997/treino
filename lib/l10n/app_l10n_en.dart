@@ -5290,5 +5290,17 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t delete the assessment. Try again.';
 
   @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get agendaRuleDeleteTitle => 'Delete this time slot?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Existing bookings are kept.';
+
+  @override
+  String get agendaOverrideDeleteTitle => 'Delete this exception?';
+
+  @override
   String get onboardingCustomExerciseNotNow => 'NOT NOW';
 }

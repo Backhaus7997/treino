@@ -5389,6 +5389,18 @@ class AppL10nEs extends AppL10n {
       'No pudimos eliminar la evaluación. Prueba de nuevo.';
 
   @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
+
+  @override
   String get onboardingCustomExerciseNotNow => 'AHORA NO';
 }
 
@@ -10772,6 +10784,18 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get performanceDeleteError =>
       'No pudimos eliminar la evaluación. Probá de nuevo.';
+
+  @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
 
   @override
   String get onboardingCustomExerciseNotNow => 'AHORA NO';

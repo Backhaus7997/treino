@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/data/measurement_repository.dart';
@@ -196,5 +197,83 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Entre 2 y 70 %'), findsOneWidget);
+  });
+
+  // #1484: el header iba con el título a la derecha y «Cancelar» en MAGENTA.
+  // Se alinea al de Nuevo post: CANCELAR neutro a la izquierda, título al
+  // centro.
+  testWidgets('#1484: header con CANCELAR neutro y título centrado',
+      (tester) async {
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider
+            .overrideWithValue(_MockMeasurementRepository()),
+        currentUidProvider.overrideWithValue('athleteX'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const LogMeasurementScreen.selfLog(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final cancelar = find.text('CANCELAR');
+    expect(cancelar, findsOneWidget);
+    expect(tester.widget<Text>(cancelar).style!.color,
+        AppPalette.mintMagentaLight.textMuted);
+
+    final titulo = find.text('Cargar medición');
+    final anchoPantalla =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(tester.getCenter(titulo).dx, closeTo(anchoPantalla / 2, 1));
+    expect(tester.getCenter(cancelar).dx, lessThan(anchoPantalla / 4));
+  });
+
+  // Lo marcó la revisión de #1544: el título centrado en un Stack no le
+  // reservaba lugar a CANCELAR, y con texto grande en un teléfono angosto
+  // podían pisarse.
+  testWidgets('#1484: con texto grande en 375 pt el título no pisa CANCELAR',
+      (tester) async {
+    tester.view.physicalSize = const Size(375 * 3, 812 * 3);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider
+            .overrideWithValue(_MockMeasurementRepository()),
+        currentUidProvider.overrideWithValue('athleteX'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.6)),
+          child: child!,
+        ),
+        home: LogMeasurementScreen(
+          athleteId: 'athleteX',
+          initial: Measurement(
+            id: 'm1',
+            athleteId: 'athleteX',
+            recordedBy: 'athleteX',
+            recordedAt: DateTime.utc(2026, 3, 10, 14, 30),
+            weightKg: 80,
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final cancelar = tester.getRect(find.text('CANCELAR'));
+    final titulo = tester.getRect(find.text('Editar medición'));
+    expect(titulo.overlaps(cancelar), isFalse,
+        reason: 'título $titulo pisa a CANCELAR $cancelar');
   });
 }

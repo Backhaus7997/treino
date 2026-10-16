@@ -2280,5 +2280,9 @@
   "performanceDeleteConfirmBody": "The assessment from {date} will be deleted. This can't be undone.",
   "performanceDeleteSuccess": "Assessment deleted",
   "performanceDeleteError": "We couldn't delete the assessment. Try again.",
+  "commonDelete": "Delete",
+  "agendaRuleDeleteTitle": "Delete this time slot?",
+  "agendaRuleDeleteBody": "Existing bookings are kept.",
+  "agendaOverrideDeleteTitle": "Delete this exception?",
   "onboardingCustomExerciseNotNow": "NOT NOW"
 }

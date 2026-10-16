@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -19,11 +21,16 @@ import '../../domain/exercise_progression.dart';
 /// [AD2] Mismo redondeo de display que `PersonalRecordsList._formatValue`:
 /// el 1RM estimado (Epley, double pleno) se muestra al 0.5 kg más cercano;
 /// el resto muestra su valor con a lo sumo un decimal.
-String _formatRecordValue(double value, {required bool isOneRepMax}) {
+String _formatRecordValue(
+  double value, {
+  required bool isOneRepMax,
+  required String localeName,
+}) {
   final display = isOneRepMax ? roundToNearestHalfKg(value) : value;
-  return display % 1 == 0
-      ? display.toStringAsFixed(0)
-      : display.toStringAsFixed(1);
+  // Un decimal como máximo y con el separador del locale: «88,5» y
+  // «1.537,5» en es, no «88.5» (#1512). Sin compactar: un récord se lee
+  // exacto.
+  return NumberFormat('#,##0.#', localeName).format(display);
 }
 
 TextStyle _sectionTitleTextStyle(AppPalette palette) =>
@@ -196,18 +203,26 @@ class _SessionRecordRow extends StatelessWidget {
         l10n.progressionMetricBestSetVolume,
       ProgressionRecordType.bestSessionVolume => l10n.progressionMetricVolume,
     };
-    final unit = switch (record.recordType) {
-      ProgressionRecordType.heaviestWeight ||
-      ProgressionRecordType.oneRepMax =>
-        'kg',
-      ProgressionRecordType.bestSetVolume ||
-      ProgressionRecordType.bestSessionVolume =>
-        'kg·reps',
-    };
+    // #1512: la mejor serie se muestra COMO SERIE («80 kg × 7»), no como el
+    // producto «560 kg·reps», que era jerga. El resto de los récords son un
+    // peso, en kg. `kg·reps` ya no se usa: el volumen es carga, y va en kg.
+    String serie(({double weightKg, int reps}) s) =>
+        '${formatWeightDisplay(s.weightKg, l10n.localeName)} kg × ${s.reps}';
+    final set = record.set;
+    final previousSet = record.previousSet;
+    final showsSet =
+        record.recordType == ProgressionRecordType.bestSetVolume && set != null;
+    String value(double v) => _formatRecordValue(v,
+        isOneRepMax: isOneRepMax, localeName: l10n.localeName);
 
-    final newValue = _formatRecordValue(record.value, isOneRepMax: isOneRepMax);
-    final previous =
-        _formatRecordValue(record.previousBest, isOneRepMax: isOneRepMax);
+    // Con la serie, la unidad va DENTRO del texto («kg × 7»): no hay sufijo.
+    final unit = showsSet ? '' : 'kg';
+    final newValue = showsSet ? serie(set) : value(record.value);
+    final previous = !showsSet
+        ? value(record.previousBest)
+        : previousSet != null
+            ? serie(previousSet)
+            : '${value(record.previousBest)} kg';
 
     // El bloque de valores tiene ancho INTRÍNSECO, y un hijo no flexible de un
     // Row recibe ancho ILIMITADO: sin acotarlo el FittedBox nunca escala y la
@@ -286,22 +301,24 @@ class _SessionRecordRow extends StatelessWidget {
                           color: palette.accent,
                         ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        unit,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: palette.accent,
+                      if (unit.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          unit,
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: palette.accent,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   // "→ marca anterior" — mismo idioma visual que las stat cards
                   // del radar de Insights (valor actual grande, "→ prev" chico
                   // abajo).
                   Text(
-                    '→ $previous $unit',
+                    unit.isEmpty ? '→ $previous' : '→ $previous $unit',
                     maxLines: 1,
                     style: GoogleFonts.barlow(
                       fontSize: 10,
@@ -391,7 +408,7 @@ class _SessionExerciseRow extends StatelessWidget {
     // TODO(l10n): "sets"/"reps" literales — mismo pendiente que tenían las
     // barras de distribución que este cambio reemplazó.
     final bestSet = exercise.bestWeightKg > 0
-        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false)} kg '
+        ? '${_formatRecordValue(exercise.bestWeightKg, isOneRepMax: false, localeName: AppL10n.of(context).localeName)} kg '
             '× ${exercise.bestSetReps}'
         : '${exercise.bestSetReps} reps';
     final stats = '${exercise.setCount} sets · $bestSet';

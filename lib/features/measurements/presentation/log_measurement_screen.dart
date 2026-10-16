@@ -22,6 +22,9 @@ import '../domain/measurement.dart';
 ///
 /// Rejects any character that cannot be part of a decimal metric at entry
 /// time, so the user never types a value that would be silently dropped.
+/// Carril de CANCELAR en el header, y margen del título a cada lado (#1484).
+const double _kHeaderSideLane = 96;
+
 final List<TextInputFormatter> _decimalInputFormatters = <TextInputFormatter>[
   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
 ];
@@ -505,44 +508,83 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
         child: Column(
           children: [
             // ── Top bar ─────────────────────────────────────────────────────
+            // #1484: mismo header que Nuevo post — CANCELAR neutro a la
+            // izquierda y el título CENTRADO. Antes el título iba a la derecha
+            // y «Cancelar» en magenta. Stack y no Row con Spacers: el título
+            // queda al centro de la pantalla aunque CANCELAR mida distinto.
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-              child: Row(
+              // Simétrico: el título se centra en la pantalla, no en el hueco.
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s8,
+                AppSpacing.s8,
+                AppSpacing.s8,
+                0,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  TextButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.of(context).pop(),
-                    child: Text(
-                      l10n.commonCancel,
-                      style: GoogleFonts.barlow(
-                        color: _saving ? palette.textMuted : palette.highlight,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                  // CANCELAR tiene un carril propio de [_kHeaderSideLane] a la
+                  // izquierda, y el título se queda con el centro menos ese
+                  // carril de cada lado. Con texto grande cada uno se ACHICA
+                  // dentro de su lugar en vez de pisarse (lo marcó la revisión
+                  // de #1544). Estructural a propósito: no depende de cuánto
+                  // mida la fuente.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(maxWidth: _kHeaderSideLane),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.of(context).pop(),
+                          child: Text(
+                            l10n.commonCancel.toUpperCase(),
+                            style: GoogleFonts.barlowCondensed(
+                              // Atenuado mientras guarda: deshabilitado tiene
+                              // que verse (también de la revisión de #1544).
+                              color: _saving
+                                  ? palette.textFaint
+                                  : palette.textMuted,
+                              fontSize: AppTextSize.body,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        isEditing
-                            ? l10n.measurementLogTitleEdit
-                            : l10n.measurementLogTitleCreate,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: palette.textPrimary,
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: _kHeaderSideLane,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        children: [
+                          Text(
+                            isEditing
+                                ? l10n.measurementLogTitleEdit
+                                : l10n.measurementLogTitleCreate,
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: AppTextSize.title,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            _formatDateTimeEs(headerDate, l10n.localeName),
+                            style: GoogleFonts.barlow(
+                              fontSize: AppTextSize.caption,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        _formatDateTimeEs(headerDate, l10n.localeName),
-                        style: GoogleFonts.barlow(
-                          fontSize: 12,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ],
               ),

@@ -1165,5 +1165,9 @@
   "performanceDeleteConfirmBody": "Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.",
   "performanceDeleteSuccess": "Evaluación eliminada",
   "performanceDeleteError": "No pudimos eliminar la evaluación. Prueba de nuevo.",
+  "commonDelete": "Eliminar",
+  "agendaRuleDeleteTitle": "¿Borrar este horario?",
+  "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
   "onboardingCustomExerciseNotNow": "AHORA NO"
 }

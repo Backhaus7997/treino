@@ -131,7 +131,7 @@ class _SetCellFieldState extends State<SetCellField> {
         style: GoogleFonts.barlow(
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          color: widget.hasError ? palette.danger : palette.textPrimary,
+          color: widget.hasError ? palette.dangerText : palette.textPrimary,
         ),
         textAlign: TextAlign.center,
         decoration: setCellDecoration(

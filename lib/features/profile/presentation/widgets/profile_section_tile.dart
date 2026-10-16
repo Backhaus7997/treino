@@ -45,8 +45,8 @@ class ProfileSectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final iconColor = destructive ? palette.danger : palette.accent;
-    final titleColor = destructive ? palette.danger : palette.textPrimary;
+    final iconColor = destructive ? palette.dangerText : palette.accent;
+    final titleColor = destructive ? palette.dangerText : palette.textPrimary;
 
     final row = TreinoTappable(
       onTap: onTap,

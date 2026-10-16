@@ -236,7 +236,7 @@ class _Cola extends ConsumerWidget {
                   : 'No hay reportes esperando.', // i18n: Fase W3
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                color: cola.incompleta ? palette.danger : palette.textMuted,
+                color: cola.incompleta ? palette.dangerText : palette.textMuted,
                 fontSize: AppTextSize.body,
               ),
             ),
@@ -252,7 +252,7 @@ class _Cola extends ConsumerWidget {
                   'La lista está incompleta: el servidor dejó de buscar '
                   'antes de llegar al final.', // i18n: Fase W3
                   style: GoogleFonts.barlow(
-                    color: palette.danger,
+                    color: palette.dangerText,
                     fontSize: AppTextSize.caption,
                   ),
                 ),
@@ -339,7 +339,7 @@ class _FilaState extends ConsumerState<_Fila> {
                     ? '—'
                     : 'hace ${reporte.horasDesdeQueEntro} h', // i18n
                 style: GoogleFonts.barlow(
-                  color: tarde ? palette.danger : palette.textMuted,
+                  color: tarde ? palette.dangerText : palette.textMuted,
                   fontSize: AppTextSize.caption,
                   fontWeight: tarde ? FontWeight.w700 : FontWeight.w400,
                 ),
