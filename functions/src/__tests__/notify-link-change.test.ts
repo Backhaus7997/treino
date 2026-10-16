@@ -7,7 +7,8 @@
  * SCENARIOs covered:
  *   SCENARIO-637 — new link (pending) → notify trainer
  *   SCENARIO-638 — pending → active → notify athlete
- *   SCENARIO-639 — active → terminated (no reason) → notify BOTH
+ *   SCENARIO-639 — active → terminated (no reason) → notify BOTH, cada uno con
+ *                  el nombre de la OTRA parte (#1464)
  *   SCENARIO-W1-a — pending → terminated 'declined' → notify SOLO al alumno
  *   SCENARIO-W1-b — pending → terminated 'cancelled-by-athlete' → notify SOLO al PF
  *   SCENARIO-640 — reason === 'account-deleted' → sendFcm NOT called
@@ -71,9 +72,28 @@ async function seedUser(
   });
 }
 
+async function seedPublicProfile(uid: string, displayName: string): Promise<void> {
+  await db().collection("userPublicProfiles").doc(uid).set({ uid, displayName });
+}
+
+/**
+ * Los pushes de una corrida, indexados por token: cada `sendEachForMulticast`
+ * es un destinatario (una llamada por uid), y cada uno debe ver SU cuerpo.
+ */
+function pushesPorToken(mock: Messaging): Map<string, MulticastMessage> {
+  const porToken = new Map<string, MulticastMessage>();
+  for (const [msg] of (mock.sendEachForMulticast as jest.Mock).mock.calls) {
+    for (const token of (msg as MulticastMessage).tokens) {
+      porToken.set(token, msg as MulticastMessage);
+    }
+  }
+  return porToken;
+}
+
 async function cleanup(...uids: string[]): Promise<void> {
   for (const uid of uids) {
     await db().collection("users").doc(uid).delete().catch(() => undefined);
+    await db().collection("userPublicProfiles").doc(uid).delete().catch(() => undefined);
 
     // Mismo motivo que en notify-appointment.test.ts: el mail encolado tiene
     // id determinístico y `enqueueMail` trata un id ya existente como dedupe
@@ -250,6 +270,8 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
   beforeEach(async () => {
     await seedUser(trainerId, ["trainer-token-639"]);
     await seedUser(athleteId, ["athlete-token-639"]);
+    await seedPublicProfile(trainerId, "Lautaro Coach");
+    await seedPublicProfile(athleteId, "Martín Alumno");
   });
 
   afterEach(() => cleanup(trainerId, athleteId));
@@ -266,11 +288,56 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
 
     await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
-    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
-    expect(callArg.tokens).toContain("trainer-token-639");
-    expect(callArg.tokens).toContain("athlete-token-639");
-    expect(callArg.data?.deepLink).toBe("/coach");
+    // Un push por destinatario: el cuerpo de cada uno nombra a la OTRA parte.
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(2);
+    const push = pushesPorToken(mock);
+    expect([...push.keys()].sort()).toEqual(["athlete-token-639", "trainer-token-639"]);
+    for (const msg of push.values()) {
+      expect(msg.data?.deepLink).toBe("/coach");
+      expect(msg.notification?.title).toBe("Vinculación finalizada");
+    }
+  });
+
+  it("#1464: cada uno lee el nombre de la OTRA parte, no el mismo texto", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "active" },
+      { trainerId, athleteId, status: "terminated" },
+      mock,
+    );
+
+    const push = pushesPorToken(mock);
+    expect(push.get("athlete-token-639")?.notification?.body).toBe(
+      "La vinculación con Lautaro Coach fue finalizada.",
+    );
+    expect(push.get("trainer-token-639")?.notification?.body).toBe(
+      "La vinculación con Martín Alumno fue finalizada.",
+    );
+  });
+
+  it("#1464: si falta un perfil público, usa el fallback en vez de un hueco", async () => {
+    await db().collection("userPublicProfiles").doc(trainerId).delete();
+    await db().collection("userPublicProfiles").doc(athleteId).delete();
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "active" },
+      { trainerId, athleteId, status: "terminated" },
+      mock,
+    );
+
+    const push = pushesPorToken(mock);
+    expect(push.get("athlete-token-639")?.notification?.body).toBe(
+      "La vinculación con tu entrenador fue finalizada.",
+    );
+    expect(push.get("trainer-token-639")?.notification?.body).toBe(
+      "La vinculación con un atleta fue finalizada.",
+    );
   });
 
   it("respects vinculo_finalizado push=false for each recipient", async () => {
@@ -431,11 +498,13 @@ describe("terminated partido por terminationReason", () => {
       mock,
     );
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as MulticastMessage;
-    expect(callArg.tokens).toContain("trainer-token-w1");
-    expect(callArg.tokens).toContain("athlete-token-w1");
-    expect(callArg.notification?.title).toBe("Vinculación finalizada");
+    // Dos pushes, uno por destinatario (cada cuerpo nombra a la otra parte).
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(2);
+    const push = pushesPorToken(mock);
+    expect([...push.keys()].sort()).toEqual(["athlete-token-w1", "trainer-token-w1"]);
+    for (const msg of push.values()) {
+      expect(msg.notification?.title).toBe("Vinculación finalizada");
+    }
   });
 });
 
