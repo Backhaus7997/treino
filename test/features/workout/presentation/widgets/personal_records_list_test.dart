@@ -88,6 +88,29 @@ Future<List<String>> _horizontalOverflowsDuring(
 }
 
 void main() {
+  // #1512: la mejor serie se lee como SERIE. Con el producto y «kg» decía
+  // «Mejor serie 1237,5 kg», que parece una carga de 1237,5 kg.
+  testWidgets('#1512: la mejor serie con su serie se lee «82,5 kg × 15»',
+      (tester) async {
+    await tester.pumpWidget(_wrap(
+      PersonalRecordsList(
+        labels: _labels(),
+        records: [
+          PersonalRecord(
+            recordType: ProgressionRecordType.bestSetVolume,
+            value: 1237.5,
+            achievedAt: DateTime(2025, 5, 20),
+            setWeightKg: 82.5,
+            setReps: 15,
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('82,5 kg × 15'), findsOneWidget);
+    expect(find.textContaining('1237'), findsNothing);
+  });
+
   setUpAll(() async {
     await initializeDateFormatting('es_AR');
   });
