@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
+import '../../../../core/utils/argentina_time.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -158,10 +159,11 @@ class _PlanSummary extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final title = plan.title.trim();
-    // `updatedAt` es un instante real (lo escribe el repo con
-    // DateTime.now()): se localiza antes de formatear, o cerca de la
-    // medianoche cae en el día equivocado (mismo cuidado que #392).
-    final updated = plan.updatedAt.toLocal();
+    // `updatedAt` es un instante real, pero el DÍA que se muestra es un bucket
+    // de calendario: se deriva en ART y no con la zona del device, o cerca de
+    // la medianoche cae en el día equivocado (#392, #671; ver la tabla de
+    // `no_raw_clock_scan_test.dart`).
+    final updated = toArgentina(plan.updatedAt.toUtc());
     final date = '${updated.day} '
         '${monthAbbrev(updated, l10n.localeName)} ${updated.year}';
 
