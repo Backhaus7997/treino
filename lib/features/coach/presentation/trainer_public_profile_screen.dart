@@ -13,6 +13,7 @@ import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 import 'widgets/trainer_contact_cta_stub.dart';
 import 'widgets/trainer_inquiry_cta.dart';
+import 'widgets/trainer_preview_notices.dart';
 import 'widgets/trainer_profile_hero.dart';
 import 'widgets/trainer_stats_row.dart';
 
@@ -24,10 +25,26 @@ import 'widgets/trainer_stats_row.dart';
 /// de pre-consulta sin vínculo formal) y **PEDIR VÍNCULO** (secundario, el
 /// compromiso explícito). Ver [TrainerInquiryCta] para el porqué de la
 /// jerarquía.
+///
+/// Con [preview] la abre el PROPIO PF desde VER PREVIEW (#1498): se ve igual
+/// que para un alumno, pero marcada como vista previa, con los dos CTAs
+/// deshabilitados (ninguno actúa sobre uno mismo) y, si le falta, un aviso de
+/// que no cargó sus años de experiencia.
 class TrainerPublicProfileScreen extends ConsumerWidget {
-  const TrainerPublicProfileScreen({super.key, required this.uid});
+  const TrainerPublicProfileScreen({
+    super.key,
+    required this.uid,
+    this.preview = false,
+  });
 
   final String uid;
+
+  /// `true` = el PF mirando su propio perfil. Ver el dartdoc de la clase.
+  final bool preview;
+
+  /// A dónde cae «atrás» cuando no hay nada que popear (deep link). La vista
+  /// previa nace en PERFIL, no en Coach.
+  String get _fallbackPath => preview ? '/profile' : '/coach';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,7 +60,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/coach'),
+              context.canPop() ? context.pop() : context.go(_fallbackPath),
         ),
       ),
       body: async.when(
@@ -55,7 +72,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
         ),
         data: (profile) {
           if (profile == null) {
-            return _NotFoundState();
+            return _NotFoundState(fallbackPath: _fallbackPath);
           }
           return ListView(
             padding: EdgeInsets.fromLTRB(
@@ -65,9 +82,17 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               8 + MediaQuery.paddingOf(context).bottom,
             ),
             children: [
+              if (preview) ...[
+                const TrainerPreviewBanner(),
+                const SizedBox(height: AppSpacing.s8),
+              ],
               TrainerProfileHero(profile: profile),
               const SizedBox(height: 24),
               TrainerStatsRow(profile: profile),
+              if (preview && profile.trainerExperienceYears == null) ...[
+                const SizedBox(height: AppSpacing.s12),
+                TrainerPreviewMissingExperienceNotice(trainerId: uid),
+              ],
               const SizedBox(height: 24),
               Text(
                 profile.trainerBio?.isNotEmpty == true
@@ -115,10 +140,10 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               // que esta pantalla YA tiene en mano, así que el CTA conserva su
               // propiedad de no watchear ningún provider.
               if (profile.acceptsInquiries) ...[
-                TrainerInquiryCta(trainerId: uid),
+                TrainerInquiryCta(trainerId: uid, preview: preview),
                 const SizedBox(height: AppSpacing.s12),
               ],
-              TrainerContactCtaStub(trainerId: uid),
+              TrainerContactCtaStub(trainerId: uid, preview: preview),
               const SizedBox(height: 12),
               ReviewCta(trainerId: uid),
               const SizedBox(height: 20),
@@ -133,6 +158,10 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
 }
 
 class _NotFoundState extends StatelessWidget {
+  const _NotFoundState({required this.fallbackPath});
+
+  final String fallbackPath;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -149,7 +178,7 @@ class _NotFoundState extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             FilledButton(
-              onPressed: () => GoRouter.of(context).go('/coach'),
+              onPressed: () => GoRouter.of(context).go(fallbackPath),
               child: const Text('Volver'),
             ),
           ],

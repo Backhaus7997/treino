@@ -27,7 +27,8 @@ import 'application/user_providers.dart';
 ///   - ALUMNOS count (trainerLinksStreamProvider filtered active)
 ///   - Pending requests badge (same provider filtered pending)
 ///   - Public profile visibility, location summary, online flag (trainerById)
-///   - VER PREVIEW → /coach/trainer/:uid
+///   - VER PREVIEW → /profile/trainer-preview/:uid (gemela de
+///     /coach/trainer/:uid: PERFIL sigue resaltado — #1498)
 ///   - EDITAR → /profile/edit-personal (shared form; full trainer fields TBD)
 ///   - Disponibilidad → /profile/availability-editor (mirror of the /coach
 ///     route so the PERFIL tab stays highlighted — issue #387)
@@ -451,7 +452,7 @@ class _PerfilPublicoCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: isVisible && uid.isNotEmpty
-                      ? () => context.push('/coach/trainer/$uid')
+                      ? () => context.push('/profile/trainer-preview/$uid')
                       : null,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: palette.border, width: 1),
