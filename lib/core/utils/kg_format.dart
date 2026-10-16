@@ -62,3 +62,19 @@ String formatVolumeKg(double kg, String localeName) {
   }
   return format.format(kg);
 }
+
+/// Formats any other number READ on screen (cm, seconds, hours, levels,
+/// deltas) in [localeName]: grouped thousands, at most [maxDecimals]
+/// decimals, no redundant `,0` (`78.5` → `'78,5'`, `3100` → `'3.100'` in es).
+///
+/// Replaces the per-screen `v % 1 == 0 ? toStringAsFixed(0) :
+/// toStringAsFixed(1)` helpers, which ignored the locale. Like the other
+/// display helpers, NEVER for an editable field.
+String formatNumberDisplay(
+  num value,
+  String localeName, {
+  int maxDecimals = 1,
+}) {
+  final pattern = maxDecimals <= 0 ? '#,##0' : '#,##0.${'#' * maxDecimals}';
+  return NumberFormat(pattern, localeName).format(value);
+}
