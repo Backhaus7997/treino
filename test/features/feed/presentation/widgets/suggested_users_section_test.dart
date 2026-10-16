@@ -1,13 +1,21 @@
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/feed/application/suggested_users_providers.dart';
+import 'package:treino/features/feed/domain/follow.dart';
+import 'package:treino/features/feed/domain/follow_status.dart';
 import 'package:treino/features/feed/presentation/widgets/feed_empty_state.dart';
+import 'package:treino/features/feed/presentation/widgets/public_profile_follow_button.dart';
 import 'package:treino/features/feed/presentation/widgets/suggested_users_section.dart';
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
+import 'package:treino/features/profile/application/user_providers.dart'
+    show firestoreProvider;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/l10n/app_l10n_es.dart';
 
@@ -16,17 +24,21 @@ const _emptyMessage = 'Todavía no hay posts de a quienes seguís';
 UserPublicProfile profile({
   required String uid,
   required String displayName,
+  bool isProfilePublic = true,
 }) =>
     UserPublicProfile(
       uid: uid,
       displayName: displayName,
       displayNameLowercase: displayName.toLowerCase(),
       gymId: 'gym-a',
+      isProfilePublic: isProfilePublic,
     );
 
 Widget wrap({
   required String? gymId,
   required List<UserPublicProfile> suggestions,
+  String? viewerUid,
+  FakeFirebaseFirestore? firestore,
 }) {
   final router = GoRouter(
     initialLocation: '/',
@@ -55,6 +67,8 @@ Widget wrap({
 
   return ProviderScope(
     overrides: [
+      if (viewerUid != null) currentUidProvider.overrideWithValue(viewerUid),
+      if (firestore != null) firestoreProvider.overrideWithValue(firestore),
       if (gymId != null && gymId.isNotEmpty && gymId != kNoGymId)
         suggestedUsersProvider(gymId).overrideWith(
           (ref) async => suggestions,
@@ -170,5 +184,123 @@ void main() {
         findsOneWidget,
       );
     }
+  });
+
+  group('botón Seguir en la tarjeta', () {
+    testWidgets('sin sesión no se ofrece Seguir', (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          suggestions: [profile(uid: 'ana-uid', displayName: 'Ana')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SEGUIR'), findsNothing);
+    });
+
+    testWidgets('cada tarjeta ofrece SEGUIR y no desborda con nombre largo', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: FakeFirebaseFirestore(),
+          suggestions: [
+            profile(uid: 'ana-uid', displayName: 'Ana'),
+            profile(
+              uid: 'long-uid',
+              displayName: 'Maria de los Angeles Fernandez Gonzalez',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('SEGUIR'), findsNWidgets(2));
+      expect(tester.takeException(), isNull);
+
+      // El pill va pegado al fondo de la tarjeta (12 de padding + 1 de borde):
+      // sin hueco vacío abajo.
+      final rowRect = tester.getRect(find.byType(ListView));
+      final pill = find.byType(PublicProfileFollowButton).first;
+      expect(rowRect.bottom - tester.getRect(pill).bottom, closeTo(13, 1));
+    });
+
+    testWidgets('tocar SEGUIR crea la arista, pasa a SIGUIENDO y no navega', (
+      tester,
+    ) async {
+      final firestore = FakeFirebaseFirestore();
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: firestore,
+          suggestions: [profile(uid: 'ana-uid', displayName: 'Ana')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('SEGUIR'));
+      await tester.pumpAndSettle();
+
+      final edge = await firestore
+          .collection('follows')
+          .doc(Follow.edgeId('me', 'ana-uid'))
+          .get();
+      expect(edge.exists, isTrue);
+      expect(edge.data()!['status'], FollowStatus.accepted.name);
+      expect(find.text('SIGUIENDO'), findsOneWidget);
+      expect(find.text('profile-ana-uid'), findsNothing);
+    });
+
+    testWidgets('cuenta privada: SOLICITUD ENVIADA entra en la tarjeta', (
+      tester,
+    ) async {
+      final firestore = FakeFirebaseFirestore();
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: firestore,
+          suggestions: [
+            profile(
+                uid: 'priv-uid', displayName: 'Priv', isProfilePublic: false),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('SEGUIR'));
+      await tester.pumpAndSettle();
+
+      final edge = await firestore
+          .collection('follows')
+          .doc(Follow.edgeId('me', 'priv-uid'))
+          .get();
+      expect(edge.data()!['status'], FollowStatus.pending.name);
+      expect(find.text('SOLICITUD ENVIADA'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('tocar el resto de la tarjeta sigue abriendo el perfil', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: FakeFirebaseFirestore(),
+          suggestions: [profile(uid: 'ana-uid', displayName: 'Ana Pérez')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('suggested_user_ana-uid')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('profile-ana-uid'), findsOneWidget);
+    });
   });
 }

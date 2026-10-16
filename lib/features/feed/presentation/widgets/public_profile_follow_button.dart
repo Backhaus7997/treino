@@ -51,6 +51,7 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
     required this.viewerUid,
     required this.targetUid,
     this.targetIsPublic = false,
+    this.compact = false,
   });
 
   /// `follows/{viewer}_{target}` — ¿yo lo sigo? Es la que gobierna este pill.
@@ -67,6 +68,12 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
   /// When `false` (default) the edge is created as `pending` and the target
   /// must approve. See [FollowRepository.follow].
   final bool targetIsPublic;
+
+  /// Variante para tarjetas angostas (carrusel de sugerencias): el pill ocupa
+  /// todo el ancho que le da el padre, con menos padding, sin ícono, y el label
+  /// se achica en vez de desbordar ("SOLICITUD ENVIADA" no entra en una
+  /// tarjeta de ~100px).
+  final bool compact;
 
   @override
   ConsumerState<PublicProfileFollowButton> createState() =>
@@ -93,6 +100,7 @@ class _PublicProfileFollowButtonState
         return _FollowPill(
           label: 'SIGUIENDO',
           style: _FollowPillStyle.outlined,
+          compact: widget.compact,
           leadingIcon: TreinoIcon.check,
           semanticsLabel: AppL10n.of(context).feedFollowButtonFollowingA11y,
           onTap: () => _showUnfriendSheet(outgoing),
@@ -108,6 +116,7 @@ class _PublicProfileFollowButtonState
       return _FollowPill(
         label: 'SOLICITUD ENVIADA',
         style: _FollowPillStyle.outlinedMuted,
+        compact: widget.compact,
         semanticsLabel: AppL10n.of(context).feedFollowButtonRequestedA11y,
         onTap: () => _showUnfriendSheet(
           outgoing,
@@ -121,6 +130,7 @@ class _PublicProfileFollowButtonState
       return _FollowPill(
         label: 'ACEPTAR',
         style: _FollowPillStyle.mintFilled,
+        compact: widget.compact,
         busy: _busy,
         semanticsLabel: AppL10n.of(context).feedFollowButtonAcceptA11y,
         onTap: _busy ? null : () => _onAccept(repo, incoming),
@@ -132,6 +142,7 @@ class _PublicProfileFollowButtonState
     return _FollowPill(
       label: 'SEGUIR',
       style: _FollowPillStyle.mintFilled,
+      compact: widget.compact,
       busy: _busy,
       semanticsLabel: AppL10n.of(context).feedFollowButtonFollowA11y,
       onTap: _busy ? null : () => _onRequest(repo),
@@ -298,11 +309,15 @@ class _FollowPill extends StatelessWidget {
     required this.semanticsLabel,
     this.leadingIcon,
     this.busy = false,
+    this.compact = false,
   });
 
   final String label;
   final _FollowPillStyle style;
   final VoidCallback? onTap;
+
+  /// Ver [PublicProfileFollowButton.compact].
+  final bool compact;
 
   /// Lo que anuncia el lector de pantalla. Distinto por estado — el label
   /// visible es una sola palabra y no dice qué pasa al tocar.
@@ -340,17 +355,29 @@ class _FollowPill extends StatelessWidget {
         break;
     }
 
+    final text = Text(
+      label,
+      style: GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: 13,
+        letterSpacing: 1.0,
+        color: textColor,
+      ),
+    );
+
     final pill = TreinoTappable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: compact
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+            : const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: borderColor, width: 1),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: compact ? MainAxisSize.max : MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (busy) ...[
@@ -363,19 +390,16 @@ class _FollowPill extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-            ] else if (leadingIcon != null) ...[
+            ] else if (leadingIcon != null && !compact) ...[
               Icon(leadingIcon, size: 14, color: textColor),
               const SizedBox(width: 8),
             ],
-            Text(
-              label,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 1.0,
-                color: textColor,
-              ),
-            ),
+            // Compacto: el ancho lo manda la tarjeta, no el label. Sin el
+            // FittedBox, "SOLICITUD ENVIADA" desbordaría la fila.
+            if (compact)
+              Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: text))
+            else
+              text,
           ],
         ),
       ),
