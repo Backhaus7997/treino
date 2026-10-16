@@ -47,6 +47,16 @@ CheckIn? checkInForSession(List<CheckIn> dayCheckIns, String sessionId) {
   return null;
 }
 
+/// El último registro del día que NO viene de un entreno (la tarjeta de
+/// Inicio), o `null`. El resumen post-sesión lo ofrece en vez de volver a
+/// preguntar (#1513): el ánimo se respondía dos veces el mismo día.
+CheckIn? dailyCheckInWithoutSession(List<CheckIn> dayCheckIns) {
+  for (final c in dayCheckIns.reversed) {
+    if (c.sessionId == null) return c;
+  }
+  return null;
+}
+
 /// El registro más reciente del día, sin importar de dónde salió. `null` si el
 /// día está en blanco.
 CheckIn? latestCheckIn(List<CheckIn> dayCheckIns) =>

@@ -152,7 +152,12 @@ class _AssignFromAlumnoCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Elegí un alumno y armale el plan en su perfil. La plantilla queda guardada y la podés reutilizar.',
+            // #1503: decía «La plantilla queda guardada y la podés
+            // reutilizar», y asignar NO guarda ninguna plantilla. Ahora dice
+            // cómo se reutiliza de verdad.
+            'Elegí un alumno y armale el plan en su perfil. Ese plan es sólo '
+            'para ese alumno: si lo querés reutilizar, armalo como '
+            'plantilla en tu biblioteca.',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -505,7 +510,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
               'Eliminar',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                color: widget.palette.danger,
+                color: widget.palette.dangerText,
               ),
             ),
           ),
@@ -735,7 +740,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           TextButton(
             onPressed: busy ? null : () => _onAssign(context),
             style: TextButton.styleFrom(
-              foregroundColor: palette.accent,
+              foregroundColor: palette.accentText,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             ),
             child: _assigning
@@ -809,7 +814,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                 child: _MenuRow(
                   icon: TreinoIcon.trash,
                   label: 'Eliminar',
-                  color: palette.danger,
+                  color: palette.dangerText,
                 ),
               ),
             ],

@@ -104,6 +104,8 @@ InputDecoration setCellDecoration({
           const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
       hintText: hint,
       hintStyle: TextStyle(
-        color: hasError ? palette.danger.withAlpha(180) : palette.textMuted,
+        // Sin alpha: con 180 daba 3,2:1 en las dos paletas (medido), abajo de
+        // AA. El error ya lo marca el borde rojo de la celda.
+        color: hasError ? palette.dangerText : palette.textMuted,
       ),
     );

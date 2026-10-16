@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -52,7 +53,7 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
             children: [
               Text(
                 l10n.workoutHistorialHeading,
-                style: theme.textTheme.titleMedium,
+                style: _heading(theme),
               ),
               if (completedCount > 0) ...[
                 const SizedBox(height: 8),
@@ -72,7 +73,7 @@ class _HistorialSectionState extends ConsumerState<HistorialSection> {
               Expanded(
                 child: Text(
                   l10n.workoutHistorialHeading,
-                  style: theme.textTheme.titleMedium,
+                  style: _heading(theme),
                 ),
               ),
               if (completedCount > 0)
@@ -226,7 +227,7 @@ class _HistorialCard extends StatelessWidget {
     final formattedDate = formatSessionDate(session.startedAt.toLocal());
     final useStackedLayout = MediaQuery.textScalerOf(context).scale(1) > 1.3;
     final volume = Text(
-      '${formatVolumeKg(session.totalVolumeKg)}'
+      '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)}'
       '${AppL10n.of(context).workoutHistorialCardKgSuffix}',
       style: theme.textTheme.bodySmall?.copyWith(color: palette.textMuted),
     );
@@ -340,3 +341,10 @@ class _ExpandToggle extends StatelessWidget {
     );
   }
 }
+
+/// #1514: heading de sección en Barlow Condensed 700, como todo heading del
+/// sistema (AGENTS §2). `titleMedium` del tema es Barlow regular.
+TextStyle? _heading(ThemeData theme) => GoogleFonts.barlowCondensed(
+      textStyle: theme.textTheme.titleMedium,
+      fontWeight: FontWeight.w700,
+    );

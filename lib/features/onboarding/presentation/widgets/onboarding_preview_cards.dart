@@ -12,10 +12,10 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../app/theme/tokens/primitives.dart';
 
 /// The card shell these share: `bgCard`, hairline border, rounded.
 ///
@@ -315,8 +315,8 @@ class OnboardingInlineComment extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 height: 1.0,
-                // Initials on accent — `onPrimary: palette.bg`.
-                color: palette.bg,
+                // Initials on accent — `TreinoButtonTokens.ink`.
+                color: TreinoButtonTokens.ink,
               ),
             ),
           ),
@@ -421,8 +421,8 @@ class OnboardingPhotoPost extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       height: 1.0,
-                      // Initials on accent — `onPrimary: palette.bg`.
-                      color: palette.bg,
+                      // Initials on accent — `TreinoButtonTokens.ink`.
+                      color: TreinoButtonTokens.ink,
                     ),
                   ),
                 ),

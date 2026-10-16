@@ -517,6 +517,14 @@
   "@wellbeingCheckInTitle": {
     "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
   },
+  "wellbeingCheckInFromToday": "Ya lo contaste hoy en Inicio.",
+  "@wellbeingCheckInFromToday": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
+  "wellbeingCheckInUseForSession": "USAR PARA ESTE ENTRENO",
+  "@wellbeingCheckInUseForSession": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
   "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
   "@wellbeingCheckInOptional": {
     "description": "Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave."
@@ -4853,5 +4861,47 @@
   "appUpdateOpenError": "No pudimos abrir la tienda. Buscá TREINO en la App Store o en Google Play.",
   "@appUpdateTitle": {
     "description": "Título de la pantalla bloqueante que aparece cuando la versión instalada es menor a la mínima exigida (app_config/min_version)."
-  }
+  },
+  "timePickerHelpText": "Elegí una hora",
+  "@timePickerHelpText": {
+    "description": "Encabezado del selector de hora de Material. Sin esto sale el de Material en tuteo (Selecciona una hora), #1494."
+  },
+  "logFieldRange": "Entre {min} y {max} {unit}",
+  "@logFieldRange": {"description": "Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.", "placeholders": {"min": {"type": "String"}, "max": {"type": "String"}, "unit": {"type": "String"}}},
+  "inputMaxReached": "Máximo {max} {unit}",
+  "@inputMaxReached": {"description": "Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).", "placeholders": {"max": {"type": "String"}, "unit": {"type": "String"}}},
+  "performanceLogTitleEdit": "Editar evaluación",
+  "@performanceLogTitleEdit": {"description": "Título del form de evaluación en modo edición (#1485)."},
+  "performanceLogUpdateCta": "GUARDAR CAMBIOS",
+  "@performanceLogUpdateCta": {"description": "CTA del form de evaluación en modo edición."},
+  "performanceLogUpdateSuccess": "Evaluación actualizada",
+  "@performanceLogUpdateSuccess": {"description": "SnackBar tras editar una evaluación."},
+  "performanceHistoryEditTooltip": "Editar evaluación",
+  "@performanceHistoryEditTooltip": {"description": "Tooltip del lápiz en el historial de evaluaciones."},
+  "performanceHistoryDeleteTooltip": "Eliminar evaluación",
+  "@performanceHistoryDeleteTooltip": {"description": "Tooltip del tacho en el historial de evaluaciones."},
+  "performanceHistoryOtherTrainerTag": "Cargada por otro entrenador",
+  "@performanceHistoryOtherTrainerTag": {"description": "Fila del historial que cargó otro PF: las reglas sólo dejan editar/borrar al autor."},
+  "performanceDeleteConfirmTitle": "¿Eliminar evaluación?",
+  "@performanceDeleteConfirmTitle": {"description": "Título del diálogo de borrado de una evaluación."},
+  "performanceDeleteConfirmBody": "Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.",
+  "@performanceDeleteConfirmBody": {"description": "Cuerpo del diálogo de borrado.", "placeholders": {"date": {"type": "String"}}},
+  "performanceDeleteSuccess": "Evaluación eliminada",
+  "@performanceDeleteSuccess": {"description": "SnackBar tras borrar una evaluación."},
+  "performanceDeleteError": "No pudimos eliminar la evaluación. Probá de nuevo.",
+  "@performanceDeleteError": {"description": "SnackBar si falla el borrado."},
+  "commonDelete": "Eliminar",
+  "@commonDelete": {"description": "Acción destructiva genérica de showTreinoConfirmDialog (#1496)."},
+  "agendaRuleDeleteTitle": "¿Borrar este horario?",
+  "@agendaRuleDeleteTitle": {"description": "Título de la confirmación de borrado de una franja (#1496)."},
+  "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
+  "@agendaRuleDeleteBody": {"description": "Cuerpo de la confirmación de borrado de una franja."},
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
+  "@agendaOverrideDeleteTitle": {"description": "Título de la confirmación de borrado de una excepción de agenda."},
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "@onboardingCustomExerciseNotNow": {"description": "Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489)."},
+  "authSignOutConfirmTitle": "¿Cerrar sesión?",
+  "@authSignOutConfirmTitle": {"description": "Título de la confirmación de Cerrar sesión (#1504)."},
+  "authSignOutConfirmAction": "Salir",
+  "@authSignOutConfirmAction": {"description": "Acción que confirma cerrar sesión."}
 }

@@ -280,6 +280,16 @@ void main() {
       expect(find.text('CREAR RUTINA').hitTestable(), findsOneWidget);
     });
 
+    // #1514: el heading iba en `titleMedium` (Barlow regular).
+    testWidgets('#1514: MIS RUTINAS va en Barlow Condensed 700',
+        (tester) async {
+      await _pumpSection(tester);
+      await tester.pumpAndSettle();
+      final style = tester.widget<Text>(find.text('MIS RUTINAS')).style!;
+      expect(style.fontFamily, contains('BarlowCondensed'));
+      expect(style.fontWeight, FontWeight.w700);
+    });
+
     testWidgets('empty state renders motivational message + CTA enabled',
         (tester) async {
       await _pumpSection(tester);

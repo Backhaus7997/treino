@@ -69,31 +69,17 @@ Widget _buildCard({
 
 void main() {
   group('ProfileAvatarCard', () {
-    // SCENARIO-496: renders avatar, displayName, and derived @handle
-    testWidgets(
-        'SCENARIO-496: renders displayName and derived @handle for "Maria Gomez"',
-        (tester) async {
-      await tester.pumpWidget(_buildCard(profile: _profile()));
-      await tester.pumpAndSettle();
-
-      // Display name is uppercased on render (mockup parity 2026-06-01 polish).
-      // The @handle derivation still operates on the raw displayName, so the
-      // handle stays lowercase.
-      expect(find.text('MARIA GOMEZ'), findsOneWidget);
-      expect(find.text('@maria.gomez'), findsOneWidget);
-    });
-
-    // SCENARIO-497: @handle derivation preserves accented chars and lowercase
-    testWidgets('SCENARIO-497: @handle for "Ana Núñez" becomes "@ana.núñez"',
+    // #1516: el @handle derivado del nombre (con tildes, no único) se sacó:
+    // reemplaza a SCENARIO-496/497, que fijaban justamente esa derivación.
+    testWidgets('#1516: muestra el nombre y NO un @handle inventado',
         (tester) async {
       await tester.pumpWidget(
         _buildCard(profile: _profile(displayName: 'Ana Núñez')),
       );
       await tester.pumpAndSettle();
 
-      // Display name uppercased; handle derivation preserves accents.
       expect(find.text('ANA NÚÑEZ'), findsOneWidget);
-      expect(find.text('@ana.núñez'), findsOneWidget);
+      expect(find.textContaining('@'), findsNothing);
     });
 
     // SCENARIO-498: gym chip visible when gymId non-null
