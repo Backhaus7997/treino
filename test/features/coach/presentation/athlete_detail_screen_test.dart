@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/presentation/athlete_detail_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
@@ -210,7 +211,12 @@ Future<void> _pumpScreen(
 
   await tester.pumpWidget(
     ProviderScope(
-      overrides: overrides,
+      overrides: [
+        // Sin plan nutricional por default: la sección (#1538) no es lo que
+        // miran estos tests, y sin override le pegaría a Firestore real.
+        nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
+        ...overrides,
+      ],
       child: MaterialApp.router(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
@@ -220,6 +226,16 @@ Future<void> _pumpScreen(
       ),
     ),
   );
+}
+
+/// La ficha es un scroll largo: cada sección nueva empuja hacia abajo las que
+/// siguen, y un `tap` sobre algo que quedó fuera del viewport de 800×600 cae
+/// afuera SIN fallar ahí — falla después, con un finder que no encuentra lo
+/// que el tap debía abrir. Pasó al sumar PLAN NUTRICIONAL (#1538).
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -563,7 +579,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap the session row to expand
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       // SessionExerciseBlock should render the exercise name
@@ -595,7 +611,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Tap to expand
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       // Placeholder appears, no crash
@@ -625,7 +641,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       // No edit or delete button should exist in the tree
@@ -654,7 +670,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       expect(
@@ -687,7 +703,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       // El ejercicio con series sigue igual…
@@ -722,7 +738,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       expect(find.text('Esta sesión no tiene sets registrados.'), findsNothing);
@@ -757,7 +773,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       // El aviso sale…
@@ -793,7 +809,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Plan Test'));
+      await _tapVisible(tester, find.text('Plan Test'));
       await tester.pumpAndSettle();
 
       expect(find.text('No pudimos cargar los reportes del alumno.'),
@@ -1170,7 +1186,7 @@ void main() {
       expect(find.text('EN CURSO'), findsOneWidget);
       expect(find.text('Full Body'), findsOneWidget);
 
-      await tester.tap(find.text('EN CURSO'));
+      await _tapVisible(tester, find.text('EN CURSO'));
       await tester.pumpAndSettle();
 
       expect(find.text('sesion:viva'), findsOneWidget);
@@ -1227,7 +1243,7 @@ void main() {
       expect(find.text('Full Body'), findsOneWidget);
       expect(find.text('Pierna vieja'), findsNothing);
 
-      await tester.tap(find.text('EN CURSO'));
+      await _tapVisible(tester, find.text('EN CURSO'));
       await tester.pumpAndSettle();
 
       expect(find.text('sesion:viva'), findsOneWidget);
