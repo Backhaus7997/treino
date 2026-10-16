@@ -152,7 +152,12 @@ class _AssignFromAlumnoCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Elegí un alumno y armale el plan en su perfil. La plantilla queda guardada y la podés reutilizar.',
+            // #1503: decía «La plantilla queda guardada y la podés
+            // reutilizar», y asignar NO guarda ninguna plantilla. Ahora dice
+            // cómo se reutiliza de verdad.
+            'Elegí un alumno y armale el plan en su perfil. Ese plan es sólo '
+            'para ese alumno: si lo querés reutilizar, armalo como '
+            'plantilla en tu biblioteca.',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 13,
