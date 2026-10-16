@@ -474,25 +474,37 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
         child: Column(
           children: [
             // ── Top bar ─────────────────────────────────────────────────────
+            // #1484: mismo header que Nuevo post — CANCELAR neutro a la
+            // izquierda y el título CENTRADO. Antes el título iba a la derecha
+            // y «Cancelar» en magenta. Stack y no Row con Spacers: el título
+            // queda al centro de la pantalla aunque CANCELAR mida distinto.
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
-              child: Row(
+              // Simétrico: el título se centra en la pantalla, no en el hueco.
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s8,
+                AppSpacing.s8,
+                AppSpacing.s8,
+                0,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  TextButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.of(context).pop(),
-                    child: Text(
-                      l10n.commonCancel,
-                      style: GoogleFonts.barlow(
-                        color: _saving ? palette.textMuted : palette.highlight,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed:
+                          _saving ? null : () => Navigator.of(context).pop(),
+                      child: Text(
+                        l10n.commonCancel.toUpperCase(),
+                        style: GoogleFonts.barlowCondensed(
+                          color: palette.textMuted,
+                          fontSize: AppTextSize.body,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
-                  const Spacer(),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
                         isEditing
@@ -500,14 +512,14 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
                             : l10n.measurementLogTitleCreate,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w700,
-                          fontSize: 16,
+                          fontSize: AppTextSize.title,
                           color: palette.textPrimary,
                         ),
                       ),
                       Text(
                         _formatDateTimeEs(headerDate, l10n.localeName),
                         style: GoogleFonts.barlow(
-                          fontSize: 12,
+                          fontSize: AppTextSize.caption,
                           color: palette.textMuted,
                         ),
                       ),
