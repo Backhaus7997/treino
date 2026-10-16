@@ -1104,6 +1104,56 @@ void main() {
     });
   });
 
+  // #1510: el descanso configurado en la rutina sólo corría en el reloj. Al
+  // marcar la serie en el teléfono ahora arranca la cuenta, y SALTAR la saca.
+  group('#1510 descanso', () {
+    testWidgets('marcar una serie arranca el descanso del slot; SALTAR lo saca',
+        (tester) async {
+      final notifier = _LoggingNotifier(_defaultState());
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(find.byKey(const Key('rest_timer_bar')), findsOneWidget);
+      expect(find.text('1:30'), findsOneWidget,
+          reason: 'el slot trae 90 s de descanso');
+
+      await tester.tap(find.text('SALTAR'));
+      await tester.pump();
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+    });
+
+    testWidgets('sin descanso configurado no aparece nada', (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 4, slots: [
+          makeSlot(exerciseId: 'e1', targetSets: 3, restSeconds: 0),
+        ]),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      final notifier = _LoggingNotifier(state);
+      await tester.pumpWidget(_wrapProvider(
+        const SessionPlayerScreen(init: _kInit),
+        [sessionNotifierProvider.overrideWith(() => notifier)],
+      ));
+      await tester.pump();
+      await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty).first);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(find.byKey(const Key('rest_timer_bar')), findsNothing);
+    });
+  });
+
   // ── Block gating widget tests ─────────────────────────────────────────────
 
   group('block gating UI', () {
