@@ -35,6 +35,8 @@ import '../domain/custom_exercise.dart' show CustomExercise;
 import '../application/exercise_filter.dart'
     show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
+import '../application/assigned_routine_providers.dart'
+    show assignedRoutinesByTrainerProvider;
 import '../application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -2819,6 +2821,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }).toList();
   }
 
+  /// Tira el cache de PLANES ASIGNADOS del par PF/alumno.
+  ///
+  /// `assignedRoutinesByTrainerProvider` es un `FutureProvider` one-shot: sin
+  /// esto el detalle de alumno que quedó debajo del editor sigue diciendo
+  /// «Todavía no le asignaste planes.» después de «Plan creado y asignado.»
+  /// (#1486). Va por el container y no por `ref` porque corre después del
+  /// await, cuando la pantalla puede ya no estar montada.
+  static void _invalidateAssignedList(
+    ProviderContainer container, {
+    required String trainerId,
+    required String athleteId,
+  }) {
+    container.invalidate(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerId, athleteId: athleteId),
+    ));
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
 
@@ -2920,6 +2939,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           );
           await repo.updateAssigned(uid: uid, draft: draft);
           invalidateRoutineById(container, planId);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
@@ -2949,6 +2970,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           // `routine_created` sí se queda: lleva un `source` que sólo conoce
           // esta pantalla.
           await repo.createAssigned(routine);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           analytics.logRoutineCreated(
             source: analyticsSource,
             daysCount: days.length,
