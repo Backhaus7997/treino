@@ -513,6 +513,156 @@ class AppL10nEn extends AppL10n {
       'You need an active trainer link to view your nutrition plan.';
 
   @override
+  String get trainerNutritionSectionTitle => 'NUTRITION PLAN';
+
+  @override
+  String get trainerNutritionSectionLoadCta => '+ Add';
+
+  @override
+  String get trainerNutritionSectionEditCta => 'Edit';
+
+  @override
+  String get trainerNutritionSectionEmpty =>
+      'You haven\'t added a nutrition plan yet.';
+
+  @override
+  String get trainerNutritionSectionUntitled => 'Nutrition plan';
+
+  @override
+  String trainerNutritionSectionSummary(int count, String date) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count meals',
+      one: '1 meal',
+    );
+    return '$_temp0 · updated $date';
+  }
+
+  @override
+  String get trainerNutritionLoadError =>
+      'We couldn\'t load the nutrition plan.';
+
+  @override
+  String get trainerNutritionEditorTitle => 'NUTRITION PLAN';
+
+  @override
+  String get trainerNutritionEditorPlanTitleLabel => 'Plan title (optional)';
+
+  @override
+  String get trainerNutritionEditorPlanTitleHint =>
+      'E.g. Progression 4 - Week 9 onwards';
+
+  @override
+  String get trainerNutritionEditorMealNameHint => 'Meal name';
+
+  @override
+  String get trainerNutritionEditorMealTimeHint => 'Time';
+
+  @override
+  String get trainerNutritionEditorDeleteMealTooltip => 'Delete meal';
+
+  @override
+  String get trainerNutritionEditorAddMeal => 'ADD MEAL';
+
+  @override
+  String get trainerNutritionEditorGroupNameHint => 'Group name';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupTooltip => 'Delete group';
+
+  @override
+  String get trainerNutritionEditorAddGroup => '+ Add group';
+
+  @override
+  String get trainerNutritionEditorChooseOne => 'Choose one';
+
+  @override
+  String get trainerNutritionEditorAll => 'All';
+
+  @override
+  String get trainerNutritionEditorAddOption => '+ Add option';
+
+  @override
+  String get trainerNutritionEditorEmptyGroup => 'No options yet.';
+
+  @override
+  String get trainerNutritionEditorSave => 'SAVE PLAN';
+
+  @override
+  String get trainerNutritionEditorSaved => 'Nutrition plan saved.';
+
+  @override
+  String get trainerNutritionEditorSaveError =>
+      'We couldn\'t save the plan. Try again.';
+
+  @override
+  String get trainerNutritionEditorEmptyPlan =>
+      'The plan is empty. Add at least one meal with a name.';
+
+  @override
+  String get trainerNutritionEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get trainerNutritionEditorDiscardBody =>
+      'If you leave now you\'ll lose your unsaved plan changes.';
+
+  @override
+  String get trainerNutritionEditorDiscardConfirm => 'Discard';
+
+  @override
+  String trainerNutritionEditorDeleteTitle(String name) {
+    return 'Delete “$name”?';
+  }
+
+  @override
+  String get trainerNutritionEditorDeleteConfirm => 'Delete';
+
+  @override
+  String get trainerNutritionEditorDeleteMealBody =>
+      'The meal will be deleted with all its groups and options.';
+
+  @override
+  String get trainerNutritionEditorDeleteGroupBody =>
+      'The group will be deleted with all its options.';
+
+  @override
+  String get trainerNutritionOptionNewTitle => 'NEW OPTION';
+
+  @override
+  String get trainerNutritionOptionEditTitle => 'EDIT OPTION';
+
+  @override
+  String get trainerNutritionOptionNameLabel => 'FOOD';
+
+  @override
+  String get trainerNutritionOptionNameHint => 'E.g. 5 rice cakes';
+
+  @override
+  String get trainerNutritionOptionQuantityLabel => 'QUANTITY';
+
+  @override
+  String get trainerNutritionOptionQuantityHint => 'E.g. 230-240';
+
+  @override
+  String get trainerNutritionOptionUnitLabel => 'UNIT';
+
+  @override
+  String get trainerNutritionOptionUnitHint => 'E.g. g cooked weight';
+
+  @override
+  String get trainerNutritionOptionNotesLabel => 'NOTES';
+
+  @override
+  String get trainerNutritionOptionNotesHint => 'Brand, clarifications…';
+
+  @override
+  String get trainerNutritionOptionDone => 'DONE';
+
+  @override
+  String get trainerNutritionOptionDelete => 'DELETE OPTION';
+
+  @override
   String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
 
   @override
