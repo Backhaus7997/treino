@@ -9025,12 +9025,6 @@ abstract class AppL10n {
   /// **'Máximo {max} {unit}'**
   String inputMaxReached(String max, String unit);
 
-  /// Como logFieldRange, pero el mínimo NO es válido (las reglas de performance_tests exigen > 0).
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Más de {min} y hasta {max} {unit}'**
-  String logFieldRangeAbove(String min, String max, String unit);
-
   /// Título del form de evaluación en modo edición (#1485).
   ///
   /// In es_AR, this message translates to:

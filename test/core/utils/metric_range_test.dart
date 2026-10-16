@@ -48,20 +48,16 @@ void main() {
           MetricCheck.outOfRange);
     });
 
-    // Las reglas de `performance_tests` exigen `> 0`: un rango que aceptara
-    // el 0 haría que Firestore rechace lo que el form dio por bueno.
-    test('el piso es exclusivo, como optPositiveNum de las reglas', () {
-      expect(PerformanceTestRanges.verticalJumpCm.check('0'),
-          MetricCheck.outOfRange);
-      expect(PerformanceTestRanges.verticalJumpCm.check('0,1'), MetricCheck.ok);
-      expect(PerformanceTestRanges.cooperMeters.check('0'),
-          MetricCheck.outOfRange);
+    // Los pisos de producto, espejados en `firestore.rules` (#1485).
+    test('el 0 es válido donde el rango arranca en 0', () {
+      expect(PerformanceTestRanges.verticalJumpCm.check('0'), MetricCheck.ok);
+      expect(PerformanceTestRanges.cooperMeters.check('0'), MetricCheck.ok);
     });
 
-    test('sit and reach no admite negativos mientras la regla no cambie', () {
-      expect(PerformanceTestRanges.sitAndReachCm.check('-12'),
-          MetricCheck.outOfRange);
-      expect(PerformanceTestRanges.sitAndReachCm.check('0'),
+    test('sit and reach acepta negativos hasta −40', () {
+      expect(PerformanceTestRanges.sitAndReachCm.check('-12'), MetricCheck.ok);
+      expect(PerformanceTestRanges.sitAndReachCm.check('-40'), MetricCheck.ok);
+      expect(PerformanceTestRanges.sitAndReachCm.check('-41'),
           MetricCheck.outOfRange);
     });
   });

@@ -5,27 +5,20 @@ import 'package:flutter/foundation.dart';
 ///
 /// No es un rango fisiológico estricto: es un tope GENEROSO para atajar typos
 /// —150 % de grasa, un CMJ de 999 cm— sin rechazar a un atleta real fuera de
-/// lo común. Los bordes son válidos, salvo [minExclusive].
+/// lo común. Los bordes son válidos.
 @immutable
 class MetricRange {
-  const MetricRange(this.min, this.max, this.unit, {this.minExclusive = false})
+  const MetricRange(this.min, this.max, this.unit)
       : assert(min < max, 'min tiene que ser menor que max');
 
   final double min;
   final double max;
 
-  /// Si [min] mismo queda AFUERA. Existe por las reglas de Firestore de
-  /// `performance_tests`, que exigen `> 0` (`optPositiveNum`): un rango de
-  /// cliente que aceptara el 0 haría que el form diga «válido» y la escritura
-  /// vuelva permission-denied.
-  final bool minExclusive;
-
   /// Unidad que acompaña al número en el mensaje de error ("kg", "%", "cm").
   /// Vacía para métricas adimensionales (nivel de Course Navette).
   final String unit;
 
-  bool contains(double value) =>
-      (minExclusive ? value > min : value >= min) && value <= max;
+  bool contains(double value) => value >= min && value <= max;
 
   /// Valida el texto crudo de un campo. Vacío es válido: todos los campos son
   /// opcionales. Acepta coma decimal, que es lo que tipea un teclado es-AR.
@@ -42,11 +35,10 @@ class MetricRange {
       other is MetricRange &&
       other.min == min &&
       other.max == max &&
-      other.unit == unit &&
-      other.minExclusive == minExclusive;
+      other.unit == unit;
 
   @override
-  int get hashCode => Object.hash(min, max, unit, minExclusive);
+  int get hashCode => Object.hash(min, max, unit);
 }
 
 /// Resultado de [MetricRange.check].

@@ -565,4 +565,67 @@ void main() {
     expect(find.textContaining('10m 1.6s'), findsOneWidget);
     expect(find.textContaining('Sent. 120.0 kg'), findsOneWidget);
   });
+
+  // ── #1483 / #1540: rangos por campo también en el Hub ──────────────────
+  //
+  // El campo del Hub validaba 0–500 para TODO: dejaba pasar 150 % de grasa y
+  // un CMJ de 200 cm que la regla de Firestore deniega (Codex en #1540).
+
+  testWidgets('medición: 150 % de grasa no se guarda y el error dice el rango',
+      (tester) async {
+    final m = _measurement(
+      id: 'm1',
+      recordedAt: DateTime(2026, 3, 12),
+      weightKg: 78,
+      fatPercentage: 150,
+    );
+    final repo = _StubMeasurementRepo();
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(
+      _baseOverrides(measurements: [m], repo: repo),
+    ));
+    await _selectMedicionesTab(tester);
+    await tester.tap(find.byIcon(TreinoIcon.edit));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TreinoButton, 'GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entre 2 y 70 %'), findsOneWidget);
+    expect(repo.updated, isEmpty);
+  });
+
+  testWidgets('evaluación: un CMJ de 200 cm no se guarda y dice el rango',
+      (tester) async {
+    final tests = [
+      PerformanceTest(
+        id: 't1',
+        athleteId: _athleteUid,
+        recordedBy: _trainerUid,
+        recordedAt: DateTime(2026, 3, 12),
+        cmjCm: 200,
+      ),
+    ];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap([
+      ..._baseOverrides(measurements: const []),
+      performanceTestsForAthleteProvider
+          .overrideWith((ref, id) => Stream.value(tests)),
+    ]));
+    await _selectMedicionesTab(tester);
+    await navigateAlumnoDetail(
+      tester,
+      group: 'Progreso',
+      subview: 'Rendimiento',
+    );
+    await tester.tap(find.byIcon(TreinoIcon.edit));
+    await tester.pumpAndSettle();
+
+    // Si la validación dejara pasar, el save iría a un repo real sin
+    // override y el test reventaría: el error tiene que frenar ANTES.
+    await tester.tap(find.widgetWithText(TreinoButton, 'GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entre 0 y 150 cm'), findsOneWidget);
+  });
 }

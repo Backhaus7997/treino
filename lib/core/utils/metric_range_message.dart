@@ -17,9 +17,6 @@ String? metricRangeError(MetricRange range, String? raw, AppL10n l10n) {
       String n(double v) => formatWeightKg(v).replaceAll('.', ',');
       // `unit` puede ser vacío (nivel de Course Navette): sin el trim queda un
       // espacio colgando al final.
-      final text = range.minExclusive
-          ? l10n.logFieldRangeAbove(n(range.min), n(range.max), range.unit)
-          : l10n.logFieldRange(n(range.min), n(range.max), range.unit);
-      return text.trim();
+      return l10n.logFieldRange(n(range.min), n(range.max), range.unit).trim();
   }
 }

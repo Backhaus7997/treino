@@ -2270,7 +2270,6 @@
   "timePickerHelpText": "Select time",
   "logFieldRange": "Between {min} and {max} {unit}",
   "inputMaxReached": "Maximum {max} {unit}",
-  "logFieldRangeAbove": "Above {min} and up to {max} {unit}",
   "performanceLogTitleEdit": "Edit assessment",
   "performanceLogUpdateCta": "SAVE CHANGES",
   "performanceLogUpdateSuccess": "Assessment updated",

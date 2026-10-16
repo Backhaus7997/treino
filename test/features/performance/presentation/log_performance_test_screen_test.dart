@@ -58,13 +58,13 @@ void main() {
     await tester.enterText(cmj, '999');
     await tester.pump();
 
-    expect(find.text('Más de 0 y hasta 150 cm'), findsOneWidget);
+    expect(find.text('Entre 0 y 150 cm'), findsOneWidget);
     expect(guardar().onPressed, isNull);
 
     await tester.enterText(cmj, '42,5');
     await tester.pump();
 
-    expect(find.text('Más de 0 y hasta 150 cm'), findsNothing);
+    expect(find.text('Entre 0 y 150 cm'), findsNothing);
     expect(guardar().onPressed, isNotNull);
   });
 
@@ -151,13 +151,60 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('Más de 0 y hasta 150 cm'), findsOneWidget,
+    expect(find.text('Entre 0 y 150 cm'), findsOneWidget,
         reason: 'GUARDAR gris sin decir por qué no sirve (Codex en #1524)');
     final guardar = tester.widget<ButtonStyleButton>(find.ancestor(
       of: find.text('GUARDAR CAMBIOS'),
       matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
     ));
     expect(guardar.onPressed, isNull);
+  });
+
+  testWidgets('#1485: sit and reach acepta el signo menos y guarda el negativo',
+      (tester) async {
+    final repo = _MockPerformanceTestRepository();
+    when(() => repo.add(any())).thenAnswer(
+      (inv) async => inv.positionalArguments.first as PerformanceTest,
+    );
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        performanceTestRepositoryProvider.overrideWithValue(repo),
+        currentUidProvider.overrideWithValue('trainerT'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const LogPerformanceTestScreen(athleteId: 'athleteX'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    final campo = find.descendant(
+      of: find
+          .ancestor(
+            of: find.text('Flexibilidad sit-and-reach'),
+            matching: find.byType(Column),
+          )
+          .first,
+      matching: find.byType(TextField),
+    );
+    // `enterText` pasa por los inputFormatters: sin el `-` permitido, el
+    // texto quedaría en "12".
+    await tester.enterText(campo, '-12');
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(campo).controller!.text,
+      '-12',
+    );
+
+    await tester.tap(find.text('GUARDAR EVALUACIÓN'));
+    await tester.pump();
+
+    final saved =
+        verify(() => repo.add(captureAny())).captured.single as PerformanceTest;
+    expect(saved.sitAndReachCm, -12);
   });
 
   testWidgets(

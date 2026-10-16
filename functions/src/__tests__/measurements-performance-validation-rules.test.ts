@@ -347,12 +347,8 @@ describe("performance_tests create — QA #508 value validation", () => {
     await assertFails(ref().set(performanceDoc({ squat1rmKg: -200 })));
   });
 
-  it("DENIES a zero metric (client validator rejects <= 0)", async () => {
+  it("DENIES a sprint below its floor (10 m: 1–5 s)", async () => {
     await assertFails(ref().set(performanceDoc({ sprint10mS: 0 })));
-  });
-
-  it("DENIES a negative sitAndReachCm — the app's contract is positive-only", async () => {
-    await assertFails(ref().set(performanceDoc({ sitAndReachCm: -5 })));
   });
 
   it("DENIES an absurd magnitude above the cap", async () => {
@@ -411,6 +407,81 @@ describe("performance_tests create — QA #508 value validation", () => {
 
   it("allows a single-metric evaluation with the rest null", async () => {
     await assertSucceeds(ref().set(performanceDoc({ cmjCm: 40 })));
+  });
+});
+
+// Rangos por campo acordados con producto el 2026-10-16 (#1485). Reemplazan el
+// `> 0` con techo de 100000: el piso 0 de saltos/1RM/Cooper es válido, y sit
+// and reach es una métrica CON SIGNO (no llegar a la punta del pie). Espejan
+// `PerformanceTestRanges` del cliente: si divergen, el form dice «válido» y
+// la escritura vuelve permission-denied.
+describe("performance_tests create — rangos por campo (#1485)", () => {
+  beforeEach(async () => {
+    await seedRole(TRAINER, "trainer");
+  });
+
+  const ref = () => ctxDb(TRAINER).collection(COL_PERFORMANCE).doc(DOC);
+
+  it("allows 0 where the range starts at 0", async () => {
+    await assertSucceeds(
+      ref().set(
+        performanceDoc({
+          cmjCm: 0,
+          broadJumpCm: 0,
+          squat1rmKg: 0,
+          pullUp1rmKg: 0,
+          cooperMeters: 0,
+        }),
+      ),
+    );
+  });
+
+  it("allows a negative sit and reach down to -40", async () => {
+    await assertSucceeds(ref().set(performanceDoc({ sitAndReachCm: -12 })));
+    await assertSucceeds(ref().set(performanceDoc({ sitAndReachCm: -40 })));
+  });
+
+  it("allows every upper bound (inclusive)", async () => {
+    await assertSucceeds(
+      ref().set(
+        performanceDoc({
+          cmjCm: 150,
+          squatJumpCm: 150,
+          abalakovCm: 150,
+          broadJumpCm: 400,
+          sprint10mS: 5,
+          sprint20mS: 8,
+          sprint30mS: 10,
+          sprint40mS: 12,
+          squat1rmKg: 500,
+          benchPress1rmKg: 500,
+          deadlift1rmKg: 500,
+          overheadPress1rmKg: 500,
+          pullUp1rmKg: 200,
+          vo2maxMlKgMin: 95,
+          courseNavetteLevel: 21,
+          cooperMeters: 5000,
+          sitAndReachCm: 60,
+        }),
+      ),
+    );
+  });
+
+  it("DENIES the QA's 999 cm CMJ", async () => {
+    await assertFails(ref().set(performanceDoc({ cmjCm: 999 })));
+  });
+
+  it("DENIES just past each edge", async () => {
+    await assertFails(ref().set(performanceDoc({ cmjCm: 150.1 })));
+    await assertFails(ref().set(performanceDoc({ sitAndReachCm: -41 })));
+    await assertFails(ref().set(performanceDoc({ pullUp1rmKg: 201 })));
+    await assertFails(ref().set(performanceDoc({ vo2maxMlKgMin: 9 })));
+    await assertFails(ref().set(performanceDoc({ courseNavetteLevel: 22 })));
+    await assertFails(ref().set(performanceDoc({ sprint40mS: 3.9 })));
+  });
+
+  it("DENIES a negative where the range starts at 0", async () => {
+    await assertFails(ref().set(performanceDoc({ broadJumpCm: -1 })));
   });
 });
 
