@@ -1269,7 +1269,7 @@ class _SectionHeader extends StatelessWidget {
                     fontSize: 12,
                     color: trailingOnTap == null
                         ? palette.textMuted
-                        : palette.accent,
+                        : palette.accentText,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -1278,7 +1278,7 @@ class _SectionHeader extends StatelessWidget {
                   size: 14,
                   color: trailingOnTap == null
                       ? palette.textMuted
-                      : palette.accent,
+                      : palette.accentText,
                 ),
               ],
             ),

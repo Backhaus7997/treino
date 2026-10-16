@@ -1021,6 +1021,7 @@ class _TimePicker extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final picked = await showTimePicker(
       context: context,
+      helpText: AppL10n.of(context).timePickerHelpText,
       initialTime: TimeOfDay(hour: hour, minute: minute),
       builder: (ctx, child) => MediaQuery(
         data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),

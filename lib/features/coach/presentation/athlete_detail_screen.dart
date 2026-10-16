@@ -234,7 +234,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                       onPressed: () => _onMessage(context, ref),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: palette.accent, width: 1),
-                        foregroundColor: palette.accent,
+                        foregroundColor: palette.accentText,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadius.full),
@@ -640,7 +640,7 @@ class _AntropometriaSection extends ConsumerWidget {
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
@@ -931,7 +931,7 @@ class _RendimientoSection extends ConsumerWidget {
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
@@ -1395,7 +1395,8 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                 selectedColor: palette.accent,
                 backgroundColor: palette.bgCard,
                 labelStyle: TextStyle(
-                  color: selected ? palette.bg : palette.textPrimary,
+                  color:
+                      selected ? TreinoButtonTokens.ink : palette.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
                 side: BorderSide(
@@ -2106,7 +2107,7 @@ class _EntrenamientosSection extends ConsumerWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
                   letterSpacing: 1.2,
-                  color: palette.accent,
+                  color: palette.accentText,
                 ),
               ),
             ),
