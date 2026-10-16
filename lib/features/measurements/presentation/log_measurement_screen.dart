@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -144,6 +145,13 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// recompute [_hasValue] on each edit.
   late final List<TextEditingController> _allCtrls;
 
+  /// Texto de cada campo al abrir (en el mismo orden que [_allCtrls]): la
+  /// línea de base contra la que se mide si hay cambios sin guardar (#1502).
+  late final List<String> _initialTexts;
+
+  /// True si algún campo difiere de [_initialTexts]. Alimenta el `PopScope`.
+  bool _dirty = false;
+
   @override
   void initState() {
     super.initState();
@@ -203,6 +211,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
       _calfRCtrl,
       _notesCtrl,
     ];
+    _initialTexts = [for (final c in _allCtrls) c.text];
     for (final c in _allCtrls) {
       c.addListener(_onFieldChanged);
     }
@@ -218,9 +227,31 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
   /// current form state without waiting for a submit attempt.
   void _onFieldChanged() {
     final has = _hasAnyValue();
-    if (has != _hasValue) {
-      setState(() => _hasValue = has);
+    final dirty = _hasUnsavedChanges();
+    if (has != _hasValue || dirty != _dirty) {
+      setState(() {
+        _hasValue = has;
+        _dirty = dirty;
+      });
     }
+  }
+
+  bool _hasUnsavedChanges() {
+    for (var i = 0; i < _allCtrls.length; i++) {
+      if (_allCtrls[i].text != _initialTexts[i]) return true;
+    }
+    return false;
+  }
+
+  /// Salir sin guardar (Cancelar, back del sistema, swipe de iOS): con datos
+  /// cargados pregunta antes de tirarlos (#1502).
+  Future<void> _confirmLeave() async {
+    if (!_dirty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final discard = await confirmDiscardChanges(context);
+    if (discard && mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -457,6 +488,20 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      // El back del sistema y el swipe de iOS pasan por acá; con cambios sin
+      // guardar piden confirmación en vez de descartarlos (#1502). Un pop
+      // programático (el de GUARDAR) no se frena.
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _confirmLeave();
+      },
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final uid = ref.watch(currentUidProvider);
@@ -479,8 +524,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
               child: Row(
                 children: [
                   TextButton(
-                    onPressed:
-                        _saving ? null : () => Navigator.of(context).pop(),
+                    onPressed: _saving ? null : _confirmLeave,
                     child: Text(
                       l10n.commonCancel,
                       style: GoogleFonts.barlow(
