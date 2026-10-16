@@ -840,6 +840,12 @@ class AppL10nEs extends AppL10n {
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
 
   @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
+
+  @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
 
   @override
@@ -6244,6 +6250,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
 
   @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
