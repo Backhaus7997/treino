@@ -899,7 +899,8 @@
   "feedFriendRequestsWithCountA11y": "Follower requests, {count} pending",
   "feedPublishingA11y": "Publishing…",
   "searchUsersClearA11y": "Clear search",
-  "publicProfileMessageDisabledA11y": "Message (coming soon)",
+  "publicProfileMessageDisabledA11y": "Message (unavailable: this person needs to follow you)",
+  "publicProfileStatWorkouts": "WORKOUTS",
   "a11yAvatarLabel": "Profile photo of {name}",
   "@a11yAvatarLabel": {
     "placeholders": {

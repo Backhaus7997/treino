@@ -14,6 +14,7 @@ import '../../moderation/presentation/moderation_actions.dart';
 import '../../workout/application/user_routines_providers.dart';
 import '../application/follow_list_providers.dart';
 import '../application/post_providers.dart';
+import '../application/profile_chat_access_providers.dart';
 import '../application/public_profile_providers.dart';
 import '../domain/follow.dart';
 import '../domain/follow_status.dart';
@@ -64,8 +65,22 @@ class PublicProfileScreen extends ConsumerWidget {
       // breaks the color continuity.
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        // Transparente SÓLO mientras el hero está a la vista: ahí la flecha y
+        // el ⋮ flotan sobre el gradiente y no hay nada debajo. Apenas el
+        // contenido scrollea por detrás (`scrolledUnder`) la barra pasa a
+        // opaca. Antes quedaba transparente siempre y los posts pasaban por
+        // debajo de la flecha y el ⋮ (la flecha tapaba el avatar del primer
+        // post) con una franja translúcida del tinte M3 cortando la tarjeta a
+        // la mitad (#1477). El tinte se apaga porque el color ya lo pone la
+        // barra.
+        backgroundColor: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.scrolledUnder)
+              ? palette.bg
+              : Colors.transparent,
+        ),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           tooltip: l10n.commonBack,
@@ -311,18 +326,26 @@ class _PrivateProfileNotice extends StatelessWidget {
 
 /// MENSAJE pill on the public profile screen.
 ///
-/// **Habilitado sólo si el DEL PERFIL me sigue a mí** — la arista ENTRANTE
-/// (REQ-FOLLOW-012 / LD-08). Es el espejo literal de `chatCreateOk` en las
-/// rules: abrir un chat es poder mandar el primer mensaje, y eso requiere que
-/// el destinatario me siga.
+/// **Habilitado si puedo abrir el chat**, que es la disyunción de `chatCreateOk`
+/// en las rules (abrir un chat es poder mandar el primer mensaje):
 ///
-/// **No es el OR de las dos direcciones**, y tampoco la saliente. El OR era el
-/// espejo de la regla vieja, cuando `friendships` tenía un doc por par y las
-/// dos direcciones eran el mismo hecho — de hecho `_isAcceptedFriend` miraba
-/// UN documento y habilitaba a los dos lados. Si el cliente y las rules no
-/// coinciden exactamente, el UX miente: o el botón está habilitado y el envío
-/// rebota con `permission-denied`, o está gris cuando el servidor sí lo
-/// permitiría. Si cambia `chatCreateOk`, esto cambia con ella.
+/// 1. el DEL PERFIL me sigue a mí — la arista ENTRANTE aceptada
+///    (REQ-FOLLOW-012 / LD-08), la rama social; o
+/// 2. ya hay un chat entre los dos, o hay un vínculo PF↔alumno vigente — ver
+///    [chatViaRelationshipProvider]. Sin esto el PF veía a su propio alumno,
+///    con el chat ya abierto, con el botón gris (#1476): la rama de
+///    `trainer_link` de la regla no depende de que el alumno lo siga.
+///
+/// En la rama social **no es el OR de las dos direcciones**, y tampoco la
+/// saliente. El OR era el espejo de la regla vieja, cuando `friendships` tenía
+/// un doc por par y las dos direcciones eran el mismo hecho — de hecho
+/// `_isAcceptedFriend` miraba UN documento y habilitaba a los dos lados. Si el
+/// cliente y las rules no coinciden exactamente, el UX miente: o el botón está
+/// habilitado y el envío rebota con `permission-denied`, o está gris cuando el
+/// servidor sí lo permitiría. Si cambia `chatCreateOk`, esto cambia con ella.
+///
+/// Cuando queda deshabilitado, tocarlo explica por qué (el aviso de
+/// `chatBlockedComposerNotice`) en vez de no hacer nada.
 ///
 /// When enabled, tapping the pill calls `ChatRepository.getOrCreate` and
 /// pushes `/coach/chat/{chatId}?other={targetUid}` — the same route already
@@ -348,11 +371,19 @@ class _MessageButton extends ConsumerStatefulWidget {
 class _MessageButtonState extends ConsumerState<_MessageButton> {
   bool _busy = false;
 
-  bool get _chatEligible =>
-      widget.incomingFollow?.status == FollowStatus.accepted;
+  bool get _followsMe => widget.incomingFollow?.status == FollowStatus.accepted;
+
+  /// MENSAJE deshabilitado: no hace nada, pero dice por qué.
+  void _explainDisabled() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(AppL10n.of(context).chatBlockedComposerNotice)),
+      );
+  }
 
   Future<void> _onTap() async {
-    if (_busy || !_chatEligible) return;
+    if (_busy) return;
     setState(() => _busy = true);
     // Capture the router + messenger BEFORE the await — same protocol as
     // PublicProfileFollowButton: the route may pop mid-write, after which
@@ -383,7 +414,9 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final enabled = _chatEligible && !_busy;
+    final eligible =
+        _followsMe || ref.watch(chatViaRelationshipProvider(widget.targetUid));
+    final enabled = eligible && !_busy;
     final textColor = enabled ? palette.textPrimary : palette.textMuted;
     return Semantics(
       button: true,
@@ -395,7 +428,7 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
         child: Opacity(
           opacity: enabled ? 1.0 : 0.6,
           child: GestureDetector(
-            onTap: enabled ? _onTap : null,
+            onTap: enabled ? _onTap : (eligible ? null : _explainDisabled),
             behavior: HitTestBehavior.opaque,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),

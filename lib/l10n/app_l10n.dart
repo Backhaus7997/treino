@@ -4412,11 +4412,17 @@ abstract class AppL10n {
   /// **'Limpiar búsqueda'**
   String get searchUsersClearA11y;
 
-  /// Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16).
+  /// Semantics label for the disabled MENSAJE pill on the public profile screen, exposed via Semantics(button:true, enabled:false). Dice por qué está deshabilitado: el destinatario tiene que seguir a quien escribe y no hay chat ni vínculo previo.
   ///
   /// In es_AR, this message translates to:
-  /// **'Mensaje (próximamente)'**
+  /// **'Mensaje (no disponible: esta persona tiene que seguirte)'**
   String get publicProfileMessageDisabledA11y;
+
+  /// Etiqueta del contador de entrenos en la grilla de stats del perfil público (antes hardcodeada en inglés como WORKOUTS).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTRENOS'**
+  String get publicProfileStatWorkouts;
 
   /// Parametric Semantics label for user avatars (PostAvatar / HomeHeader avatar) wrapped at call sites so screen readers announce whose photo it is (findings 4,6,7,16,18,19). Fix agents must add the matching @a11yAvatarLabel placeholder metadata (name: String). When the name is null, use a11yAvatarLabelGeneric.
   ///
