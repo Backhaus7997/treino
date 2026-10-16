@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/form_inline_error.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/moderation/moderation_guard.dart';
@@ -62,6 +63,9 @@ class ReviewBottomSheet extends ConsumerStatefulWidget {
 class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
   late int _rating;
   late TextEditingController _commentController;
+  // Error de envío DENTRO del sheet: un SnackBar queda tapado por el propio
+  // sheet (abierto con `useRootNavigator: true`). Ver [FormInlineError].
+  String? _error;
 
   @override
   void initState() {
@@ -96,6 +100,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
   Future<void> _onSubmit() async {
     final l10n = AppL10n.of(context);
     final notifier = ref.read(reviewNotifierProvider(_args).notifier);
+    setState(() => _error = null);
     await notifier.submit(
       rating: _rating,
       comment: _commentController.text.isEmpty ? null : _commentController.text,
@@ -109,14 +114,10 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
       // fallar siempre, y el usuario concluye que la app está rota en vez de
       // que su texto no pasa.
       final bloqueado = state.error is ModerationBlockedException;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            bloqueado
-                ? l10n.moderationBlockedMessage
-                : l10n.reviewSnackBarError,
-          ),
-        ),
+      setState(
+        () => _error = bloqueado
+            ? l10n.moderationBlockedMessage
+            : l10n.reviewSnackBarError,
       );
     } else {
       Navigator.of(context).pop();
@@ -185,7 +186,10 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
               Center(
                 child: StarRatingInput(
                   rating: _rating,
-                  onRatingChanged: (v) => setState(() => _rating = v),
+                  onRatingChanged: (v) => setState(() {
+                    _rating = v;
+                    _error = null;
+                  }),
                 ),
               ),
               const SizedBox(height: 18),
@@ -210,6 +214,10 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                 ),
               ),
               const SizedBox(height: 18),
+              if (_error != null) ...[
+                FormInlineError(message: _error!),
+                const SizedBox(height: 12),
+              ],
               // Action row
               Row(
                 children: [

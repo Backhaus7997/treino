@@ -199,7 +199,17 @@ void main() {
     await tester.tap(find.byKey(const Key('exercise_feedback_submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text(l10n.exerciseFeedbackError), findsOneWidget);
+    // El sheet vive en el navigator raíz: un SnackBar del Scaffold de atrás
+    // queda tapado. El aviso tiene que estar ADENTRO y a la vista.
+    expect(
+      find.descendant(
+        of: find.byType(ExerciseFeedbackSheet),
+        matching: find.text(l10n.exerciseFeedbackError),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(l10n.exerciseFeedbackError).hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
     expect(find.byType(ExerciseFeedbackSheet), findsOneWidget);
     expect(
       tester
@@ -208,5 +218,41 @@ void main() {
           ?.text,
       equals('Me duele'),
     );
+  });
+
+  testWidgets(
+      'un ArgumentError (foto muy pesada) muestra SU mensaje adentro del '
+      'sheet, no en un SnackBar tapado', (tester) async {
+    when(() => submitter.submit(
+          uid: any(named: 'uid'),
+          sessionId: any(named: 'sessionId'),
+          exerciseId: any(named: 'exerciseId'),
+          exerciseName: any(named: 'exerciseName'),
+          kind: any(named: 'kind'),
+          setNumber: any(named: 'setNumber'),
+          text: any(named: 'text'),
+          localPhotoPath: any(named: 'localPhotoPath'),
+          now: any(named: 'now'),
+        )).thenThrow(ArgumentError('La foto pesa más de 15 MB.'));
+
+    await pump(tester);
+    await tester.enterText(
+      find.byKey(const Key('exercise_feedback_text')),
+      'Mirá la postura',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('exercise_feedback_submit')));
+    await tester.pumpAndSettle();
+
+    final mensaje = find.text('La foto pesa más de 15 MB.');
+    expect(
+      find.descendant(
+        of: find.byType(ExerciseFeedbackSheet),
+        matching: mensaje,
+      ),
+      findsOneWidget,
+    );
+    expect(mensaje.hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
   });
 }
