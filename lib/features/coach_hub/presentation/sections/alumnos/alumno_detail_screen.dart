@@ -3722,7 +3722,9 @@ class _SessionStatusPill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -6060,7 +6062,9 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,

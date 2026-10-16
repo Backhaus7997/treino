@@ -262,7 +262,7 @@ class _ExerciseLine extends StatelessWidget {
         week < exercise.weeks.length ? exercise.weeks[week] : const <SetSpec>[];
 
     // Un ejercicio con la celda de la semana vacía va igual, pero en rojo.
-    final nameColor = emptyWeek ? palette.danger : palette.textPrimary;
+    final nameColor = emptyWeek ? palette.dangerText : palette.textPrimary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.s8),

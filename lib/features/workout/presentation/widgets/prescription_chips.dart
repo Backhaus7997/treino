@@ -24,7 +24,8 @@ class PrescriptionChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final color = hasError ? palette.danger : palette.textMuted;
+    // Pinta texto e ícono: el rojo de texto, no el de relleno.
+    final color = hasError ? palette.dangerText : palette.textMuted;
     final style = GoogleFonts.barlow(
       color: color,
       fontSize: 11.5,

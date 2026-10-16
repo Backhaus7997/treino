@@ -1641,7 +1641,9 @@ class _SeguimientoRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 10,
                   letterSpacing: 1.0,
-                  color: color,
+                  // El tinte y el borde usan el color de estado; el texto, su versión
+                  // legible (#1550).
+                  color: palette.textVariantOf(color),
                 ),
               ),
             ),

@@ -150,7 +150,8 @@ class _Cifra extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final color = alerta ? palette.danger : palette.textPrimary;
+    // Sólo pinta el número (el borde tiene su propia expresión).
+    final color = alerta ? palette.dangerText : palette.textPrimary;
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -703,13 +704,15 @@ class _Aviso extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(TreinoIcon.warning, size: AppTextSize.body, color: color),
+        Icon(TreinoIcon.warning,
+            size: AppTextSize.body,
+            color: AppPalette.of(context).textVariantOf(color)),
         const SizedBox(width: AppSpacing.hairline * 2),
         Expanded(
           child: Text(
             texto,
             style: GoogleFonts.barlow(
-              color: color,
+              color: AppPalette.of(context).textVariantOf(color),
               fontSize: AppTextSize.caption,
               fontWeight: FontWeight.w600,
               height: 1.4,

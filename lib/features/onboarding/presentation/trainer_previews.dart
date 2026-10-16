@@ -89,7 +89,7 @@ class TrainerHomePreview extends StatelessWidget {
                   _Stat(
                     value: '1',
                     label: 'CANCELADAS',
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ],
               ),

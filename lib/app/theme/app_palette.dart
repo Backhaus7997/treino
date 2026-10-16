@@ -250,6 +250,20 @@ class AppPalette extends ThemeExtension<AppPalette> {
   static AppPalette of(BuildContext context) =>
       Theme.of(context).extension<AppPalette>() ?? mintMagenta;
 
+  /// La versión para TEXTO o ÍCONO de un color de relleno de la paleta:
+  /// [danger] → [dangerText], [accent] → [accentText]; cualquier otro, igual.
+  ///
+  /// Existe para los widgets de «color de estado» (badge de pago, chip de
+  /// alumno, aviso de moderación) que usan un solo color para el relleno, el
+  /// punto y la etiqueta. Como relleno `danger` y `accent` andan; como texto
+  /// no llegan a AA (`danger` en oscuro, `accent` en claro). El relleno sigue
+  /// usando el color original; sólo el texto pasa por acá.
+  Color textVariantOf(Color fill) {
+    if (fill == danger) return dangerText;
+    if (fill == accent) return accentText;
+    return fill;
+  }
+
   @override
   AppPalette copyWith({
     Color? accent,
