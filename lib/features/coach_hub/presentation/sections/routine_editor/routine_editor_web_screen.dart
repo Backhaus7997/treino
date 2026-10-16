@@ -143,11 +143,11 @@ class _EditorSet {
 
 /// Resumen de una prescripción por distancia: `3 × 6 m`, o `3 × —` si los
 /// sets no tienen la misma meta (mismo criterio que mobile).
-String _resumenDeDistancia(List<_EditorSet> sets) {
+String _resumenDeDistancia(List<_EditorSet> sets, String localeName) {
   final values = sets.map((s) => s.distanceMeters).toList();
   final first = values.isEmpty ? null : values.first;
   final uniform = first != null && values.every((v) => v == first);
-  return '${sets.length} × ${uniform ? '${formatWeightKg(first)} m' : '—'}';
+  return '${sets.length} × ${uniform ? '${formatWeightDisplay(first, localeName)} m' : '—'}';
 }
 
 /// Maps a persisted [SetSpec] into its mutable editor row.
@@ -4356,12 +4356,16 @@ class _SlotCard extends StatelessWidget {
       ],
     );
 
+    // El locale sale de `Localizations`, NO de `AppL10n`: este archivo tiene
+    // prohibido llamarlo (constraint C-6, ver el header).
     final card = ExerciseCard(
       title: exercise?.name ?? '—',
       summary: PrescriptionChips(
         prescription: slot.exerciseMode == ExerciseMode.distance
-            ? _resumenDeDistancia(weekSets)
+            ? _resumenDeDistancia(
+                weekSets, Localizations.localeOf(context).toString())
             : resumenDePrescripcion(
+                localeName: Localizations.localeOf(context).toString(),
                 modo: slot.exerciseMode,
                 sets: [
                   for (final set in weekSets)

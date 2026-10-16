@@ -2892,7 +2892,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
@@ -2917,7 +2917,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               emptyText:
                   'Sin datos suficientes para este ejercicio.', // i18n: Fase W2

@@ -22,7 +22,7 @@ import '../../../app/theme/app_motion.dart';
 /// ```dart
 /// TreinoCountUp(
 ///   value: session.totalVolumeKg,
-///   formatter: (v) => formatVolumeKg(v.round()),
+///   formatter: (v) => formatVolumeKg(v.toDouble(), localeName),
 ///   style: statValueStyle,
 /// ),
 /// ```

@@ -2312,7 +2312,7 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
@@ -2333,7 +2333,7 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               emptyText: l10n.progressionEmptyExercise,
               localeName: l10n.localeName,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -451,7 +452,7 @@ class _ProgressionChartBlock extends StatelessWidget {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
               singlePointHint: l10n.progressionSinglePointHint,
@@ -471,7 +472,7 @@ class _ProgressionChartBlock extends StatelessWidget {
                 oneRepMaxLabel: l10n.progressionMetricOneRepMax,
                 bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
                 bestSessionVolumeLabel: l10n.progressionMetricVolume,
-                volumeUnit: 'kg·reps',
+                volumeUnit: 'kg',
                 weightUnit: 'kg',
                 emptyText: l10n.progressionEmptyExercise,
                 localeName: l10n.localeName,
@@ -609,7 +610,7 @@ class _HistoryRow extends StatelessWidget {
             if (entry.sessionVolume > 0) ...[
               const SizedBox(height: 2),
               Text(
-                '${_formatStatValue(entry.sessionVolume)} kg·reps',
+                '${formatVolumeKg(entry.sessionVolume, AppL10n.of(context).localeName)} kg',
                 style: GoogleFonts.barlow(
                   fontSize: 11,
                   color: palette.textMuted,

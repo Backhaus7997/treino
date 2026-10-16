@@ -1026,13 +1026,16 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
       week: week,
       onTap: onTap,
       // 0 kg (movilidad / peso corporal) se muestra como "—": no aporta.
-      lastWeightDisplay: (kg == null || kg == 0) ? null : _formatWeight(kg),
+      lastWeightDisplay: (kg == null || kg == 0)
+          ? null
+          : _formatWeight(kg, AppL10n.of(context).localeName),
     );
   }
 }
 
-/// "15 kg" para enteros, "17.5 kg" para fraccionarios.
-String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
+/// "15 kg" para enteros, "17,5 kg" para fraccionarios (en es, #1481).
+String _formatWeight(double kg, String localeName) =>
+    '${formatWeightDisplay(kg, localeName)} kg';
 
 /// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.jpg`.
 ///
