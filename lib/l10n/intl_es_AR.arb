@@ -250,7 +250,10 @@
   "coachEditorUpdateLabel": "GUARDAR CAMBIOS",
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
-  "agendaButtonLabel": "VER AGENDA DEL PF",
+  "agendaButtonLabel": "MI AGENDA",
+  "@agendaButtonLabel": {
+    "description": "Botón de la tab Coach que abre la agenda del alumno: sus propias sesiones con el PF, no la agenda del PF."
+  },
   "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
   "@athleteNutritionPlanButtonLabel": {
     "description": "Botón de la tab Coach que abre el plan nutricional del alumno."

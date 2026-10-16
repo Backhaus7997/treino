@@ -479,7 +479,7 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+  String get agendaButtonLabel => 'MY SCHEDULE';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
