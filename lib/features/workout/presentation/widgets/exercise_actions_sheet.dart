@@ -119,7 +119,7 @@ class _Item extends StatelessWidget {
     final color = !action.enabled
         ? palette.textFaint
         : action.danger
-            ? palette.danger
+            ? palette.dangerText
             : palette.textPrimary;
 
     return Semantics(

@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/date_labels.dart';
 import '../../../../core/utils/kg_format.dart';
+import '../../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/performance_test_providers.dart';
@@ -37,7 +38,7 @@ String _formatRowDate(DateTime dt, String localeName) {
 /// mismo pin que exigen las reglas de `performance_tests` para update/delete.
 /// Una fila de otro PF muestra la etiqueta de sólo lectura.
 ///
-/// El borrado confirma con un diálogo y llama al repo; el stream de
+/// El borrado confirma con [showTreinoConfirmDialog] y llama al repo; el stream de
 /// `snapshots()` refresca la lista solo.
 class PerformanceTestHistoryList extends ConsumerStatefulWidget {
   const PerformanceTestHistoryList({
@@ -67,47 +68,17 @@ class _PerformanceTestHistoryListState
   bool _showAll = false;
 
   Future<void> _confirmDelete(PerformanceTest t) async {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final dateLabel = _formatRowDate(t.recordedAt, l10n.localeName);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: palette.bgCard,
-        title: Text(
-          l10n.performanceDeleteConfirmTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            color: palette.textPrimary,
-          ),
-        ),
-        content: Text(
-          l10n.performanceDeleteConfirmBody(dateLabel),
-          style: GoogleFonts.barlow(
-              fontSize: AppTextSize.bodyDense, color: palette.textPrimary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              l10n.commonCancel,
-              style: GoogleFonts.barlowCondensed(color: palette.textMuted),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              l10n.measurementDeleteConfirmAction,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                color: palette.danger,
-              ),
-            ),
-          ),
-        ],
-      ),
+    // La confirmación única de mobile (#1496): este historial nació antes
+    // y traía su propio AlertDialog.
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.performanceDeleteConfirmTitle,
+      body: l10n.performanceDeleteConfirmBody(dateLabel),
+      confirmLabel: l10n.measurementDeleteConfirmAction,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
     try {
       await ref.read(performanceTestRepositoryProvider).delete(t.id);
       if (!mounted) return;
@@ -270,7 +241,7 @@ class _HistoryRow extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               tooltip: l10n.performanceHistoryDeleteTooltip,
               onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
+              icon: Icon(TreinoIcon.trash, size: 18, color: palette.dangerText),
             ),
           ] else
             Padding(

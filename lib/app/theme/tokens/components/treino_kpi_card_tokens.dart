@@ -67,7 +67,7 @@ class TreinoKpiCardTokens {
       titleColor: p.textMuted,
       valueColor: p.textPrimary,
       variationPositiveColor: p.accent,
-      variationNegativeColor: p.danger,
+      variationNegativeColor: p.dangerText,
       iconColor: p.textMuted,
     );
   }

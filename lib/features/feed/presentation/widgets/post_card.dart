@@ -288,13 +288,13 @@ class PostCard extends ConsumerWidget {
               },
             ),
             ListTile(
-              leading: Icon(TreinoIcon.trash, color: palette.danger),
+              leading: Icon(TreinoIcon.trash, color: palette.dangerText),
               title: Text(
                 l10n.postCardMenuDelete,
                 style: GoogleFonts.barlow(
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
-                  color: palette.danger,
+                  color: palette.dangerText,
                 ),
               ),
               onTap: () {

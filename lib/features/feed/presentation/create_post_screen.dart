@@ -459,7 +459,7 @@ class _CharCounter extends StatelessWidget {
       style: GoogleFonts.barlow(
         fontWeight: FontWeight.w400,
         fontSize: 12,
-        color: isOver ? palette.danger : palette.textMuted,
+        color: isOver ? palette.dangerText : palette.textMuted,
       ),
     );
   }
@@ -634,7 +634,7 @@ class _InlineError extends StatelessWidget {
         style: GoogleFonts.barlow(
           fontWeight: FontWeight.w400,
           fontSize: 14,
-          color: palette.danger,
+          color: palette.dangerText,
         ),
       ),
     );

@@ -292,12 +292,12 @@ class _ExerciseLine extends StatelessWidget {
           if (emptyWeek)
             Row(
               children: [
-                Icon(TreinoIcon.warning, color: palette.danger),
+                Icon(TreinoIcon.warning, color: palette.dangerText),
                 const SizedBox(width: AppSpacing.hairline),
                 Text(
                   'falta cargar reps',
                   style: importText(
-                    palette.danger,
+                    palette.dangerText,
                     size: AppTextSize.caption,
                     weight: AppFonts.w600,
                   ),

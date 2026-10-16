@@ -236,7 +236,7 @@ class _HistoryRow extends StatelessWidget {
               visualDensity: VisualDensity.compact,
               tooltip: l10n.measurementHistoryDeleteTooltip,
               onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
+              icon: Icon(TreinoIcon.trash, size: 18, color: palette.dangerText),
             ),
           ] else
             Padding(

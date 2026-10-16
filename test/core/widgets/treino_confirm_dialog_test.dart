@@ -82,16 +82,13 @@ void main() {
     ('dark', AppTheme.dark, AppPalette.mintMagenta),
     ('light', AppTheme.light, AppPalette.mintMagentaLight),
   ]) {
-    testWidgets('destructiva: acción en danger y legible ($nombre)',
-        // Medido: `danger` (#E53935) sobre `bgCard` oscuro da 4,37:1, abajo de
-        // AA para texto. No es de este diálogo: es TODO texto en `danger` en
-        // el tema oscuro, y se arregla con un token de texto de peligro en la
-        // paleta (follow-up aparte). El umbral NO se baja para que pase.
-        // `testWidgets` toma `skip` como bool: el motivo es este comentario.
-        skip: nombre == 'dark', (tester) async {
+    // Antes medía `danger`, que en oscuro daba 4,37:1 y el caso estaba en
+    // skip. Ahora la acción usa `dangerText` y pasa en las dos paletas.
+    testWidgets('destructiva: acción en dangerText y legible ($nombre)',
+        (tester) async {
       await _abrir(tester, theme: theme());
       final accion = _colorDe(tester, 'Eliminar');
-      expect(accion, p.danger);
+      expect(accion, p.dangerText);
       expect(_ratio(accion, p.bgCard), greaterThanOrEqualTo(4.5),
           reason: 'la acción es texto: AA, no 3:1');
       // Cancelar es neutro, no mint (#1474).

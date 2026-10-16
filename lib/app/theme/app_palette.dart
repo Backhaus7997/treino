@@ -42,6 +42,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.sage,
     required this.espresso,
     required this.danger,
+    required this.dangerText,
     required this.warning,
     required this.reactionLike,
     required this.reactionFire,
@@ -144,7 +145,15 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color espresso;
 
   /// Danger red — inline error states, char-limit exceeded indicator.
+  ///
+  /// Es el RELLENO. Para texto o íconos de peligro va [dangerText]: como
+  /// texto, `danger` no llega a AA sobre las superficies oscuras.
   final Color danger;
+
+  /// Rojo de peligro para TEXTO e íconos — el par de [danger], como
+  /// [accentText] lo es de [accent]. ≥ 4,5:1 sobre `bg`, `bgCard` y
+  /// `bgElevated` en las dos paletas. En claro coincide con [danger].
+  final Color dangerText;
 
   /// Warning amber — non-blocking caution states (eg. import partial match,
   /// rate limit close to cap). Distinct hue from `danger` so the user can
@@ -196,6 +205,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     sage: AppColorPrimitives.sage500,
     espresso: AppColorPrimitives.espresso500,
     danger: AppColorPrimitives.dangerRed,
+    dangerText: AppColorPrimitives.dangerRedText,
     warning: AppColorPrimitives.warningAmber,
     reactionLike: AppColorPrimitives.reactionLike,
     reactionFire: AppColorPrimitives.reactionFire,
@@ -225,6 +235,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     sage: AppColorPrimitives.sageTint50,
     espresso: AppColorPrimitives.espressoTint50,
     danger: AppColorPrimitives.dangerRedDark,
+    dangerText: AppColorPrimitives.dangerRedDark,
     warning: AppColorPrimitives.warningAmberDark,
     reactionLike: AppColorPrimitives.reactionLikeDark,
     reactionFire: AppColorPrimitives.reactionFireDark,
@@ -257,6 +268,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? sage,
     Color? espresso,
     Color? danger,
+    Color? dangerText,
     Color? warning,
     Color? reactionLike,
     Color? reactionFire,
@@ -284,6 +296,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         sage: sage ?? this.sage,
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
+        dangerText: dangerText ?? this.dangerText,
         warning: warning ?? this.warning,
         reactionLike: reactionLike ?? this.reactionLike,
         reactionFire: reactionFire ?? this.reactionFire,
@@ -315,6 +328,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       sage: Color.lerp(sage, other.sage, t)!,
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,
+      dangerText: Color.lerp(dangerText, other.dangerText, t)!,
       warning: Color.lerp(warning, other.warning, t)!,
       reactionLike: Color.lerp(reactionLike, other.reactionLike, t)!,
       reactionFire: Color.lerp(reactionFire, other.reactionFire, t)!,
