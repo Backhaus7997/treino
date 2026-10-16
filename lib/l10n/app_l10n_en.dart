@@ -3110,6 +3110,51 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t finish the session. Please try again.';
 
   @override
+  String get sessionFinishNeedOneSet =>
+      'Do at least one set to finish. If you\'re not training today, tap ABANDON.';
+
+  @override
+  String get sessionFinishEarlyTitle => 'FINISH ANYWAY?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets left:',
+      one: '1 set left:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more exercises',
+      one: 'and 1 more exercise',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'You did $percent% of the session: it counts as a workout for your streak and rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'You did $percent% of the session. It\'s saved, but it doesn\'t count as a workout for your streak or rankings: $minPercent% is needed.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'FINISH ANYWAY';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'KEEP TRAINING';
+
+  @override
   String get routineEditorMissingName => 'Give your routine a name.';
 
   @override

@@ -1,9 +1,20 @@
+import 'dart:math' show min;
+
 import 'package:flutter/foundation.dart';
 
 import '../domain/routine_day.dart';
 import '../domain/routine_slot.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
+
+/// Desde qué fracción de las series planificadas una sesión terminada con
+/// "TERMINAR IGUAL" cuenta como entreno (racha, rankings, progresión, lo que ve
+/// el PF). Por debajo se guarda igual, pero como incompleta — lo mismo que hoy
+/// hace abandonar (#1511).
+///
+/// El piso existe por QA-WKT-005: sin él, una serie y "terminar igual" sumaría
+/// un día a la racha semanal en dos taps.
+const double kEarlyFinishCountsRatio = 0.5;
 
 /// DTO inmutable que representa el estado en memoria de la sesión activa.
 ///
@@ -70,6 +81,46 @@ class SessionState {
       (slot) => setsLoggedFor(slot.exerciseId) >= plannedSetsFor(slot),
     );
   }
+
+  /// Total de series planificadas hoy (con los overrides de sets agregados o
+  /// quitados en esta sesión), la base del porcentaje de [completionRatio].
+  int get plannedSetsTotal =>
+      day.slots.fold<int>(0, (sum, slot) => sum + plannedSetsFor(slot));
+
+  /// Series hechas que cuentan contra lo planificado: por slot se topea en lo
+  /// planificado, así una serie extra en un ejercicio no tapa la que falta en
+  /// otro.
+  int get doneSetsTotal => day.slots.fold<int>(
+        0,
+        (sum, slot) =>
+            sum + min(setsLoggedFor(slot.exerciseId), plannedSetsFor(slot)),
+      );
+
+  /// Fracción 0..1 de la sesión que se hizo. 0 si no hay nada planificado (el
+  /// mismo caso que [isFullyCompleted] trata como "no completa", QA-WKT-005).
+  double get completionRatio {
+    final planned = plannedSetsTotal;
+    return planned == 0 ? 0 : doneSetsTotal / planned;
+  }
+
+  /// `true` si terminar la sesión AHORA la deja contando como entreno (#1511):
+  /// está completa, o llegó al [kEarlyFinishCountsRatio] de las series
+  /// planificadas. Es el valor que se guarda en `Session.wasFullyCompleted`.
+  bool get countsAsWorkoutIfFinished =>
+      isFullyCompleted || completionRatio >= kEarlyFinishCountsRatio;
+
+  /// Slots con series sin hacer, con lo hecho y lo planificado de cada uno.
+  /// Vacío cuando [isFullyCompleted]. Es lo que el aviso de "terminar igual"
+  /// le dice al atleta que falta.
+  List<({RoutineSlot slot, int done, int planned})> get missingSets => [
+        for (final slot in day.slots)
+          if (setsLoggedFor(slot.exerciseId) < plannedSetsFor(slot))
+            (
+              slot: slot,
+              done: setsLoggedFor(slot.exerciseId),
+              planned: plannedSetsFor(slot),
+            ),
+      ];
 
   /// Suma de reps × weightKg sobre todos los setLogs.
   double get totalVolumeKg =>

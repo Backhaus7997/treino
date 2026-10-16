@@ -3165,6 +3165,51 @@ class AppL10nEs extends AppL10n {
       'No pudimos finalizar la sesión. Inténtalo de nuevo.';
 
   @override
+  String get sessionFinishNeedOneSet =>
+      'Haz al menos una serie para poder terminar. Si hoy no vas a entrenar, toca ABANDONAR.';
+
+  @override
+  String get sessionFinishEarlyTitle => '¿TERMINAR IGUAL?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Te faltan $count series:',
+      one: 'Te falta 1 serie:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'y $count ejercicios más',
+      one: 'y 1 ejercicio más',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'Hiciste el $percent % de la sesión: cuenta como entreno para tu racha y tus rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'Hiciste el $percent % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el $minPercent %.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'TERMINAR IGUAL';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'SEGUIR ENTRENANDO';
+
+  @override
   String get routineEditorMissingName => 'Ponle un nombre a la rutina.';
 
   @override
@@ -8504,6 +8549,51 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get sessionFinishError =>
       'No pudimos finalizar la sesión. Probá de nuevo.';
+
+  @override
+  String get sessionFinishNeedOneSet =>
+      'Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.';
+
+  @override
+  String get sessionFinishEarlyTitle => '¿TERMINAR IGUAL?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Te faltan $count series:',
+      one: 'Te falta 1 serie:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'y $count ejercicios más',
+      one: 'y 1 ejercicio más',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'Hiciste el $percent % de la sesión: cuenta como entreno para tu racha y tus rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'Hiciste el $percent % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el $minPercent %.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'TERMINAR IGUAL';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'SEGUIR ENTRENANDO';
 
   @override
   String get routineEditorMissingName => 'Poné un nombre a la rutina.';
