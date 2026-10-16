@@ -19,9 +19,14 @@ import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
+import '../application/next_position_for_routine.dart';
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
-    show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
+    show
+        currentUidProvider,
+        lastWeightByExerciseProvider,
+        planProgressProvider,
+        sessionsByUidProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_day_duration.dart';
@@ -1530,7 +1535,18 @@ class _PeriodizedStartAction extends ConsumerWidget {
     // Startable or repeatable, the route composed is identical
     // (SCENARIO-REPEAT-004); only the label changes (AD-5). Unknown progress
     // falls back to EMPEZAR, never REPETIR.
+    //
+    // #1509: el día que le TOCA a la rutina (la misma cuenta que la card de
+    // Inicio) dice EMPEZAR aunque esté hecho de un ciclo anterior. Si no,
+    // con el plan completo Inicio ofrece EMPEZAR y acá el mismo día decía
+    // REPETIR.
+    final sessions = ref.watch(sessionsByUidProvider(uid)).valueOrNull;
+    final toca =
+        sessions == null ? null : nextPositionForRoutine(routine, sessions);
+    final esElQueToca =
+        toca?.weekNumber == viewedWeek && toca?.dayNumber == day.dayNumber;
     final isRepeat = progress != null &&
+        !esElQueToca &&
         progress.completed.contains((week: viewedWeek, day: day.dayNumber));
 
     return _StartActionButton(

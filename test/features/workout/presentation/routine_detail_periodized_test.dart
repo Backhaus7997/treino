@@ -406,7 +406,8 @@ void main() {
     // #1509: Inicio ofrecía EMPEZAR y el detalle del mismo día decía REPETIR.
     // Inicio es cíclico (última sesión + 1); el «hecho» del detalle es de todo
     // el historial. El día que toca dice EMPEZAR; los demás hechos, REPETIR.
-    testWidgets('#1509: el día que recomienda Inicio dice EMPEZAR, los otros '
+    testWidgets(
+        '#1509: el día que recomienda Inicio dice EMPEZAR, los otros '
         'hechos REPETIR', (tester) async {
       final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
       // Ciclo completo y la semana 1 otra vez: la última es semana 1 · día 2
@@ -546,10 +547,12 @@ void main() {
         sessions: sessions,
       ));
       await _settle(tester);
+      // #1509: tras el ciclo completo, semana 1 · día 1 es lo que toca (como
+      // en Inicio) → la acción dice EMPEZAR. Lo que se fija acá es que esté.
 
       final btn = tester.widget<ElevatedButton>(find
           .ancestor(
-            of: find.text('REPETIR', skipOffstage: false),
+            of: find.text('EMPEZAR', skipOffstage: false),
             matching: find.byType(ElevatedButton, skipOffstage: false),
           )
           .first);
