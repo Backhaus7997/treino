@@ -239,6 +239,7 @@ mixin _$Appointment {
 // `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
 // clave en su allowlist. Omitirla cuando es null deja que esta versión de
 // la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
   @JsonKey(
       includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
   AppointmentAttendance? get attendance => throw _privateConstructorUsedError;
@@ -580,6 +581,7 @@ class _$AppointmentImpl extends _Appointment {
 // `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
 // clave en su allowlist. Omitirla cuando es null deja que esta versión de
 // la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(
       includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
@@ -732,6 +734,7 @@ abstract class _Appointment extends Appointment {
 // `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
 // clave en su allowlist. Omitirla cuando es null deja que esta versión de
 // la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(
       includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
