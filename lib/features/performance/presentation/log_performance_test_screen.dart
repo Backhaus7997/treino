@@ -166,10 +166,17 @@ class _LogPerformanceTestScreenState
       ctrl.addListener(_recomputeHasAnyMetric);
     }
     // En edición los campos ya traen valores: GUARDAR tiene que reflejarlo
-    // desde el primer frame, y un valor viejo fuera de rango (el CMJ de 999
-    // del QA) tiene que verse como error antes de que nadie toque nada.
+    // desde el primer frame.
     _hasAnyMetric = _metricCtrls.any((c) => c.text.trim().isNotEmpty);
     _hasInvalid = _metricCtrls.any((c) => _ranges[c]!.check(c.text).isError);
+    // Un valor viejo fuera de rango (el CMJ de 999 del QA) deja GUARDAR
+    // deshabilitado; `onUserInteraction` no mostraría el error hasta tocar ESE
+    // campo. Validar al primer frame para que diga qué corregir (Codex, #1524).
+    if (_hasInvalid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _formKey.currentState?.validate();
+      });
+    }
   }
 
   /// Recomputes whether any metric field is non-empty so the Save button
