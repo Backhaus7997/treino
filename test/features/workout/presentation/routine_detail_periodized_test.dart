@@ -373,14 +373,18 @@ void main() {
 
       // Plan-complete banner is in the CTA area below the fold.
       expect(find.text('PLAN COMPLETADO', skipOffstage: false), findsOneWidget);
-      // AD-2: the banner is a signal, never a lock — REPETIR must still be
-      // there and enabled. This is the true device repro path: before this
+      // AD-2: the banner is a signal, never a lock — the action must still
+      // be there and enabled. This is the true device repro path: before this
       // change, the widget early-returned the banner with no button at all.
+      //
+      // #1509: con el plan completo, Inicio vuelve a empezar el ciclo y
+      // recomienda semana 1 · día 1 — que es justo lo que el detalle muestra
+      // por defecto. Ese día ofrece EMPEZAR, como Inicio, y no REPETIR.
       expect(
-        find.text('REPETIR', skipOffstage: false),
+        find.text('EMPEZAR', skipOffstage: false),
         findsOneWidget,
-        reason: 'A complete plan must still offer an action (AD-2) — the '
-            'device repro this change fixes.',
+        reason: 'A complete plan must still offer an action (AD-2), and the '
+            'day Inicio recommends reads like Inicio (#1509).',
       );
       // AD-1: banner XOR chip. Exact match on 'COMPLETADO' does not collide
       // with 'PLAN COMPLETADO' (find.text is an exact match, not substring).
@@ -392,11 +396,54 @@ void main() {
       );
       final btn = tester.widget<ElevatedButton>(find
           .ancestor(
-            of: find.text('REPETIR', skipOffstage: false),
+            of: find.text('EMPEZAR', skipOffstage: false),
             matching: find.byType(ElevatedButton, skipOffstage: false),
           )
           .first);
       expect(btn.onPressed, isNotNull);
+    });
+
+    // #1509: Inicio ofrecía EMPEZAR y el detalle del mismo día decía REPETIR.
+    // Inicio es cíclico (última sesión + 1); el «hecho» del detalle es de todo
+    // el historial. El día que toca dice EMPEZAR; los demás hechos, REPETIR.
+    testWidgets('#1509: el día que recomienda Inicio dice EMPEZAR, los otros '
+        'hechos REPETIR', (tester) async {
+      final routine = _multiWeekRoutine(numWeeks: 2, days: [_day(1), _day(2)]);
+      // Ciclo completo y la semana 1 otra vez: la última es semana 1 · día 2
+      // (índice 0), así que Inicio recomienda semana 2 · día 1 (índice 1).
+      final sessions = [
+        _doneSession(routineId: routine.id, week: 0, day: 1),
+        _doneSession(routineId: routine.id, week: 0, day: 2),
+        _doneSession(routineId: routine.id, week: 1, day: 1),
+        _doneSession(routineId: routine.id, week: 1, day: 2),
+        _doneSession(routineId: routine.id, week: 0, day: 1, seq: 1)
+            .copyWith(startedAt: DateTime.utc(2026, 2, 1)),
+        _doneSession(routineId: routine.id, week: 0, day: 2, seq: 1)
+            .copyWith(startedAt: DateTime.utc(2026, 2, 2)),
+      ];
+
+      Future<void> abrir(int week, int day) async {
+        await tester.pumpWidget(_wrap(
+          RoutineDetailScreen(
+            key: ValueKey('$week-$day'),
+            routineId: routine.id,
+            initialWeekIndex: week,
+            initialDayNumber: day,
+          ),
+          routine: routine,
+          sessions: sessions,
+        ));
+        await _settle(tester);
+      }
+
+      await abrir(1, 1);
+      expect(find.text('EMPEZAR', skipOffstage: false), findsOneWidget,
+          reason: 'semana 2 · día 1 es lo que Inicio ofrece');
+      expect(find.text('REPETIR', skipOffstage: false), findsNothing);
+
+      await abrir(0, 1);
+      expect(find.text('REPETIR', skipOffstage: false), findsOneWidget,
+          reason: 'un día hecho que NO es el que toca sigue siendo REPETIR');
     });
 
     testWidgets(
