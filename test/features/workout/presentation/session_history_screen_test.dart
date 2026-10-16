@@ -92,7 +92,7 @@ void main() {
       expect(find.textContaining('600.0'), findsNothing);
     });
 
-    testWidgets('volumen fraccionario conserva un decimal ("1234.5 kg")',
+    testWidgets('volumen fraccionario conserva un decimal ("1.234,5 kg" en es)',
         (tester) async {
       await _pumpHistoryScreen(
         tester,
@@ -102,7 +102,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('1234.5 kg'), findsOneWidget);
+      expect(find.textContaining('1.234,5 kg'), findsOneWidget);
     });
   });
 }

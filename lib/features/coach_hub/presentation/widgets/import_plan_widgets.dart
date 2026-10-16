@@ -133,7 +133,7 @@ class ImportDiagnosticsList extends StatelessWidget {
           Text(
             '${importDiagnosticGroupTitle(entry.key)} (${entry.value.length})',
             style: importText(
-              entry.value.first.isError ? palette.danger : palette.warning,
+              entry.value.first.isError ? palette.dangerText : palette.warning,
               size: AppTextSize.bodyDense,
               weight: AppFonts.w700,
             ),

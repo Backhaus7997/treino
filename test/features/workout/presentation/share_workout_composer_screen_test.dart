@@ -118,6 +118,10 @@ Widget _wrap({
         path: '/workout',
         builder: (_, __) => const Scaffold(body: Text('workout-screen')),
       ),
+      GoRoute(
+        path: '/feed',
+        builder: (_, __) => const Scaffold(body: Text('feed-screen')),
+      ),
     ],
   );
 
@@ -269,14 +273,15 @@ void main() {
       expect(find.text('AGREGAR FOTO'), findsOneWidget);
     });
 
-    testWidgets('al publicar OK navega a /workout', (tester) async {
+    // #1514: al Feed, donde está el post recién publicado (antes, Entrenar).
+    testWidgets('al publicar OK navega al Feed', (tester) async {
       await tester.pumpWidget(_wrap(notifier: notifier));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('PUBLICAR'));
       await tester.pumpAndSettle();
 
-      expect(find.text('workout-screen'), findsOneWidget);
+      expect(find.text('feed-screen'), findsOneWidget);
     });
 
     testWidgets('si publicar falla se queda en el composer con el texto',
@@ -290,7 +295,7 @@ void main() {
       await tester.tap(find.text('PUBLICAR'));
       await tester.pumpAndSettle();
 
-      expect(find.text('workout-screen'), findsNothing);
+      expect(find.text('feed-screen'), findsNothing);
       final field = tester.widget<TextField>(find.byType(TextField));
       expect(field.controller!.text, 'Mi entreno');
     });

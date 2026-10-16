@@ -34,9 +34,10 @@ enum CustomExerciseOnboardingLayout {
 /// [OnboardingTourView], and what lets it be tested with a bare
 /// `TestAppWrapper` and no provider overrides.
 ///
-/// Both callbacks are terminal and equivalent to the caller: SALTAR and the
-/// final CTA persist the same flag. A tour nobody can leave is a toll, not a
-/// welcome (#429).
+/// Both callbacks are terminal and persist the same flag, but they are NOT
+/// equivalent: the final CTA opens the blank exercise editor, while SALTAR /
+/// AHORA NO just closes. A tour nobody can leave is a toll, not a welcome
+/// (#429) — so the last slide keeps a neutral exit too (#1489).
 class CustomExerciseOnboardingView extends StatefulWidget {
   const CustomExerciseOnboardingView({
     super.key,
@@ -44,6 +45,7 @@ class CustomExerciseOnboardingView extends StatefulWidget {
     required this.onFinish,
     required this.onSkip,
     required this.skipLabel,
+    required this.lastSkipLabel,
     required this.nextLabel,
     required this.finishLabel,
     required this.stepSemanticsLabel,
@@ -55,11 +57,15 @@ class CustomExerciseOnboardingView extends StatefulWidget {
   /// Last slide's CTA. The caller persists the flag and closes.
   final VoidCallback onFinish;
 
-  /// SALTAR — offered on every slide but the last, where the CTA already ends
-  /// the flow and a second "leave" control would just be noise.
+  /// SALTAR on every slide; on the last one it reads [lastSkipLabel]. The
+  /// last CTA OPENS the exercise editor, so without this the trainer who came
+  /// to build a plan had no way out but dragging the sheet (#1489).
   final VoidCallback onSkip;
 
   final String skipLabel;
+
+  /// Label of the neutral exit on the last slide («AHORA NO»).
+  final String lastSkipLabel;
   final String nextLabel;
   final String finishLabel;
 
@@ -171,8 +177,8 @@ class _CustomExerciseOnboardingViewState
             OnboardingActions(
               skipKey: _skipKey,
               primaryKey: _ctaKey,
-              showSkip: !_isLast,
-              skipLabel: widget.skipLabel,
+              showSkip: true,
+              skipLabel: _isLast ? widget.lastSkipLabel : widget.skipLabel,
               primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
               onSkip: widget.onSkip,
               onPrimary: _onPrimary,
@@ -220,8 +226,8 @@ class _CustomExerciseOnboardingViewState
             OnboardingActions(
               skipKey: _skipKey,
               primaryKey: _ctaKey,
-              showSkip: !_isLast,
-              skipLabel: widget.skipLabel,
+              showSkip: true,
+              skipLabel: _isLast ? widget.lastSkipLabel : widget.skipLabel,
               primaryLabel: _isLast ? widget.finishLabel : widget.nextLabel,
               onSkip: widget.onSkip,
               onPrimary: _onPrimary,

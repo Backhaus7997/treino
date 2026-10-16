@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -207,17 +208,13 @@ class _EditorBody extends ConsumerWidget {
     AvailabilityRule rule,
   ) async {
     final l10n = AppL10n.of(context);
-    final palette = AppPalette.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => _ConfirmDialog(
-        palette: palette,
-        body: l10n.agendaRuleDeleteConfirm,
-        confirmLabel: l10n.agendaBookingConfirmCta,
-        cancelLabel: l10n.agendaBookingCancel,
-      ),
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.agendaRuleDeleteTitle,
+      body: l10n.agendaRuleDeleteBody,
+      confirmLabel: l10n.commonDelete,
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     await ref
         .read(availabilityRepositoryProvider)
         .deleteRule(trainerId, rule.id);
@@ -247,17 +244,12 @@ class _EditorBody extends ConsumerWidget {
     AvailabilityOverride override,
   ) async {
     final l10n = AppL10n.of(context);
-    final palette = AppPalette.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => _ConfirmDialog(
-        palette: palette,
-        body: '¿Eliminar esta excepción?',
-        confirmLabel: l10n.agendaBookingConfirmCta,
-        cancelLabel: l10n.agendaBookingCancel,
-      ),
+    final confirmed = await showTreinoConfirmDialog(
+      context,
+      title: l10n.agendaOverrideDeleteTitle,
+      confirmLabel: l10n.commonDelete,
     );
-    if (confirmed != true || !context.mounted) return;
+    if (!confirmed || !context.mounted) return;
     await ref
         .read(availabilityRepositoryProvider)
         .deleteOverride(trainerId, override.id);
@@ -1021,6 +1013,7 @@ class _TimePicker extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final picked = await showTimePicker(
       context: context,
+      helpText: AppL10n.of(context).timePickerHelpText,
       initialTime: TimeOfDay(hour: hour, minute: minute),
       builder: (ctx, child) => MediaQuery(
         data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
@@ -1028,60 +1021,6 @@ class _TimePicker extends StatelessWidget {
       ),
     );
     if (picked != null) onChanged(picked.hour, picked.minute);
-  }
-}
-
-class _ConfirmDialog extends StatelessWidget {
-  const _ConfirmDialog({
-    required this.palette,
-    required this.body,
-    required this.confirmLabel,
-    required this.cancelLabel,
-  });
-
-  final AppPalette palette;
-  final String body;
-  final String confirmLabel;
-  final String cancelLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.lg)),
-      content: Text(
-        body,
-        style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
-      ),
-      actions: [
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(
-            cancelLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-          ),
-          child: Text(
-            confirmLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 

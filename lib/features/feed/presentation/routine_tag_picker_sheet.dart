@@ -23,6 +23,8 @@ Future<RoutineTag?> showRoutineTagPickerSheet({
   final palette = AppPalette.of(context);
   return showModalBottomSheet<RoutineTag>(
     context: context,
+    // #1471: arriba de la nav bar flotante, como el sheet de Reportar.
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: palette.bgCard,
     shape: const RoundedRectangleBorder(
