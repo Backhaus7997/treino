@@ -121,4 +121,49 @@ void main() {
     expect(captured.notes, 'nota original');
     verifyNever(() => repo.add(any()));
   });
+
+  // ── #1483: rango por campo ────────────────────────────────────────────────
+
+  testWidgets(
+      '#1483: 150 % de grasa muestra el rango, deshabilita GUARDAR, y al '
+      'corregir el error se va', (tester) async {
+    final repo = _MockMeasurementRepository();
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        measurementRepositoryProvider.overrideWithValue(repo),
+        currentUidProvider.overrideWithValue('athleteX'),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const LogMeasurementScreen.selfLog(),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    ButtonStyleButton guardar() => tester.widget<ButtonStyleButton>(
+          find.ancestor(
+            of: find.text('GUARDAR MEDICIÓN'),
+            matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+          ),
+        );
+
+    // Segundo campo: % de grasa.
+    final grasa = find.byType(TextField).at(1);
+    await tester.enterText(grasa, '150');
+    await tester.pump();
+
+    expect(find.text('Entre 2 y 70 %'), findsOneWidget);
+    expect(guardar().onPressed, isNull,
+        reason: 'no se puede guardar un valor fuera de rango');
+
+    await tester.enterText(grasa, '20');
+    await tester.pump();
+
+    expect(find.text('Entre 2 y 70 %'), findsNothing,
+        reason: 'el error se limpia al corregir (no repetir #1500)');
+    expect(guardar().onPressed, isNotNull);
+  });
 }
