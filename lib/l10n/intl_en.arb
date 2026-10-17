@@ -992,6 +992,7 @@
   "athleteDetailDeletePlanA11y": "Delete plan",
   "coachMapDisabledOnlineA11y": "Map, unavailable in Online mode",
   "commonCancel": "Cancel",
+  "commonDone": "Done",
   "publicProfileLoadErrorA11y": "We couldn't load this profile.",
   "authGenericErrorFallback": "Something went wrong. Please try again.",
   "agendaNoUpcomingSessions": "Your coach hasn't scheduled any sessions yet.",

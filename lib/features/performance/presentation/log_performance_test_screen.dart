@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' as intl;
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/utils/metric_range.dart';
@@ -294,7 +295,7 @@ class _LogPerformanceTestScreenState
 
     // Surface inline errors for any non-numeric / non-positive field instead of
     // silently dropping the value via tryParse.
-    if (!(_formKey.currentState?.validate() ?? true)) return;
+    if (!validateAndRevealFirstError(_formKey)) return;
 
     setState(() => _saving = true);
 

@@ -382,6 +382,7 @@
   "coachInquiryCtaHelp": "Pregúntale precio, modalidad y horarios sin comprometerte con nadie.",
   "coachInquiryCtaError": "No pudimos abrir la consulta. Inténtalo de nuevo.",
   "commonCancel": "Cancelar",
+  "commonDone": "Listo",
   "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
   "authGenericErrorFallback": "Algo salió mal. Inténtalo de nuevo.",
   "agendaNoUpcomingSessions": "Tu entrenador todavía no te agendó sesiones.",

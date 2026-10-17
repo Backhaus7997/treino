@@ -2605,6 +2605,9 @@ class AppL10nEs extends AppL10n {
   String get commonCancel => 'Cancelar';
 
   @override
+  String get commonDone => 'Listo';
+
+  @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
 
   @override
@@ -8022,6 +8025,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonDone => 'Listo';
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';

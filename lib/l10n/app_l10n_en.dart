@@ -2552,6 +2552,9 @@ class AppL10nEn extends AppL10n {
   String get commonCancel => 'Cancel';
 
   @override
+  String get commonDone => 'Done';
+
+  @override
   String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
 
   @override
