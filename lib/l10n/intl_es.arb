@@ -23,7 +23,7 @@
       }
     }
   },
-  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{SEMANA} other{SEMANAS}}",
   "@homeEstaSemanaStreakUnit": {
     "placeholders": {
       "count": {

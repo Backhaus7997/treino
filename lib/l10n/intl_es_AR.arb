@@ -45,8 +45,9 @@
       }
     }
   },
-  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{SEMANA} other{SEMANAS}}",
   "@homeEstaSemanaStreakUnit": {
+    "description": "Unit label next to the big streak number in the Home 'Esta Semana' card. The streak counts consecutive WEEKS in which the athlete met their routine's day target (computeWeeklyStreak, ADR-WRS-08), not days (#1507).",
     "placeholders": {
       "count": {
         "type": "int"
