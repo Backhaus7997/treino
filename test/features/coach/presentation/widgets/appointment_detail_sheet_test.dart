@@ -20,8 +20,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/appointment_repository.dart';
+import 'package:treino/features/coach/domain/agenda_exceptions.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
 import 'package:treino/features/coach/presentation/widgets/appointment_detail_sheet.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
@@ -34,6 +36,23 @@ import 'package:treino/l10n/app_l10n.dart';
 
 const _kTrainerId = 'trainer-cobrar-mobile-1';
 const _kAthleteId = 'athlete-cobrar-mobile-1';
+
+/// Repo cuya cancelación siempre falla con [error].
+class _FailingCancelRepository extends Fake implements AppointmentRepository {
+  _FailingCancelRepository(this.error);
+
+  final Object error;
+
+  @override
+  Future<void> cancel({
+    required Appointment appointment,
+    required String actorUid,
+    String? reason,
+    DateTime? now,
+  }) async {
+    throw error;
+  }
+}
 
 // ─── Factories ───────────────────────────────────────────────────────────────
 
@@ -71,11 +90,12 @@ Widget _wrap({
   required Appointment appointment,
   required FakeFirebaseFirestore firestore,
   AthleteBilling? billing,
+  AppointmentRepository? repository,
 }) {
   return ProviderScope(
     overrides: [
       appointmentRepositoryProvider.overrideWithValue(
-        AppointmentRepository(firestore: firestore),
+        repository ?? AppointmentRepository(firestore: firestore),
       ),
       athleteBillingProvider(_kAthleteId).overrideWith(
         (ref) => Stream.value(billing),
@@ -308,6 +328,73 @@ void main() {
 
       expect(find.text('COBRAR'), findsNothing);
       expect(find.text('Cobrado'), findsNothing);
+    });
+  });
+
+  // ── Cancelar: el error va ADENTRO del sheet ──────────────────────────────
+  //
+  // El sheet se abre con `useRootNavigator: true`: un SnackBar del Scaffold de
+  // atrás queda tapado por el propio sheet y el PF no se enteraba de que la
+  // cancelación había fallado.
+  group('cancelar — error inline', () {
+    // 1/6/2026: el turno de los tests (1/7) queda a más de 24h → CANCELAR TURNO
+    // habilitado.
+    setUp(() => AppClock.freeze(DateTime(2026, 6, 1, 10)));
+    tearDown(AppClock.unfreeze);
+
+    Future<AppL10n> abrirYCancelar(
+      WidgetTester tester,
+      AppointmentRepository repo,
+    ) async {
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      await tester.pumpWidget(_wrap(
+        appointment: _confirmedAppt(id: 'appt-cancel-error'),
+        firestore: firestore,
+        repository: repo,
+      ));
+      await _openSheet(tester);
+      await _tap(tester, find.text('CANCELAR TURNO'));
+      await _tap(tester, find.text(l10n.agendaCancellationConfirmCta));
+      return l10n;
+    }
+
+    testWidgets('un error genérico se ve adentro, sin SnackBar',
+        (tester) async {
+      final l10n = await abrirYCancelar(
+        tester,
+        _FailingCancelRepository(Exception('network')),
+      );
+
+      final aviso = find.text(l10n.agendaGenericError);
+      expect(
+        find.descendant(
+          of: find.byType(AppointmentDetailSheet),
+          matching: aviso,
+        ),
+        findsOneWidget,
+      );
+      expect(aviso.hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      // El sheet sigue abierto y se puede reintentar.
+      expect(find.byType(AppointmentDetailSheet), findsOneWidget);
+    });
+
+    testWidgets('"menos de 24h" también se ve adentro', (tester) async {
+      final l10n = await abrirYCancelar(
+        tester,
+        _FailingCancelRepository(
+          const CancellationTooLateException('appt-cancel-error'),
+        ),
+      );
+
+      expect(
+        find.descendant(
+          of: find.byType(AppointmentDetailSheet),
+          matching: find.text(l10n.agendaCancellationTooLate),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byType(SnackBar), findsNothing);
     });
   });
 }
