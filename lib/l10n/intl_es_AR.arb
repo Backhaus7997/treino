@@ -358,6 +358,21 @@
   "agendaEditorTitle": "Mis horarios",
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
   "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
+  "agendaRuleOverlap": "Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.",
+  "@agendaRuleOverlap": {
+    "description": "Error inline del formulario Agregar/Editar horario cuando la franja se superpone con una regla semanal ya cargada.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
   "agendaBlockedDayTitle": "Día bloqueado",
   "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",

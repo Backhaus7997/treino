@@ -634,6 +634,11 @@ class AppL10nEs extends AppL10n {
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
 
@@ -6044,6 +6049,11 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get agendaRuleInvalidWindow =>
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
+
+  @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
 
   @override
   String get agendaBookingCancelledByCoach =>

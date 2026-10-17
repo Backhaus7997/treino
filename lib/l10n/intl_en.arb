@@ -225,6 +225,7 @@
   "agendaEditorTitle": "",
   "agendaRuleDeleteConfirm": "",
   "agendaRuleInvalidWindow": "",
+  "agendaRuleOverlap": "This time overlaps one you already added: {day}, {start} – {end}.",
   "agendaBookingCancelledByCoach": "",
   "agendaBlockedDayTitle": "",
   "agendaBlockedDayBodySingle": "",
