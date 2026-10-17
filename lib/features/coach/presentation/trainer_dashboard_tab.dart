@@ -15,6 +15,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
+import '../../../core/widgets/form_inline_error.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
 import '../../payments/application/pagos_por_cobrar_provider.dart';
 import '../../payments/application/payment_providers.dart';
@@ -2193,11 +2194,31 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
   DateTime? _dueDate;
   bool _saving = false;
 
+  // Error de validación / guardado DENTRO del sheet: un SnackBar queda tapado
+  // por el propio sheet (abierto con `useRootNavigator: true`). Ver
+  // [FormInlineError].
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController.addListener(_clearError);
+    _conceptController.addListener(_clearError);
+  }
+
   @override
   void dispose() {
+    _amountController.removeListener(_clearError);
+    _conceptController.removeListener(_clearError);
     _amountController.dispose();
     _conceptController.dispose();
     super.dispose();
+  }
+
+  /// El error describe el estado anterior del formulario: en cuanto el PF
+  /// cambia algo deja de ser verdad.
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   @override
@@ -2251,7 +2272,10 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
               links: activeLinks,
               selectedId: _selectedAthleteId,
               palette: palette,
-              onChanged: (id) => setState(() => _selectedAthleteId = id),
+              onChanged: (id) => setState(() {
+                _selectedAthleteId = id;
+                _error = null;
+              }),
             ),
           const SizedBox(height: 14),
           Text(
@@ -2370,7 +2394,10 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
                       button: true,
                       label: l10n.dashboardVenceElQuitar,
                       child: GestureDetector(
-                        onTap: () => setState(() => _dueDate = null),
+                        onTap: () => setState(() {
+                          _dueDate = null;
+                          _error = null;
+                        }),
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.all(2),
@@ -2387,6 +2414,10 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
             ),
           ),
           const SizedBox(height: 20),
+          if (_error != null) ...[
+            FormInlineError(message: _error!),
+            const SizedBox(height: 12),
+          ],
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -2442,7 +2473,10 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       lastDate: floor.add(const Duration(days: 365)),
     );
     if (picked != null && mounted) {
-      setState(() => _dueDate = picked);
+      setState(() {
+        _dueDate = picked;
+        _error = null;
+      });
     }
   }
 
@@ -2453,21 +2487,20 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     final concept = _conceptController.text.trim();
 
     if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.dashboardCompletaCampos)));
+      setState(() => _error = l10n.dashboardCompletaCampos);
       return;
     }
 
     final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.dashboardMontoInvalido)));
+      setState(() => _error = l10n.dashboardMontoInvalido);
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
 
     try {
       final now = DateTime.now().toUtc();
@@ -2508,10 +2541,10 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.dashboardGuardarError)));
+        setState(() {
+          _saving = false;
+          _error = l10n.dashboardGuardarError;
+        });
       }
     }
   }

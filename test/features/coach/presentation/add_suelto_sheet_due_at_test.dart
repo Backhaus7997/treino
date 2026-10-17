@@ -52,6 +52,14 @@ class _StubPaymentRepository extends Fake implements PaymentRepository {
   }
 }
 
+/// Repo cuyo guardado siempre falla.
+class _FailingPaymentRepository extends _StubPaymentRepository {
+  @override
+  Future<void> add(Payment payment) async {
+    throw Exception('permission-denied');
+  }
+}
+
 // ─── Factories ───────────────────────────────────────────────────────────────
 
 TrainerLink _activeLink() => TrainerLink(
@@ -213,4 +221,73 @@ void main() {
       expect(repo.captured!.dueAt, isNull);
     },
   );
+
+  // ── Errores DENTRO del sheet ─────────────────────────────────────────────
+  //
+  // Un SnackBar del Scaffold de atrás queda tapado por el sheet (en la app se
+  // abre en el navigator raíz): el PF tocaba AGREGAR COBRO y no veía ni la
+  // validación ni la falla de guardado.
+
+  Finder enElSheet(String texto) => find.descendant(
+        of: find.byType(AddSueltoSheetTestHarness),
+        matching: find.text(texto),
+      );
+
+  testWidgets('campos incompletos: el aviso se ve ADENTRO del sheet',
+      (tester) async {
+    final repo = _StubPaymentRepository();
+    await tester.pumpWidget(_app(repo));
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AGREGAR COBRO'));
+    await tester.pumpAndSettle();
+
+    expect(enElSheet('Completá todos los campos.'), findsOneWidget);
+    expect(
+        find.text('Completá todos los campos.').hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(repo.captured, isNull);
+  });
+
+  testWidgets('monto inválido: el aviso va adentro y se va al corregirlo',
+      (tester) async {
+    final repo = _StubPaymentRepository();
+    await tester.pumpWidget(_app(repo));
+    await _openAndFillRequired(tester);
+    await tester.enterText(find.byType(TextField).at(0), '0');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AGREGAR COBRO'));
+    await tester.pumpAndSettle();
+    expect(enElSheet('Ingresá un monto válido.'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+
+    // Corregir el monto limpia el aviso.
+    await tester.enterText(find.byType(TextField).at(0), '5000');
+    await tester.pumpAndSettle();
+    expect(enElSheet('Ingresá un monto válido.'), findsNothing);
+  });
+
+  testWidgets('si guardar falla, el aviso va adentro y el sheet sigue abierto',
+      (tester) async {
+    await tester.pumpWidget(_app(_FailingPaymentRepository()));
+    await _openAndFillRequired(tester);
+
+    await tester.tap(find.text('AGREGAR COBRO'));
+    await tester.pumpAndSettle();
+
+    expect(enElSheet('Error al guardar. Intentá de nuevo.'), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AddSueltoSheetTestHarness), findsOneWidget);
+    // Puede reintentar: el botón volvió a estar habilitado.
+    expect(
+      tester
+          .widget<ElevatedButton>(
+            find.widgetWithText(ElevatedButton, 'AGREGAR COBRO'),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
 }
