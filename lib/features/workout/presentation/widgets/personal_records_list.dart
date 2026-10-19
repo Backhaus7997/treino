@@ -5,6 +5,7 @@
 // Spanish strings.
 
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -21,11 +22,14 @@ String _dateWithYear(DateTime dt, String localeName) =>
 
 /// [AD2] The 1RM record is the only one requiring 0.5kg display rounding —
 /// same convention as exercise_progression_chart.dart's `_formatMetricValue`.
-String _formatValue(double value, {required bool isOneRepMax}) {
+String _formatValue(
+  double value, {
+  required bool isOneRepMax,
+  required String localeName,
+}) {
   final display = isOneRepMax ? roundToNearestHalfKg(value) : value;
-  return display % 1 == 0
-      ? display.toStringAsFixed(0)
-      : display.toStringAsFixed(1);
+  // Un decimal como máximo y con el separador del locale (#1512).
+  return intl.NumberFormat('#,##0.#', localeName).format(display);
 }
 
 /// Plain-string label bag for [PersonalRecordsList] — same R3 no-AppL10n
@@ -174,8 +178,19 @@ class _PersonalRecordRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final isOneRepMax = record.recordType == ProgressionRecordType.oneRepMax;
-    final valStr = _formatValue(record.value, isOneRepMax: isOneRepMax);
-    final unit = labels.unitFor(record.recordType);
+    // #1512: la mejor serie con su serie se lee «80 kg × 7», sin unidad
+    // aparte. Sin la serie (un récord armado a mano) queda el producto.
+    final setWeight = record.setWeightKg;
+    final setReps = record.setReps;
+    final showsSet = record.recordType == ProgressionRecordType.bestSetVolume &&
+        setWeight != null &&
+        setReps != null;
+    final valStr = showsSet
+        ? '${formatWeightDisplay(setWeight, labels.localeName)} '
+            '${labels.weightUnit} × $setReps'
+        : _formatValue(record.value,
+            isOneRepMax: isOneRepMax, localeName: labels.localeName);
+    final unit = showsSet ? '' : labels.unitFor(record.recordType);
 
     // El bloque valor+unidad tiene ancho INTRÍNSECO, y un hijo no flexible de un
     // Row recibe ancho ILIMITADO: sin acotarlo no puede achicarse y la fila
@@ -257,15 +272,17 @@ class _PersonalRecordRow extends StatelessWidget {
                       color: palette.accent,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    unit,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: palette.accent,
+                  if (unit.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      unit,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: palette.accent,
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),

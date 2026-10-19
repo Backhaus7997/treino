@@ -42,7 +42,8 @@ void main() {
         HomeHeader(profile: makeProfile(displayName: 'Martín')),
       ));
       await tester.pump();
-      expect(find.text('HOLA, MARTÍN!'), findsOneWidget);
+      // #1506: signo de apertura, en castellano.
+      expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
     });
 
     testWidgets(
@@ -52,7 +53,7 @@ void main() {
         HomeHeader(profile: makeProfile(displayName: 'ana')),
       ));
       await tester.pump();
-      expect(find.text('HOLA, ANA!'), findsOneWidget);
+      expect(find.text('¡HOLA, ANA!'), findsOneWidget);
     });
 
     testWidgets(
@@ -60,7 +61,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrap(const HomeHeader(profile: null)));
       await tester.pump();
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.textContaining(RegExp(r'HOLA, ')), findsNothing);
     });
 
@@ -71,7 +72,7 @@ void main() {
         HomeHeader(profile: makeProfile(displayName: null)),
       ));
       await tester.pump();
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.textContaining(RegExp(r'HOLA, ')), findsNothing);
     });
 

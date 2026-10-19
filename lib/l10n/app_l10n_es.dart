@@ -64,8 +64,8 @@ class AppL10nEs extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }
@@ -645,6 +645,11 @@ class AppL10nEs extends AppL10n {
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
 
@@ -849,6 +854,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
 
   @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
@@ -2603,6 +2614,9 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonDone => 'Listo';
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
@@ -5355,6 +5369,70 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Elige una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Prueba de nuevo.';
+
+  @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -5417,8 +5495,8 @@ class AppL10nEsAr extends AppL10nEs {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DÍAS',
-      one: 'DÍA',
+      other: 'SEMANAS',
+      one: 'SEMANA',
     );
     return '$_temp0';
   }
@@ -5998,6 +6076,11 @@ class AppL10nEsAr extends AppL10nEs {
       'La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'Ese horario se superpone con otro que ya cargaste: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach =>
       'Reserva cancelada por el entrenador.';
 
@@ -6202,6 +6285,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get wellbeingCheckInTitle => '¿CÓMO TE SENTISTE?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'Ya lo contaste hoy en Inicio.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USAR PARA ESTE ENTRENO';
 
   @override
   String get wellbeingCheckInOptional => 'Opcional. Podés saltearlo.';
@@ -7958,6 +8047,9 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonDone => 'Listo';
 
   @override
   String get publicProfileLoadErrorA11y => 'No pudimos cargar este perfil.';
@@ -10705,4 +10797,68 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get timePickerHelpText => 'Elegí una hora';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Entre $min y $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Máximo $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Editar evaluación';
+
+  @override
+  String get performanceLogUpdateCta => 'GUARDAR CAMBIOS';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Evaluación actualizada';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Editar evaluación';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Eliminar evaluación';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Cargada por otro entrenador';
+
+  @override
+  String get performanceDeleteConfirmTitle => '¿Eliminar evaluación?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'Se eliminará la evaluación del $date. Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Evaluación eliminada';
+
+  @override
+  String get performanceDeleteError =>
+      'No pudimos eliminar la evaluación. Probá de nuevo.';
+
+  @override
+  String get commonDelete => 'Eliminar';
+
+  @override
+  String get agendaRuleDeleteTitle => '¿Borrar este horario?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Las reservas existentes se mantienen.';
+
+  @override
+  String get agendaOverrideDeleteTitle => '¿Eliminar esta excepción?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'AHORA NO';
+
+  @override
+  String get authSignOutConfirmTitle => '¿Cerrar sesión?';
+
+  @override
+  String get authSignOutConfirmAction => 'Salir';
 }

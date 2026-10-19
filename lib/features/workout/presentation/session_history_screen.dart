@@ -327,7 +327,7 @@ class _HistoryCard extends StatelessWidget {
             ],
             const SizedBox(width: 8),
             Text(
-              '${formatVolumeKg(session.totalVolumeKg)}${l10n.workoutHistorialCardKgSuffix}',
+              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)}${l10n.workoutHistorialCardKgSuffix}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
               ),

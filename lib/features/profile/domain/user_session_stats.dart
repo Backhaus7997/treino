@@ -18,7 +18,8 @@ class UserSessionStats {
   /// Sum of [Session.totalVolumeKg] for all finished sessions.
   final double totalVolumeKg;
 
-  /// Current consecutive training streak (days), per ADR-WRS-02.
+  /// Racha actual en SEMANAS consecutivas (`computeWeeklyStreak`). Decía
+  /// «days», y por eso las pantallas la etiquetaban mal (#1516, #1507).
   final int streak;
 
   @override

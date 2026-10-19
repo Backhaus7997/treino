@@ -91,7 +91,7 @@ void main() {
       await tester.tap(find.text('SEMANA 2'));
       await tester.pumpAndSettle();
       expect(find.text('falta cargar reps'), findsOneWidget);
-      expect(_colorOf(tester, 'Ejercicio A'), palette.danger);
+      expect(_colorOf(tester, 'Ejercicio A'), palette.dangerText); // texto
 
       // El aviso del parser apunta a la celda exacta (SEMANA 2 = columna E,
       // primer renglón de datos = fila 2).

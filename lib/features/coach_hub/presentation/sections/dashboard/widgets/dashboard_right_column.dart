@@ -506,7 +506,7 @@ class _VencimientoRow extends ConsumerWidget {
             fontFamily: AppFonts.barlow,
             fontWeight: FontWeight.w700,
             fontSize: 10,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ),

@@ -34,12 +34,18 @@ enum ProgressionRecordType {
 
 /// [AD3] The first-achieved date + value for a given [ProgressionRecordType],
 /// derived by [derivePersonalRecords] — powers the dated PR list (REQ spec#2).
+///
+/// [setWeightKg]/[setReps]: sólo en `bestSetVolume`, la serie que dio [value]
+/// (reps × peso). La UI la muestra como «80 kg × 7» en vez del producto, que
+/// con «kg» se leía como una carga (#1512). `null` en los otros tipos.
 @freezed
 class PersonalRecord with _$PersonalRecord {
   const factory PersonalRecord({
     required ProgressionRecordType recordType,
     required double value,
     required DateTime achievedAt,
+    double? setWeightKg,
+    int? setReps,
   }) = _PersonalRecord;
 }
 

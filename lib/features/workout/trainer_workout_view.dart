@@ -10,6 +10,7 @@ import '../../core/analytics/analytics_service.dart';
 import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
+import '../../core/widgets/treino_destructive_menu_item.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../coach/application/template_quota_provider.dart';
 import '../coach/presentation/template_limit_gate.dart';
@@ -152,7 +153,12 @@ class _AssignFromAlumnoCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Elegí un alumno y armale el plan en su perfil. La plantilla queda guardada y la podés reutilizar.',
+            // #1503: decía «La plantilla queda guardada y la podés
+            // reutilizar», y asignar NO guarda ninguna plantilla. Ahora dice
+            // cómo se reutiliza de verdad.
+            'Elegí un alumno y armale el plan en su perfil. Ese plan es sólo '
+            'para ese alumno: si lo querés reutilizar, armalo como '
+            'plantilla en tu biblioteca.',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -445,7 +451,8 @@ class _MenuRow extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           label,
-          style: GoogleFonts.barlow(fontSize: 14, color: color),
+          // Fuente, peso y tamaño los pone `popupMenuTheme.labelTextStyle`.
+          style: TextStyle(color: color),
         ),
       ],
     );
@@ -505,7 +512,7 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
               'Eliminar',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                color: widget.palette.danger,
+                color: widget.palette.dangerText,
               ),
             ),
           ),
@@ -757,7 +764,6 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           PopupMenuButton<_TemplateAction>(
             key: Key('template_actions_menu_${t.id}'),
             enabled: !busy,
-            color: palette.bgCard,
             tooltip: 'Más acciones',
             icon: (_publishing || _deleting)
                 ? SizedBox(
@@ -804,13 +810,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   color: palette.textPrimary,
                 ),
               ),
-              PopupMenuItem(
+              TreinoDestructiveMenuItem(
                 value: _TemplateAction.delete,
-                child: _MenuRow(
-                  icon: TreinoIcon.trash,
-                  label: 'Eliminar',
-                  color: palette.danger,
-                ),
+                icon: TreinoIcon.trash,
+                child: const Text('Eliminar'),
               ),
             ],
           ),

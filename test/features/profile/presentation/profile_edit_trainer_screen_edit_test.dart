@@ -354,6 +354,82 @@ void main() {
     });
   });
 
+  group('#1499/#1500: errores de validación', () {
+    final experiencia =
+        find.byKey(const Key('profile_edit_trainer_experience_field'));
+    final guardar = find.byKey(const Key('profile_edit_trainer_save_button'));
+
+    testWidgets('GUARDAR scrollea hasta el primer campo inválido',
+        (tester) async {
+      // Viewport bajo a propósito: con la pantalla entera a la vista el campo
+      // ya estaría visible y el test no probaría nada.
+      tester.view.physicalSize = const Size(800, 400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final mockRepo = MockUserRepository();
+      when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+      await tester.pumpWidget(_buildScreen(
+        profile: _trainerProfile(complete: true),
+        repo: mockRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(experiencia, '150');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(guardar);
+      await tester.pumpAndSettle();
+      // Precondición: el campo quedó arriba, fuera de pantalla.
+      expect(tester.getTopLeft(experiencia).dy, lessThan(0));
+
+      await tester.tap(guardar);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entre 0 y 80 años.'), findsOneWidget);
+      expect(tester.getTopLeft(experiencia).dy, greaterThanOrEqualTo(0));
+      expect(tester.getBottomRight(experiencia).dy, lessThanOrEqualTo(400));
+      verifyNever(() => mockRepo.update(any(), any()));
+    });
+
+    testWidgets('el error se limpia al corregir el valor, sin otro GUARDAR',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _trainerProfile(complete: true),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(experiencia, '150');
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(guardar);
+      await tester.pumpAndSettle();
+      await tester.tap(guardar);
+      await tester.pumpAndSettle();
+      expect(find.text('Entre 0 y 80 años.'), findsOneWidget);
+
+      await tester.enterText(experiencia, '8');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Entre 0 y 80 años.'), findsNothing);
+    });
+
+    testWidgets('el detalle del campo va en el helper, no en el placeholder',
+        (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile: _trainerProfile(complete: true),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ej: 5'), findsOneWidget);
+      expect(
+        find.text('Opcional. Se muestra en tu perfil público.'),
+        findsOneWidget,
+      );
+    });
+  });
+
   group('#637: toggle "Acepto consultas"', () {
     testWidgets(
         'se dibuja y arranca APAGADO cuando el perfil trae '
