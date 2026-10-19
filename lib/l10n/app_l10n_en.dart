@@ -724,6 +724,58 @@ class AppL10nEn extends AppL10n {
   String get agendaBlockedDayConfirm => '';
 
   @override
+  String get agendaConflictTitle => 'Check the schedule';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'It overlaps with $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'And $count more sessions.',
+      one: 'And 1 more session.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'another session';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'It falls outside your published availability.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions in the series overlap others already scheduled.',
+      one: '1 session in the series overlaps another one already scheduled.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sessions in the series fall outside your published availability.',
+      one: '1 session in the series falls outside your published availability.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => 'Schedule it anyway?';
+
+  @override
   String get agendaSlotFreeLabel => '';
 
   @override
