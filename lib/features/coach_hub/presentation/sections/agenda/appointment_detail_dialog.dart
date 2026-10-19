@@ -30,7 +30,6 @@ import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
 import '../pagos/widgets/thousands_input_formatter.dart';
 import 'agenda_web_helpers.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
-import 'package:treino/core/widgets/treino_toast.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
 

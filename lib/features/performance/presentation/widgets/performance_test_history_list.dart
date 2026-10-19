@@ -11,6 +11,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/performance_test_providers.dart';
 import '../../domain/performance_test.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Filas visibles antes del toggle "Ver todas" — mismo criterio que el
 /// historial de mediciones: la lista vive dentro de una pantalla que ya
@@ -82,13 +83,17 @@ class _PerformanceTestHistoryListState
     try {
       await ref.read(performanceTestRepositoryProvider).delete(t.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.performanceDeleteSuccess)),
+      showTreinoToast(
+        context,
+        l10n.performanceDeleteSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.performanceDeleteError)),
+      showTreinoToast(
+        context,
+        l10n.performanceDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }

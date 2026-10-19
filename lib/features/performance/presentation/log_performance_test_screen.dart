@@ -7,7 +7,6 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
-import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/utils/metric_range.dart';
 import '../../../core/utils/metric_range_message.dart';
@@ -17,6 +16,7 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/performance_test_providers.dart';
 import '../domain/performance_test.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ── Date header ──────────────────────────────────────────────────────────────
 
@@ -280,10 +280,10 @@ class _LogPerformanceTestScreenState
     final l10n = AppL10n.of(context);
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.performanceLogNoSession),
-        ),
+      showTreinoToast(
+        context,
+        l10n.performanceLogNoSession,
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -340,34 +340,23 @@ class _LogPerformanceTestScreenState
         await repo.add(test);
       }
       if (!mounted) return;
+      // Messenger capturado ANTES del pop: después la pantalla se desmonta.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // El pop ya pasó (línea de arriba) — no compite con ninguna
-              // navegación.
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  initial != null
-                      ? l10n.performanceLogUpdateSuccess
-                      : l10n.performanceLogSaveSuccess,
-                ),
-              ),
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        initial != null
+            ? l10n.performanceLogUpdateSuccess
+            : l10n.performanceLogSaveSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.performanceLogSaveError),
-        ),
+      showTreinoToast(
+        context,
+        l10n.performanceLogSaveError,
+        type: TreinoToastType.error,
       );
     }
   }

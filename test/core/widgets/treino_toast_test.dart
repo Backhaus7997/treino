@@ -212,6 +212,61 @@ void main() {
   });
 
   testWidgets(
+      'en tema CLARO el toast usa la paleta clara: el messenger raíz vive '
+      'arriba del Theme y su context no la ve', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: _Boton((c) => showTreinoToast(c, 'Guardado')),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    final clara = AppTheme.light().extension<AppPalette>()!;
+    final material = tester.widget<Material>(_cuerpoDelSnack());
+    expect(material.color, clara.bgCard);
+    final texto = tester.widget<RichText>(
+      find.descendant(
+        of: find.text('Guardado'),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(texto.text.style?.color, clara.textPrimary);
+  });
+
+  testWidgets(
+      'fuera del shell (sin nav bar, antes del login) con el messenger RAÍZ '
+      'por key: se ve, cerca del borde y con la acción andando',
+      (tester) async {
+    // El camino de `app.dart` (cartel FCM) y de chat_media_send_controller:
+    // sin context de pantalla, sólo el `rootScaffoldMessengerKey`.
+    final key = GlobalKey<ScaffoldMessengerState>();
+    var tocado = false;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      scaffoldMessengerKey: key,
+      home: const Scaffold(body: SizedBox.expand()),
+    ));
+
+    showTreinoToastOn(
+      key.currentState!,
+      'Nuevo mensaje\nTenés una rutina asignada',
+      action: TreinoToastAction(label: 'VER', onPressed: () => tocado = true),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Nuevo mensaje\nTenés una rutina asignada'), findsOneWidget);
+    final alto = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final gap = alto - tester.getBottomLeft(_cuerpoDelSnack()).dy;
+    expect(gap, lessThanOrEqualTo(20), reason: 'sin nav, el toast va abajo');
+
+    await tester.tap(find.text('VER'));
+    await tester.pumpAndSettle();
+    expect(tocado, isTrue);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
       'desde un sheet con el teclado abierto el toast queda ARRIBA '
       'del teclado', (tester) async {
     const teclado = 300.0;
@@ -439,6 +494,48 @@ void main() {
       final r =
           await rectDelToast(tester, const Size(1440, 900), enSheet: true);
       expect(r.width, moreOrLessEquals(560));
+    });
+  });
+
+  // Codex en #1590: el cartel de notificaciones de la web drena varios
+  // avisos seguidos. Con el reemplazo por defecto cada uno pisaba al
+  // anterior y sólo se veía el último; antes el ScaffoldMessenger los
+  // encolaba.
+  group('encolar', () {
+    Future<void> dos(WidgetTester tester, {required bool encolar}) async {
+      await tester.pumpWidget(_app(
+        home: _Boton((c) {
+          final m = ScaffoldMessenger.of(c);
+          showTreinoToastOn(m, 'Primero', encolar: encolar);
+          showTreinoToastOn(m, 'Segundo', encolar: encolar);
+        }),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    testWidgets('con encolar, salen los dos en orden', (tester) async {
+      await dos(tester, encolar: true);
+      expect(find.text('Primero'), findsOneWidget);
+      expect(find.text('Segundo'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('Primero'), findsNothing);
+      expect(find.text('Segundo'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('por defecto el nuevo reemplaza al anterior', (tester) async {
+      await dos(tester, encolar: false);
+      await tester.pumpAndSettle();
+      expect(find.text('Primero'), findsNothing);
+      expect(find.text('Segundo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
     });
   });
 }

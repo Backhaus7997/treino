@@ -134,6 +134,12 @@ void showTreinoToast(
 /// Variante para código que ya capturó el messenger ANTES de un `await`
 /// (el `context` puede estar desmontado al volver). No cubre el caso sheet:
 /// ahí usá [showTreinoToast] con el context del sheet.
+///
+/// Por defecto el aviso nuevo REEMPLAZA al visible: es lo que se quiere en
+/// una pantalla (el último resultado es el que importa). Con [encolar] el
+/// aviso espera su turno detrás del visible, como hace el `ScaffoldMessenger`
+/// de Material: lo usa el cartel de notificaciones de la web, que puede
+/// recibir varios avisos seguidos y no debe perder ninguno (Codex, #1590).
 void showTreinoToastOn(
   ScaffoldMessengerState messenger,
   String message, {
@@ -141,42 +147,42 @@ void showTreinoToastOn(
   TreinoToastAction? action,
   Duration duration = _kToastDuration,
   double bottomOffset = 0,
+  bool encolar = false,
 }) {
   if (!messenger.mounted) return;
-  _cerrarOverlay();
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        // El SnackBar es sólo el portador: transparente y sin padding, con
-        // márgenes fijos. La tarjeta visible (fondo, borde, radio y acción)
-        // va adentro, en [_AnchoDelToast], que recalcula el ancho en cada
-        // frame.
-        content: _AnchoDelToast(
-          child: _ToastCard(
-            message: message,
-            type: type,
-            action: action,
-            onAction: messenger.hideCurrentSnackBar,
-          ),
+  if (!encolar) _cerrarOverlay();
+  if (!encolar) messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      // El SnackBar es sólo el portador: transparente y sin padding, con
+      // márgenes fijos. La tarjeta visible (fondo, borde, radio y acción)
+      // va adentro, en [_AnchoDelToast], que recalcula el ancho en cada
+      // frame.
+      content: _AnchoDelToast(
+        child: _ToastCard(
+          message: message,
+          type: type,
+          action: action,
+          onAction: messenger.hideCurrentSnackBar,
         ),
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.fromLTRB(
-          _kMargenLateral,
-          0,
-          _kMargenLateral,
-          _kMargenInferior + bottomOffset,
-        ),
-        padding: EdgeInsets.zero,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        duration: duration,
-        // La acción vive en la tarjeta, no en `SnackBar.action`: así el
-        // SnackBar no la vuelve eterna y el toast se cierra solo igual
-        // (ver snackbar_persist_scan_test).
-        persist: false,
       ),
-    );
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.fromLTRB(
+        _kMargenLateral,
+        0,
+        _kMargenLateral,
+        _kMargenInferior + bottomOffset,
+      ),
+      padding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      duration: duration,
+      // La acción vive en la tarjeta, no en `SnackBar.action`: así el
+      // SnackBar no la vuelve eterna y el toast se cierra solo igual
+      // (ver snackbar_persist_scan_test).
+      persist: false,
+    ),
+  );
 }
 
 /// Toast visible por Overlay, si lo hay. Su Timer NO vive acá sino en el

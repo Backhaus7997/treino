@@ -28,6 +28,7 @@ import '../domain/ranking_dimension.dart';
 import 'lift_rank_label.dart';
 import 'widgets/lift_rank_badge.dart';
 import 'widgets/lift_rank_strip.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Per-gym rankings screen — 3 dimensions (Rachas / Volumen / Lifts, lifts
 /// sub-split squat/bench/deadlift) for the current athlete's gym.
@@ -285,10 +286,10 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
     } catch (_) {
       sync.finish();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No pudimos activar los rankings. Probá de nuevo.'),
-          ),
+        showTreinoToast(
+          context,
+          'No pudimos activar los rankings. Probá de nuevo.',
+          type: TreinoToastType.error,
         );
       }
     } finally {

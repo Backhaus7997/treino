@@ -67,12 +67,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       ref.read(accountDeletedFlagProvider.notifier).state = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Tu cuenta fue eliminada', // i18n: Fase 6 Etapa 3
-              ),
-            ),
+          showTreinoToast(
+            context,
+            'Tu cuenta fue eliminada', // i18n: Fase 6 Etapa 3
+            type: TreinoToastType.success,
           );
         }
       });

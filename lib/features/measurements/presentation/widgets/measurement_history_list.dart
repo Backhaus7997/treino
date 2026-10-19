@@ -11,6 +11,7 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/measurement_providers.dart';
 import '../../domain/measurement.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Cantidad de filas visibles antes del toggle "Ver todas". Mantiene liviano
 /// el build dentro de pantallas que ya scrollean (la lista vive dentro de un
@@ -83,13 +84,17 @@ class _MeasurementHistoryListState
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementDeleteSuccess)),
+      showTreinoToast(
+        context,
+        l10n.measurementDeleteSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementDeleteError)),
+      showTreinoToast(
+        context,
+        l10n.measurementDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }

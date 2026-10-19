@@ -9,7 +9,6 @@ import '../../../core/utils/date_labels.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/form_scroll_to_error.dart';
-import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../core/utils/metric_range.dart';
 import '../../../core/utils/metric_range_message.dart';
@@ -19,6 +18,7 @@ import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/measurement_providers.dart';
 import '../domain/measurement.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Upper sanity bound for any logged metric (kg, %, or cm).
 ///
@@ -401,8 +401,10 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     final l10n = AppL10n.of(context);
     final uid = ref.read(currentUidProvider);
     if (uid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementLogNoSession)),
+      showTreinoToast(
+        context,
+        l10n.measurementLogNoSession,
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -432,9 +434,7 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
     if (!validateAndRevealFirstError(_formKey)) return;
 
     if (!_hasAnyValue()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.logEmptyRecordWarning)),
-      );
+      showTreinoToast(context, l10n.logEmptyRecordWarning);
       return;
     }
 
@@ -484,33 +484,23 @@ class _LogMeasurementScreenState extends ConsumerState<LogMeasurementScreen> {
         await repo.add(measurement);
       }
       if (!mounted) return;
+      // Messenger capturado ANTES del pop: después la pantalla se desmonta.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // El pop ya pasó (línea de arriba) — el check no compite con
-              // ninguna navegación, solo acompaña el mensaje mientras el
-              // SnackBar hace su propia entrada.
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  initial != null
-                      ? l10n.measurementLogUpdateSuccess
-                      : l10n.measurementLogSaveSuccess,
-                ),
-              ),
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        initial != null
+            ? l10n.measurementLogUpdateSuccess
+            : l10n.measurementLogSaveSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.measurementLogSaveError)),
+      showTreinoToast(
+        context,
+        l10n.measurementLogSaveError,
+        type: TreinoToastType.error,
       );
     }
   }
