@@ -45,8 +45,9 @@
       }
     }
   },
-  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{SEMANA} other{SEMANAS}}",
   "@homeEstaSemanaStreakUnit": {
+    "description": "Unit label next to the big streak number in the Home 'Esta Semana' card. The streak counts consecutive WEEKS in which the athlete met their routine's day target (computeWeeklyStreak, ADR-WRS-08), not days (#1507).",
     "placeholders": {
       "count": {
         "type": "int"
@@ -132,6 +133,23 @@
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",
+  "authWelcomeTrainerPrompt": "¿Sos entrenador?",
+  "@authWelcomeTrainerPrompt": {
+    "description": "Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail."
+  },
+  "authWelcomeBecomeTrainer": "Quiero ser entrenador",
+  "@authWelcomeBecomeTrainer": {
+    "description": "Welcome screen — link that opens a mailto: to the TREINO team (same channel and subject as the Coach Hub not-allowed screen)."
+  },
+  "authWelcomeBecomeTrainerFallback": "No pudimos abrir tu correo. Escribinos a {email}.",
+  "@authWelcomeBecomeTrainerFallback": {
+    "description": "Welcome screen — SnackBar when no mail app handles the mailto:. Shows the address so it can be typed by hand.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authLoginTitle": "BIENVENIDO",
   "authLoginSubtitle": "Entrá para seguir tu rutina",
   "authLoginEmailHint": "tu@email.com",
@@ -382,6 +400,21 @@
   "agendaEditorTitle": "Mis horarios",
   "agendaRuleDeleteConfirm": "¿Borrar este horario? Las reservas existentes se mantienen.",
   "agendaRuleInvalidWindow": "La hora de fin debe ser posterior al inicio y dejar espacio para al menos un turno.",
+  "agendaRuleOverlap": "Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.",
+  "@agendaRuleOverlap": {
+    "description": "Error inline del formulario Agregar/Editar horario cuando la franja se superpone con una regla semanal ya cargada.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
   "agendaBlockedDayTitle": "Día bloqueado",
   "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",
@@ -540,6 +573,14 @@
   "@wellbeingCheckInTitle": {
     "description": "Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric."
   },
+  "wellbeingCheckInFromToday": "Ya lo contaste hoy en Inicio.",
+  "@wellbeingCheckInFromToday": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
+  "wellbeingCheckInUseForSession": "USAR PARA ESTE ENTRENO",
+  "@wellbeingCheckInUseForSession": {
+    "description": "#1513: resumen post-sesión cuando el ánimo ya se respondió en Inicio."
+  },
   "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
   "@wellbeingCheckInOptional": {
     "description": "Reassures that the check-in is skippable at no cost. The post-session moment is when the user wants to leave."
@@ -693,6 +734,16 @@
     "description": "Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638)."
   },
   "workoutExploreEmptyLevel": "No hay rutinas para este nivel.",
+  "templatesFilterEmptyDays": "{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}",
+  "@templatesFilterEmptyDays": {"description": "Estado vacío de EXPLORAR cuando el filtro duro de días (#1561) no deja ninguna plantilla. Va seguido del botón templatesFilterEmptyAction.", "placeholders": {"days": {"type": "int"}}},
+  "templatesFilterEmptyMinutes": "No hay plantillas de unos {minutes} min",
+  "@templatesFilterEmptyMinutes": {"description": "Igual que templatesFilterEmptyDays pero cuando sólo hay filtro de minutos (±15).", "placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyMinutesOrMore": "No hay plantillas de {minutes} min o más",
+  "@templatesFilterEmptyMinutesOrMore": {"description": "Igual que templatesFilterEmptyMinutes pero para la opción \"75 MIN O MÁS\" del cuestionario, que no tiene techo: decir \"unos 75 min\" mentiría sobre qué se filtró.", "placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyDaysAndMinutes": "Ninguna plantilla encaja con tus días y tus minutos a la vez",
+  "@templatesFilterEmptyDaysAndMinutes": {"description": "Estado vacío de EXPLORAR cuando días y minutos dejan plantillas CADA UNO por separado pero ninguna cumple los dos (#1561). Va seguido de templatesFilterEmptyAction."},
+  "templatesFilterEmptyAction": "Ver todas",
+  "@templatesFilterEmptyAction": {"description": "CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista."},
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },
@@ -1826,6 +1877,10 @@
   "commonCancel": "Cancelar",
   "@commonCancel": {
     "description": "Generic accessibility/action label for a Cancel control."
+  },
+  "commonDone": "Listo",
+  "@commonDone": {
+    "description": "[#1500] Label of the accessory bar above the iOS numeric keyboard; tapping it dismisses the keyboard."
   },
   "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
   "@publicProfileLoadErrorA11y": {
@@ -3973,10 +4028,10 @@
   "templatesOnboardingStep1Title": "¿Cuántos días podés entrenar?",
   "@templatesOnboardingStep1Title": {"description": "Paso 1 del mini-onboarding de PLANTILLAS (#635). Pregunta por días disponibles."},
   "templatesOnboardingStep1Body": "Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.",
-  "@templatesOnboardingStep1Body": {"description": "Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él."},
+  "@templatesOnboardingStep1Body": {"description": "Paso 1, bajada. La respuesta se guarda y se usa en EXPLORAR: días y minutos filtran la grilla (#1561) y todas las respuestas la ordenan por afinidad (#635). Qué filtra y qué ordena lo explica templatesOnboardingStep1Hint; esta bajada no lo repite."},
   "templatesOnboardingStep1Label": "Días por semana",
-  "templatesOnboardingStep1Hint": "Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.",
-  "@templatesOnboardingStep1Hint": {"description": "Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde."},
+  "templatesOnboardingStep1Hint": "Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.",
+  "@templatesOnboardingStep1Hint": {"description": "Aclara qué hace cada respuesta (#1561): días y minutos FILTRAN la grilla (con salida \"Ver todas\" si queda vacía); objetivo y zonas sólo ordenan."},
   "templatesOnboardingStep2Title": "¿Cuánto dura tu sesión?",
   "@templatesOnboardingStep2Title": {"description": "Paso 2. Pregunta por duración de sesión."},
   "templatesOnboardingStep2Body": "45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.",
@@ -4022,8 +4077,10 @@
   "@templatesFilterBarAdjust": {"description": "Acción de la barra de PLANTILLAS que reabre el mini-onboarding (#635 PR#3) sembrado con lo ya respondido. La gente cambia de disponibilidad; sin esto tendría que rehacer el cuestionario o no podría."},
   "templatesFilterBarSetUp": "AJUSTAR MI BÚSQUEDA",
   "@templatesFilterBarSetUp": {"description": "Misma acción cuando el atleta todavía no respondió nada: el texto invita en vez de referirse a respuestas que no existen."},
-  "templatesFilterBarHint": "Ordenado según lo que buscás",
-  "@templatesFilterBarHint": {"description": "Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde."},
+  "templatesFilterBarHint": "Filtrado y ordenado según lo que buscás",
+  "@templatesFilterBarHint": {"description": "Explica por qué la grilla se ve así (#1561) cuando el filtro de días/minutos ESTÁ en efecto: recorta y además ordena."},
+  "templatesFilterBarHintSorted": "Ordenado según lo que buscás",
+  "@templatesFilterBarHintSorted": {"description": "Misma barra cuando NO hay filtro en efecto: sólo se respondió objetivo/zonas, o el atleta tocó \"Ver todas\". Decir \"Filtrado\" ahí sería falso: no se esconde nada, sólo cambia el orden."},
   "exerciseFeedbackAction": "COMENTAR / REPORTAR",
   "@exerciseFeedbackAction": {"description": "Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628)."},
   "exerciseFeedbackActionA11y": "Comentar o reportar una molestia en {exerciseName}",
@@ -4880,5 +4937,43 @@
   "timePickerHelpText": "Elegí una hora",
   "@timePickerHelpText": {
     "description": "Encabezado del selector de hora de Material. Sin esto sale el de Material en tuteo (Selecciona una hora), #1494."
-  }
+  },
+  "logFieldRange": "Entre {min} y {max} {unit}",
+  "@logFieldRange": {"description": "Error inline cuando un campo numérico de medición/evaluación queda fuera de su rango válido (#1483, #1485). unit puede venir vacío; el código recorta el espacio final.", "placeholders": {"min": {"type": "String"}, "max": {"type": "String"}, "unit": {"type": "String"}}},
+  "inputMaxReached": "Máximo {max} {unit}",
+  "@inputMaxReached": {"description": "Aviso cuando una tecla se rechaza por pasarse del tope de la celda de peso/reps (#1510).", "placeholders": {"max": {"type": "String"}, "unit": {"type": "String"}}},
+  "performanceLogTitleEdit": "Editar evaluación",
+  "@performanceLogTitleEdit": {"description": "Título del form de evaluación en modo edición (#1485)."},
+  "performanceLogUpdateCta": "GUARDAR CAMBIOS",
+  "@performanceLogUpdateCta": {"description": "CTA del form de evaluación en modo edición."},
+  "performanceLogUpdateSuccess": "Evaluación actualizada",
+  "@performanceLogUpdateSuccess": {"description": "SnackBar tras editar una evaluación."},
+  "performanceHistoryEditTooltip": "Editar evaluación",
+  "@performanceHistoryEditTooltip": {"description": "Tooltip del lápiz en el historial de evaluaciones."},
+  "performanceHistoryDeleteTooltip": "Eliminar evaluación",
+  "@performanceHistoryDeleteTooltip": {"description": "Tooltip del tacho en el historial de evaluaciones."},
+  "performanceHistoryOtherTrainerTag": "Cargada por otro entrenador",
+  "@performanceHistoryOtherTrainerTag": {"description": "Fila del historial que cargó otro PF: las reglas sólo dejan editar/borrar al autor."},
+  "performanceDeleteConfirmTitle": "¿Eliminar evaluación?",
+  "@performanceDeleteConfirmTitle": {"description": "Título del diálogo de borrado de una evaluación."},
+  "performanceDeleteConfirmBody": "Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.",
+  "@performanceDeleteConfirmBody": {"description": "Cuerpo del diálogo de borrado.", "placeholders": {"date": {"type": "String"}}},
+  "performanceDeleteSuccess": "Evaluación eliminada",
+  "@performanceDeleteSuccess": {"description": "SnackBar tras borrar una evaluación."},
+  "performanceDeleteError": "No pudimos eliminar la evaluación. Probá de nuevo.",
+  "@performanceDeleteError": {"description": "SnackBar si falla el borrado."},
+  "commonDelete": "Eliminar",
+  "@commonDelete": {"description": "Acción destructiva genérica de showTreinoConfirmDialog (#1496)."},
+  "agendaRuleDeleteTitle": "¿Borrar este horario?",
+  "@agendaRuleDeleteTitle": {"description": "Título de la confirmación de borrado de una franja (#1496)."},
+  "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
+  "@agendaRuleDeleteBody": {"description": "Cuerpo de la confirmación de borrado de una franja."},
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
+  "@agendaOverrideDeleteTitle": {"description": "Título de la confirmación de borrado de una excepción de agenda."},
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "@onboardingCustomExerciseNotNow": {"description": "Salida neutra de la última slide del onboarding de ejercicios propios: cierra sin abrir el editor (#1489)."},
+  "authSignOutConfirmTitle": "¿Cerrar sesión?",
+  "@authSignOutConfirmTitle": {"description": "Título de la confirmación de Cerrar sesión (#1504)."},
+  "authSignOutConfirmAction": "Salir",
+  "@authSignOutConfirmAction": {"description": "Acción que confirma cerrar sesión."}
 }

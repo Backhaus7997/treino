@@ -9,6 +9,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/contact/quiero_ser_entrenador.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 
@@ -75,15 +76,8 @@ class _CoachHubNotAllowedScreenState
     setState(() => _contactError = null);
     var abierto = false;
     try {
-      // `query:` + `encodeComponent`, NO `queryParameters`: éste codifica el
-      // espacio como `+`, que en un `mailto:` los clientes muestran literal.
       abierto = await widget.abrirUrl(
-        Uri(
-          scheme: 'mailto',
-          path: kLegalContactEmail,
-          query:
-              'subject=${Uri.encodeComponent(l10n.coachHubNotAllowedMailSubject)}',
-        ),
+        mailtoQuieroSerEntrenador(l10n.coachHubNotAllowedMailSubject),
       );
     } catch (_) {
       // Sin handler de `mailto:` la plataforma lanza o devuelve false; los dos
@@ -170,7 +164,7 @@ class _CoachHubNotAllowedScreenState
                     _contactError!,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
-                      color: palette.danger,
+                      color: palette.dangerText,
                       fontSize: AppTextSize.bodyDense,
                     ),
                   ),
@@ -202,7 +196,7 @@ class _CoachHubNotAllowedScreenState
                     _error!,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.barlow(
-                      color: palette.danger,
+                      color: palette.dangerText,
                       fontSize: AppTextSize.bodyDense,
                     ),
                   ),

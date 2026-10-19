@@ -89,7 +89,7 @@ class TrainerHomePreview extends StatelessWidget {
                   _Stat(
                     value: '1',
                     label: 'CANCELADAS',
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ],
               ),
@@ -1151,7 +1151,7 @@ class TrainerProfilePreview extends StatelessWidget {
         _Tile(
           icon: TreinoIcon.trash,
           label: 'Eliminar cuenta',
-          color: palette.danger,
+          color: palette.dangerText,
         ),
       ],
     );

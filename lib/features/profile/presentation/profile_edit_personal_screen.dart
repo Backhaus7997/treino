@@ -11,6 +11,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/image/avatar_cropper.dart';
+import '../../../core/widgets/form_scroll_to_error.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -236,7 +237,7 @@ class _ProfileEditPersonalScreenState
 
   Future<void> _save() async {
     if (_isBusy) return; // re-entrancy guard — a save is already in flight
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!validateAndRevealFirstError(_formKey)) return;
     // El gate de edad, ANTES de escribir. El campo de fecha no es un
     // `TextFormField` y por lo tanto NO cuelga del `_formKey`: se escapaba
     // entero del `validate()` de la línea de arriba, así que
@@ -461,7 +462,7 @@ class _ProfileEditPersonalScreenState
             child: Text(
               'DESCARTAR', // i18n: Fase 6 Etapa 3
               style: GoogleFonts.barlowCondensed(
-                color: palette.danger,
+                color: palette.dangerText,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
                 letterSpacing: 1.0,
@@ -557,6 +558,8 @@ class _ProfileEditPersonalScreenState
                 20, 8, 20, 20 + MediaQuery.paddingOf(context).bottom),
             child: Form(
               key: _formKey,
+              // El error se re-evalúa al editar el campo (#1500).
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -790,7 +793,7 @@ class _ProfileEditPersonalScreenState
         borderSide: BorderSide(color: palette.danger),
       ),
       errorStyle: GoogleFonts.barlow(
-        color: palette.danger,
+        color: palette.dangerText,
         fontSize: 12,
       ),
     );

@@ -49,8 +49,9 @@ class HomeHeader extends StatelessWidget {
     final avatarUrl = profile?.avatarUrl;
 
     final greetingText = (displayName != null && displayName.isNotEmpty)
-        ? 'HOLA, ${displayName.toUpperCase()}!'
-        : 'HOLA!';
+        // Con signo de apertura (#1506): «¡HOLA, OCTI!», no «HOLA, OCTI!».
+        ? '¡HOLA, ${displayName.toUpperCase()}!'
+        : '¡HOLA!';
 
     final initials = _computeInitials(displayName);
 

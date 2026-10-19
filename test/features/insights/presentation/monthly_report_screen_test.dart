@@ -216,7 +216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 40 + 25 = 65 min = 1.1 h — active session's 999 must be excluded.
-    expect(find.text('1.1'), findsOneWidget);
+    expect(find.text('1,1'), findsOneWidget);
     expect(find.text('h'), findsOneWidget);
   });
 

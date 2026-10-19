@@ -14,10 +14,16 @@ import 'session_recognition.dart';
 /// Solo los 3 tipos por-set del detalle de ejercicio (peso máximo, 1RM
 /// estimado, mejor volumen de set) — `bestSessionVolume` queda afuera a
 /// propósito: el volumen de la sesión ya tiene su tile en el grid 2×2.
+///
+/// [set]/[previousSet]: sólo en `bestSetVolume`, la serie que dio [value] y
+/// la que dio [previousBest]. El resumen muestra «80 kg × 7», no el producto
+/// «560 kg·reps», que era jerga (#1512). `null` en los otros tipos.
 typedef SessionExerciseRecord = ({
   ProgressionRecordType recordType,
   double value,
   double previousBest,
+  ({double weightKg, int reps})? set,
+  ({double weightKg, int reps})? previousSet,
 });
 
 /// Resumen por-ejercicio de la sesión, en orden de primera aparición.
@@ -158,6 +164,7 @@ SessionHighlights aggregateSessionHighlights({
       // Valores de HOY con las mismas reglas que las series históricas.
       double? todayMaxWeight;
       double? todayBestSetVolume;
+      SetLog? todayBestSet;
       for (final log in logs) {
         if (log.weightKg <= 0) continue;
         if (todayMaxWeight == null || log.weightKg > todayMaxWeight) {
@@ -166,8 +173,24 @@ SessionHighlights aggregateSessionHighlights({
         final setVolume = log.reps * log.weightKg;
         if (todayBestSetVolume == null || setVolume > todayBestSetVolume) {
           todayBestSetVolume = setVolume;
+          todayBestSet = log;
         }
       }
+      // La serie histórica que sostiene `previousBest` de bestSetVolume: la
+      // de mayor reps×peso del historial de este ejercicio, misma regla.
+      SetLog? priorBestSet;
+      for (final priorLogs in priorLogsBySession.values) {
+        for (final log in priorLogs) {
+          if (log.exerciseId != id || log.weightKg <= 0) continue;
+          if (priorBestSet == null ||
+              log.reps * log.weightKg >
+                  priorBestSet.reps * priorBestSet.weightKg) {
+            priorBestSet = log;
+          }
+        }
+      }
+      ({double weightKg, int reps})? asSet(SetLog? log) =>
+          log == null ? null : (weightKg: log.weightKg, reps: log.reps);
       double? todayOneRepMax;
       for (final log in logs) {
         final estimate =
@@ -182,9 +205,14 @@ SessionHighlights aggregateSessionHighlights({
         if (today == null) return;
         final previous = priorBestOf(type);
         if (previous != null && today > previous) {
-          records.add(
-            (recordType: type, value: today, previousBest: previous),
-          );
+          final isSet = type == ProgressionRecordType.bestSetVolume;
+          records.add((
+            recordType: type,
+            value: today,
+            previousBest: previous,
+            set: isSet ? asSet(todayBestSet) : null,
+            previousSet: isSet ? asSet(priorBestSet) : null,
+          ));
         }
       }
 

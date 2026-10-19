@@ -349,7 +349,9 @@ class _Boton extends StatelessWidget {
               // el tema claro ese par da 1.57:1 (AGENTS.md regla 2).
               color: primario
                   ? TreinoButtonTokens.foreground(context)
-                  : (apagado ? palette.textMuted : color),
+                  : (apagado
+                      ? palette.textMuted
+                      : palette.textVariantOf(color)),
               fontSize: AppTextSize.caption,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

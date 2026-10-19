@@ -424,7 +424,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
                     _error!,
                     key: const Key('verify_mail_error'),
                     style: GoogleFonts.barlow(
-                      color: palette.danger,
+                      color: palette.dangerText,
                       fontSize: AppTextSize.bodyDense,
                       height: 1.4,
                     ),

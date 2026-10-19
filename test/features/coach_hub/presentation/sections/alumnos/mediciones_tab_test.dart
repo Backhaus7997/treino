@@ -279,14 +279,12 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: measurements)));
     await _selectMedicionesTab(tester);
 
-    // Summary de m1 → peso + %grasa (double `78` renderiza como "78.0")
-    await _scrollHasta(tester, find.textContaining('78.0 kg'));
-    expect(find.textContaining('78.0 kg'), findsOneWidget);
-    expect(find.textContaining('15.0% grasa'), findsOneWidget);
+    // Summary de m1 → peso + %grasa (con el locale: `78` → «78», sin ,0)
+    await _scrollHasta(tester, find.textContaining('78 kg · 15% grasa'));
+    expect(find.textContaining('78 kg · 15% grasa'), findsOneWidget);
     // Summary de m2 → peso + cintura
-    await _scrollHasta(tester, find.textContaining('80.0 kg'));
-    expect(find.textContaining('80.0 kg'), findsOneWidget);
-    expect(find.textContaining('cintura 82.0 cm'), findsOneWidget);
+    await _scrollHasta(tester, find.textContaining('80 kg · cintura 82 cm'));
+    expect(find.textContaining('80 kg · cintura 82 cm'), findsOneWidget);
   });
 
   testWidgets('Antropometría reúne gráfico de lectura y lista editable',
@@ -315,10 +313,10 @@ void main() {
     // Se scrollea al final porque la lista es perezosa: con el chart arriba, la
     // segunda fila no está en el árbol hasta llegar. Que haya que scrollear ES
     // la prueba de que el viewport quedó perezoso.
-    // La lista va DESC, así que la segunda fila es m1 (72). Su summary usa el
-    // double crudo — '72.0 kg' — a diferencia de la card de lectura, que lo
-    // recorta a '72 kg'.
-    await _scrollHasta(tester, find.textContaining('72.0 kg'));
+    // La lista va DESC, así que la segunda fila es m1 (72). La card de lectura
+    // de arriba muestra la ÚLTIMA medición (70), así que «72 kg» sólo lo dice
+    // esa fila.
+    await _scrollHasta(tester, find.textContaining('72 kg'));
     expect(find.byIcon(TreinoIcon.edit), findsNWidgets(2));
   });
 
@@ -376,8 +374,11 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: [m])));
     await _selectMedicionesTab(tester);
 
-    // Antes del tap: solo summary visible.
-    expect(find.textContaining('78.0 kg'), findsOneWidget);
+    // Antes del tap: solo summary visible. Se busca la línea del summary
+    // entera: «78 kg» suelto también lo dice la card de lectura de arriba.
+    expect(find.textContaining('78 kg · 15% grasa'), findsOneWidget);
+    // Cuántos «82 cm» hay ANTES de expandir (la card de lectura ya lo dice).
+    final antes = find.text('82 cm').evaluate().length;
 
     // Tap en la row (usa el chevron).
     await tester.tap(find.byIcon(TreinoIcon.chevronRight));
@@ -388,11 +389,12 @@ void main() {
     // Ojo con qué se afirma acá. Desde que Progreso y Mediciones son una sola
     // vista, la card de lectura de arriba (`_MeasCard`) también rotula 'Peso' y
     // 'Cintura': afirmar esos dos daría verde aunque la expansión no hubiera
-    // abierto nada. Los dos de abajo no tienen esa ambigüedad — '% grasa' es
-    // minúscula sólo en el detalle (la card dice '% Graso'), y el detalle
-    // imprime el double crudo ('82.0 cm') donde la card lo recorta ('82 cm').
+    // abierto nada. '% grasa' es minúscula sólo en el detalle (la card dice
+    // '% Graso'). El detalle antes se distinguía porque imprimía el double
+    // crudo ('82.0 cm'); con el locale los dos dicen «82 cm», así que se mide
+    // que la expansión SUME uno.
     expect(find.text('% grasa'), findsOneWidget);
-    expect(find.text('82.0 cm'), findsOneWidget);
+    expect(find.text('82 cm').evaluate().length, antes + 1);
   });
 
   testWidgets('tap en trash → confirm dialog → repository.delete llamado',
@@ -564,5 +566,68 @@ void main() {
     expect(find.textContaining('CMJ 42.0 cm'), findsOneWidget);
     expect(find.textContaining('10m 1.6s'), findsOneWidget);
     expect(find.textContaining('Sent. 120.0 kg'), findsOneWidget);
+  });
+
+  // ── #1483 / #1540: rangos por campo también en el Hub ──────────────────
+  //
+  // El campo del Hub validaba 0–500 para TODO: dejaba pasar 150 % de grasa y
+  // un CMJ de 200 cm que la regla de Firestore deniega (Codex en #1540).
+
+  testWidgets('medición: 150 % de grasa no se guarda y el error dice el rango',
+      (tester) async {
+    final m = _measurement(
+      id: 'm1',
+      recordedAt: DateTime(2026, 3, 12),
+      weightKg: 78,
+      fatPercentage: 150,
+    );
+    final repo = _StubMeasurementRepo();
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(
+      _baseOverrides(measurements: [m], repo: repo),
+    ));
+    await _selectMedicionesTab(tester);
+    await tester.tap(find.byIcon(TreinoIcon.edit));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TreinoButton, 'GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entre 2 y 70 %'), findsOneWidget);
+    expect(repo.updated, isEmpty);
+  });
+
+  testWidgets('evaluación: un CMJ de 200 cm no se guarda y dice el rango',
+      (tester) async {
+    final tests = [
+      PerformanceTest(
+        id: 't1',
+        athleteId: _athleteUid,
+        recordedBy: _trainerUid,
+        recordedAt: DateTime(2026, 3, 12),
+        cmjCm: 200,
+      ),
+    ];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap([
+      ..._baseOverrides(measurements: const []),
+      performanceTestsForAthleteProvider
+          .overrideWith((ref, id) => Stream.value(tests)),
+    ]));
+    await _selectMedicionesTab(tester);
+    await navigateAlumnoDetail(
+      tester,
+      group: 'Progreso',
+      subview: 'Rendimiento',
+    );
+    await tester.tap(find.byIcon(TreinoIcon.edit));
+    await tester.pumpAndSettle();
+
+    // Si la validación dejara pasar, el save iría a un repo real sin
+    // override y el test reventaría: el error tiene que frenar ANTES.
+    await tester.tap(find.widgetWithText(TreinoButton, 'GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Entre 0 y 150 cm'), findsOneWidget);
   });
 }

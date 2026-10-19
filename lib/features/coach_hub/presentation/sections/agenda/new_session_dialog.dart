@@ -450,7 +450,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
                     _errorMessage!,
                     style: GoogleFonts.barlow(
                       fontSize: 13,
-                      color: palette.danger,
+                      color: palette.dangerText,
                     ),
                   ),
                 ],

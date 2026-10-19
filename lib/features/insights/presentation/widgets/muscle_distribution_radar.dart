@@ -21,6 +21,7 @@ import '../../domain/radar_axis.dart';
 /// AppL10n — see file header.
 class MuscleDistributionLabels {
   const MuscleDistributionLabels({
+    required this.localeName,
     required this.currentLabel,
     required this.previousLabel,
     required this.emptyStateText,
@@ -31,6 +32,10 @@ class MuscleDistributionLabels {
     required this.durationUnit,
     required this.volumeUnit,
   });
+
+  /// Locale con el que se formatean los números (`9.600`, `20,7k`). Viaja
+  /// en los labels porque este widget no lee AppL10n (ver el header).
+  final String localeName;
 
   /// E.g. 'Actual' — current-period legend entry (Hevy: "Current").
   final String currentLabel;
@@ -325,9 +330,9 @@ class _StatCardGrid extends StatelessWidget {
             child: _StatCard(
               label: labels.volumeLabel,
               currentValue:
-                  '${formatVolumeKg(insights.currentVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.currentVolumeKg, labels.localeName)} ${labels.volumeUnit}',
               previousValue:
-                  '${formatVolumeKg(insights.previousVolumeKg)} ${labels.volumeUnit}',
+                  '${formatVolumeKg(insights.previousVolumeKg, labels.localeName)} ${labels.volumeUnit}',
             ),
           ),
           const SizedBox(width: 8),

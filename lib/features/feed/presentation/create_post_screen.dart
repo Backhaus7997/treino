@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -353,10 +354,8 @@ class _CreatePostHeader extends ConsumerWidget {
                               AppL10n.of(context).moderationBlockedMessage,
                         );
                         if (ok && context.mounted) {
-                          messenger
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                                SnackBar(content: Text(successMessage)));
+                          showTreinoToastOn(messenger, successMessage,
+                              type: TreinoToastType.success);
                           context.pop();
                         }
                       }
@@ -432,9 +431,9 @@ class _PostTextField extends StatelessWidget {
           fontSize: 16,
           color: palette.textMuted,
         ),
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
+        // #1473: sin bordes propios. El tema fuerza `filled`, y con
+        // `InputBorder.none` el relleno quedaba como una banda de esquinas
+        // rectas; el borde del tema lo redondea como el resto de los inputs.
       ),
     );
   }
@@ -459,7 +458,7 @@ class _CharCounter extends StatelessWidget {
       style: GoogleFonts.barlow(
         fontWeight: FontWeight.w400,
         fontSize: 12,
-        color: isOver ? palette.danger : palette.textMuted,
+        color: isOver ? palette.dangerText : palette.textMuted,
       ),
     );
   }
@@ -634,7 +633,7 @@ class _InlineError extends StatelessWidget {
         style: GoogleFonts.barlow(
           fontWeight: FontWeight.w400,
           fontSize: 14,
-          color: palette.danger,
+          color: palette.dangerText,
         ),
       ),
     );

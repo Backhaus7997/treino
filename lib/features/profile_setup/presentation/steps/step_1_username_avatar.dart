@@ -161,8 +161,8 @@ class _UsernameAvailabilityStatus extends StatelessWidget {
         ),
       UsernameAvailability.taken => (
           l10n.profileSetupUsernameTaken,
-          palette.danger,
-          Icon(TreinoIcon.warning, size: 16, color: palette.danger),
+          palette.dangerText,
+          Icon(TreinoIcon.warning, size: 16, color: palette.dangerText),
         ),
       UsernameAvailability.error => (
           l10n.profileSetupUsernameCheckError,

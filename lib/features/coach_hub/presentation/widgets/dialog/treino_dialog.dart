@@ -191,7 +191,7 @@ class TreinoDialog extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
                             fontSize: AppTextSize.bodyDense,
-                            color: palette.danger,
+                            color: palette.dangerText,
                           ),
                         ),
                       ],

@@ -156,7 +156,7 @@ class _AxisBarRow extends StatelessWidget {
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerRight,
                 child: Text(
-                  '$sets sets · ${formatVolumeKg(volumeKg)} kg',
+                  '$sets sets · ${formatVolumeKg(volumeKg, AppL10n.of(context).localeName)} kg',
                   maxLines: 1,
                   style: GoogleFonts.barlow(
                     fontSize: 12,
