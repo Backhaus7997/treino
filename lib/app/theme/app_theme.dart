@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_bottom_bar.dart';
 
 import 'app_palette.dart';
 
@@ -109,12 +110,39 @@ class AppTheme {
   /// responde», y el acento es el color con el que el sistema ya dice eso en
   /// todos lados. Las alfas son bajas a propósito — es una insinuación de
   /// superficie, no un relleno.
+  /// Snackbar del kit (#1560): flotante, con el radio y el borde de una card,
+  /// y un margen inferior que libra la nav flotante. Sin esto Material pinta
+  /// una banda blanca (oscuro) o negra (claro) de borde a borde.
+  static SnackBarThemeData _snackBarTheme(AppPalette palette) =>
+      SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: palette.bgCard,
+        elevation: 0,
+        insetPadding: const EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          TreinoBottomBar.toastBottomMargin,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          side: BorderSide(color: palette.border),
+        ),
+        contentTextStyle: GoogleFonts.barlow(
+          color: palette.textPrimary,
+          fontSize: AppTextSize.body,
+          fontWeight: FontWeight.w600,
+        ),
+        actionTextColor: palette.accentText,
+      );
+
   static ThemeData _conEstadosDeInteraccion(ThemeData t, AppPalette palette) =>
       t.copyWith(
         hoverColor: palette.accent.withValues(alpha: 0.08),
         focusColor: palette.accent.withValues(alpha: 0.12),
         highlightColor: palette.accent.withValues(alpha: 0.10),
         splashColor: palette.accent.withValues(alpha: 0.12),
+        snackBarTheme: _snackBarTheme(palette),
         scrollbarTheme: ScrollbarThemeData(
           thumbColor: _ThumbDelScrollbar(palette.textMuted),
         ),
