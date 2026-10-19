@@ -406,9 +406,14 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
     // El helper ya fija `persist: false`: con acción, un SnackBar es eterno
     // por default y el cartel se quedaba hasta recargar la página.
+    // `encolar`: al vencer la espera del permiso, [_drenarAvisosEnEspera]
+    // entrega varios avisos seguidos. Reemplazando, cada uno pisaba al
+    // anterior y sólo quedaba el último — y este cartel promete que drenar
+    // nunca descarta (Codex, #1590).
     showTreinoToastOn(
       messenger,
       [title, body].where((s) => s.isNotEmpty).join('\n'),
+      encolar: true,
       action: TreinoToastAction(
         label: ctx != null ? AppL10n.of(ctx).appFcmSnackBarActionLabel : 'Ver',
         onPressed: () {

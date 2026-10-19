@@ -496,4 +496,46 @@ void main() {
       expect(r.width, moreOrLessEquals(560));
     });
   });
+
+  // Codex en #1590: el cartel de notificaciones de la web drena varios
+  // avisos seguidos. Con el reemplazo por defecto cada uno pisaba al
+  // anterior y sólo se veía el último; antes el ScaffoldMessenger los
+  // encolaba.
+  group('encolar', () {
+    Future<void> dos(WidgetTester tester, {required bool encolar}) async {
+      await tester.pumpWidget(_app(
+        home: _Boton((c) {
+          final m = ScaffoldMessenger.of(c);
+          showTreinoToastOn(m, 'Primero', encolar: encolar);
+          showTreinoToastOn(m, 'Segundo', encolar: encolar);
+        }),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+    }
+
+    testWidgets('con encolar, salen los dos en orden', (tester) async {
+      await dos(tester, encolar: true);
+      expect(find.text('Primero'), findsOneWidget);
+      expect(find.text('Segundo'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text('Primero'), findsNothing);
+      expect(find.text('Segundo'), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('por defecto el nuevo reemplaza al anterior', (tester) async {
+      await dos(tester, encolar: false);
+      await tester.pumpAndSettle();
+      expect(find.text('Primero'), findsNothing);
+      expect(find.text('Segundo'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    });
+  });
 }
