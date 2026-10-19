@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -7,7 +6,6 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
-import '../../application/trainer_discovery_providers.dart';
 
 /// Marca de «VISTA PREVIA» arriba del perfil público cuando el que mira es el
 /// propio PF (VER PREVIEW, #1498).
@@ -77,16 +75,12 @@ class TrainerPreviewBanner extends StatelessWidget {
 /// calcula el servidor. Los años los carga el PF a mano en EDITAR, así que acá
 /// se lo dice y se lo lleva al formulario.
 ///
-/// Al volver del formulario invalida el perfil público: el proveedor es
-/// one-shot, y sin el `invalidate` la vista previa seguiría mostrando «—» con
-/// el dato ya guardado.
+/// No refresca nada al volver del formulario: la vista previa escucha el
+/// documento (`trainerLiveByIdProvider`), así que el dato recién guardado
+/// aparece solo y el aviso se va con él. Un `invalidate` acá dependía de qué le
+/// contestara una lectura puntual al SDK, y en QA seguía mostrando «—».
 class TrainerPreviewMissingExperienceNotice extends StatelessWidget {
-  const TrainerPreviewMissingExperienceNotice({
-    super.key,
-    required this.trainerId,
-  });
-
-  final String trainerId;
+  const TrainerPreviewMissingExperienceNotice({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -98,13 +92,7 @@ class TrainerPreviewMissingExperienceNotice extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: () async {
-          // El container se toma ANTES del await: al volver el `context` puede
-          // ya no estar montado.
-          final container = ProviderScope.containerOf(context);
-          await context.push<void>('/profile/edit-trainer');
-          container.invalidate(trainerByIdProvider(trainerId));
-        },
+        onTap: () => context.push<void>('/profile/edit-trainer'),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.s12),
           decoration: BoxDecoration(

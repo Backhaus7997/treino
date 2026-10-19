@@ -42,8 +42,11 @@ Widget _wrap({
   List<Override> extra = const [],
 }) {
   final overrides = <Override>[
+    // El alumno lee el perfil una vez; el preview del PF lo escucha en vivo.
     trainerByIdProvider(_uid)
         .overrideWith((ref) async => _profile(years: years)),
+    trainerLiveByIdProvider(_uid)
+        .overrideWith((ref) => Stream.value(_profile(years: years))),
     currentAthleteLinkAnyStatusProvider
         .overrideWith((ref) => Stream.value(null)),
     currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
@@ -127,10 +130,8 @@ void main() {
       expect(find.byType(TrainerPreviewMissingExperienceNotice), findsNothing);
     });
 
-    testWidgets(
-        'tocar el aviso lleva a editar el perfil, y al volver recarga el perfil '
-        'público (el dato recién guardado se ve)', (tester) async {
-      var cargas = 0;
+    testWidgets('tocar el aviso lleva a editar el perfil profesional',
+        (tester) async {
       final router = GoRouter(
         routes: [
           GoRoute(
@@ -144,32 +145,18 @@ void main() {
           ),
         ],
       );
-      await tester.pumpWidget(_wrap(
-        preview: true,
-        router: router,
-        extra: [
-          // Cuenta cuántas veces se lee el perfil público.
-          trainerByIdProvider(_uid).overrideWith((ref) async {
-            cargas++;
-            return _profile(years: cargas > 1 ? 9 : null);
-          }),
-        ],
-      ));
+      await tester.pumpWidget(_wrap(preview: true, router: router));
       await tester.pumpAndSettle();
-      expect(cargas, 1);
-      expect(
-          find.byType(TrainerPreviewMissingExperienceNotice), findsOneWidget);
 
       await tester.tap(find.byType(TrainerPreviewMissingExperienceNotice));
       await tester.pumpAndSettle();
-      expect(find.text('EDITAR PERFIL'), findsOneWidget);
 
+      expect(find.text('EDITAR PERFIL'), findsOneWidget);
+      // Volver NO refresca nada a mano: el dato nuevo lo trae el listener (ver
+      // `trainer_public_profile_screen_preview_refresh_test.dart`).
       router.pop();
       await tester.pumpAndSettle();
-
-      expect(cargas, 2, reason: 'volver del formulario invalida el perfil');
-      expect(find.byType(TrainerPreviewMissingExperienceNotice), findsNothing);
-      expect(find.text('9'), findsOneWidget);
+      expect(find.byType(TrainerPublicProfileScreen), findsOneWidget);
     });
 
     testWidgets('atrás sin historial cae en /profile, no en /coach',

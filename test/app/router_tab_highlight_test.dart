@@ -94,6 +94,10 @@ List<Override> _overrides() => [
       trainerByIdProvider('trainer-1').overrideWith(
         (ref) async => const TrainerPublicProfile(uid: 'trainer-1'),
       ),
+      // El preview escucha el documento (`trainerLiveByIdProvider`, #1498).
+      trainerLiveByIdProvider('trainer-1').overrideWith(
+        (ref) => Stream.value(const TrainerPublicProfile(uid: 'trainer-1')),
+      ),
       // Availability editor streams (trainerId travels as a query param).
       availabilityRulesStreamProvider('trainer-1').overrideWith(
         (ref) => Stream.value(const <AvailabilityRule>[]),

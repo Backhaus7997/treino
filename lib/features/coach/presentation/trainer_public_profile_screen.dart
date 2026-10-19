@@ -9,6 +9,7 @@ import '../../../l10n/app_l10n.dart';
 import '../../reviews/presentation/widgets/review_cta.dart';
 import '../../reviews/presentation/widgets/trainer_reviews_section.dart';
 import '../application/trainer_discovery_providers.dart';
+import '../domain/trainer_public_profile.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 import 'widgets/trainer_contact_cta_stub.dart';
@@ -50,7 +51,12 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final async = ref.watch(trainerByIdProvider(uid));
+    // Vista previa del PF: perfil EN VIVO, para que el guardado se vea sin
+    // reiniciar (#1498). Un alumno mira un perfil ajeno con la lectura puntual
+    // de siempre. `preview` es final: la rama no cambia en la vida del widget.
+    final AsyncValue<TrainerPublicProfile?> async = preview
+        ? ref.watch(trainerLiveByIdProvider(uid))
+        : ref.watch(trainerByIdProvider(uid));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -68,7 +74,9 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
           child: CircularProgressIndicator(color: palette.accent),
         ),
         error: (_, __) => _ErrorState(
-          onRetry: () => ref.invalidate(trainerByIdProvider(uid)),
+          onRetry: () => preview
+              ? ref.invalidate(trainerLiveByIdProvider(uid))
+              : ref.invalidate(trainerByIdProvider(uid)),
         ),
         data: (profile) {
           if (profile == null) {
@@ -91,7 +99,7 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
               TrainerStatsRow(profile: profile),
               if (preview && profile.trainerExperienceYears == null) ...[
                 const SizedBox(height: AppSpacing.s12),
-                TrainerPreviewMissingExperienceNotice(trainerId: uid),
+                const TrainerPreviewMissingExperienceNotice(),
               ],
               const SizedBox(height: 24),
               Text(
