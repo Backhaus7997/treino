@@ -2617,6 +2617,61 @@
   "@sessionFinishError": {
     "description": "Snackbar when finishSession/abandonSession fails so the user isn't stranded on the player (finding 22)."
   },
+  "sessionFinishNeedOneSet": "Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.",
+  "@sessionFinishNeedOneSet": {
+    "description": "Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is."
+  },
+  "sessionFinishEarlyTitle": "¿TERMINAR IGUAL?",
+  "@sessionFinishEarlyTitle": {
+    "description": "Title of the confirm dialog shown when the athlete taps TERMINAR SESIÓN with sets still missing (#1511)."
+  },
+  "sessionFinishEarlyMissingHeader": "{count, plural, =1{Te falta 1 serie:} other{Te faltan {count} series:}}",
+  "@sessionFinishEarlyMissingHeader": {
+    "description": "Header of the list of missing sets in the finish-anyway dialog. [count] is the total of planned sets not done yet.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyMore": "{count, plural, =1{y 1 ejercicio más} other{y {count} ejercicios más}}",
+  "@sessionFinishEarlyMore": {
+    "description": "Tail of the missing-sets list in the finish-anyway dialog when more exercises are missing sets than fit on screen.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyCounts": "Hiciste el {percent} % de la sesión: cuenta como entreno para tu racha y tus rankings.",
+  "@sessionFinishEarlyCounts": {
+    "description": "Finish-anyway dialog: the session reaches the minimum share of planned sets, so it counts as a workout (#1511).",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyNotCounts": "Hiciste el {percent} % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el {minPercent} %.",
+  "@sessionFinishEarlyNotCounts": {
+    "description": "Finish-anyway dialog: the session is below the minimum share, so it is saved as incomplete and does not count as a workout (#1511).",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "minPercent": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyConfirm": "TERMINAR IGUAL",
+  "@sessionFinishEarlyConfirm": {
+    "description": "Confirm button of the finish-anyway dialog."
+  },
+  "sessionFinishEarlyKeepGoing": "SEGUIR ENTRENANDO",
+  "@sessionFinishEarlyKeepGoing": {
+    "description": "Dismiss button of the finish-anyway dialog: back to the session."
+  },
   "routineEditorMissingName": "Poné un nombre a la rutina.",
   "@routineEditorMissingName": {
     "description": "Inline validation hint when the routine name is empty and the save button is disabled (finding 19)."

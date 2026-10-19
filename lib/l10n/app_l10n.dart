@@ -5756,6 +5756,54 @@ abstract class AppL10n {
   /// **'No pudimos finalizar la sesión. Probá de nuevo.'**
   String get sessionFinishError;
 
+  /// Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.'**
+  String get sessionFinishNeedOneSet;
+
+  /// Title of the confirm dialog shown when the athlete taps TERMINAR SESIÓN with sets still missing (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿TERMINAR IGUAL?'**
+  String get sessionFinishEarlyTitle;
+
+  /// Header of the list of missing sets in the finish-anyway dialog. [count] is the total of planned sets not done yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{Te falta 1 serie:} other{Te faltan {count} series:}}'**
+  String sessionFinishEarlyMissingHeader(int count);
+
+  /// Tail of the missing-sets list in the finish-anyway dialog when more exercises are missing sets than fit on screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{count, plural, =1{y 1 ejercicio más} other{y {count} ejercicios más}}'**
+  String sessionFinishEarlyMore(int count);
+
+  /// Finish-anyway dialog: the session reaches the minimum share of planned sets, so it counts as a workout (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hiciste el {percent} % de la sesión: cuenta como entreno para tu racha y tus rankings.'**
+  String sessionFinishEarlyCounts(int percent);
+
+  /// Finish-anyway dialog: the session is below the minimum share, so it is saved as incomplete and does not count as a workout (#1511).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hiciste el {percent} % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el {minPercent} %.'**
+  String sessionFinishEarlyNotCounts(int percent, int minPercent);
+
+  /// Confirm button of the finish-anyway dialog.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TERMINAR IGUAL'**
+  String get sessionFinishEarlyConfirm;
+
+  /// Dismiss button of the finish-anyway dialog: back to the session.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SEGUIR ENTRENANDO'**
+  String get sessionFinishEarlyKeepGoing;
+
   /// Inline validation hint when the routine name is empty and the save button is disabled (finding 19).
   ///
   /// In es_AR, this message translates to:
