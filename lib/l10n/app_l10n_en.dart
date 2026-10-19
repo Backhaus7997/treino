@@ -371,6 +371,17 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t open the chat. Please try again.';
 
   @override
+  String get coachPreviewBannerTitle => 'PREVIEW';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'This is how a student sees your profile. The buttons are disabled in this view.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'You haven\'t added your years of experience yet: students see “—”. Tap to add them.';
+
+  @override
   String get coachCtaProximamente => '';
 
   @override

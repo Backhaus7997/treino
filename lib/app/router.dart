@@ -1174,6 +1174,23 @@ GoRouter buildRouter({
                   return _withBg(AvailabilityEditorScreen(trainerId: uid));
                 },
               ),
+              // Vista previa del perfil público del PF, abierta desde VER PREVIEW
+              // en TrainerProfileView. Gemela de /coach/trainer/:uid registrada
+              // bajo la rama ORIGEN: _ShellScaffold deriva el tab resaltado del
+              // prefijo del path, así que bajo /coach la barra saltaba a COACH
+              // aunque el PF viniera de PERFIL — y el pop vuelve a /profile
+              // (patrón del #387, igual que availability-editor de arriba).
+              // `preview: true` marca la pantalla como vista previa y apaga los
+              // CTAs (#1498).
+              GoRoute(
+                path: 'trainer-preview/:uid',
+                builder: (context, state) {
+                  final uid = state.pathParameters['uid']!;
+                  return _withBg(
+                    TrainerPublicProfileScreen(uid: uid, preview: true),
+                  );
+                },
+              ),
               // /profile/settings GoRoute REMOVED 2026-05-28 — PR#4 pivot.
               // Sign-out and eliminar-cuenta tiles now live directly in
               // ProfileScreen body. Settings surface deferred to future SDD.

@@ -752,6 +752,24 @@ abstract class AppL10n {
   /// **'No pudimos abrir la consulta. Probá de nuevo.'**
   String get coachInquiryCtaError;
 
+  /// Título de la marca que aparece arriba del perfil público cuando el que lo mira es el propio PF (VER PREVIEW, #1498).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VISTA PREVIA'**
+  String get coachPreviewBannerTitle;
+
+  /// Explica por qué CONSULTAR y PEDIR VÍNCULO no responden en la vista previa: nadie se consulta ni se pide vínculo a sí mismo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.'**
+  String get coachPreviewBannerBody;
+
+  /// Aviso en la vista previa del PF cuando trainerExperienceYears es null. Lleva a EDITAR (/profile/edit-trainer). RESEÑAS y ALUMNOS también pueden mostrar «—», pero esos los calcula el servidor; los años los carga el PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no cargaste tus años de experiencia: los alumnos ven «—». Tocá para cargarlos.'**
+  String get coachPreviewMissingExperience;
+
   /// No description provided for @coachCtaProximamente.
   ///
   /// In es_AR, this message translates to:

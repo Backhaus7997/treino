@@ -377,6 +377,17 @@ class AppL10nEs extends AppL10n {
       'No pudimos abrir la consulta. Inténtalo de nuevo.';
 
   @override
+  String get coachPreviewBannerTitle => 'VISTA PREVIA';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'Todavía no has cargado tus años de experiencia: los alumnos ven «—». Toca para cargarlos.';
+
+  @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
 
   @override
@@ -5857,6 +5868,17 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachInquiryCtaError =>
       'No pudimos abrir la consulta. Probá de nuevo.';
+
+  @override
+  String get coachPreviewBannerTitle => 'VISTA PREVIA';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'Así ve tu perfil un alumno. Los botones están desactivados en esta vista.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'Todavía no cargaste tus años de experiencia: los alumnos ven «—». Tocá para cargarlos.';
 
   @override
   String get coachCtaProximamente => 'Próximamente — Etapa 3';
