@@ -378,17 +378,23 @@ final List<RouteBase> _signedInRoutes = [
 /// acota igual que `CoachHubLoginScreen` y `CoachHubNotAllowedScreen`, las
 /// otras dos pantallas sin shell del Hub. El fondo se pinta afuera porque el
 /// `Scaffold` de la pantalla solo cubre la caja.
-class _VerifyMailEnElHub extends StatelessWidget {
+///
+/// «Cerrar sesión» va DIRECTO a Firebase Auth (ver
+/// `VerifyMailScreen.cerrarSesion`): por `AuthNotifier.signOut()` se colgaba y
+/// el botón quedaba deshabilitado sin sacar a nadie.
+class _VerifyMailEnElHub extends ConsumerWidget {
   const _VerifyMailEnElHub();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ColoredBox(
       color: AppPalette.of(context).bg,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: const VerifyMailScreen(),
+          child: VerifyMailScreen(
+            cerrarSesion: () => ref.read(firebaseAuthProvider).signOut(),
+          ),
         ),
       ),
     );
