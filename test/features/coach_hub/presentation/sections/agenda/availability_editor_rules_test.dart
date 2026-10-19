@@ -324,4 +324,57 @@ void main() {
       expect(stub.capturedDeleteRuleId, equals(_kRuleId1));
     });
   });
+
+  // #1495: franjas superpuestas (gemelo del editor mobile)
+  group('#1495 — franjas superpuestas', () {
+    testWidgets(
+        'el default de "Agregar horario" no choca con lo cargado: con lunes '
+        '09–11 propone lunes 11–13', (tester) async {
+      final stub = _StubAvailabilityRepository();
+      await _openPanel(tester, rules: [_rule()], repo: stub);
+
+      await tester.tap(find.text('AGREGAR HORARIO')); // i18n
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GUARDAR')); // i18n
+      await tester.pumpAndSettle();
+
+      final added = stub.capturedAddRule;
+      expect(added, isNotNull);
+      expect(added!.dayOfWeek, equals(DateTime.monday));
+      expect(added.startHour, equals(11));
+      expect(added.endHour, equals(13));
+    });
+
+    testWidgets(
+        'mover una regla encima de otra se rechaza con el horario que pisa '
+        'y no guarda', (tester) async {
+      final stub = _StubAvailabilityRepository();
+      await _openPanel(
+        tester,
+        rules: [
+          _rule(),
+          _rule(id: _kRuleId2, dayOfWeek: DateTime.tuesday),
+        ],
+        repo: stub,
+      );
+
+      // Editar la del martes y pasarla al lunes 09–11.
+      await tester.tap(find.byIcon(TreinoIcon.edit).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Lun')); // i18n
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('GUARDAR')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Ese horario se superpone con otro que ya cargaste: '
+          'Lunes, 09:00 – 11:00.', // i18n
+        ),
+        findsOneWidget,
+      );
+      expect(stub.capturedUpdateRule, isNull);
+      expect(stub.capturedAddRule, isNull);
+    });
+  });
 }

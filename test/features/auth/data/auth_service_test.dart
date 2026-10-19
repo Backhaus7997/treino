@@ -294,6 +294,7 @@ void main() {
               userDisabled: (_) => false,
               userNotFound: (_) => false,
               wrongPassword: (_) => false,
+              invalidCredentials: (_) => false,
               emailAlreadyInUse: (_) => false,
               weakPassword: (_) => false,
               tooManyRequests: (_) => false,
@@ -417,6 +418,7 @@ void main() {
               userDisabled: (_) => false,
               userNotFound: (_) => false,
               wrongPassword: (_) => false,
+              invalidCredentials: (_) => false,
               emailAlreadyInUse: (_) => false,
               weakPassword: (_) => false,
               tooManyRequests: (_) => false,
@@ -462,7 +464,8 @@ void main() {
       expect(result, user);
     });
 
-    test('scenario 7.2 — maps wrong-password to wrongPassword', () async {
+    // #1505: el sign-in ya no distingue clave mala de cuenta inexistente.
+    test('scenario 7.2 — maps wrong-password to invalidCredentials', () async {
       when(
         () => fbAuth.signInWithEmailAndPassword(
           email: any(named: 'email'),
@@ -472,11 +475,12 @@ void main() {
 
       expect(
         () => sut.signInWithEmail(email: 'a@b.c', password: 'wrong'),
-        throwsA(const AuthFailure.wrongPassword()),
+        throwsA(const AuthFailure.invalidCredentials()),
       );
     });
 
-    test('scenario 7.3 — maps invalid-credential to wrongPassword', () async {
+    test('scenario 7.3 — maps invalid-credential to invalidCredentials',
+        () async {
       when(
         () => fbAuth.signInWithEmailAndPassword(
           email: any(named: 'email'),
@@ -486,11 +490,13 @@ void main() {
 
       expect(
         () => sut.signInWithEmail(email: 'a@b.c', password: 'wrong'),
-        throwsA(const AuthFailure.wrongPassword()),
+        throwsA(const AuthFailure.invalidCredentials()),
       );
     });
 
-    test('scenario 8.2 — maps user-not-found to userNotFound', () async {
+    // #1505: ésta era la fuga — «No encontramos una cuenta con ese email» le
+    // confirmaba a quien probaba emails cuál NO existía.
+    test('scenario 8.2 — maps user-not-found to invalidCredentials', () async {
       when(
         () => fbAuth.signInWithEmailAndPassword(
           email: any(named: 'email'),
@@ -500,7 +506,7 @@ void main() {
 
       expect(
         () => sut.signInWithEmail(email: 'a@b.c', password: 'Pass1234'),
-        throwsA(const AuthFailure.userNotFound()),
+        throwsA(const AuthFailure.invalidCredentials()),
       );
     });
 

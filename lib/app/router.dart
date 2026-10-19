@@ -697,11 +697,13 @@ GoRouter buildRouter({
 
       GoRoute(
         // Athlete detail (coach) — full-screen, MENSAJE/CREAR PLAN sit at the
-        // bottom with no nav bar. Bare Column (no Scaffold) → wrap in _immersive.
+        // bottom with no nav bar. Trae su propio Scaffold (no `_immersive`).
         path: '/coach/athlete/:athleteId',
         builder: (context, state) {
           final athleteId = state.pathParameters['athleteId']!;
-          return _immersive(AthleteDetailScreen(athleteId: athleteId));
+          // Scaffold propio: los botones van en su bottomNavigationBar para
+          // que los SnackBar no los tapen (#1484).
+          return AthleteDetailScreen(athleteId: athleteId);
         },
       ),
       GoRoute(

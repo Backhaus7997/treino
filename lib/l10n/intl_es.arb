@@ -23,7 +23,7 @@
       }
     }
   },
-  "homeEstaSemanaStreakUnit": "{count, plural, =1{DÍA} other{DÍAS}}",
+  "homeEstaSemanaStreakUnit": "{count, plural, =1{SEMANA} other{SEMANAS}}",
   "@homeEstaSemanaStreakUnit": {
     "placeholders": {
       "count": {
@@ -382,11 +382,13 @@
   "coachInquiryCtaHelp": "Pregúntale precio, modalidad y horarios sin comprometerte con nadie.",
   "coachInquiryCtaError": "No pudimos abrir la consulta. Inténtalo de nuevo.",
   "commonCancel": "Cancelar",
+  "commonDone": "Listo",
   "publicProfileLoadErrorA11y": "No pudimos cargar este perfil.",
   "authGenericErrorFallback": "Algo salió mal. Inténtalo de nuevo.",
   "agendaNoUpcomingSessions": "Tu entrenador todavía no te agendó sesiones.",
   "agendaSaveError": "No pudimos guardar. Inténtalo de nuevo.",
   "agendaSaveSuccess": "Horario guardado.",
+  "agendaRuleOverlap": "Ese horario se superpone con otro que ya cargaste: {day}, {start} – {end}.",
   "agendaCobrarCta": "COBRAR",
   "agendaCobradoLabel": "Cobrado",
   "agendaCobrarMontoLabel": "MONTO (ARS)",
@@ -998,6 +1000,8 @@
   "wellbeingDailyTitle": "¿CÓMO TE SIENTES HOY?",
   "wellbeingDailyPrompt": "Anota cómo amaneces, entrenes o no.",
   "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
+  "wellbeingCheckInFromToday": "Ya lo contaste hoy en Inicio.",
+  "wellbeingCheckInUseForSession": "USAR PARA ESTE ENTRENO",
   "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
   "workoutWeekCompletedTitle": "¡Semana cumplida! 🔥",
   "workoutWeekCompletedStreak": "{count, plural, =1{¡Tu primera semana cumplida!} other{Llevas {count} semanas de racha.}}",
@@ -1196,5 +1200,24 @@
   "appUpdateBody": "Esta versión de TREINO ya no es compatible y puede perder datos de tus rutinas. Actualízala para seguir entrenando.",
   "appUpdateCta": "ACTUALIZAR",
   "appUpdateOpenError": "No pudimos abrir la tienda. Busca TREINO en la App Store o en Google Play.",
-  "timePickerHelpText": "Elige una hora"
+  "timePickerHelpText": "Elige una hora",
+  "logFieldRange": "Entre {min} y {max} {unit}",
+  "inputMaxReached": "Máximo {max} {unit}",
+  "performanceLogTitleEdit": "Editar evaluación",
+  "performanceLogUpdateCta": "GUARDAR CAMBIOS",
+  "performanceLogUpdateSuccess": "Evaluación actualizada",
+  "performanceHistoryEditTooltip": "Editar evaluación",
+  "performanceHistoryDeleteTooltip": "Eliminar evaluación",
+  "performanceHistoryOtherTrainerTag": "Cargada por otro entrenador",
+  "performanceDeleteConfirmTitle": "¿Eliminar evaluación?",
+  "performanceDeleteConfirmBody": "Se eliminará la evaluación del {date}. Esta acción no se puede deshacer.",
+  "performanceDeleteSuccess": "Evaluación eliminada",
+  "performanceDeleteError": "No pudimos eliminar la evaluación. Prueba de nuevo.",
+  "commonDelete": "Eliminar",
+  "agendaRuleDeleteTitle": "¿Borrar este horario?",
+  "agendaRuleDeleteBody": "Las reservas existentes se mantienen.",
+  "agendaOverrideDeleteTitle": "¿Eliminar esta excepción?",
+  "onboardingCustomExerciseNotNow": "AHORA NO",
+  "authSignOutConfirmTitle": "¿Cerrar sesión?",
+  "authSignOutConfirmAction": "Salir"
 }

@@ -50,7 +50,8 @@ void main() {
     );
 
     final text = tester.widget<Text>(find.text('2 sets'));
-    expect(text.style?.color, AppPalette.mintMagenta.danger);
+    // Es TEXTO: el rojo legible, no el de relleno (#1550).
+    expect(text.style?.color, AppPalette.mintMagenta.dangerText);
   });
 
   ExerciseCard card({bool hasError = false, bool expanded = false}) =>

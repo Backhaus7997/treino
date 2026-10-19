@@ -39,7 +39,7 @@ void main() {
       expect(value, const Color(0xFF0F1513));
     });
 
-    testWidgets('variationNegativeColor == danger (0xFFE53935)',
+    testWidgets('variationNegativeColor == dangerText (0xFFEF5350)',
         (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
@@ -49,8 +49,9 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: dangerRed = #E53935.
-      expect(value, const Color(0xFFE53935));
+      // Valor pinado: dangerRedText = #EF5350. La variación negativa es TEXTO:
+      // `danger` como texto no llega a AA sobre las superficies oscuras.
+      expect(value, const Color(0xFFEF5350));
     });
 
     testWidgets('titleColor == textMuted (dark)', (tester) async {
@@ -82,7 +83,7 @@ void main() {
       expect(value, const Color(0xFFFFFFFF));
     });
 
-    testWidgets('variationNegativeColor == danger light (0xFFD32F2F)',
+    testWidgets('variationNegativeColor == dangerText light (0xFFD32F2F)',
         (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
