@@ -30,10 +30,28 @@ const double _kMargenLateral = AppSpacing.s20;
 /// crece y el toast queda centrado.
 const double _kAnchoMaximo = 560;
 
-/// Margen lateral para que el toast no supere [_kAnchoMaximo] en una pantalla
-/// de [anchoPantalla].
-double _margenLateral(double anchoPantalla) =>
-    math.max(_kMargenLateral, (anchoPantalla - _kAnchoMaximo) / 2);
+/// Limita el toast a [_kAnchoMaximo] centrado, calculándolo en CADA layout.
+///
+/// Antes el margen lateral se calculaba una vez, al encolar el SnackBar, y
+/// quedaba fijo: achicando la ventana del navegador con el toast a la vista,
+/// los 440 px de cada lado de un monitor de 1440 quedaban aplicados a 600 y el
+/// toast se quedaba sin ancho (Codex, #1593). Con un `LayoutBuilder` el ancho
+/// sale del espacio real de ese frame, igual en el SnackBar y en el Overlay.
+class _AnchoDelToast extends StatelessWidget {
+  const _AnchoDelToast({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, box) => Center(
+          child: SizedBox(
+            width: math.min(_kAnchoMaximo, box.maxWidth),
+            child: child,
+          ),
+        ),
+      );
+}
 
 /// Separación entre el toast y lo que tenga abajo: la barra de navegación,
 /// el teclado o el borde seguro. Es un gap de diseño y NADA más: el
@@ -126,37 +144,37 @@ void showTreinoToastOn(
 }) {
   if (!messenger.mounted) return;
   _cerrarOverlay();
-  final palette = AppPalette.of(messenger.context);
-  final lateral = _margenLateral(MediaQuery.sizeOf(messenger.context).width);
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
-        content: DefaultTextStyle(
-          style: _estiloTexto(palette),
-          child: _ToastContent(message: message, type: type),
+        // El SnackBar es sólo el portador: transparente y sin padding, con
+        // márgenes fijos. La tarjeta visible (fondo, borde, radio y acción)
+        // va adentro, en [_AnchoDelToast], que recalcula el ancho en cada
+        // frame.
+        content: _AnchoDelToast(
+          child: _ToastCard(
+            message: message,
+            type: type,
+            action: action,
+            onAction: messenger.hideCurrentSnackBar,
+          ),
         ),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.fromLTRB(
-          lateral,
+          _kMargenLateral,
           0,
-          lateral,
+          _kMargenLateral,
           _kMargenInferior + bottomOffset,
         ),
-        backgroundColor: palette.bgCard,
+        padding: EdgeInsets.zero,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        shape: _forma(palette),
         duration: duration,
-        // Explícito: con acción Material lo deja eterno por default
+        // La acción vive en la tarjeta, no en `SnackBar.action`: así el
+        // SnackBar no la vuelve eterna y el toast se cierra solo igual
         // (ver snackbar_persist_scan_test).
         persist: false,
-        action: action == null
-            ? null
-            : SnackBarAction(
-                label: action.label,
-                textColor: palette.accentText,
-                onPressed: action.onPressed,
-              ),
       ),
     );
 }
@@ -196,10 +214,9 @@ void _showEnOverlay(
 
   entrada = OverlayEntry(
     builder: (ctx) {
-      final lateral = _margenLateral(MediaQuery.sizeOf(ctx).width);
       return Positioned(
-        left: lateral,
-        right: lateral,
+        left: _kMargenLateral,
+        right: _kMargenLateral,
         // El mayor entre teclado y borde seguro: con el teclado abierto el
         // `viewPadding` sigue siendo el del home indicator y el toast quedaba
         // escondido debajo del teclado.
@@ -209,12 +226,14 @@ void _showEnOverlay(
             ) +
             _kMargenInferior +
             bottomOffset,
-        child: _OverlayToast(
-          message: message,
-          type: type,
-          action: action,
-          duration: duration,
-          onDismiss: cerrarEsta,
+        child: _AnchoDelToast(
+          child: _OverlayToast(
+            message: message,
+            type: type,
+            action: action,
+            duration: duration,
+            onDismiss: cerrarEsta,
+          ),
         ),
       );
     },
@@ -259,44 +278,67 @@ class _OverlayToastState extends State<_OverlayToast> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final action = widget.action;
     // Lo que el SnackBar de Material hace solo: sin `liveRegion` el lector de
     // pantalla no anuncia un aviso que aparece por Overlay.
     return Semantics(
       container: true,
       liveRegion: true,
-      child: Material(
-        color: palette.bgCard,
-        shape: _forma(palette),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s14,
-            vertical: AppSpacing.s12,
-          ),
-          child: DefaultTextStyle(
-            style: _estiloTexto(palette),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ToastContent(
-                    message: widget.message,
-                    type: widget.type,
+      child: _ToastCard(
+        message: widget.message,
+        type: widget.type,
+        action: widget.action,
+        onAction: widget.onDismiss,
+      ),
+    );
+  }
+}
+
+/// La tarjeta visible del toast, la misma por SnackBar y por Overlay: fondo
+/// `bgCard`, borde y radio del kit, ícono por tipo, mensaje y acción opcional.
+/// [onAction] cierra el toast antes de correr la acción.
+class _ToastCard extends StatelessWidget {
+  const _ToastCard({
+    required this.message,
+    required this.type,
+    required this.action,
+    required this.onAction,
+  });
+
+  final String message;
+  final TreinoToastType type;
+  final TreinoToastAction? action;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final action = this.action;
+    return Material(
+      key: const Key('treino-toast-card'),
+      color: palette.bgCard,
+      shape: _forma(palette),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s14,
+          vertical: AppSpacing.s12,
+        ),
+        child: DefaultTextStyle(
+          style: _estiloTexto(palette),
+          child: Row(
+            children: [
+              Expanded(child: _ToastContent(message: message, type: type)),
+              if (action != null)
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: palette.accentText,
                   ),
+                  onPressed: () {
+                    onAction();
+                    action.onPressed();
+                  },
+                  child: Text(action.label),
                 ),
-                if (action != null)
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: palette.accentText,
-                    ),
-                    onPressed: () {
-                      widget.onDismiss();
-                      action.onPressed();
-                    },
-                    child: Text(action.label),
-                  ),
-              ],
-            ),
+            ],
           ),
         ),
       ),

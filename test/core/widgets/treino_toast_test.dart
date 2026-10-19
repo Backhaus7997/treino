@@ -53,9 +53,9 @@ Future<void> _abrirSheetYDisparar(WidgetTester tester) async {
 }
 
 /// El `Material` visible del SnackBar (sin el margen que lo envuelve).
-Finder _cuerpoDelSnack() => find
-    .descendant(of: find.byType(SnackBar), matching: find.byType(Material))
-    .first;
+/// La tarjeta visible del toast (fondo, borde y radio del kit), dentro del
+/// SnackBar o del Overlay.
+Finder _cuerpoDelSnack() => find.byKey(const Key('treino-toast-card'));
 
 void main() {
   testWidgets('muestra el mensaje en un SnackBar y su ícono por tipo',
@@ -197,12 +197,16 @@ void main() {
     await tester.pumpAndSettle();
 
     final palette = AppTheme.dark().extension<AppPalette>()!;
+    // El SnackBar es el portador transparente; la tarjeta visible va
+    // adentro (#1593: así el ancho se recalcula en cada layout).
     final sb = tester.widget<SnackBar>(find.byType(SnackBar));
     expect(sb.behavior, SnackBarBehavior.floating);
-    expect(sb.backgroundColor, palette.bgCard);
+    expect(sb.backgroundColor, Colors.transparent);
     expect(sb.elevation, 0);
     expect(sb.margin, isNotNull);
-    final shape = sb.shape! as RoundedRectangleBorder;
+    final card = tester.widget<Material>(_cuerpoDelSnack());
+    expect(card.color, palette.bgCard);
+    final shape = card.shape! as RoundedRectangleBorder;
     expect(shape.borderRadius, BorderRadius.circular(AppRadius.sm));
     expect(shape.side.color, palette.border);
   });
@@ -378,10 +382,7 @@ void main() {
         await tester.pumpWidget(_appConSheet('Guardado'));
         await _abrirSheetYDisparar(tester);
         await tester.pumpAndSettle();
-        final rect = tester.getRect(find
-            .ancestor(
-                of: find.text('Guardado'), matching: find.byType(Material))
-            .first);
+        final rect = tester.getRect(_cuerpoDelSnack());
         await tester.pumpWidget(const SizedBox());
         return rect;
       }
@@ -404,6 +405,34 @@ void main() {
       final r = await rectDelToast(tester, const Size(390, 844));
       expect(r.left, moreOrLessEquals(AppSpacing.s20));
       expect(r.width, moreOrLessEquals(390 - 2 * AppSpacing.s20));
+    });
+
+    // Codex en #1593: el margen lateral se calculaba una vez, al encolar el
+    // SnackBar. Achicando la ventana del navegador con el toast a la vista,
+    // los 440 px de cada lado de 1440 quedaban aplicados a 600 y el toast se
+    // quedaba sin ancho.
+    testWidgets('si la ventana se achica con el toast a la vista, se adapta',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_app(
+        home: _Boton((c) => showTreinoToast(c, 'Guardado')),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      expect(tester.getSize(_cuerpoDelSnack()).width, moreOrLessEquals(560));
+
+      tester.view.physicalSize = const Size(600, 900);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(_cuerpoDelSnack()).width,
+          moreOrLessEquals(600 - 2 * AppSpacing.s20));
+
+      tester.view.physicalSize = const Size(1440, 900);
+      await tester.pump();
+      expect(tester.getSize(_cuerpoDelSnack()).width, moreOrLessEquals(560),
+          reason: 'y al agrandarla vuelve al máximo');
     });
 
     testWidgets('el toast por Overlay respeta el mismo máximo', (tester) async {
