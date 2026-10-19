@@ -386,7 +386,14 @@ class _DayTimelineState extends ConsumerState<DayTimeline> {
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: palette.highlight.withAlpha(30),
+              // Opaco a propósito (#1491): la grilla se dibuja ANTES que los
+              // bloques, pero un relleno translúcido deja ver las líneas de
+              // media hora a través de la sesión. Es el mismo tinte sobre el
+              // fondo de la pantalla, sin transparencia.
+              color: Color.alphaBlend(
+                palette.highlight.withAlpha(30),
+                palette.bg,
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(

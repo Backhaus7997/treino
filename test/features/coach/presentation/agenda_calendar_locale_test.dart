@@ -58,15 +58,25 @@ void main() {
     addTearDown(AppClock.unfreeze);
   }
 
-  // Abreviaturas de `DateFormat.E('es')`. TableCalendar arranca la semana en
-  // domingo por defecto; acá sólo importa que estén las siete en español.
-  const diasEs = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  // Abreviaturas de `DateFormat.E('es')`, en el orden en que se dibujan: la
+  // semana arranca en LUNES (#1491; TableCalendar arranca en domingo si no se
+  // le dice otra cosa, y el resto de la app —`weekdayInitials`— empieza en
+  // lunes).
+  const diasEs = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
-  void expectCalendarioEnEspanol(String mes) {
+  void expectCalendarioEnEspanol(WidgetTester tester, String mes) {
     expect(find.text(mes), findsOneWidget);
     for (final dia in diasEs) {
       expect(find.text(dia), findsOneWidget, reason: 'falta «$dia»');
     }
+    final xs = [
+      for (final dia in diasEs) tester.getTopLeft(find.text(dia)).dx,
+    ];
+    expect(
+      xs,
+      orderedEquals([...xs]..sort()),
+      reason: 'la fila de días no va de lunes a domingo: $xs',
+    );
   }
 
   /// El «hoy» que resalta el calendario es el mismo día que enfoca: si
@@ -103,7 +113,7 @@ void main() {
         );
         await tester.pump();
 
-        expectCalendarioEnEspanol(caso.mes);
+        expectCalendarioEnEspanol(tester, caso.mes);
         expectHoyEsElDiaCongelado(tester, caso.local);
       });
     }
@@ -134,7 +144,7 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        expectCalendarioEnEspanol(caso.mes);
+        expectCalendarioEnEspanol(tester, caso.mes);
         expectHoyEsElDiaCongelado(tester, caso.local);
       });
     }

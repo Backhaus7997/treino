@@ -9,6 +9,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../core/utils/app_clock.dart';
+import '../../../../core/widgets/aligned_dropdown_menu.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -1328,7 +1329,8 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DropdownButtonFormField<String>(
+    return AlignedDropdownMenu(
+        child: DropdownButtonFormField<String>(
       initialValue: selectedId,
       hint: Text(
         'Seleccioná un alumno',
@@ -1366,7 +1368,7 @@ class _AthleteDropdown extends ConsumerWidget {
         );
       }).toList(),
       onChanged: onChanged,
-    );
+    ));
   }
 }
 

@@ -84,5 +84,22 @@ void main() {
       // TableCalendar is still alive after toggle
       expect(find.byType(TableCalendar<dynamic>), findsOneWidget);
     });
+
+    testWidgets('#1491 — la semana arranca en lunes (no en domingo)',
+        (tester) async {
+      await tester.pumpWidget(buildScreen());
+      await tester.pumpAndSettle();
+
+      final calendar = tester.widget<TableCalendar<dynamic>>(
+        find.byType(TableCalendar<dynamic>),
+      );
+      expect(calendar.startingDayOfWeek, StartingDayOfWeek.monday);
+
+      // Y se ve: «lun» a la izquierda de «dom».
+      expect(
+        tester.getTopLeft(find.text('lun')).dx,
+        lessThan(tester.getTopLeft(find.text('dom')).dx),
+      );
+    });
   });
 }
