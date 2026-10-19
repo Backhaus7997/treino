@@ -404,11 +404,6 @@ class TreinoBottomBar extends StatelessWidget {
   /// margen superior de la barra viajan adentro de `padding.bottom`.
   static const double collapsedHeight = 52;
 
-  /// Margen inferior de los toasts/snackbars flotantes: el alto de la barra
-  /// ([minHeight]) más los 8 de separación que ya hay entre barra y contenido.
-  /// Así un aviso nunca tapa la nav flotante ni los CTA que viven encima.
-  static const double toastBottomMargin = minHeight + 8;
-
   /// Key del pill de gradient activo.
   ///
   /// Es pública a propósito: es el ancla con la que los tests lo miden contra
