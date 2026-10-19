@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../auth/application/auth_providers.dart';
 import '../../../reviews/presentation/widgets/star_rating_input.dart';
@@ -95,15 +96,15 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
           );
       if (!mounted) return;
       navigator.pop();
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.templateRatingSheetSuccess)),
-      );
+      showTreinoToastOn(messenger, l10n.templateRatingSheetSuccess,
+          type: TreinoToastType.success);
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.templateRatingSheetError)),
-      );
+      // Context del sheet: sigue abierto y taparía el aviso del messenger
+      // de atrás (#1490).
+      showTreinoToast(context, l10n.templateRatingSheetError,
+          type: TreinoToastType.error);
     }
   }
 

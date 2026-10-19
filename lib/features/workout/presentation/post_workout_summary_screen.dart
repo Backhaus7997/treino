@@ -11,6 +11,7 @@ import '../../../core/widgets/motion/treino_confetti.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_success_check.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../checkins/application/check_in_providers.dart';
 import '../../checkins/domain/check_in.dart';
 import '../../checkins/presentation/wellbeing_check_in_sheet.dart';
@@ -474,9 +475,8 @@ class _CheckInSlot extends ConsumerWidget {
               existing: delDia,
             );
       } catch (_) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.wellbeingSaveError)),
-        );
+        showTreinoToastOn(messenger, l10n.wellbeingSaveError,
+            type: TreinoToastType.error);
       }
     }
 
