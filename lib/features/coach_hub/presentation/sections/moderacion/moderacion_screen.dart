@@ -10,6 +10,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 import 'package:treino/features/coach_hub/presentation/widgets/section_hero/section_hero.dart';
 import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
 import 'package:treino/features/moderation/domain/pending_report.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// La cola de revisión de reportes.
 ///
@@ -473,18 +474,16 @@ class _FilaState extends ConsumerState<_Fila> {
       // (contenido ya borrado, no aplica a un perfil, es otro moderador). El
       // mensaje del HttpsError ya viene en castellano desde el backend — el
       // genérico de abajo es sólo el resguardo para cuando no viene ninguno.
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e.message ?? 'No pudimos cerrar el reporte.', // i18n: Fase W3
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        e.message ?? 'No pudimos cerrar el reporte.', // i18n: Fase W3
+        type: TreinoToastType.error,
       );
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos cerrar el reporte.'), // i18n: Fase W3
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos cerrar el reporte.', // i18n: Fase W3
+        type: TreinoToastType.error,
       );
     }
   }

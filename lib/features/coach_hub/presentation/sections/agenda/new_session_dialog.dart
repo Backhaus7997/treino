@@ -21,7 +21,6 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/analytics/analytics_service.dart';
 import '../../../../../core/telemetry/non_fatal.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
-import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/application/trainer_link_providers.dart';
@@ -32,6 +31,7 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../widgets/coach_hub_widgets.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ─── NewSessionDialog ─────────────────────────────────────────────────────────
 
@@ -226,19 +226,12 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       );
 
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop(true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // El pop ya pasó — el check no compite con la navegación.
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Sesión registrada.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Sesión registrada.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;

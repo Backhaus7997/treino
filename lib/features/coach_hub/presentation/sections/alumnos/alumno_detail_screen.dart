@@ -13,7 +13,6 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/motion/treino_success_check.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -88,6 +87,7 @@ import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado de un grupo de la ficha, para su marca en la barra.
 ///
@@ -1053,10 +1053,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(measurementRepositoryProvider).delete(m.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1089,10 +1089,10 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     try {
       await ref.read(performanceTestRepositoryProvider).delete(t.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -3429,24 +3429,18 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
       // (appointment_detail_dialog.dart): mismo momento de éxito (guardado),
       // mismo feedback — antes solo el guardado de notas del TURNO tenía el
       // check y el de notas privadas del alumno quedaba en texto plano.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              const SizedBox(width: 10),
-              Flexible(child: Text(l10n.coachHubAlumnoDetailNotasSaveSuccess)),
-            ],
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveSuccess,
+        type: TreinoToastType.success,
       );
     } on FirebaseException catch (_) {
       if (!mounted) return;
       final l10n = AppL10n.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubAlumnoDetailNotasSaveError)),
+      showTreinoToast(
+        context,
+        l10n.coachHubAlumnoDetailNotasSaveError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) {
@@ -3805,25 +3799,24 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
             bytes: bytes,
           );
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadSuccess),
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadSuccess,
+        type: TreinoToastType.success,
       );
     } on AthleteFileTooLargeException {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadTooLarge),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadTooLarge,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosUploadError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosUploadError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -3859,10 +3852,10 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
       await ref.read(athleteFileRepositoryProvider).delete(file);
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosDeleteError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosDeleteError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4029,10 +4022,10 @@ class _ArchivoRow extends ConsumerWidget {
           .read(athleteFileRepositoryProvider)
           .setShared(file, !file.sharedWithAthlete);
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(l10n.coachHubAlumnoDetailArchivosShareError),
-        ),
+      showTreinoToastOn(
+        messenger,
+        l10n.coachHubAlumnoDetailArchivosShareError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -4726,20 +4719,21 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Medición actualizada.' // i18n: Fase W2
-              : 'Medición guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Medición actualizada.' // i18n: Fase W2
+            : 'Medición guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la medición.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la medición.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -5541,20 +5535,21 @@ class _NuevoRendimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Prueba actualizada.' // i18n: Fase W2
-              : 'Prueba guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Prueba actualizada.' // i18n: Fase W2
+            : 'Prueba guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la prueba.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la prueba.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -5852,10 +5847,10 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
     try {
       await ref.read(followUpEntryRepositoryProvider).delete(entry.id);
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la entrada.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos eliminar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     }
   }
@@ -6140,20 +6135,21 @@ class _NuevaEntradaSeguimientoDialogState
       }
       if (!mounted) return;
       Navigator.of(context).pop();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_isEditing
-              ? 'Entrada actualizada.' // i18n: Fase W2
-              : 'Entrada guardada.'), // i18n: Fase W2
-          duration: const Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        _isEditing
+            ? 'Entrada actualizada.' // i18n: Fase W2
+            : 'Entrada guardada.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar la entrada.'), // i18n: Fase W2
-        ),
+      // Con context y no con el messenger: el diálogo sigue abierto y un
+      // SnackBar del Scaffold de atrás quedaría tapado (#1490).
+      showTreinoToast(
+        context,
+        'No pudimos guardar la entrada.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -6343,12 +6339,10 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     final messenger = ScaffoldMessenger.of(context);
     final clean = draft.sanitizeForSave();
     if (clean.meals.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'El plan está vacío. Agregá al menos una comida con nombre.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -6356,18 +6350,17 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     try {
       await ref.read(nutritionPlanRepositoryProvider).save(clean);
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Plan guardado.'), // i18n: Fase W2
-          duration: Duration(seconds: 2),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Plan guardado.', // i18n: Fase W2
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos guardar el plan.'), // i18n: Fase W2
-        ),
+      showTreinoToastOn(
+        messenger,
+        'No pudimos guardar el plan.', // i18n: Fase W2
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);

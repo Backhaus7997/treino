@@ -15,7 +15,6 @@ import '../../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
-import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
@@ -31,6 +30,7 @@ import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
 import '../pagos/widgets/thousands_input_formatter.dart';
 import 'agenda_web_helpers.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
 
@@ -108,23 +108,17 @@ class _AppointmentDetailDialogState
             noteAfter: after.isEmpty ? null : after,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Notas guardadas.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToast(
+        context,
+        'Notas guardadas.', // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No pudimos guardar. Probá de nuevo.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.', // i18n
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -150,24 +144,19 @@ class _AppointmentDetailDialogState
             reason: 'Cancelado por el coach', // i18n
           );
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // El pop ya pasó — el check no compite con la navegación.
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Sesión cancelada.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Sesión cancelada.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos cancelar la sesión.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos cancelar la sesión.', // i18n
+        type: TreinoToastType.error,
       );
     }
   }
@@ -194,32 +183,24 @@ class _AppointmentDetailDialogState
                 reason: 'Cancelado por el coach', // i18n
               );
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          // El pop ya pasó — el check no compite con la navegación. Solo se
-          // muestra si de verdad se canceló algo (n==0 no es un momento de
-          // éxito, es un no-op informativo).
-          content: n == 0
-              ? const Text('No había sesiones futuras para cancelar.') // i18n
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        'Se cancelaron $n sesiones de la serie.', // i18n
-                      ),
-                    ),
-                  ],
-                ),
-        ),
+      // El pop ya pasó — el aviso no compite con la navegación. Solo es de
+      // éxito si de verdad se canceló algo (n==0 no es un momento de éxito,
+      // es un no-op informativo).
+      showTreinoToastOn(
+        messenger,
+        n == 0
+            ? 'No había sesiones futuras para cancelar.' // i18n
+            : 'Se cancelaron $n sesiones de la serie.', // i18n
+        type: n == 0 ? TreinoToastType.info : TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos cancelar la serie.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos cancelar la serie.', // i18n
+        type: TreinoToastType.error,
       );
     }
   }
@@ -316,19 +297,12 @@ class _AppointmentDetailDialogState
             payment: payment,
           );
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // El pop ya pasó — el check no compite con la navegación.
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Turno cobrado.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Turno cobrado.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        type: TreinoToastType.success,
       );
     } on AppointmentAlreadyBilledException {
       if (!mounted) return;
