@@ -2520,7 +2520,11 @@ class AppL10nEs extends AppL10n {
   String get searchUsersClearA11y => 'Limpiar búsqueda';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+  String get publicProfileMessageDisabledA11y =>
+      'Mensaje (no disponible: esta persona tiene que seguirte)';
+
+  @override
+  String get publicProfileStatWorkouts => 'ENTRENOS';
 
   @override
   String a11yAvatarLabel(String name) {
@@ -8000,7 +8004,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get searchUsersClearA11y => 'Limpiar búsqueda';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Mensaje (próximamente)';
+  String get publicProfileMessageDisabledA11y =>
+      'Mensaje (no disponible: esta persona tiene que seguirte)';
+
+  @override
+  String get publicProfileStatWorkouts => 'ENTRENOS';
 
   @override
   String a11yAvatarLabel(String name) {

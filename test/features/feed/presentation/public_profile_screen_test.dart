@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' show Tristate;
 
+import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/material.dart';
@@ -91,8 +92,9 @@ Widget _wrap({
   required Widget child,
   required AsyncValue<PublicProfileView> view,
   String viewerUid = 'viewer',
+  FakeFirebaseFirestore? firestore,
 }) {
-  final firestore = FakeFirebaseFirestore();
+  firestore ??= FakeFirebaseFirestore();
   return ProviderScope(
     overrides: [
       firestoreProvider.overrideWithValue(firestore),
@@ -392,6 +394,253 @@ void main() {
 
       expect(find.text('MENSAJE'), findsNothing);
       expect(find.text('SEGUIR'), findsNothing);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // #1476 — MENSAJE también se habilita por CHAT EXISTENTE o VÍNCULO vigente.
+  //
+  // La rama social de `chatCreateOk` (el otro me sigue) no es la única: la rama
+  // `linkId` no depende de ningún follow, y un chat que ya existe se abre sin
+  // pasar por la regla de creación. El PF veía a su propio alumno, con el chat
+  // abierto, con MENSAJE gris.
+  // ---------------------------------------------------------------------------
+  group('PublicProfileScreen — MENSAJE por chat existente o vínculo (#1476)',
+      () {
+    bool messageEnabled(WidgetTester tester) {
+      final finder = find.bySemanticsLabel('Mensaje');
+      if (finder.evaluate().isEmpty) return false;
+      return tester.getSemantics(finder).flagsCollection.isEnabled ==
+          Tristate.isTrue;
+    }
+
+    Future<void> pumpProfile(
+      WidgetTester tester,
+      FakeFirebaseFirestore firestore,
+    ) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        // Sin ninguna arista: la única salida es el chat o el vínculo.
+        view: AsyncData(_view()),
+        firestore: firestore,
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> seedLink(
+      FakeFirebaseFirestore firestore, {
+      required String trainerId,
+      required String athleteId,
+      required String status,
+    }) =>
+        firestore.collection('trainer_links').doc('link-1').set({
+          'id': 'link-1',
+          'trainerId': trainerId,
+          'athleteId': athleteId,
+          'status': status,
+          'requestedAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+        });
+
+    testWidgets('chat ya abierto entre los dos → MENSAJE habilitado',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('chats').doc('target_viewer').set({
+        'chatId': 'target_viewer',
+        'members': ['target', 'viewer'],
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+        'lastMessageAt': Timestamp.fromDate(DateTime.utc(2026, 1, 2)),
+      });
+
+      await pumpProfile(tester, firestore);
+
+      expect(messageEnabled(tester), isTrue);
+      semantics.dispose();
+    });
+
+    testWidgets('chat con OTRA persona no habilita MENSAJE', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('chats').doc('other_viewer').set({
+        'chatId': 'other_viewer',
+        'members': ['other', 'viewer'],
+        'createdAt': Timestamp.fromDate(DateTime.utc(2026, 1, 1)),
+        'lastMessageAt': Timestamp.fromDate(DateTime.utc(2026, 1, 2)),
+      });
+
+      await pumpProfile(tester, firestore);
+
+      expect(messageEnabled(tester), isFalse);
+      semantics.dispose();
+    });
+
+    testWidgets('soy el PF y es mi alumno (vínculo activo) → habilitado',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final firestore = FakeFirebaseFirestore();
+      await seedLink(
+        firestore,
+        trainerId: 'viewer',
+        athleteId: 'target',
+        status: 'active',
+      );
+
+      await pumpProfile(tester, firestore);
+
+      expect(messageEnabled(tester), isTrue);
+      semantics.dispose();
+    });
+
+    testWidgets('soy el alumno y es mi PF (vínculo pausado) → habilitado',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      final firestore = FakeFirebaseFirestore();
+      await seedLink(
+        firestore,
+        trainerId: 'target',
+        athleteId: 'viewer',
+        status: 'paused',
+      );
+
+      await pumpProfile(tester, firestore);
+
+      expect(messageEnabled(tester), isTrue);
+      semantics.dispose();
+    });
+
+    for (final status in ['pending', 'terminated']) {
+      testWidgets('vínculo $status NO habilita MENSAJE', (tester) async {
+        final semantics = tester.ensureSemantics();
+        final firestore = FakeFirebaseFirestore();
+        await seedLink(
+          firestore,
+          trainerId: 'viewer',
+          athleteId: 'target',
+          status: status,
+        );
+
+        await pumpProfile(tester, firestore);
+
+        expect(messageEnabled(tester), isFalse);
+        semantics.dispose();
+      });
+    }
+
+    testWidgets('vínculo con OTRO alumno no habilita MENSAJE', (tester) async {
+      final semantics = tester.ensureSemantics();
+      final firestore = FakeFirebaseFirestore();
+      await seedLink(
+        firestore,
+        trainerId: 'viewer',
+        athleteId: 'someone-else',
+        status: 'active',
+      );
+
+      await pumpProfile(tester, firestore);
+
+      expect(messageEnabled(tester), isFalse);
+      semantics.dispose();
+    });
+
+    testWidgets('deshabilitado: tocar MENSAJE explica por qué con un toast',
+        (tester) async {
+      await pumpProfile(tester, FakeFirebaseFirestore());
+
+      await tester.tap(find.text('MENSAJE'));
+      await tester.pump();
+
+      // Es el toast del kit (`showTreinoToast`, #1560), no un SnackBar a mano:
+      // lleva el ícono de tipo `info` junto al mensaje.
+      final toast = find.byType(SnackBar);
+      expect(toast, findsOneWidget);
+      expect(
+        find.descendant(
+          of: toast,
+          matching:
+              find.text('Para escribirle, esta persona tiene que seguirte.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: toast,
+          matching: find.byIcon(TreinoIcon.infoCircle),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('deshabilitado: la etiqueta a11y explica por qué',
+        (tester) async {
+      final semantics = tester.ensureSemantics();
+      await pumpProfile(tester, FakeFirebaseFirestore());
+
+      expect(
+        find.bySemanticsLabel(RegExp('esta persona tiene que seguirte')),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsLabel(RegExp('próximamente')), findsNothing);
+      semantics.dispose();
+    });
+  });
+
+  // #1476 — "WORKOUTS" estaba hardcodeado en inglés en una UI en español.
+  group('PublicProfileScreen — stats en español (#1476)', () {
+    testWidgets('el contador de entrenos dice ENTRENOS, no WORKOUTS',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ENTRENOS'), findsOneWidget);
+      expect(find.text('WORKOUTS'), findsNothing);
+    });
+  });
+
+  // #1477 — los posts pasaban por debajo de la flecha y el ⋮ flotantes.
+  group('PublicProfileScreen — app bar al scrollear (#1477)', () {
+    Color? appBarFill(WidgetTester tester) => tester
+        .widget<Material>(
+          find
+              .descendant(
+                of: find.byType(AppBar),
+                matching: find.byType(Material),
+              )
+              .first,
+        )
+        .color;
+
+    testWidgets('transparente arriba (sobre el hero) y opaca al scrollear',
+        (tester) async {
+      // Pantalla baja para que el perfil sí scrollee.
+      tester.view.physicalSize = const Size(390, 420);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(appBarFill(tester), Colors.transparent);
+
+      await tester.drag(
+        find.byType(SingleChildScrollView).first,
+        const Offset(0, -200),
+      );
+      await tester.pumpAndSettle();
+
+      final fill = appBarFill(tester)!;
+      expect(
+        fill.a,
+        1.0,
+        reason: 'una barra opaca no deja ver los posts que pasan por detrás '
+            'de la flecha y el ⋮',
+      );
     });
   });
 

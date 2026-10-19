@@ -1679,9 +1679,13 @@
   "@searchUsersClearA11y": {
     "description": "Accessibility label for the icon-only clear-field button on the user search screen (finding 17). Existing workoutPickerSheetClear='Limpiar' is a different, sheet-scoped action."
   },
-  "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
+  "publicProfileMessageDisabledA11y": "Mensaje (no disponible: esta persona tiene que seguirte)",
   "@publicProfileMessageDisabledA11y": {
-    "description": "Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16)."
+    "description": "Semantics label for the disabled MENSAJE pill on the public profile screen, exposed via Semantics(button:true, enabled:false). Dice por qué está deshabilitado: el destinatario tiene que seguir a quien escribe y no hay chat ni vínculo previo."
+  },
+  "publicProfileStatWorkouts": "ENTRENOS",
+  "@publicProfileStatWorkouts": {
+    "description": "Etiqueta del contador de entrenos en la grilla de stats del perfil público (antes hardcodeada en inglés como WORKOUTS)."
   },
   "a11yAvatarLabel": "Foto de perfil de {name}",
   "@a11yAvatarLabel": {
