@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
@@ -646,10 +647,10 @@ class _ActionRow extends ConsumerWidget {
       context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos abrir el chat. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -926,8 +927,10 @@ class _AliasRow extends StatelessWidget {
                 onTap: () async {
                   await Clipboard.setData(ClipboardData(text: alias!));
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Alias copiado.')),
+                    showTreinoToast(
+                      context,
+                      'Alias copiado.',
+                      type: TreinoToastType.success,
                     );
                   }
                 },

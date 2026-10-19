@@ -123,6 +123,7 @@ void main() {
         AppColorPrimitives.espresso500,
         AppColorPrimitives.dangerRed,
         AppColorPrimitives.dangerRedDark,
+        AppColorPrimitives.dangerRedText,
         AppColorPrimitives.warningAmber,
         AppColorPrimitives.warningAmberDark,
         AppColorPrimitives.white,

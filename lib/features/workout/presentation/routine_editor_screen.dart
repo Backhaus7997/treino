@@ -35,6 +35,8 @@ import '../domain/custom_exercise.dart' show CustomExercise;
 import '../application/exercise_filter.dart'
     show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
+import '../application/assigned_routine_providers.dart'
+    show assignedRoutinesByTrainerProvider;
 import '../application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -850,7 +852,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           key: const Key('invalid_week_hint'),
           style: GoogleFonts.barlow(
             fontSize: 11,
-            color: palette.danger,
+            color: palette.dangerText,
           ),
         ),
       ],
@@ -2124,7 +2126,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             SimpleDialogOption(
               onPressed: () => Navigator.of(ctx).pop(_DeleteScope.allWeeks),
               child: Text(l10n.routineEditorScopeAllWeeks,
-                  style: TextStyle(color: palette.danger)),
+                  style: TextStyle(color: palette.dangerText)),
             ),
           ],
         );
@@ -2819,6 +2821,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }).toList();
   }
 
+  /// Tira el cache de PLANES ASIGNADOS del par PF/alumno.
+  ///
+  /// `assignedRoutinesByTrainerProvider` es un `FutureProvider` one-shot: sin
+  /// esto el detalle de alumno que quedó debajo del editor sigue diciendo
+  /// «Todavía no le asignaste planes.» después de «Plan creado y asignado.»
+  /// (#1486). Va por el container y no por `ref` porque corre después del
+  /// await, cuando la pantalla puede ya no estar montada.
+  static void _invalidateAssignedList(
+    ProviderContainer container, {
+    required String trainerId,
+    required String athleteId,
+  }) {
+    container.invalidate(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerId, athleteId: athleteId),
+    ));
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
 
@@ -2920,6 +2939,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           );
           await repo.updateAssigned(uid: uid, draft: draft);
           invalidateRoutineById(container, planId);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
@@ -2949,6 +2970,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           // `routine_created` sí se queda: lleva un `source` que sólo conoce
           // esta pantalla.
           await repo.createAssigned(routine);
+          _invalidateAssignedList(container,
+              trainerId: uid, athleteId: athleteId);
           analytics.logRoutineCreated(
             source: analyticsSource,
             daysCount: days.length,
@@ -3802,15 +3825,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 // tiene en pantalla.
                 final primerDia =
                     problemas.map((p) => p.dia).whereType<_EditableDay>();
-                return EditorFooterBar(
-                  summary: _resumenPie(l10n),
-                  problems: visibles,
-                  submitLabel: _submitLabelFor(widget.mode, l10n),
-                  submitting: _submitting,
-                  onSubmit: () => _submit(),
-                  onGoToProblem: primerDia.isEmpty
-                      ? null
-                      : () => _irAlDia(primerDia.first),
+                return _PieSinTeclado(
+                  builder: (acceptsTaps) => EditorFooterBar(
+                    summary: _resumenPie(l10n),
+                    problems: visibles,
+                    submitLabel: _submitLabelFor(widget.mode, l10n),
+                    submitting: _submitting,
+                    acceptsTaps: acceptsTaps,
+                    onSubmit: () => _submit(),
+                    onGoToProblem: primerDia.isEmpty
+                        ? null
+                        : () => _irAlDia(primerDia.first),
+                  ),
                 );
               }),
             ],
@@ -5718,10 +5744,13 @@ class _SlotEditorState extends State<_SlotEditor> {
       final values = sets.map((s) => s.distanceMeters).toList();
       final first = values.isEmpty ? null : values.first;
       final uniform = first != null && values.every((v) => v == first);
-      final target = uniform ? '${formatWeightKg(first)} m' : '—';
+      final target = uniform
+          ? '${formatWeightDisplay(first, AppL10n.of(context).localeName)} m'
+          : '—';
       return '${sets.length} × $target';
     }
     return resumenDePrescripcion(
+      localeName: AppL10n.of(context).localeName,
       modo: slot.exerciseMode,
       sets: [
         for (final set in sets)
@@ -5854,31 +5883,22 @@ class _SetTableState extends State<_SetTable> {
         relativeOffset.dx + 120,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
             l10n.routineEditorMeasureReps,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
             l10n.routineEditorMeasureTime,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: ExerciseMode.distance,
-          child: Text(
-            'Distancia',
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
-          ),
+          child: Text('Distancia'),
         ),
       ],
     );
@@ -6463,7 +6483,10 @@ class _SetRowState extends State<_SetRow> {
                 : l10n.routineEditorFieldReps,
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
-      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      stepLabel: esKg
+          ? formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName)
+          : '1',
       canDecrease: esKg
           ? (_currentKg ?? 0) > 0
           : esDistancia
@@ -6475,14 +6498,14 @@ class _SetRowState extends State<_SetRow> {
               ? _stepDistance(delta)
               : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepIncreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Aumentar distancia en 1 metro'
               : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
-          ? l10n
-              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
+          ? l10n.routineEditorKgStepDecreaseA11y(formatWeightDisplay(
+              kKgStepsKg.first, AppL10n.of(context).localeName))
           : esDistancia
               ? 'Reducir distancia en 1 metro'
               : l10n.routineEditorRepsStepDecreaseA11y('1'),
@@ -6509,7 +6532,6 @@ class _SetRowState extends State<_SetRow> {
         offset.dx + 160,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
             value: SetType.normal,
@@ -7294,5 +7316,80 @@ class _ShareOnProfileTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// El pie del editor (aviso + guardar) se esconde mientras el teclado está
+/// abierto, y cuando vuelve ignora los taps un momento (#1487).
+///
+/// Con el teclado arriba el pie subía pegado a él: tapaba las sugerencias de
+/// la entrada rápida y, al cerrarlo, ASIGNAR PLAN quedaba justo donde estaba
+/// el ✓ del teclado — un tap de más asignaba el plan sin querer.
+class _PieSinTeclado extends StatefulWidget {
+  const _PieSinTeclado({required this.builder});
+
+  /// Arma el pie; recibe si acepta taps todavía.
+  final Widget Function(bool acceptsTaps) builder;
+
+  @override
+  State<_PieSinTeclado> createState() => _PieSinTecladoState();
+}
+
+class _PieSinTecladoState extends State<_PieSinTeclado>
+    with WidgetsBindingObserver {
+  /// Cuánto tiempo el pie recién vuelto no acepta taps: lo que tarda un
+  /// segundo toque involuntario, no lo que tarda alguien en decidir guardar.
+  static const _resguardo = Duration(milliseconds: 500);
+
+  bool _hayTeclado = false;
+  bool _enResguardo = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _hayTeclado = _tecladoAbierto();
+  }
+
+  /// `View` y no `MediaQuery`: dentro del body de un Scaffold el inset del
+  /// teclado ya viene consumido (el Scaffold achica el body) y vale 0 siempre.
+  bool _tecladoAbierto() => View.of(context).viewInsets.bottom > 0;
+
+  /// El teclado cambia las métricas de la ventana, no las dependencias de este
+  /// widget: sin el observer nada lo reconstruye al abrirse o cerrarse.
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final abierto = _tecladoAbierto();
+    if (abierto == _hayTeclado) return;
+    setState(() {
+      if (_hayTeclado && !abierto) {
+        _enResguardo = true;
+        _timer?.cancel();
+        _timer = Timer(_resguardo, () {
+          if (mounted) setState(() => _enResguardo = false);
+        });
+      }
+      _hayTeclado = abierto;
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hayTeclado) return const SizedBox.shrink();
+    return widget.builder(!_enResguardo);
   }
 }

@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/floating_bar_metrics.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -19,9 +20,14 @@ import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
+import '../application/next_position_for_routine.dart';
 import '../application/routine_providers.dart';
 import '../application/session_providers.dart'
-    show currentUidProvider, lastWeightByExerciseProvider, planProgressProvider;
+    show
+        currentUidProvider,
+        lastWeightByExerciseProvider,
+        planProgressProvider,
+        sessionsByUidProvider;
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
 import '../domain/routine_day_duration.dart';
@@ -185,6 +191,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
           top: 0,
           left: 0,
           child: _BackBar(
+            routineAsync: routineAsync,
             fallbackRoute: widget.coachAthleteId != null
                 ? '/coach/athlete/${widget.coachAthleteId}'
                 : '/workout',
@@ -217,7 +224,10 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
 /// states (REQ-RDT-016 strengthened). Now floats over the hero image with a
 /// translucent chip so it stays legible on bright photos.
 class _BackBar extends StatelessWidget {
-  const _BackBar({required this.fallbackRoute});
+  const _BackBar({required this.fallbackRoute, required this.routineAsync});
+
+  /// Decide si hay foto detrás (ver [_floatingFill]).
+  final AsyncValue<Routine?> routineAsync;
 
   /// Where to land when there is nothing to pop (deep-link / OS state
   /// restoration). The athlete's own usage passes `/workout`; the coach
@@ -230,15 +240,19 @@ class _BackBar extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
+      padding: const EdgeInsets.only(
+        left: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
-        color: palette.scrimDark.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
+        color: _floatingFill(palette, routineAsync.valueOrNull),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
           label: l10n.commonBack,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: l10n.commonBack,
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
@@ -279,15 +293,19 @@ class _EditBar extends ConsumerWidget {
 
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
-        color: palette.scrimDark.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
+        color: _floatingFill(palette, routineAsync.valueOrNull),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
           label: 'Editar rutina', // i18n: Fase W2
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: 'Editar rutina', // i18n: Fase W2
             icon: Icon(Icons.edit, color: palette.textPrimary),
             onPressed: () =>
@@ -424,15 +442,19 @@ class _FollowTemplateBar extends ConsumerWidget {
         yaLaSigue ? l10n.workoutRoutineFollowing : l10n.workoutRoutineFollow;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
-        color: palette.scrimDark.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
+        color: _floatingFill(palette, routineAsync.valueOrNull),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
           label: label,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_follow_template'),
             tooltip: label,
             icon: Icon(
@@ -534,15 +556,19 @@ class _UseAsBaseBar extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
-        color: palette.scrimDark.withValues(alpha: 0.35),
-        shape: const CircleBorder(),
+        color: _floatingFill(palette, routineAsync.valueOrNull),
+        shape: _floatingShape(palette, routineAsync.valueOrNull),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           button: true,
           label: l10n.workoutRoutineUseAsBase,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_use_as_base'),
             tooltip: l10n.workoutRoutineUseAsBase,
             icon: Icon(
@@ -1026,13 +1052,40 @@ class _SlotRowWithLastWeight extends ConsumerWidget {
       week: week,
       onTap: onTap,
       // 0 kg (movilidad / peso corporal) se muestra como "—": no aporta.
-      lastWeightDisplay: (kg == null || kg == 0) ? null : _formatWeight(kg),
+      lastWeightDisplay: (kg == null || kg == 0)
+          ? null
+          : _formatWeight(kg, AppL10n.of(context).localeName),
     );
   }
 }
 
-/// "15 kg" para enteros, "17.5 kg" para fraccionarios.
-String _formatWeight(double kg) => '${formatWeightKg(kg)} kg';
+/// "15 kg" para enteros, "17,5 kg" para fraccionarios (en es, #1481).
+String _formatWeight(double kg, String localeName) =>
+    '${formatWeightDisplay(kg, localeName)} kg';
+
+/// ¿El encabezado lleva foto? Sólo las plantillas del catálogo con foto.
+bool routineHasHeroPhoto(Routine routine) =>
+    routine.source == RoutineSource.system &&
+    routineIdsWithHeroPhoto.contains(routine.id);
+
+/// Fondo de los botones flotantes (atrás, editar, seguir, usar de base).
+///
+/// #1509: el disco translúcido oscuro existe para leer el ícono SOBRE LA
+/// FOTO. Sin foto —planes del PF, rutinas propias, plantillas sin foto—
+/// quedaba como un círculo gris enorme sobre el fondo liso. Ahí el disco es
+/// de superficie de card (con [_floatingShape] le pone el borde): sigue
+/// tapando lo que scrollea por debajo —la lista pasa bajo los botones— pero
+/// habla el idioma del resto de la pantalla.
+Color _floatingFill(AppPalette palette, Routine? routine) =>
+    routine != null && routineHasHeroPhoto(routine)
+        ? palette.scrimDark.withValues(alpha: 0.35)
+        : palette.bgCard;
+
+/// Forma del disco: con borde neutro cuando no hay foto (ver [_floatingFill]).
+ShapeBorder _floatingShape(AppPalette palette, Routine? routine) =>
+    routine != null && routineHasHeroPhoto(routine)
+        ? const CircleBorder()
+        : CircleBorder(side: BorderSide(color: palette.border));
 
 /// Ids de plantillas del catálogo que traen foto en `assets/routines/{id}.jpg`.
 ///
@@ -1113,12 +1166,16 @@ class _HeroStrip extends ConsumerWidget {
     // llevan hero. Las demás —planes del PF, rutinas propias y las plantillas
     // del catálogo sin foto— usan el encabezado compacto (badges + título, sin
     // imagen ni bloque degradado de 320px que el errorBuilder pintaba).
-    final hasHeroPhoto = routine.source == RoutineSource.system &&
-        routineIdsWithHeroPhoto.contains(routine.id);
+    final hasHeroPhoto = routineHasHeroPhoto(routine);
     if (!hasHeroPhoto) {
       return Padding(
         key: const Key('routine-compact-header'),
-        padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          FloatingBarMetrics.reservedHeight,
+          20,
+          8,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1263,7 +1320,7 @@ class _AssignedByChip extends ConsumerWidget {
           fontWeight: FontWeight.w600,
           fontSize: 11,
           letterSpacing: 1.2,
-          color: palette.accent,
+          color: palette.accentText, // #1509: mint sobre tinte mint (1,6:1)
         ),
       ),
     );
@@ -1290,7 +1347,7 @@ class _DayChipBadge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           fontSize: 11,
           letterSpacing: 1.4,
-          color: palette.accent,
+          color: palette.accentText, // #1509: mint sobre tinte mint (1,6:1)
         ),
       ),
     );
@@ -1356,7 +1413,10 @@ class _DaySelector extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
                   letterSpacing: 1.2,
-                  color: i == selectedIndex ? palette.bg : palette.textMuted,
+                  // #1509: `palette.bg` es blanco en claro → blanco sobre mint.
+                  color: i == selectedIndex
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                 ),
               ),
               selected: i == selectedIndex,
@@ -1403,7 +1463,10 @@ class _WeekSelector extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
                   letterSpacing: 1.2,
-                  color: i == selectedIndex ? palette.bg : palette.textMuted,
+                  // #1509: `palette.bg` es blanco en claro → blanco sobre mint.
+                  color: i == selectedIndex
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                 ),
               ),
               selected: i == selectedIndex,
@@ -1527,7 +1590,18 @@ class _PeriodizedStartAction extends ConsumerWidget {
     // Startable or repeatable, the route composed is identical
     // (SCENARIO-REPEAT-004); only the label changes (AD-5). Unknown progress
     // falls back to EMPEZAR, never REPETIR.
+    //
+    // #1509: el día que le TOCA a la rutina (la misma cuenta que la card de
+    // Inicio) dice EMPEZAR aunque esté hecho de un ciclo anterior. Si no,
+    // con el plan completo Inicio ofrece EMPEZAR y acá el mismo día decía
+    // REPETIR.
+    final sessions = ref.watch(sessionsByUidProvider(uid)).valueOrNull;
+    final toca =
+        sessions == null ? null : nextPositionForRoutine(routine, sessions);
+    final esElQueToca =
+        toca?.weekNumber == viewedWeek && toca?.dayNumber == day.dayNumber;
     final isRepeat = progress != null &&
+        !esElQueToca &&
         progress.completed.contains((week: viewedWeek, day: day.dayNumber));
 
     return _StartActionButton(

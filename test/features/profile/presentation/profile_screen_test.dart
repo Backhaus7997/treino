@@ -210,6 +210,10 @@ void main() {
           find.text('Cerrar sesión'), 50); // i18n: Fase 6 Etapa 3
       await tester.tap(find.text('Cerrar sesión')); // i18n: Fase 6 Etapa 3
       await tester.pumpAndSettle();
+      // #1504: pregunta antes; se confirma con «Salir».
+      expect(_notifier.signOutCalled, isFalse);
+      await tester.tap(find.text('Salir'));
+      await tester.pumpAndSettle();
 
       expect(_notifier.signOutCalled, isTrue);
     });

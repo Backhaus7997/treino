@@ -915,144 +915,109 @@ void main() {
     });
   });
 
-  // ── #1490: los errores se ven DENTRO del sheet ─────────────────────────────
-  //
-  // En la app el sheet vive en el overlay del root navigator: un SnackBar del
-  // Scaffold de atrás queda tapado y el PF tocaba REGISTRAR sin ver nada. El
-  // test lo fija mirando que el texto sea DESCENDIENTE del sheet (un SnackBar
-  // vive en el Scaffold, no adentro) y que no haya ningún SnackBar.
-  group('Errores inline (#1490)', () {
-    // Jueves 16/10/2026 10:15, hora local del dispositivo.
-    setUp(() => AppClock.freeze(DateTime(2026, 10, 16, 10, 15)));
+  // ── #1490: la hora por defecto no puede proponer el pasado ─────────────────
+  group('#1490 — hora por defecto', () {
     tearDown(AppClock.unfreeze);
 
-    final today = DateTime(2026, 10, 16);
-
-    Finder inSheet(String text) => find.descendant(
-          of: find.byType(NewSessionSheet),
-          matching: find.text(text),
-        );
-
-    Future<void> pumpWithAthlete(
-      WidgetTester tester, {
-      DateTime? initialDate,
-      TimeOfDay? initialTime,
-    }) async {
+    testWidgets('hoy a las 9:51 arranca en 10:00, no en 9:00', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
       _useTallViewport(tester);
-      await tester.pumpWidget(_wrap(
-        initialDate: initialDate,
-        initialTime: initialTime,
-        overrides: _overrides(
-          links: [_activeLink(_kAthleteId1)],
-          profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
-          appointmentRepo: mockAppointmentRepo,
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('10:00'), findsOneWidget);
+      expect(find.text('9:00'), findsNothing);
+    });
+
+    testWidgets('hoy antes de las 9:00 sigue arrancando en 9:00',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 7, 40));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('9:00'), findsOneWidget);
+    });
+
+    testWidgets('una hora elegida por el timeline se respeta tal cual',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(ProviderScope(
+        overrides: _overrides(),
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: NewSessionSheet(
+              initialDate: DateTime(2026, 10, 25),
+              initialTime: const TimeOfDay(hour: 7, minute: 15),
+            ),
+          ),
         ),
       ));
       await tester.pumpAndSettle();
+
+      expect(find.text('7:15'), findsOneWidget);
+    });
+  });
+
+  // ── #1490: los avisos del sheet tienen que verse ENCIMA del sheet ─────────
+  //
+  // Los tests de arriba montan el sheet como `body` de un Scaffold, así que
+  // nunca vieron el caso real: abierto con `showModalBottomSheet`, un
+  // `SnackBar` lo pinta el Scaffold de ATRÁS y el sheet lo tapa.
+  group('#1490 — aviso desde el sheet abierto como modal', () {
+    testWidgets('duración inválida → el aviso es tocable encima del sheet',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            appointmentRepo: mockAppointmentRepo,
+          ),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) =>
+                        NewSessionSheet(initialDate: targetDateOnly),
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
       await _selectAthlete(tester, 'Carlos Pérez');
-    }
-
-    testWidgets(
-        'hora pasada: el aviso aparece adentro del sheet, no como SnackBar',
-        (tester) async {
-      await pumpWithAthlete(
-        tester,
-        initialDate: today,
-        initialTime: const TimeOfDay(hour: 9, minute: 0),
-      );
-
+      await tester.enterText(find.widgetWithText(TextField, '60'), '2');
       await tester.tap(find.text('REGISTRAR SESIÓN'));
       await tester.pumpAndSettle();
 
-      expect(
-        inSheet('No podés registrar una sesión en el pasado.'),
-        findsOneWidget,
-      );
+      const aviso = 'Ingresá una duración válida (5–480 min).';
+      // Si lo pintara el Scaffold de atrás existiría pero el sheet lo taparía.
+      expect(find.text(aviso).hitTestable(), findsOneWidget);
       expect(find.byType(SnackBar), findsNothing);
-      verifyNever(
-        () => mockAppointmentRepo.createByTrainer(
-          trainerId: any(named: 'trainerId'),
-          athleteId: any(named: 'athleteId'),
-          athleteDisplayName: any(named: 'athleteDisplayName'),
-          startsAt: any(named: 'startsAt'),
-          durationMin: any(named: 'durationMin'),
-          noteBefore: any(named: 'noteBefore'),
-        ),
-      );
-    });
 
-    testWidgets('el aviso se va en cuanto el PF cambia algo del formulario',
-        (tester) async {
-      await pumpWithAthlete(
-        tester,
-        initialDate: today,
-        initialTime: const TimeOfDay(hour: 9, minute: 0),
-      );
-      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      // El toast por Overlay se cierra solo: no deja Timers colgando.
+      await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
-      expect(
-        inSheet('No podés registrar una sesión en el pasado.'),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.text('Se repite'));
-      await tester.pumpAndSettle();
-
-      expect(
-        inSheet('No podés registrar una sesión en el pasado.'),
-        findsNothing,
-      );
-    });
-
-    testWidgets('sin hora explícita el default NO cae en el pasado: 11:00',
-        (tester) async {
-      // Son las 10:15: el viejo default (9:00) ya pasó.
-      await pumpWithAthlete(tester);
-
-      await tester.tap(find.text('REGISTRAR SESIÓN'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('No podés registrar una sesión en el pasado.'),
-          findsNothing);
-      verify(
-        () => mockAppointmentRepo.createByTrainer(
-          trainerId: _kTrainerId,
-          athleteId: _kAthleteId1,
-          athleteDisplayName: 'Carlos Pérez',
-          startsAt: DateTime.utc(2026, 10, 16, 11),
-          durationMin: 60,
-          noteBefore: any(named: 'noteBefore'),
-        ),
-      ).called(1);
-    });
-
-    testWidgets('serie sin días: "Elegí al menos un día." adentro del sheet',
-        (tester) async {
-      await pumpWithAthlete(tester, initialDate: today);
-
-      await tester.tap(find.text('Se repite'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('REGISTRAR SERIE'));
-      await tester.pumpAndSettle();
-
-      expect(inSheet('Elegí al menos un día.'), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-    });
-
-    testWidgets('duración inválida: el error de duración va adentro del sheet',
-        (tester) async {
-      await pumpWithAthlete(tester, initialDate: today);
-
-      await tester.enterText(find.byType(TextField).first, '1');
-      await tester.pump();
-      await tester.tap(find.text('REGISTRAR SESIÓN'));
-      await tester.pumpAndSettle();
-
-      expect(
-        inSheet('Ingresá una duración válida (5–480 min).'),
-        findsOneWidget,
-      );
-      expect(find.byType(SnackBar), findsNothing);
+      expect(find.text(aviso), findsNothing);
     });
   });
 
@@ -1258,8 +1223,9 @@ void main() {
           links: [_activeLink(_kAthleteId1)],
           profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
           appointmentRepo: mockAppointmentRepo,
-          // Lunes 13–15; la serie arranca a las 11:00 (la hora default de
-          // hoy, 10:15) → las cuatro fechas quedan afuera.
+          // Lunes 13–15; la serie arranca a las 10:30 (la hora default de
+          // hoy a las 10:15: la próxima media hora) → las cuatro fechas
+          // quedan afuera.
           availabilityRepo: _FakeAvailabilityRepository(
             rules: [regla(DateTime.monday, 13, 15)],
           ),
@@ -1292,8 +1258,8 @@ void main() {
           athleteId: _kAthleteId1,
           athleteDisplayName: 'Carlos Pérez',
           weekdays: any(named: 'weekdays'),
-          startHour: 11,
-          startMinute: 0,
+          startHour: 10,
+          startMinute: 30,
           durationMin: 60,
           fromDate: any(named: 'fromDate'),
           untilDate: any(named: 'untilDate'),

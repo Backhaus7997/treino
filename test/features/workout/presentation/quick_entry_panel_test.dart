@@ -78,6 +78,20 @@ void main() {
       expect(find.text('Hombros'), findsOneWidget);
     });
 
+    // #1488: los datos reales traen la CLAVE canónica («chest»), no el label.
+    // Los fixtures de arriba ya venían en castellano y por eso no lo veían.
+    testWidgets('el músculo se muestra en castellano aunque venga la clave',
+        (tester) async {
+      await _montarPanel(tester, resultados: const [
+        QuickEntryResult(
+            id: 'bench', name: 'Press de Banca', muscleGroup: 'chest'),
+        QuickEntryResult(id: 'fondos', name: 'Fondos', muscleGroup: 'triceps'),
+      ]);
+      expect(find.text('Pecho'), findsOneWidget);
+      expect(find.text('chest'), findsNothing);
+      expect(find.text('triceps'), findsNothing);
+    });
+
     testWidgets('la prescripción parseada va a la derecha', (tester) async {
       await _montarPanel(tester, texto: 'press 4x10 60');
       expect(find.text('4×10 · 60kg'), findsWidgets);

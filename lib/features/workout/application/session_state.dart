@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 
 import '../domain/routine_day.dart';
@@ -90,6 +92,19 @@ class SessionState {
   /// Cantidad de ejercicios del día con todos sus sets completados.
   int get completedExerciseCount =>
       day.slots.where((s) => isExerciseDone(s.exerciseId)).length;
+
+  /// Series planificadas del día (la misma suma que [isFullyCompleted]).
+  int get totalPlannedSets =>
+      day.slots.fold<int>(0, (sum, slot) => sum + plannedSetsFor(slot));
+
+  /// Series hechas, topeadas por ejercicio a lo planificado: una serie de
+  /// más en un ejercicio no adelanta la barra de otro (#1510).
+  int get completedSetCount => day.slots.fold<int>(
+        0,
+        (sum, slot) =>
+            sum +
+            math.min(setsLoggedFor(slot.exerciseId), plannedSetsFor(slot)),
+      );
 
   // ── Mutación ──────────────────────────────────────────────────────────────
 

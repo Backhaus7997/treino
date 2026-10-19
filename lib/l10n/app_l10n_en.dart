@@ -63,8 +63,8 @@ class AppL10nEn extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DAYS',
-      one: 'DAY',
+      other: 'WEEKS',
+      one: 'WEEK',
     );
     return '$_temp0';
   }
@@ -150,6 +150,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get authWelcomeSignIn => '';
+
+  @override
+  String get authWelcomeTrainerPrompt => 'Are you a trainer?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'I want to be a trainer';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'We couldn\'t open your email app. Write to us at $email.';
+  }
 
   @override
   String get authLoginTitle => '';
@@ -621,6 +632,11 @@ class AppL10nEn extends AppL10n {
   String get agendaRuleInvalidWindow => '';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'This time overlaps one you already added: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach => '';
 
   @override
@@ -876,6 +892,12 @@ class AppL10nEn extends AppL10n {
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
 
   @override
+  String get wellbeingCheckInFromToday => 'You already told us today on Home.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USE FOR THIS WORKOUT';
+
+  @override
   String get wellbeingCheckInOptional => 'Optional. You can skip it.';
 
   @override
@@ -1093,6 +1115,34 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutExploreEmptyLevel => 'No routines for this level.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No $days-day templates',
+      one: 'No 1-day templates',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No templates of around $minutes min';
+  }
+
+  @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No templates of $minutes min or more';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'No template fits both your days and your minutes';
+
+  @override
+  String get templatesFilterEmptyAction => 'Show all';
 
   @override
   String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
@@ -2591,6 +2641,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get commonCancel => 'Cancel';
+
+  @override
+  String get commonDone => 'Done';
 
   @override
   String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
@@ -4383,7 +4436,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'No answer filters the catalog: you will keep seeing every template.';
+      'Days and minutes filter the catalog: you will only see templates that fit. Goal and focus areas only sort.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';
@@ -4490,7 +4543,12 @@ class AppL10nEn extends AppL10n {
   String get templatesFilterBarSetUp => 'SET UP MY SEARCH';
 
   @override
-  String get templatesFilterBarHint => 'Sorted to match what you are after';
+  String get templatesFilterBarHint =>
+      'Filtered and sorted to match what you are after';
+
+  @override
+  String get templatesFilterBarHintSorted =>
+      'Sorted to match what you are after';
 
   @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';
@@ -5294,4 +5352,71 @@ class AppL10nEn extends AppL10n {
   @override
   String get appUpdateOpenError =>
       'We couldn\'t open the store. Search for TREINO on the App Store or Google Play.';
+
+  @override
+  String get timePickerHelpText => 'Select time';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Between $min and $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Maximum $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Edit assessment';
+
+  @override
+  String get performanceLogUpdateCta => 'SAVE CHANGES';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Assessment updated';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Edit assessment';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Delete assessment';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Logged by another trainer';
+
+  @override
+  String get performanceDeleteConfirmTitle => 'Delete assessment?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'The assessment from $date will be deleted. This can\'t be undone.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Assessment deleted';
+
+  @override
+  String get performanceDeleteError =>
+      'We couldn\'t delete the assessment. Try again.';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get agendaRuleDeleteTitle => 'Delete this time slot?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Existing bookings are kept.';
+
+  @override
+  String get agendaOverrideDeleteTitle => 'Delete this exception?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'NOT NOW';
+
+  @override
+  String get authSignOutConfirmTitle => 'Sign out?';
+
+  @override
+  String get authSignOutConfirmAction => 'Sign out';
 }

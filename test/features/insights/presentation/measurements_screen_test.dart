@@ -159,7 +159,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.text('80.5 kg'), findsOneWidget);
+    expect(find.text('80,5 kg'), findsOneWidget);
   });
 
   testWidgets(

@@ -1,49 +1,57 @@
-/// Hora de arranque que propone el formulario "Nueva sesión" (#1490).
+/// Fecha y hora con las que arranca "Nueva sesión" cuando nadie las eligió.
 ///
-/// Antes el default era "hoy a las 9:00" a ciegas: pasadas las 9, el PF abría el
-/// formulario con una hora que el propio submit rechaza ("No podés registrar una
-/// sesión en el pasado"). Esta función devuelve una propuesta que NUNCA cae en el
-/// pasado:
+/// ## Por qué existe (#1490)
 ///
-///  * si las 9:00 de [day] todavía no pasaron (o [day] es un día futuro), se
-///    conserva el default de siempre;
-///  * si ya pasaron, se propone la próxima hora en punto;
-///  * si esa hora ya cae al día siguiente (23:xx), se propone mañana a las 9:00.
+/// El sheet arrancaba siempre en 9:00. Abierto un día a las 9:51, proponía
+/// una hora que ya había pasado, y REGISTRAR SESIÓN rebotaba con "No podés
+/// registrar una sesión en el pasado.": el PF veía un formulario prolijo que
+/// no se podía enviar sin tocar nada.
 ///
-/// Todo es wall-clock ADR-7 (ver `wall_clock.dart`): [nowWall] y el resultado
-/// son `DateTime.utc` con los campos del calendario local, sin conversión.
+/// ## Regla
+///
+/// - Otro día, o hoy antes de las 9:00 → 9:00, como siempre.
+/// - Hoy con las 9:00 ya pasadas → la próxima media hora ESTRICTAMENTE
+///   posterior a [now] (9:51 → 10:00; 10:00 → 10:30). Estrictamente porque el
+///   submit exige `startsAt.isAfter(nowWall)`.
+/// - Hoy a las 23:30 o más ya no queda ninguna media hora → mañana a las
+///   9:00, en vez de proponer otra hora del pasado.
+///
+/// Sólo mira la hora de PARED de [now] (año, mes, día, hora, minuto), igual
+/// que el chequeo del submit: un `DateTime` UTC o local con los mismos campos
+/// da el mismo resultado.
 library;
 
-/// Hora default del formulario cuando todavía no pasó.
+/// Hora de arranque cuando la fecha no es hoy o las 9:00 todavía no pasaron.
 const int kDefaultSessionHour = 9;
 
-/// Devuelve `(fecha, hora, minuto)` propuestos para una sesión nueva en [day].
-///
-/// [day] se toma sólo por su día de calendario (se ignora la hora).
-/// [nowWall] es "ahora" en wall-clock (`nowWall()` de `wall_clock.dart`).
-({DateTime date, int hour, int minute}) defaultSessionStart({
-  required DateTime day,
-  required DateTime nowWall,
+const int _kPasoMinutos = 30;
+
+typedef DefaultSessionStart = ({DateTime date, int hour, int minute});
+
+DefaultSessionStart defaultSessionStart({
+  required DateTime now,
+  required DateTime date,
 }) {
-  final date = DateTime.utc(day.year, day.month, day.day);
-  final nine =
-      DateTime.utc(date.year, date.month, date.day, kDefaultSessionHour);
-  if (nine.isAfter(nowWall)) {
-    return (date: date, hour: kDefaultSessionHour, minute: 0);
+  final esHoy =
+      date.year == now.year && date.month == now.month && date.day == now.day;
+  final hoy = DateTime(date.year, date.month, date.day);
+  if (!esHoy) return (date: hoy, hour: kDefaultSessionHour, minute: 0);
+
+  final minutoActual = now.hour * 60 + now.minute;
+  // A las 9:00 en punto las 9:00 ya no son futuras: `>=`, no `>`.
+  if (minutoActual < kDefaultSessionHour * 60) {
+    return (date: hoy, hour: kDefaultSessionHour, minute: 0);
   }
 
-  // Las 9:00 ya pasaron, así que [day] es hoy (el 9:00 de un día futuro siempre
-  // es posterior a ahora; uno anterior el date picker no deja elegirlo).
-  final today = DateTime.utc(nowWall.year, nowWall.month, nowWall.day);
-  final nextHour = nowWall.hour + 1;
-  if (nextHour < 24) {
-    return (date: today, hour: nextHour, minute: 0);
+  // Próximo múltiplo de 30 ESTRICTAMENTE mayor: en 14:00 o 14:00:59 ya es
+  // tarde para 14:00, así que va 14:30.
+  final siguiente = (minutoActual ~/ _kPasoMinutos + 1) * _kPasoMinutos;
+  if (siguiente >= 24 * 60) {
+    return (
+      date: DateTime(date.year, date.month, date.day + 1),
+      hour: kDefaultSessionHour,
+      minute: 0,
+    );
   }
-
-  // 23:xx → la próxima hora en punto ya es mañana: mañana a las 9:00.
-  return (
-    date: today.add(const Duration(days: 1)),
-    hour: kDefaultSessionHour,
-    minute: 0,
-  );
+  return (date: hoy, hour: siguiente ~/ 60, minute: siguiente % 60);
 }

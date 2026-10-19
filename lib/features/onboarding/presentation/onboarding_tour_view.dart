@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import 'onboarding_card_content.dart';
-import '../../../app/theme/tokens/primitives.dart';
 
 /// Full-screen, swipeable welcome tour: one slide per section, run once right
 /// after login.
@@ -381,7 +381,7 @@ class _PrimaryCta extends StatelessWidget {
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: palette.accent,
-          foregroundColor: palette.bg,
+          foregroundColor: TreinoButtonTokens.ink,
           shape: const StadiumBorder(),
           padding: EdgeInsets.zero,
         ),

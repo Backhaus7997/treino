@@ -21,6 +21,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart'
+    show assignedRoutinesByTrainerProvider;
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -478,5 +480,172 @@ void main() {
           uid: any(named: 'uid'),
           draft: any(named: 'draft'),
         ));
+  });
+
+  // ── #1486: PLANES ASIGNADOS se refresca al guardar ─────────────────────────
+  //
+  // `assignedRoutinesByTrainerProvider` es un FutureProvider one-shot: si el
+  // editor no lo invalida, el detalle de alumno sigue diciendo «Todavía no le
+  // asignaste planes.» después de «Plan creado y asignado.».
+
+  group('#1486 — invalida PLANES ASIGNADOS del par PF/alumno', () {
+    const key = (trainerId: 'trainer-1', athleteId: 'athlete-x');
+
+    /// Monta el editor con el listado del par [key] contando sus fetches, y
+    /// lo deja escuchado como lo deja el detalle de alumno debajo del editor.
+    Future<int Function()> pumpConListado(
+      WidgetTester tester, {
+      required RoutineEditorMode mode,
+      required RoutineRepository repo,
+    }) async {
+      var fetches = 0;
+      await _pumpEditor(
+        tester,
+        mode: mode,
+        overrides: [
+          ..._overrides(repo: repo),
+          assignedRoutinesByTrainerProvider(key).overrideWith((ref) async {
+            fetches++;
+            return const <Routine>[];
+          }),
+        ],
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RoutineEditorScreen)),
+      );
+      container.listen(assignedRoutinesByTrainerProvider(key), (_, __) {});
+      await tester.pumpAndSettle();
+      return () => fetches;
+    }
+
+    Future<void> agregarEjercicioConReps(WidgetTester tester) async {
+      await desplazarHastaAgregarEjercicio(tester);
+      await tester.tap(find.text('Agregar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar 1 ejercicio'));
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+      final repsField = find.byType(TextField).evaluate().where((e) {
+        final w = e.widget as TextField;
+        return w.controller != null && w.controller!.text.isEmpty;
+      }).last;
+      await tester.enterText(find.byWidget(repsField.widget), '8');
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('crear y asignar vuelve a pedir el listado', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.first as Routine;
+        return r.copyWith(id: 'new-plan-id');
+      });
+
+      final fetches = await pumpConListado(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-x'),
+        repo: repo,
+      );
+      expect(fetches(), 1);
+
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Nuevo Plan');
+      await tester.enterText(
+          find.byKey(const Key('editor_split_field')), 'PPL');
+      await tester.pumpAndSettle();
+      await agregarEjercicioConReps(tester);
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.createAssigned(any())).called(1);
+      expect(fetches(), 2);
+    });
+
+    testWidgets('editar un plan asignado vuelve a pedir el listado',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('plan-id-1'))
+          .thenAnswer((_) async => _existingPlan);
+      when(() => repo.updateAssigned(
+                uid: any(named: 'uid'),
+                draft: any(named: 'draft'),
+              ))
+          .thenAnswer((inv) async =>
+              inv.namedArguments[const Symbol('draft')] as Routine);
+
+      final fetches = await pumpConListado(
+        tester,
+        mode: const TrainerAssigning(
+          athleteId: 'athlete-x',
+          existingPlanId: 'plan-id-1',
+        ),
+        repo: repo,
+      );
+      expect(fetches(), 1);
+
+      await agregarEjercicioConReps(tester);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+      await tester.pumpAndSettle();
+
+      verify(() => repo.updateAssigned(
+            uid: 'trainer-1',
+            draft: any(named: 'draft'),
+          )).called(1);
+      expect(fetches(), 2);
+    });
+  });
+
+  // #1487: con el teclado abierto el pie (aviso + ASIGNAR PLAN) subía pegado
+  // al teclado, tapaba las sugerencias de la entrada rápida, y al cerrarlo el
+  // botón quedaba justo donde estaba el ✓ del teclado: tap de más → plan
+  // asignado sin querer.
+  group('#1487 — el pie y el teclado', () {
+    testWidgets('con el teclado abierto el pie no está', (tester) async {
+      await _pumpEditor(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-x'),
+        overrides: _overrides(),
+      );
+      expect(
+          find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'), findsOneWidget);
+
+      simularTeclado(tester);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'), findsNothing);
+    });
+
+    testWidgets(
+        'al cerrar el teclado, un tap inmediato sobre ASIGNAR no hace nada',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async =>
+          (inv.positionalArguments.first as Routine).copyWith(id: 'nuevo'));
+      await _pumpEditor(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-x'),
+        overrides: _overrides(repo: repo),
+      );
+
+      simularTeclado(tester);
+      await tester.pump();
+      // El teclado se cierra (el ✓): vuelve el pie.
+      tester.view.resetViewInsets();
+      await tester.pump();
+
+      final asignar = find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN');
+      expect(asignar, findsOneWidget);
+      // El mismo dedo que tocó el ✓ cae sobre el botón: se ignora.
+      expect(
+        tester.widget<ElevatedButton>(asignar).onPressed,
+        isNull,
+        reason: 'recién vuelto, el pie no acepta taps',
+      );
+
+      // Pasado el resguardo, el botón vuelve a andar.
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.widget<ElevatedButton>(asignar).onPressed, isNotNull);
+    });
   });
 }

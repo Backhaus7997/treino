@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
@@ -385,10 +386,10 @@ class _ActiveAlumnoCard extends ConsumerWidget {
         await onFailure(context, e);
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos actualizar el vínculo. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos actualizar el vínculo. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -471,12 +472,10 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                           if (!context.mounted) return;
                           if (error
                               is LinkPromotionFailure$PromotionPrecondition) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Este vínculo ya no está disponible.',
-                                ),
-                              ),
+                            showTreinoToast(
+                              context,
+                              'Este vínculo ya no está disponible.',
+                              type: TreinoToastType.error,
                             );
                             return;
                           }
@@ -485,12 +484,10 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                           // sealed hierarchy — a service bug, a platform
                           // error — must still surface feedback instead of
                           // leaving the trainer believing nothing happened.
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Revisá tu conexión y probá de nuevo.',
-                              ),
-                            ),
+                          showTreinoToast(
+                            context,
+                            'Revisá tu conexión y probá de nuevo.',
+                            type: TreinoToastType.error,
                           );
                         },
                       ),
@@ -526,7 +523,7 @@ class _ActiveAlumnoCard extends ConsumerWidget {
                       ),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: palette.accent, width: 1),
-                        foregroundColor: palette.accent,
+                        foregroundColor: palette.accentText,
                         minimumSize: const Size.fromHeight(40),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadius.full),
