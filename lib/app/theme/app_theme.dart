@@ -139,6 +139,32 @@ class AppTheme {
           trackColor: _SoloApagado(palette.bgCard),
           trackOutlineColor: _SoloApagado(palette.border),
         ),
+        // #1558: sin esto los PopupMenuButton/showMenu (11 archivos) caían al
+        // default de Material: caja cuadrada, sin borde, Barlow regular. Ahora
+        // hablan el idioma del kit: superficie `bgCard`, contorno `border`,
+        // radio `AppRadius.md` y Barlow 600. La sombra es sutil a propósito:
+        // el menú flota sobre contenido y sin ella no se separa. Los ítems
+        // destructivos usan `TreinoDestructiveMenuItem` (`dangerText`).
+        popupMenuTheme: PopupMenuThemeData(
+          color: palette.bgCard,
+          surfaceTintColor: Colors.transparent,
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: BorderSide(color: palette.border),
+          ),
+          textStyle: _itemDeMenu(palette.textPrimary),
+          // Con `useMaterial3: true`, `PopupMenuItem` ignora `textStyle` y
+          // sólo lee `labelTextStyle`: sin esto los ítems salían en el
+          // `labelLarge` de M3 (w500). El deshabilitado baja el texto a 0,38,
+          // igual que el `TextButton` del tema.
+          labelTextStyle: _EstiloDeItemDeMenu(
+            habilitado: _itemDeMenu(palette.textPrimary),
+            deshabilitado:
+                _itemDeMenu(palette.textPrimary.withValues(alpha: 0.38)),
+          ),
+        ),
         // #1513: sin estos dos, `FilledButton` y `OutlinedButton` caían al
         // default de Material — Barlow regular fina, y el outlined con texto
         // `primary` (mint sobre blanco, ~1,6:1) y borde `outline` casi negro.
@@ -160,6 +186,12 @@ class AppTheme {
             side: WidgetStatePropertyAll(BorderSide(color: palette.border)),
           ),
         ),
+      );
+
+  static TextStyle _itemDeMenu(Color color) => GoogleFonts.barlow(
+        fontWeight: AppFonts.w600,
+        fontSize: AppTextSize.body,
+        color: color,
       );
 
   static TextStyle _labelDeBoton() => GoogleFonts.barlowCondensed(
@@ -244,6 +276,32 @@ class _TextoDeAcento implements WidgetStateProperty<Color> {
   @override
   bool operator ==(Object other) =>
       other is _TextoDeAcento &&
+      other.habilitado == habilitado &&
+      other.deshabilitado == deshabilitado;
+
+  @override
+  int get hashCode => Object.hash(habilitado, deshabilitado);
+}
+
+/// Estilo de los ítems de menú emergente, con igualdad de VALOR — por lo
+/// mismo que [_TextoDeAcento].
+@immutable
+class _EstiloDeItemDeMenu implements WidgetStateProperty<TextStyle> {
+  const _EstiloDeItemDeMenu({
+    required this.habilitado,
+    required this.deshabilitado,
+  });
+
+  final TextStyle habilitado;
+  final TextStyle deshabilitado;
+
+  @override
+  TextStyle resolve(Set<WidgetState> states) =>
+      states.contains(WidgetState.disabled) ? deshabilitado : habilitado;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _EstiloDeItemDeMenu &&
       other.habilitado == habilitado &&
       other.deshabilitado == deshabilitado;
 

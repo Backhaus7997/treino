@@ -4647,10 +4647,7 @@ class _SetTypeChip extends StatelessWidget {
         for (final (value, text) in _options)
           PopupMenuItem<SetType>(
             value: value,
-            child: Text(
-              text,
-              style: GoogleFonts.barlow(color: palette.textPrimary),
-            ),
+            child: Text(text),
           ),
       ],
       child: Container(
