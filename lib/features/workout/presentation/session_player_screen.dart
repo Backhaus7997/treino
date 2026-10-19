@@ -13,6 +13,7 @@ import '../../../core/utils/join_non_empty.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../../gyms/application/gym_display_name_provider.dart';
@@ -446,14 +447,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     if (notifier == null || !notifier.finishedElsewhere.value) return;
     if (!mounted) return;
     final l10n = AppL10n.of(context);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(l10n.sessionFinishedOnWatch),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    showTreinoToast(context, l10n.sessionFinishedOnWatch);
     // `canPop` para no explotar si el player ya no es la ruta de arriba (el
     // atleta pudo navegar a un ejercicio mientras el reloj cerraba).
     final navigator = Navigator.of(context);
@@ -471,24 +465,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     }
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.sessionLogSetError),
-        behavior: SnackBarBehavior.floating,
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-        // se queda hasta recargar la página.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: l10n.coachRetryLabel,
-          onPressed: () {
-            messenger.hideCurrentSnackBar();
-            notifier.retryLastLogError();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.sessionLogSetError,
+      type: TreinoToastType.error,
+      action: TreinoToastAction(
+        label: l10n.coachRetryLabel,
+        onPressed: () {
+          messenger.hideCurrentSnackBar();
+          notifier.retryLastLogError();
+        },
       ),
     );
     // Limpiamos el canal una vez mostrado el feedback para que no re-dispare el
@@ -556,24 +542,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   void _showFinishError(Future<void> Function() onRetry) {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.sessionFinishError),
-        behavior: SnackBarBehavior.floating,
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-        // se queda hasta recargar la página.
-        persist: false,
-        duration: const Duration(seconds: 6),
-        action: SnackBarAction(
-          label: l10n.coachRetryLabel,
-          onPressed: () {
-            messenger.hideCurrentSnackBar();
-            onRetry();
-          },
-        ),
+    showTreinoToastOn(
+      messenger,
+      l10n.sessionFinishError,
+      type: TreinoToastType.error,
+      action: TreinoToastAction(
+        label: l10n.coachRetryLabel,
+        onPressed: () {
+          messenger.hideCurrentSnackBar();
+          onRetry();
+        },
       ),
     );
   }

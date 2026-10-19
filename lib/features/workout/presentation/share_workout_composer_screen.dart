@@ -13,6 +13,7 @@ import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/application/create_post_notifier.dart' show kMaxPostChars;
@@ -160,9 +161,8 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
             localPhotoPath: _photoPath,
           );
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutSnackShareSuccess)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutSnackShareSuccess,
+          type: TreinoToastType.success);
       if (!context.mounted) return;
       // #1514: al Feed, donde está el post recién publicado. Antes iba a
       // Entrenar (el destino de LISTO), y lo único que confirmaba la
@@ -172,14 +172,12 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
       // `workoutSnackShareError` invita a reintentar, y para un bloqueo eso es
       // consejo falso: el mismo texto va a fallar siempre.
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.moderationBlockedMessage)),
-      );
+      showTreinoToastOn(messenger, l10n.moderationBlockedMessage,
+          type: TreinoToastType.error);
     } catch (_) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutSnackShareError)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutSnackShareError,
+          type: TreinoToastType.error);
     }
   }
 

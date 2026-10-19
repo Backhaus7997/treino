@@ -11,6 +11,7 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart';
 import '../../paywall/domain/athlete_entitlement.dart'
@@ -375,13 +376,11 @@ class _FollowTemplateBar extends ConsumerWidget {
       await ref.read(userRepositoryProvider).update(uid, {
         'activeRoutineId': r.id,
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutRoutineFollowSuccess)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutRoutineFollowSuccess,
+          type: TreinoToastType.success);
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.workoutRoutineFollowError)),
-      );
+      showTreinoToastOn(messenger, l10n.workoutRoutineFollowError,
+          type: TreinoToastType.error);
     }
   }
 
