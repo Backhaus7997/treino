@@ -152,6 +152,17 @@ class AppL10nEn extends AppL10n {
   String get authWelcomeSignIn => '';
 
   @override
+  String get authWelcomeTrainerPrompt => 'Are you a trainer?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'I want to be a trainer';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'We couldn\'t open your email app. Write to us at $email.';
+  }
+
+  @override
   String get authLoginTitle => '';
 
   @override
