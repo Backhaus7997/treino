@@ -469,6 +469,17 @@ class _UseAsBaseBar extends ConsumerWidget {
                     : null;
     final locked = lockedReason != null;
 
+    // Con las DOS acciones bloqueadas, un solo candado. En una plantilla paga
+    // del catálogo, `_FollowTemplateBar` ya muestra el suyo y abre la hoja del
+    // plan pago, que incluye personalizarla; un segundo candado idéntico al
+    // lado no decía cuál era cuál (reporte del dueño en device). Con una
+    // plantilla gratis Seguir queda libre, y este candado sí es el único que
+    // avisa que copiarla es del plan pago, así que ahí se queda.
+    final seguirTambienBloqueado = esDelCatalogo &&
+        routine.isPremium &&
+        ref.watch(catalogLockActiveProvider);
+    if (locked && seguirTambienBloqueado) return const SizedBox.shrink();
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return TreinoTopBarAction(

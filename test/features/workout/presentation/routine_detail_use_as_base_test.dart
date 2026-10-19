@@ -281,8 +281,13 @@ void main() {
     IconData iconoDelChip(WidgetTester tester) =>
         (tester.widget<IconButton>(find.byKey(_chip)).icon as Icon).icon!;
 
-    testWidgets('alumno free: el chip sigue ahí y abre la hoja',
-        (tester) async {
+    testWidgets(
+        'alumno free: con las dos acciones bloqueadas queda UN solo candado '
+        '(el de seguir), que abre la hoja', (tester) async {
+      // Antes Seguir y Usar como base se volvían dos candados idénticos, uno
+      // al lado del otro, sin forma de saber cuál era cuál (reporte del dueño
+      // en device). El de Seguir ya dice que la plantilla es del plan pago, y
+      // ese plan incluye personalizarla: el segundo no agregaba nada.
       await _pump(
         tester,
         _routine(source: RoutineSource.system, isPremium: true),
@@ -290,12 +295,10 @@ void main() {
         entitlement: AthleteEntitlement.free,
       );
 
-      expect(find.byKey(_chip), findsOneWidget,
-          reason:
-              'esconderlo dejaría al alumno sin saber que la función existe');
-      expect(iconoDelChip(tester), TreinoIcon.lock);
+      expect(find.byKey(_chip), findsNothing);
+      expect(find.byIcon(TreinoIcon.lock), findsOneWidget);
 
-      await tester.tap(find.byKey(_chip));
+      await tester.tap(find.byIcon(TreinoIcon.lock));
       await tester.pumpAndSettle();
       expect(find.byKey(sheet), findsOneWidget);
     });
