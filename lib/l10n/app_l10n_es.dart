@@ -96,6 +96,21 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get homeEstaSemanaMusclesTitle => 'MÚSCULOS DE LA SEMANA';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'Más color = más cerca de las series que pide tu rutina esta semana.';
+
+  @override
+  String get homeGreeting => '¡HOLA!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return '¡HOLA, $name!';
+  }
+
+  @override
   String get homeEstaSemanaEmptyTitle => 'TU RACHA\nEMPIEZA AQUÍ';
 
   @override
@@ -5556,6 +5571,21 @@ class AppL10nEsAr extends AppL10nEs {
       one: 'entreno',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get homeEstaSemanaMusclesTitle => 'MÚSCULOS DE LA SEMANA';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'Más color = más cerca de las series que pide tu rutina esta semana.';
+
+  @override
+  String get homeGreeting => '¡HOLA!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return '¡HOLA, $name!';
   }
 
   @override

@@ -224,6 +224,30 @@ abstract class AppL10n {
   /// **'{count, plural, =1{entreno} other{entrenos}}'**
   String homeEstaSemanaPeriodUnit(int count);
 
+  /// Title of the muscle map in the Home 'Esta Semana' card. The map paints the sets the athlete already logged THIS WEEK (finished sessions), not today's routine (#1508).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MÚSCULOS DE LA SEMANA'**
+  String get homeEstaSemanaMusclesTitle;
+
+  /// Legend under the Home muscle map: opacity = sets done this week / weekly target sets of the active routine.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más color = más cerca de las series que pide tu rutina esta semana.'**
+  String get homeEstaSemanaMusclesLegend;
+
+  /// Home header greeting when the athlete has no display name yet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡HOLA!'**
+  String get homeGreeting;
+
+  /// Home header greeting. [name] is the athlete's FIRST name, already uppercased (#1508).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡HOLA, {name}!'**
+  String homeGreetingNamed(String name);
+
   /// Home 'Esta Semana' card empty-state title for an athlete with zero sessions.
   ///
   /// In es_AR, this message translates to:
