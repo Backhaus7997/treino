@@ -1111,6 +1111,19 @@ class AppL10nEn extends AppL10n {
   String get templatesFilterEmptyAction => 'Show all';
 
   @override
+  String get templatesFilterBarClear => 'Clear filters';
+
+  @override
+  String get templatesFiltersCleared => 'Filters cleared';
+
+  @override
+  String get templatesFiltersClearError =>
+      'We couldn\'t clear your filters. Try again.';
+
+  @override
+  String get templatesFiltersUndo => 'UNDO';
+
+  @override
   String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
 
   @override

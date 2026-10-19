@@ -32,6 +32,27 @@ Routine _r(String id, int days, {int? minutes}) => Routine(
 
 final _catalogo = [_r('a', 3, minutes: 60), _r('b', 5, minutes: 60)];
 
+/// Controller falso: registra qué se pidió borrar y restaurar.
+class _FakeController extends TemplatePreferencesController {
+  _FakeController(super.ref);
+
+  int clears = 0;
+  final saved = <TemplatePreferences>[];
+  bool clearResult = true;
+
+  @override
+  Future<bool> clear() async {
+    clears++;
+    return clearResult;
+  }
+
+  @override
+  Future<void> save(TemplatePreferences preferences) async =>
+      saved.add(preferences);
+}
+
+late _FakeController _ctrl;
+
 Future<ProviderContainer> _pump(
   WidgetTester tester,
   TemplatePreferences prefs, {
@@ -43,6 +64,8 @@ Future<ProviderContainer> _pump(
     currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
     routinesProvider.overrideWith((ref) async => catalogo ?? _catalogo),
     athleteTemplatePreferencesProvider.overrideWithValue(prefs),
+    templatePreferencesControllerProvider
+        .overrideWith((ref) => _ctrl = _FakeController(ref)),
   ]);
   addTearDown(container.dispose);
   container.read(routinesLevelFilterProvider.notifier).state = level;
@@ -226,6 +249,53 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Ordenado según lo que buscás'), findsOneWidget);
       expect(find.textContaining('Filtrado'), findsNothing);
+    });
+  });
+
+  group('borrar filtros', () {
+    const prefs = TemplatePreferences(
+      daysPerWeek: 3,
+      minutesPerSession: 30,
+      goals: [RoutineGoal.health],
+    );
+    const borrar = Key('templates_preferences_clear');
+
+    testWidgets('sin respuestas no hay nada que borrar', (tester) async {
+      await _pump(tester, const TemplatePreferences());
+      expect(find.byKey(borrar), findsNothing);
+    });
+
+    testWidgets('borra, avisa y DESHACER restaura lo que había',
+        (tester) async {
+      await _pump(tester, prefs);
+      await tester.tap(find.byKey(borrar));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(_ctrl.clears, 1);
+      expect(find.text('Filtros borrados'), findsOneWidget);
+
+      // Que termine de entrar antes de tocar la acción.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('DESHACER'));
+      await tester.pump();
+      expect(_ctrl.saved, [prefs]);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('si no se pudo borrar, lo dice y no ofrece DESHACER',
+        (tester) async {
+      final c = await _pump(tester, prefs);
+      c.read(templatePreferencesControllerProvider);
+      _ctrl.clearResult = false;
+      await tester.tap(find.byKey(borrar));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('No pudimos borrar los filtros. Probá de nuevo.'),
+          findsOneWidget);
+      expect(find.text('DESHACER'), findsNothing);
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 }

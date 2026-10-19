@@ -1133,6 +1133,19 @@ class AppL10nEs extends AppL10n {
   String get templatesFilterEmptyAction => 'Ver todas';
 
   @override
+  String get templatesFilterBarClear => 'Borrar filtros';
+
+  @override
+  String get templatesFiltersCleared => 'Filtros borrados';
+
+  @override
+  String get templatesFiltersClearError =>
+      'No pudimos borrar los filtros. Inténtalo de nuevo.';
+
+  @override
+  String get templatesFiltersUndo => 'DESHACER';
+
+  @override
   String get workoutExploreSearchHint =>
       'Buscar por nombre, músculo o ejercicio';
 
@@ -6612,6 +6625,19 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesFilterEmptyAction => 'Ver todas';
+
+  @override
+  String get templatesFilterBarClear => 'Borrar filtros';
+
+  @override
+  String get templatesFiltersCleared => 'Filtros borrados';
+
+  @override
+  String get templatesFiltersClearError =>
+      'No pudimos borrar los filtros. Probá de nuevo.';
+
+  @override
+  String get templatesFiltersUndo => 'DESHACER';
 
   @override
   String get workoutExploreSearchHint =>

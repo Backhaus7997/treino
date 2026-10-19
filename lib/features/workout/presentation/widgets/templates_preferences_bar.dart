@@ -5,9 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/primitives.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/template_preferences_providers.dart';
 import '../../application/unified_templates_providers.dart';
+import '../../domain/template_preferences.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import '../onboarding/templates_onboarding_steps.dart';
 
@@ -27,14 +29,21 @@ import '../onboarding/templates_onboarding_steps.dart';
 /// distintas palabras. Dos: es la mitad del código, y el ranking ya vive en un
 /// provider derivado que no le importa quién escribió las preferencias.
 ///
-/// ## Dice "Filtrado" sólo si filtra (#1561)
+/// ## Dice "Filtrado" sólo si filtra
 ///
-/// Días y minutos filtran la grilla (si queda vacía, PlantillasTab ofrece
-/// "Ver todas"); objetivo y zonas sólo la ordenan. La copy dice "Filtrado"
-/// sólo mientras ese filtro está EN EFECTO
-/// ([templatesPreferenceFilterActiveProvider]); con sólo objetivo/zonas, o
+/// Todas las respuestas filtran la grilla (si queda vacía, PlantillasTab
+/// ofrece "Ver todas"), salvo "75 o más", que no excluye nada. La copy dice
+/// "Filtrado" sólo mientras el filtro está EN EFECTO
+/// ([templatesPreferenceFilterActiveProvider]); con sólo "75 o más", o
 /// levantado con "Ver todas", dice "Ordenado" — prometer un recorte que no
 /// pasa es la advertencia falsa de AGENTS.md §11.1.
+///
+/// ## Borrar filtros
+///
+/// Con respuestas, una ✕ al lado de AJUSTAR las borra del perfil
+/// ([TemplatePreferencesController.clear]) y avisa con DESHACER, que vuelve a
+/// guardar las que había. Sin confirmación previa a propósito: deshacer es más
+/// barato que preguntar, y no se pierde nada que no se pueda recuperar.
 class TemplatesPreferencesBar extends ConsumerWidget {
   const TemplatesPreferencesBar({super.key});
 
@@ -102,6 +111,13 @@ class TemplatesPreferencesBar extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.s12),
+          if (answered)
+            IconButton(
+              key: const Key('templates_preferences_clear'),
+              tooltip: l10n.templatesFilterBarClear,
+              onPressed: () => _clear(context, ref, prefs),
+              icon: Icon(TreinoIcon.close, size: 18, color: palette.textMuted),
+            ),
           TextButton.icon(
             key: const Key('templates_preferences_adjust'),
             onPressed: () =>
@@ -120,6 +136,34 @@ class TemplatesPreferencesBar extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _clear(
+    BuildContext context,
+    WidgetRef ref,
+    TemplatePreferences previous,
+  ) async {
+    final l10n = AppL10n.of(context);
+    final controller = ref.read(templatePreferencesControllerProvider);
+    final ok = await controller.clear();
+    if (!context.mounted) return;
+    if (!ok) {
+      showTreinoToast(
+        context,
+        l10n.templatesFiltersClearError,
+        type: TreinoToastType.error,
+      );
+      return;
+    }
+    showTreinoToast(
+      context,
+      l10n.templatesFiltersCleared,
+      type: TreinoToastType.success,
+      action: TreinoToastAction(
+        label: l10n.templatesFiltersUndo,
+        onPressed: () => controller.save(previous),
       ),
     );
   }

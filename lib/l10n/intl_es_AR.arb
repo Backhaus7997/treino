@@ -746,6 +746,14 @@
   "@templatesFilterEmptyZones": {"description": "Estado vacío de EXPLORAR cuando ninguna plantilla dedica al menos el 10 % de sus ejercicios a alguna de las zonas elegidas. Va seguido de templatesFilterEmptyAction."},
   "templatesFilterEmptyAction": "Ver todas",
   "@templatesFilterEmptyAction": {"description": "CTA del estado vacío de EXPLORAR: levanta todos los filtros del cuestionario (días, minutos, objetivo y zonas) en esa vista; el nivel y la búsqueda quedan."},
+  "templatesFilterBarClear": "Borrar filtros",
+  "@templatesFilterBarClear": {"description": "Botón de la barra de EXPLORAR que borra las respuestas guardadas del cuestionario (vuelve a mostrar el catálogo entero). Se usa como tooltip y etiqueta accesible."},
+  "templatesFiltersCleared": "Filtros borrados",
+  "@templatesFiltersCleared": {"description": "Aviso después de borrar los filtros de EXPLORAR. Lleva la acción templatesFiltersUndo."},
+  "templatesFiltersClearError": "No pudimos borrar los filtros. Probá de nuevo.",
+  "@templatesFiltersClearError": {"description": "Aviso cuando no se pudieron borrar los filtros de EXPLORAR (sin conexión o sin perfil cargado)."},
+  "templatesFiltersUndo": "DESHACER",
+  "@templatesFiltersUndo": {"description": "Acción del aviso templatesFiltersCleared: vuelve a guardar las respuestas que había."},
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },

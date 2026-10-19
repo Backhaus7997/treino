@@ -2090,6 +2090,30 @@ abstract class AppL10n {
   /// **'Ver todas'**
   String get templatesFilterEmptyAction;
 
+  /// Botón de la barra de EXPLORAR que borra las respuestas guardadas del cuestionario (vuelve a mostrar el catálogo entero). Se usa como tooltip y etiqueta accesible.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Borrar filtros'**
+  String get templatesFilterBarClear;
+
+  /// Aviso después de borrar los filtros de EXPLORAR. Lleva la acción templatesFiltersUndo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Filtros borrados'**
+  String get templatesFiltersCleared;
+
+  /// Aviso cuando no se pudieron borrar los filtros de EXPLORAR (sin conexión o sin perfil cargado).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos borrar los filtros. Probá de nuevo.'**
+  String get templatesFiltersClearError;
+
+  /// Acción del aviso templatesFiltersCleared: vuelve a guardar las respuestas que había.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER'**
+  String get templatesFiltersUndo;
+
   /// Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise.
   ///
   /// In es_AR, this message translates to:
