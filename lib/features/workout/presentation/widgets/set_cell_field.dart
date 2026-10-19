@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../l10n/app_l10n.dart';
+
 import '../../../../app/theme/app_palette.dart';
 import '../../domain/set_limits.dart';
 import 'bounded_number_formatter.dart';
@@ -116,12 +118,20 @@ class _SetCellFieldState extends State<SetCellField> {
           BoundedNumberFormatter(
             max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
             decimal: widget.decimal,
+            // #1510: el tope no se traga la tecla en silencio.
+            onOverMax: () => avisarTopeAlcanzado(
+              context,
+              max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+              unit: widget.decimal
+                  ? 'kg'
+                  : AppL10n.of(context).routineEditorFieldReps,
+            ),
           ),
         ],
         style: GoogleFonts.barlow(
           fontSize: 17,
           fontWeight: FontWeight.w600,
-          color: widget.hasError ? palette.danger : palette.textPrimary,
+          color: widget.hasError ? palette.dangerText : palette.textPrimary,
         ),
         textAlign: TextAlign.center,
         decoration: setCellDecoration(
@@ -131,9 +141,8 @@ class _SetCellFieldState extends State<SetCellField> {
         ).copyWith(
           hintStyle: GoogleFonts.barlow(
             fontSize: 13,
-            color: widget.hasError
-                ? palette.danger.withAlpha(180)
-                : palette.textMuted,
+            // Sin alpha: con 180 daba 3,2:1 (medido), abajo de AA.
+            color: widget.hasError ? palette.dangerText : palette.textMuted,
           ),
         ),
         onChanged: (value) {

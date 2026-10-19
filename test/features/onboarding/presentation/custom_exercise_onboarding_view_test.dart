@@ -39,6 +39,7 @@ Future<void> _pump(
           onFinish: onFinish,
           onSkip: onSkip,
           skipLabel: 'SALTAR',
+          lastSkipLabel: 'AHORA NO',
           nextLabel: 'SIGUIENTE',
           finishLabel: 'CREAR MI EJERCICIO',
           stepSemanticsLabel: (c, t) => 'Paso $c de $t',
@@ -109,22 +110,29 @@ void main() {
       expect(finished, 1);
     });
 
-    testWidgets('SALTAR is offered on every slide but the last',
+    // #1489: la última slide sólo ofrecía CREAR MI EJERCICIO, que ABRE el
+    // editor de ejercicio. El PF que vino a armar un plan quedaba empujado a
+    // crear un ejercicio, sin salida neutra (sólo arrastrar el sheet).
+    testWidgets('hay salida en TODAS las slides; en la última dice AHORA NO',
         (tester) async {
       var skipped = 0;
-      await _pump(tester, onFinish: () {}, onSkip: () => skipped++);
+      var finished = 0;
+      await _pump(tester, onFinish: () => finished++, onSkip: () => skipped++);
 
       for (var i = 0; i < athleteCustomExerciseSlides.length - 1; i++) {
         expect(find.byKey(_skipKey), findsOneWidget, reason: 'slide $i');
+        expect(find.text('SALTAR'), findsOneWidget, reason: 'slide $i');
         await _next(tester);
       }
 
-      expect(
-        find.byKey(_skipKey),
-        findsNothing,
-        reason: 'the last slide CTA already ends the flow',
-      );
-      expect(skipped, 0);
+      expect(find.byKey(_skipKey), findsOneWidget,
+          reason: 'la última también tiene salida neutra');
+      expect(find.text('AHORA NO'), findsOneWidget);
+
+      await tester.tap(find.byKey(_skipKey));
+      await tester.pumpAndSettle();
+      expect(skipped, 1, reason: 'AHORA NO es saltar, no crear');
+      expect(finished, 0);
     });
 
     // Un test POR DECK, no un loop adentro de uno: el `PageView` conserva su
@@ -213,6 +221,7 @@ void main() {
                 onFinish: () {},
                 onSkip: () {},
                 skipLabel: 'SALTAR',
+                lastSkipLabel: 'AHORA NO',
                 nextLabel: 'SIGUIENTE',
                 finishLabel: 'CREAR MI EJERCICIO',
                 stepSemanticsLabel: (c, t) => 'Paso $c de $t',

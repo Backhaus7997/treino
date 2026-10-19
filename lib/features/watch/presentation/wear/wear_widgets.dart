@@ -242,7 +242,7 @@ class WearEffortRow extends StatelessWidget {
         if (hayPulso)
           _WearEffortCell(
             icon: TreinoIcon.heartRate,
-            iconColor: palette.danger,
+            iconColor: palette.dangerText,
             value: effort.bpm,
             unit: WearStrings.bpmUnit,
           ),

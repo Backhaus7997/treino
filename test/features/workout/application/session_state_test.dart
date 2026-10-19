@@ -376,6 +376,30 @@ void main() {
       expect(state.completedExerciseCount, equals(1));
     });
 
+    // #1510: la barra de progreso avanza por SERIE, no por ejercicio.
+    test('#1510: completedSetCount y totalPlannedSets cuentan series, topeadas',
+        () {
+      final day = makeDay(slots: [
+        makeSlot(exerciseId: 'e1', targetSets: 3),
+        makeSlot(exerciseId: 'e2', targetSets: 2),
+      ]);
+      final state = SessionState(
+        session: makeSession(),
+        day: day,
+        setLogs: [
+          makeSetLog(exerciseId: 'e1', setNumber: 1, id: 'l1'),
+          // Una serie DE MÁS en e2 (3 de 2) no adelanta las de e1.
+          makeSetLog(exerciseId: 'e2', setNumber: 1, id: 'l2'),
+          makeSetLog(exerciseId: 'e2', setNumber: 2, id: 'l3'),
+          makeSetLog(exerciseId: 'e2', setNumber: 3, id: 'l4'),
+        ],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      expect(state.totalPlannedSets, 5);
+      expect(state.completedSetCount, 3);
+    });
+
     // ── copyWith / == / hashCode cover setCountOverride ──────────────────────
 
     test(

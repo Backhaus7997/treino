@@ -233,6 +233,7 @@ class _OnboardingSheet extends StatelessWidget {
             skipLabel: l10n.onboardingTourSkip,
             nextLabel: l10n.onboardingTourNext,
             finishLabel: l10n.onboardingCustomExerciseCta,
+            lastSkipLabel: l10n.onboardingCustomExerciseNotNow,
             stepSemanticsLabel: (current, total) =>
                 l10n.onboardingTourProgress(current, total),
           ),
@@ -282,6 +283,7 @@ class _OnboardingDialog extends StatelessWidget {
             skipLabel: l10n.onboardingTourSkip,
             nextLabel: l10n.onboardingTourNext,
             finishLabel: l10n.onboardingCustomExerciseCta,
+            lastSkipLabel: l10n.onboardingCustomExerciseNotNow,
             stepSemanticsLabel: (current, total) =>
                 l10n.onboardingTourProgress(current, total),
           ),

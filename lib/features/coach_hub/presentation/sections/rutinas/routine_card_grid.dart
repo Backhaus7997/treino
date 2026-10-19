@@ -390,7 +390,7 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
           value: _AccionRutina.eliminar,
           child: Text(
             'Eliminar', // i18n
-            style: TextStyle(color: palette.danger),
+            style: TextStyle(color: palette.dangerText),
           ),
         ),
       ],
@@ -909,7 +909,7 @@ class _DialogoDePublicarState extends State<_DialogoDePublicar> {
                 fontFamily: AppFonts.barlow,
                 fontWeight: AppFonts.w600,
                 fontSize: AppTextSize.caption,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ],

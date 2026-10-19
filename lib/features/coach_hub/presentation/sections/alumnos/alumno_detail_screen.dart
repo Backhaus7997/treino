@@ -43,6 +43,7 @@ import 'package:treino/features/insights/presentation/widgets/daily_heatmap_sect
 import 'package:treino/features/insights/presentation/widgets/day_strip_labels.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
+import 'package:treino/features/measurements/domain/measurement_ranges.dart';
 import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
@@ -50,6 +51,7 @@ import 'package:treino/features/payments/application/payment_providers.dart';
 import 'package:treino/features/payments/domain/athlete_billing.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
 import 'package:treino/features/performance/domain/performance_test.dart';
+import 'package:treino/features/performance/domain/performance_test_ranges.dart';
 import 'package:treino/features/performance/presentation/widgets/performance_progress_chart.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -73,6 +75,9 @@ import 'package:treino/features/workout/presentation/widgets/feedback_load_error
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/core/utils/metric_range.dart';
+import 'package:treino/core/utils/metric_range_message.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../infrastructure/browser_download.dart';
@@ -1459,8 +1464,9 @@ String _trimNum(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 /// Volumen compacto: kg hasta 999, toneladas con un decimal de ahí en más.
-String _fmtVolKg(double kg) =>
-    kg >= 1000 ? '${(kg / 1000).toStringAsFixed(1)} t' : '${kg.round()} kg';
+String _fmtVolKg(double kg, String localeName) => kg >= 1000
+    ? '${formatNumberDisplay(kg / 1000, localeName)} t'
+    : '${formatNumberDisplay(kg.round(), localeName)} kg';
 
 /// Tab Resumen (W2 PR4): 4 métricas derivadas + heatmap de adherencia de 12
 /// semanas. Sólo usa data trainer-readable (sesiones, mediciones, plan
@@ -1540,7 +1546,7 @@ class _ResumenTab extends ConsumerWidget {
           : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
       deltaColor: pesoDelta == null
           ? null
-          : (pesoDelta >= 0 ? palette.accent : palette.danger),
+          : (pesoDelta >= 0 ? palette.accent : palette.dangerText),
       caption: pesoDelta == null ? null : '30 días',
     );
 
@@ -1577,7 +1583,7 @@ class _ResumenTab extends ConsumerWidget {
                           '${adhDelta.abs().round()} pts',
                   deltaColor: adhDelta == null
                       ? null
-                      : (adhDelta >= 0 ? palette.accent : palette.danger),
+                      : (adhDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       adh == null ? 'Todavía sin datos' : 'vs 30 días previos',
                 ),
@@ -1594,13 +1600,14 @@ class _ResumenTab extends ConsumerWidget {
                   palette: palette,
                   icon: TreinoIcon.dumbbell,
                   label: 'VOLUMEN', // i18n: Fase W2
-                  value: _fmtVolKg(m.volumenSemanaActualKg),
+                  value: _fmtVolKg(
+                      m.volumenSemanaActualKg, AppL10n.of(context).localeName),
                   delta: volDelta == null
                       ? null
                       : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
                   deltaColor: volDelta == null
                       ? null
-                      : (volDelta >= 0 ? palette.accent : palette.danger),
+                      : (volDelta >= 0 ? palette.accent : palette.dangerText),
                   caption:
                       volDelta == null ? 'esta semana' : 'vs semana pasada',
                 ),
@@ -2888,7 +2895,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               // #555: el count viene acotado al período activo del selector.
               frequencyLabel: (n) => n == 1
@@ -2913,7 +2920,7 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               oneRepMaxLabel: '1RM', // i18n: Fase W2
               bestSetVolumeLabel: 'Mejor serie', // i18n: Fase W2
               bestSessionVolumeLabel: 'Volumen', // i18n: Fase W2
-              volumeUnit: 'kg·reps', // i18n: Fase W2
+              volumeUnit: 'kg', // i18n: Fase W2
               weightUnit: 'kg', // i18n: Fase W2
               emptyText:
                   'Sin datos suficientes para este ejercicio.', // i18n: Fase W2
@@ -3715,7 +3722,9 @@ class _SessionStatusPill extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -4113,7 +4122,7 @@ class _ArchivoRow extends ConsumerWidget {
             TreinoIconButton(
               icon: TreinoIcon.trash,
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
-              color: palette.danger,
+              color: palette.dangerText,
               onPressed: onDelete,
             ),
           ],
@@ -4302,10 +4311,13 @@ class _MedicionRowState extends State<_MedicionRow> {
   /// Si alguno es null, se omite del summary.
   String _summary() {
     final m = widget.measurement;
+    // Con el locale: «78,5 kg», no el double crudo «78.5 kg» ni «78.0 kg».
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final parts = <String>[];
-    if (m.weightKg != null) parts.add('${m.weightKg} kg');
-    if (m.fatPercentage != null) parts.add('${m.fatPercentage}% grasa');
-    if (m.waistCm != null) parts.add('cintura ${m.waistCm} cm');
+    if (m.weightKg != null) parts.add('${n(m.weightKg)} kg');
+    if (m.fatPercentage != null) parts.add('${n(m.fatPercentage)}% grasa');
+    if (m.waistCm != null) parts.add('cintura ${n(m.waistCm)} cm');
     if (parts.isEmpty) return 'Sin datos de composición'; // i18n: Fase W2
     return parts.join(' · ');
   }
@@ -4380,7 +4392,7 @@ class _MedicionRowState extends State<_MedicionRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -4408,33 +4420,37 @@ class _MedicionDetail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = measurement;
+    String n(double? v) =>
+        formatNumberDisplay(v!, AppL10n.of(context).localeName, maxDecimals: 2);
     final entries = <(String, String)>[
       // Composición
-      if (m.weightKg != null) ('Peso', '${m.weightKg} kg'),
-      if (m.fatPercentage != null) ('% grasa', '${m.fatPercentage}%'),
-      if (m.muscleMassKg != null) ('Masa muscular', '${m.muscleMassKg} kg'),
+      if (m.weightKg != null) ('Peso', '${n(m.weightKg)} kg'),
+      if (m.fatPercentage != null) ('% grasa', '${n(m.fatPercentage)}%'),
+      if (m.muscleMassKg != null) ('Masa muscular', '${n(m.muscleMassKg)} kg'),
       // Trunk
-      if (m.shouldersCm != null) ('Hombros', '${m.shouldersCm} cm'),
-      if (m.chestCm != null) ('Pecho', '${m.chestCm} cm'),
-      if (m.waistCm != null) ('Cintura', '${m.waistCm} cm'),
-      if (m.hipsCm != null) ('Cadera', '${m.hipsCm} cm'),
-      if (m.glutesCm != null) ('Glúteos', '${m.glutesCm} cm'),
+      if (m.shouldersCm != null) ('Hombros', '${n(m.shouldersCm)} cm'),
+      if (m.chestCm != null) ('Pecho', '${n(m.chestCm)} cm'),
+      if (m.waistCm != null) ('Cintura', '${n(m.waistCm)} cm'),
+      if (m.hipsCm != null) ('Cadera', '${n(m.hipsCm)} cm'),
+      if (m.glutesCm != null) ('Glúteos', '${n(m.glutesCm)} cm'),
       // Upper
-      if (m.bicepsLCm != null) ('Bíceps izq.', '${m.bicepsLCm} cm'),
-      if (m.bicepsRCm != null) ('Bíceps der.', '${m.bicepsRCm} cm'),
+      if (m.bicepsLCm != null) ('Bíceps izq.', '${n(m.bicepsLCm)} cm'),
+      if (m.bicepsRCm != null) ('Bíceps der.', '${n(m.bicepsRCm)} cm'),
       if (m.bicepsFlexedLCm != null)
-        ('Bíceps flex. izq.', '${m.bicepsFlexedLCm} cm'),
+        ('Bíceps flex. izq.', '${n(m.bicepsFlexedLCm)} cm'),
       if (m.bicepsFlexedRCm != null)
-        ('Bíceps flex. der.', '${m.bicepsFlexedRCm} cm'),
-      if (m.forearmLCm != null) ('Antebrazo izq.', '${m.forearmLCm} cm'),
-      if (m.forearmRCm != null) ('Antebrazo der.', '${m.forearmRCm} cm'),
+        ('Bíceps flex. der.', '${n(m.bicepsFlexedRCm)} cm'),
+      if (m.forearmLCm != null) ('Antebrazo izq.', '${n(m.forearmLCm)} cm'),
+      if (m.forearmRCm != null) ('Antebrazo der.', '${n(m.forearmRCm)} cm'),
       // Lower
-      if (m.upperThighLCm != null) ('Muslo sup. izq.', '${m.upperThighLCm} cm'),
-      if (m.upperThighRCm != null) ('Muslo sup. der.', '${m.upperThighRCm} cm'),
-      if (m.midThighLCm != null) ('Muslo med. izq.', '${m.midThighLCm} cm'),
-      if (m.midThighRCm != null) ('Muslo med. der.', '${m.midThighRCm} cm'),
-      if (m.calfLCm != null) ('Gemelo izq.', '${m.calfLCm} cm'),
-      if (m.calfRCm != null) ('Gemelo der.', '${m.calfRCm} cm'),
+      if (m.upperThighLCm != null)
+        ('Muslo sup. izq.', '${n(m.upperThighLCm)} cm'),
+      if (m.upperThighRCm != null)
+        ('Muslo sup. der.', '${n(m.upperThighRCm)} cm'),
+      if (m.midThighLCm != null) ('Muslo med. izq.', '${n(m.midThighLCm)} cm'),
+      if (m.midThighRCm != null) ('Muslo med. der.', '${n(m.midThighRCm)} cm'),
+      if (m.calfLCm != null) ('Gemelo izq.', '${n(m.calfLCm)} cm'),
+      if (m.calfRCm != null) ('Gemelo der.', '${n(m.calfRCm)} cm'),
     ];
 
     if (entries.isEmpty && (m.notes ?? '').isEmpty) {
@@ -4775,16 +4791,19 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Peso',
                                 suffix: 'kg',
                                 controller: _weightC,
+                                range: MeasurementRanges.weightKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: '% grasa',
                                 suffix: '%',
                                 controller: _fatC,
+                                range: MeasurementRanges.fatPercentage,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Masa muscular',
                                 suffix: 'kg',
                                 controller: _muscleC,
+                                range: MeasurementRanges.muscleMassKg,
                                 palette: palette),
                           ],
                         ),
@@ -4800,26 +4819,31 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Hombros',
                                 suffix: 'cm',
                                 controller: _shouldersC,
+                                range: MeasurementRanges.shouldersCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Pecho',
                                 suffix: 'cm',
                                 controller: _chestC,
+                                range: MeasurementRanges.chestCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cintura',
                                 suffix: 'cm',
                                 controller: _waistC,
+                                range: MeasurementRanges.waistCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cadera',
                                 suffix: 'cm',
                                 controller: _hipsC,
+                                range: MeasurementRanges.hipsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Glúteos',
                                 suffix: 'cm',
                                 controller: _glutesC,
+                                range: MeasurementRanges.glutesCm,
                                 palette: palette),
                           ],
                         ),
@@ -4835,31 +4859,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Bíceps izq.',
                                 suffix: 'cm',
                                 controller: _bicepsLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps der.',
                                 suffix: 'cm',
                                 controller: _bicepsRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. izq.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedLC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Bíceps flex. der.',
                                 suffix: 'cm',
                                 controller: _bicepsFlexedRC,
+                                range: MeasurementRanges.bicepsCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo izq.',
                                 suffix: 'cm',
                                 controller: _forearmLC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Antebrazo der.',
                                 suffix: 'cm',
                                 controller: _forearmRC,
+                                range: MeasurementRanges.forearmCm,
                                 palette: palette),
                           ],
                         ),
@@ -4875,31 +4905,37 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                                 label: 'Muslo sup. izq.',
                                 suffix: 'cm',
                                 controller: _upperThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo sup. der.',
                                 suffix: 'cm',
                                 controller: _upperThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. izq.',
                                 suffix: 'cm',
                                 controller: _midThighLC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Muslo med. der.',
                                 suffix: 'cm',
                                 controller: _midThighRC,
+                                range: MeasurementRanges.thighCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo izq.',
                                 suffix: 'cm',
                                 controller: _calfLC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Gemelo der.',
                                 suffix: 'cm',
                                 controller: _calfRC,
+                                range: MeasurementRanges.calfCm,
                                 palette: palette),
                           ],
                         ),
@@ -5036,17 +5072,25 @@ class _NuevaMedicionSection extends StatelessWidget {
 }
 
 /// Campo numérico del dialog. Acepta coma o punto como decimal.
+///
+/// Lo comparten los dialogs de medición y de evaluación del Hub, y valida
+/// contra el [range] de SU campo — los mismos `MeasurementRanges` /
+/// `PerformanceTestRanges` que mobile y que `firestore.rules`. Antes era un
+/// 0–500 genérico para todo: aceptaba 150 % de grasa (#1483) y un CMJ de
+/// 200 cm que la regla deniega (lo marcó Codex en #1540).
 class _NuevaMedicionField extends StatelessWidget {
   const _NuevaMedicionField({
     required this.label,
     required this.suffix,
     required this.controller,
+    required this.range,
     required this.palette,
   });
 
   final String label;
   final String suffix;
   final TextEditingController controller;
+  final MetricRange range;
   final AppPalette palette;
 
   @override
@@ -5078,16 +5122,7 @@ class _NuevaMedicionField extends StatelessWidget {
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         ),
-        validator: (v) {
-          final s = v?.trim().replaceAll(',', '.') ?? '';
-          if (s.isEmpty) return null; // opcional
-          final parsed = double.tryParse(s);
-          if (parsed == null) return 'Número inválido'; // i18n: Fase W2
-          if (parsed < 0 || parsed > 500) {
-            return 'Fuera de rango'; // i18n: Fase W2
-          }
-          return null;
-        },
+        validator: (v) => metricRangeError(range, v, AppL10n.of(context)),
       ),
     );
   }
@@ -5198,7 +5233,7 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                 TreinoIconButton(
                   icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
-                  color: palette.danger,
+                  color: palette.dangerText,
                   onPressed: widget.onDelete,
                 ),
               ],
@@ -5571,21 +5606,25 @@ class _NuevoRendimientoDialogState
                                 label: 'CMJ',
                                 suffix: 'cm',
                                 controller: _cmjC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Squat Jump',
                                 suffix: 'cm',
                                 controller: _squatJumpC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Abalakov',
                                 suffix: 'cm',
                                 controller: _abalakovC,
+                                range: PerformanceTestRanges.verticalJumpCm,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Salto largo',
                                 suffix: 'cm',
                                 controller: _broadJumpC,
+                                range: PerformanceTestRanges.broadJumpCm,
                                 palette: palette),
                           ],
                         ),
@@ -5601,21 +5640,25 @@ class _NuevoRendimientoDialogState
                                 label: 'Sprint 10m',
                                 suffix: 's',
                                 controller: _sprint10C,
+                                range: PerformanceTestRanges.sprint10mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 20m',
                                 suffix: 's',
                                 controller: _sprint20C,
+                                range: PerformanceTestRanges.sprint20mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 30m',
                                 suffix: 's',
                                 controller: _sprint30C,
+                                range: PerformanceTestRanges.sprint30mS,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sprint 40m',
                                 suffix: 's',
                                 controller: _sprint40C,
+                                range: PerformanceTestRanges.sprint40mS,
                                 palette: palette),
                           ],
                         ),
@@ -5631,26 +5674,31 @@ class _NuevoRendimientoDialogState
                                 label: 'Sentadilla',
                                 suffix: 'kg',
                                 controller: _squat1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press banca',
                                 suffix: 'kg',
                                 controller: _bench1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Peso muerto',
                                 suffix: 'kg',
                                 controller: _deadlift1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Press militar',
                                 suffix: 'kg',
                                 controller: _overhead1rmC,
+                                range: PerformanceTestRanges.oneRepMaxKg,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Dominada',
                                 suffix: 'kg',
                                 controller: _pullUp1rmC,
+                                range: PerformanceTestRanges.pullUpLoadKg,
                                 palette: palette),
                           ],
                         ),
@@ -5666,21 +5714,25 @@ class _NuevoRendimientoDialogState
                                 label: 'VO2 máx',
                                 suffix: 'ml/kg/min',
                                 controller: _vo2maxC,
+                                range: PerformanceTestRanges.vo2maxMlKgMin,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Course Navette',
                                 suffix: 'nivel',
                                 controller: _courseNavetteC,
+                                range: PerformanceTestRanges.courseNavetteLevel,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Cooper',
                                 suffix: 'm',
                                 controller: _cooperC,
+                                range: PerformanceTestRanges.cooperMeters,
                                 palette: palette),
                             _NuevaMedicionField(
                                 label: 'Sit & Reach',
                                 suffix: 'cm',
                                 controller: _sitAndReachC,
+                                range: PerformanceTestRanges.sitAndReachCm,
                                 palette: palette),
                           ],
                         ),
@@ -5955,7 +6007,7 @@ class _SeguimientoEntryCard extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 onPressed: onDelete,
               ),
             ],
@@ -6010,7 +6062,9 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: color,
+          // El tinte y el borde usan el color de estado; el texto, su versión
+          // legible (#1550).
+          color: palette.textVariantOf(color),
           fontSize: 10,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.5,
@@ -6607,7 +6661,7 @@ class _MealEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar comida', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6723,7 +6777,7 @@ class _GroupEditor extends StatelessWidget {
               TreinoIconButton(
                 icon: TreinoIcon.trash,
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
-                color: palette.danger,
+                color: palette.dangerText,
                 size: TreinoButtonSize.xs,
                 onPressed: onDelete,
               ),
@@ -6903,7 +6957,7 @@ class _OptionRow extends StatelessWidget {
         TreinoIconButton(
           icon: TreinoIcon.trash,
           tooltip: 'Eliminar opción', // i18n: Fase W2
-          color: palette.danger,
+          color: palette.dangerText,
           size: TreinoButtonSize.xs,
           onPressed: onDelete,
         ),

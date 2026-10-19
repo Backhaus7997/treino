@@ -80,7 +80,9 @@ abstract final class TreinoButtonTokens {
       TreinoButtonVariant.danger => TreinoButtonVisual._(
           background: AppColorPrimitives.transparent,
           hoverBackground: p.danger.withValues(alpha: 0.08),
-          foreground: p.danger,
+          // Texto en `dangerText` (AA en las dos paletas); el borde queda en
+          // `danger`, que como borde sólo necesita 3:1.
+          foreground: p.dangerText,
           borderColor: p.danger,
           hoverBorderColor: p.danger,
         ),

@@ -120,7 +120,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: AppTextSize.titleLarge,
-                      color: palette.danger,
+                      color: palette.dangerText,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -185,7 +185,7 @@ class EliminarCuentaSheet extends ConsumerWidget {
                         style: GoogleFonts.barlow(
                           fontWeight: FontWeight.w600,
                           fontSize: AppTextSize.bodyDense,
-                          color: palette.danger,
+                          color: palette.dangerText,
                         ),
                       ),
                     ),
