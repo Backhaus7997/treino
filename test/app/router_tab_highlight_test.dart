@@ -6,6 +6,8 @@
 //   - /feed/friend-requests    (twin of /profile/friend-requests) — feed bell
 //   - /profile/availability-editor (twin of /coach/availability-editor) —
 //     TrainerProfileView "Disponibilidad" row
+//   - /profile/trainer-preview/:uid (twin of /coach/trainer/:uid) —
+//     TrainerProfileView "VER PREVIEW" (#1498)
 // Same route-mirroring pattern as the coach plan/exercise routes (issue #410).
 //
 // Auth note: authNotifierProvider is overridden to stay AsyncLoading forever,
@@ -28,7 +30,10 @@ import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/domain/availability_override.dart';
 import 'package:treino/features/coach/domain/availability_rule.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
+import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/presentation/availability_editor_screen.dart';
+import 'package:treino/features/coach/presentation/trainer_public_profile_screen.dart';
 import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
@@ -84,6 +89,15 @@ List<Override> _overrides() => [
       myFollowingFeedProvider.overrideWith((ref) async => const <Post>[]),
       myGymFeedProvider.overrideWith((ref) async => null),
       feedPublicProvider.overrideWith((ref) async => const <Post>[]),
+      // Perfil público del PF que abre VER PREVIEW: sin override el repo real
+      // tira por Firebase; con `null` la pantalla cae en su estado estático.
+      trainerByIdProvider('trainer-1').overrideWith(
+        (ref) async => const TrainerPublicProfile(uid: 'trainer-1'),
+      ),
+      // El preview escucha el documento (`trainerLiveByIdProvider`, #1498).
+      trainerLiveByIdProvider('trainer-1').overrideWith(
+        (ref) => Stream.value(const TrainerPublicProfile(uid: 'trainer-1')),
+      ),
       // Availability editor streams (trainerId travels as a query param).
       availabilityRulesStreamProvider('trainer-1').overrideWith(
         (ref) => Stream.value(const <AvailabilityRule>[]),
@@ -206,6 +220,46 @@ void main() {
       expect(find.byType(ProfileScreen), findsOneWidget);
       expect(_tabIndex(tester), 4,
           reason: 'back must land on the PERFIL tab root');
+    });
+
+    testWidgets(
+        'PERFIL → VER PREVIEW keeps PERFIL highlighted and pops back to '
+        '/profile (#1498)', (tester) async {
+      final router = await _pumpRouter(tester, '/profile');
+      expect(_tabIndex(tester), 4,
+          reason: 'sanity: /profile highlights PERFIL');
+
+      // Same push TrainerProfileView's "VER PREVIEW" button performs.
+      router.push('/profile/trainer-preview/trainer-1');
+      await tester.pumpAndSettle();
+
+      final screen = tester.widget<TrainerPublicProfileScreen>(
+        find.byType(TrainerPublicProfileScreen),
+      );
+      expect(screen.preview, isTrue,
+          reason: 'the /profile twin must open the screen in preview mode');
+      expect(_tabIndex(tester), 4,
+          reason: 'preview opened from PERFIL must keep PERFIL highlighted, '
+              'not jump to COACH');
+
+      router.pop();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ProfileScreen), findsOneWidget);
+      expect(_tabIndex(tester), 4,
+          reason: 'back must land on the PERFIL tab root');
+    });
+
+    testWidgets(
+        'the athlete-facing /coach/trainer/:uid still highlights COACH and '
+        'is NOT a preview', (tester) async {
+      await _pumpRouter(tester, '/coach/trainer/trainer-1');
+
+      final screen = tester.widget<TrainerPublicProfileScreen>(
+        find.byType(TrainerPublicProfileScreen),
+      );
+      expect(screen.preview, isFalse);
+      expect(_tabIndex(tester), 3);
     });
 
     testWidgets(

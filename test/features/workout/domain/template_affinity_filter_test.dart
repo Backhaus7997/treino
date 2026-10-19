@@ -1,5 +1,7 @@
-// Filtro DURO de EXPLORAR (#1561): días exactos y minutos ±15. Objetivo y
-// foco NO filtran (siguen siendo sólo orden — ver template_affinity_test).
+// Filtro DURO de EXPLORAR: todo lo que el atleta elige filtra. Días exactos,
+// minutos "tengo hasta X", objetivo y zonas. Sin dato NO pasa. Ver el dartdoc
+// de TemplateAffinity y, contra el catálogo real,
+// explorar_filtros_estrictos_test.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -10,10 +12,21 @@ import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/template_affinity.dart';
 import 'package:treino/features/workout/domain/template_preferences.dart';
 
+RoutineSlot _slot(String muscle) => RoutineSlot(
+      exerciseId: muscle,
+      exerciseName: muscle,
+      muscleGroup: muscle,
+      targetSets: 3,
+      targetRepsMin: 8,
+      targetRepsMax: 12,
+      restSeconds: 0,
+    );
+
 Routine _routine({
   int days = 3,
   int? minutes,
   List<RoutineGoal> goals = const [],
+  List<String> muscles = const [],
 }) =>
     Routine(
       id: 'r',
@@ -23,7 +36,11 @@ Routine _routine({
       goals: goals,
       days: [
         for (var i = 0; i < days; i++)
-          RoutineDay(dayNumber: i + 1, name: 'D${i + 1}', slots: const []),
+          RoutineDay(
+            dayNumber: i + 1,
+            name: 'D${i + 1}',
+            slots: [for (final m in muscles) _slot(m)],
+          ),
       ],
     );
 
@@ -41,15 +58,7 @@ Routine _estimable() => Routine(
             name: 'D${i + 1}',
             slots: [
               for (final m in ['chest', 'triceps'])
-                RoutineSlot(
-                  exerciseId: m,
-                  exerciseName: m,
-                  muscleGroup: m,
-                  targetSets: 3,
-                  targetRepsMin: 8,
-                  targetRepsMax: 12,
-                  restSeconds: 60,
-                ),
+                _slot(m).copyWith(restSeconds: 60),
             ],
           ),
       ],
@@ -60,12 +69,10 @@ bool _fits(Routine r, TemplatePreferences p) =>
 
 void main() {
   group('días: coincidencia exacta', () {
-    test('con 3 días una de 5 NO aparece (el bug del issue)', () {
+    test('con 3 días una de 5 NO aparece', () {
       const prefs = TemplatePreferences(daysPerWeek: 3);
       expect(_fits(_routine(days: 5), prefs), isFalse);
-      expect(_fits(_routine(days: 6), prefs), isFalse);
-      expect(_fits(_routine(days: 4), prefs), isFalse,
-          reason: 'exacto: ni un día de diferencia');
+      expect(_fits(_routine(days: 4), prefs), isFalse);
       expect(_fits(_routine(days: 2), prefs), isFalse);
       expect(_fits(_routine(days: 3), prefs), isTrue);
     });
@@ -80,43 +87,47 @@ void main() {
       }
     });
 
-    test('plantilla sin días cargados: desconocido no es desajuste', () {
+    test('plantilla sin días cargados: no se puede afirmar que encaje', () {
       expect(
         _fits(_routine(days: 0), const TemplatePreferences(daysPerWeek: 3)),
-        isTrue,
+        isFalse,
       );
     });
   });
 
-  group('minutos: ±15', () {
-    const prefs = TemplatePreferences(minutesPerSession: 45);
-
-    test('dentro de la tolerancia pasa, fuera no (bordes incluidos)', () {
-      expect(_fits(_routine(minutes: 30), prefs), isTrue);
-      expect(_fits(_routine(minutes: 45), prefs), isTrue);
-      expect(_fits(_routine(minutes: 60), prefs), isTrue);
-      expect(_fits(_routine(minutes: 29), prefs), isFalse);
-      expect(_fits(_routine(minutes: 61), prefs), isFalse);
-      expect(_fits(_routine(minutes: 90), prefs), isFalse);
-    });
-
-    test('sin minutos (comunidad/PF) NO se excluye', () {
-      expect(_fits(_routine(minutes: null), prefs), isTrue);
-      expect(_fits(_routine(minutes: 0), prefs), isTrue);
-    });
-
-    test('75 significa "75 o más": sin techo, piso en 60', () {
-      const p75 = TemplatePreferences(minutesPerSession: 75);
-      expect(_fits(_routine(minutes: 60), p75), isTrue);
-      expect(_fits(_routine(minutes: 75), p75), isTrue);
-      expect(_fits(_routine(minutes: 110), p75), isTrue);
-      expect(_fits(_routine(minutes: 59), p75), isFalse);
-    });
-
-    test('30 min: una de 60 no entra', () {
+  group('minutos: "tengo hasta X"', () {
+    test('el reporte: con 30 min no entra nada de más de 30', () {
       const p30 = TemplatePreferences(minutesPerSession: 30);
-      expect(_fits(_routine(minutes: 60), p30), isFalse);
-      expect(_fits(_routine(minutes: 45), p30), isTrue);
+      expect(_fits(_routine(minutes: 20), p30), isTrue);
+      expect(_fits(_routine(minutes: 30), p30), isTrue, reason: 'borde');
+      expect(_fits(_routine(minutes: 31), p30), isFalse);
+      expect(_fits(_routine(minutes: 45), p30), isFalse);
+    });
+
+    test('45 y 60: lo que dura eso o menos', () {
+      for (final cap in [45, 60]) {
+        final p = TemplatePreferences(minutesPerSession: cap);
+        for (final m in [20, 30, 45, 50, 60, 75, 90]) {
+          expect(_fits(_routine(minutes: m), p), m <= cap,
+              reason: 'tengo $cap, la plantilla dura $m');
+        }
+      }
+    });
+
+    test('"75 o más" no filtra: con 75+ entra cualquiera', () {
+      const p75 = TemplatePreferences(minutesPerSession: 75);
+      for (final m in [20, 45, 75, 110]) {
+        expect(_fits(_routine(minutes: m), p75), isTrue, reason: '$m');
+      }
+      expect(TemplateAffinity.hasHardFilters(p75), isFalse);
+    });
+
+    test('sin duración posible no pasa: no se puede afirmar que entre', () {
+      expect(TemplateAffinity.minutesOf(_routine()), isNull);
+      expect(
+        _fits(_routine(), const TemplatePreferences(minutesPerSession: 60)),
+        isFalse,
+      );
     });
   });
 
@@ -124,40 +135,20 @@ void main() {
     test('se filtra con la duración estimada de sus series', () {
       expect(TemplateAffinity.minutesOf(_estimable()), 16);
       expect(
-        _fits(_estimable(), const TemplatePreferences(minutesPerSession: 75)),
-        isFalse,
-        reason: '16 min estimados no son "75 o más"',
-      );
-      expect(
         _fits(_estimable(), const TemplatePreferences(minutesPerSession: 30)),
         isTrue,
-        reason: '16 está a 14 de 30: dentro de ±15',
-      );
-    });
-
-    test('sin series ni minutos no hay estimación y la plantilla pasa', () {
-      expect(TemplateAffinity.minutesOf(_routine()), isNull);
-      expect(
-        _fits(_routine(), const TemplatePreferences(minutesPerSession: 30)),
-        isTrue,
+        reason: '16 min estimados entran en "tengo hasta 30"',
       );
     });
 
     test('el orden usa la misma estimación que el filtro', () {
       const prefs = TemplatePreferences(minutesPerSession: 30);
-      final estimada = TemplateAffinity.score(_estimable(), prefs);
       expect(
-        estimada,
+        TemplateAffinity.score(_estimable(), prefs),
         TemplateAffinity.score(
           _estimable().copyWith(estimatedMinutesPerDay: 16),
           prefs,
         ),
-        reason: 'puntúa igual que si tuviera los 16 min cargados',
-      );
-      expect(
-        estimada,
-        isNot(TemplateAffinity.score(_routine(), prefs)),
-        reason: 'no es el neutral de una plantilla sin dato',
       );
     });
   });
@@ -167,41 +158,109 @@ void main() {
     expect(
       TemplateAffinity.score(_routine(minutes: 100), prefs),
       greaterThan(TemplateAffinity.score(_routine(minutes: 70), prefs)),
-      reason: 'el filtro deja entrar la de 100: el orden no puede hundirla',
     );
   });
 
-  group('matchesDays / matchesMinutes por separado', () {
-    test('cada dimensión se evalúa sola', () {
-      const prefs = TemplatePreferences(daysPerWeek: 3, minutesPerSession: 30);
-      final r = _routine(days: 3, minutes: 90);
-      expect(TemplateAffinity.matchesDays(r, prefs), isTrue);
-      expect(TemplateAffinity.matchesMinutes(r, prefs), isFalse);
-      expect(_fits(r, prefs), isFalse);
-    });
-  });
+  group('objetivo: al menos uno de los elegidos', () {
+    const prefs = TemplatePreferences(
+      goals: [RoutineGoal.sport, RoutineGoal.health],
+    );
 
-  group('objetivo y foco NO filtran', () {
-    test('objetivo opuesto, sin objetivos y foco distinto pasan', () {
-      const prefs = TemplatePreferences(
-        goals: [RoutineGoal.sport],
-        priorityMuscleGroups: ['back'],
+    test('comparte uno → pasa; ninguno → no', () {
+      expect(
+        _fits(_routine(goals: const [RoutineGoal.health]), prefs),
+        isTrue,
+      );
+      expect(
+        _fits(
+          _routine(goals: const [RoutineGoal.aesthetics, RoutineGoal.sport]),
+          prefs,
+        ),
+        isTrue,
       );
       expect(
         _fits(_routine(goals: const [RoutineGoal.aesthetics]), prefs),
-        isTrue,
+        isFalse,
       );
-      expect(_fits(_routine(), prefs), isTrue);
+    });
+
+    test('sin objetivos declarados no pasa', () {
+      expect(_fits(_routine(), prefs), isFalse);
+    });
+  });
+
+  group('zonas: ≥ 10 % de los ejercicios en alguna elegida', () {
+    const prefs = TemplatePreferences(priorityMuscleGroups: ['glutes']);
+
+    test('justo en el 10 % pasa; por debajo no', () {
+      final diez = ['glutes', for (var i = 0; i < 9; i++) 'chest'];
+      final menos = ['glutes', for (var i = 0; i < 10; i++) 'chest'];
+      expect(_fits(_routine(muscles: diez), prefs), isTrue);
+      expect(_fits(_routine(muscles: menos), prefs), isFalse);
+    });
+
+    test('alcanza con UNA de las zonas elegidas', () {
+      const dos = TemplatePreferences(
+        priorityMuscleGroups: ['glutes', 'back'],
+      );
+      expect(_fits(_routine(muscles: const ['back', 'chest']), dos), isTrue);
+      expect(_fits(_routine(muscles: const ['chest', 'biceps']), dos), isFalse);
+    });
+
+    test('"cuerpo completo" no cuenta como la zona pedida', () {
+      expect(
+        _fits(_routine(muscles: const ['full_body', 'chest']), prefs),
+        isFalse,
+      );
+    });
+
+    test('sin ejercicios no pasa', () {
+      expect(_fits(_routine(), prefs), isFalse);
     });
   });
 
   group('combinaciones', () {
-    test('días Y minutos: tienen que cumplirse los dos', () {
-      const prefs = TemplatePreferences(daysPerWeek: 3, minutesPerSession: 75);
-      expect(_fits(_routine(days: 3, minutes: 75), prefs), isTrue);
-      expect(_fits(_routine(days: 5, minutes: 75), prefs), isFalse);
-      expect(_fits(_routine(days: 3, minutes: 30), prefs), isFalse);
-      expect(_fits(_routine(days: 3), prefs), isTrue);
+    test('tienen que cumplirse TODAS', () {
+      const prefs = TemplatePreferences(
+        daysPerWeek: 3,
+        minutesPerSession: 45,
+        goals: [RoutineGoal.health],
+        priorityMuscleGroups: ['chest'],
+      );
+      Routine ok() => _routine(
+            days: 3,
+            minutes: 40,
+            goals: const [RoutineGoal.health],
+            muscles: const ['chest'],
+          );
+      expect(_fits(ok(), prefs), isTrue);
+      expect(_fits(ok().copyWith(estimatedMinutesPerDay: 50), prefs), isFalse);
+      expect(_fits(ok().copyWith(goals: const [RoutineGoal.sport]), prefs),
+          isFalse);
+      expect(
+        _fits(
+          _routine(
+            days: 4,
+            minutes: 40,
+            goals: const [RoutineGoal.health],
+            muscles: const ['chest'],
+          ),
+          prefs,
+        ),
+        isFalse,
+      );
+      expect(
+        _fits(
+          _routine(
+            days: 3,
+            minutes: 40,
+            goals: const [RoutineGoal.health],
+            muscles: const ['back'],
+          ),
+          prefs,
+        ),
+        isFalse,
+      );
     });
 
     test('preferencias vacías: todo pasa', () {
@@ -211,27 +270,16 @@ void main() {
       );
     });
 
-    test('hasHardFilters: sólo días o minutos', () {
+    test('hasHardFilters: cualquier respuesta salvo "75 o más"', () {
+      bool has(TemplatePreferences p) => TemplateAffinity.hasHardFilters(p);
+      expect(has(const TemplatePreferences()), isFalse);
+      expect(has(const TemplatePreferences(minutesPerSession: 75)), isFalse);
+      expect(has(const TemplatePreferences(daysPerWeek: 3)), isTrue);
+      expect(has(const TemplatePreferences(minutesPerSession: 30)), isTrue);
       expect(
-        TemplateAffinity.hasHardFilters(const TemplatePreferences()),
-        isFalse,
-      );
+          has(const TemplatePreferences(goals: [RoutineGoal.health])), isTrue);
       expect(
-        TemplateAffinity.hasHardFilters(
-          const TemplatePreferences(goals: [RoutineGoal.health]),
-        ),
-        isFalse,
-      );
-      expect(
-        TemplateAffinity.hasHardFilters(
-          const TemplatePreferences(daysPerWeek: 3),
-        ),
-        isTrue,
-      );
-      expect(
-        TemplateAffinity.hasHardFilters(
-          const TemplatePreferences(minutesPerSession: 30),
-        ),
+        has(const TemplatePreferences(priorityMuscleGroups: ['back'])),
         isTrue,
       );
     });

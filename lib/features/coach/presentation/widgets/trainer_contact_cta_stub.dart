@@ -35,10 +35,18 @@ import '../../../../l10n/app_l10n.dart';
 /// el CTA de consulta: preguntarle a un entrenador no es cambiarse de
 /// entrenador.
 class TrainerContactCtaStub extends ConsumerStatefulWidget {
-  const TrainerContactCtaStub({super.key, required this.trainerId});
+  const TrainerContactCtaStub({
+    super.key,
+    required this.trainerId,
+    this.preview = false,
+  });
 
   /// uid del PF a quien se le pide el vínculo.
   final String trainerId;
+
+  /// Vista previa del propio PF (#1498): el botón se ve pero no actúa. Nadie
+  /// se pide vínculo a sí mismo (`_onPressed` ya lo corta en silencio).
+  final bool preview;
 
   @override
   ConsumerState<TrainerContactCtaStub> createState() =>
@@ -101,7 +109,10 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     final hasActiveOrPending = existingLink != null &&
         (existingLink.status == TrainerLinkStatus.pending ||
             existingLink.status == TrainerLinkStatus.active);
-    final disabled = _submitting || !linkAsync.hasValue || hasActiveOrPending;
+    final disabled = widget.preview ||
+        _submitting ||
+        !linkAsync.hasValue ||
+        hasActiveOrPending;
 
     // El atleta está bloqueado porque ya tiene un vínculo con OTRO PF: no
     // dejamos un botón disabled sin explicación. Mostramos una línea de ayuda

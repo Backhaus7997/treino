@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_collapsing_top_bar.dart';
 import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../../gyms/domain/gym.dart' show hasRealGym;
 import '../../domain/public_profile_view.dart';
@@ -28,11 +29,9 @@ class PublicProfileHero extends ConsumerWidget {
         ? ''
         : ref.watch(gymDisplayNameProvider(gymId)).valueOrNull ?? '';
 
-    // The parent screen extends its body behind the transparent AppBar so
-    // this gradient reaches the very top. Add the status-bar inset + the
-    // AppBar height as top padding so the avatar clears the floating back
-    // arrow and the notch instead of hiding under them.
-    final topInset = MediaQuery.paddingOf(context).top + kToolbarHeight;
+    // El gradiente llega hasta el borde superior y la flecha/⋮ de la barra
+    // flotan encima (#1559): el avatar arranca debajo de ellos.
+    final topInset = TreinoTopBarMetrics.reservedHeightOf(context);
 
     return Container(
       decoration: BoxDecoration(
@@ -46,7 +45,7 @@ class PublicProfileHero extends ConsumerWidget {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 20),
+        padding: EdgeInsets.fromLTRB(20, topInset, 20, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [

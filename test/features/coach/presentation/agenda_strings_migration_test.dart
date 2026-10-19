@@ -29,7 +29,9 @@ void main() {
     testWidgets('agendaButtonLabel', (t) async {
       await t.pumpWidget(_harness());
       await t.pumpAndSettle();
-      expect(_l10n(t).agendaButtonLabel, 'VER AGENDA DEL PF');
+      // #1515 — la pantalla muestra las sesiones del ALUMNO, no la agenda
+      // del PF.
+      expect(_l10n(t).agendaButtonLabel, 'MI AGENDA');
     });
 
     testWidgets('agendaScreenTitle', (t) async {

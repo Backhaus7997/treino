@@ -10,6 +10,7 @@
  *   SCENARIO-631 — data.deepLink == "/coach/chat/{chatId}?other={senderUid}"
  *   SCENARIO-666 — total body ≤ 256 chars
  *   SCENARIO-680 — sender NOT included in recipients
+ *   #1464        — title is the sender's name, body carries no name prefix
  *
  * REQ-PN-CF-002. Fase 6 Etapa 2.
  */
@@ -184,11 +185,10 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
+    // The body is the text alone (the sender's name is the title, #1464).
     const body = callArg.notification?.body ?? "";
-    // Extract the text portion after "Sender Name: "
-    const textPart = body.replace(/^[^:]+: /, "");
-    expect(textPart.length).toBeLessThanOrEqual(100 + 1); // +1 for ellipsis char
-    expect(textPart.endsWith("…")).toBe(true);
+    expect(body.length).toBeLessThanOrEqual(100 + 1); // +1 for ellipsis char
+    expect(body.endsWith("…")).toBe(true);
   });
 
   it("total body length is ≤ 256 chars (SCENARIO-666)", async () => {
@@ -211,6 +211,57 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
 // ---------------------------------------------------------------------------
 // SCENARIO-631 — deepLink
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// #1464 — the push title is the sender, not the app name
+// ---------------------------------------------------------------------------
+describe("#1464: title = sender's display name, body = message without name prefix", () => {
+  const chatId = "chat-1464";
+  const senderUid = "sender-1464";
+  const recipientUid = "recipient-1464";
+
+  beforeEach(async () => {
+    await seedUser(senderUid, []);
+    await seedUser(recipientUid, ["recipient-token-1464"]);
+    await seedChat(chatId, [senderUid, recipientUid]);
+  });
+
+  afterEach(async () => {
+    await cleanup(senderUid, recipientUid);
+    await cleanupChat(chatId);
+  });
+
+  it("titles the push with the sender's display name and keeps the name out of the body", async () => {
+    await seedUserPublicProfile(senderUid, "Lautaro Coach");
+    const mock = makeMockMessaging();
+
+    await notifyOnChatMessageHandler(
+      testApp,
+      chatId,
+      { senderId: senderUid, text: "Dale, nos vemos", createdAt: Timestamp.now() },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
+    expect(callArg.notification?.title).toBe("Lautaro Coach");
+    expect(callArg.notification?.body).toBe("Dale, nos vemos");
+  });
+
+  it("falls back to 'Alguien' as the title when the sender has no public profile", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnChatMessageHandler(
+      testApp,
+      chatId,
+      { senderId: senderUid, text: "Hola", createdAt: Timestamp.now() },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
+    expect(callArg.notification?.title).toBe("Alguien");
+    expect(callArg.notification?.body).toBe("Hola");
+  });
+});
+
 describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}", () => {
   const chatId = "chat-631";
   const senderUid = "sender-631";
@@ -311,7 +362,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     await cleanupChat(chatId);
   });
 
-  it("image-only: body is 'Sender: 📷 Foto'", async () => {
+  it("image-only: title is the sender, body is '📷 Foto'", async () => {
     const mock = makeMockMessaging();
     const messageData = {
       senderId: senderUid,
@@ -323,10 +374,11 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
-    expect(callArg.notification?.body).toBe("Sender: 📷 Foto");
+    expect(callArg.notification?.title).toBe("Sender");
+    expect(callArg.notification?.body).toBe("📷 Foto");
   });
 
-  it("video-only: body is 'Sender: 🎥 Video'", async () => {
+  it("video-only: title is the sender, body is '🎥 Video'", async () => {
     const mock = makeMockMessaging();
     const messageData = {
       senderId: senderUid,
@@ -338,7 +390,8 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
-    expect(callArg.notification?.body).toBe("Sender: 🎥 Video");
+    expect(callArg.notification?.title).toBe("Sender");
+    expect(callArg.notification?.body).toBe("🎥 Video");
   });
 
   it("caption + image: caption wins over media label", async () => {
@@ -353,10 +406,10 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
-    expect(callArg.notification?.body).toBe("Sender: Look at this!");
+    expect(callArg.notification?.body).toBe("Look at this!");
   });
 
-  it("unknown mediaType with empty text: does not throw, body is 'Sender: '", async () => {
+  it("unknown mediaType with empty text: does not throw, body is empty", async () => {
     const mock = makeMockMessaging();
     const messageData = {
       senderId: senderUid,
@@ -371,7 +424,8 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
     ).resolves.toBeUndefined();
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
-    // Body should be "Sender: " (senderName + empty displayText) — no crash
-    expect(callArg.notification?.body).toBe("Sender: ");
+    // Title still names the sender; the body is just the (empty) display text — no crash
+    expect(callArg.notification?.title).toBe("Sender");
+    expect(callArg.notification?.body).toBe("");
   });
 });
