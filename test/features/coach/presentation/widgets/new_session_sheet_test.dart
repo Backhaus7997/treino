@@ -898,4 +898,61 @@ void main() {
       expect(find.text('No tenés alumnos activos.'), findsNothing);
     });
   });
+
+  // ── #1490: los avisos del sheet tienen que verse ENCIMA del sheet ─────────
+  //
+  // Los tests de arriba montan el sheet como `body` de un Scaffold, así que
+  // nunca vieron el caso real: abierto con `showModalBottomSheet`, un
+  // `SnackBar` lo pinta el Scaffold de ATRÁS y el sheet lo tapa.
+  group('#1490 — aviso desde el sheet abierto como modal', () {
+    testWidgets('duración inválida → el aviso es tocable encima del sheet',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            appointmentRepo: mockAppointmentRepo,
+          ),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) =>
+                        NewSessionSheet(initialDate: targetDateOnly),
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.enterText(find.widgetWithText(TextField, '60'), '2');
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      const aviso = 'Ingresá una duración válida (5–480 min).';
+      // Si lo pintara el Scaffold de atrás existiría pero el sheet lo taparía.
+      expect(find.text(aviso).hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      // El toast por Overlay se cierra solo: no deja Timers colgando.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text(aviso), findsNothing);
+    });
+  });
 }
