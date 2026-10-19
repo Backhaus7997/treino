@@ -324,4 +324,63 @@ void main() {
       expect(find.text('Cobrado'), findsNothing); // i18n
     });
   });
+
+  // #1492 — el PF cancela sin la regla de 24 h y, una vez que la sesión
+  // empezó, marca si el alumno vino. `isPast` lo calcula el llamador.
+  group('(f) #1492 — cancelar sin 24 h y asistencia', () {
+    Future<Map<String, Object?>> docOf(String id) async =>
+        (await firestore.collection('appointments').doc(id).get()).data()!;
+
+    testWidgets('antes de empezar: CANCELAR RESERVA, sin aviso de 24 h',
+        (tester) async {
+      final appt = _confirmedAppt(id: 'appt-1492-web-cancel');
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await tester.pumpWidget(_wrap(appointment: appt, firestore: firestore));
+      await _openDialog(tester);
+
+      expect(find.text('No se puede cancelar (menos de 24h).'), findsNothing);
+      expect(find.text('MARCAR AUSENTE'), findsNothing); // i18n
+      await _tap(tester, find.text('CANCELAR RESERVA')); // i18n
+      await _tap(tester, find.text('Cancelar sesión')); // i18n
+
+      expect((await docOf(appt.id))['status'], 'cancelled');
+    });
+
+    testWidgets('empezada: MARCAR AUSENTE y DESHACER, sin CANCELAR RESERVA',
+        (tester) async {
+      final appt = _confirmedAppt(id: 'appt-1492-web-ausente');
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await tester.pumpWidget(
+        _wrap(appointment: appt, firestore: firestore, isPast: true),
+      );
+      await _openDialog(tester);
+
+      expect(find.text('CANCELAR RESERVA'), findsNothing); // i18n
+      await _tap(tester, find.text('MARCAR AUSENTE')); // i18n
+      expect((await docOf(appt.id))['attendance'], 'absent');
+      expect(find.text('Marcaste que el alumno faltó.'), findsOneWidget);
+
+      await _tap(tester, find.text('DESHACER AUSENTE')); // i18n
+      expect((await docOf(appt.id))['attendance'], isNull);
+    });
+
+    testWidgets('una sesión cancelada no ofrece marcar asistencia',
+        (tester) async {
+      final appt = _cancelledAppt();
+      await tester.pumpWidget(
+        _wrap(appointment: appt, firestore: firestore, isPast: true),
+      );
+      await _openDialog(tester);
+
+      expect(find.text('MARCAR AUSENTE'), findsNothing); // i18n
+    });
+  });
 }

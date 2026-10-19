@@ -666,6 +666,27 @@ class AppL10nEn extends AppL10n {
   String get agendaBookingCancelledByCoach => '';
 
   @override
+  String get agendaAttendanceMarkAbsent => 'MARK AS NO-SHOW';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'UNDO NO-SHOW';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'If you don\'t mark anything, the session counts as done.';
+
+  @override
+  String get agendaAttendanceAbsentHint =>
+      'You marked that the athlete didn\'t show up.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'No-show';
+
+  @override
+  String get agendaAttendanceError =>
+      'We couldn\'t save attendance. Try again.';
+
+  @override
   String get agendaBlockedDayTitle => '';
 
   @override

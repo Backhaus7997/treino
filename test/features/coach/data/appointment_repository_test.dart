@@ -294,6 +294,171 @@ void main() {
         );
       },
     );
+
+    // ─── #1492: the 24h gate is the athlete's, not the trainer's ──────────
+    test('#1492: the trainer cancels <24h ahead (no time gate for them)',
+        () async {
+      final appt = makeConfirmedAppt(startsAt: startsAt);
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+
+      await repo.cancel(
+        appointment: appt,
+        actorUid: trainerId,
+        // 3h before the session.
+        now: DateTime.utc(2026, 7, 1, 7, 0),
+      );
+
+      final snap =
+          await firestore.collection('appointments').doc(appt.id).get();
+      expect(snap.data()!['status'], 'cancelled');
+      expect(snap.data()!['cancelledBy'], trainerId);
+    });
+
+    test('#1492: the athlete still gets CancellationTooLate at the same moment',
+        () async {
+      final appt = makeConfirmedAppt(startsAt: startsAt);
+      expect(
+        () => repo.cancel(
+          appointment: appt,
+          actorUid: athleteId,
+          now: DateTime.utc(2026, 7, 1, 7, 0),
+        ),
+        throwsA(isA<CancellationTooLateException>()),
+      );
+    });
+  });
+
+  group('#1492 — cancelFutureSeries() without the 24h gate for the trainer',
+      () {
+    final now = DateTime.utc(2026, 7, 1, 12, 0);
+    const serie = 'serie-1492';
+
+    Future<void> seed(String id, DateTime at) =>
+        firestore.collection('appointments').doc(id).set(Appointment(
+              id: id,
+              trainerId: trainerId,
+              athleteId: athleteId,
+              athleteDisplayName: athleteDisplayName,
+              startsAt: at,
+              durationMin: durationMin,
+              status: AppointmentStatus.confirmed,
+              recurringId: serie,
+            ).toJson());
+
+    setUp(() async {
+      await seed('empezada', now.subtract(const Duration(hours: 1)));
+      await seed('en-3-horas', now.add(const Duration(hours: 3)));
+      await seed('en-3-dias', now.add(const Duration(days: 3)));
+    });
+
+    Future<String> statusOf(String id) async =>
+        (await firestore.collection('appointments').doc(id).get())
+            .data()!['status'] as String;
+
+    test('the trainer cancels what has not started, <24h included', () async {
+      final n = await repo.cancelFutureSeries(
+        recurringId: serie,
+        trainerId: trainerId,
+        actorUid: trainerId,
+        now: now,
+      );
+
+      expect(n, 2);
+      expect(await statusOf('empezada'), 'confirmed');
+      expect(await statusOf('en-3-horas'), 'cancelled');
+      expect(await statusOf('en-3-dias'), 'cancelled');
+    });
+
+    test('any other actor keeps the >24h gate', () async {
+      final n = await repo.cancelFutureSeries(
+        recurringId: serie,
+        trainerId: trainerId,
+        actorUid: athleteId,
+        now: now,
+      );
+
+      expect(n, 1);
+      expect(await statusOf('en-3-horas'), 'confirmed');
+      expect(await statusOf('en-3-dias'), 'cancelled');
+    });
+  });
+
+  group('#1492 — setAttendance()', () {
+    late Appointment appt;
+
+    setUp(() async {
+      appt = Appointment.create(
+        trainerId: trainerId,
+        athleteId: athleteId,
+        athleteDisplayName: athleteDisplayName,
+        startsAt: startsAt,
+        durationMin: durationMin,
+      );
+      await firestore
+          .collection('appointments')
+          .doc(appt.id)
+          .set(appt.toJson());
+    });
+
+    test('marks absent with the wire value the rules accept', () async {
+      await repo.setAttendance(
+        appointmentId: appt.id,
+        attendance: AppointmentAttendance.absent,
+      );
+
+      final data =
+          (await firestore.collection('appointments').doc(appt.id).get())
+              .data()!;
+      expect(data['attendance'], 'absent');
+      expect(data['status'], 'confirmed',
+          reason: 'absent is NOT a status: the session stays in the agenda');
+    });
+
+    test('undo writes null back', () async {
+      await repo.setAttendance(
+        appointmentId: appt.id,
+        attendance: AppointmentAttendance.absent,
+      );
+      await repo.setAttendance(appointmentId: appt.id, attendance: null);
+
+      final data =
+          (await firestore.collection('appointments').doc(appt.id).get())
+              .data()!;
+      expect(data['attendance'], isNull);
+    });
+  });
+
+  group('#1492 — Appointment.attendance on the wire', () {
+    final base = Appointment.create(
+      trainerId: trainerId,
+      athleteId: athleteId,
+      athleteDisplayName: athleteDisplayName,
+      startsAt: startsAt,
+      durationMin: durationMin,
+    );
+
+    test(
+        'toJson() OMITS the key when null — creates keep passing the rules '
+        'deployed before #1492, which do not list it', () {
+      expect(base.toJson().containsKey('attendance'), isFalse);
+    });
+
+    test('toJson() writes it when absent', () {
+      expect(
+        base
+            .copyWith(attendance: AppointmentAttendance.absent)
+            .toJson()['attendance'],
+        'absent',
+      );
+    });
+
+    test('an unknown value reads as null instead of breaking the stream', () {
+      final json = {...base.toJson(), 'attendance': 'algo-nuevo'};
+      expect(Appointment.fromJson(json).attendance, isNull);
+    });
   });
 
   group('createRecurringByTrainer() + cancelFutureSeries()', () {
