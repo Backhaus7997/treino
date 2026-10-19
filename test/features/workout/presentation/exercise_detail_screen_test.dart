@@ -40,6 +40,8 @@ Widget _wrapWithOverrides(
         theme: AppTheme.dark(),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
+        // Sin esto el host resolvía `en` y los números salían «2,400» (#1512).
+        locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
     );
@@ -487,7 +489,8 @@ void main() {
       );
       expect(find.text('80 kg × 8'), findsOneWidget);
       expect(find.text('4 series'), findsOneWidget);
-      expect(find.text('2400 kg·reps'), findsOneWidget);
+      // En kg y con el locale: «kg·reps» era jerga (#1512).
+      expect(find.text('2.400 kg'), findsOneWidget);
       // #368 bodyweight-only session: reps-only best set, no volume line.
       expect(find.text('12 reps'), findsOneWidget);
       expect(find.text('1 serie'), findsOneWidget);

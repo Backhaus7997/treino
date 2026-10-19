@@ -202,18 +202,22 @@ void main() {
     expect(find.textContaining(expectedTime), findsOneWidget);
     expect(find.text('Push'), findsOneWidget);
 
-    // 4 StatTiles — labels (duración/volumen carry their unit, #363)
-    expect(find.text('DURACIÓN MIN'), findsOneWidget);
+    // 4 StatTiles. Desde #1512 la unidad va AL LADO del número («45 min»),
+    // no en el label («DURACIÓN MIN 45» se leía al revés). Revierte #363.
+    expect(find.text('DURACIÓN'), findsOneWidget);
     expect(find.text('SETS'), findsOneWidget);
-    expect(find.text('VOLUMEN KG'), findsOneWidget);
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('min'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
     expect(find.text('PRS HOY'), findsOneWidget);
 
     // Stat values: duration=45, sets=3 (count of setLogs), volume=1800.
-    // Volume renders via formatVolumeKg — whole values drop the .0 (#436).
+    // Volume renders via formatVolumeKg — whole values drop the .0 (#436),
+    // y con separador de miles en es (#1465).
     expect(find.text('45'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
-    expect(find.text('1800'), findsOneWidget);
-    expect(find.text('1800.0'), findsNothing);
+    expect(find.text('1.800'), findsOneWidget);
+    expect(find.text('1800'), findsNothing);
 
     // Historical details use the shared card without post-workout count-ups.
     final statsCard = tester.widget<SessionStatsCard>(

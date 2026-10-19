@@ -27,6 +27,7 @@ Widget _wrap({required Stream<List<Routine>> stream}) => ProviderScope(
     );
 
 void main() {
+  _rootNavigatorTest();
   testWidgets('shows a spinner while the routines load', (tester) async {
     final completer = Completer<List<Routine>>();
     await tester.pumpWidget(_wrap(stream: Stream.fromFuture(completer.future)));
@@ -76,5 +77,44 @@ void main() {
       find.text('Todavía no tenés rutinas propias para etiquetar.'),
       findsOneWidget,
     );
+  });
+}
+
+// #1471: el sheet quedaba DEBAJO de la nav bar flotante, que vive en el shell
+// (un Navigator anidado). Tiene que abrirse en el Navigator raíz, como el de
+// Reportar.
+void _rootNavigatorTest() {
+  testWidgets('#1471: se abre en el Navigator raíz', (tester) async {
+    final raiz = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        userCreatedRoutinesProvider
+            .overrideWith((ref, uid) => Stream.value(const [])),
+      ],
+      child: MaterialApp(
+        navigatorKey: raiz,
+        theme: AppTheme.dark(),
+        home: Navigator(
+          onGenerateRoute: (_) => MaterialPageRoute<void>(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () =>
+                    showRoutineTagPickerSheet(context: context, uid: 'u1'),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    final nav = tester.state<NavigatorState>(find
+        .ancestor(
+            of: find.byType(RoutineTagPickerSheet),
+            matching: find.byType(Navigator))
+        .first);
+    expect(nav, raiz.currentState);
   });
 }

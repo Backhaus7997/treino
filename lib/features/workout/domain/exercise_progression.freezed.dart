@@ -166,6 +166,8 @@ mixin _$PersonalRecord {
   ProgressionRecordType get recordType => throw _privateConstructorUsedError;
   double get value => throw _privateConstructorUsedError;
   DateTime get achievedAt => throw _privateConstructorUsedError;
+  double? get setWeightKg => throw _privateConstructorUsedError;
+  int? get setReps => throw _privateConstructorUsedError;
 
   /// Create a copy of PersonalRecord
   /// with the given fields replaced by the non-null parameter values.
@@ -181,7 +183,11 @@ abstract class $PersonalRecordCopyWith<$Res> {
       _$PersonalRecordCopyWithImpl<$Res, PersonalRecord>;
   @useResult
   $Res call(
-      {ProgressionRecordType recordType, double value, DateTime achievedAt});
+      {ProgressionRecordType recordType,
+      double value,
+      DateTime achievedAt,
+      double? setWeightKg,
+      int? setReps});
 }
 
 /// @nodoc
@@ -202,6 +208,8 @@ class _$PersonalRecordCopyWithImpl<$Res, $Val extends PersonalRecord>
     Object? recordType = null,
     Object? value = null,
     Object? achievedAt = null,
+    Object? setWeightKg = freezed,
+    Object? setReps = freezed,
   }) {
     return _then(_value.copyWith(
       recordType: null == recordType
@@ -216,6 +224,14 @@ class _$PersonalRecordCopyWithImpl<$Res, $Val extends PersonalRecord>
           ? _value.achievedAt
           : achievedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      setWeightKg: freezed == setWeightKg
+          ? _value.setWeightKg
+          : setWeightKg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      setReps: freezed == setReps
+          ? _value.setReps
+          : setReps // ignore: cast_nullable_to_non_nullable
+              as int?,
     ) as $Val);
   }
 }
@@ -229,7 +245,11 @@ abstract class _$$PersonalRecordImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {ProgressionRecordType recordType, double value, DateTime achievedAt});
+      {ProgressionRecordType recordType,
+      double value,
+      DateTime achievedAt,
+      double? setWeightKg,
+      int? setReps});
 }
 
 /// @nodoc
@@ -248,6 +268,8 @@ class __$$PersonalRecordImplCopyWithImpl<$Res>
     Object? recordType = null,
     Object? value = null,
     Object? achievedAt = null,
+    Object? setWeightKg = freezed,
+    Object? setReps = freezed,
   }) {
     return _then(_$PersonalRecordImpl(
       recordType: null == recordType
@@ -262,6 +284,14 @@ class __$$PersonalRecordImplCopyWithImpl<$Res>
           ? _value.achievedAt
           : achievedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      setWeightKg: freezed == setWeightKg
+          ? _value.setWeightKg
+          : setWeightKg // ignore: cast_nullable_to_non_nullable
+              as double?,
+      setReps: freezed == setReps
+          ? _value.setReps
+          : setReps // ignore: cast_nullable_to_non_nullable
+              as int?,
     ));
   }
 }
@@ -272,7 +302,9 @@ class _$PersonalRecordImpl implements _PersonalRecord {
   const _$PersonalRecordImpl(
       {required this.recordType,
       required this.value,
-      required this.achievedAt});
+      required this.achievedAt,
+      this.setWeightKg,
+      this.setReps});
 
   @override
   final ProgressionRecordType recordType;
@@ -280,10 +312,14 @@ class _$PersonalRecordImpl implements _PersonalRecord {
   final double value;
   @override
   final DateTime achievedAt;
+  @override
+  final double? setWeightKg;
+  @override
+  final int? setReps;
 
   @override
   String toString() {
-    return 'PersonalRecord(recordType: $recordType, value: $value, achievedAt: $achievedAt)';
+    return 'PersonalRecord(recordType: $recordType, value: $value, achievedAt: $achievedAt, setWeightKg: $setWeightKg, setReps: $setReps)';
   }
 
   @override
@@ -295,11 +331,15 @@ class _$PersonalRecordImpl implements _PersonalRecord {
                 other.recordType == recordType) &&
             (identical(other.value, value) || other.value == value) &&
             (identical(other.achievedAt, achievedAt) ||
-                other.achievedAt == achievedAt));
+                other.achievedAt == achievedAt) &&
+            (identical(other.setWeightKg, setWeightKg) ||
+                other.setWeightKg == setWeightKg) &&
+            (identical(other.setReps, setReps) || other.setReps == setReps));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, recordType, value, achievedAt);
+  int get hashCode => Object.hash(
+      runtimeType, recordType, value, achievedAt, setWeightKg, setReps);
 
   /// Create a copy of PersonalRecord
   /// with the given fields replaced by the non-null parameter values.
@@ -315,7 +355,9 @@ abstract class _PersonalRecord implements PersonalRecord {
   const factory _PersonalRecord(
       {required final ProgressionRecordType recordType,
       required final double value,
-      required final DateTime achievedAt}) = _$PersonalRecordImpl;
+      required final DateTime achievedAt,
+      final double? setWeightKg,
+      final int? setReps}) = _$PersonalRecordImpl;
 
   @override
   ProgressionRecordType get recordType;
@@ -323,6 +365,10 @@ abstract class _PersonalRecord implements PersonalRecord {
   double get value;
   @override
   DateTime get achievedAt;
+  @override
+  double? get setWeightKg;
+  @override
+  int? get setReps;
 
   /// Create a copy of PersonalRecord
   /// with the given fields replaced by the non-null parameter values.

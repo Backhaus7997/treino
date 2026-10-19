@@ -428,6 +428,26 @@ void main() {
       expect(result.bestSetVolumeSeries[1].value, closeTo(285.0, 0.01));
     });
 
+    // #1512: «Mejor serie 400» no dice nada; con «kg» se leería como una
+    // carga de 400 kg. El récord trae la SERIE que lo dio: «80 kg × 5».
+    test('#1512: el récord de mejor serie trae la serie que lo dio', () {
+      final result = aggregateExerciseProgression(
+        exerciseId: 'squat',
+        sessionsDesc: _sessionsDesc,
+        logsBySession: _logsBySession,
+        now: DateTime(2025, 2, 1),
+      );
+      final record = result.personalRecords.singleWhere(
+          (r) => r.recordType == ProgressionRecordType.bestSetVolume);
+      expect(record.value, closeTo(400.0, 0.01));
+      expect(record.setWeightKg, 80);
+      expect(record.setReps, 5);
+      // Los otros récords no son «una serie».
+      final peso = result.personalRecords.singleWhere(
+          (r) => r.recordType == ProgressionRecordType.heaviestWeight);
+      expect(peso.setWeightKg, isNull);
+    });
+
     // AD2 — 1RM series (NEW): Epley per session, taking the max across sets
     test('AD2: 1RM series uses Epley formula, max per session', () {
       final result = aggregateExerciseProgression(

@@ -27,8 +27,11 @@ class _StubAuthNotifier extends AuthNotifier {
   Future<User?> build() async => _user;
 
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async => _signOuts++;
 }
+
+/// Cuántas veces se llamó a `signOut` en el test en curso (#1504).
+int _signOuts = 0;
 
 UserProfile _testProfile() => UserProfile(
       uid: 'uid-test',
@@ -139,8 +142,8 @@ void main() {
       expect(find.text('SESIONES'), findsOneWidget);
       expect(find.text('42'), findsOneWidget); // totalSessions
       expect(find.text('VOLUMEN KG'), findsOneWidget);
-      expect(find.text('15.0k'),
-          findsOneWidget); // kFormatMagnitude(15000), never overstates volume
+      // formatVolumeKg con el locale: 15 000 → «15k», no «15.0k» (#1516).
+      expect(find.text('15k'), findsOneWidget);
       expect(find.text('RACHA'), findsOneWidget);
       expect(find.text('7'), findsOneWidget); // streak
     });
@@ -229,5 +232,63 @@ void main() {
 
       completer.completeError(Exception('cleanup'));
     });
+  });
+
+  // #1516: los labels SESIONES/VOLUMEN KG/RACHA iban en Barlow regular.
+  testWidgets('#1516: labels de stats en Barlow Condensed 700', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 1, totalVolumeKg: 1, streak: 1)),
+    ]));
+    await tester.pump();
+    for (final label in ['SESIONES', 'VOLUMEN KG', 'RACHA']) {
+      final style = tester.widget<Text>(find.text(label)).style!;
+      expect(style.fontFamily, contains('BarlowCondensed'), reason: label);
+      expect(style.fontWeight, FontWeight.w700, reason: label);
+    }
+  });
+
+  // #1516: la racha cuenta SEMANAS; sin unidad, «4» se leía como días.
+  testWidgets('#1516: RACHA lleva la unidad «sem»', (tester) async {
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 1, totalVolumeKg: 1, streak: 4)),
+    ]));
+    await tester.pump();
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('sem'), findsOneWidget);
+  });
+
+  // #1504: «Cerrar sesión» cerraba la sesión al primer toque, sin confirmar.
+  testWidgets('#1504: cerrar sesión pide confirmación', (tester) async {
+    _signOuts = 0;
+    await tester.pumpWidget(_buildScreen(overrides: [
+      ..._baseOverrides(),
+      userSessionStatsProvider.overrideWith((_) async => const UserSessionStats(
+          totalSessions: 0, totalVolumeKg: 0, streak: 0)),
+    ]));
+    await tester.pump();
+
+    final tile = find.text('Cerrar sesión');
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
+
+    // Cancelar no cierra la sesión.
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.text('¿Cerrar sesión?'), findsOneWidget);
+    expect(_signOuts, 0, reason: 'el primer toque sólo pregunta');
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(_signOuts, 0);
+
+    // Confirmar sí.
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Salir'));
+    await tester.pumpAndSettle();
+    expect(_signOuts, 1);
   });
 }

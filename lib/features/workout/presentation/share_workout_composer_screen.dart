@@ -164,7 +164,10 @@ class _ComposerBodyState extends ConsumerState<_ComposerBody> {
         SnackBar(content: Text(l10n.workoutSnackShareSuccess)),
       );
       if (!context.mounted) return;
-      context.go('/workout');
+      // #1514: al Feed, donde está el post recién publicado. Antes iba a
+      // Entrenar (el destino de LISTO), y lo único que confirmaba la
+      // publicación era un SnackBar de cuatro segundos.
+      context.go('/feed');
     } on ModerationBlockedException catch (_) {
       // `workoutSnackShareError` invita a reintentar, y para un bloqueo eso es
       // consejo falso: el mismo texto va a fallar siempre.
@@ -472,7 +475,7 @@ class _PhotoField extends StatelessWidget {
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
                 fontSize: 12,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ],

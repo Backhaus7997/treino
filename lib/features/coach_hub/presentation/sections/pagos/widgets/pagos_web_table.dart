@@ -307,7 +307,9 @@ class _EstadoBadge extends StatelessWidget {
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: color,
+                  // El relleno y el punto usan el color de estado; el texto,
+                  // su versión legible (danger/accent no llegan a AA como texto).
+                  color: palette.textVariantOf(color),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),

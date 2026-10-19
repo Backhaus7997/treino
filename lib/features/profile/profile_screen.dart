@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:treino/features/auth/presentation/confirmar_cerrar_sesion.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
-import '../../core/utils/k_formatter.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
-import '../auth/application/auth_providers.dart';
 import 'application/profile_stats_providers.dart';
 import 'application/user_providers.dart';
 import 'domain/user_role.dart';
@@ -244,8 +244,8 @@ class _AthleteProfile extends ConsumerWidget {
                     icon: TreinoIcon.signOut,
                     title: 'Cerrar sesión', // i18n: Fase 6 Etapa 3
                     inGroup: true,
-                    onTap: () =>
-                        ref.read(authNotifierProvider.notifier).signOut(),
+                    // Pregunta antes de salir (#1504).
+                    onTap: () => confirmarCerrarSesion(context, ref),
                   ),
                 ),
                 Semantics(
@@ -411,7 +411,8 @@ class _OwnProfileStatsRow extends ConsumerWidget {
               _StatTile(
                 label: 'VOLUMEN KG', // i18n: Fase 6 Etapa 3
                 value: statsAsync.when(
-                  data: (s) => kFormatMagnitude(s.totalVolumeKg),
+                  data: (s) => formatVolumeKg(
+                      s.totalVolumeKg, AppL10n.of(context).localeName),
                   loading: () => '--',
                   error: (_, __) => '--',
                 ),
@@ -427,6 +428,9 @@ class _OwnProfileStatsRow extends ConsumerWidget {
                   loading: () => '--',
                   error: (_, __) => '--',
                 ),
+                // #1516: la racha cuenta SEMANAS (computeWeeklyStreak); sin
+                // unidad, «4» se leía como días, que es lo que decía Inicio.
+                unit: statsAsync.hasValue ? 'sem' : null,
                 valueColor: palette.highlight,
                 theme: theme,
                 palette: palette,
@@ -464,10 +468,14 @@ class _StatTile extends StatelessWidget {
     required this.valueColor,
     required this.theme,
     required this.palette,
+    this.unit,
   });
 
   final String label;
   final String value;
+
+  /// Unidad chica a la derecha del número («sem»). Null = sin unidad.
+  final String? unit;
   final Color valueColor;
   final ThemeData theme;
   final AppPalette palette;
@@ -486,17 +494,37 @@ class _StatTile extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: valueColor,
-                fontWeight: FontWeight.w700,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    color: valueColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (unit != null) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    unit!,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 4),
             Text(
               label,
-              style: theme.textTheme.labelSmall?.copyWith(
+              // #1516: label condensado 700 como el resto de los labels del
+              // sistema; `labelSmall` del tema es Barlow regular espaciada.
+              style: GoogleFonts.barlowCondensed(
+                textStyle: theme.textTheme.labelSmall,
+                fontWeight: FontWeight.w700,
                 color: palette.textMuted,
                 letterSpacing: 1.2,
               ),

@@ -19,6 +19,10 @@ abstract final class TreinoButtonTokens {
   /// Color de fondo del botón primario — delega a `AppPalette.accent`.
   static Color background(BuildContext ctx) => AppPalette.of(ctx).accent;
 
+  /// Ink invariante sobre el acento, para quien no tiene `BuildContext`: el
+  /// `colorScheme.onPrimary` de [AppTheme] lo usa en las dos paletas.
+  static const Color ink = AppColorPrimitives.ink950;
+
   /// Color de texto/icono sobre el botón primario.
   ///
   /// El acento mint es claro, entonces usamos el ink más profundo para
@@ -27,7 +31,7 @@ abstract final class TreinoButtonTokens {
   static Color foreground(BuildContext ctx) {
     // El acento (mint) es el mismo en dark y light, pero el ink de fondo
     // varía — usamos ink950 como foreground absoluto para CTA.
-    return AppColorPrimitives.ink950;
+    return ink;
   }
 
   /// Radio de borde del botón primario (referencias a [AppRadius]).
@@ -76,7 +80,9 @@ abstract final class TreinoButtonTokens {
       TreinoButtonVariant.danger => TreinoButtonVisual._(
           background: AppColorPrimitives.transparent,
           hoverBackground: p.danger.withValues(alpha: 0.08),
-          foreground: p.danger,
+          // Texto en `dangerText` (AA en las dos paletas); el borde queda en
+          // `danger`, que como borde sólo necesita 3:1.
+          foreground: p.dangerText,
           borderColor: p.danger,
           hoverBorderColor: p.danger,
         ),

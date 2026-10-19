@@ -155,7 +155,8 @@ class _PostUnavailableState extends StatelessWidget {
                 label: l10n.coachRetryLabel,
                 child: TextButton(
                   onPressed: onRetry,
-                  style: TextButton.styleFrom(foregroundColor: palette.accent),
+                  style:
+                      TextButton.styleFrom(foregroundColor: palette.accentText),
                   child: Text(l10n.coachRetryLabel),
                 ),
               ),

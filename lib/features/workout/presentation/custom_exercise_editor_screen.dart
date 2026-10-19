@@ -649,7 +649,7 @@ class _ErrorState extends StatelessWidget {
               onPressed: onRetry,
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.accent, width: 1),
-                foregroundColor: palette.accent,
+                foregroundColor: palette.accentText,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.full),
                 ),

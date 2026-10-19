@@ -42,6 +42,7 @@ void main() {
         HomeHeader(profile: makeProfile(displayName: 'Martín')),
       ));
       await tester.pump();
+      // #1506: signo de apertura, en castellano.
       expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
     });
 

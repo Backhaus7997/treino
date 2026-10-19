@@ -649,7 +649,7 @@ class _ErrorState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(TreinoIcon.errorState, size: 32, color: palette.danger),
+          Icon(TreinoIcon.errorState, size: 32, color: palette.dangerText),
           const SizedBox(height: AppSpacing.s8),
           Text(
             message,

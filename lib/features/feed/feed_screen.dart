@@ -829,7 +829,7 @@ class _FeedAsyncBody<T> extends StatelessWidget {
                   TextButton(
                     onPressed: onRetry,
                     style: TextButton.styleFrom(
-                      foregroundColor: palette.accent,
+                      foregroundColor: palette.accentText,
                     ),
                     child: Text(l10n.coachRetryLabel),
                   ),

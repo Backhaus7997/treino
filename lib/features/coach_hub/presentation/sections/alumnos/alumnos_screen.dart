@@ -1049,7 +1049,9 @@ class _DotLabel extends StatelessWidget {
             child: Text(
               label,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: color, fontSize: 13),
+              style: TextStyle(
+                  color: AppPalette.of(context).textVariantOf(color),
+                  fontSize: 13),
             ),
           ),
         ],
@@ -1107,7 +1109,9 @@ class _TappableDotLabel extends StatelessWidget {
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: color, fontSize: 13),
+                style: TextStyle(
+                    color: AppPalette.of(context).textVariantOf(color),
+                    fontSize: 13),
               ),
             ),
           ],

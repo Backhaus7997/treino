@@ -75,7 +75,7 @@ class RutinasSection extends ConsumerWidget {
             children: [
               Text(
                 l10n.workoutMisRutinasSectionTitle,
-                style: theme.textTheme.titleMedium,
+                style: _heading(theme),
               ),
               if (headerAction != null) ...[
                 const SizedBox(height: 12),
@@ -89,7 +89,7 @@ class RutinasSection extends ConsumerWidget {
               Expanded(
                 child: Text(
                   l10n.workoutMisRutinasSectionTitle,
-                  style: theme.textTheme.titleMedium,
+                  style: _heading(theme),
                 ),
               ),
               if (headerAction != null) headerAction,
@@ -592,3 +592,10 @@ class _FinalizadoChip extends StatelessWidget {
     );
   }
 }
+
+/// #1514: heading de sección en Barlow Condensed 700, como todo heading del
+/// sistema (AGENTS §2). `titleMedium` del tema es Barlow regular.
+TextStyle? _heading(ThemeData theme) => GoogleFonts.barlowCondensed(
+      textStyle: theme.textTheme.titleMedium,
+      fontWeight: FontWeight.w700,
+    );

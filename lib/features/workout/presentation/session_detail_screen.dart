@@ -229,8 +229,9 @@ class _DetailLoaded extends StatelessWidget {
               tiles: [
                 StatTile(
                   icon: TreinoIcon.clock,
-                  label: l10n.workoutDetailStatDurationMin,
+                  label: l10n.workoutDetailStatDuration,
                   value: session.durationMin.toString(),
+                  unit: 'min',
                 ),
                 StatTile(
                   icon: TreinoIcon.statSets,
@@ -239,8 +240,10 @@ class _DetailLoaded extends StatelessWidget {
                 ),
                 StatTile(
                   icon: TreinoIcon.dumbbell,
-                  label: l10n.workoutDetailStatVolumeKg,
-                  value: formatVolumeKg(session.totalVolumeKg),
+                  label: l10n.workoutDetailStatVolume,
+                  unit: 'kg',
+                  value: formatVolumeKg(
+                      session.totalVolumeKg, AppL10n.of(context).localeName),
                 ),
                 StatTile(
                   icon: TreinoIcon.statPr,

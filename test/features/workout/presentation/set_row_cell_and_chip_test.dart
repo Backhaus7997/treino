@@ -10,9 +10,14 @@ import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_limits.dart';
 import 'package:treino/features/workout/presentation/widgets/set_cell_field.dart';
 import 'package:treino/features/workout/presentation/widgets/set_type_chip.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 Widget _host(AppPalette palette, Widget child) => MaterialApp(
       theme: ThemeData(extensions: [palette]),
+      // El aviso del tope (#1510) es texto localizado.
+      localizationsDelegates: AppL10n.localizationsDelegates,
+      supportedLocales: AppL10n.supportedLocales,
+      locale: const Locale('es', 'AR'),
       home: Scaffold(
         backgroundColor: palette.bgCard,
         body: Center(child: child),
@@ -266,6 +271,8 @@ void main() {
       await tester.pump();
       expect(ctrl.text, '$kMaxReps',
           reason: 'un set imposible no puede autorearse');
+      // #1510: y lo dice, en vez de tragarse la tecla en silencio.
+      expect(find.text('Máximo $kMaxReps reps'), findsOneWidget);
     });
 
     testWidgets('decimal parsea coma y punto', (tester) async {

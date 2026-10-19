@@ -155,6 +155,10 @@ class TreinoSegmentedPillTokens {
   /// importe capa 1 directamente — mismo criterio que [dividerColor].
   static const FontWeight labelWeight = AppFonts.w700;
 
+  /// Familia del label — `AppFonts.barlowCondensed`, como todo label del kit
+  /// (#1514). Mismo criterio que [labelWeight]: el widget no lee capa 1.
+  static const String labelFamily = AppFonts.barlowCondensed;
+
   /// Tracking del label — `AppFonts.headingTracking`.
   static const double labelTracking = AppFonts.headingTracking;
 
