@@ -51,6 +51,7 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
     required this.viewerUid,
     required this.targetUid,
     this.targetIsPublic = false,
+    this.targetDisplayName,
     this.compact = false,
   });
 
@@ -68,6 +69,15 @@ class PublicProfileFollowButton extends ConsumerStatefulWidget {
   /// When `false` (default) the edge is created as `pending` and the target
   /// must approve. See [FollowRepository.follow].
   final bool targetIsPublic;
+
+  /// Nombre a mostrar en la hoja de dejar de seguir / cancelar solicitud.
+  ///
+  /// Si el caller ya lo tiene, que lo pase: sin él la hoja lo busca con
+  /// `ref.read(userPublicProfileProvider)`, que sólo devuelve dato si ALGUIEN
+  /// más ya cargó ese perfil. En el perfil público alguien lo hace
+  /// (`publicProfileViewProvider`); en una tarjeta de sugerencias no, y la hoja
+  /// decía "¿Dejar de seguir a Usuario anónimo?" (#1533).
+  final String? targetDisplayName;
 
   /// Variante para tarjetas angostas (carrusel de sugerencias): el pill ocupa
   /// todo el ancho que le da el padre, con menos padding, sin ícono, y el label
@@ -240,8 +250,9 @@ class _PublicProfileFollowButtonState
 
   /// Opens the unfriend confirmation bottom sheet.
   ///
-  /// Resolves the display name from [userPublicProfileProvider] with a fallback
-  /// of "Usuario anónimo". On ELIMINAR, calls [FollowRepository.deleteEdge]
+  /// Resolves the display name from [PublicProfileFollowButton.targetDisplayName],
+  /// then [userPublicProfileProvider], with a fallback of "Usuario anónimo".
+  /// On ELIMINAR, calls [FollowRepository.deleteEdge]
   /// sobre la arista SALIENTE — **nunca toca la inversa**: dejar de seguir
   /// corta un solo sentido, y si el otro me sigue eso queda intacto.
   /// Stream providers self-update — sólo [myFollowingFeedProvider] necesita
@@ -252,8 +263,9 @@ class _PublicProfileFollowButtonState
   }) async {
     final palette = AppPalette.of(context);
     final profileAsync = ref.read(userPublicProfileProvider(widget.targetUid));
-    final friendDisplayName =
-        profileAsync.valueOrNull?.displayName ?? 'Usuario anónimo';
+    final friendDisplayName = widget.targetDisplayName ??
+        profileAsync.valueOrNull?.displayName ??
+        'Usuario anónimo';
 
     final repo = ref.read(followRepositoryProvider);
     // Capture the root container + messenger + copy BEFORE awaiting the sheet:

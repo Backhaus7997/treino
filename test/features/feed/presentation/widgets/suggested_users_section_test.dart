@@ -255,6 +255,77 @@ void main() {
       expect(find.text('profile-ana-uid'), findsNothing);
     });
 
+    testWidgets(
+        'tocar SIGUIENDO en la tarjeta abre la hoja con el NOMBRE de la '
+        'sugerencia, no "Usuario anónimo"', (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      // El perfil existe en Firestore, como en el device: lo que falta es que
+      // nadie lo haya cargado todavía (a diferencia del perfil público, donde
+      // `publicProfileViewProvider` ya lo está mirando).
+      await firestore.collection('userPublicProfiles').doc('ana-uid').set({
+        'uid': 'ana-uid',
+        'displayName': 'Ana Pérez',
+        'displayNameLowercase': 'ana pérez',
+        'gymId': 'gym-a',
+      });
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: firestore,
+          suggestions: [profile(uid: 'ana-uid', displayName: 'Ana Pérez')],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('SEGUIR'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SIGUIENDO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Dejar de seguir a Ana Pérez?'), findsOneWidget);
+      expect(find.textContaining('Usuario anónimo'), findsNothing);
+    });
+
+    testWidgets(
+        'cuenta privada: la hoja de cancelar solicitud también lleva el '
+        'nombre', (tester) async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('userPublicProfiles').doc('priv-uid').set({
+        'uid': 'priv-uid',
+        'displayName': 'Priv Ada',
+        'displayNameLowercase': 'priv ada',
+        'gymId': 'gym-a',
+        'isProfilePublic': false,
+      });
+      await tester.pumpWidget(
+        wrap(
+          gymId: 'gym-a',
+          viewerUid: 'me',
+          firestore: firestore,
+          suggestions: [
+            profile(
+              uid: 'priv-uid',
+              displayName: 'Priv Ada',
+              isProfilePublic: false,
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('SEGUIR'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('SOLICITUD ENVIADA'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('¿Cancelar la solicitud a Priv Ada?'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Usuario anónimo'), findsNothing);
+    });
+
     testWidgets('cuenta privada: SOLICITUD ENVIADA entra en la tarjeta', (
       tester,
     ) async {

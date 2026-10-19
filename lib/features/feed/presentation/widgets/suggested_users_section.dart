@@ -252,6 +252,7 @@ class _SuggestedFollowButton extends ConsumerWidget {
         viewerUid: viewerUid,
         targetUid: profile.uid,
         targetIsPublic: profile.isProfilePublic,
+        targetDisplayName: profile.displayName,
       ),
     );
   }
