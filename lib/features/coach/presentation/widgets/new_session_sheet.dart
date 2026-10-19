@@ -8,9 +8,11 @@ import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/telemetry/non_fatal.dart';
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../agenda_formatters.dart';
@@ -20,6 +22,7 @@ import '../../application/agenda_providers.dart';
 import '../../application/trainer_link_providers.dart';
 import '../../domain/compute_free_slots.dart'
     show blockedDatesAmong, isDayBlocked;
+import '../../domain/default_session_start.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
 
@@ -65,9 +68,20 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
-    _time = widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0);
+    final now = AppClock.now();
+    final date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
+    final initialTime = widget.initialTime;
+    if (initialTime != null) {
+      // Hora elegida en el timeline: se respeta tal cual.
+      _date = date;
+      _time = initialTime;
+      return;
+    }
+    // #1490: sin hora elegida, nunca proponer una que ya pasó (ver
+    // [defaultSessionStart]); si hoy no queda ninguna, pasa a mañana.
+    final inicio = defaultSessionStart(now: now, date: date);
+    _date = inicio.date;
+    _time = TimeOfDay(hour: inicio.hour, minute: inicio.minute);
   }
 
   @override
@@ -84,10 +98,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   int? _parsedDuration() {
     final val = int.tryParse(_durationController.text.trim());
     if (val == null || val < 5 || val > 480) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context).newSessionSheetDurationError),
-        ),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).newSessionSheetDurationError,
+        type: TreinoToastType.error,
       );
       return null;
     }
@@ -603,9 +617,7 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitSingleInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      showTreinoToast(context, 'Elegí un alumno.', type: TreinoToastType.error);
       return;
     }
 
@@ -626,10 +638,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       now.minute,
     );
     if (!startsAt.isAfter(nowWall)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No podés registrar una sesión en el pasado.'),
-        ),
+      showTreinoToast(
+        context,
+        'No podés registrar una sesión en el pasado.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -639,10 +651,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'Error de autenticación. Intentá de nuevo.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -697,17 +709,19 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       );
 
       if (!mounted) return;
+      // El messenger se captura ANTES del pop: el aviso va a la pantalla de
+      // atrás, que es la que queda visible cuando el sheet se cierra.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Sesión registrada.')));
+      showTreinoToastOn(messenger, 'Sesión registrada.',
+          type: TreinoToastType.success);
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la sesión. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos registrar la sesión. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -730,16 +744,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   Future<void> _submitRecurringInner() async {
     final athleteId = _selectedAthleteId;
     if (athleteId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí un alumno.')));
+      showTreinoToast(context, 'Elegí un alumno.', type: TreinoToastType.error);
       return;
     }
 
     if (_weekdays.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Elegí al menos un día.')));
+      showTreinoToast(context, 'Elegí al menos un día.',
+          type: TreinoToastType.error);
       return;
     }
 
@@ -748,10 +759,10 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
     final trainerId = ref.read(currentUidProvider);
     if (trainerId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error de autenticación. Intentá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'Error de autenticación. Intentá de nuevo.',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -834,32 +845,29 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
 
       if (count == 0) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No se creó ninguna sesión (todas caían en el pasado). '
-              'Revisá los días y la hora.',
-            ),
-          ),
+        showTreinoToast(
+          context,
+          'No se creó ninguna sesión (todas caían en el pasado). '
+          'Revisá los días y la hora.',
+          type: TreinoToastType.error,
         );
         return;
       }
 
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '$count ${count == 1 ? "sesión registrada" : "sesiones registradas"}.',
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        '$count ${count == 1 ? "sesión registrada" : "sesiones registradas"}.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos registrar la serie. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos registrar la serie. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }

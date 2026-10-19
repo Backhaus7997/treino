@@ -58,6 +58,7 @@ import '../../workout/presentation/widgets/personal_records_list.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -446,14 +447,17 @@ class _PlanesSection extends ConsumerWidget {
       // process, "empezar sesión" included.
       invalidateRoutineById(container, plan.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(AppL10n.of(context).athleteDetailPlanDeleteSuccess)),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).athleteDetailPlanDeleteSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos eliminar el plan.')),
+      showTreinoToast(
+        context,
+        'No pudimos eliminar el plan.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -1256,8 +1260,10 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }
@@ -2730,10 +2736,10 @@ class _AthleteDetailActions extends ConsumerWidget {
       context.push('/coach/chat/${chat.chatId}?other=$athleteId');
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos abrir el chat. Probá de nuevo.'),
-        ),
+      showTreinoToast(
+        context,
+        'No pudimos abrir el chat. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     }
   }

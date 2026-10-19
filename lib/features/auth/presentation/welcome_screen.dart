@@ -12,6 +12,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/primitives.dart';
 import '../../../core/contact/quiero_ser_entrenador.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
@@ -344,12 +345,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       abierto = false;
     }
     if (abierto || !mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          l10n.authWelcomeBecomeTrainerFallback(kLegalContactEmail),
-        ),
-      ),
+    showTreinoToast(
+      context,
+      l10n.authWelcomeBecomeTrainerFallback(kLegalContactEmail),
     );
   }
 
