@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
+import '../../../core/widgets/floating_bar_metrics.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -239,7 +240,10 @@ class _BackBar extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
+      padding: const EdgeInsets.only(
+        left: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
         shape: _floatingShape(palette, routineAsync.valueOrNull),
@@ -248,6 +252,7 @@ class _BackBar extends StatelessWidget {
           button: true,
           label: l10n.commonBack,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: l10n.commonBack,
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
@@ -288,7 +293,10 @@ class _EditBar extends ConsumerWidget {
 
     final palette = AppPalette.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
         shape: _floatingShape(palette, routineAsync.valueOrNull),
@@ -297,6 +305,7 @@ class _EditBar extends ConsumerWidget {
           button: true,
           label: 'Editar rutina', // i18n: Fase W2
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: 'Editar rutina', // i18n: Fase W2
             icon: Icon(Icons.edit, color: palette.textPrimary),
             onPressed: () =>
@@ -433,7 +442,10 @@ class _FollowTemplateBar extends ConsumerWidget {
         yaLaSigue ? l10n.workoutRoutineFollowing : l10n.workoutRoutineFollow;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
         shape: _floatingShape(palette, routineAsync.valueOrNull),
@@ -442,6 +454,7 @@ class _FollowTemplateBar extends ConsumerWidget {
           button: true,
           label: label,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_follow_template'),
             tooltip: label,
             icon: Icon(
@@ -543,7 +556,10 @@ class _UseAsBaseBar extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(right: 12, top: 8),
+      padding: const EdgeInsets.only(
+        right: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: _floatingFill(palette, routineAsync.valueOrNull),
         shape: _floatingShape(palette, routineAsync.valueOrNull),
@@ -552,6 +568,7 @@ class _UseAsBaseBar extends ConsumerWidget {
           button: true,
           label: l10n.workoutRoutineUseAsBase,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_use_as_base'),
             tooltip: l10n.workoutRoutineUseAsBase,
             icon: Icon(
@@ -1153,7 +1170,12 @@ class _HeroStrip extends ConsumerWidget {
     if (!hasHeroPhoto) {
       return Padding(
         key: const Key('routine-compact-header'),
-        padding: const EdgeInsets.fromLTRB(20, 64, 20, 8),
+        padding: const EdgeInsets.fromLTRB(
+          20,
+          FloatingBarMetrics.reservedHeight,
+          20,
+          8,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

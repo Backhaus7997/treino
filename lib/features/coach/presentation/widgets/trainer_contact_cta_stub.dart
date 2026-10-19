@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart' show AppSpacing;
@@ -73,17 +74,18 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
       ref.invalidate(currentAthleteLinkProvider);
       ref.invalidate(currentAthleteLinkAnyStatusProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Solicitud enviada. Te avisamos cuando el PF responda.'),
-          ),
+        showTreinoToast(
+          context,
+          'Solicitud enviada. Te avisamos cuando el PF responda.',
+          type: TreinoToastType.success,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No pudimos enviar la solicitud: $e')),
+        showTreinoToast(
+          context,
+          'No pudimos enviar la solicitud: $e',
+          type: TreinoToastType.error,
         );
       }
     } finally {

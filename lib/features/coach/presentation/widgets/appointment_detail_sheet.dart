@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/argentina_time.dart'
@@ -357,18 +358,24 @@ class _AppointmentDetailSheetState
           );
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationSuccess,
+        type: TreinoToastType.success,
       );
     } on CancellationTooLateException {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationTooLate,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToast(
+        context,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -466,8 +473,10 @@ class _AppointmentDetailSheetState
           );
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCobrarSuccess)),
+      showTreinoToast(
+        context,
+        l10n.agendaCobrarSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       // Covers AppointmentAlreadyBilledException, AppointmentNotConfirmedException

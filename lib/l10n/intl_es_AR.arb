@@ -133,6 +133,23 @@
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",
+  "authWelcomeTrainerPrompt": "¿Sos entrenador?",
+  "@authWelcomeTrainerPrompt": {
+    "description": "Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail."
+  },
+  "authWelcomeBecomeTrainer": "Quiero ser entrenador",
+  "@authWelcomeBecomeTrainer": {
+    "description": "Welcome screen — link that opens a mailto: to the TREINO team (same channel and subject as the Coach Hub not-allowed screen)."
+  },
+  "authWelcomeBecomeTrainerFallback": "No pudimos abrir tu correo. Escribinos a {email}.",
+  "@authWelcomeBecomeTrainerFallback": {
+    "description": "Welcome screen — SnackBar when no mail app handles the mailto:. Shows the address so it can be typed by hand.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authLoginTitle": "BIENVENIDO",
   "authLoginSubtitle": "Entrá para seguir tu rutina",
   "authLoginEmailHint": "tu@email.com",
@@ -705,6 +722,16 @@
     "description": "Empty state of the EXPLORAR catalogue grid when no trainer has published anything yet and no level filter is active (#638)."
   },
   "workoutExploreEmptyLevel": "No hay rutinas para este nivel.",
+  "templatesFilterEmptyDays": "{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}",
+  "@templatesFilterEmptyDays": {"description": "Estado vacío de EXPLORAR cuando el filtro duro de días (#1561) no deja ninguna plantilla. Va seguido del botón templatesFilterEmptyAction.", "placeholders": {"days": {"type": "int"}}},
+  "templatesFilterEmptyMinutes": "No hay plantillas de unos {minutes} min",
+  "@templatesFilterEmptyMinutes": {"description": "Igual que templatesFilterEmptyDays pero cuando sólo hay filtro de minutos (±15).", "placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyMinutesOrMore": "No hay plantillas de {minutes} min o más",
+  "@templatesFilterEmptyMinutesOrMore": {"description": "Igual que templatesFilterEmptyMinutes pero para la opción \"75 MIN O MÁS\" del cuestionario, que no tiene techo: decir \"unos 75 min\" mentiría sobre qué se filtró.", "placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyDaysAndMinutes": "Ninguna plantilla encaja con tus días y tus minutos a la vez",
+  "@templatesFilterEmptyDaysAndMinutes": {"description": "Estado vacío de EXPLORAR cuando días y minutos dejan plantillas CADA UNO por separado pero ninguna cumple los dos (#1561). Va seguido de templatesFilterEmptyAction."},
+  "templatesFilterEmptyAction": "Ver todas",
+  "@templatesFilterEmptyAction": {"description": "CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista."},
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },
@@ -3989,10 +4016,10 @@
   "templatesOnboardingStep1Title": "¿Cuántos días podés entrenar?",
   "@templatesOnboardingStep1Title": {"description": "Paso 1 del mini-onboarding de PLANTILLAS (#635). Pregunta por días disponibles."},
   "templatesOnboardingStep1Body": "Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.",
-  "@templatesOnboardingStep1Body": {"description": "Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él."},
+  "@templatesOnboardingStep1Body": {"description": "Paso 1, bajada. La respuesta se guarda y se usa en EXPLORAR: días y minutos filtran la grilla (#1561) y todas las respuestas la ordenan por afinidad (#635). Qué filtra y qué ordena lo explica templatesOnboardingStep1Hint; esta bajada no lo repite."},
   "templatesOnboardingStep1Label": "Días por semana",
-  "templatesOnboardingStep1Hint": "Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.",
-  "@templatesOnboardingStep1Hint": {"description": "Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde."},
+  "templatesOnboardingStep1Hint": "Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.",
+  "@templatesOnboardingStep1Hint": {"description": "Aclara qué hace cada respuesta (#1561): días y minutos FILTRAN la grilla (con salida \"Ver todas\" si queda vacía); objetivo y zonas sólo ordenan."},
   "templatesOnboardingStep2Title": "¿Cuánto dura tu sesión?",
   "@templatesOnboardingStep2Title": {"description": "Paso 2. Pregunta por duración de sesión."},
   "templatesOnboardingStep2Body": "45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.",
@@ -4038,8 +4065,10 @@
   "@templatesFilterBarAdjust": {"description": "Acción de la barra de PLANTILLAS que reabre el mini-onboarding (#635 PR#3) sembrado con lo ya respondido. La gente cambia de disponibilidad; sin esto tendría que rehacer el cuestionario o no podría."},
   "templatesFilterBarSetUp": "AJUSTAR MI BÚSQUEDA",
   "@templatesFilterBarSetUp": {"description": "Misma acción cuando el atleta todavía no respondió nada: el texto invita en vez de referirse a respuestas que no existen."},
-  "templatesFilterBarHint": "Ordenado según lo que buscás",
-  "@templatesFilterBarHint": {"description": "Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde."},
+  "templatesFilterBarHint": "Filtrado y ordenado según lo que buscás",
+  "@templatesFilterBarHint": {"description": "Explica por qué la grilla se ve así (#1561) cuando el filtro de días/minutos ESTÁ en efecto: recorta y además ordena."},
+  "templatesFilterBarHintSorted": "Ordenado según lo que buscás",
+  "@templatesFilterBarHintSorted": {"description": "Misma barra cuando NO hay filtro en efecto: sólo se respondió objetivo/zonas, o el atleta tocó \"Ver todas\". Decir \"Filtrado\" ahí sería falso: no se esconde nada, sólo cambia el orden."},
   "exerciseFeedbackAction": "COMENTAR / REPORTAR",
   "@exerciseFeedbackAction": {"description": "Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628)."},
   "exerciseFeedbackActionA11y": "Comentar o reportar una molestia en {exerciseName}",

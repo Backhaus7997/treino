@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
@@ -94,9 +95,11 @@ class _TrainerInquiryCtaState extends ConsumerState<TrainerInquiryCta> {
       }
       router.push('/coach/chat/${chat.chatId}?other=${widget.trainerId}');
     } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorText)));
+      showTreinoToastOn(
+        messenger,
+        errorText,
+        type: TreinoToastType.error,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
