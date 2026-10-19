@@ -256,6 +256,10 @@ class AppTheme {
       inputDecorationTheme: _buildInputDecoration(palette, errorColor),
       appBarTheme: AppBarTheme(
         systemOverlayStyle: systemOverlayStyleFor(Brightness.dark),
+        // Sin tinte de scrolled-under (#1559): sobre los AppBar transparentes
+        // pintaba una banda que cortaba el contenido de abajo.
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       textTheme: textTheme,
       extensions: [palette],
@@ -287,6 +291,10 @@ class AppTheme {
       inputDecorationTheme: _buildInputDecoration(palette, palette.danger),
       appBarTheme: AppBarTheme(
         systemOverlayStyle: systemOverlayStyleFor(Brightness.light),
+        // Sin tinte de scrolled-under (#1559): sobre los AppBar transparentes
+        // pintaba una banda que cortaba el contenido de abajo.
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       textTheme: textTheme,
       extensions: [palette],
