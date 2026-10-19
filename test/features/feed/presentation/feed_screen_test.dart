@@ -804,11 +804,14 @@ void main() {
               UserPublicProfile(uid: uid, rankingOptIn: rankingOptIn),
             ),
           ),
-          streakLeaderboardProvider(gymId).overrideWith((_) async => []),
-          volumeLeaderboardProvider(gymId).overrideWith((_) async => []),
-          squatLeaderboardProvider(gymId).overrideWith((_) async => []),
-          benchLeaderboardProvider(gymId).overrideWith((_) async => []),
-          deadliftLeaderboardProvider(gymId).overrideWith((_) async => []),
+          streakLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
+          volumeLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
+          squatLeaderboardProvider(gymId).overrideWith((_) => Stream.value([])),
+          benchLeaderboardProvider(gymId).overrideWith((_) => Stream.value([])),
+          deadliftLeaderboardProvider(gymId)
+              .overrideWith((_) => Stream.value([])),
           rankingOptInControllerProvider
               .overrideWithValue(_FakeRankingOptInController()),
         ];
