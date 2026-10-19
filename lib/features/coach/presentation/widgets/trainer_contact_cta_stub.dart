@@ -115,7 +115,7 @@ class _TrainerContactCtaStubState extends ConsumerState<TrainerContactCtaStub> {
     final button = OutlinedButton(
       onPressed: disabled ? null : _onPressed,
       style: OutlinedButton.styleFrom(
-        foregroundColor: palette.accent,
+        foregroundColor: palette.accentText,
         side: BorderSide(
           color: disabled ? palette.border : palette.accent,
         ),

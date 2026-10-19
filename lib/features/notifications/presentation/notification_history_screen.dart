@@ -445,7 +445,7 @@ class _NotificationError extends StatelessWidget {
           const SizedBox(height: 12),
           TextButton(
             onPressed: onRetry,
-            style: TextButton.styleFrom(foregroundColor: palette.accent),
+            style: TextButton.styleFrom(foregroundColor: palette.accentText),
             child: Text(l10n.coachRetryLabel),
           ),
         ],

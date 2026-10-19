@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -431,6 +432,7 @@ class _TimeField extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final picked = await showTimePicker(
       context: context,
+      helpText: AppL10n.of(context).timePickerHelpText,
       initialTime: TimeOfDay(hour: hour, minute: minute),
       builder: (ctx, child) => MediaQuery(
         data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),

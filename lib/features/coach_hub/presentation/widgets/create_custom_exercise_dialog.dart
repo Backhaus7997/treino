@@ -338,7 +338,7 @@ class _CustomExerciseFormDialogState
                 Text(
                   _error!,
                   style: GoogleFonts.barlow(
-                    color: palette.danger,
+                    color: palette.dangerText,
                     fontSize: AppTextSize.bodyDense,
                   ),
                 ),

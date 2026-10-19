@@ -280,7 +280,7 @@ class _AppointmentDetailSheetState
                                 onPressed: () => _openCobrarForm(ref),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(color: palette.accent),
-                                  foregroundColor: palette.accent,
+                                  foregroundColor: palette.accentText,
                                   shape: RoundedRectangleBorder(
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.full),
@@ -619,7 +619,7 @@ class _AppointmentDetailSheetState
             const SizedBox(height: 10),
             Text(
               _billingError!,
-              style: TextStyle(color: palette.danger, fontSize: 12),
+              style: TextStyle(color: palette.dangerText, fontSize: 12),
             ),
           ],
           const SizedBox(height: 14),

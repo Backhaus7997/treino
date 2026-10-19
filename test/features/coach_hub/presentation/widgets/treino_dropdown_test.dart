@@ -78,12 +78,11 @@ void main() {
     );
 
     final context = tester.element(find.byType(TreinoPopupMenuButton<String>));
-    final button = tester.widget<PopupMenuButton<String>>(
-      find.byType(PopupMenuButton<String>),
-    );
-    final shape = button.shape as RoundedRectangleBorder;
+    // El look viene de `popupMenuTheme` (#1558), no de props del widget.
+    final popupTheme = Theme.of(context).popupMenuTheme;
+    final shape = popupTheme.shape! as RoundedRectangleBorder;
 
-    expect(button.color, TreinoCardTokens.background(context));
+    expect(popupTheme.color, TreinoCardTokens.background(context));
     expect(shape.borderRadius, BorderRadius.circular(AppRadius.md));
     expect(shape.side.color, TreinoCardTokens.border(context));
 

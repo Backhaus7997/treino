@@ -375,7 +375,7 @@ class TrainerFilterChip extends StatelessWidget {
       opacity = 0.6;
     } else if (isActive) {
       bg = palette.accent;
-      fg = palette.bg;
+      fg = TreinoButtonTokens.ink;
       borderColor = palette.accent;
       opacity = 1.0;
     } else {

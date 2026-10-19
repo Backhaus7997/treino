@@ -553,6 +553,9 @@ void main() {
       );
       await tester.ensureVisible(revoke);
       expect(revoke, findsOneWidget);
+      // #1499: se lee como un switch (y encendido), no como texto suelto con
+      // un botón al lado.
+      expect(tester.widget<SwitchListTile>(revoke).value, isTrue);
 
       await tester.tap(revoke);
       await tester.pumpAndSettle();

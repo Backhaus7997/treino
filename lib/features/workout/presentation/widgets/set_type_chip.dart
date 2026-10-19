@@ -34,7 +34,9 @@ class SetTypeChip extends StatelessWidget {
     final foreground = switch (type) {
       SetType.warmup => palette.accentText,
       SetType.drop => palette.highlight,
-      SetType.failure => palette.danger,
+      // Es el color del TEXTO del chip: el relleno y el borde de arriba y de
+      // abajo siguen en `danger`.
+      SetType.failure => palette.dangerText,
       SetType.normal => palette.textPrimary,
     };
     final border = switch (type) {
