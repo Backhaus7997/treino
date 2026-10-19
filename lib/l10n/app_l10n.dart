@@ -2042,6 +2042,18 @@ abstract class AppL10n {
   /// **'No hay plantillas de unos {minutes} min'**
   String templatesFilterEmptyMinutes(String minutes);
 
+  /// Igual que templatesFilterEmptyMinutes pero para la opción "75 MIN O MÁS" del cuestionario, que no tiene techo: decir "unos 75 min" mentiría sobre qué se filtró.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay plantillas de {minutes} min o más'**
+  String templatesFilterEmptyMinutesOrMore(String minutes);
+
+  /// Estado vacío de EXPLORAR cuando días y minutos dejan plantillas CADA UNO por separado pero ninguna cumple los dos (#1561). Va seguido de templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna plantilla encaja con tus días y tus minutos a la vez'**
+  String get templatesFilterEmptyDaysAndMinutes;
+
   /// CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista.
   ///
   /// In es_AR, this message translates to:
@@ -7713,7 +7725,7 @@ abstract class AppL10n {
   /// **'¿Cuántos días podés entrenar?'**
   String get templatesOnboardingStep1Title;
 
-  /// Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él.
+  /// Paso 1, bajada. La respuesta se guarda y se usa en EXPLORAR: días y minutos filtran la grilla (#1561) y todas las respuestas la ordenan por afinidad (#635). Qué filtra y qué ordena lo explica templatesOnboardingStep1Hint; esta bajada no lo repite.
   ///
   /// In es_AR, this message translates to:
   /// **'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.'**
@@ -7929,11 +7941,17 @@ abstract class AppL10n {
   /// **'AJUSTAR MI BÚSQUEDA'**
   String get templatesFilterBarSetUp;
 
-  /// Explica por qué la grilla se ve así (#1561): días y minutos filtran, el resto ordena.
+  /// Explica por qué la grilla se ve así (#1561) cuando el filtro de días/minutos ESTÁ en efecto: recorta y además ordena.
   ///
   /// In es_AR, this message translates to:
   /// **'Filtrado y ordenado según lo que buscás'**
   String get templatesFilterBarHint;
+
+  /// Misma barra cuando NO hay filtro en efecto: sólo se respondió objetivo/zonas, o el atleta tocó "Ver todas". Decir "Filtrado" ahí sería falso: no se esconde nada, sólo cambia el orden.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ordenado según lo que buscás'**
+  String get templatesFilterBarHintSorted;
 
   /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
   ///

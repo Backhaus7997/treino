@@ -1103,6 +1103,15 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No hay plantillas de $minutes min o más';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
+
+  @override
   String get templatesFilterEmptyAction => 'Ver todas';
 
   @override
@@ -4568,6 +4577,9 @@ class AppL10nEs extends AppL10n {
       'Filtrado y ordenado según lo que buscás';
 
   @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
+
+  @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
 
   @override
@@ -6552,6 +6564,15 @@ class AppL10nEsAr extends AppL10nEs {
   String templatesFilterEmptyMinutes(String minutes) {
     return 'No hay plantillas de unos $minutes min';
   }
+
+  @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No hay plantillas de $minutes min o más';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
 
   @override
   String get templatesFilterEmptyAction => 'Ver todas';
@@ -10014,6 +10035,9 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get templatesFilterBarHint =>
       'Filtrado y ordenado según lo que buscás';
+
+  @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';

@@ -12,7 +12,6 @@ import '../../application/template_preferences_providers.dart';
 import '../../application/unified_templates_providers.dart';
 import '../../domain/routine.dart';
 import '../../domain/template_affinity.dart';
-import '../../domain/template_search.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
@@ -143,7 +142,6 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     final entriesAsync = ref.watch(searchedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
     final searchQuery = ref.watch(templatesSearchQueryProvider);
-    final hardFilterActive = ref.watch(templatesPreferenceFilterActiveProvider);
     final preferences = ref.watch(athleteTemplatePreferencesProvider);
 
     Widget message(Widget child) => SliverToBoxAdapter(
@@ -160,28 +158,34 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
           final textStyle = theme.textTheme.bodyMedium?.copyWith(
             color: palette.textMuted,
           );
-          // Filtro duro de días/minutos en efecto (#1561): si es lo que dejó
-          // la grilla en cero (sin texto de por medio), el mensaje lo dice y
-          // el CTA lo levanta. Con texto de búsqueda se conserva el mensaje de
-          // búsqueda, pero la salida sigue estando.
-          final blank = TemplateSearch.isBlank(searchQuery);
-          final msg = !blank
-              ? l10n.workoutExploreSearchEmpty(searchQuery)
-              : hardFilterActive
-                  ? (preferences.daysPerWeek ?? 0) > 0
-                      ? l10n.templatesFilterEmptyDays(preferences.daysPerWeek!)
-                      : l10n.templatesFilterEmptyMinutes(
-                          '${preferences.minutesPerSession}',
-                        )
-                  : filter == null
-                      ? l10n.workoutExploreEmptyAll
-                      : l10n.workoutExploreEmptyLevel;
+          // El motivo lo calcula templatesEmptyReasonProvider (#1561), que
+          // recorta de a una dimensión: si el vacío lo causan el nivel o el
+          // texto, el mensaje es ése y "Ver todas" NO se ofrece — levantar
+          // días/minutos no sacaría a la grilla del vacío. Si lo causa el
+          // filtro duro, culpa a días, a minutos o a la combinación.
+          final reason = ref.watch(templatesEmptyReasonProvider) ??
+              TemplatesEmptyReason.catalog;
+          final minutes = preferences.minutesPerSession ?? 0;
+          final msg = switch (reason) {
+            TemplatesEmptyReason.search =>
+              l10n.workoutExploreSearchEmpty(searchQuery),
+            TemplatesEmptyReason.level => l10n.workoutExploreEmptyLevel,
+            TemplatesEmptyReason.catalog => l10n.workoutExploreEmptyAll,
+            TemplatesEmptyReason.days =>
+              l10n.templatesFilterEmptyDays(preferences.daysPerWeek ?? 0),
+            TemplatesEmptyReason.minutes =>
+              TemplateAffinity.isOpenEndedMinutes(minutes)
+                  ? l10n.templatesFilterEmptyMinutesOrMore('$minutes')
+                  : l10n.templatesFilterEmptyMinutes('$minutes'),
+            TemplatesEmptyReason.daysAndMinutes =>
+              l10n.templatesFilterEmptyDaysAndMinutes,
+          };
           return message(
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(msg, style: textStyle),
-                if (hardFilterActive)
+                if (reason.canLiftPreferenceFilter)
                   TextButton(
                     key: const Key('templates_filter_empty_show_all'),
                     onPressed: () => ref

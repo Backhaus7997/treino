@@ -6,6 +6,7 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_goal.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/template_affinity.dart';
 import 'package:treino/features/workout/domain/template_preferences.dart';
 
@@ -23,6 +24,34 @@ Routine _routine({
       days: [
         for (var i = 0; i < days; i++)
           RoutineDay(dayNumber: i + 1, name: 'D${i + 1}', slots: const []),
+      ],
+    );
+
+/// Sin `estimatedMinutesPerDay` pero con series: el estimador de #1562 tiene
+/// de dónde sacar la duración. 3 días de 2 ejercicios × 3 series × 12 reps
+/// con 60 s → 16 min por día.
+Routine _estimable() => Routine(
+      id: 'pf',
+      name: 'PF',
+      level: ExperienceLevel.beginner,
+      days: [
+        for (var i = 0; i < 3; i++)
+          RoutineDay(
+            dayNumber: i + 1,
+            name: 'D${i + 1}',
+            slots: [
+              for (final m in ['chest', 'triceps'])
+                RoutineSlot(
+                  exerciseId: m,
+                  exerciseName: m,
+                  muscleGroup: m,
+                  targetSets: 3,
+                  targetRepsMin: 8,
+                  targetRepsMax: 12,
+                  restSeconds: 60,
+                ),
+            ],
+          ),
       ],
     );
 
@@ -88,6 +117,67 @@ void main() {
       const p30 = TemplatePreferences(minutesPerSession: 30);
       expect(_fits(_routine(minutes: 60), p30), isFalse);
       expect(_fits(_routine(minutes: 45), p30), isTrue);
+    });
+  });
+
+  group('minutos sin dato cargado: respaldo del estimador (#1562)', () {
+    test('se filtra con la duración estimada de sus series', () {
+      expect(TemplateAffinity.minutesOf(_estimable()), 16);
+      expect(
+        _fits(_estimable(), const TemplatePreferences(minutesPerSession: 75)),
+        isFalse,
+        reason: '16 min estimados no son "75 o más"',
+      );
+      expect(
+        _fits(_estimable(), const TemplatePreferences(minutesPerSession: 30)),
+        isTrue,
+        reason: '16 está a 14 de 30: dentro de ±15',
+      );
+    });
+
+    test('sin series ni minutos no hay estimación y la plantilla pasa', () {
+      expect(TemplateAffinity.minutesOf(_routine()), isNull);
+      expect(
+        _fits(_routine(), const TemplatePreferences(minutesPerSession: 30)),
+        isTrue,
+      );
+    });
+
+    test('el orden usa la misma estimación que el filtro', () {
+      const prefs = TemplatePreferences(minutesPerSession: 30);
+      final estimada = TemplateAffinity.score(_estimable(), prefs);
+      expect(
+        estimada,
+        TemplateAffinity.score(
+          _estimable().copyWith(estimatedMinutesPerDay: 16),
+          prefs,
+        ),
+        reason: 'puntúa igual que si tuviera los 16 min cargados',
+      );
+      expect(
+        estimada,
+        isNot(TemplateAffinity.score(_routine(), prefs)),
+        reason: 'no es el neutral de una plantilla sin dato',
+      );
+    });
+  });
+
+  test('"75 o más" tampoco tiene techo al ORDENAR', () {
+    const prefs = TemplatePreferences(minutesPerSession: 75);
+    expect(
+      TemplateAffinity.score(_routine(minutes: 100), prefs),
+      greaterThan(TemplateAffinity.score(_routine(minutes: 70), prefs)),
+      reason: 'el filtro deja entrar la de 100: el orden no puede hundirla',
+    );
+  });
+
+  group('matchesDays / matchesMinutes por separado', () {
+    test('cada dimensión se evalúa sola', () {
+      const prefs = TemplatePreferences(daysPerWeek: 3, minutesPerSession: 30);
+      final r = _routine(days: 3, minutes: 90);
+      expect(TemplateAffinity.matchesDays(r, prefs), isTrue);
+      expect(TemplateAffinity.matchesMinutes(r, prefs), isFalse);
+      expect(_fits(r, prefs), isFalse);
     });
   });
 

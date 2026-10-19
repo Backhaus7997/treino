@@ -1,5 +1,6 @@
 import 'muscle_group.dart';
 import 'routine.dart';
+import 'routine_day_duration.dart';
 import 'template_preferences.dart';
 
 /// Afinidad entre una plantilla y lo que el atleta respondió en el
@@ -67,34 +68,53 @@ abstract final class TemplateAffinity {
       (preferences.daysPerWeek ?? 0) > 0 ||
       (preferences.minutesPerSession ?? 0) > 0;
 
-  /// Filtro duro (#1561): ¿la plantilla encaja en los días y minutos pedidos?
-  ///
-  ///   * Días: `days.length == daysPerWeek`. Sin días cargados ⇒ pasa.
-  ///   * Minutos: `|estimatedMinutesPerDay − pedidos| ≤` [minutesTolerance];
-  ///     con 75 ("75 o más") alcanza `≥ 75 − tolerancia`. Sin minutos
-  ///     (null / ≤ 0) ⇒ pasa: desconocido no es desajuste.
-  ///   * Preferencia no respondida en esa dimensión ⇒ pasa.
+  /// Filtro duro (#1561): ¿la plantilla encaja en los días Y los minutos
+  /// pedidos? Es [matchesDays] && [matchesMinutes]; están separadas para que
+  /// el estado vacío pueda culpar a la dimensión correcta.
   static bool matchesHardFilters(
     Routine routine,
     TemplatePreferences preferences,
-  ) {
-    final wantedDays = preferences.daysPerWeek;
-    if (wantedDays != null && wantedDays > 0) {
-      final days = routine.days.length;
-      if (days > 0 && days != wantedDays) return false;
-    }
-    final wantedMinutes = preferences.minutesPerSession;
-    if (wantedMinutes != null && wantedMinutes > 0) {
-      final minutes = routine.estimatedMinutesPerDay;
-      if (minutes != null && minutes > 0) {
-        final diff = minutes - wantedMinutes;
-        final openEnded = wantedMinutes >= _minutosOMas;
-        if (diff < -minutesTolerance) return false;
-        if (!openEnded && diff > minutesTolerance) return false;
-      }
-    }
-    return true;
+  ) =>
+      matchesDays(routine, preferences) && matchesMinutes(routine, preferences);
+
+  /// Días: `days.length == daysPerWeek`. Sin días cargados ⇒ pasa. Sin
+  /// preferencia de días ⇒ pasa.
+  static bool matchesDays(Routine routine, TemplatePreferences preferences) {
+    final wanted = preferences.daysPerWeek;
+    if (wanted == null || wanted <= 0) return true;
+    final days = routine.days.length;
+    return days == 0 || days == wanted;
   }
+
+  /// Minutos: `|minutesOf − pedidos| ≤` [minutesTolerance]; con 75 ("75 o
+  /// más") alcanza `≥ 75 − tolerancia`. Sin estimación posible ⇒ pasa:
+  /// desconocido no es desajuste. Sin preferencia de minutos ⇒ pasa.
+  static bool matchesMinutes(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) {
+    final wanted = preferences.minutesPerSession;
+    if (wanted == null || wanted <= 0) return true;
+    final minutes = minutesOf(routine);
+    if (minutes == null) return true;
+    final diff = minutes - wanted;
+    if (diff < -minutesTolerance) return false;
+    return isOpenEndedMinutes(wanted) || diff <= minutesTolerance;
+  }
+
+  /// Minutos por sesión de [routine] con los que se filtra y se ordena: el
+  /// `estimatedMinutesPerDay` cargado y, si no hay, la estimación de sus
+  /// series ([estimateRoutineSessionMinutes], #1562). Las plantillas de
+  /// comunidad/PF casi nunca traen el campo; sin este respaldo el filtro de
+  /// minutos no las tocaba nunca. `null` sólo si no hay nada que estimar.
+  static int? minutesOf(Routine routine) {
+    final minutes = estimateRoutineSessionMinutes(routine).minutes;
+    return (minutes == null || minutes <= 0) ? null : minutes;
+  }
+
+  /// True si [minutes] es la opción "75 MIN O MÁS" del cuestionario, que no
+  /// tiene techo.
+  static bool isOpenEndedMinutes(int minutes) => minutes >= _minutosOMas;
 
   /// Valor de la opción "75 MIN O MÁS" del cuestionario.
   static const int _minutosOMas = 75;
@@ -129,8 +149,8 @@ abstract final class TemplateAffinity {
     return gap >= 3 ? 0 : 1 - (gap / 3);
   }
 
-  /// Minutos por sesión. Nullable en el modelo, así que la ausencia es
-  /// esperable y neutra.
+  /// Minutos por sesión, de [minutesOf] (cargados o estimados de las series).
+  /// Sin nada que estimar la ausencia es esperable y neutra.
   ///
   /// La tolerancia asimétrica es a propósito: **pasarse de tiempo penaliza más
   /// que sobrar**. Quien dice "tengo 30 minutos" tiene 30; una sesión de 60 no
@@ -138,9 +158,15 @@ abstract final class TemplateAffinity {
   /// termina antes.
   static double _minutesScore(Routine routine, int? wanted) {
     if (wanted == null || wanted <= 0) return neutral;
-    final minutes = routine.estimatedMinutesPerDay;
-    if (minutes == null || minutes <= 0) return neutral;
+    // Misma fuente que el filtro ([minutesOf]): ordenar con un dato y filtrar
+    // con otro dejaría arriba una plantilla que el filtro debió sacar.
+    final minutes = minutesOf(routine);
+    if (minutes == null) return neutral;
     final diff = minutes - wanted;
+    // "75 o más" no tiene techo, igual que en [matchesMinutes]: pasarse no es
+    // desajuste. Sin esto el filtro dejaba entrar una de 100 min y el orden
+    // la hundía debajo de una de 70.
+    if (diff >= 0 && isOpenEndedMinutes(wanted)) return 1;
     // 20 min de margen cuando la sesión es más corta, 10 cuando es más larga.
     final tolerance = diff <= 0 ? 20 : 10;
     final gap = diff.abs() / tolerance;

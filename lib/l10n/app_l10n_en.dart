@@ -1081,6 +1081,15 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No templates of $minutes min or more';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'No template fits both your days and your minutes';
+
+  @override
   String get templatesFilterEmptyAction => 'Show all';
 
   @override
@@ -4484,6 +4493,10 @@ class AppL10nEn extends AppL10n {
   @override
   String get templatesFilterBarHint =>
       'Filtered and sorted to match what you are after';
+
+  @override
+  String get templatesFilterBarHintSorted =>
+      'Sorted to match what you are after';
 
   @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';

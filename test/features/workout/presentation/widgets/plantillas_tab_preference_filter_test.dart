@@ -32,14 +32,19 @@ final _catalogo = [_r('a', 3, minutes: 60), _r('b', 5, minutes: 60)];
 
 Future<ProviderContainer> _pump(
   WidgetTester tester,
-  TemplatePreferences prefs,
-) async {
+  TemplatePreferences prefs, {
+  List<Routine>? catalogo,
+  ExperienceLevel? level,
+  String query = '',
+}) async {
   final container = ProviderContainer(overrides: [
     currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
-    routinesProvider.overrideWith((ref) async => _catalogo),
+    routinesProvider.overrideWith((ref) async => catalogo ?? _catalogo),
     athleteTemplatePreferencesProvider.overrideWithValue(prefs),
   ]);
   addTearDown(container.dispose);
+  container.read(routinesLevelFilterProvider.notifier).state = level;
+  container.read(templatesSearchQueryProvider.notifier).state = query;
   await tester.pumpWidget(
     UncontrolledProviderScope(
       container: container,
@@ -107,5 +112,104 @@ void main() {
     );
     expect(find.byType(RoutineCard), findsNWidgets(2));
     expect(find.text('Ver todas'), findsNothing);
+  });
+
+  group('el vacío culpa a lo que lo causó', () {
+    testWidgets('vacío por NIVEL con filtro duro: mensaje de nivel, sin CTA',
+        (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(daysPerWeek: 3),
+        level: ExperienceLevel.advanced,
+      );
+      expect(find.text('No hay rutinas para este nivel.'), findsOneWidget);
+      expect(find.text('No hay plantillas de 3 días'), findsNothing);
+      expect(find.text('Ver todas'), findsNothing,
+          reason: 'levantar días/minutos no sacaría a la grilla del vacío');
+    });
+
+    testWidgets('vacío por TEXTO con filtro duro: mensaje de búsqueda, sin CTA',
+        (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(daysPerWeek: 3),
+        query: 'zzzz',
+      );
+      expect(find.textContaining('zzzz'), findsWidgets);
+      expect(find.text('No hay plantillas de 3 días'), findsNothing);
+      expect(find.text('Ver todas'), findsNothing);
+    });
+
+    testWidgets('vacío por DÍAS aunque también haya minutos que sí encajan',
+        (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(daysPerWeek: 6, minutesPerSession: 60),
+      );
+      expect(find.text('No hay plantillas de 6 días'), findsOneWidget);
+      expect(find.text('Ver todas'), findsOneWidget);
+    });
+
+    testWidgets('vacío por MINUTOS aunque también haya días que sí encajan',
+        (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(daysPerWeek: 3, minutesPerSession: 30),
+      );
+      expect(find.text('No hay plantillas de unos 30 min'), findsOneWidget);
+      expect(find.text('No hay plantillas de 3 días'), findsNothing);
+      expect(find.text('Ver todas'), findsOneWidget);
+    });
+
+    testWidgets('días y minutos encajan por separado pero no juntos',
+        (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(daysPerWeek: 3, minutesPerSession: 30),
+        catalogo: [_r('a', 3, minutes: 60), _r('c', 5, minutes: 30)],
+      );
+      expect(
+        find.text(
+            'Ninguna plantilla encaja con tus días y tus minutos a la vez'),
+        findsOneWidget,
+      );
+      expect(find.text('Ver todas'), findsOneWidget);
+    });
+
+    testWidgets('"75 o más" no dice "unos 75 min"', (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(minutesPerSession: 75),
+        catalogo: [_r('a', 3, minutes: 30)],
+      );
+      expect(find.text('No hay plantillas de 75 min o más'), findsOneWidget);
+      expect(find.text('No hay plantillas de unos 75 min'), findsNothing);
+    });
+  });
+
+  group('la barra no dice "Filtrado" si nada filtra', () {
+    testWidgets('con días: filtrado y ordenado', (tester) async {
+      await _pump(tester, const TemplatePreferences(daysPerWeek: 3));
+      expect(
+          find.text('Filtrado y ordenado según lo que buscás'), findsOneWidget);
+    });
+
+    testWidgets('sólo objetivo/zonas: ordenado', (tester) async {
+      await _pump(
+        tester,
+        const TemplatePreferences(priorityMuscleGroups: ['back']),
+      );
+      expect(find.text('Ordenado según lo que buscás'), findsOneWidget);
+      expect(find.textContaining('Filtrado'), findsNothing);
+    });
+
+    testWidgets('después de "Ver todas": ordenado', (tester) async {
+      await _pump(tester, const TemplatePreferences(daysPerWeek: 6));
+      await tester.tap(find.text('Ver todas'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Ordenado según lo que buscás'), findsOneWidget);
+      expect(find.textContaining('Filtrado'), findsNothing);
+    });
   });
 }

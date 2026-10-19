@@ -203,3 +203,95 @@ final searchedUnifiedTemplatesProvider =
     (list) => TemplateSearch.filter(list, query, (e) => e.routine),
   );
 });
+
+/// Por qué EXPLORAR quedó sin plantillas (#1561). Lo lee el estado vacío de
+/// PlantillasTab para elegir el mensaje y decidir si ofrece "Ver todas".
+enum TemplatesEmptyReason {
+  /// No hay nada publicado ni en el catálogo: ningún filtro es el culpable.
+  catalog,
+
+  /// La pill de nivel deja la grilla vacía por sí sola.
+  level,
+
+  /// El texto de búsqueda (con el nivel) la deja vacía por sí solo.
+  search,
+
+  /// Nivel y texto dejan algo, pero ninguna tiene los días pedidos.
+  days,
+
+  /// Nivel y texto dejan algo, pero ninguna dura lo pedido (±15).
+  minutes,
+
+  /// Días y minutos dejan algo CADA UNO por separado, pero no juntos.
+  daysAndMinutes;
+
+  /// Si levantar el filtro de días/minutos ("Ver todas") cambia algo. En
+  /// [catalog], [level] y [search] no: la grilla seguiría vacía, y ofrecerlo
+  /// sería un botón que no hace nada visible.
+  bool get canLiftPreferenceFilter =>
+      this == days || this == minutes || this == daysAndMinutes;
+}
+
+/// El motivo del vacío de [searchedUnifiedTemplatesProvider], o `null` si la
+/// grilla tiene algo, todavía está cargando o falló: ninguno de esos es un
+/// vacío, y la pestaña los dibuja por su lado.
+///
+/// Decide recortando de a una dimensión sobre la MISMA fuente que la grilla
+/// ([unifiedTemplatesProvider] + nivel + texto):
+///
+///   1. Sin el filtro duro, ¿queda algo? Si no, el culpable es el nivel (si
+///      la pill sola ya vacía la grilla), si no el texto, si no el catálogo —
+///      y "Ver todas" no se ofrece. El nivel va antes que el texto: con los
+///      dos puestos y la pill sola vaciando la grilla, culpar al texto
+///      mandaría al atleta a reescribir una búsqueda que no es el problema.
+///   2. Si sí: sólo días ⇒ ¿vacío? → [TemplatesEmptyReason.days]; sólo
+///      minutos ⇒ ¿vacío? → [TemplatesEmptyReason.minutes]; si ninguno solo
+///      vacía la grilla, es la combinación. Si los dos solos la vacían, se
+///      nombran los días: es la dimensión más gruesa, y "Ver todas" levanta
+///      las dos igual.
+///
+/// Vive en un provider y no en el widget: es lógica de negocio sobre los
+/// mismos datos que la grilla, y así se testea sin montar la pantalla. Sólo
+/// recalcula cuando la grilla está vacía — con resultados devuelve antes de
+/// tocar el catálogo.
+final templatesEmptyReasonProvider =
+    Provider.autoDispose<TemplatesEmptyReason?>((ref) {
+  final shown = ref.watch(searchedUnifiedTemplatesProvider);
+  if (!shown.hasValue || shown.requireValue.isNotEmpty) return null;
+
+  final all = ref.watch(unifiedTemplatesProvider).valueOrNull ?? const [];
+  final level = ref.watch(routinesLevelFilterProvider);
+  final query = ref.watch(templatesSearchQueryProvider);
+  final preferences = ref.watch(athleteTemplatePreferencesProvider);
+  final hardFilter = ref.watch(templatesPreferenceFilterActiveProvider);
+  final searching = !TemplateSearch.isBlank(query);
+
+  bool anyLeft({
+    required bool days,
+    required bool minutes,
+    bool search = true,
+  }) {
+    final list = [
+      for (final e in all)
+        if ((level == null || e.routine.level == level) &&
+            (!days || TemplateAffinity.matchesDays(e.routine, preferences)) &&
+            (!minutes ||
+                TemplateAffinity.matchesMinutes(e.routine, preferences)))
+          e,
+    ];
+    if (!searching || !search) return list.isNotEmpty;
+    return TemplateSearch.filter(list, query, (e) => e.routine).isNotEmpty;
+  }
+
+  if (!hardFilter || !anyLeft(days: false, minutes: false)) {
+    if (level != null && !anyLeft(days: false, minutes: false, search: false)) {
+      return TemplatesEmptyReason.level;
+    }
+    if (searching) return TemplatesEmptyReason.search;
+    if (level != null) return TemplatesEmptyReason.level;
+    return TemplatesEmptyReason.catalog;
+  }
+  if (!anyLeft(days: true, minutes: false)) return TemplatesEmptyReason.days;
+  if (!anyLeft(days: false, minutes: true)) return TemplatesEmptyReason.minutes;
+  return TemplatesEmptyReason.daysAndMinutes;
+});

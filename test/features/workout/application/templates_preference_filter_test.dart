@@ -57,8 +57,14 @@ final _sistema = [
   _r('pierna2', days: 2, minutes: 45, muscles: const ['quads']),
 ];
 
-// Comunidad/PF: sin minutos y sin objetivos (publicada antes de #635).
-final _comunidad = [_r('pf3', days: 3)];
+// Comunidad/PF: sin minutos cargados y sin objetivos (publicadas antes de
+// #635). `pf3` tiene series, así que el estimador de #1562 le calcula 16 min
+// por día; `pfvacia` no tiene nada que estimar — desconocido, nunca excluida
+// por minutos.
+final _comunidad = [
+  _r('pf3', days: 3),
+  _r('pfvacia', days: 3, muscles: const []),
+];
 
 Future<ProviderContainer> _pump({
   TemplatePreferences prefs = const TemplatePreferences(),
@@ -93,7 +99,7 @@ void main() {
       final ids = _ids(c);
       expect(ids, isNot(contains('bro5')));
       expect(ids, isNot(contains('ppl6')));
-      expect(ids, unorderedEquals(['push3', 'corta3', 'pf3']));
+      expect(ids, unorderedEquals(['push3', 'corta3', 'pf3', 'pfvacia']));
     });
 
     test('barrido de días 2–6: sólo las de esa cantidad', () async {
@@ -108,20 +114,22 @@ void main() {
     });
 
     test(
-        '3 días · 75 min: la de 30 min sale, la de comunidad sin minutos '
-        'se queda', () async {
+        '3 días · 75 min: la de 30 min sale, la de comunidad se juzga por '
+        'su estimación y la que no tiene dato se queda', () async {
       final c = await _pump(
         prefs: const TemplatePreferences(daysPerWeek: 3, minutesPerSession: 75),
       );
-      expect(_ids(c), unorderedEquals(['push3', 'pf3']));
+      // pf3 estima 16 min: no es "75 o más".
+      expect(_ids(c), unorderedEquals(['push3', 'pfvacia']));
     });
 
     test('sólo minutos: 30 → ±15', () async {
       final c = await _pump(
         prefs: const TemplatePreferences(minutesPerSession: 30),
       );
-      // 30 y 45 entran; 60/75 no; sin minutos (pf3) entra.
-      expect(_ids(c), unorderedEquals(['corta3', 'pierna2', 'pf3']));
+      // 30 y 45 entran; 60/75 no; pf3 estima 16 (a 14 de 30) entra; sin
+      // estimación posible (pfvacia) entra.
+      expect(_ids(c), unorderedEquals(['corta3', 'pierna2', 'pf3', 'pfvacia']));
     });
   });
 
@@ -145,7 +153,7 @@ void main() {
         ),
       );
       expect(_ids(c).first, 'push3');
-      expect(_ids(c), hasLength(3));
+      expect(_ids(c), hasLength(4));
     });
   });
 
@@ -192,7 +200,96 @@ void main() {
         ),
         query: 'pecho y triceps',
       );
-      expect(_ids(c), ['push3', 'pf3']);
+      // pf3 estima 16 min y sale; pfvacia no tiene ejercicios: el texto la
+      // descarta.
+      expect(_ids(c), ['push3']);
+    });
+  });
+
+  group('motivo del vacío (templatesEmptyReasonProvider)', () {
+    TemplatesEmptyReason? reason(ProviderContainer c) =>
+        c.read(templatesEmptyReasonProvider);
+
+    test('con resultados no hay motivo', () async {
+      final c = await _pump(prefs: const TemplatePreferences(daysPerWeek: 3));
+      expect(reason(c), isNull);
+    });
+
+    test('vacío por NIVEL aunque haya filtro duro: no se ofrece "Ver todas"',
+        () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 3),
+        level: ExperienceLevel.intermediate,
+      );
+      expect(_ids(c), isEmpty);
+      expect(reason(c), TemplatesEmptyReason.level);
+      expect(reason(c)!.canLiftPreferenceFilter, isFalse);
+    });
+
+    test('vacío por TEXTO aunque haya filtro duro: no se ofrece "Ver todas"',
+        () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 3),
+        query: 'zzzz',
+      );
+      expect(_ids(c), isEmpty);
+      expect(reason(c), TemplatesEmptyReason.search);
+      expect(reason(c)!.canLiftPreferenceFilter, isFalse);
+    });
+
+    test('vacío por DÍAS: el nivel solo deja algo, los días lo vacían',
+        () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 6),
+        level: ExperienceLevel.advanced,
+      );
+      expect(_ids(c), isEmpty);
+      expect(reason(c), TemplatesEmptyReason.days);
+      expect(reason(c)!.canLiftPreferenceFilter, isTrue);
+    });
+
+    test('vacío por MINUTOS: se culpa a los minutos, no a los días', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(minutesPerSession: 30),
+        level: ExperienceLevel.advanced,
+      );
+      expect(_ids(c), isEmpty);
+      expect(reason(c), TemplatesEmptyReason.minutes);
+    });
+
+    test('días y minutos tienen cada uno resultados, pero no juntos', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 4, minutesPerSession: 30),
+      );
+      expect(_ids(c), isEmpty);
+      expect(reason(c), TemplatesEmptyReason.daysAndMinutes);
+      expect(reason(c)!.canLiftPreferenceFilter, isTrue);
+    });
+
+    test('nivel Y texto, y la pill sola ya vacía: se culpa al nivel', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 3),
+        level: ExperienceLevel.intermediate,
+        query: 'pecho',
+      );
+      expect(reason(c), TemplatesEmptyReason.level);
+    });
+
+    test('días y minutos vacían CADA UNO solos: se nombran los días', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 6, minutesPerSession: 30),
+        level: ExperienceLevel.advanced,
+      );
+      expect(reason(c), TemplatesEmptyReason.days);
+    });
+
+    test('con el filtro levantado, el vacío vuelve a ser de nivel', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(daysPerWeek: 3),
+        level: ExperienceLevel.intermediate,
+      );
+      c.read(templatesPreferenceFilterLiftedProvider.notifier).state = true;
+      expect(reason(c), TemplatesEmptyReason.level);
     });
   });
 

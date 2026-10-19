@@ -7,6 +7,7 @@ import '../../../../app/theme/tokens/primitives.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/template_preferences_providers.dart';
+import '../../application/unified_templates_providers.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import '../onboarding/templates_onboarding_steps.dart';
 
@@ -26,11 +27,14 @@ import '../onboarding/templates_onboarding_steps.dart';
 /// distintas palabras. Dos: es la mitad del código, y el ranking ya vive en un
 /// provider derivado que no le importa quién escribió las preferencias.
 ///
-/// ## Dice FILTRADO y ordenado (#1561)
+/// ## Dice "Filtrado" sólo si filtra (#1561)
 ///
 /// Días y minutos filtran la grilla (si queda vacía, PlantillasTab ofrece
-/// "Ver todas"); objetivo y zonas sólo la ordenan. La copy no puede prometer
-/// menos que eso: el resumen que se ve acá ES lo que está recortando la grilla.
+/// "Ver todas"); objetivo y zonas sólo la ordenan. La copy dice "Filtrado"
+/// sólo mientras ese filtro está EN EFECTO
+/// ([templatesPreferenceFilterActiveProvider]); con sólo objetivo/zonas, o
+/// levantado con "Ver todas", dice "Ordenado" — prometer un recorte que no
+/// pasa es la advertencia falsa de AGENTS.md §11.1.
 class TemplatesPreferencesBar extends ConsumerWidget {
   const TemplatesPreferencesBar({super.key});
 
@@ -40,6 +44,9 @@ class TemplatesPreferencesBar extends ConsumerWidget {
     final l10n = AppL10n.of(context);
     final prefs = ref.watch(athleteTemplatePreferencesProvider);
     final answered = !prefs.isEmpty;
+    // "Filtrado" sólo si días/minutos están recortando la grilla de verdad:
+    // con sólo objetivo/zonas, o después de "Ver todas", no se esconde nada.
+    final filtering = ref.watch(templatesPreferenceFilterActiveProvider);
 
     final resumen = <String>[
       if (prefs.daysPerWeek != null)
@@ -62,7 +69,11 @@ class TemplatesPreferencesBar extends ConsumerWidget {
                 Text(
                   // Sin respuestas no hay orden que explicar: la fila entera
                   // pasa a ser una invitación en vez de un resumen vacío.
-                  answered ? l10n.templatesFilterBarHint : '',
+                  !answered
+                      ? ''
+                      : filtering
+                          ? l10n.templatesFilterBarHint
+                          : l10n.templatesFilterBarHintSorted,
                   style: GoogleFonts.barlow(
                     fontWeight: FontWeight.w400,
                     fontSize: 11,
