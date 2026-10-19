@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../core/widgets/treino_collapsing_top_bar.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
@@ -53,213 +54,190 @@ class PublicProfileScreen extends ConsumerWidget {
     // sigue leyendo `viewAsync.when(...)` para loading/error/data.
     final view = viewAsync.valueOrNull;
 
-    // Transparent Scaffold + AppBar so the screen still composites over the
-    // shell's AppBackground, while providing an on-screen back affordance
-    // (mirrors TrainerPublicProfileScreen). Without this the pushed sub-route
-    // is a navigational dead-end — the bottom tab bar replaces the stack
-    // rather than popping.
+    // Scaffold transparente: la pantalla se compone sobre el AppBackground del
+    // shell. La barra superior aparece al scrollear (#1559, #1477): en offset 0
+    // la flecha y el ⋮ flotan sobre el gradiente del hero, sin fondo ni
+    // círculo; al scrollear aparece una barra translúcida con el nombre, así
+    // que los posts ya no pasan por debajo de íconos sueltos. Sin esto la
+    // subruta empujada sería un callejón sin salida: la barra inferior
+    // reemplaza el stack en vez de hacer pop.
     return Scaffold(
       backgroundColor: Colors.transparent,
-      // Extend the body behind the transparent AppBar so the hero's mint
-      // gradient fills the very top of the screen — the back arrow then
-      // floats over the gradient instead of sitting on a separate bar that
-      // breaks the color continuity.
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        // Transparente SÓLO mientras el hero está a la vista: ahí la flecha y
-        // el ⋮ flotan sobre el gradiente y no hay nada debajo. Apenas el
-        // contenido scrollea por detrás (`scrolledUnder`) la barra pasa a
-        // opaca. Antes quedaba transparente siempre y los posts pasaban por
-        // debajo de la flecha y el ⋮ (la flecha tapaba el avatar del primer
-        // post) con una franja translúcida del tinte M3 cortando la tarjeta a
-        // la mitad (#1477). El tinte se apaga porque el color ya lo pone la
-        // barra.
-        backgroundColor: WidgetStateColor.resolveWith(
-          (states) => states.contains(WidgetState.scrolledUnder)
-              ? palette.bg
-              : Colors.transparent,
-        ),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          tooltip: l10n.commonBack,
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/feed'),
-        ),
+      body: TreinoCollapsingTopBar(
+        title: view?.authorDisplayName,
+        // El nombre grande del hero sale de pantalla ~210 px abajo.
+        collapseOffset: 210,
+        onBack: () => context.canPop() ? context.pop() : context.go('/feed'),
         // Reportar/Bloquear el perfil — sólo cuando ya resolvió Y no es el
         // propio (moderacion-reporte-y-bloqueo). Nada mientras carga: no hay
         // targetOwnerDisplayName todavía.
         actions: [
           if (view != null && !view.isSelf)
-            Semantics(
-              button: true,
-              label: l10n.moderationMenuA11y,
-              child: IconButton(
-                icon: Icon(TreinoIcon.dotsThree, color: palette.textPrimary),
-                onPressed: () => showModerationMenu(
-                  context,
-                  ref,
-                  targetKind: ReportTargetKind.profile,
-                  targetId: targetUid,
-                  targetOwnerUid: targetUid,
-                  targetOwnerDisplayName: view.authorDisplayName,
-                ),
-                tooltip: null,
+            TreinoTopBarAction(
+              icon: TreinoIcon.dotsThree,
+              tooltip: l10n.moderationMenuA11y,
+              onPressed: () => showModerationMenu(
+                context,
+                ref,
+                targetKind: ReportTargetKind.profile,
+                targetId: targetUid,
+                targetOwnerUid: targetUid,
+                targetOwnerDisplayName: view.authorDisplayName,
               ),
             ),
         ],
-      ),
-      body: viewAsync.when(
-        data: (view) {
-          final viewerUid =
-              ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
-          // Privacy gate — Instagram-style. When the target profile is
-          // private AND the viewer is neither the owner nor an ACCEPTED
-          // follower, hide detailed content (stats numbers, rutinas, actividad).
-          // Header (name / avatar / gym) and the SEGUIR button stay visible so
-          // the viewer can still send a follow request.
-          // El gate de privacidad mira la arista SALIENTE: para ver el
-          // contenido de una cuenta privada hay que SEGUIRLA. Que ella te siga
-          // a vos no te da acceso a lo suyo (REQ-FOLLOW-010, mismo criterio que
-          // el gate de posts en las rules).
-          // ⚠️ `gated` es PRESENTACIÓN, no un límite de seguridad
-          // (QA-SEC-011, #778). No hay contraparte en las reglas: el `read` de
-          // `userPublicProfiles` es `if request.auth != null`
-          // (`firestore.rules:942`) y ninguna regla de lectura consulta
-          // `isProfilePublic`. Un tercero que no sigue a esta persona puede
-          // leer igual racha, workoutsCount, contadores, volumen y PRs, y lo
-          // mismo vale para sus posts `public` y sus rutinas `public`. Está
-          // medido contra el emulador en `docs/security.md` §4.9.
-          //
-          // O sea: esconder acá evita mostrarlo en la app, no protege el dato.
-          // No agregues copy que le prometa al usuario que esto lo protege, ni
-          // asumas enforcement server-side al tocar este bloque. El único gate
-          // real es el de `posts` con `privacy: 'friends'`, que vive en las
-          // reglas y no depende de este flag.
-          final isAcceptedFollower =
-              view.outgoingFollow?.status == FollowStatus.accepted;
-          final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
-          // Inset inferior para que el último post/rutina despeje la
-          // TreinoBottomBar flotante. Acá había un `+ 88` que rearmaba a mano
-          // la composición de la barra (72 del pill + 8 de margen + safe
-          // area) SOBRE un `padding.bottom` que ya la traía entera: el hueco
-          // al final del scroll salía duplicado (#830).
-          //
-          // Esta pantalla se monta DENTRO del shell: `/feed/profile/:uid` y
-          // `/home/profile/:uid` son subrutas de la `ShellRoute`
-          // (`router.dart:673` y `:716`), así que la barra se ve y el
-          // `Scaffold` del shell ya publicó su caja entera en
-          // `padding.bottom`. El `Scaffold` propio de esta pantalla no la
-          // toca: no tiene `bottomNavigationBar`, y `extendBodyBehindAppBar`
-          // sólo reescribe el inset de ARRIBA.
-          //
-          // Mismo criterio que su gemela `TrainerPublicProfileScreen`. Ver el
-          // dartdoc de [TreinoBottomBar.minHeight].
-          final bottomInset = MediaQuery.paddingOf(context).bottom;
-          return SingleChildScrollView(
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  image: true,
-                  label: l10n.a11yAvatarLabel(view.authorDisplayName),
-                  child: PublicProfileHero(view: view),
-                ),
-                const SizedBox(height: 20),
-                if (!view.isSelf) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: PublicProfileFollowButton(
-                            outgoingFollow: view.outgoingFollow,
-                            incomingFollow: view.incomingFollow,
-                            viewerUid: viewerUid,
-                            targetUid: targetUid,
-                            targetIsPublic: view.isPublic,
+        body: viewAsync.when(
+          data: (view) {
+            final viewerUid =
+                ref.watch(authStateChangesProvider).valueOrNull?.uid ?? '';
+            // Privacy gate — Instagram-style. When the target profile is
+            // private AND the viewer is neither the owner nor an ACCEPTED
+            // follower, hide detailed content (stats numbers, rutinas, actividad).
+            // Header (name / avatar / gym) and the SEGUIR button stay visible so
+            // the viewer can still send a follow request.
+            // El gate de privacidad mira la arista SALIENTE: para ver el
+            // contenido de una cuenta privada hay que SEGUIRLA. Que ella te siga
+            // a vos no te da acceso a lo suyo (REQ-FOLLOW-010, mismo criterio que
+            // el gate de posts en las rules).
+            // ⚠️ `gated` es PRESENTACIÓN, no un límite de seguridad
+            // (QA-SEC-011, #778). No hay contraparte en las reglas: el `read` de
+            // `userPublicProfiles` es `if request.auth != null`
+            // (`firestore.rules:942`) y ninguna regla de lectura consulta
+            // `isProfilePublic`. Un tercero que no sigue a esta persona puede
+            // leer igual racha, workoutsCount, contadores, volumen y PRs, y lo
+            // mismo vale para sus posts `public` y sus rutinas `public`. Está
+            // medido contra el emulador en `docs/security.md` §4.9.
+            //
+            // O sea: esconder acá evita mostrarlo en la app, no protege el dato.
+            // No agregues copy que le prometa al usuario que esto lo protege, ni
+            // asumas enforcement server-side al tocar este bloque. El único gate
+            // real es el de `posts` con `privacy: 'friends'`, que vive en las
+            // reglas y no depende de este flag.
+            final isAcceptedFollower =
+                view.outgoingFollow?.status == FollowStatus.accepted;
+            final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
+            // Inset inferior para que el último post/rutina despeje la
+            // TreinoBottomBar flotante. Acá había un `+ 88` que rearmaba a mano
+            // la composición de la barra (72 del pill + 8 de margen + safe
+            // area) SOBRE un `padding.bottom` que ya la traía entera: el hueco
+            // al final del scroll salía duplicado (#830).
+            //
+            // Esta pantalla se monta DENTRO del shell: `/feed/profile/:uid` y
+            // `/home/profile/:uid` son subrutas de la `ShellRoute`
+            // (`router.dart:673` y `:716`), así que la barra se ve y el
+            // `Scaffold` del shell ya publicó su caja entera en
+            // `padding.bottom`. El `Scaffold` propio de esta pantalla no la
+            // toca: no tiene `bottomNavigationBar`, y `extendBodyBehindAppBar`
+            // sólo reescribe el inset de ARRIBA.
+            //
+            // Mismo criterio que su gemela `TrainerPublicProfileScreen`. Ver el
+            // dartdoc de [TreinoBottomBar.minHeight].
+            final bottomInset = MediaQuery.paddingOf(context).bottom;
+            return SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Semantics(
+                    image: true,
+                    label: l10n.a11yAvatarLabel(view.authorDisplayName),
+                    child: PublicProfileHero(view: view),
+                  ),
+                  const SizedBox(height: 20),
+                  if (!view.isSelf) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: PublicProfileFollowButton(
+                              outgoingFollow: view.outgoingFollow,
+                              incomingFollow: view.incomingFollow,
+                              viewerUid: viewerUid,
+                              targetUid: targetUid,
+                              targetIsPublic: view.isPublic,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _MessageButton(
-                            incomingFollow: view.incomingFollow,
-                            viewerUid: viewerUid,
-                            targetUid: targetUid,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _MessageButton(
+                              incomingFollow: view.incomingFollow,
+                              viewerUid: viewerUid,
+                              targetUid: targetUid,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  if (gated) ...[
+                    const _PrivateProfileNotice(),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      // Los contadores abren las listas, como en Instagram. La
+                      // ruta se arma sobre `matchedLocation` y no sobre
+                      // '/feed/profile/...' fijo: este mismo screen está
+                      // registrado también bajo /home, y hardcodear /feed haría
+                      // saltar la tab resaltada a FEED al abrir la lista desde
+                      // INICIO (issue #387).
+                      child: PublicProfileStatsRow(
+                        workoutsCount: view.workoutsCount,
+                        racha: view.racha,
+                        followersCount: view.followersCount,
+                        followingCount: view.followingCount,
+                        onFollowersTap: () => context.push(
+                          '${GoRouterState.of(context).matchedLocation}'
+                          '/follows?tab=${FollowListKind.followers.name}',
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-                if (gated) ...[
-                  const _PrivateProfileNotice(),
-                  const SizedBox(height: 20),
-                ] else ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    // Los contadores abren las listas, como en Instagram. La
-                    // ruta se arma sobre `matchedLocation` y no sobre
-                    // '/feed/profile/...' fijo: este mismo screen está
-                    // registrado también bajo /home, y hardcodear /feed haría
-                    // saltar la tab resaltada a FEED al abrir la lista desde
-                    // INICIO (issue #387).
-                    child: PublicProfileStatsRow(
-                      workoutsCount: view.workoutsCount,
-                      racha: view.racha,
-                      followersCount: view.followersCount,
-                      followingCount: view.followingCount,
-                      onFollowersTap: () => context.push(
-                        '${GoRouterState.of(context).matchedLocation}'
-                        '/follows?tab=${FollowListKind.followers.name}',
+                        onFollowingTap: () => context.push(
+                          '${GoRouterState.of(context).matchedLocation}'
+                          '/follows?tab=${FollowListKind.following.name}',
+                        ),
+                        followersSemanticsLabel:
+                            l10n.followListOpenFollowersA11y,
+                        followingSemanticsLabel:
+                            l10n.followListOpenFollowingA11y,
                       ),
-                      onFollowingTap: () => context.push(
-                        '${GoRouterState.of(context).matchedLocation}'
-                        '/follows?tab=${FollowListKind.following.name}',
-                      ),
-                      followersSemanticsLabel: l10n.followListOpenFollowersA11y,
-                      followingSemanticsLabel: l10n.followListOpenFollowingA11y,
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _ProfileTabPills(targetUid: targetUid),
-                  ),
-                  const SizedBox(height: 18),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _ProfileTabBody(targetUid: targetUid),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _ProfileTabPills(targetUid: targetUid),
+                    ),
+                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _ProfileTabBody(targetUid: targetUid),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
-        loading: () => Center(
-          child: Semantics(
-            label: l10n.commonLoading,
-            child: CircularProgressIndicator(color: palette.accent),
-          ),
-        ),
-        error: (_, __) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Center(
+              ),
+            );
+          },
+          loading: () => Center(
             child: Semantics(
-              liveRegion: true,
-              label: l10n.publicProfileLoadErrorA11y,
-              child: Text(
-                l10n.publicProfileLoadErrorA11y,
-                style: GoogleFonts.barlow(
-                  fontSize: 14,
-                  color: palette.textMuted,
+              label: l10n.commonLoading,
+              child: CircularProgressIndicator(color: palette.accent),
+            ),
+          ),
+          error: (_, __) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Center(
+              child: Semantics(
+                liveRegion: true,
+                label: l10n.publicProfileLoadErrorA11y,
+                child: Text(
+                  l10n.publicProfileLoadErrorA11y,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
           ),
