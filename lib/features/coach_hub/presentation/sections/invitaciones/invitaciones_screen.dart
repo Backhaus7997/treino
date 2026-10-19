@@ -36,6 +36,7 @@ import '../../widgets/coach_hub_widgets.dart';
 import 'solicitudes_providers.dart';
 import 'widgets/solicitud_card.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Bandeja de Solicitudes (`/invitaciones`) — WU-04.
 class InvitacionesScreen extends ConsumerWidget {
@@ -283,8 +284,10 @@ class _SolicitudTileState extends ConsumerState<_SolicitudTile> {
           .read(trainerLinkPromotionServiceProvider)
           .accept(widget.link.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptSuccess)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptSuccess,
+        type: TreinoToastType.success,
       );
     } on LinkPromotionFailure$PlanLimitReached catch (failure) {
       if (!mounted) return;
@@ -306,15 +309,19 @@ class _SolicitudTileState extends ConsumerState<_SolicitudTile> {
     } on LinkPromotionFailure$PromotionPrecondition {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptPrecondition)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptPrecondition,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       // Catch-all a proposito (QA H5): ver dashboard_pending.dart.
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardAcceptUnavailable)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardAcceptUnavailable,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -333,14 +340,18 @@ class _SolicitudTileState extends ConsumerState<_SolicitudTile> {
     try {
       await repo.decline(widget.link.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardRejectSuccess)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardRejectSuccess,
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
       setState(() => _busy = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.coachHubDashboardRejectError)),
+      showTreinoToast(
+        context,
+        l10n.coachHubDashboardRejectError,
+        type: TreinoToastType.error,
       );
     }
   }

@@ -414,7 +414,7 @@ void main() {
       expect(find.text('100'), findsNWidgets(2));
       expect(find.text('60'), findsNothing);
 
-      await tester.tap(find.widgetWithText(SnackBarAction, 'Deshacer'));
+      await tester.tap(find.widgetWithText(TextButton, 'Deshacer'));
       await tester.pumpAndSettle();
 
       expect(find.text('100'), findsOneWidget);

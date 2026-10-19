@@ -36,6 +36,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Estado compuesto de un alumno en el roster (link + billing).
 ///
@@ -1195,8 +1196,10 @@ class _RowActionsState extends ConsumerState<_RowActions> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+    showTreinoToast(
+      context,
+      message,
+      type: TreinoToastType.error,
     );
   }
 

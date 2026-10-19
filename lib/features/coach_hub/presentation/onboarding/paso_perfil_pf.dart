@@ -21,6 +21,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/dialog/treino_dia
 import 'package:treino/features/coach_hub/presentation/widgets/filter_chips/filter_chips.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Paso `pf`: bio, especialidad, tarifa mensual y modalidad (online y/o un
 /// lugar presencial elegido por dirección). Todo va en UNA escritura
@@ -91,14 +92,11 @@ class _PasoPerfilPfState extends ConsumerState<PasoPerfilPf> {
               (l.lat == lugar.lat && l.lng == lugar.lng)),
     );
     if (repetido) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content:
-                Text(AppL10n.of(context).coachHubOnboardingPfLocationDuplicate),
-          ),
-        );
+      showTreinoToast(
+        context,
+        AppL10n.of(context).coachHubOnboardingPfLocationDuplicate,
+        type: TreinoToastType.error,
+      );
       return;
     }
     final ahora = AppClock.now();

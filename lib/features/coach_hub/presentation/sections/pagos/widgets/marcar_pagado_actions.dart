@@ -27,12 +27,21 @@ import 'registrar_pago_dialog.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
 
-/// Muestra un SnackBar con [msg].
-void pagoSnack(BuildContext context, String msg) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+/// Muestra un toast TREINO con [msg].
+void pagoSnack(
+  BuildContext context,
+  String msg, {
+  TreinoToastType type = TreinoToastType.info,
+}) {
+  showTreinoToast(
+    context,
+    msg,
+    type: type,
+  );
 }
 
 /// Construye un Payment pagado para settlear un cobro recurrente. El [periodKey]
@@ -113,11 +122,13 @@ Future<void> marcarPagado(
         await repo.add(paidPaymentFor(trainerId, cobro, now, null));
     }
     if (context.mounted) {
-      pagoSnack(context, 'Cobro registrado.'); // i18n
+      pagoSnack(context, 'Cobro registrado.',
+          type: TreinoToastType.success); // i18n
     }
   } catch (_) {
     if (context.mounted) {
-      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.',
+          type: TreinoToastType.error); // i18n
     }
   }
 }
@@ -166,11 +177,13 @@ Future<void> marcarPagadoDoc(
   try {
     await repo.markManyPaid([payment.id], now);
     if (context.mounted) {
-      pagoSnack(context, 'Cobro registrado.'); // i18n
+      pagoSnack(context, 'Cobro registrado.',
+          type: TreinoToastType.success); // i18n
     }
   } catch (_) {
     if (context.mounted) {
-      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.',
+          type: TreinoToastType.error); // i18n
     }
   }
 }
@@ -237,11 +250,13 @@ Future<void> recordar(
           text: text.trim(),
         );
     if (context.mounted) {
-      pagoSnack(context, 'Recordatorio enviado por chat.'); // i18n
+      pagoSnack(context, 'Recordatorio enviado por chat.',
+          type: TreinoToastType.success); // i18n
     }
   } catch (_) {
     if (context.mounted) {
-      pagoSnack(context, 'No pudimos enviar el recordatorio.'); // i18n
+      pagoSnack(context, 'No pudimos enviar el recordatorio.',
+          type: TreinoToastType.error); // i18n
     }
   }
 }
@@ -334,11 +349,13 @@ Future<void> registrarPago(
           dueAt: result.status == PaymentStatus.pending ? result.dueAt : null,
         ));
     if (context.mounted) {
-      pagoSnack(context, 'Pago registrado.'); // i18n
+      pagoSnack(context, 'Pago registrado.',
+          type: TreinoToastType.success); // i18n
     }
   } catch (_) {
     if (context.mounted) {
-      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+      pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.',
+          type: TreinoToastType.error); // i18n
     }
   }
 }
