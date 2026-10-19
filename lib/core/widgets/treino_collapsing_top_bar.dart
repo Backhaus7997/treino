@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../app/theme/tokens/tokens.dart';
 import '../../l10n/app_l10n.dart';
 import 'treino_icon.dart';
 
@@ -271,7 +272,7 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
-                              fontSize: 18,
+                              fontSize: AppTextSize.title,
                               letterSpacing: 0.5,
                               color: palette.textPrimary,
                             ),
