@@ -223,7 +223,7 @@ void main() {
   group('goDeepLink — link de chat arma Feed → Mensajes → chat', () {
     // Misma forma que el router real: `/feed` adentro del ShellRoute, y la
     // bandeja y el chat como rutas top-level del navigator raíz.
-    GoRouter armarRouter() => GoRouter(
+    GoRouter armarRouter({bool sobreLaPilaActual = false}) => GoRouter(
           initialLocation: '/home/notifications',
           routes: [
             ShellRoute(
@@ -236,8 +236,11 @@ void main() {
                 GoRoute(
                   path: '/home/notifications',
                   builder: (ctx, _) => TextButton(
-                    onPressed: () =>
-                        goDeepLink(ctx, '/coach/chat/abc?other=xyz'),
+                    onPressed: () => goDeepLink(
+                      ctx,
+                      '/coach/chat/abc?other=xyz',
+                      sobreLaPilaActual: sobreLaPilaActual,
+                    ),
                     child: const Text('abrir-chat'),
                   ),
                 ),
@@ -382,6 +385,46 @@ void main() {
 
       expect(stack(r), ['/feed', '/feed/messages', '/coach/chat/abc']);
       expect(locationActualDe(r), '/coach/chat/abc?other=xyz');
+    });
+
+    testWidgets(
+        'desde la lista in-app (sobreLaPilaActual) el chat se apila sobre la '
+        'lista: atrás vuelve a Notificaciones y no pasa por Mensajes (#1468)',
+        (tester) async {
+      final r = armarRouter(sobreLaPilaActual: true);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: r));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('abrir-chat'));
+      await tester.pumpAndSettle();
+
+      expect(stack(r), ['/home/notifications', '/coach/chat/abc']);
+      expect(locationActualDe(r), '/coach/chat/abc?other=xyz',
+          reason: 'el `?other=` del link tiene que llegar al chat');
+      expect(r.canPop(), isTrue);
+
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+
+      expect(locationActualDe(r), '/home/notifications');
+      expect(find.text('abrir-chat'), findsOneWidget);
+      expect(find.text('MENSAJES'), findsNothing);
+    });
+
+    testWidgets(
+        'sobreLaPilaActual no cambia a los links que no son de chat: siguen '
+        'siendo un `go`', (tester) async {
+      final r = armarRouter(sobreLaPilaActual: true);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: r));
+      await tester.pumpAndSettle();
+      goDeepLink(
+        tester.element(find.text('abrir-chat')),
+        '/coach',
+        sobreLaPilaActual: true,
+      );
+      await tester.pumpAndSettle();
+
+      expect(stack(r), ['/coach']);
+      expect(r.canPop(), isFalse);
     });
 
     testWidgets('un link que no es de chat sigue siendo un `go` sin stack',
