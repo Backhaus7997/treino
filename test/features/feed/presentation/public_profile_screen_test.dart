@@ -129,7 +129,9 @@ void main() {
       // an on-screen back affordance (mirrors TrainerPublicProfileScreen).
       // That is the screen's Scaffold plus the outer test wrapper's = 2.
       expect(find.byType(Scaffold), findsNWidgets(2));
-      expect(find.byType(AppBar), findsOneWidget);
+      // #1559: la flecha ya no vive en un AppBar sino en la barra que aparece
+      // al scrollear.
+      expect(find.byType(AppBar), findsNothing);
       expect(
           find.byType(BackButton), findsNothing); // custom leading, not default
       expect(find.widgetWithIcon(IconButton, TreinoIcon.back), findsOneWidget);
@@ -599,20 +601,9 @@ void main() {
     });
   });
 
-  // #1477 — los posts pasaban por debajo de la flecha y el ⋮ flotantes.
-  group('PublicProfileScreen — app bar al scrollear (#1477)', () {
-    Color? appBarFill(WidgetTester tester) => tester
-        .widget<Material>(
-          find
-              .descendant(
-                of: find.byType(AppBar),
-                matching: find.byType(Material),
-              )
-              .first,
-        )
-        .color;
-
-    testWidgets('transparente arriba (sobre el hero) y opaca al scrollear',
+  // #1477 / #1559 — los posts pasaban por debajo de la flecha y el ⋮ sueltos.
+  group('PublicProfileScreen — barra al scrollear (#1477, #1559)', () {
+    testWidgets('sin fondo arriba (sobre el hero) y con fondo al scrollear',
         (tester) async {
       // Pantalla baja para que el perfil sí scrollee.
       tester.view.physicalSize = const Size(390, 420);
@@ -626,20 +617,21 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(appBarFill(tester), Colors.transparent);
+      expect(find.byKey(const Key('treino-top-bar-surface')), findsNothing);
 
       await tester.drag(
         find.byType(SingleChildScrollView).first,
-        const Offset(0, -200),
+        const Offset(0, -300),
       );
       await tester.pumpAndSettle();
 
-      final fill = appBarFill(tester)!;
+      final surface = tester.widget<AnimatedOpacity>(
+        find.byKey(const Key('treino-top-bar-surface')),
+      );
       expect(
-        fill.a,
+        surface.opacity,
         1.0,
-        reason: 'una barra opaca no deja ver los posts que pasan por detrás '
-            'de la flecha y el ⋮',
+        reason: 'sin fondo, los posts pasan por debajo de la flecha y el ⋮',
       );
     });
   });
