@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -85,6 +86,35 @@ class AppTheme {
   }
 
   // ---------------------------------------------------------------------------
+
+  /// Estilo de la barra de estado (el color de los íconos de hora, wifi y
+  /// batería) para un tema de [brightness]: íconos CLAROS sobre el tema oscuro,
+  /// OSCUROS sobre el claro.
+  ///
+  /// Lo comparten dos consumidores y tienen que coincidir siempre:
+  /// [ThemeWatcher], que lo aplica a toda la app, y el `AppBarTheme` de las dos
+  /// fábricas de abajo. Si cada uno tuviera su propia copia del `if`, el día que
+  /// cambie uno el otro se queda atrás y la barra de estado vuelve a bailar
+  /// según haya o no un `AppBar` en pantalla.
+  ///
+  /// ## Por qué el `AppBarTheme` lo necesita (#1463)
+  ///
+  /// Un `AppBar` sin `systemOverlayStyle` NO hereda el de [ThemeWatcher]:
+  /// envuelve su contenido en su propio `AnnotatedRegion`, que está más abajo en
+  /// el árbol y por eso gana, y lo calcula estimando el brillo de su
+  /// `backgroundColor`. Con `Colors.transparent` (`0x00000000`) la luminancia da
+  /// negro, o sea «fondo oscuro» → íconos blancos, aunque detrás haya un fondo
+  /// claro. En el tema claro eso dejaba hora, wifi y batería casi invisibles en
+  /// el chat, las notificaciones y los perfiles.
+  ///
+  /// Poniéndolo en el tema, todo `AppBar` del árbol resuelve el estilo correcto
+  /// sin que cada pantalla lo repita. Una pantalla con una superficie de color
+  /// fijo (el visor de fotos) lo sigue pudiendo pisar con su propio
+  /// `AppBar.systemOverlayStyle` o con un `Theme` propio.
+  static SystemUiOverlayStyle systemOverlayStyleFor(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark;
 
   // ---------------------------------------------------------------------------
   // Estados de interacción — los defaults de Material, tapados
@@ -224,6 +254,9 @@ class AppTheme {
         onSurface: palette.textPrimary,
       ),
       inputDecorationTheme: _buildInputDecoration(palette, errorColor),
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: systemOverlayStyleFor(Brightness.dark),
+      ),
       textTheme: textTheme,
       extensions: [palette],
     );
@@ -252,6 +285,9 @@ class AppTheme {
         onError: palette.onDanger,
       ),
       inputDecorationTheme: _buildInputDecoration(palette, palette.danger),
+      appBarTheme: AppBarTheme(
+        systemOverlayStyle: systemOverlayStyleFor(Brightness.light),
+      ),
       textTheme: textTheme,
       extensions: [palette],
     );

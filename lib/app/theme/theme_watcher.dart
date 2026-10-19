@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'app_theme.dart';
+
 /// Wraps its [child] with an [AnnotatedRegion] that keeps the system UI
 /// overlay style (status-bar icon brightness) in sync with the active theme.
 ///
@@ -20,12 +22,12 @@ class ThemeWatcher extends StatelessWidget {
   Widget build(BuildContext context) {
     if (kIsWeb) return child;
 
-    final brightness = Theme.of(context).brightness;
-
     // Dark theme → light icons on the status bar; light theme → dark icons.
-    final overlayStyle = brightness == Brightness.dark
-        ? SystemUiOverlayStyle.light
-        : SystemUiOverlayStyle.dark;
+    // Same function the theme's `AppBarTheme` uses, so an `AppBar` (which wraps
+    // its own region on top of this one) can't disagree with it (#1463).
+    final overlayStyle = AppTheme.systemOverlayStyleFor(
+      Theme.of(context).brightness,
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
