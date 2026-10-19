@@ -96,6 +96,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (currentUid == null) return;
 
     setState(() => _sending = true);
+    // Se vacía YA y no al terminar: el campo queda habilitado durante el envío
+    // (si no, perdería el foco y el teclado se cerraría con cada mensaje,
+    // #1466), y limpiarlo recién al volver pisaba lo que la persona escribiera
+    // mientras tanto. Si el envío falla, el texto vuelve (ver el `catch`).
+    _textController.clear();
     // Capturados antes del await (mismo criterio que _onAttach / issue #435):
     // el envío pertenece a ESTE chat y `ref` no se puede usar una vez que la
     // pantalla murió, pero el mensaje igual salió y el evento corresponde.
@@ -109,12 +114,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         text: text,
       );
       analytics.logChatMessageSent(chatId: chatId, senderId: currentUid);
-      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
-      // logout). Tocar el controller ya disposed tira "used after being
-      // disposed" y el catch de abajo lo reporta como envío fallido cuando en
-      // realidad salió.
-      if (!mounted) return;
-      _textController.clear();
     } catch (e, st) {
       developer.log(
         'sendMessage failed',
@@ -122,7 +121,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         error: e,
         stackTrace: st,
       );
+      // #501: el await pudo sobrevivir a la pantalla (back, deep-link,
+      // logout). Con la pantalla muerta no se toca ni el controller (ya
+      // disposed: "used after being disposed") ni el contexto.
       if (mounted) {
+        _restaurarTexto(text);
         // `chatScreenSendError` dice "Probá de nuevo", y para un bloqueo de
         // moderación eso es consejo falso: el mismo texto falla siempre.
         final copy = e is ModerationBlockedException
@@ -133,6 +136,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// Devuelve al campo el texto de un envío que falló, sin pisar lo que se
+  /// haya escrito después: va ANTES, en su propia línea.
+  void _restaurarTexto(String text) {
+    final actual = _textController.text;
+    final restaurado = actual.isEmpty ? text : '$text\n$actual';
+    _textController.value = TextEditingValue(
+      text: restaurado,
+      selection: TextSelection.collapsed(offset: restaurado.length),
+    );
   }
 
   /// Muestra un aviso del gate de cuota. Local y no por el messenger root: a
@@ -447,6 +461,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             _Composer(
               controller: _textController,
               sending: _sending || mediaSend.uploading,
+              uploading: mediaSend.uploading,
               canWrite: canWrite,
               onSend: _onSend,
               onAttach: _onAttach,
@@ -590,6 +605,7 @@ class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.sending,
+    required this.uploading,
     required this.canWrite,
     required this.onSend,
     required this.onAttach,
@@ -599,8 +615,14 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
 
-  /// Espejo de `senderMayPost` en las rules. Se compone con [sending]: el
-  /// composer se apaga si hay un envío en vuelo O si no hay permiso.
+  /// Hay una foto o un video subiéndose. A diferencia de un envío de texto, ahí
+  /// el campo SÍ se apaga: la persona viene de la galería (el teclado ya está
+  /// cerrado) y no puede mandar texto hasta que termine la subida.
+  final bool uploading;
+
+  /// Espejo de `senderMayPost` en las rules. Se compone con [sending] para los
+  /// BOTONES: se apagan si hay un envío en vuelo O si no hay permiso. El campo
+  /// de texto no se apaga por un envío de texto (ver el `enabled` de abajo).
   final bool canWrite;
   final VoidCallback onSend;
   final VoidCallback onAttach;
@@ -635,13 +657,30 @@ class _Composer extends StatelessWidget {
                 maxLines: 5,
                 minLines: 1,
                 textInputAction: TextInputAction.newline,
+                // La caja es el `Container` de arriba: el campo va desnudo.
+                // `border: none` NO alcanza (#1466): el `InputDecorationTheme`
+                // de la app define `enabledBorder` y `focusedBorder`, que
+                // mandan sobre `border` según el estado, además de un relleno
+                // y un `contentPadding` propios. Por eso se anula cada uno.
                 decoration: InputDecoration(
                   hintText: l10n.chatScreenComposerHint,
                   hintStyle: TextStyle(color: palette.textMuted),
+                  filled: false,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.zero,
                   isCollapsed: true,
                 ),
-                enabled: !disabled,
+                // Se apaga si NO se puede escribir o si hay una SUBIDA en curso.
+                // Durante el envío de un texto queda habilitado: deshabilitar un
+                // `TextField` le saca el foco y el teclado se cerraba con cada
+                // mensaje (#1466). Lo que bloquea el doble envío son los
+                // botones y el guard de `_onSend`.
+                enabled: canWrite && !uploading,
               ),
             ),
           ),

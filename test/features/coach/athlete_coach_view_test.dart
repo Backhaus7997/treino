@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/athlete_coach_view.dart';
+import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/presentation/trainers_list_screen.dart';
@@ -17,7 +20,11 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
-Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
+Widget _wrap(
+  Widget child, {
+  List<Override> overrides = const [],
+  NutritionPlan? plan,
+}) =>
     ProviderScope(
       overrides: [
         // Keep Firestore out of these widget tests. The payments "Tu cuota"
@@ -32,6 +39,10 @@ Widget _wrap(Widget child, {List<Override> overrides = const []}) =>
         // overrides keep driving the view unchanged.
         currentAthleteLinkAnyStatusProvider.overrideWith(
             (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
+        // #1517: la card lee el plan para decidir el peso de su CTA. Va acá y
+        // no en `overrides` porque Riverpod no deja pisar un provider dos
+        // veces en el mismo scope.
+        nutritionPlanProvider.overrideWith((ref, key) => Stream.value(plan)),
         ...overrides,
       ],
       child: MaterialApp(
@@ -66,6 +77,32 @@ UserPublicProfile _makePub({String displayName = 'Coach Joe'}) =>
       displayName: displayName,
       displayNameLowercase: displayName.toLowerCase(),
     );
+
+NutritionPlan _makePlan() => NutritionPlan(
+      id: 'plan-1',
+      trainerId: 'trainer-1',
+      athleteId: 'athlete-1',
+      title: 'Plan',
+      meals: const [],
+      updatedAt: DateTime.utc(2026, 5, 20),
+    );
+
+/// El botón de la card que contiene [etiqueta].
+///
+/// Los tres accesos son `OutlinedButton` con `backgroundColor` del token, así
+/// que la jerarquía se afirma sobre el FONDO, no sobre el tipo de widget:
+/// contar `ElevatedButton` daría 1 (sólo MENSAJE) tanto si el plan nutricional
+/// está relleno como si no. Ese assert pasaba en verde con el cambio puesto Y
+/// sin él: no medía nada.
+Finder _accesoCon(String etiqueta) => find
+    .ancestor(of: find.text(etiqueta), matching: find.byType(OutlinedButton))
+    .first;
+
+Color? _fondoDe(WidgetTester tester, String etiqueta) => tester
+    .widget<OutlinedButton>(_accesoCon(etiqueta))
+    .style
+    ?.backgroundColor
+    ?.resolve(<WidgetState>{});
 
 void main() {
   group('AthleteCoachView', () {
@@ -110,10 +147,11 @@ void main() {
     // Se testea el ORDEN y la JERARQUÍA juntos porque por separado cada uno
     // pasa con el bug del otro puesto: reordenar sin destacar deja tres
     // botones iguales, y destacar sin reordenar deja el primario en el medio.
-    testWidgets('el plan nutricional va primero y es el único relleno',
+    testWidgets('con plan, el plan nutricional va primero y es el relleno',
         (tester) async {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
+        plan: _makePlan(),
         overrides: [
           currentAthleteLinkProvider
               .overrideWith((ref) => Stream.value(_makeLink())),
@@ -135,24 +173,6 @@ void main() {
       expect(yArchivos, lessThan(yAgenda),
           reason: 'la agenda queda última: hoy aporta poco dato propio');
 
-      // La jerarquía se afirma sobre el FONDO, no sobre el tipo de widget.
-      //
-      // Los tres accesos son `OutlinedButton` con `backgroundColor` del token,
-      // así que contar `ElevatedButton` daría 1 (sólo MENSAJE) tanto si el
-      // plan nutricional está relleno como si no. Ese assert pasaba en verde
-      // con el cambio puesto Y sin él: no medía nada.
-      Color? fondoDe(String etiqueta) {
-        final boton = tester.widget<OutlinedButton>(
-          find
-              .ancestor(
-                of: find.text(etiqueta),
-                matching: find.byType(OutlinedButton),
-              )
-              .first,
-        );
-        return boton.style?.backgroundColor?.resolve(<WidgetState>{});
-      }
-
       final palette = AppPalette.of(
         tester.element(find.text(l10n.athleteFilesButtonLabel)),
       );
@@ -160,15 +180,71 @@ void main() {
       // Decisión de producto del maintainer, contra la recomendación del
       // design system (el CTA relleno es uno por pantalla y «MENSAJE» ya lo
       // es). Queda fijado acá para que un refactor no lo "corrija" solo.
-      expect(fondoDe(l10n.athleteNutritionPlanButtonLabel), palette.accent,
-          reason: 'el plan nutricional va RELLENO, por decisión de producto');
+      expect(_fondoDe(tester, l10n.athleteNutritionPlanButtonLabel),
+          palette.accent,
+          reason: 'con plan, el plan nutricional va RELLENO');
       for (final delineado in [
         l10n.athleteFilesButtonLabel,
         l10n.agendaButtonLabel,
       ]) {
-        expect(fondoDe(delineado), isNot(palette.accent),
+        expect(_fondoDe(tester, delineado), isNot(palette.accent),
             reason: '$delineado va delineado, no relleno');
       }
+    });
+
+    // #1517 — con el plan vacío, el CTA más fuerte de la card mandaba a una
+    // pantalla que dice «Tu PF todavía no cargó tu plan nutricional».
+    testWidgets('sin plan, el plan nutricional baja a delineado',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      final palette = AppPalette.of(
+        tester.element(find.text(l10n.athleteFilesButtonLabel)),
+      );
+
+      expect(_fondoDe(tester, l10n.athleteNutritionPlanButtonLabel),
+          isNot(palette.accent),
+          reason: 'sin plan no hay nada que destacar: MENSAJE queda solo');
+      // Sigue estando: el alumno puede entrar y ver que todavía no hay plan.
+      expect(find.text(l10n.athleteNutritionPlanButtonLabel), findsOneWidget);
+      expect(find.text('MENSAJE'), findsOneWidget);
+    });
+
+    // #1515 — el botón decía «VER AGENDA DEL PF» con una mancuerna, y la
+    // pantalla muestra las sesiones del propio alumno.
+    testWidgets('MI AGENDA lleva el ícono de calendario', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      final agenda = _accesoCon(l10n.agendaButtonLabel);
+      expect(
+        find.descendant(of: agenda, matching: find.byIcon(TreinoIcon.calendar)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+            of: agenda, matching: find.byIcon(TreinoIcon.tabWorkout)),
+        findsNothing,
+      );
     });
 
     testWidgets('Fase B: status active → muestra botón MENSAJE',

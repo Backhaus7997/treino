@@ -964,6 +964,140 @@ void main() {
       );
     });
 
+    // ── #1511: TERMINAR IGUAL ──────────────────────────────────────────────
+    //
+    // Una sesión con series sin hacer se puede cerrar con `allowIncomplete`.
+    // `wasFullyCompleted` se guarda como "cuenta como entreno": true desde el
+    // 50 % de las series planificadas, false por debajo (igual que abandonar).
+    group('allowIncomplete (#1511)', () {
+      /// Notifier con un único ejercicio de [planned] series y [done] ya
+      /// logueadas. Devuelve el repo para inspeccionar el `finish`.
+      Future<({MockSessionRepository repo, SessionNotifier notifier})>
+          setupEarly({required int planned, required int done}) async {
+        final repo = MockSessionRepository();
+        final routine = makeRoutine(
+          days: [
+            makeDay(
+              slots: [makeSlot(exerciseId: 'e1', targetSets: planned)],
+            )
+          ],
+        );
+        when(() => repo.create(
+              uid: any(named: 'uid'),
+              routineId: any(named: 'routineId'),
+              routineName: any(named: 'routineName'),
+              startedAt: any(named: 'startedAt'),
+              dayNumber: any(named: 'dayNumber'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            )).thenAnswer((_) async => makeSession());
+        when(() => repo.addSetLog(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              setLog: any(named: 'setLog'),
+            )).thenAnswer(
+          // Devuelve la serie que recibe: con un `LoggedSet` fijo todas las
+          // series colapsarían en una (misma identidad lógica) y el porcentaje
+          // que se prueba acá no se podría armar.
+          (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[#setLog] as SetLog,
+          ),
+        );
+        when(() => repo.finish(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              finishedAt: any(named: 'finishedAt'),
+              totalVolumeKg: any(named: 'totalVolumeKg'),
+              durationMin: any(named: 'durationMin'),
+              wasFullyCompleted: any(named: 'wasFullyCompleted'),
+              weeklyTarget: any(named: 'weeklyTarget'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            )).thenAnswer((_) async {});
+
+        final container =
+            _makeContainer(repo: repo, uid: 'u1', routine: routine);
+        addTearDown(container.dispose);
+
+        final init = FreshSession(routineId: routine.id, dayNumber: 1);
+        await container.read(sessionNotifierProvider(init).future);
+        final notifier = container.read(sessionNotifierProvider(init).notifier);
+        for (var n = 1; n <= done; n++) {
+          // Ids distintos: `logSet` indexa por id y un mismo id pisaría la serie.
+          await notifier.logSet(
+            makeSetLog(exerciseId: 'e1', setNumber: n, id: 'early-$n'),
+          );
+        }
+        return (repo: repo, notifier: notifier);
+      }
+
+      Object? savedWasFullyCompleted(MockSessionRepository repo) => verify(
+            () => repo.finish(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              finishedAt: any(named: 'finishedAt'),
+              totalVolumeKg: any(named: 'totalVolumeKg'),
+              durationMin: any(named: 'durationMin'),
+              wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
+              weeklyTarget: any(named: 'weeklyTarget'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            ),
+          ).captured.single;
+
+      test('sin allowIncomplete, una sesión incompleta sigue lanzando',
+          () async {
+        final s = await setupEarly(planned: 4, done: 3);
+        expect(() => s.notifier.finishSession(), throwsA(isA<StateError>()));
+      });
+
+      test('con 0 series hechas lanza aunque allowIncomplete sea true',
+          () async {
+        final s = await setupEarly(planned: 4, done: 0);
+        expect(
+          () => s.notifier.finishSession(allowIncomplete: true),
+          throwsA(isA<StateError>()),
+        );
+        verifyNever(() => s.repo.finish(
+              uid: any(named: 'uid'),
+              sessionId: any(named: 'sessionId'),
+              finishedAt: any(named: 'finishedAt'),
+              totalVolumeKg: any(named: 'totalVolumeKg'),
+              durationMin: any(named: 'durationMin'),
+              wasFullyCompleted: any(named: 'wasFullyCompleted'),
+              weeklyTarget: any(named: 'weeklyTarget'),
+              waitForServer: any(named: 'waitForServer'),
+              onServerRejected: any(named: 'onServerRejected'),
+            ));
+      });
+
+      test('75 % de las series → cuenta como entreno (wasFullyCompleted true)',
+          () async {
+        final s = await setupEarly(planned: 4, done: 3);
+        await s.notifier.finishSession(allowIncomplete: true);
+        expect(savedWasFullyCompleted(s.repo), isTrue);
+      });
+
+      test('exactamente 50 % → cuenta (el piso es inclusivo)', () async {
+        final s = await setupEarly(planned: 4, done: 2);
+        await s.notifier.finishSession(allowIncomplete: true);
+        expect(savedWasFullyCompleted(s.repo), isTrue);
+      });
+
+      test('25 % de las series → se guarda como incompleta, no cuenta',
+          () async {
+        final s = await setupEarly(planned: 4, done: 1);
+        await s.notifier.finishSession(allowIncomplete: true);
+        expect(savedWasFullyCompleted(s.repo), isFalse);
+      });
+
+      test('una sesión completa con allowIncomplete también cuenta', () async {
+        final s = await setupEarly(planned: 2, done: 2);
+        await s.notifier.finishSession(allowIncomplete: true);
+        expect(savedWasFullyCompleted(s.repo), isTrue);
+      });
+    });
+
     // #367: on finish, Home ("HOY" card) and Insights showed pre-workout data
     // until the app was restarted — the finish flow never refreshed the
     // session-derived caches. finishSession must invalidate

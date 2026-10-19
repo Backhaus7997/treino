@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../coach/domain/subscription_tier.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Dónde puede el entrenador CONTRATAR su suscripción a TREINO.
 ///
@@ -133,8 +134,10 @@ final class PlanCheckoutAvailable extends PlanCheckout {
   }
 
   void _avisar(ScaffoldMessengerState messenger, String texto) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(texto)), // i18n: Fase W3
+    showTreinoToastOn(
+      messenger,
+      texto, // i18n: Fase W3
+      type: TreinoToastType.error,
     );
   }
 }

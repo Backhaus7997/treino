@@ -230,7 +230,19 @@ mixin _$Appointment {
 // session. Set exactly once via AppointmentRepository.billAppointment /
 // markBilled — never cleared client-side (see firestore.rules set-once
 // guard on this field).
-  String? get paymentId => throw _privateConstructorUsedError;
+  String? get paymentId =>
+      throw _privateConstructorUsedError; // #1492 — null = la sesión se dio; [AppointmentAttendance.absent] = el
+// alumno faltó. Lo escribe sólo el PF (AppointmentRepository.setAttendance,
+// Path 2 de firestore.rules).
+//
+// `includeIfNull: false` NO es estética: `createByTrainer` escribe
+// `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
+// clave en su allowlist. Omitirla cuando es null deja que esta versión de
+// la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
+  @JsonKey(
+      includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+  AppointmentAttendance? get attendance => throw _privateConstructorUsedError;
 
   /// Serializes this Appointment to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -262,7 +274,11 @@ abstract class $AppointmentCopyWith<$Res> {
       String? noteBefore,
       String? noteAfter,
       String? recurringId,
-      String? paymentId});
+      String? paymentId,
+      @JsonKey(
+          includeIfNull: false,
+          unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+      AppointmentAttendance? attendance});
 }
 
 /// @nodoc
@@ -294,6 +310,7 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
     Object? noteAfter = freezed,
     Object? recurringId = freezed,
     Object? paymentId = freezed,
+    Object? attendance = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -352,6 +369,10 @@ class _$AppointmentCopyWithImpl<$Res, $Val extends Appointment>
           ? _value.paymentId
           : paymentId // ignore: cast_nullable_to_non_nullable
               as String?,
+      attendance: freezed == attendance
+          ? _value.attendance
+          : attendance // ignore: cast_nullable_to_non_nullable
+              as AppointmentAttendance?,
     ) as $Val);
   }
 }
@@ -378,7 +399,11 @@ abstract class _$$AppointmentImplCopyWith<$Res>
       String? noteBefore,
       String? noteAfter,
       String? recurringId,
-      String? paymentId});
+      String? paymentId,
+      @JsonKey(
+          includeIfNull: false,
+          unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+      AppointmentAttendance? attendance});
 }
 
 /// @nodoc
@@ -408,6 +433,7 @@ class __$$AppointmentImplCopyWithImpl<$Res>
     Object? noteAfter = freezed,
     Object? recurringId = freezed,
     Object? paymentId = freezed,
+    Object? attendance = freezed,
   }) {
     return _then(_$AppointmentImpl(
       id: null == id
@@ -466,6 +492,10 @@ class __$$AppointmentImplCopyWithImpl<$Res>
           ? _value.paymentId
           : paymentId // ignore: cast_nullable_to_non_nullable
               as String?,
+      attendance: freezed == attendance
+          ? _value.attendance
+          : attendance // ignore: cast_nullable_to_non_nullable
+              as AppointmentAttendance?,
     ));
   }
 }
@@ -487,7 +517,11 @@ class _$AppointmentImpl extends _Appointment {
       this.noteBefore,
       this.noteAfter,
       this.recurringId,
-      this.paymentId})
+      this.paymentId,
+      @JsonKey(
+          includeIfNull: false,
+          unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+      this.attendance})
       : _cancellationLog = cancellationLog,
         super._();
 
@@ -539,10 +573,23 @@ class _$AppointmentImpl extends _Appointment {
 // guard on this field).
   @override
   final String? paymentId;
+// #1492 — null = la sesión se dio; [AppointmentAttendance.absent] = el
+// alumno faltó. Lo escribe sólo el PF (AppointmentRepository.setAttendance,
+// Path 2 de firestore.rules).
+//
+// `includeIfNull: false` NO es estética: `createByTrainer` escribe
+// `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
+// clave en su allowlist. Omitirla cuando es null deja que esta versión de
+// la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(
+      includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+  final AppointmentAttendance? attendance;
 
   @override
   String toString() {
-    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter, recurringId: $recurringId, paymentId: $paymentId)';
+    return 'Appointment(id: $id, trainerId: $trainerId, athleteId: $athleteId, athleteDisplayName: $athleteDisplayName, startsAt: $startsAt, durationMin: $durationMin, status: $status, cancelledAt: $cancelledAt, cancelledBy: $cancelledBy, cancellationLog: $cancellationLog, noteBefore: $noteBefore, noteAfter: $noteAfter, recurringId: $recurringId, paymentId: $paymentId, attendance: $attendance)';
   }
 
   @override
@@ -575,7 +622,9 @@ class _$AppointmentImpl extends _Appointment {
             (identical(other.recurringId, recurringId) ||
                 other.recurringId == recurringId) &&
             (identical(other.paymentId, paymentId) ||
-                other.paymentId == paymentId));
+                other.paymentId == paymentId) &&
+            (identical(other.attendance, attendance) ||
+                other.attendance == attendance));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -595,7 +644,8 @@ class _$AppointmentImpl extends _Appointment {
       noteBefore,
       noteAfter,
       recurringId,
-      paymentId);
+      paymentId,
+      attendance);
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.
@@ -628,7 +678,11 @@ abstract class _Appointment extends Appointment {
       final String? noteBefore,
       final String? noteAfter,
       final String? recurringId,
-      final String? paymentId}) = _$AppointmentImpl;
+      final String? paymentId,
+      @JsonKey(
+          includeIfNull: false,
+          unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+      final AppointmentAttendance? attendance}) = _$AppointmentImpl;
   const _Appointment._() : super._();
 
   factory _Appointment.fromJson(Map<String, dynamic> json) =
@@ -671,7 +725,20 @@ abstract class _Appointment extends Appointment {
 // markBilled — never cleared client-side (see firestore.rules set-once
 // guard on this field).
   @override
-  String? get paymentId;
+  String?
+      get paymentId; // #1492 — null = la sesión se dio; [AppointmentAttendance.absent] = el
+// alumno faltó. Lo escribe sólo el PF (AppointmentRepository.setAttendance,
+// Path 2 de firestore.rules).
+//
+// `includeIfNull: false` NO es estética: `createByTrainer` escribe
+// `toJson()` entero, y las reglas desplegadas ANTES de #1492 no tienen la
+// clave en su allowlist. Omitirla cuando es null deja que esta versión de
+// la app siga agendando aunque las reglas nuevas todavía no estén arriba.
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(
+      includeIfNull: false, unknownEnumValue: JsonKey.nullForUndefinedEnumValue)
+  AppointmentAttendance? get attendance;
 
   /// Create a copy of Appointment
   /// with the given fields replaced by the non-null parameter values.

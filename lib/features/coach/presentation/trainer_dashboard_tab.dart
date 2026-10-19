@@ -14,6 +14,7 @@ import '../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
+import '../../../core/widgets/aligned_dropdown_menu.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/thousands_input_formatter.dart';
@@ -2564,7 +2565,8 @@ class _AthleteDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
-    return DropdownButtonFormField<String>(
+    return AlignedDropdownMenu(
+        child: DropdownButtonFormField<String>(
       initialValue: selectedId,
       hint: Text(
         l10n.dashboardSeleccionaAlumnoHint,
@@ -2602,7 +2604,7 @@ class _AthleteDropdown extends ConsumerWidget {
         );
       }).toList(),
       onChanged: onChanged,
-    );
+    ));
   }
 }
 

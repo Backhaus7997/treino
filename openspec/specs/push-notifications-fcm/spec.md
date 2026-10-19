@@ -144,12 +144,12 @@ The project MUST include a shared helper `functions/src/notifications/send-fcm.t
 
 ### REQ-PN-CF-002 — notifyOnChatMessage Trigger
 
-The project MUST include a CF `notifyOnChatMessage` triggered by `onDocumentCreated('chats/{chatId}/messages/{messageId}')` deployed in `southamerica-east1`. It MUST read `chats/{chatId}.members`, compute `recipients = members.filter(m => m !== senderId)`, compose title `"Nuevo mensaje"` and body `"${senderDisplayName}: ${truncate(text, 100)}"`, set `data.deepLink = "/coach/chat/${chatId}?other=${senderUid}"`, and call `sendFcm`. All string literals MUST carry `// i18n: Fase 6 Etapa 2`. Body MUST NOT exceed 256 characters.
+The project MUST include a CF `notifyOnChatMessage` triggered by `onDocumentCreated('chats/{chatId}/messages/{messageId}')` deployed in `southamerica-east1`. It MUST read `chats/{chatId}.members`, compute `recipients = members.filter(m => m !== senderId)`, compose title `senderDisplayName` (fallback `"Alguien"`, #1464) and body `truncate(text, 100)` with NO sender-name prefix (a media-only message uses `"📷 Foto"` / `"🎥 Video"`), set `data.deepLink = "/coach/chat/${chatId}?other=${senderUid}"`, and call `sendFcm`. All string literals MUST carry `// i18n: Fase 6 Etapa 2`. Body MUST NOT exceed 256 characters.
 
 #### SCENARIO-629: Chat notification sent to the other member
 - **Given** a chat with `members: ['athlete-uid', 'trainer-uid']` and `senderId: 'athlete-uid'`
 - **When** a new message document is created
-- **Then** `sendFcm` is called with `uids: ['trainer-uid']` and body containing the sender name and truncated text
+- **Then** `sendFcm` is called with `uids: ['trainer-uid']`, title equal to the sender name and body equal to the truncated text
 - **Test target**: `functions/src/__tests__/notify-chat-message.test.ts`
 - **REQ**: REQ-PN-CF-002
 - **Status**: PASS ✅
@@ -157,7 +157,7 @@ The project MUST include a CF `notifyOnChatMessage` triggered by `onDocumentCrea
 #### SCENARIO-630: Chat notification body is truncated at 100 chars
 - **Given** a message with `text` of 150 characters
 - **When** `notifyOnChatMessage` composes the body
-- **Then** the text portion of the body is at most 100 characters long
+- **Then** the body (the text alone, the sender name is the title) is at most 100 characters long, plus the ellipsis
 - **And** the total body length is ≤ 256 characters
 - **Test target**: `functions/src/__tests__/notify-chat-message.test.ts`
 - **REQ**: REQ-PN-CF-002
@@ -253,7 +253,7 @@ The project MUST include a CF `notifyOnLinkChange` triggered by `onDocumentWritt
 |---|---|---|---|
 | `pending` (create) | `"Nueva solicitud de vínculo"` | `"${athleteName} quiere vincularse con vos"` | trainer |
 | `active` | `"Vínculo aceptado"` | `"${trainerName} aceptó tu solicitud"` | athlete |
-| `terminated` | `"Vínculo finalizado"` | `"El vínculo con ${otherPartyName} fue finalizado"` | both |
+| `terminated` | `"Vinculación finalizada"` | `"La vinculación con ${otherPartyName} fue finalizada."` (one push per recipient, each with the OTHER party's name, #1464) | both |
 
 #### SCENARIO-637: pending link fires trainer notification
 - **Given** a new `trainer_links/{linkId}` document with `status: 'pending'`
@@ -620,8 +620,8 @@ The project MUST NOT add `flutter_local_notifications` as a dependency. All fore
 All FCM notification bodies composed by CFs MUST NOT exceed 256 characters. Chat message previews MUST be truncated at 100 characters before inclusion in the body string.
 
 #### SCENARIO-666: chat body with max-length preview stays under 256 chars
-- **Given** a sender display name of 50 chars and a message truncated to 100 chars
-- **When** the body string is assembled as `"${name}: ${preview}"`
+- **Given** a message truncated to 100 chars
+- **When** the body string is assembled (the preview alone; the sender name goes in the title)
 - **Then** the resulting string is ≤ 256 characters
 - **Test target**: `functions/src/__tests__/notify-chat-message.test.ts`
 - **REQ**: REQ-PN-CX-003

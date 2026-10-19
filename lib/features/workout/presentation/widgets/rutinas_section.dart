@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../../coach/domain/trainer_link.dart';
@@ -316,15 +317,13 @@ class _RoutineCard extends ConsumerWidget {
         'activeRoutineId': routine.id,
       });
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasMarkActiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasMarkActiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasActiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasActiveError,
+            type: TreinoToastType.error);
       }
     }
   }
@@ -361,15 +360,13 @@ class _RoutineCard extends ConsumerWidget {
       // siendo arrancable hasta que se reinicie la app.
       invalidateRoutineById(container, routine.id);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveSuccess)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveSuccess,
+            type: TreinoToastType.success);
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.workoutMisRutinasArchiveError)),
-        );
+        showTreinoToast(context, l10n.workoutMisRutinasArchiveError,
+            type: TreinoToastType.error);
       }
     }
   }

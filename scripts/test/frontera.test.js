@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 54 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 55 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -221,13 +221,20 @@ test('los 54 scripts que inicializan Firebase pasan por la frontera', () => {
   // y el proyecto resuelto antes de escribir, y es DRY-RUN POR DEFECTO: escribe
   // sólo con `--apply`.
   //
+  // El 55 es `backfill_user_search_prefixes.js` (#1478): completa
+  // `userPublicProfiles.searchPrefixes` en los perfiles anteriores a la CF que
+  // lo escribe. Entra por `lib/admin`, imprime el banner de producción ANTES de
+  // inicializar y el proyecto antes de leer, es DRY-RUN POR DEFECTO (escribe
+  // sólo con `--apply`) y, contra un proyecto real, aborta si las reglas
+  // DESPLEGADAS todavía no conocen el campo.
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    54,
+    55,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

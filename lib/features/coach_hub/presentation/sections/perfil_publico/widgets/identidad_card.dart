@@ -25,6 +25,7 @@ import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Card «IDENTIDAD» — columna izquierda de `PerfilPublicoScreen` (WU-03).
 class IdentidadCard extends ConsumerStatefulWidget {
@@ -65,7 +66,7 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
     if (_saving) return;
     final error = _bioError;
     if (error != null) {
-      _toast(error);
+      _toast(error, type: TreinoToastType.error);
       return;
     }
     setState(() => _saving = true);
@@ -73,23 +74,29 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
       await ref.read(userRepositoryProvider).update(widget.profile.uid, {
         'trainerBio': _bio.text.trim(),
       });
-      _toast('Bio guardada.'); // i18n: Fase 11
+      _toast('Bio guardada.', type: TreinoToastType.success); // i18n: Fase 11
     } catch (e) {
       if (!mounted) return;
       // `moderationBlockedMessage` va PRIMERO: "probá de nuevo" es consejo
       // falso para un bloqueo del filtro de términos vetados — la misma bio
       // va a fallar siempre.
-      _toast(e is ModerationBlockedException
-          ? AppL10n.of(context).moderationBlockedMessage
-          : 'No se pudo guardar la bio. Probá de nuevo.'); // i18n: Fase 11
+      _toast(
+          e is ModerationBlockedException
+              ? AppL10n.of(context).moderationBlockedMessage
+              : 'No se pudo guardar la bio. Probá de nuevo.',
+          type: TreinoToastType.error); // i18n: Fase 11
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  void _toast(String msg) {
+  void _toast(String msg, {TreinoToastType type = TreinoToastType.info}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showTreinoToast(
+      context,
+      msg,
+      type: type,
+    );
   }
 
   @override

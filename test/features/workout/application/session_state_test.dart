@@ -465,4 +465,95 @@ void main() {
       expect(a == b, isFalse);
     });
   });
+
+  // ── #1511 — terminar igual: cuánto se hizo y si cuenta ────────────────────
+  group('SessionState — progreso y "terminar igual" (#1511)', () {
+    SessionState build({
+      required List<int> planned,
+      required List<int> done,
+      Map<String, int> override = const {},
+    }) {
+      final slots = [
+        for (var i = 0; i < planned.length; i++)
+          makeSlot(
+            exerciseId: 'e$i',
+            exerciseName: 'Ejercicio $i',
+            targetSets: planned[i],
+          ),
+      ];
+      final logs = [
+        for (var i = 0; i < done.length; i++)
+          for (var n = 1; n <= done[i]; n++)
+            makeSetLog(exerciseId: 'e$i', setNumber: n, id: 'l-$i-$n'),
+      ];
+      return SessionState(
+        session: makeSession(),
+        day: makeDay(slots: slots),
+        setLogs: logs,
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+        setCountOverride: override,
+      );
+    }
+
+    test('plannedSetsTotal / doneSetsTotal / completionRatio', () {
+      final s = build(planned: [3, 3], done: [3, 0]);
+      expect(s.plannedSetsTotal, 6);
+      expect(s.doneSetsTotal, 3);
+      expect(s.completionRatio, 0.5);
+    });
+
+    test('sin series hechas: ratio 0 y no cuenta', () {
+      final s = build(planned: [3, 3], done: [0, 0]);
+      expect(s.doneSetsTotal, 0);
+      expect(s.completionRatio, 0);
+      expect(s.countsAsWorkoutIfFinished, isFalse);
+    });
+
+    test('una serie extra en un ejercicio no tapa la que falta en otro', () {
+      // e0 tiene 5 logs de 3 planificadas; e1 no hizo ninguna. Sin el tope por
+      // slot serían 5 de 6 (83 %) cuando en realidad se hizo la mitad.
+      final s = build(planned: [3, 3], done: [5, 0]);
+      expect(s.doneSetsTotal, 3);
+      expect(s.completionRatio, 0.5);
+    });
+
+    test('el piso es inclusivo: 50 % cuenta, por debajo no', () {
+      expect(build(planned: [4], done: [2]).countsAsWorkoutIfFinished, isTrue);
+      expect(build(planned: [4], done: [1]).countsAsWorkoutIfFinished, isFalse);
+      expect(
+        build(planned: [3], done: [1]).countsAsWorkoutIfFinished,
+        isFalse,
+        reason: '1/3 = 33 %',
+      );
+    });
+
+    test('una sesión completa cuenta', () {
+      expect(build(planned: [2, 2], done: [2, 2]).countsAsWorkoutIfFinished,
+          isTrue);
+    });
+
+    test('un día sin trabajo planificado nunca cuenta (QA-WKT-005)', () {
+      final s = build(planned: const [], done: const []);
+      expect(s.completionRatio, 0);
+      expect(s.countsAsWorkoutIfFinished, isFalse);
+    });
+
+    test('respeta el override de series agregadas/quitadas en la sesión', () {
+      // El atleta agregó una serie a e0 (3 → 4): ahora son 4 + 3 = 7 planificadas.
+      final s = build(planned: [3, 3], done: [4, 0], override: {'e0': 4});
+      expect(s.plannedSetsTotal, 7);
+      expect(s.doneSetsTotal, 4);
+    });
+
+    test('missingSets lista sólo los slots con series pendientes', () {
+      final s = build(planned: [3, 3, 2], done: [3, 1, 0]);
+      expect(s.missingSets.map((m) => (m.slot.exerciseId, m.done, m.planned)),
+          [('e1', 1, 3), ('e2', 0, 2)]);
+    });
+
+    test('missingSets vacío cuando la sesión está completa', () {
+      expect(build(planned: [2], done: [2]).missingSets, isEmpty);
+    });
+  });
 }

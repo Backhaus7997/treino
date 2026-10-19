@@ -78,6 +78,27 @@
       }
     }
   },
+  "homeEstaSemanaMusclesTitle": "MÚSCULOS DE LA SEMANA",
+  "@homeEstaSemanaMusclesTitle": {
+    "description": "Title of the muscle map in the Home 'Esta Semana' card. The map paints the sets the athlete already logged THIS WEEK (finished sessions), not today's routine (#1508)."
+  },
+  "homeEstaSemanaMusclesLegend": "Más color = más cerca de las series que pide tu rutina esta semana.",
+  "@homeEstaSemanaMusclesLegend": {
+    "description": "Legend under the Home muscle map: opacity = sets done this week / weekly target sets of the active routine."
+  },
+  "homeGreeting": "¡HOLA!",
+  "@homeGreeting": {
+    "description": "Home header greeting when the athlete has no display name yet."
+  },
+  "homeGreetingNamed": "¡HOLA, {name}!",
+  "@homeGreetingNamed": {
+    "description": "Home header greeting. [name] is the athlete's FIRST name, already uppercased (#1508).",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "homeEstaSemanaEmptyTitle": "TU RACHA\nEMPIEZA ACÁ",
   "@homeEstaSemanaEmptyTitle": {
     "description": "Home 'Esta Semana' card empty-state title for an athlete with zero sessions."
@@ -227,6 +248,18 @@
   "@coachInquiryCtaError": {
     "description": "Snackbar cuando falla el getOrCreate del chat de consulta."
   },
+  "coachPreviewBannerTitle": "VISTA PREVIA",
+  "@coachPreviewBannerTitle": {
+    "description": "Título de la marca que aparece arriba del perfil público cuando el que lo mira es el propio PF (VER PREVIEW, #1498)."
+  },
+  "coachPreviewBannerBody": "Así ve tu perfil un alumno. Los botones están desactivados en esta vista.",
+  "@coachPreviewBannerBody": {
+    "description": "Explica por qué CONSULTAR y PEDIR VÍNCULO no responden en la vista previa: nadie se consulta ni se pide vínculo a sí mismo."
+  },
+  "coachPreviewMissingExperience": "Todavía no cargaste tus años de experiencia: los alumnos ven «—». Tocá para cargarlos.",
+  "@coachPreviewMissingExperience": {
+    "description": "Aviso en la vista previa del PF cuando trainerExperienceYears es null. Lleva a EDITAR (/profile/edit-trainer). RESEÑAS y ALUMNOS también pueden mostrar «—», pero esos los calcula el servidor; los años los carga el PF."
+  },
   "coachCtaProximamente": "Próximamente — Etapa 3",
   "coachLocationSheetTitle": "TU UBICACIÓN",
   "coachLocationSheetBody": "TREINO usa tu ubicación para mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros usuarios.",
@@ -268,7 +301,10 @@
   "coachEditorUpdateLabel": "GUARDAR CAMBIOS",
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
-  "agendaButtonLabel": "VER AGENDA DEL PF",
+  "agendaButtonLabel": "MI AGENDA",
+  "@agendaButtonLabel": {
+    "description": "Botón de la tab Coach que abre la agenda del alumno: sus propias sesiones con el PF, no la agenda del PF."
+  },
   "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
   "@athleteNutritionPlanButtonLabel": {
     "description": "Botón de la tab Coach que abre el plan nutricional del alumno."
@@ -365,6 +401,30 @@
   "agendaCancellationKeep": "No, mantener",
   "agendaCancellationSuccess": "Reserva cancelada.",
   "agendaCancellationTooLate": "No podés cancelar con menos de 24h de anticipación.",
+  "agendaAthleteCancelCta": "CANCELAR",
+  "@agendaAthleteCancelCta": {
+    "description": "Botón de una sesión en MI AGENDA del alumno, con más de 24 h de anticipación (#1515)."
+  },
+  "agendaAthleteCancelConfirmBody": "¿Cancelar esta sesión? Le avisamos a tu PF.",
+  "@agendaAthleteCancelConfirmBody": {
+    "description": "Cuerpo del diálogo de confirmación cuando el alumno cancela una sesión."
+  },
+  "agendaBookingCancelledByAthlete": "Reserva cancelada por el alumno.",
+  "@agendaBookingCancelledByAthlete": {
+    "description": "Motivo que queda en el registro de cancelación cuando cancela el alumno."
+  },
+  "agendaAthleteNotifyTrainerCta": "AVISAR A MI PF",
+  "@agendaAthleteNotifyTrainerCta": {
+    "description": "Botón de una sesión con menos de 24 h en MI AGENDA: abre el chat con el PF (#1515)."
+  },
+  "agendaAthleteNotifyHint": "Faltan menos de 24 h: si no podés ir, avisale a tu PF.",
+  "@agendaAthleteNotifyHint": {
+    "description": "Texto sobre el botón AVISAR A MI PF, que explica por qué no hay CANCELAR."
+  },
+  "agendaAthleteChatError": "No pudimos abrir el chat. Probá de nuevo.",
+  "@agendaAthleteChatError": {
+    "description": "Snackbar cuando AVISAR A MI PF no puede abrir el chat."
+  },
   "agendaUpcomingAppointmentsHeading": "TUS PRÓXIMAS RESERVAS",
   "agendaPastAppointmentsHeading": "TURNOS PASADOS",
   "agendaGenericError": "Hubo un problema. Intentá de nuevo.",
@@ -392,6 +452,30 @@
     }
   },
   "agendaBookingCancelledByCoach": "Reserva cancelada por el entrenador.",
+  "agendaAttendanceMarkAbsent": "MARCAR AUSENTE",
+  "@agendaAttendanceMarkAbsent": {
+    "description": "Botón del detalle de una sesión que ya empezó: el PF marca que el alumno faltó (#1492)."
+  },
+  "agendaAttendanceUndoAbsent": "DESHACER AUSENTE",
+  "@agendaAttendanceUndoAbsent": {
+    "description": "Botón que vuelve a dejar como hecha una sesión marcada ausente."
+  },
+  "agendaAttendanceDefaultHint": "Si no marcás nada, la sesión cuenta como hecha.",
+  "@agendaAttendanceDefaultHint": {
+    "description": "Ayuda sobre el botón de asistencia: el default es que la sesión se dio."
+  },
+  "agendaAttendanceAbsentHint": "Marcaste que el alumno faltó.",
+  "@agendaAttendanceAbsentHint": {
+    "description": "Ayuda sobre el botón de asistencia cuando la sesión ya está marcada ausente."
+  },
+  "agendaAttendanceAbsentStatus": "Ausente",
+  "@agendaAttendanceAbsentStatus": {
+    "description": "Valor de la fila ESTADO del detalle del turno cuando el alumno faltó."
+  },
+  "agendaAttendanceError": "No pudimos guardar la asistencia. Probá de nuevo.",
+  "@agendaAttendanceError": {
+    "description": "Snackbar cuando falla marcar o deshacer el ausente."
+  },
   "agendaBlockedDayTitle": "Día bloqueado",
   "agendaBlockedDayBodySingle": "El {date} está marcado como bloqueado en tus horarios. ¿Querés cargar la sesión igual?",
   "@agendaBlockedDayBodySingle": {
@@ -410,6 +494,49 @@
     }
   },
   "agendaBlockedDayConfirm": "Cargar igual",
+  "agendaConflictTitle": "Revisá el horario",
+  "agendaConflictOverlapLine": "Se superpone con {name} ({start} – {end}).",
+  "@agendaConflictOverlapLine": {
+    "description": "Línea del aviso de conflicto al agendar una sesión: la sesión nueva se superpone con una ya agendada.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "agendaConflictOverlapMore": "{count, plural, =1{Y 1 sesión más.} other{Y {count} sesiones más.}}",
+  "@agendaConflictOverlapMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictSomeoneElse": "otra sesión",
+  "agendaConflictOutsideAvailability": "Queda fuera de tu disponibilidad publicada.",
+  "agendaConflictSeriesOverlap": "{count, plural, =1{1 sesión de la serie se superpone con otra ya agendada.} other{{count} sesiones de la serie se superponen con otras ya agendadas.}}",
+  "@agendaConflictSeriesOverlap": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictSeriesOutside": "{count, plural, =1{1 sesión de la serie queda fuera de tu disponibilidad publicada.} other{{count} sesiones de la serie quedan fuera de tu disponibilidad publicada.}}",
+  "@agendaConflictSeriesOutside": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "agendaConflictQuestion": "¿Querés agendarla igual?",
   "agendaSlotFreeLabel": "Disponible",
   "agendaSlotBlockedLabel": "Bloqueado",
   "agendaSlotBookedByLabel": "Reservado por {athleteName}",
@@ -712,14 +839,24 @@
   "workoutExploreEmptyLevel": "No hay rutinas para este nivel.",
   "templatesFilterEmptyDays": "{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}",
   "@templatesFilterEmptyDays": {"description": "Estado vacío de EXPLORAR cuando el filtro duro de días (#1561) no deja ninguna plantilla. Va seguido del botón templatesFilterEmptyAction.", "placeholders": {"days": {"type": "int"}}},
-  "templatesFilterEmptyMinutes": "No hay plantillas de unos {minutes} min",
-  "@templatesFilterEmptyMinutes": {"description": "Igual que templatesFilterEmptyDays pero cuando sólo hay filtro de minutos (±15).", "placeholders": {"minutes": {"type": "String"}}},
-  "templatesFilterEmptyMinutesOrMore": "No hay plantillas de {minutes} min o más",
-  "@templatesFilterEmptyMinutesOrMore": {"description": "Igual que templatesFilterEmptyMinutes pero para la opción \"75 MIN O MÁS\" del cuestionario, que no tiene techo: decir \"unos 75 min\" mentiría sobre qué se filtró.", "placeholders": {"minutes": {"type": "String"}}},
-  "templatesFilterEmptyDaysAndMinutes": "Ninguna plantilla encaja con tus días y tus minutos a la vez",
-  "@templatesFilterEmptyDaysAndMinutes": {"description": "Estado vacío de EXPLORAR cuando días y minutos dejan plantillas CADA UNO por separado pero ninguna cumple los dos (#1561). Va seguido de templatesFilterEmptyAction."},
+  "templatesFilterEmptyMinutes": "No hay plantillas de {minutes} min o menos",
+  "@templatesFilterEmptyMinutes": {"description": "Estado vacío de EXPLORAR cuando ninguna plantilla dura los minutos elegidos o menos (\"tengo hasta X\"). La opción \"75 o más\" no filtra, así que nunca llega acá.", "placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyCombination": "Ninguna plantilla cumple todo lo que elegiste a la vez",
+  "@templatesFilterEmptyCombination": {"description": "Estado vacío de EXPLORAR cuando cada respuesta del cuestionario deja plantillas por separado pero ninguna cumple todas a la vez. Va seguido de templatesFilterEmptyAction."},
+  "templatesFilterEmptyGoals": "Ninguna plantilla apunta a los objetivos que elegiste",
+  "@templatesFilterEmptyGoals": {"description": "Estado vacío de EXPLORAR cuando ninguna plantilla declara alguno de los objetivos elegidos. Va seguido de templatesFilterEmptyAction."},
+  "templatesFilterEmptyZones": "Ninguna plantilla trabaja las zonas que elegiste",
+  "@templatesFilterEmptyZones": {"description": "Estado vacío de EXPLORAR cuando ninguna plantilla dedica al menos el 10 % de sus ejercicios a alguna de las zonas elegidas. Va seguido de templatesFilterEmptyAction."},
   "templatesFilterEmptyAction": "Ver todas",
-  "@templatesFilterEmptyAction": {"description": "CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista."},
+  "@templatesFilterEmptyAction": {"description": "CTA del estado vacío de EXPLORAR: levanta todos los filtros del cuestionario (días, minutos, objetivo y zonas) en esa vista; el nivel y la búsqueda quedan."},
+  "templatesFilterBarClear": "Borrar filtros",
+  "@templatesFilterBarClear": {"description": "Botón de la barra de EXPLORAR que borra las respuestas guardadas del cuestionario (vuelve a mostrar el catálogo entero). Se usa como tooltip y etiqueta accesible."},
+  "templatesFiltersCleared": "Filtros borrados",
+  "@templatesFiltersCleared": {"description": "Aviso después de borrar los filtros de EXPLORAR. Lleva la acción templatesFiltersUndo."},
+  "templatesFiltersClearError": "No pudimos borrar los filtros. Probá de nuevo.",
+  "@templatesFiltersClearError": {"description": "Aviso cuando no se pudieron borrar los filtros de EXPLORAR (sin conexión o sin perfil cargado)."},
+  "templatesFiltersUndo": "DESHACER",
+  "@templatesFiltersUndo": {"description": "Acción del aviso templatesFiltersCleared: vuelve a guardar las respuestas que había."},
   "@workoutExploreEmptyLevel": {
     "description": "Empty state of the EXPLORAR catalogue grid when a level filter pill is active and nothing matches it (#638)."
   },
@@ -1655,9 +1792,13 @@
   "@searchUsersClearA11y": {
     "description": "Accessibility label for the icon-only clear-field button on the user search screen (finding 17). Existing workoutPickerSheetClear='Limpiar' is a different, sheet-scoped action."
   },
-  "publicProfileMessageDisabledA11y": "Mensaje (próximamente)",
+  "publicProfileMessageDisabledA11y": "Mensaje (no disponible: esta persona tiene que seguirte)",
   "@publicProfileMessageDisabledA11y": {
-    "description": "Semantics label for the disabled MENSAJE stub on the public profile screen, exposed via Semantics(button:true, enabled:false) (finding 16)."
+    "description": "Semantics label for the disabled MENSAJE pill on the public profile screen, exposed via Semantics(button:true, enabled:false). Dice por qué está deshabilitado: el destinatario tiene que seguir a quien escribe y no hay chat ni vínculo previo."
+  },
+  "publicProfileStatWorkouts": "ENTRENOS",
+  "@publicProfileStatWorkouts": {
+    "description": "Etiqueta del contador de entrenos en la grilla de stats del perfil público (antes hardcodeada en inglés como WORKOUTS)."
   },
   "a11yAvatarLabel": "Foto de perfil de {name}",
   "@a11yAvatarLabel": {
@@ -2576,6 +2717,61 @@
   "sessionFinishError": "No pudimos finalizar la sesión. Probá de nuevo.",
   "@sessionFinishError": {
     "description": "Snackbar when finishSession/abandonSession fails so the user isn't stranded on the player (finding 22)."
+  },
+  "sessionFinishNeedOneSet": "Hacé al menos una serie para poder terminar. Si hoy no vas a entrenar, tocá ABANDONAR.",
+  "@sessionFinishNeedOneSet": {
+    "description": "Caption under the disabled TERMINAR SESIÓN button while the athlete has logged zero sets (#1511). Explains why it is disabled and where the other exit is."
+  },
+  "sessionFinishEarlyTitle": "¿TERMINAR IGUAL?",
+  "@sessionFinishEarlyTitle": {
+    "description": "Title of the confirm dialog shown when the athlete taps TERMINAR SESIÓN with sets still missing (#1511)."
+  },
+  "sessionFinishEarlyMissingHeader": "{count, plural, =1{Te falta 1 serie:} other{Te faltan {count} series:}}",
+  "@sessionFinishEarlyMissingHeader": {
+    "description": "Header of the list of missing sets in the finish-anyway dialog. [count] is the total of planned sets not done yet.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyMore": "{count, plural, =1{y 1 ejercicio más} other{y {count} ejercicios más}}",
+  "@sessionFinishEarlyMore": {
+    "description": "Tail of the missing-sets list in the finish-anyway dialog when more exercises are missing sets than fit on screen.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyCounts": "Hiciste el {percent} % de la sesión: cuenta como entreno para tu racha y tus rankings.",
+  "@sessionFinishEarlyCounts": {
+    "description": "Finish-anyway dialog: the session reaches the minimum share of planned sets, so it counts as a workout (#1511).",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyNotCounts": "Hiciste el {percent} % de la sesión. Se guarda, pero no cuenta como entreno para tu racha ni tus rankings: hace falta el {minPercent} %.",
+  "@sessionFinishEarlyNotCounts": {
+    "description": "Finish-anyway dialog: the session is below the minimum share, so it is saved as incomplete and does not count as a workout (#1511).",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "minPercent": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionFinishEarlyConfirm": "TERMINAR IGUAL",
+  "@sessionFinishEarlyConfirm": {
+    "description": "Confirm button of the finish-anyway dialog."
+  },
+  "sessionFinishEarlyKeepGoing": "SEGUIR ENTRENANDO",
+  "@sessionFinishEarlyKeepGoing": {
+    "description": "Dismiss button of the finish-anyway dialog: back to the session."
   },
   "routineEditorMissingName": "Poné un nombre a la rutina.",
   "@routineEditorMissingName": {
@@ -3856,9 +4052,9 @@
   },
   "feedSegmentFollowing": "SEGUIDORES",
   "@feedSegmentFollowing": {
-    "description": "Pill del segmento del feed que muestra posts de a quienes seguís."
+    "description": "Pill del segmento del feed que muestra posts de quienes seguís."
   },
-  "feedEmptyFollowing": "Todavía no hay posts de a quienes seguís",
+  "feedEmptyFollowing": "Todavía no hay posts de quienes seguís",
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
@@ -4006,8 +4202,8 @@
   "templatesOnboardingStep1Body": "Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.",
   "@templatesOnboardingStep1Body": {"description": "Paso 1, bajada. La respuesta se guarda y se usa en EXPLORAR: días y minutos filtran la grilla (#1561) y todas las respuestas la ordenan por afinidad (#635). Qué filtra y qué ordena lo explica templatesOnboardingStep1Hint; esta bajada no lo repite."},
   "templatesOnboardingStep1Label": "Días por semana",
-  "templatesOnboardingStep1Hint": "Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.",
-  "@templatesOnboardingStep1Hint": {"description": "Aclara qué hace cada respuesta (#1561): días y minutos FILTRAN la grilla (con salida \"Ver todas\" si queda vacía); objetivo y zonas sólo ordenan."},
+  "templatesOnboardingStep1Hint": "Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.",
+  "@templatesOnboardingStep1Hint": {"description": "Aclara que TODAS las respuestas filtran la grilla: sólo se ven plantillas que cumplen todo, con salida \"Ver todas\" si queda vacía."},
   "templatesOnboardingStep2Title": "¿Cuánto dura tu sesión?",
   "@templatesOnboardingStep2Title": {"description": "Paso 2. Pregunta por duración de sesión."},
   "templatesOnboardingStep2Body": "45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.",

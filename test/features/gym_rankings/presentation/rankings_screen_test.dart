@@ -34,6 +34,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/gym_rankings/application/ranking_metrics_sync.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
 import 'package:treino/features/gym_rankings/domain/lift_rank.dart';
 import 'package:treino/features/gym_rankings/domain/ranking_dimension.dart';
@@ -167,15 +168,15 @@ void main() {
             ),
           ),
           streakLeaderboardProvider(gymId ?? '')
-              .overrideWith((_) async => streak),
+              .overrideWith((_) => Stream.value(streak)),
           volumeLeaderboardProvider(gymId ?? '')
-              .overrideWith((_) async => volume),
+              .overrideWith((_) => Stream.value(volume)),
           squatLeaderboardProvider(gymId ?? '')
-              .overrideWith((_) async => squat),
+              .overrideWith((_) => Stream.value(squat)),
           benchLeaderboardProvider(gymId ?? '')
-              .overrideWith((_) async => bench),
+              .overrideWith((_) => Stream.value(bench)),
           deadliftLeaderboardProvider(gymId ?? '')
-              .overrideWith((_) async => deadlift),
+              .overrideWith((_) => Stream.value(deadlift)),
           // AD-4 self-heal fires unconditionally via ref.read on first build
           // whenever rankingOptIn == true — default to a no-op fake so tests
           // that don't care about the self-heal itself never touch real
@@ -219,8 +220,8 @@ void main() {
 
       expect(find.text('Lu'), findsOneWidget);
       expect(find.text('Coti'), findsOneWidget);
-      expect(find.text('12'), findsOneWidget);
-      expect(find.text('8'), findsOneWidget);
+      expect(find.text('12 sem'), findsOneWidget);
+      expect(find.text('8 sem'), findsOneWidget);
     });
 
     testWidgets(
@@ -623,10 +624,10 @@ void main() {
         ));
         await tester.pumpAndSettle();
 
-        expect(find.text('120'), findsOneWidget);
-        expect(find.text('100'), findsOneWidget);
+        expect(find.text('120 kg'), findsOneWidget);
+        expect(find.text('100 kg'), findsOneWidget);
         // Los 3 sin sentadilla no aparecen — ni como fila ni como "0 kg".
-        expect(find.text('0'), findsNothing);
+        expect(find.text('0 kg'), findsNothing);
         expect(find.text('Ana'), findsNothing);
         expect(find.text('Nico'), findsNothing);
         expect(find.text('Sofi'), findsNothing);
@@ -648,7 +649,7 @@ void main() {
 
         expect(find.byKey(const Key('rankings_empty_squat')), findsOneWidget);
         expect(find.text('Lu'), findsNothing);
-        expect(find.text('0'), findsNothing);
+        expect(find.text('0 kg'), findsNothing);
       });
 
       testWidgets(
@@ -782,11 +783,16 @@ void main() {
           ),
           userPublicProfileProvider(_uid)
               .overrideWith((_) => controller.stream),
-          streakLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          volumeLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          squatLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          benchLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          deadliftLeaderboardProvider(_gymId).overrideWith((_) async => []),
+          streakLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          volumeLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          squatLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          benchLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          deadliftLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
           rankingOptInControllerProvider
               .overrideWithValue(_FakeRankingOptInController()),
         ]));
@@ -900,11 +906,16 @@ void main() {
           ),
           userPublicProfileProvider(_uid)
               .overrideWith((_) => controller.stream),
-          streakLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          volumeLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          squatLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          benchLeaderboardProvider(_gymId).overrideWith((_) async => []),
-          deadliftLeaderboardProvider(_gymId).overrideWith((_) async => []),
+          streakLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          volumeLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          squatLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          benchLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          deadliftLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
           rankingOptInControllerProvider.overrideWithValue(fake),
         ]));
 
@@ -1204,6 +1215,275 @@ void main() {
 
     test('empty in → empty out', () {
       expect(rankableEntries(RankingDimension.squat, const []), isEmpty);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // #1518 — el número de la fila se lee como número (miles + unidad), y la
+  // fila propia no inventa un 0 mientras el servidor calcula.
+  // ──────────────────────────────────────────────────────────────────────
+  group('formatRankingValue (#1518)', () {
+    test('volumen: miles y coma decimal de es-AR, con unidad', () {
+      expect(
+        formatRankingValue(RankingDimension.volume, 66057.5, 'es_AR'),
+        '66.057,5 kg',
+      );
+    });
+
+    test('un entero no lleva decimales', () {
+      expect(
+          formatRankingValue(RankingDimension.squat, 120, 'es_AR'), '120 kg');
+      expect(
+        formatRankingValue(RankingDimension.volume, 1234567, 'es_AR'),
+        '1.234.567 kg',
+      );
+    });
+
+    test('a lo sumo un decimal', () {
+      expect(
+        formatRankingValue(RankingDimension.bench, 100.26, 'es_AR'),
+        '100,3 kg',
+      );
+    });
+
+    test('la racha va en semanas, no en kilos', () {
+      expect(formatRankingValue(RankingDimension.streak, 3, 'es_AR'), '3 sem');
+    });
+
+    test('cero sigue siendo cero con su unidad', () {
+      expect(formatRankingValue(RankingDimension.volume, 0, 'es_AR'), '0 kg');
+    });
+
+    test('respeta el locale: en inglés los separadores se invierten', () {
+      expect(
+        formatRankingValue(RankingDimension.volume, 66057.5, 'en'),
+        '66,057.5 kg',
+      );
+    });
+  });
+
+  group('RankingsScreen — métricas propias en cálculo (#1518)', () {
+    final mockUser = MockUser();
+
+    /// Un atleta recién llegado al opt-in: el doc público ya dice
+    /// `rankingOptIn` pero la función todavía no escribió ninguna métrica.
+    const optedInNoMetrics = UserPublicProfile(uid: _uid, rankingOptIn: true);
+
+    UserPublicProfile me({num volume = 0}) => UserPublicProfile(
+          uid: _uid,
+          displayName: 'Yo',
+          gymId: _gymId,
+          rankingOptIn: true,
+          lifetimeVolumeKg: volume,
+        );
+
+    List<Override> overrides({
+      required Stream<UserPublicProfile?> myDoc,
+      required Stream<List<UserPublicProfile>> volume,
+      required _FakeRankingOptInController fake,
+    }) =>
+        [
+          authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
+          userProfileProvider.overrideWith(
+            (_) => Stream.value(_profile(gymId: _gymId)),
+          ),
+          userPublicProfileProvider(_uid).overrideWith((_) => myDoc),
+          streakLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          volumeLeaderboardProvider(_gymId).overrideWith((_) => volume),
+          squatLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          benchLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          deadliftLeaderboardProvider(_gymId)
+              .overrideWith((_) => Stream.value([])),
+          rankingOptInControllerProvider.overrideWithValue(fake),
+        ];
+
+    /// Arma la pantalla con el atleta en "sin opt-in", toca ACTIVAR RANKINGS y
+    /// deja que el write "llegue" como llega en la app: el doc propio pasa a
+    /// opted-in SIN métricas, y el board de volumen lo muestra con el 0 de
+    /// default del modelo.
+    Future<
+        ({
+          StreamController<UserPublicProfile?> myDoc,
+          StreamController<List<UserPublicProfile>> volume
+        })> activar(WidgetTester tester) async {
+      final myDoc = StreamController<UserPublicProfile?>();
+      final volume = StreamController<List<UserPublicProfile>>();
+      addTearDown(myDoc.close);
+      addTearDown(volume.close);
+
+      final fake = _FakeRankingOptInController(
+        onEnable: () async {
+          myDoc.add(optedInNoMetrics);
+          volume.add([me()]);
+        },
+      );
+
+      await tester.pumpWidget(_buildScreen(
+        overrides:
+            overrides(myDoc: myDoc.stream, volume: volume.stream, fake: fake),
+      ));
+      myDoc.add(const UserPublicProfile(uid: _uid, rankingOptIn: false));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ACTIVAR RANKINGS'));
+      await tester.pumpAndSettle();
+      return (myDoc: myDoc, volume: volume);
+    }
+
+    testWidgets(
+        'recién activado: el volumen propio dice CALCULANDO…, no 0, y se '
+        'completa solo cuando llega el dato', (tester) async {
+      final streams = await activar(tester);
+
+      expect(
+        find.byKey(const Key('rankings_calculating_$_uid')),
+        findsOneWidget,
+      );
+      expect(find.text('CALCULANDO…'), findsOneWidget);
+      expect(find.text('0 kg'), findsNothing);
+
+      // La función escribe las métricas 1-3 s después: el stream del doc y el
+      // del board emiten, y la pantalla se actualiza SIN salir y volver.
+      streams.myDoc.add(me(volume: 66057.5));
+      streams.volume.add([me(volume: 66057.5)]);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('rankings_calculating_$_uid')), findsNothing);
+      expect(find.text('66.057,5 kg'), findsOneWidget);
+    });
+
+    testWidgets(
+        'si pasa el plazo y la función no escribió nada (atleta sin entrenos), '
+        'el 0 honesto aparece con su unidad', (tester) async {
+      await activar(tester);
+      expect(find.text('CALCULANDO…'), findsOneWidget);
+
+      await tester.pump(kRankingMetricsSyncWindow + const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CALCULANDO…'), findsNothing);
+      expect(find.text('0 kg'), findsOneWidget);
+    });
+
+    testWidgets(
+        'mientras calcula, la pestaña de levantamientos vacía no afirma que '
+        'nadie registró el levantamiento', (tester) async {
+      await activar(tester);
+
+      expect(
+          find.text('Estamos calculando tus levantamientos…'), findsOneWidget);
+      expect(
+        find.text('Todavía nadie de tu gym registró este levantamiento.'),
+        findsNothing,
+      );
+
+      await tester.pump(kRankingMetricsSyncWindow + const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Todavía nadie de tu gym registró este levantamiento.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'un atleta que ya estaba en los rankings ve su 0 como siempre — '
+        'CALCULANDO… solo existe justo después de activar', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: overrides(
+          myDoc: Stream.value(optedInNoMetrics),
+          volume: Stream.value([me()]),
+          fake: _FakeRankingOptInController(),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CALCULANDO…'), findsNothing);
+      expect(find.text('0 kg'), findsOneWidget);
+    });
+
+    testWidgets('si activar falla, no queda ningún "calculando" colgado',
+        (tester) async {
+      final fake = _FakeRankingOptInController(
+        onEnable: () => Future<void>.error(Exception('boom')),
+      );
+      await tester.pumpWidget(_buildScreen(
+        overrides: overrides(
+          myDoc: Stream.value(
+            const UserPublicProfile(uid: _uid, rankingOptIn: false),
+          ),
+          volume: Stream.value(const []),
+          fake: fake,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('ACTIVAR RANKINGS'));
+      await tester.pumpAndSettle();
+
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MaterialApp)),
+      );
+      expect(container.read(rankingMetricsSyncProvider), isFalse);
+    });
+  });
+
+  group('RankingsScreen — encabezado (#1518)', () {
+    final mockUser = MockUser();
+
+    Future<_FakeRankingOptInController> pumpOptedIn(WidgetTester tester) async {
+      final fake = _FakeRankingOptInController();
+      await tester.pumpWidget(_buildScreen(overrides: [
+        authStateChangesProvider.overrideWith((_) => Stream.value(mockUser)),
+        userProfileProvider.overrideWith(
+          (_) => Stream.value(_profile(gymId: _gymId)),
+        ),
+        userPublicProfileProvider(_uid).overrideWith(
+          (_) => Stream.value(
+            const UserPublicProfile(uid: _uid, rankingOptIn: true),
+          ),
+        ),
+        streakLeaderboardProvider(_gymId).overrideWith((_) => Stream.value([])),
+        volumeLeaderboardProvider(_gymId).overrideWith((_) => Stream.value([])),
+        squatLeaderboardProvider(_gymId).overrideWith((_) => Stream.value([])),
+        benchLeaderboardProvider(_gymId).overrideWith((_) => Stream.value([])),
+        deadliftLeaderboardProvider(_gymId)
+            .overrideWith((_) => Stream.value([])),
+        rankingOptInControllerProvider.overrideWithValue(fake),
+      ]));
+      await tester.pumpAndSettle();
+      return fake;
+    }
+
+    testWidgets('la sección de levantamientos está en español, no "LIFTS"',
+        (tester) async {
+      await pumpOptedIn(tester);
+
+      expect(find.text('LEVANTAMIENTOS'), findsOneWidget);
+      expect(find.text('LIFTS'), findsNothing);
+    });
+
+    testWidgets(
+        'salir de los rankings es un botón con texto, no una ✕ pelada, y '
+        'pide confirmación antes de borrar las métricas', (tester) async {
+      final fake = await pumpOptedIn(tester);
+
+      expect(find.text('DESACTIVAR'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('rankings_disable_affordance')));
+      await tester.pumpAndSettle();
+
+      // Nada se borra hasta confirmar.
+      expect(find.text('DESACTIVAR RANKINGS'), findsOneWidget);
+      expect(fake.disabledCalls, isEmpty);
+
+      await tester.tap(find.text('Desactivar'));
+      await tester.pumpAndSettle();
+
+      expect(fake.disabledCalls, equals([_uid]));
     });
   });
 }

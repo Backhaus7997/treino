@@ -15,13 +15,12 @@ import '../../../../../core/utils/argentina_time.dart'
     show argentinaNow, argentinaUtcOffset;
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
-import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../../core/widgets/treino_toast.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
 import '../../../../coach/domain/appointment.dart';
-import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
@@ -31,6 +30,7 @@ import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
 import '../pagos/widgets/thousands_input_formatter.dart';
 import 'agenda_web_helpers.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
 
@@ -41,7 +41,9 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 /// /alumnos/{id} pertenece a la rama chat-web-v1.
 ///
 /// Soporta: rango horario, badge SERIE RECURRENTE, notas (antes/después),
-/// GUARDAR NOTAS, CANCELAR RESERVA (>24h), cancelar toda la serie, Cerrar.
+/// GUARDAR NOTAS, CANCELAR RESERVA (hasta que empieza — #1492: el PF no tiene
+/// la regla de 24 h), cancelar toda la serie, MARCAR AUSENTE (después de que
+/// empezó), Cerrar.
 class AppointmentDetailDialog extends ConsumerStatefulWidget {
   const AppointmentDetailDialog({
     super.key,
@@ -78,6 +80,13 @@ class _AppointmentDetailDialogState
   /// the 15th.
   DateTime? _dueDate;
 
+  // ── Asistencia (#1492) ────────────────────────────────────────────────────
+  // Estado local: el diálogo recibe un [Appointment] fijo, el del momento en
+  // que se abrió, y sin esto el botón no reflejaría su propio cambio.
+  late AppointmentAttendance? _attendance = widget.appointment.attendance;
+  bool _savingAttendance = false;
+  bool get _absent => _attendance == AppointmentAttendance.absent;
+
   @override
   void initState() {
     super.initState();
@@ -108,23 +117,17 @@ class _AppointmentDetailDialogState
             noteAfter: after.isEmpty ? null : after,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Notas guardadas.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToast(
+        context,
+        'Notas guardadas.', // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No pudimos guardar. Probá de nuevo.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.', // i18n
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -150,25 +153,46 @@ class _AppointmentDetailDialogState
             reason: 'Cancelado por el coach', // i18n
           );
       if (!mounted) return;
+      // Capturado antes del pop: el aviso sale en la pantalla de atrás y no
+      // compite con la navegación.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // El pop ya pasó — el check no compite con la navegación.
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Sesión cancelada.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Sesión cancelada.', // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos cancelar la sesión.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos cancelar la sesión.', // i18n
+        type: TreinoToastType.error,
       );
+    }
+  }
+
+  Future<void> _toggleAttendance() async {
+    if (_savingAttendance) return;
+    final next = _absent ? null : AppointmentAttendance.absent;
+    setState(() => _savingAttendance = true);
+    try {
+      await ref.read(appointmentRepositoryProvider).setAttendance(
+            appointmentId: widget.appointment.id,
+            attendance: next,
+          );
+      if (!mounted) return;
+      setState(() => _attendance = next);
+    } catch (_) {
+      if (!mounted) return;
+      // Desde el diálogo: el toast va por el Overlay raíz y no queda tapado.
+      showTreinoToast(
+        context,
+        'No pudimos guardar la asistencia. Probá de nuevo.', // i18n
+        type: TreinoToastType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _savingAttendance = false);
     }
   }
 
@@ -179,7 +203,7 @@ class _AppointmentDetailDialogState
       palette: palette,
       title: 'Cancelar toda la serie', // i18n
       body:
-          'Se cancelan todas las sesiones futuras de esta serie recurrente (las que faltan más de 24h). No se puede deshacer.', // i18n
+          'Se cancelan todas las sesiones de esta serie recurrente que todavía no empezaron. No se puede deshacer.', // i18n
       confirmLabel: 'Cancelar serie', // i18n
       cancelLabel: 'No', // i18n
     );
@@ -194,32 +218,24 @@ class _AppointmentDetailDialogState
                 reason: 'Cancelado por el coach', // i18n
               );
       if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          // El pop ya pasó — el check no compite con la navegación. Solo se
-          // muestra si de verdad se canceló algo (n==0 no es un momento de
-          // éxito, es un no-op informativo).
-          content: n == 0
-              ? const Text('No había sesiones futuras para cancelar.') // i18n
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const TreinoSuccessCheck(size: 18, strokeWidth: 2),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        'Se cancelaron $n sesiones de la serie.', // i18n
-                      ),
-                    ),
-                  ],
-                ),
-        ),
+      // El pop ya pasó — el aviso no compite con la navegación. Solo es de
+      // éxito si de verdad se canceló algo (n==0 no es un momento de éxito,
+      // es un no-op informativo).
+      showTreinoToastOn(
+        messenger,
+        n == 0
+            ? 'No había sesiones futuras para cancelar.' // i18n
+            : 'Se cancelaron $n sesiones de la serie.', // i18n
+        type: n == 0 ? TreinoToastType.info : TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos cancelar la serie.')), // i18n
+      showTreinoToast(
+        context,
+        'No pudimos cancelar la serie.', // i18n
+        type: TreinoToastType.error,
       );
     }
   }
@@ -316,19 +332,14 @@ class _AppointmentDetailDialogState
             payment: payment,
           );
       if (!mounted) return;
+      // Capturado antes del pop: el aviso sale en la pantalla de atrás y no
+      // compite con la navegación.
+      final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // El pop ya pasó — el check no compite con la navegación.
-          content: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TreinoSuccessCheck(size: 18, strokeWidth: 2),
-              SizedBox(width: 10),
-              Flexible(child: Text('Turno cobrado.')), // i18n
-            ],
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        'Turno cobrado.', // i18n
+        type: TreinoToastType.success,
       );
     } on AppointmentAlreadyBilledException {
       if (!mounted) return;
@@ -539,13 +550,11 @@ class _AppointmentDetailDialogState
         ? 'Alumno'
         : rawName; // i18n
 
-    final canCancel = !widget.isPast &&
-        // Wall-clock: contra el instante UTC real la ventana de 24h se
-        // volvia de 27h, y la web negaba cancelaciones que mobile permitia
-        // (#671).
-        appt.startsAt.difference(nowWall()) > const Duration(hours: 24);
-    final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appt.recurringId != null;
+    // #1492: una vez que la sesión empezó (`isPast` es "empezó" en los dos
+    // llamadores), lo que queda por decir es si el alumno vino.
+    final canMarkAttendance =
+        widget.isPast && appt.status == AppointmentStatus.confirmed;
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
@@ -758,31 +767,46 @@ class _AppointmentDetailDialogState
                   ),
                 ],
 
+                // ── Asistencia (#1492) ───────────────────────────────────
+                if (canMarkAttendance) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _absent
+                        ? 'Marcaste que el alumno faltó.' // i18n
+                        : 'Si no marcás nada, la sesión cuenta como hecha.', // i18n
+                    style: GoogleFonts.barlow(
+                      fontSize: 12,
+                      color: _absent ? palette.warning : palette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TreinoButton(
+                    label: _absent
+                        ? 'DESHACER AUSENTE' // i18n
+                        : 'MARCAR AUSENTE', // i18n
+                    variant: TreinoButtonVariant.secondary,
+                    expand: true,
+                    loading: _savingAttendance,
+                    onPressed: _toggleAttendance,
+                  ),
+                ],
+
                 // ── Cancelar ─────────────────────────────────────────────
+                // #1492: el PF cancela hasta que la sesión empieza, sin la
+                // regla de 24 h — esa es del atleta.
                 if (!widget.isPast) ...[
                   const SizedBox(height: 12),
-                  if (canCancel)
-                    // Las dos cancelaciones iban en COLORES DISTINTOS —ésta en
-                    // `highlight` (magenta), la de la serie en `danger` (rojo)—
-                    // y las dos destruyen algo. La escalación la dice el LABEL
-                    // («esta reserva» vs «toda la serie»), no el color: dos
-                    // rojos distintos uno arriba del otro no enseñan nada.
-                    TreinoButton(
-                      label: 'CANCELAR RESERVA', // i18n
-                      variant: TreinoButtonVariant.danger,
-                      expand: true,
-                      onPressed: _cancelAppointment,
-                    )
-                  else if (isWithin24h)
-                    Center(
-                      child: Text(
-                        'No se puede cancelar (menos de 24h).', // i18n
-                        style: GoogleFonts.barlow(
-                          fontSize: 13,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ),
+                  // Las dos cancelaciones iban en COLORES DISTINTOS —ésta en
+                  // `highlight` (magenta), la de la serie en `danger` (rojo)—
+                  // y las dos destruyen algo. La escalación la dice el LABEL
+                  // («esta reserva» vs «toda la serie»), no el color: dos
+                  // rojos distintos uno arriba del otro no enseñan nada.
+                  TreinoButton(
+                    label: 'CANCELAR RESERVA', // i18n
+                    variant: TreinoButtonVariant.danger,
+                    expand: true,
+                    onPressed: _cancelAppointment,
+                  ),
                   if (isRecurring) ...[
                     const SizedBox(height: 8),
                     TreinoButton(

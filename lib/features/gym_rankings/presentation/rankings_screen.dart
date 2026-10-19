@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' as intl;
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
@@ -20,6 +21,7 @@ import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart'
     show userPublicProfileProvider;
 import '../../profile/domain/user_public_profile.dart';
+import '../application/ranking_metrics_sync.dart';
 import '../application/ranking_providers.dart';
 import '../domain/lift_rank.dart';
 import '../domain/ranking_dimension.dart';
@@ -144,6 +146,7 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
     );
     if (confirmed != true) return;
     await ref.read(rankingOptInControllerProvider).disableRankingOptIn(uid);
+    ref.read(rankingMetricsSyncProvider.notifier).finish();
   }
 
   @override
@@ -184,13 +187,26 @@ class _RankingsBodyState extends ConsumerState<RankingsBody> {
                   ),
                 ),
               ),
+              // #1518: antes era una ✕ pelada. Una ✕ al lado del título se
+              // lee como "cerrar esta pantalla", no como "salir de los
+              // rankings", y el tooltip no aparece en un teléfono. Lo que hace
+              // de verdad (borra tus métricas de los tableros, previa
+              // confirmación) va escrito en el botón.
               if (rankingOptIn)
-                IconButton(
+                TextButton.icon(
                   key: const Key('rankings_disable_affordance'),
                   onPressed: () => _confirmDisable(myUid),
                   icon: Icon(TreinoIcon.close,
-                      size: 20, color: palette.textMuted),
-                  tooltip: 'Desactivar rankings',
+                      size: 16, color: palette.textMuted),
+                  label: Text(
+                    'DESACTIVAR',
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppTextSize.caption,
+                      letterSpacing: 1.0,
+                      color: palette.textMuted,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -256,11 +272,19 @@ class _InvitationStateState extends ConsumerState<_InvitationState> {
 
   Future<void> _enable() async {
     setState(() => _enabling = true);
+    // #1518: ANTES de escribir, no después. El write local dispara el stream del
+    // doc y este widget se reemplaza por los tableros mientras el `await` sigue
+    // en vuelo; si el flag se prendiera al volver, los tableros dibujarían un
+    // primer cuadro con el volumen en 0 como si fuera real. `ref.read` capturado
+    // antes del await porque este widget puede estar desmontado para cuando
+    // termine.
+    final sync = ref.read(rankingMetricsSyncProvider.notifier)..start();
     try {
       await ref
           .read(rankingOptInControllerProvider)
           .enableRankingOptIn(widget.myUid);
     } catch (_) {
+      sync.finish();
       if (mounted) {
         showTreinoToast(
           context,
@@ -429,6 +453,15 @@ class _RankingsBody extends ConsumerWidget {
       MainLiftTab.deadlift => deadliftLeaderboardProvider(gymId),
     };
 
+    // #1518: mis métricas todavía no las calculó la función. Se cruza el flag
+    // con el doc (y no se usa el flag solo) para que "calculando" se vaya en el
+    // instante en que llega el dato real, sin esperar al plazo.
+    final calculatingMine = ref.watch(rankingMetricsSyncProvider) &&
+        ref.watch(
+          userPublicProfileProvider(myUid)
+              .select((async) => !hasRankingMetrics(async.valueOrNull)),
+        );
+
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -447,6 +480,7 @@ class _RankingsBody extends ConsumerWidget {
             myUid: myUid,
             async: ref.watch(streakLeaderboardProvider(gymId)),
             dimension: RankingDimension.streak,
+            calculatingMine: calculatingMine,
           ),
           const SizedBox(height: 20),
           _DimensionSection(
@@ -457,6 +491,7 @@ class _RankingsBody extends ConsumerWidget {
             myUid: myUid,
             async: ref.watch(volumeLeaderboardProvider(gymId)),
             dimension: RankingDimension.volume,
+            calculatingMine: calculatingMine,
           ),
           const SizedBox(height: 20),
           Row(
@@ -465,7 +500,7 @@ class _RankingsBody extends ConsumerWidget {
               Icon(TreinoIcon.dumbbell, size: 16, color: palette.textMuted),
               const SizedBox(width: 8),
               Text(
-                'LIFTS',
+                'LEVANTAMIENTOS',
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
@@ -494,6 +529,7 @@ class _RankingsBody extends ConsumerWidget {
             myUid: myUid,
             async: ref.watch(liftProvider),
             dimension: liftTab.dimension,
+            calculatingMine: calculatingMine,
           ),
         ],
       ),
@@ -559,6 +595,7 @@ class _DimensionSection extends StatelessWidget {
     required this.myUid,
     required this.async,
     required this.dimension,
+    required this.calculatingMine,
   });
 
   final Key sectionKey;
@@ -568,6 +605,11 @@ class _DimensionSection extends StatelessWidget {
   final String myUid;
   final AsyncValue<List<UserPublicProfile>> async;
   final RankingDimension dimension;
+
+  /// Las métricas del atleta logueado todavía no las calculó el servidor: su
+  /// fila no puede mostrar un número (el `0` es el default del modelo, no un
+  /// dato). Ver [rankingMetricsSyncProvider].
+  final bool calculatingMine;
 
   @override
   Widget build(BuildContext context) {
@@ -616,6 +658,7 @@ class _DimensionSection extends StatelessWidget {
                   emptyKey: emptyKey,
                   palette: palette,
                   dimension: dimension,
+                  calculatingMine: calculatingMine,
                 );
               }
               return _LeaderboardList(
@@ -623,6 +666,7 @@ class _DimensionSection extends StatelessWidget {
                 myUid: myUid,
                 palette: palette,
                 dimension: dimension,
+                calculatingMine: calculatingMine,
               );
             },
           ),
@@ -726,25 +770,58 @@ List<RankedEntry> rankableEntries(
   return entries;
 }
 
+/// #1518: el número de una fila del tablero como lo lee una persona — con
+/// separador de miles y decimal de [localeName] (es-AR: `66.057,5`), a lo sumo
+/// un decimal, y con su unidad. Antes salía `66057.5`: punto de programador, sin
+/// miles y sin decir si era kilos, repeticiones o qué.
+///
+/// La unidad depende de la dimensión: la racha cuenta semanas (ADR-WRS-08); el
+/// volumen y los levantamientos son kilos.
+String formatRankingValue(
+  RankingDimension dimension,
+  num value,
+  String localeName,
+) {
+  final number = intl.NumberFormat('#,##0.#', localeName).format(value);
+  switch (dimension) {
+    case RankingDimension.streak:
+      return '$number sem';
+    case RankingDimension.volume:
+    case RankingDimension.squat:
+    case RankingDimension.bench:
+    case RankingDimension.deadlift:
+      return '$number kg';
+  }
+}
+
 class _LeaderboardList extends StatelessWidget {
   const _LeaderboardList({
     required this.entries,
     required this.myUid,
     required this.palette,
     required this.dimension,
+    required this.calculatingMine,
   });
 
   final List<RankedEntry> entries;
   final String myUid;
   final AppPalette palette;
   final RankingDimension dimension;
+  final bool calculatingMine;
 
   Widget _row(int i, List<int> ranks) {
+    final isMe = entries[i].profile.uid == myUid;
     final row = _LeaderboardRow(
       rank: ranks[i],
       profile: entries[i].profile,
       value: entries[i].value,
-      isMe: entries[i].profile.uid == myUid,
+      dimension: dimension,
+      isMe: isMe,
+      // Solo el volumen lo escribe la función con un 0 de default. Las
+      // rachas las denormaliza `SessionRepository.finish()` y los
+      // levantamientos con valor `null` ni llegan acá (`rankableEntries`).
+      calculating:
+          isMe && calculatingMine && dimension == RankingDimension.volume,
       palette: palette,
       // Sólo las pestañas de levantamientos tienen rango; rachas y volumen
       // devuelven `null` y la fila queda como estaba.
@@ -795,7 +872,9 @@ class _LeaderboardRow extends StatelessWidget {
     required this.rank,
     required this.profile,
     required this.value,
+    required this.dimension,
     required this.isMe,
+    required this.calculating,
     required this.palette,
     this.showLiftRankSlot = false,
     this.liftRank,
@@ -804,7 +883,12 @@ class _LeaderboardRow extends StatelessWidget {
   final int rank;
   final UserPublicProfile profile;
   final num value;
+  final RankingDimension dimension;
   final bool isMe;
+
+  /// El servidor todavía no calculó el valor de esta fila: en lugar de [value]
+  /// (que sería el `0` por default del modelo) se muestra "CALCULANDO…".
+  final bool calculating;
   final AppPalette palette;
 
   /// `true` en las pestañas de levantamientos: TODAS las filas llevan
@@ -896,24 +980,31 @@ class _LeaderboardRow extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                _formatValue(value),
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                  color: isMe ? palette.accent : palette.textPrimary,
+              if (calculating)
+                Text(
+                  'CALCULANDO…',
+                  key: Key('rankings_calculating_${profile.uid}'),
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppTextSize.caption,
+                    letterSpacing: 1.0,
+                    color: palette.textMuted,
+                  ),
+                )
+              else
+                Text(
+                  formatRankingValue(dimension, value, l10n.localeName),
+                  style: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    color: isMe ? palette.accent : palette.textPrimary,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _formatValue(num value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(1);
   }
 }
 
@@ -922,11 +1013,17 @@ class _EmptyLeaderboard extends StatelessWidget {
     required this.emptyKey,
     required this.palette,
     required this.dimension,
+    required this.calculatingMine,
   });
 
   final Key emptyKey;
   final AppPalette palette;
   final RankingDimension dimension;
+
+  /// Mis métricas todavía no las calculó el servidor (#1518): "nadie registró
+  /// este levantamiento" sería falso — puede que el único que lo registró sea
+  /// yo y simplemente aún no aparezco.
+  final bool calculatingMine;
 
   /// QA-GYM-506: a lift board now empties out whenever nobody REGISTERED the
   /// movement, which is a different thing from nobody having joined the
@@ -940,7 +1037,9 @@ class _EmptyLeaderboard extends StatelessWidget {
       case RankingDimension.squat:
       case RankingDimension.bench:
       case RankingDimension.deadlift:
-        return 'Todavía nadie de tu gym registró este levantamiento.';
+        return calculatingMine
+            ? 'Estamos calculando tus levantamientos…'
+            : 'Todavía nadie de tu gym registró este levantamiento.';
     }
   }
 

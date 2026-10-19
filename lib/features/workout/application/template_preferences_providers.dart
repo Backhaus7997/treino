@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../profile/application/user_providers.dart';
@@ -52,6 +53,33 @@ class TemplatePreferencesController {
         'saveTemplatePreferences failed: $e',
         name: 'templates-onboarding',
       );
+    }
+  }
+
+  /// Borra las respuestas guardadas ("Borrar filtros" de EXPLORAR): saca el
+  /// campo del documento, así EXPLORAR vuelve a mostrar el catálogo entero
+  /// sin filtrar ni ordenar. No reabre el cuestionario: eso lo decide
+  /// `onboardingSeen`, que no se toca.
+  ///
+  /// A diferencia de [save], NO se traga el error en silencio: el atleta tocó
+  /// un botón y espera ver el resultado, así que la barra necesita saber si
+  /// avisar "Filtros borrados" o que no se pudo. Devuelve `false` si no hay
+  /// perfil cargado o la escritura falló.
+  Future<bool> clear() async {
+    final profile = _ref.read(userProfileProvider).valueOrNull;
+    if (profile == null) return false;
+    try {
+      await _ref.read(userRepositoryProvider).update(
+        profile.uid,
+        {'templatePreferences': FieldValue.delete()},
+      );
+      return true;
+    } catch (e) {
+      developer.log(
+        'clearTemplatePreferences failed: $e',
+        name: 'templates-onboarding',
+      );
+      return false;
     }
   }
 }
