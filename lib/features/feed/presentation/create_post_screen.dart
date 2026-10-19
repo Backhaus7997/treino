@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -353,10 +354,8 @@ class _CreatePostHeader extends ConsumerWidget {
                               AppL10n.of(context).moderationBlockedMessage,
                         );
                         if (ok && context.mounted) {
-                          messenger
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(
-                                SnackBar(content: Text(successMessage)));
+                          showTreinoToastOn(messenger, successMessage,
+                              type: TreinoToastType.success);
                           context.pop();
                         }
                       }
