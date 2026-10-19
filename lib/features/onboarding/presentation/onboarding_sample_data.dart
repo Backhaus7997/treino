@@ -19,7 +19,9 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../chat/application/chat_providers.dart';
+import '../../coach/application/nutrition_plan_providers.dart';
 import '../../coach/application/trainer_link_providers.dart';
+import '../../coach/domain/nutrition_plan.dart';
 import '../../coach/domain/trainer_link.dart';
 import '../../coach/domain/trainer_link_status.dart';
 import '../../feed/application/feed_screen_providers.dart';
@@ -290,6 +292,16 @@ const _sampleTrainerProfile = UserPublicProfile(
   gymName: 'Gimnasio Central',
 );
 
+// El slide sólo pregunta si el plan EXISTE; el contenido no se dibuja.
+final _samplePlan = NutritionPlan(
+  id: 'onboarding-preview-plan',
+  trainerId: _kTrainerId,
+  athleteId: _kUid,
+  title: 'Plan nutricional',
+  meals: const [],
+  updatedAt: _now,
+);
+
 // ── The overrides ───────────────────────────────────────────────────────────
 
 /// Seeds every provider the preview widgets read.
@@ -335,6 +347,10 @@ List<Override> onboardingSampleOverrides() => [
         (ref, uid) => Stream.value(_sampleTrainerProfile),
       ),
       hasUnreadFromProvider.overrideWith((ref, uid) => false),
+      // LinkStateCard decide con esto si «MI PLAN NUTRICIONAL» va relleno
+      // (#1517). El slide muestra un vínculo andando, así que va CON plan.
+      nutritionPlanProvider
+          .overrideWith((ref, key) => Stream.value(_samplePlan)),
       // miCuotaProvider derives from currentAthleteLinkProvider, which IS
       // overridden here. Riverpod refuses that combination — a provider whose
       // dependency is overridden must either be overridden too or declare

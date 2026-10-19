@@ -1,5 +1,7 @@
-// Filtro duro de EXPLORAR (#1561) compuesto con nivel, orden por afinidad y
-// búsqueda de texto — la cadena completa tal cual la arma PlantillasTab.
+// Filtro duro de EXPLORAR compuesto con nivel, orden por afinidad y búsqueda
+// de texto — la cadena completa tal cual la arma PlantillasTab. Todo lo que
+// el atleta elige filtra (ver el dartdoc de TemplateAffinity); el barrido
+// contra el catálogo real está en explorar_filtros_estrictos_test.
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,8 +61,8 @@ final _sistema = [
 
 // Comunidad/PF: sin minutos cargados y sin objetivos (publicadas antes de
 // #635). `pf3` tiene series, así que el estimador de #1562 le calcula 16 min
-// por día; `pfvacia` no tiene nada que estimar — desconocido, nunca excluida
-// por minutos.
+// por día; `pfvacia` no tiene nada que estimar, así que cualquier filtro de
+// minutos la deja afuera.
 final _comunidad = [
   _r('pf3', days: 3),
   _r('pfvacia', days: 3, muscles: const []),
@@ -113,47 +115,48 @@ void main() {
       }
     });
 
-    test(
-        '3 días · 75 min: la de 30 min sale, la de comunidad se juzga por '
-        'su estimación y la que no tiene dato se queda', () async {
+    test('3 días · "75 o más": los minutos no filtran, quedan las de 3 días',
+        () async {
       final c = await _pump(
         prefs: const TemplatePreferences(daysPerWeek: 3, minutesPerSession: 75),
       );
-      // pf3 estima 16 min: no es "75 o más".
-      expect(_ids(c), unorderedEquals(['push3', 'pfvacia']));
+      expect(_ids(c), unorderedEquals(['push3', 'corta3', 'pf3', 'pfvacia']));
     });
 
-    test('sólo minutos: 30 → ±15', () async {
+    test('sólo minutos: "tengo hasta 30"', () async {
       final c = await _pump(
         prefs: const TemplatePreferences(minutesPerSession: 30),
       );
-      // 30 y 45 entran; 60/75 no; pf3 estima 16 (a 14 de 30) entra; sin
-      // estimación posible (pfvacia) entra.
-      expect(_ids(c), unorderedEquals(['corta3', 'pierna2', 'pf3', 'pfvacia']));
+      // corta3 dura 30 y pf3 estima 16: entran. pierna2 (45) no. pfvacia no
+      // tiene duración posible: no se puede afirmar que entre.
+      expect(_ids(c), unorderedEquals(['corta3', 'pf3']));
     });
   });
 
-  group('objetivo y foco NO filtran, sólo ordenan', () {
-    test('objetivo y zona sin días/minutos: se ve todo el catálogo', () async {
+  group('objetivo y foco también filtran', () {
+    test('objetivo: sólo las que lo declaran (comunidad sin objetivos, afuera)',
+        () async {
       final c = await _pump(
-        prefs: const TemplatePreferences(
-          goals: [RoutineGoal.sport],
-          priorityMuscleGroups: ['back'],
-        ),
+        prefs: const TemplatePreferences(goals: [RoutineGoal.health]),
       );
-      expect(_ids(c), hasLength(_sistema.length + _comunidad.length));
+      expect(_ids(c), unorderedEquals(['push3', 'bro5', 'ppl6']));
     });
 
-    test('con 3 días, el objetivo ordena: la que lo cubre va primero',
-        () async {
+    test('zona: sólo las que la trabajan', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(priorityMuscleGroups: ['quads']),
+      );
+      expect(_ids(c), ['pierna2']);
+    });
+
+    test('3 días + salud: sólo la que cumple las dos', () async {
       final c = await _pump(
         prefs: const TemplatePreferences(
           daysPerWeek: 3,
           goals: [RoutineGoal.health],
         ),
       );
-      expect(_ids(c).first, 'push3');
-      expect(_ids(c), hasLength(4));
+      expect(_ids(c), ['push3']);
     });
   });
 
@@ -262,7 +265,7 @@ void main() {
         prefs: const TemplatePreferences(daysPerWeek: 4, minutesPerSession: 30),
       );
       expect(_ids(c), isEmpty);
-      expect(reason(c), TemplatesEmptyReason.daysAndMinutes);
+      expect(reason(c), TemplatesEmptyReason.combination);
       expect(reason(c)!.canLiftPreferenceFilter, isTrue);
     });
 
@@ -317,11 +320,18 @@ void main() {
       expect(_ids(c), ['full4']);
     });
 
-    test('sin días/minutos el filtro no está activo', () async {
+    test('sólo "75 o más": el filtro no está activo', () async {
+      final c = await _pump(
+        prefs: const TemplatePreferences(minutesPerSession: 75),
+      );
+      expect(c.read(templatesPreferenceFilterActiveProvider), isFalse);
+    });
+
+    test('con sólo un objetivo el filtro SÍ está activo', () async {
       final c = await _pump(
         prefs: const TemplatePreferences(goals: [RoutineGoal.health]),
       );
-      expect(c.read(templatesPreferenceFilterActiveProvider), isFalse);
+      expect(c.read(templatesPreferenceFilterActiveProvider), isTrue);
     });
   });
 }

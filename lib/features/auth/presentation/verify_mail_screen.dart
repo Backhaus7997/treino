@@ -47,7 +47,17 @@ import 'package:treino/core/widgets/treino_toast.dart';
 const _segundosParaHoras = 90 * 60;
 
 class VerifyMailScreen extends ConsumerStatefulWidget {
-  const VerifyMailScreen({super.key, @visibleForTesting this.ahora});
+  const VerifyMailScreen({
+    super.key,
+    this.cerrarSesion,
+    @visibleForTesting this.ahora,
+  });
+
+  /// Cómo cierra la sesión «Cerrar sesión». `null` ⇒ `AuthNotifier.signOut()`
+  /// (la app móvil). El Coach Hub pasa uno DIRECTO a Firebase Auth: el camino
+  /// del notifier espera `GoogleSignIn` web, cuyo `initialize()` el Hub nunca
+  /// llama, y se cuelga (mismo motivo que `CoachHubNotAllowedScreen`).
+  final Future<void> Function()? cerrarSesion;
 
   /// Reloj de la cuenta regresiva. `null` ⇒ `DateTime.now`. Se inyecta en los
   /// tests porque `pump` adelanta el tiempo falso pero no `DateTime.now`.
@@ -78,6 +88,10 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
 
   /// Está corriendo el borrado de «Me equivoqué de mail». Bloquea todo lo demás.
   bool _borrando = false;
+
+  /// Está corriendo [VerifyMailScreen.cerrarSesion]. El camino del notifier se
+  /// ve en su propio `isLoading`; este no.
+  bool _cerrandoSesion = false;
 
   /// El último pedido contestó «limitado»: la espera es de minutos u horas y se
   /// cuenta con [_reenviarEn], pero se muestra en minutos u horas (ver [build]).
@@ -340,10 +354,31 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
     }
   }
 
+  /// No navega: al cerrarse la sesión el router la saca sola.
+  Future<void> _cerrarSesion() async {
+    final cerrarSesion = widget.cerrarSesion;
+    if (cerrarSesion == null) {
+      await ref.read(authNotifierProvider.notifier).signOut();
+      return;
+    }
+    setState(() => _cerrandoSesion = true);
+    try {
+      await cerrarSesion();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _cerrandoSesion = false;
+        _error = AppL10n.of(context).coachHubSignOutError;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final signingOut = ref.watch(authNotifierProvider).isLoading || _borrando;
+    final signingOut = ref.watch(authNotifierProvider).isLoading ||
+        _borrando ||
+        _cerrandoSesion;
     final puedeConfirmar = _codigo.text.trim().length == 6 &&
         !_verificando &&
         !_verificado &&
@@ -457,10 +492,7 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
                 Center(
                   child: TextButton.icon(
                     key: const Key('verify_mail_sign_out'),
-                    onPressed: signingOut
-                        ? null
-                        : () =>
-                            ref.read(authNotifierProvider.notifier).signOut(),
+                    onPressed: signingOut ? null : _cerrarSesion,
                     style: TextButton.styleFrom(
                       foregroundColor: palette.textMuted,
                     ),

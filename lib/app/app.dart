@@ -21,6 +21,7 @@ import '../features/watch/application/watch_credential_providers.dart';
 import '../features/watch/application/watch_effort_notifier.dart';
 import '../features/watch/application/watch_timer_control_notifier.dart';
 import '../l10n/app_l10n.dart';
+import 'back_anidado_sync.dart';
 import 'locale_resolver.dart';
 import 'root_scaffold_messenger.dart';
 import 'router.dart';
@@ -405,9 +406,14 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
     // El helper ya fija `persist: false`: con acción, un SnackBar es eterno
     // por default y el cartel se quedaba hasta recargar la página.
+    // `encolar`: al vencer la espera del permiso, [_drenarAvisosEnEspera]
+    // entrega varios avisos seguidos. Reemplazando, cada uno pisaba al
+    // anterior y sólo quedaba el último — y este cartel promete que drenar
+    // nunca descarta (Codex, #1590).
     showTreinoToastOn(
       messenger,
       [title, body].where((s) => s.isNotEmpty).join('\n'),
+      encolar: true,
       action: TreinoToastAction(
         label: ctx != null ? AppL10n.of(ctx).appFcmSnackBarActionLabel : 'Ver',
         onPressed: () {
@@ -446,11 +452,19 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         // El gate de versión mínima va ADENTRO del ThemeWatcher (necesita
         // tema y l10n) y reemplaza al router solo si hay que actualizar.
-        child: ThemeWatcher(
-          // "Listo" sobre el teclado numérico de iOS (#1500): una sola vez
-          // acá en vez de tocar los ~17 campos numéricos de la app.
-          child: NumericKeyboardDoneBar(
-            child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
+        //
+        // `BackAnidadoSync` va por fuera de todo: tiene que ver las
+        // `NavigationNotification` de los dos navigators (raíz y shell) para
+        // corregir el aviso que Android usa para decidir si el back lo maneja
+        // Flutter (#1468).
+        child: BackAnidadoSync(
+          router: _router,
+          child: ThemeWatcher(
+            // "Listo" sobre el teclado numérico de iOS (#1500): una sola vez
+            // acá en vez de tocar los ~17 campos numéricos de la app.
+            child: NumericKeyboardDoneBar(
+              child: AppUpdateGate(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         ),
       ),

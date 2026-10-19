@@ -12,6 +12,7 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/treino_destructive_menu_item.dart';
 import '../../core/widgets/treino_icon.dart';
+import '../../core/widgets/treino_toast.dart';
 import '../coach/application/template_quota_provider.dart';
 import '../coach/presentation/template_limit_gate.dart';
 import '../coach/presentation/widgets/athlete_picker_sheet.dart';
@@ -216,22 +217,17 @@ class _TemplateLibrarySection extends ConsumerWidget {
           .read(userPublicProfileRepositoryProvider)
           .setSharedTemplatesWithAthletes(uid, value);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            value
-                ? 'Tus alumnos ya pueden ver todas tus plantillas.'
-                : 'Tus plantillas vuelven a ser privadas.',
-          ),
-        ),
+      showTreinoToast(
+        context,
+        value
+            ? 'Tus alumnos ya pueden ver todas tus plantillas.'
+            : 'Tus plantillas vuelven a ser privadas.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos actualizar la configuración.'),
-        ),
-      );
+      showTreinoToast(context, 'No pudimos actualizar la configuración.',
+          type: TreinoToastType.error);
     }
   }
 
@@ -530,15 +526,13 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       // whose Firestore doc no longer exists for the rest of the process.
       invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plantilla eliminada.')),
-      );
+      showTreinoToast(context, 'Plantilla eliminada.',
+          type: TreinoToastType.success);
       // The templates stream auto-refreshes from the Firestore snapshot.
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos eliminar la plantilla.')),
-      );
+      showTreinoToast(context, 'No pudimos eliminar la plantilla.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _deleting = false);
     }
@@ -606,23 +600,18 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       // `visibleRoutineByIdProvider` keeps resolving it instead of null.
       invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isPublished
-                ? 'Tu plantilla salió del catálogo público.'
-                : '¡Tu plantilla ya está en el catálogo público!',
-          ),
-        ),
+      showTreinoToast(
+        context,
+        isPublished
+            ? 'Tu plantilla salió del catálogo público.'
+            : '¡Tu plantilla ya está en el catálogo público!',
+        type: TreinoToastType.success,
       );
       // The templates stream auto-refreshes from the Firestore snapshot.
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos actualizar la publicación.'),
-        ),
-      );
+      showTreinoToast(context, 'No pudimos actualizar la publicación.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _publishing = false);
     }
@@ -646,14 +635,12 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
         weeksCount: widget.template.numWeeks,
       );
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Plantilla asignada al alumno.')),
-      );
+      showTreinoToast(context, 'Plantilla asignada al alumno.',
+          type: TreinoToastType.success);
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos asignar la plantilla.')),
-      );
+      showTreinoToast(context, 'No pudimos asignar la plantilla.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _assigning = false);
     }

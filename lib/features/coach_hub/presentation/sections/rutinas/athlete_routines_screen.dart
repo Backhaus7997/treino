@@ -21,6 +21,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Filtro de estado seleccionado en [AthleteRoutinesScreen] (WU-03).
 /// `autoDispose` porque el filtro no debe sobrevivir a la navegación fuera
@@ -319,14 +320,12 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
 
     if (!mounted) return;
     setState(() => _archiving = false);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Rutina archivada.' // i18n
-              : 'No pudimos archivar la rutina.', // i18n
-        ),
-      ),
+    showTreinoToastOn(
+      messenger,
+      ok
+          ? 'Rutina archivada.' // i18n
+          : 'No pudimos archivar la rutina.', // i18n
+      type: ok ? TreinoToastType.success : TreinoToastType.error,
     );
   }
 

@@ -87,7 +87,8 @@ void main() {
       expect(ids, ['a', 'b', 'c']);
     });
 
-    test('sube la que matchea el objetivo sin sacar a ninguna', () async {
+    test('el objetivo filtra: no declarar y otro objetivo quedan afuera',
+        () async {
       final ids = await _rankedIds(
         [
           _routine('no-declara'),
@@ -96,23 +97,26 @@ void main() {
         ],
         const TemplatePreferences(goals: [RoutineGoal.aesthetics]),
       );
-
-      expect(ids.first, 'matchea');
-      expect(ids, hasLength(3), reason: 'ordena, nunca excluye');
-      expect(ids.last, 'otro-objetivo',
-          reason: 'un desajuste real cae por debajo de no declarar nada');
+      expect(ids, ['matchea']);
     });
 
-    test('la que no declara queda ENTRE el match y el desajuste', () async {
+    test(
+        'con dos objetivos, la que cubre los dos va antes que la que cubre uno',
+        () async {
       final ids = await _rankedIds(
         [
-          _routine('otro-objetivo', goals: const [RoutineGoal.sport]),
-          _routine('no-declara'),
-          _routine('matchea', goals: const [RoutineGoal.aesthetics]),
+          _routine('uno', goals: const [RoutineGoal.aesthetics]),
+          _routine(
+            'los-dos',
+            goals: const [RoutineGoal.aesthetics, RoutineGoal.sport],
+          ),
         ],
-        const TemplatePreferences(goals: [RoutineGoal.aesthetics]),
+        const TemplatePreferences(
+          goals: [RoutineGoal.aesthetics, RoutineGoal.sport],
+        ),
       );
-      expect(ids, ['matchea', 'no-declara', 'otro-objetivo']);
+      expect(ids, ['los-dos', 'uno'],
+          reason: 'filtra por al menos uno y ordena por cuántos cubre');
     });
 
     test('el orden es ESTABLE ante empates', () async {
@@ -130,7 +134,7 @@ void main() {
       expect(segunda, primera);
     });
 
-    test('objetivo y zonas por sí solos nunca vacían la grilla', () async {
+    test('objetivo y zona que ninguna cumple vacían la grilla', () async {
       final ids = await _rankedIds(
         [
           _routine('ppl',
@@ -142,11 +146,10 @@ void main() {
           priorityMuscleGroups: ['back'],
         ),
       );
-      expect(ids, hasLength(2));
+      expect(ids, isEmpty);
     });
 
-    test('días y minutos SÍ filtran (#1561): 2 días · 30 min no deja ninguna',
-        () async {
+    test('días y minutos filtran: 2 días · 30 min no deja ninguna', () async {
       final ids = await _rankedIds(
         [
           _routine('ppl',

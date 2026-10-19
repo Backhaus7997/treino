@@ -48,6 +48,7 @@ import 'widgets/pagos_periodo_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
+import 'package:treino/core/widgets/treino_toast.dart' show TreinoToastType;
 
 /// Etiquetas (es-AR) de cada [PagosFiltro], en el orden en que se muestran
 /// los chips.
@@ -165,11 +166,13 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     try {
       await ref.read(paymentRepositoryProvider).add(payment);
       if (mounted) {
-        pagoSnack(context, 'Pago registrado.'); // i18n
+        pagoSnack(context, 'Pago registrado.',
+            type: TreinoToastType.success); // i18n
       }
     } catch (_) {
       if (mounted) {
-        pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.'); // i18n
+        pagoSnack(context, 'No pudimos guardar. Intentá de nuevo.',
+            type: TreinoToastType.error); // i18n
       }
     }
   }

@@ -85,7 +85,6 @@ void main() {
       'features/coach/presentation/trainer_dashboard_tab.dart',
       'features/coach/presentation/widgets/appointment_detail_sheet.dart',
       'features/coach/presentation/widgets/athlete_picker_sheet.dart',
-      'features/coach/presentation/widgets/day_slots_sheet.dart',
       'features/coach/presentation/widgets/day_timeline.dart',
       'features/coach/presentation/widgets/equipment_filter_sheet.dart',
       'features/coach/presentation/widgets/exercise_picker_sheet.dart',

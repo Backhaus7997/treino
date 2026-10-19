@@ -28,6 +28,7 @@ import 'create_custom_exercise_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -220,20 +221,26 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref
           .read(customExerciseRepositoryProvider)
           .delete(trainerId: uid, id: exercise.id);
-      if (mounted) setState(() => _selected.remove(exercise.id));
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Ejercicio eliminado.')), // i18n
+      if (!mounted) return;
+      setState(() => _selected.remove(exercise.id));
+      // Con context y no con un messenger capturado: el picker es un diálogo
+      // y sigue abierto, así que el SnackBar del Scaffold de atrás quedaría
+      // tapado (#1490). El helper lo manda al Overlay raíz.
+      showTreinoToast(
+        context,
+        'Ejercicio eliminado.', // i18n
+        type: TreinoToastType.success,
       );
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar el ejercicio.'), // i18n
-        ),
+      if (!mounted) return;
+      showTreinoToast(
+        context,
+        'No pudimos eliminar el ejercicio.', // i18n
+        type: TreinoToastType.error,
       );
     }
   }

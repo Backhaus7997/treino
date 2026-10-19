@@ -11,6 +11,7 @@ import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/not
 import 'package:treino/features/coach_hub/presentation/widgets/stale_async.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/stale_data_notice.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Tab «Notificaciones» de Configuración (Fase W3.2 / Fase 12 WU-05).
 ///
@@ -215,10 +216,10 @@ class _Matrix extends ConsumerWidget {
       });
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo guardar. Probá de nuevo.'), // i18n
-          ),
+        showTreinoToast(
+          context,
+          'No se pudo guardar. Probá de nuevo.', // i18n
+          type: TreinoToastType.error,
         );
       }
     }

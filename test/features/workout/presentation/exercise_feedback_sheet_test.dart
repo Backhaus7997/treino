@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/workout/application/exercise_feedback_submitter.dart';
 import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_feedback_sheet.dart';
@@ -208,5 +209,82 @@ void main() {
           ?.text,
       equals('Me duele'),
     );
+  });
+
+  // ── #1490: el aviso de error tiene que verse ENCIMA del sheet ─────────────
+  //
+  // El resto del archivo monta el sheet como `body` de un Scaffold, así que
+  // nunca ve el caso real del player: abierto con `showModalBottomSheet`, un
+  // `SnackBar` lo pinta el Scaffold de ATRÁS y el sheet lo tapa justo cuando
+  // el alumno está reportando una molestia.
+  testWidgets(
+      '#1490 — abierto como modal, el error al guardar es tocable encima '
+      'del sheet', (tester) async {
+    when(() => submitter.submit(
+          uid: any(named: 'uid'),
+          sessionId: any(named: 'sessionId'),
+          exerciseId: any(named: 'exerciseId'),
+          exerciseName: any(named: 'exerciseName'),
+          kind: any(named: 'kind'),
+          setNumber: any(named: 'setNumber'),
+          text: any(named: 'text'),
+          localPhotoPath: any(named: 'localPhotoPath'),
+          now: any(named: 'now'),
+        )).thenThrow(StateError('sin red'));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          exerciseFeedbackSubmitterProvider.overrideWithValue(submitter),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('es', 'AR'),
+          localizationsDelegates: const [
+            AppL10n.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppL10n.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showExerciseFeedbackSheet(
+                  context,
+                  uid: uid,
+                  sessionId: sessionId,
+                  exerciseId: 'bench-press',
+                  exerciseName: 'Press de banca',
+                  setNumber: 3,
+                ),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+    await tester.tap(find.text('abrir'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('exercise_feedback_text')),
+      'Me duele',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('exercise_feedback_submit')));
+    await tester.pumpAndSettle();
+
+    // Si lo pintara el Scaffold de atrás existiría, pero el sheet lo taparía.
+    expect(find.text(l10n.exerciseFeedbackError).hitTestable(), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(ExerciseFeedbackSheet), findsOneWidget);
+
+    // El toast por Overlay se cierra solo: no deja Timers colgando.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text(l10n.exerciseFeedbackError), findsNothing);
   });
 }

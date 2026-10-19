@@ -1,7 +1,7 @@
 // QA H3 (cola): la card de identidad del perfil del PF mostraba el stat
 // ALUMNOS con `'$activeAlumnos'` sobre `linksAsync.valueOrNull ?? []` — un
 // fallo de lectura colapsaba a "0 alumnos" (un stat falso). Ahora, ante error,
-// el stat muestra "—" (desconocido), igual que el stat RATING ya lo hace.
+// el stat muestra "—" (desconocido) en vez de un falso "0".
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,8 +77,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
 
     expect(find.text('ALUMNOS'), findsOneWidget);
-    // ALUMNOS + RATING both read "—" (unknown) on this path.
-    expect(find.text('—'), findsWidgets);
+    // ALUMNOS reads "—" (unknown) on this path; RATING no se dibuja sin
+    // reseñas (#1497).
+    expect(find.text('—'), findsOneWidget);
     // The stat must never claim "0 alumnos" when the read simply failed.
     expect(find.text('0'), findsNothing);
   });

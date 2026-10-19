@@ -1,8 +1,9 @@
 /**
  * test/backfill_production_banner.test.js
  *
- * Los tests del CABLEADO: que los dos backfills que escriben sobre `users/` y
- * `userPublicProfiles/` efectivamente IMPRIMAN el cartel de producción, y que
+ * Los tests del CABLEADO: que los backfills que escriben sobre `users/` y
+ * `userPublicProfiles/` (la lista `BACKFILLS`; el tercero, el de
+ * `searchPrefixes`, es del #1478) efectivamente IMPRIMAN el cartel de producción, y que
  * lo impriman antes de leer un solo dato.
  *
  *   node --test scripts/test/
@@ -32,7 +33,11 @@ const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
 const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
 
-const BACKFILLS = ['backfill_gym_ids.js', 'backfill_gym_names.js'];
+const BACKFILLS = [
+  'backfill_gym_ids.js',
+  'backfill_gym_names.js',
+  'backfill_user_search_prefixes.js',
+];
 
 /**
  * Corre un backfill con el stub puesto y devuelve su salida.

@@ -13,6 +13,7 @@ import '../../../../../../core/utils/firestore_error.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
+import '../../../../../../core/widgets/treino_toast.dart';
 import '../../../../../chat/application/chat_media_send_controller.dart';
 import '../../../../../chat/application/chat_providers.dart';
 import '../../../../../chat/domain/media_type.dart';
@@ -171,36 +172,34 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
         }),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            // El `permission-denied` NO es un problema de red y decirle
-            // "reintentá" es mandarlo a repetir algo que va a fallar siempre.
-            // La distinción se hace en runtime sobre el código real, no sobre
-            // una sospecha: cuando este texto aparece, es porque las reglas
-            // denegaron la escritura.
-            content: Text(
-              // El bloqueo del filtro de términos vetados va PRIMERO: no es
-              // permission-denied ni un problema de red, y los tres textos de
-              // abajo mandan al PF a reintentar algo que va a fallar siempre.
-              e is ModerationBlockedException
-                  ? AppL10n.of(context).moderationBlockedMessage
-                  : switch ((
-                      isPermissionDenied(e),
-                      widget.chatId == chatIdDelEnvio,
-                    )) {
-                      // El deíctico "este" sólo es cierto si el PF sigue parado en la
-                      // conversación donde falló. Si ya se fue a otra, el cartel
-                      // aparece sobre una conversación distinta y "este chat" señala
-                      // a la equivocada.
-                      (true, true) =>
-                        'No tenés permiso para escribir en este chat.',
-                      (true, false) =>
-                        'No pudimos enviar el mensaje: no tenés permiso en '
-                            'esa conversación.',
-                      (false, _) => 'No pudimos enviar el mensaje. Reintentá.',
-                    },
-            ), // i18n: Fase W2
-          ),
+        showTreinoToast(
+          context,
+          // El `permission-denied` NO es un problema de red y decirle
+          // "reintentá" es mandarlo a repetir algo que va a fallar siempre.
+          // La distinción se hace en runtime sobre el código real, no sobre
+          // una sospecha: cuando este texto aparece, es porque las reglas
+          // denegaron la escritura.
+          // El bloqueo del filtro de términos vetados va PRIMERO: no es
+          // permission-denied ni un problema de red, y los tres textos de
+          // abajo mandan al PF a reintentar algo que va a fallar siempre.
+          e is ModerationBlockedException
+              ? AppL10n.of(context).moderationBlockedMessage
+              : switch ((
+                  isPermissionDenied(e),
+                  widget.chatId == chatIdDelEnvio,
+                )) {
+                  // El deíctico "este" sólo es cierto si el PF sigue parado en la
+                  // conversación donde falló. Si ya se fue a otra, el cartel
+                  // aparece sobre una conversación distinta y "este chat" señala
+                  // a la equivocada.
+                  (true, true) =>
+                    'No tenés permiso para escribir en este chat.',
+                  (true, false) =>
+                    'No pudimos enviar el mensaje: no tenés permiso en '
+                        'esa conversación.',
+                  (false, _) => 'No pudimos enviar el mensaje. Reintentá.',
+                }, // i18n: Fase W2
+          type: TreinoToastType.error,
         );
       }
     } finally {

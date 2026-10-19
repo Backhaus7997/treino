@@ -27,6 +27,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/application/email_gate_providers.dart';
+import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/data/mail_verification_service.dart';
 import 'package:treino/features/auth/presentation/verify_mail_screen.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -55,6 +56,8 @@ class _MockUser extends Mock implements User {}
 class _MockFunctions extends Mock implements FirebaseFunctions {}
 
 class _MockAuth extends Mock implements FirebaseAuth {}
+
+class _MockAuthService extends Mock implements AuthService {}
 
 /// Servicio del código que no toca la red: contesta «ya hay uno vigente», que
 /// no arranca la cuenta regresiva del «Reenviar» (un `Timer` periódico que
@@ -552,6 +555,50 @@ void main() {
         );
         expect(find.byType(VerifyMailScreen), findsNothing);
         expect(find.byType(PricingScreen), findsOneWidget);
+      },
+    );
+
+    // `AuthService.signOut()` espera primero a `GoogleSignIn` web, cuyo
+    // `initialize()` el Hub nunca llama: se cuelga y `AuthNotifier` queda en
+    // `AsyncLoading` para siempre (botón deshabilitado, router quieto). El
+    // servicio de acá reproduce ese cuelgue; el Hub tiene que cerrar la sesión
+    // directo contra Firebase Auth, como `CoachHubNotAllowedScreen`.
+    testWidgets(
+      'PF sin confirmar: «Cerrar sesión» cierra la sesión de Firebase Auth '
+      'aunque el camino de AuthService se cuelgue',
+      (tester) async {
+        final user = _MockUser();
+        when(() => user.email).thenReturn(email);
+        when(() => user.uid).thenReturn('test-uid');
+        final auth = _MockAuth();
+        when(() => auth.currentUser).thenReturn(user);
+        when(() => auth.signOut()).thenAnswer((_) async {});
+        final servicio = _MockAuthService();
+        when(() => servicio.signOut())
+            .thenAnswer((_) => Completer<void>().future);
+
+        await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(user)),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream.value(_trainerProfile()),
+          ),
+          emailGate: Stream<bool>.value(true),
+          overrides: [
+            firebaseAuthProvider.overrideWithValue(auth),
+            authServiceProvider.overrideWithValue(servicio),
+            mailVerificationServiceProvider
+                .overrideWithValue(_ServicioQuieto()),
+          ],
+        );
+        expect(find.byType(VerifyMailScreen), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('verify_mail_sign_out')));
+        await tester.pump();
+
+        verify(() => auth.signOut()).called(1);
       },
     );
   });

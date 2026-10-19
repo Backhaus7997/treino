@@ -7,9 +7,17 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../auth/application/auth_providers.dart';
+import '../coach/application/limite_de_alumnos_provider.dart';
 import '../coach/application/trainer_discovery_providers.dart';
 import '../coach/application/trainer_link_providers.dart';
+import '../coach/domain/subscription_tier.dart';
 import '../coach/domain/trainer_link_status.dart';
+import '../coach_hub/presentation/sections/facturacion_planes/plan_copy.dart'
+    show tierName;
+import '../notifications/application/notification_router.dart'
+    show kCentroDeNotificaciones;
+import '../notifications/presentation/notification_history_screen.dart'
+    show kTabSolicitudes;
 import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import '../coach/domain/trainer_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
@@ -26,9 +34,15 @@ import 'package:treino/core/widgets/treino_toast.dart';
 /// Wired sections:
 ///   - Avatar + display name (userProfileProvider)
 ///   - ALUMNOS count (trainerLinksStreamProvider filtered active)
+///   - RATING (averageRating/reviewCount del perfil público; sin reseñas el
+///     stat no se muestra)
 ///   - Pending requests badge (same provider filtered pending)
+///   - Solicitudes entrantes → Notificaciones, pestaña «Solicitudes»
+///   - Plan label under the name (limiteDeAlumnosProvider — la misma fuente
+///     que el medidor «2 DE 2 · PLAN FREE» de la pestaña Coach)
 ///   - Public profile visibility, location summary, online flag (trainerById)
-///   - VER PREVIEW → /coach/trainer/:uid
+///   - VER PREVIEW → /profile/trainer-preview/:uid (gemela de
+///     /coach/trainer/:uid: PERFIL sigue resaltado — #1498)
 ///   - EDITAR → /profile/edit-personal (shared form; full trainer fields TBD)
 ///   - Disponibilidad → /profile/availability-editor (mirror of the /coach
 ///     route so the PERFIL tab stays highlighted — issue #387)
@@ -36,9 +50,7 @@ import 'package:treino/core/widgets/treino_toast.dart';
 ///   - Cerrar sesión → AuthNotifier.signOut
 ///
 /// Placeholder (snackbar "Próximamente"):
-///   - RATING (no aggregate score model yet)
 ///   - Planes comerciales (no billing module)
-///   - "Plan Pro" subtitle (no billing tier model — hardcoded literal)
 class TrainerProfileView extends ConsumerWidget {
   const TrainerProfileView({super.key});
 
@@ -120,6 +132,7 @@ class TrainerProfileView extends ConsumerWidget {
           displayName: displayName.isEmpty ? 'Coach' : displayName,
           // A failed links read shows "—" (unknown), not a false "0 alumnos".
           activeAlumnos: linksHasError ? null : activeAlumnos,
+          rating: _ratingOf(pub),
           palette: palette,
         ),
         const SizedBox(height: 14),
@@ -138,12 +151,17 @@ class TrainerProfileView extends ConsumerWidget {
           icon: TreinoIcon.users,
           label: 'Solicitudes entrantes',
           badge: pendingRequests > 0 ? '$pendingRequests' : null,
-          onTap: () => context.go('/home'),
+          // Las solicitudes viven en Notificaciones → «Solicitudes» (no en
+          // INICIO). `push` y no `go`: esa pantalla vuelve con `context.pop()`,
+          // y con `go` no quedaría nada a donde volver.
+          onTap: () => context.push(_solicitudesPath),
           palette: palette,
         ),
         const SizedBox(height: 10),
         _MenuRow(
-          icon: TreinoIcon.bell,
+          // Horarios en los que el PF atiende, no avisos: la campana es de
+          // Notificaciones.
+          icon: TreinoIcon.clock,
           label: 'Disponibilidad',
           // /profile twin of /coach/availability-editor so the bottom bar
           // keeps PERFIL highlighted while the editor is open (issue #387).
@@ -223,6 +241,7 @@ class _IdentityCard extends StatelessWidget {
     required this.initials,
     required this.displayName,
     required this.activeAlumnos,
+    required this.rating,
     required this.palette,
   });
 
@@ -232,6 +251,10 @@ class _IdentityCard extends StatelessWidget {
   /// Active-athlete count, or null when the links read failed → renders "—"
   /// (unknown) instead of a misleading "0".
   final int? activeAlumnos;
+
+  /// Promedio de reseñas, o null si el PF todavía no tiene ninguna → el stat
+  /// RATING no se dibuja (ver [_ratingOf]).
+  final double? rating;
   final AppPalette palette;
 
   @override
@@ -290,15 +313,7 @@ class _IdentityCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                // Hardcoded tier label — billing module not implemented yet.
-                Text(
-                  'Coach · Plan Pro',
-                  style: GoogleFonts.barlow(
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                  ),
-                ),
+                _PlanSubtitle(palette: palette),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -308,19 +323,66 @@ class _IdentityCard extends StatelessWidget {
                       color: palette.accent,
                       palette: palette,
                     ),
-                    const SizedBox(width: 18),
-                    _IdentityStat(
-                      value: '—',
-                      label: 'RATING',
-                      color: palette.textPrimary,
-                      palette: palette,
-                    ),
+                    if (rating != null) ...[
+                      const SizedBox(width: 18),
+                      _IdentityStat(
+                        // 1 decimal, igual que el perfil público (ADR-RV-011).
+                        value: rating!.toStringAsFixed(1),
+                        label: 'RATING',
+                        color: palette.textPrimary,
+                        palette: palette,
+                      ),
+                    ],
                   ],
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// «Plan Free» / «Plan 1»: [tierName] a secas diría sólo «Free» para el tier
+/// gratuito, que sin la palabra «Plan» no se lee como un plan.
+///
+/// Se usa `plan_copy.dart` y no `tierPlanLabel` (de `plan_upsell_banner.dart`)
+/// porque ese archivo es del Hub web y trae el banner de upsell: esta vista
+/// viaja en el binario móvil, donde un llamado a comprar no entra (3.1.3(f)).
+String _planLabel(SubscriptionTier tier) =>
+    tier == SubscriptionTier.free ? 'Plan Free' : tierName(tier);
+
+/// «Coach · Plan Free» bajo el nombre.
+///
+/// El plan sale de [limiteDeAlumnosProvider], la MISMA fuente del medidor «2 DE
+/// 2 · PLAN FREE» de la pestaña Coach: el nombre del plan se deduce del tope
+/// que el servidor HACE CUMPLIR, no del doc de suscripción. Antes era el
+/// literal «Plan Pro», que un PF en Free leía como cierto.
+///
+/// Si ningún plan de la tabla dice lo mismo que el número publicado, `tier` es
+/// `null` y se muestra «Coach» a secas: mejor no nombrar plan que nombrar uno
+/// que no corresponde.
+///
+/// Es un widget aparte y mira sólo `tier` (`select`): el provider se re-evalúa
+/// cada minuto cerca de un borde por reloj y el resto de la tarjeta no tiene
+/// por qué enterarse.
+class _PlanSubtitle extends ConsumerWidget {
+  const _PlanSubtitle({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tier = ref.watch(limiteDeAlumnosProvider.select((l) => l.tier));
+    return Text(
+      // i18n: esta vista todavía no usa AppL10n
+      tier == null ? 'Coach' : 'Coach · ${_planLabel(tier)}',
+      key: const Key('trainer-profile-plan'),
+      style: GoogleFonts.barlow(
+        fontWeight: FontWeight.w400,
+        fontSize: 12,
+        color: palette.textMuted,
       ),
     );
   }
@@ -452,7 +514,7 @@ class _PerfilPublicoCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: isVisible && uid.isNotEmpty
-                      ? () => context.push('/coach/trainer/$uid')
+                      ? () => context.push('/profile/trainer-preview/$uid')
                       : null,
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: palette.border, width: 1),
@@ -600,8 +662,21 @@ class _MenuRow extends StatelessWidget {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/// Notificaciones → pestaña «Solicitudes». Armado con las constantes de la
+/// ruta y del `?tab=` y no a mano: son las mismas que lee el router.
+const _solicitudesPath = '$kCentroDeNotificaciones?tab=$kTabSolicitudes';
+
 void _toast(BuildContext context, String message) {
   showTreinoToast(context, message);
+}
+
+/// El promedio de reseñas a mostrar en la tarjeta, o null si no hay nada que
+/// mostrar. Mismo criterio que `TrainerStatsRow` (ADR-RV-011): hace falta al
+/// menos una reseña Y un promedio. Sin reseñas devuelve null en vez de un
+/// «—»: un guion que nunca cambia para un PF nuevo es un dato falso.
+double? _ratingOf(TrainerPublicProfile? p) {
+  if (p == null || p.reviewCount <= 0) return null;
+  return p.averageRating;
 }
 
 String _initials(String name) {

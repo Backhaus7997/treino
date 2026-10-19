@@ -95,6 +95,21 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get homeEstaSemanaMusclesTitle => 'MUSCLES THIS WEEK';
+
+  @override
+  String get homeEstaSemanaMusclesLegend =>
+      'More color = closer to the sets your routine asks for this week.';
+
+  @override
+  String get homeGreeting => 'HELLO!';
+
+  @override
+  String homeGreetingNamed(String name) {
+    return 'HELLO, $name!';
+  }
+
+  @override
   String get homeEstaSemanaEmptyTitle => 'YOUR STREAK\nSTARTS HERE';
 
   @override
@@ -356,6 +371,17 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t open the chat. Please try again.';
 
   @override
+  String get coachPreviewBannerTitle => 'PREVIEW';
+
+  @override
+  String get coachPreviewBannerBody =>
+      'This is how a student sees your profile. The buttons are disabled in this view.';
+
+  @override
+  String get coachPreviewMissingExperience =>
+      'You haven\'t added your years of experience yet: students see “—”. Tap to add them.';
+
+  @override
   String get coachCtaProximamente => '';
 
   @override
@@ -490,7 +516,7 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+  String get agendaButtonLabel => 'MY SCHEDULE';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
@@ -599,6 +625,27 @@ class AppL10nEn extends AppL10n {
   String get agendaCancellationTooLate => '';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCEL';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      'Cancel this session? We\'ll let your trainer know.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Booking cancelled by the athlete.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'TELL MY TRAINER';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Less than 24 h left: if you can\'t make it, tell your trainer.';
+
+  @override
+  String get agendaAthleteChatError => 'We couldn\'t open the chat. Try again.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => '';
 
   @override
@@ -640,6 +687,27 @@ class AppL10nEn extends AppL10n {
   String get agendaBookingCancelledByCoach => '';
 
   @override
+  String get agendaAttendanceMarkAbsent => 'MARK AS NO-SHOW';
+
+  @override
+  String get agendaAttendanceUndoAbsent => 'UNDO NO-SHOW';
+
+  @override
+  String get agendaAttendanceDefaultHint =>
+      'If you don\'t mark anything, the session counts as done.';
+
+  @override
+  String get agendaAttendanceAbsentHint =>
+      'You marked that the athlete didn\'t show up.';
+
+  @override
+  String get agendaAttendanceAbsentStatus => 'No-show';
+
+  @override
+  String get agendaAttendanceError =>
+      'We couldn\'t save attendance. Try again.';
+
+  @override
   String get agendaBlockedDayTitle => '';
 
   @override
@@ -654,6 +722,58 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get agendaBlockedDayConfirm => '';
+
+  @override
+  String get agendaConflictTitle => 'Check the schedule';
+
+  @override
+  String agendaConflictOverlapLine(String name, String start, String end) {
+    return 'It overlaps with $name ($start – $end).';
+  }
+
+  @override
+  String agendaConflictOverlapMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'And $count more sessions.',
+      one: 'And 1 more session.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictSomeoneElse => 'another session';
+
+  @override
+  String get agendaConflictOutsideAvailability =>
+      'It falls outside your published availability.';
+
+  @override
+  String agendaConflictSeriesOverlap(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sessions in the series overlap others already scheduled.',
+      one: '1 session in the series overlaps another one already scheduled.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String agendaConflictSeriesOutside(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count sessions in the series fall outside your published availability.',
+      one: '1 session in the series falls outside your published availability.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get agendaConflictQuestion => 'Schedule it anyway?';
 
   @override
   String get agendaSlotFreeLabel => '';
@@ -1077,20 +1197,36 @@ class AppL10nEn extends AppL10n {
 
   @override
   String templatesFilterEmptyMinutes(String minutes) {
-    return 'No templates of around $minutes min';
+    return 'No templates of $minutes min or less';
   }
 
   @override
-  String templatesFilterEmptyMinutesOrMore(String minutes) {
-    return 'No templates of $minutes min or more';
-  }
+  String get templatesFilterEmptyCombination =>
+      'No template matches everything you picked at once';
 
   @override
-  String get templatesFilterEmptyDaysAndMinutes =>
-      'No template fits both your days and your minutes';
+  String get templatesFilterEmptyGoals =>
+      'No template targets the goals you picked';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'No template works the areas you picked';
 
   @override
   String get templatesFilterEmptyAction => 'Show all';
+
+  @override
+  String get templatesFilterBarClear => 'Clear filters';
+
+  @override
+  String get templatesFiltersCleared => 'Filters cleared';
+
+  @override
+  String get templatesFiltersClearError =>
+      'We couldn\'t clear your filters. Try again.';
+
+  @override
+  String get templatesFiltersUndo => 'UNDO';
 
   @override
   String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
@@ -2451,7 +2587,11 @@ class AppL10nEn extends AppL10n {
   String get searchUsersClearA11y => 'Clear search';
 
   @override
-  String get publicProfileMessageDisabledA11y => 'Message (coming soon)';
+  String get publicProfileMessageDisabledA11y =>
+      'Message (unavailable: this person needs to follow you)';
+
+  @override
+  String get publicProfileStatWorkouts => 'WORKOUTS';
 
   @override
   String a11yAvatarLabel(String name) {
@@ -3161,6 +3301,51 @@ class AppL10nEn extends AppL10n {
   @override
   String get sessionFinishError =>
       'We couldn\'t finish the session. Please try again.';
+
+  @override
+  String get sessionFinishNeedOneSet =>
+      'Do at least one set to finish. If you\'re not training today, tap ABANDON.';
+
+  @override
+  String get sessionFinishEarlyTitle => 'FINISH ANYWAY?';
+
+  @override
+  String sessionFinishEarlyMissingHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets left:',
+      one: '1 set left:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyMore(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'and $count more exercises',
+      one: 'and 1 more exercise',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String sessionFinishEarlyCounts(int percent) {
+    return 'You did $percent% of the session: it counts as a workout for your streak and rankings.';
+  }
+
+  @override
+  String sessionFinishEarlyNotCounts(int percent, int minPercent) {
+    return 'You did $percent% of the session. It\'s saved, but it doesn\'t count as a workout for your streak or rankings: $minPercent% is needed.';
+  }
+
+  @override
+  String get sessionFinishEarlyConfirm => 'FINISH ANYWAY';
+
+  @override
+  String get sessionFinishEarlyKeepGoing => 'KEEP TRAINING';
 
   @override
   String get routineEditorMissingName => 'Give your routine a name.';
@@ -4384,7 +4569,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Days and minutes filter the catalog: you will only see templates that fit. Goal and focus areas only sort.';
+      'Everything you pick filters the catalog: you will only see templates that match all of it. If none is left, you can show them all.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';

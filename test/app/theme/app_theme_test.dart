@@ -173,4 +173,20 @@ void main() {
       );
     });
   });
+
+  // #1559: Material 3 tiñe el AppBar cuando hay contenido scrolleado debajo
+  // (scrolled-under). Sobre las pantallas con AppBar transparente eso dibuja
+  // una banda verdosa que corta lo que pasa por debajo (el avatar del perfil
+  // del entrenador).
+  group('appBarTheme sin tinte de scrolled-under (#1559)', () {
+    for (final (nombre, tema) in [
+      ('dark', AppTheme.dark()),
+      ('light', AppTheme.light()),
+    ]) {
+      test(nombre, () {
+        expect(tema.appBarTheme.scrolledUnderElevation, 0);
+        expect(tema.appBarTheme.surfaceTintColor, Colors.transparent);
+      });
+    }
+  });
 }
