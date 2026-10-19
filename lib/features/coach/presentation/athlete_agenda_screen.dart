@@ -12,6 +12,7 @@ import '../../../core/utils/app_clock.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../chat/application/chat_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../application/agenda_providers.dart';
@@ -533,6 +534,8 @@ class AppointmentTile extends ConsumerWidget {
     final confirmado = await _confirmarCancelacion(context);
     if (!confirmado || !context.mounted) return;
 
+    // Capturado ANTES del await: al cancelar, el turno sale del stream y esta
+    // tarjeta se desmonta, así que su `context` ya no sirve para avisar.
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(appointmentRepositoryProvider).cancel(
@@ -540,28 +543,32 @@ class AppointmentTile extends ConsumerWidget {
             actorUid: appointment.athleteId,
             reason: l10n.agendaBookingCancelledByAthlete,
           );
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
+      showTreinoToastOn(
+        messenger,
+        l10n.agendaCancellationSuccess,
+        type: TreinoToastType.success,
       );
     } on CancellationTooLateException {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
+      showTreinoToastOn(
+        messenger,
+        l10n.agendaCancellationTooLate,
+        type: TreinoToastType.error,
       );
     } on FirebaseException catch (e) {
       // El cliente y el servidor miden las 24 h con relojes distintos; si el
       // tap cae justo en el borde, el que manda es el servidor.
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e.code == 'permission-denied'
-                ? l10n.agendaCancellationTooLate
-                : l10n.agendaGenericError,
-          ),
-        ),
+      showTreinoToastOn(
+        messenger,
+        e.code == 'permission-denied'
+            ? l10n.agendaCancellationTooLate
+            : l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     } catch (_) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToastOn(
+        messenger,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -576,8 +583,10 @@ class AppointmentTile extends ConsumerWidget {
       context.push('/coach/chat/${chat.chatId}?other=${link.trainerId}');
     } catch (_) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaAthleteChatError)),
+      showTreinoToast(
+        context,
+        l10n.agendaAthleteChatError,
+        type: TreinoToastType.error,
       );
     }
   }

@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/utils/app_clock.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -125,7 +126,17 @@ void main() {
     expect(data['status'], 'cancelled');
     expect(data['cancelledBy'], _kAthlete,
         reason: 'la firma tiene que ser del alumno: el Path 1 la pinea');
-    expect(find.text('Reserva cancelada.'), findsOneWidget);
+    // El aviso es el toast del kit (showTreinoToastOn): el mensaje va con el
+    // ícono de éxito, que un SnackBar crudo no tiene.
+    final toast = find.byType(SnackBar);
+    expect(
+      find.descendant(of: toast, matching: find.text('Reserva cancelada.')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: toast, matching: find.byIcon(TreinoIcon.check)),
+      findsOneWidget,
+    );
   });
 
   testWidgets('con menos de 24 h: no hay CANCELAR; AVISAR A MI PF abre el chat',
