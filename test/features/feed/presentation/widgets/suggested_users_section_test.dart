@@ -11,7 +11,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/l10n/app_l10n_es.dart';
 
-const _emptyMessage = 'Todavía no hay posts de a quienes seguís';
+const _emptyMessage = 'Todavía no hay posts de quienes seguís';
 
 UserPublicProfile profile({
   required String uid,

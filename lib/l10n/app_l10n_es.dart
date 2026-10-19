@@ -4262,7 +4262,7 @@ class AppL10nEs extends AppL10n {
   String get feedSegmentFollowing => 'SEGUIDORES';
 
   @override
-  String get feedEmptyFollowing => 'Aún no hay posts de a quienes seguís';
+  String get feedEmptyFollowing => 'Aún no hay posts de quienes seguís';
 
   @override
   String get chatBlockedComposerNotice =>
@@ -9722,7 +9722,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get feedSegmentFollowing => 'SEGUIDORES';
 
   @override
-  String get feedEmptyFollowing => 'Todavía no hay posts de a quienes seguís';
+  String get feedEmptyFollowing => 'Todavía no hay posts de quienes seguís';
 
   @override
   String get chatBlockedComposerNotice =>

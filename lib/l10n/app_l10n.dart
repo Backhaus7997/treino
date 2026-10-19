@@ -7401,7 +7401,7 @@ abstract class AppL10n {
   /// **'Ahora seguís a esta persona.'**
   String get feedFollowStartedSuccess;
 
-  /// Pill del segmento del feed que muestra posts de a quienes seguís.
+  /// Pill del segmento del feed que muestra posts de quienes seguís.
   ///
   /// In es_AR, this message translates to:
   /// **'SEGUIDORES'**
@@ -7410,7 +7410,7 @@ abstract class AppL10n {
   /// Estado vacío del feed SEGUIDORES.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todavía no hay posts de a quienes seguís'**
+  /// **'Todavía no hay posts de quienes seguís'**
   String get feedEmptyFollowing;
 
   /// Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021).

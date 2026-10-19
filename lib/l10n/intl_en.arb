@@ -1631,7 +1631,7 @@
   },
   "feedSegmentFollowing": "FOLLOWERS",
   "@feedSegmentFollowing": {
-    "description": "Pill del segmento del feed que muestra posts de a quienes seguís."
+    "description": "Pill del segmento del feed que muestra posts de quienes seguís."
   },
   "feedEmptyFollowing": "No posts yet from people you follow",
   "@feedEmptyFollowing": {

@@ -3856,9 +3856,9 @@
   },
   "feedSegmentFollowing": "SEGUIDORES",
   "@feedSegmentFollowing": {
-    "description": "Pill del segmento del feed que muestra posts de a quienes seguís."
+    "description": "Pill del segmento del feed que muestra posts de quienes seguís."
   },
-  "feedEmptyFollowing": "Todavía no hay posts de a quienes seguís",
+  "feedEmptyFollowing": "Todavía no hay posts de quienes seguís",
   "@feedEmptyFollowing": {
     "description": "Estado vacío del feed SEGUIDORES."
   },
