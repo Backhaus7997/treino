@@ -1,20 +1,30 @@
 import 'muscle_group.dart';
 import 'routine.dart';
+import 'routine_day_duration.dart';
 import 'template_preferences.dart';
 
 /// Afinidad entre una plantilla y lo que el atleta respondió en el
 /// mini-onboarding de PLANTILLAS (#635 PR#3).
 ///
-/// ## Ordena, NUNCA excluye
+/// ## Qué FILTRA y qué sólo ORDENA (#1561)
 ///
-/// El catálogo del sistema son 7 plantillas. Cruzar cuatro dimensiones sobre 7
-/// ítems da vacío en la mayoría de las combinaciones: *2 días · 30 min ·
-/// deporte · tren superior* no matchea ninguna, porque el mínimo del catálogo
-/// son 3 días y 45 minutos. Un filtro duro dejaría la grilla en cero y el
-/// atleta sin saber por qué.
+/// Decisión de producto (owner, 2026-10): **días y minutos son filtro duro**;
+/// **objetivo y zonas siguen siendo sólo orden**.
 ///
-/// Por eso esto devuelve un puntaje para ORDENAR. Toda plantilla sigue
-/// visible; lo que cambia es cuál se ve primero.
+///   * Días por semana: coincidencia EXACTA con `days.length`. Quien elige 3
+///     días no ve una Bro Split de 5: la UI presenta estas respuestas como
+///     filtro ("AJUSTAR", "3 días/sem · 75 min") y que no filtraran era un bug.
+///   * Minutos por sesión: tolerancia de ±[minutesTolerance]. `75` significa
+///     "75 o más" (la última opción del cuestionario), así que no tiene techo.
+///   * "Sin dato" NO es desajuste: una plantilla sin `estimatedMinutesPerDay`
+///     (comunidad/PF) o sin días cargados nunca se excluye por esa dimensión.
+///   * Objetivo y zonas NO excluyen: dan puntaje para ordenar. Cruzar cuatro
+///     dimensiones duras vaciaría la grilla; con dos (que el atleta controla y
+///     puede levantar) el vacío tiene salida — ver [matchesHardFilters] y el
+///     estado vacío "ver todas" de PlantillasTab.
+///
+/// El filtro lo aplica `filteredUnifiedTemplatesProvider`; lo que sobrevive se
+/// ordena con [score].
 ///
 /// ## "Sin dato" es NEUTRO, y esa es la decisión central
 ///
@@ -49,6 +59,66 @@ abstract final class TemplateAffinity {
   /// Puntaje de una dimensión sin dato suficiente para opinar.
   static const double neutral = 0.5;
 
+  /// Tolerancia del filtro duro de minutos: ±15.
+  static const int minutesTolerance = 15;
+
+  /// True si las preferencias traen algo que FILTRA (días o minutos).
+  /// Objetivo y zonas no cuentan: sólo ordenan.
+  static bool hasHardFilters(TemplatePreferences preferences) =>
+      (preferences.daysPerWeek ?? 0) > 0 ||
+      (preferences.minutesPerSession ?? 0) > 0;
+
+  /// Filtro duro (#1561): ¿la plantilla encaja en los días Y los minutos
+  /// pedidos? Es [matchesDays] && [matchesMinutes]; están separadas para que
+  /// el estado vacío pueda culpar a la dimensión correcta.
+  static bool matchesHardFilters(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) =>
+      matchesDays(routine, preferences) && matchesMinutes(routine, preferences);
+
+  /// Días: `days.length == daysPerWeek`. Sin días cargados ⇒ pasa. Sin
+  /// preferencia de días ⇒ pasa.
+  static bool matchesDays(Routine routine, TemplatePreferences preferences) {
+    final wanted = preferences.daysPerWeek;
+    if (wanted == null || wanted <= 0) return true;
+    final days = routine.days.length;
+    return days == 0 || days == wanted;
+  }
+
+  /// Minutos: `|minutesOf − pedidos| ≤` [minutesTolerance]; con 75 ("75 o
+  /// más") alcanza `≥ 75 − tolerancia`. Sin estimación posible ⇒ pasa:
+  /// desconocido no es desajuste. Sin preferencia de minutos ⇒ pasa.
+  static bool matchesMinutes(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) {
+    final wanted = preferences.minutesPerSession;
+    if (wanted == null || wanted <= 0) return true;
+    final minutes = minutesOf(routine);
+    if (minutes == null) return true;
+    final diff = minutes - wanted;
+    if (diff < -minutesTolerance) return false;
+    return isOpenEndedMinutes(wanted) || diff <= minutesTolerance;
+  }
+
+  /// Minutos por sesión de [routine] con los que se filtra y se ordena: el
+  /// `estimatedMinutesPerDay` cargado y, si no hay, la estimación de sus
+  /// series ([estimateRoutineSessionMinutes], #1562). Las plantillas de
+  /// comunidad/PF casi nunca traen el campo; sin este respaldo el filtro de
+  /// minutos no las tocaba nunca. `null` sólo si no hay nada que estimar.
+  static int? minutesOf(Routine routine) {
+    final minutes = estimateRoutineSessionMinutes(routine).minutes;
+    return (minutes == null || minutes <= 0) ? null : minutes;
+  }
+
+  /// True si [minutes] es la opción "75 MIN O MÁS" del cuestionario, que no
+  /// tiene techo.
+  static bool isOpenEndedMinutes(int minutes) => minutes >= _minutosOMas;
+
+  /// Valor de la opción "75 MIN O MÁS" del cuestionario.
+  static const int _minutosOMas = 75;
+
   /// Afinidad total en `[0, 1]`. Más alto = se muestra antes.
   ///
   /// Con preferencias vacías todas las plantillas dan [neutral], así que el
@@ -79,8 +149,8 @@ abstract final class TemplateAffinity {
     return gap >= 3 ? 0 : 1 - (gap / 3);
   }
 
-  /// Minutos por sesión. Nullable en el modelo, así que la ausencia es
-  /// esperable y neutra.
+  /// Minutos por sesión, de [minutesOf] (cargados o estimados de las series).
+  /// Sin nada que estimar la ausencia es esperable y neutra.
   ///
   /// La tolerancia asimétrica es a propósito: **pasarse de tiempo penaliza más
   /// que sobrar**. Quien dice "tengo 30 minutos" tiene 30; una sesión de 60 no
@@ -88,9 +158,15 @@ abstract final class TemplateAffinity {
   /// termina antes.
   static double _minutesScore(Routine routine, int? wanted) {
     if (wanted == null || wanted <= 0) return neutral;
-    final minutes = routine.estimatedMinutesPerDay;
-    if (minutes == null || minutes <= 0) return neutral;
+    // Misma fuente que el filtro ([minutesOf]): ordenar con un dato y filtrar
+    // con otro dejaría arriba una plantilla que el filtro debió sacar.
+    final minutes = minutesOf(routine);
+    if (minutes == null) return neutral;
     final diff = minutes - wanted;
+    // "75 o más" no tiene techo, igual que en [matchesMinutes]: pasarse no es
+    // desajuste. Sin esto el filtro dejaba entrar una de 100 min y el orden
+    // la hundía debajo de una de 70.
+    if (diff >= 0 && isOpenEndedMinutes(wanted)) return 1;
     // 20 min de margen cuando la sesión es más corta, 10 cuando es más larga.
     final tolerance = diff <= 0 ? 20 : 10;
     final gap = diff.abs() / tolerance;
