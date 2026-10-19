@@ -762,7 +762,6 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
           PopupMenuButton<_TemplateAction>(
             key: Key('template_actions_menu_${t.id}'),
             enabled: !busy,
-            color: palette.bgCard,
             tooltip: 'Más acciones',
             icon: (_publishing || _deleting)
                 ? SizedBox(

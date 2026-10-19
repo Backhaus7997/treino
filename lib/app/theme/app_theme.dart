@@ -139,6 +139,27 @@ class AppTheme {
           trackColor: _SoloApagado(palette.bgCard),
           trackOutlineColor: _SoloApagado(palette.border),
         ),
+        // #1558: sin esto los PopupMenuButton/showMenu (11 archivos) caían al
+        // default de Material: caja cuadrada, sin borde, Barlow regular. Ahora
+        // hablan el idioma del kit: superficie `bgCard`, contorno `border`,
+        // radio `AppRadius.md` y Barlow 600. La sombra es sutil a propósito:
+        // el menú flota sobre contenido y sin ella no se separa. Los ítems
+        // destructivos usan `TreinoDestructiveMenuItem` (`dangerText`).
+        popupMenuTheme: PopupMenuThemeData(
+          color: palette.bgCard,
+          surfaceTintColor: Colors.transparent,
+          elevation: 6,
+          shadowColor: Colors.black.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            side: BorderSide(color: palette.border),
+          ),
+          textStyle: GoogleFonts.barlow(
+            fontWeight: AppFonts.w600,
+            fontSize: AppTextSize.body,
+            color: palette.textPrimary,
+          ),
+        ),
         // #1513: sin estos dos, `FilledButton` y `OutlinedButton` caían al
         // default de Material — Barlow regular fina, y el outlined con texto
         // `primary` (mint sobre blanco, ~1,6:1) y borde `outline` casi negro.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 /// Tests for [AppTheme.light()].
 ///
@@ -102,5 +103,26 @@ void main() {
         ),
       );
     });
+  });
+
+  group('popupMenuTheme (#1558)', () {
+    for (final entry in {
+      'dark': (AppTheme.dark(), AppPalette.mintMagenta),
+      'light': (AppTheme.light(), AppPalette.mintMagentaLight),
+    }.entries) {
+      testWidgets('usa tokens del kit en ${entry.key}', (tester) async {
+        final (theme, palette) = entry.value;
+        final p = theme.popupMenuTheme;
+        expect(p.color, palette.bgCard);
+        expect(p.surfaceTintColor, Colors.transparent);
+        expect(p.elevation, greaterThan(0));
+        final shape = p.shape! as RoundedRectangleBorder;
+        expect(shape.borderRadius, BorderRadius.circular(AppRadius.md));
+        expect(shape.side.color, palette.border);
+        expect(p.textStyle!.fontFamily, contains('Barlow'));
+        expect(p.textStyle!.fontWeight, FontWeight.w600);
+        expect(p.textStyle!.color, palette.textPrimary);
+      });
+    }
   });
 }

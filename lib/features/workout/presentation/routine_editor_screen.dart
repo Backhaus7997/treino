@@ -5883,31 +5883,22 @@ class _SetTableState extends State<_SetTable> {
         relativeOffset.dx + 120,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
           value: ExerciseMode.reps,
           child: Text(
             l10n.routineEditorMeasureReps,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
         PopupMenuItem(
           value: ExerciseMode.duration,
           child: Text(
             l10n.routineEditorMeasureTime,
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: ExerciseMode.distance,
-          child: Text(
-            'Distancia',
-            style: GoogleFonts.barlow(
-                color: widget.palette.textPrimary, fontSize: 13),
-          ),
+          child: Text('Distancia'),
         ),
       ],
     );
@@ -6541,7 +6532,6 @@ class _SetRowState extends State<_SetRow> {
         offset.dx + 160,
         0,
       ),
-      color: widget.palette.bgCard,
       items: [
         PopupMenuItem(
             value: SetType.normal,
