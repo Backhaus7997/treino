@@ -498,7 +498,7 @@ class AppL10nEs extends AppL10n {
   String get coachExercisePicker => 'Buscar ejercicio';
 
   @override
-  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+  String get agendaButtonLabel => 'MI AGENDA';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
@@ -5961,7 +5961,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachExercisePicker => 'Buscar ejercicio';
 
   @override
-  String get agendaButtonLabel => 'VER AGENDA DEL PF';
+  String get agendaButtonLabel => 'MI AGENDA';
 
   @override
   String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';

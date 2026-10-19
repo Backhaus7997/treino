@@ -974,10 +974,10 @@ abstract class AppL10n {
   /// **'Buscar ejercicio'**
   String get coachExercisePicker;
 
-  /// No description provided for @agendaButtonLabel.
+  /// Botón de la tab Coach que abre la agenda del alumno: sus propias sesiones con el PF, no la agenda del PF.
   ///
   /// In es_AR, this message translates to:
-  /// **'VER AGENDA DEL PF'**
+  /// **'MI AGENDA'**
   String get agendaButtonLabel;
 
   /// Botón de la tab Coach que abre el plan nutricional del alumno.
