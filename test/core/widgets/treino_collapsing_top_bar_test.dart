@@ -23,6 +23,7 @@ Widget _screen({
   VoidCallback? onBack,
   bool overHero = false,
   ThemeData? theme,
+  List<Widget>? actions,
 }) {
   return MaterialApp(
     theme: theme ?? AppTheme.dark(),
@@ -36,14 +37,15 @@ Widget _screen({
           overHero: overHero,
           collapseOffset: 100,
           onBack: onBack ?? () {},
-          actions: [
-            TreinoTopBarAction(
-              buttonKey: const Key('action'),
-              icon: TreinoIcon.dotsThree,
-              tooltip: 'Más',
-              onPressed: () {},
-            ),
-          ],
+          actions: actions ??
+              [
+                TreinoTopBarAction(
+                  buttonKey: const Key('action'),
+                  icon: TreinoIcon.dotsThree,
+                  tooltip: 'Más',
+                  onPressed: () {},
+                ),
+              ],
           body: ListView(
             padding: EdgeInsets.zero,
             children: [
@@ -120,6 +122,36 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  // Codex en #1596: el detalle de rutina pasa tres acciones y casi siempre
+  // dos son `SizedBox.shrink()`. Reservar lugar por ENTRADA de la lista le
+  // dejaba ~62 px al título en un teléfono de 390 y lo cortaba entero.
+  testWidgets('el título chico usa el ancho que dejan las acciones VISIBLES',
+      (tester) async {
+    await _pump(
+      tester,
+      _screen(
+        actions: [
+          const SizedBox.shrink(),
+          const SizedBox.shrink(),
+          TreinoTopBarAction(
+            buttonKey: const Key('action'),
+            icon: TreinoIcon.dotsThree,
+            tooltip: 'Más',
+            onPressed: () {},
+          ),
+        ],
+      ),
+    );
+    await _scroll(tester, -300);
+
+    // Una sola acción visible: flecha (12 + 48) a la izquierda y acción a la
+    // derecha. Centrado, el título tiene el ancho entre las dos simétricas.
+    final ancho = tester.getSize(find.byKey(_smallTitle)).width;
+    expect(ancho, greaterThanOrEqualTo(390 - 2 * (12 + 48 + 8)));
+    // Y queda centrado en la pantalla.
+    expect(tester.getCenter(find.byKey(_smallTitle)).dx, closeTo(195, 1));
   });
 
   testWidgets('scrollear de vuelta hacia arriba los oculta', (tester) async {

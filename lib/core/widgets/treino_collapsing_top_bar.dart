@@ -199,11 +199,6 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
           ]
         : const <Shadow>[];
 
-    final actionSlots = widget.actions.isEmpty ? 1 : widget.actions.length;
-    final titleInset = TreinoTopBarMetrics.sideInset +
-        TreinoTopBarMetrics.buttonSize * actionSlots +
-        TreinoTopBarMetrics.clearance;
-
     return Stack(
       children: [
         Positioned.fill(
@@ -250,38 +245,6 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                     ),
                   ),
                 ),
-              // Título chico centrado.
-              if (_mounted && title != null && title.isNotEmpty)
-                Positioned(
-                  top: top + TreinoTopBarMetrics.topInset,
-                  height: TreinoTopBarMetrics.buttonSize,
-                  left: titleInset,
-                  right: titleInset,
-                  child: IgnorePointer(
-                    child: ExcludeSemantics(
-                      excluding: !_collapsed,
-                      child: AnimatedOpacity(
-                        key: const Key('treino-top-bar-title'),
-                        opacity: _shown ? 1 : 0,
-                        duration: AppMotion.fast,
-                        curve: AppMotion.standard,
-                        child: Center(
-                          child: Text(
-                            title.toUpperCase(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: AppTextSize.title,
-                              letterSpacing: 0.5,
-                              color: palette.textPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               // Flecha + acciones. El color cambia con la misma curva que la
               // barra, así no hay un salto blanco → oscuro.
               Positioned(
@@ -306,17 +269,49 @@ class _TreinoCollapsingTopBarState extends State<TreinoCollapsingTopBar> {
                     padding: const EdgeInsets.symmetric(
                       horizontal: TreinoTopBarMetrics.sideInset,
                     ),
-                    child: Row(
-                      children: [
-                        TreinoTopBarAction(
-                          buttonKey: const Key('treino-top-bar-back'),
-                          icon: TreinoIcon.back,
-                          tooltip: l10n.commonBack,
-                          onPressed: widget.onBack,
-                        ),
-                        const Spacer(),
-                        ...widget.actions,
-                      ],
+                    // NavigationToolbar (el layout del AppBar de Flutter)
+                    // centra el título según lo que MIDEN de verdad la
+                    // flecha y las acciones. Contar las entradas de
+                    // [actions] reservaba lugar para las que son
+                    // `SizedBox.shrink()` y cortaba el título (Codex, #1596).
+                    child: NavigationToolbar(
+                      middleSpacing: TreinoTopBarMetrics.clearance,
+                      leading: TreinoTopBarAction(
+                        buttonKey: const Key('treino-top-bar-back'),
+                        icon: TreinoIcon.back,
+                        tooltip: l10n.commonBack,
+                        onPressed: widget.onBack,
+                      ),
+                      middle: _mounted && title != null && title.isNotEmpty
+                          ? IgnorePointer(
+                              child: ExcludeSemantics(
+                                excluding: !_collapsed,
+                                child: AnimatedOpacity(
+                                  key: const Key('treino-top-bar-title'),
+                                  opacity: _shown ? 1 : 0,
+                                  duration: AppMotion.fast,
+                                  curve: AppMotion.standard,
+                                  child: Center(
+                                    child: Text(
+                                      title.toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.barlowCondensed(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: AppTextSize.title,
+                                        letterSpacing: 0.5,
+                                        color: palette.textPrimary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : null,
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: widget.actions,
+                      ),
                     ),
                   ),
                 ),
