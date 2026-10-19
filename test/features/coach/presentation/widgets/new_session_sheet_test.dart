@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -896,6 +897,55 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
       // ...so a transient failure never claims the trainer has no athletes.
       expect(find.text('No tenés alumnos activos.'), findsNothing);
+    });
+  });
+
+  // ── #1490: la hora por defecto no puede proponer el pasado ─────────────────
+  group('#1490 — hora por defecto', () {
+    tearDown(AppClock.unfreeze);
+
+    testWidgets('hoy a las 9:51 arranca en 10:00, no en 9:00', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('10:00'), findsOneWidget);
+      expect(find.text('9:00'), findsNothing);
+    });
+
+    testWidgets('hoy antes de las 9:00 sigue arrancando en 9:00',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 7, 40));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('9:00'), findsOneWidget);
+    });
+
+    testWidgets('una hora elegida por el timeline se respeta tal cual',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(ProviderScope(
+        overrides: _overrides(),
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: NewSessionSheet(
+              initialDate: DateTime(2026, 10, 25),
+              initialTime: const TimeOfDay(hour: 7, minute: 15),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('7:15'), findsOneWidget);
     });
   });
 

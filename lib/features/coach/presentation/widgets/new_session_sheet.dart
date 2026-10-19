@@ -8,6 +8,7 @@ import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
 import '../../../../core/telemetry/non_fatal.dart';
+import '../../../../core/utils/app_clock.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -21,6 +22,7 @@ import '../../application/agenda_providers.dart';
 import '../../application/trainer_link_providers.dart';
 import '../../domain/compute_free_slots.dart'
     show blockedDatesAmong, isDayBlocked;
+import '../../domain/default_session_start.dart';
 import '../../domain/trainer_link.dart';
 import '../../domain/trainer_link_status.dart';
 
@@ -66,9 +68,20 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
-    _time = widget.initialTime ?? const TimeOfDay(hour: 9, minute: 0);
+    final now = AppClock.now();
+    final date = widget.initialDate ?? DateTime(now.year, now.month, now.day);
+    final initialTime = widget.initialTime;
+    if (initialTime != null) {
+      // Hora elegida en el timeline: se respeta tal cual.
+      _date = date;
+      _time = initialTime;
+      return;
+    }
+    // #1490: sin hora elegida, nunca proponer una que ya pasó (ver
+    // [defaultSessionStart]); si hoy no queda ninguna, pasa a mañana.
+    final inicio = defaultSessionStart(now: now, date: date);
+    _date = inicio.date;
+    _time = TimeOfDay(hour: inicio.hour, minute: inicio.minute);
   }
 
   @override
