@@ -234,7 +234,8 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                       Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: palette.danger, fontSize: 13),
+                        style:
+                            TextStyle(color: palette.dangerText, fontSize: 13),
                       ),
                       if (_errorEsProveedorNoDisponible) ...[
                         const SizedBox(height: AppSpacing.s8),

@@ -162,7 +162,7 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
               esFaltanteDeKeyDePlaces(error)
                   ? l10n.gymSearchConfigError
                   : l10n.gymNearbyLoadError,
-              style: TextStyle(color: palette.danger, fontSize: 13),
+              style: TextStyle(color: palette.dangerText, fontSize: 13),
             ),
             if (!esFaltanteDeKeyDePlaces(error)) ...[
               const SizedBox(height: 8),

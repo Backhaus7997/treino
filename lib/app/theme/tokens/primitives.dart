@@ -91,6 +91,11 @@ abstract final class AppColorPrimitives {
   /// `#D32F2F` — Rojo de error/peligro, estado light (mayor contraste).
   static const Color dangerRedDark = Color(0xFFD32F2F);
 
+  /// `#EF5350` — Rojo de peligro para TEXTO en el tema oscuro. [dangerRed]
+  /// como texto no llega a AA sobre las superficies oscuras (4,37:1 sobre
+  /// `ink900`); éste da ≥ 5,06:1 sobre `ink950`, `ink900` e `ink850`.
+  static const Color dangerRedText = Color(0xFFEF5350);
+
   // ---------------------------------------------------------------------------
   // Familia Warning (ámbar)
   // ---------------------------------------------------------------------------

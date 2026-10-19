@@ -209,7 +209,7 @@ class _ConfigError extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Text(
           AppL10n.of(context).gymSearchConfigError,
-          style: TextStyle(color: palette.danger, fontSize: 13),
+          style: TextStyle(color: palette.dangerText, fontSize: 13),
         ),
       ),
     );
@@ -231,7 +231,7 @@ class _ErrorRetry extends StatelessWidget {
         children: [
           Text(
             AppL10n.of(context).profileLoadError,
-            style: TextStyle(color: palette.danger, fontSize: 13),
+            style: TextStyle(color: palette.dangerText, fontSize: 13),
           ),
           const SizedBox(height: 8),
           Align(

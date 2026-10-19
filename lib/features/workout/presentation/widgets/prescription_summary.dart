@@ -35,6 +35,8 @@ String resumenDePrescripcion({
   required ExerciseMode modo,
   required List<SetDeResumen> sets,
   required String unidadDePeso,
+  // Locale con el que se escribe el peso: «17,5 kg» en es (#1481).
+  required String localeName,
 }) {
   final esDuracion = modo == ExerciseMode.duration;
 
@@ -52,7 +54,7 @@ String resumenDePrescripcion({
   if (!esDuracion) {
     final peso = _uniforme(sets.map((s) => s.weightKg).toList());
     if (peso != null) {
-      partes.add('${formatWeightKg(peso)} $unidadDePeso');
+      partes.add('${formatWeightDisplay(peso, localeName)} $unidadDePeso');
     } else if (sets.any((s) => s.weightKg != null)) {
       // Algunos sets tienen peso y otros no: el guión dice "no es uniforme",
       // que es distinto de "no hay peso" (peso corporal, sin unidad).

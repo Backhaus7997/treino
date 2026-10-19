@@ -82,7 +82,7 @@ void main() {
         (tester) async {
       await _pumpScreen(tester, repo: _MockMeasurementRepository());
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
       expect(find.text(_discardTitle), findsNothing);
@@ -95,7 +95,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, '80');
       await tester.pump();
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
       expect(find.text(_discardTitle), findsOneWidget);
@@ -114,7 +114,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, '80');
       await tester.pump();
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('discard_changes_confirm')));
       await tester.pumpAndSettle();
@@ -174,7 +174,7 @@ void main() {
         initial: initial,
       );
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
       expect(find.text(_discardTitle), findsNothing);
@@ -190,7 +190,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, '55');
       await tester.pump();
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
       expect(find.text(_discardTitle), findsOneWidget);
@@ -208,7 +208,7 @@ void main() {
       await tester.enterText(find.byType(TextField).first, '50');
       await tester.pump();
 
-      await tester.tap(find.text('Cancelar'));
+      await tester.tap(find.text('CANCELAR'));
       await tester.pumpAndSettle();
 
       expect(find.text(_discardTitle), findsNothing);

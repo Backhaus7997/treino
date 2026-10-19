@@ -2,7 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/utils/kg_format.dart';
 
 void main() {
-  group('formatWeightKg', () {
+  // formatWeightKg es para CAMPOS EDITABLES: sin agrupar y con punto, porque
+  // el parser acepta los dos separadores y «5.000» se leería como 5.
+  group('formatWeightKg (inputs)', () {
     test('null → empty string (empty editor field)', () {
       expect(formatWeightKg(null), '');
     });
@@ -29,65 +31,113 @@ void main() {
     });
   });
 
-  group('formatVolumeKg — full number below 10 000', () {
-    test('0 (bodyweight-only session) renders as 0, not 0.0', () {
-      expect(formatVolumeKg(0), '0');
-    });
+  group('formatWeightKg — nunca agrupa: un input con «5.000» se lee 5', () {
+    test('5000 queda 5000', () => expect(formatWeightKg(5000), '5000'));
+  });
 
-    test('small fractional volume keeps one decimal', () {
-      expect(formatVolumeKg(3.2), '3.2');
-    });
+  // ── Pantalla: con el locale (#1465, #1481, #1512, #1516) ─────────────────
 
-    test('whole volumes drop the decimal', () {
-      expect(formatVolumeKg(600.0), '600');
-      expect(formatVolumeKg(1800.0), '1800');
-      expect(formatVolumeKg(3880.0), '3880');
-    });
+  group('formatWeightDisplay — es_AR', () {
+    String f(double kg) => formatWeightDisplay(kg, 'es_AR');
 
-    test('fractional volumes round to one decimal', () {
-      expect(formatVolumeKg(987.5), '987.5');
-      expect(formatVolumeKg(999.9), '999.9');
-      expect(formatVolumeKg(1234.5), '1234.5');
-      expect(formatVolumeKg(3880.75), '3880.8');
+    test('coma decimal', () {
+      expect(f(12.5), '12,5');
+      expect(f(88.5), '88,5');
+      expect(f(0.5), '0,5');
     });
-
-    test('exactly 1000 stays full — compaction starts at 10 000', () {
-      expect(formatVolumeKg(1000.0), '1000');
+    test('enteros sin decimal', () {
+      expect(f(20), '20');
+      expect(f(0), '0');
     });
-
-    test('just below the threshold stays full', () {
-      expect(formatVolumeKg(9999.0), '9999');
-      expect(formatVolumeKg(9999.5), '9999.5');
+    test('miles con punto', () {
+      expect(f(1000), '1.000');
+      expect(f(1234.5), '1.234,5');
+    });
+    test('hasta dos decimales, como se cargó', () {
+      expect(f(17.25), '17,25');
     });
   });
 
-  group('formatVolumeKg — compact from 10 000', () {
-    test('exactly 10 000 compacts and drops the redundant .0', () {
-      expect(formatVolumeKg(10000.0), '10k');
+  group('formatWeightDisplay — en', () {
+    test('punto decimal y coma de miles', () {
+      expect(formatWeightDisplay(12.5, 'en'), '12.5');
+      expect(formatWeightDisplay(1234.5, 'en'), '1,234.5');
     });
+  });
 
-    test('whole thousands drop the redundant .0', () {
-      expect(formatVolumeKg(12000.0), '12k');
-      expect(formatVolumeKg(100000.0), '100k');
+  group('formatVolumeKg — debajo de 10 000, número completo', () {
+    String f(double kg) => formatVolumeKg(kg, 'es_AR');
+
+    test('0 (sesión sólo con peso corporal) es 0, no 0,0', () {
+      expect(f(0), '0');
     });
-
-    test('floors — a headline never inflates', () {
-      // 20 770 rounds to 20.8k; flooring keeps it honest at 20.7k.
-      expect(formatVolumeKg(20770.0), '20.7k');
-      expect(formatVolumeKg(34580.0), '34.5k');
-      expect(formatVolumeKg(49480.0), '49.4k');
-      // 10 099 must not round up to 10.1k.
-      expect(formatVolumeKg(10099.0), '10k');
-      expect(formatVolumeKg(99999.0), '99.9k');
+    test('volumen chico fraccionario conserva un decimal', () {
+      expect(f(3.2), '3,2');
     });
-
-    test('one decimal survives when meaningful', () {
-      expect(formatVolumeKg(10100.0), '10.1k');
-      expect(formatVolumeKg(13900.0), '13.9k');
+    test('enteros sin decimal y con separador de miles (#1465)', () {
+      expect(f(600), '600');
+      expect(f(1800), '1.800');
+      expect(f(9600), '9.600');
     });
+    test('fraccionarios redondean a un decimal', () {
+      expect(f(987.5), '987,5');
+      expect(f(999.9), '999,9');
+      expect(f(1234.5), '1.234,5');
+      expect(f(3880.75), '3.880,8');
+    });
+    test('justo debajo del umbral sigue completo', () {
+      expect(f(9999), '9.999');
+      expect(f(9999.5), '9.999,5');
+    });
+  });
 
-    test('well above 100k keeps the same floored rule', () {
-      expect(formatVolumeKg(123456.0), '123.4k');
+  group('formatVolumeKg — compacto desde 10 000', () {
+    String f(double kg) => formatVolumeKg(kg, 'es_AR');
+
+    test('miles exactos sin el ,0 redundante', () {
+      expect(f(10000), '10k');
+      expect(f(12000), '12k');
+      expect(f(100000), '100k');
+    });
+    test('trunca — un titular nunca infla', () {
+      expect(f(20770), '20,7k');
+      expect(f(34580), '34,5k');
+      expect(f(10099), '10k');
+    });
+    test('el caso del QA: 66.057,5 → 66k, no «66.0k» (#1516)', () {
+      expect(f(66057.5), '66k');
+    });
+    test('un millón agrupa la parte entera', () {
+      expect(f(1234567), '1.234,5k');
+    });
+  });
+
+  group('formatVolumeKg — en', () {
+    test('punto decimal y coma de miles', () {
+      expect(formatVolumeKg(1234.5, 'en'), '1,234.5');
+      expect(formatVolumeKg(20770, 'en'), '20.7k');
+    });
+  });
+
+  // Números que no son kg (cm, s, horas, niveles, deltas): mismo criterio que
+  // los helpers sueltos que reemplaza — entero sin decimal, si no uno — pero
+  // con el locale.
+  group('formatNumberDisplay', () {
+    test('es_AR: coma decimal, sin ,0 redundante, miles con punto', () {
+      expect(formatNumberDisplay(80, 'es_AR'), '80');
+      expect(formatNumberDisplay(78.5, 'es_AR'), '78,5');
+      expect(formatNumberDisplay(1.66, 'es_AR'),
+          '1,7'); // 1.65 es 1.6499… en binario
+      expect(formatNumberDisplay(3100, 'es_AR'), '3.100');
+      expect(formatNumberDisplay(-12.5, 'es_AR'), '-12,5');
+    });
+    test('maxDecimals', () {
+      expect(formatNumberDisplay(1.784, 'es_AR', maxDecimals: 2), '1,78');
+      expect(formatNumberDisplay(2.5, 'es_AR', maxDecimals: 0), '3');
+    });
+    test('en', () {
+      expect(formatNumberDisplay(78.5, 'en'), '78.5');
+      expect(formatNumberDisplay(3100, 'en'), '3,100');
     });
   });
 }

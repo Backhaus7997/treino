@@ -603,7 +603,7 @@ class _DangerZone extends ConsumerWidget {
           Text(
             'ZONA PELIGROSA', // i18n: Fase W3
             style: TextStyle(
-              color: palette.danger,
+              color: palette.dangerText,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.8,

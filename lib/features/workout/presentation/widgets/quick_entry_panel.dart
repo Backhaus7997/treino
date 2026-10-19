@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/features/workout/domain/muscle_group.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -358,7 +359,9 @@ class _FilaResultado extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      result.muscleGroup,
+                      // La clave canónica («chest») pasa por el label: nunca
+                      // inglés crudo al usuario (#1488).
+                      muscleGroupLabel(result.muscleGroup),
                       style: GoogleFonts.barlow(
                         fontSize: 11,
                         fontWeight: FontWeight.w400,

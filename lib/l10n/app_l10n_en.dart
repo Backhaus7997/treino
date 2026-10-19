@@ -63,8 +63,8 @@ class AppL10nEn extends AppL10n {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'DAYS',
-      one: 'DAY',
+      other: 'WEEKS',
+      one: 'WEEK',
     );
     return '$_temp0';
   }
@@ -621,6 +621,11 @@ class AppL10nEn extends AppL10n {
   String get agendaRuleInvalidWindow => '';
 
   @override
+  String agendaRuleOverlap(String day, String start, String end) {
+    return 'This time overlaps one you already added: $day, $start – $end.';
+  }
+
+  @override
   String get agendaBookingCancelledByCoach => '';
 
   @override
@@ -822,6 +827,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
+
+  @override
+  String get wellbeingCheckInFromToday => 'You already told us today on Home.';
+
+  @override
+  String get wellbeingCheckInUseForSession => 'USE FOR THIS WORKOUT';
 
   @override
   String get wellbeingCheckInOptional => 'Optional. You can skip it.';
@@ -2539,6 +2550,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get commonCancel => 'Cancel';
+
+  @override
+  String get commonDone => 'Done';
 
   @override
   String get publicProfileLoadErrorA11y => 'We couldn\'t load this profile.';
@@ -5245,4 +5259,68 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get timePickerHelpText => 'Select time';
+
+  @override
+  String logFieldRange(String min, String max, String unit) {
+    return 'Between $min and $max $unit';
+  }
+
+  @override
+  String inputMaxReached(String max, String unit) {
+    return 'Maximum $max $unit';
+  }
+
+  @override
+  String get performanceLogTitleEdit => 'Edit assessment';
+
+  @override
+  String get performanceLogUpdateCta => 'SAVE CHANGES';
+
+  @override
+  String get performanceLogUpdateSuccess => 'Assessment updated';
+
+  @override
+  String get performanceHistoryEditTooltip => 'Edit assessment';
+
+  @override
+  String get performanceHistoryDeleteTooltip => 'Delete assessment';
+
+  @override
+  String get performanceHistoryOtherTrainerTag => 'Logged by another trainer';
+
+  @override
+  String get performanceDeleteConfirmTitle => 'Delete assessment?';
+
+  @override
+  String performanceDeleteConfirmBody(String date) {
+    return 'The assessment from $date will be deleted. This can\'t be undone.';
+  }
+
+  @override
+  String get performanceDeleteSuccess => 'Assessment deleted';
+
+  @override
+  String get performanceDeleteError =>
+      'We couldn\'t delete the assessment. Try again.';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get agendaRuleDeleteTitle => 'Delete this time slot?';
+
+  @override
+  String get agendaRuleDeleteBody => 'Existing bookings are kept.';
+
+  @override
+  String get agendaOverrideDeleteTitle => 'Delete this exception?';
+
+  @override
+  String get onboardingCustomExerciseNotNow => 'NOT NOW';
+
+  @override
+  String get authSignOutConfirmTitle => 'Sign out?';
+
+  @override
+  String get authSignOutConfirmAction => 'Sign out';
 }
