@@ -10,6 +10,7 @@ import '../../core/analytics/analytics_service.dart';
 import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
+import '../../core/widgets/treino_destructive_menu_item.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../coach/application/template_quota_provider.dart';
 import '../coach/presentation/template_limit_gate.dart';
@@ -450,7 +451,8 @@ class _MenuRow extends StatelessWidget {
         const SizedBox(width: 12),
         Text(
           label,
-          style: GoogleFonts.barlow(fontSize: 14, color: color),
+          // Fuente, peso y tamaño los pone `popupMenuTheme.labelTextStyle`.
+          style: TextStyle(color: color),
         ),
       ],
     );
@@ -808,13 +810,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
                   color: palette.textPrimary,
                 ),
               ),
-              PopupMenuItem(
+              TreinoDestructiveMenuItem(
                 value: _TemplateAction.delete,
-                child: _MenuRow(
-                  icon: TreinoIcon.trash,
-                  label: 'Eliminar',
-                  color: palette.dangerText,
-                ),
+                icon: TreinoIcon.trash,
+                child: const Text('Eliminar'),
               ),
             ],
           ),
