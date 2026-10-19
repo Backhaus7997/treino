@@ -25,8 +25,13 @@ import 'widgets/user_search_result_tile.dart';
 /// [Timer] that drives 300ms debounce. The debounce lives in the screen so
 /// [searchUsersProvider] stays pure and cacheable.
 ///
-/// Does NOT own a [Scaffold] — relies on [_ShellScaffold] via the router
-/// (per spec REQ-UPS-001 / design Section B.4).
+/// Owns a transparent [Scaffold] only to host the [AppBar]: the shell's
+/// Scaffold (bottom bar, background) is still the one around it. Same shape
+/// as `NotificationHistoryScreen` and `ChatListScreen`, so the back arrow and
+/// the title land on the same x in the three screens (#1479).
+///
+/// The field takes focus on open (#1478): the only reason to land here is to
+/// type, so the keyboard comes up without an extra tap.
 ///
 /// Privacy: uses [UserPublicProfile] exclusively — never [UserProfile].
 /// All search results come from [userPublicProfileRepositoryProvider].
@@ -74,28 +79,31 @@ class _SearchUsersScreenState extends ConsumerState<SearchUsersScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _SearchUsersHeader(palette: palette),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _SearchTextField(
-            controller: _controller,
-            palette: palette,
-            onChanged: _onQueryChanged,
-            onClear: _clearQuery,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: _searchUsersAppBar(context, palette),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _SearchTextField(
+              controller: _controller,
+              palette: palette,
+              onChanged: _onQueryChanged,
+              onClear: _clearQuery,
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Expanded(
-          child: _SearchBody(
-            activeQuery: _activeQuery,
-            palette: palette,
+          const SizedBox(height: 14),
+          Expanded(
+            child: _SearchBody(
+              activeQuery: _activeQuery,
+              palette: palette,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -104,51 +112,34 @@ class _SearchUsersScreenState extends ConsumerState<SearchUsersScreen> {
 // Header
 // ---------------------------------------------------------------------------
 
-class _SearchUsersHeader extends StatelessWidget {
-  const _SearchUsersHeader({required this.palette});
+/// The same transparent [AppBar] that Notificaciones and Mensajes use, on
+/// purpose: a hand-rolled `Row` put the arrow at a different x and the title
+/// flush left, while theirs follows the platform (centered on iOS). Copying
+/// the widget instead of re-deriving its metrics is what keeps the three
+/// screens aligned when one of them changes.
+PreferredSizeWidget _searchUsersAppBar(
+  BuildContext context,
+  AppPalette palette,
+) {
+  final l10n = AppL10n.of(context);
 
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppL10n.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      child: Row(
-        children: [
-          Semantics(
-            button: true,
-            label: l10n.commonBack,
-            child: TreinoTappable(
-              onTap: () => context.pop(),
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: Center(
-                  child: Icon(
-                    TreinoIcon.back,
-                    size: 20,
-                    color: palette.textPrimary,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Text(
-            'BUSCAR USUARIOS',
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 20,
-              letterSpacing: 1.2,
-              color: palette.textPrimary,
-            ),
-          ),
-        ],
+  return AppBar(
+    backgroundColor: Colors.transparent,
+    leading: IconButton(
+      tooltip: l10n.commonBack,
+      onPressed: () => context.pop(),
+      icon: Icon(TreinoIcon.back, color: palette.textPrimary),
+    ),
+    title: Text(
+      'BUSCAR USUARIOS',
+      style: GoogleFonts.barlowCondensed(
+        fontWeight: FontWeight.w700,
+        fontSize: 20,
+        letterSpacing: 1.2,
+        color: palette.textPrimary,
       ),
-    );
-  }
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -174,6 +165,7 @@ class _SearchTextField extends StatelessWidget {
 
     return TextField(
       controller: controller,
+      autofocus: true,
       onChanged: onChanged,
       decoration: InputDecoration(
         hintText: 'Buscar por nombre',
