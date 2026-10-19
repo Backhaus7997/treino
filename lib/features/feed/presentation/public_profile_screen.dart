@@ -376,11 +376,11 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
 
   /// MENSAJE deshabilitado: no hace nada, pero dice por qué.
   void _explainDisabled() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(AppL10n.of(context).chatBlockedComposerNotice)),
-      );
+    showTreinoToast(
+      context,
+      AppL10n.of(context).chatBlockedComposerNotice,
+      type: TreinoToastType.info,
+    );
   }
 
   Future<void> _onTap() async {

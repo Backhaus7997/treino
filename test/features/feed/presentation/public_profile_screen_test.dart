@@ -542,14 +542,30 @@ void main() {
       semantics.dispose();
     });
 
-    testWidgets('deshabilitado: tocar MENSAJE explica por qué', (tester) async {
+    testWidgets('deshabilitado: tocar MENSAJE explica por qué con un toast',
+        (tester) async {
       await pumpProfile(tester, FakeFirebaseFirestore());
 
       await tester.tap(find.text('MENSAJE'));
       await tester.pump();
 
+      // Es el toast del kit (`showTreinoToast`, #1560), no un SnackBar a mano:
+      // lleva el ícono de tipo `info` junto al mensaje.
+      final toast = find.byType(SnackBar);
+      expect(toast, findsOneWidget);
       expect(
-        find.text('Para escribirle, esta persona tiene que seguirte.'),
+        find.descendant(
+          of: toast,
+          matching:
+              find.text('Para escribirle, esta persona tiene que seguirte.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: toast,
+          matching: find.byIcon(TreinoIcon.infoCircle),
+        ),
         findsOneWidget,
       );
     });
