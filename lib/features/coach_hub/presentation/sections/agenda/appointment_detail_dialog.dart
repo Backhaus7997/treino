@@ -144,11 +144,13 @@ class _AppointmentDetailDialogState
             reason: 'Cancelado por el coach', // i18n
           );
       if (!mounted) return;
+      // Capturado antes del pop: el aviso sale en la pantalla de atrás y no
+      // compite con la navegación.
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       showTreinoToastOn(
         messenger,
-        'Sesión cancelada.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        'Sesión cancelada.', // i18n
         type: TreinoToastType.success,
       );
     } catch (_) {
@@ -297,11 +299,13 @@ class _AppointmentDetailDialogState
             payment: payment,
           );
       if (!mounted) return;
+      // Capturado antes del pop: el aviso sale en la pantalla de atrás y no
+      // compite con la navegación.
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop();
       showTreinoToastOn(
         messenger,
-        'Turno cobrado.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        'Turno cobrado.', // i18n
         type: TreinoToastType.success,
       );
     } on AppointmentAlreadyBilledException {

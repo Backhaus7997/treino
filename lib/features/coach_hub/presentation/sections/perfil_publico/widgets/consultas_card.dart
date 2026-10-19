@@ -68,7 +68,8 @@ class _ConsultasCardState extends ConsumerState<ConsultasCard> {
       setState(() => _valor = anterior);
       showTreinoToast(
         context,
-        'No se pudo guardar. Probá de nuevo.', // Mismo copy que el resto del Coach Hub cuando falla un guardado.
+        // Mismo copy que el resto del Coach Hub cuando falla un guardado.
+        'No se pudo guardar. Probá de nuevo.',
         type: TreinoToastType.error,
       );
     } finally {

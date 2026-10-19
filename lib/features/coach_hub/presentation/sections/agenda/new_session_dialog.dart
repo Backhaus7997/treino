@@ -226,11 +226,13 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       );
 
       if (!mounted) return;
+      // Capturado antes del pop: el aviso sale en la pantalla de atrás y no
+      // compite con la navegación.
       final messenger = ScaffoldMessenger.of(context);
       Navigator.of(context).pop(true);
       showTreinoToastOn(
         messenger,
-        'Sesión registrada.', // El pop ya pasó — el check no compite con la navegación. // i18n
+        'Sesión registrada.', // i18n
         type: TreinoToastType.success,
       );
     } catch (_) {
