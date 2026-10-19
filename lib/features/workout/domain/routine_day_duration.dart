@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'routine.dart';
 import 'routine_day.dart';
 
@@ -8,17 +10,36 @@ import 'routine_day.dart';
 /// prefix computed values with "~" to read as an estimate.
 typedef RoutineDayDuration = ({int? minutes, bool authored});
 
+/// Seconds per rep when estimating the work time of a rep-based set.
+const int kSecondsPerRep = 4;
+
+/// Minimum work time of any set, in seconds. Includes getting set up (load,
+/// position, unrack) so a 2-rep set is not estimated at 8 s (#1562).
+const int kMinSetWorkSeconds = 25;
+
+/// Rest between sets, in seconds, when the slot carries none (`restSeconds`
+/// 0). The domain has no compound/isolation signal on a slot, so this is flat.
+const int kDefaultRestSeconds = 75;
+
+/// Extra seconds between two exercises (walk, change load/machine). Counted
+/// between exercises only, never after the last one.
+const int kExerciseTransitionSeconds = 75;
+
 /// Estimated total minutes to complete [day] in the given 0-based [week].
 ///
 /// Priority:
 ///   1. Authored `day.estimatedMinutes` when present → returns it with
 ///      `authored: true`.
-///   2. Otherwise sum per slot present in the week, per set:
-///      work seconds (slot's `durationSeconds` if positive, else
-///      `reps × 3s` using `reps ?? repsMax ?? repsMin ?? 12`) plus the
-///      slot's `restSeconds`. Round to nearest minute → `authored: false`.
-///   3. Returns `minutes: null` when nothing measurable is on the day
-///      (no slots / every set evaluates to zero seconds).
+///   2. Otherwise, per slot present in the week with at least one set:
+///      - work per set: the set's `durationSeconds` when positive, else
+///        `max(reps × [kSecondsPerRep], [kMinSetWorkSeconds])` using
+///        `reps ?? repsMax ?? repsMin ?? 12`;
+///      - rest: `slot.restSeconds` (or [kDefaultRestSeconds] when 0) between
+///        sets — NOT after the last set of the exercise;
+///      - [kExerciseTransitionSeconds] between consecutive exercises — NOT
+///        after the last one.
+///      Rounded to the nearest minute → `authored: false`.
+///   3. Returns `minutes: null` when nothing measurable is on the day.
 ///
 /// Pure function — no Flutter imports, no providers, safe to use from both
 /// presentation widgets and Riverpod providers.
@@ -28,16 +49,25 @@ RoutineDayDuration estimateRoutineDayMinutes(RoutineDay day, {int week = 0}) {
   }
 
   var seconds = 0;
+  var exercises = 0;
   for (final slot in day.slots) {
     if (!slot.isPresentInWeek(week)) continue;
-    for (final s in slot.effectiveSetsForWeek(week)) {
-      final work = (s.durationSeconds != null && s.durationSeconds! > 0)
+    final sets = slot.effectiveSetsForWeek(week);
+    if (sets.isEmpty) continue;
+    exercises++;
+    final rest = slot.restSeconds > 0 ? slot.restSeconds : kDefaultRestSeconds;
+    for (final s in sets) {
+      seconds += (s.durationSeconds != null && s.durationSeconds! > 0)
           ? s.durationSeconds!
-          : (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * 3;
-      seconds += work + slot.restSeconds;
+          : math.max(
+              (s.reps ?? s.repsMax ?? s.repsMin ?? 12) * kSecondsPerRep,
+              kMinSetWorkSeconds,
+            );
     }
+    seconds += rest * (sets.length - 1);
   }
-  if (seconds <= 0) return (minutes: null, authored: false);
+  if (exercises == 0) return (minutes: null, authored: false);
+  seconds += kExerciseTransitionSeconds * (exercises - 1);
   return (minutes: (seconds / 60).round(), authored: false);
 }
 
