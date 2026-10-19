@@ -158,14 +158,14 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
           final textStyle = theme.textTheme.bodyMedium?.copyWith(
             color: palette.textMuted,
           );
-          // El motivo lo calcula templatesEmptyReasonProvider (#1561), que
-          // recorta de a una dimensión: si el vacío lo causan el nivel o el
-          // texto, el mensaje es ése y "Ver todas" NO se ofrece — levantar
-          // días/minutos no sacaría a la grilla del vacío. Si lo causa el
-          // filtro duro, culpa a días, a minutos o a la combinación.
+          // El motivo lo calcula templatesEmptyReasonProvider, que recorta de
+          // a una dimensión: si el vacío lo causan el nivel o el texto, el
+          // mensaje es ése y "Ver todas" NO se ofrece — levantar el
+          // cuestionario no sacaría a la grilla del vacío. Si lo causa el
+          // cuestionario, culpa a la respuesta que lo vacía sola (días,
+          // minutos, objetivo, zonas) o a la combinación.
           final reason = ref.watch(templatesEmptyReasonProvider) ??
               TemplatesEmptyReason.catalog;
-          final minutes = preferences.minutesPerSession ?? 0;
           final msg = switch (reason) {
             TemplatesEmptyReason.search =>
               l10n.workoutExploreSearchEmpty(searchQuery),
@@ -173,12 +173,13 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
             TemplatesEmptyReason.catalog => l10n.workoutExploreEmptyAll,
             TemplatesEmptyReason.days =>
               l10n.templatesFilterEmptyDays(preferences.daysPerWeek ?? 0),
-            TemplatesEmptyReason.minutes =>
-              TemplateAffinity.isOpenEndedMinutes(minutes)
-                  ? l10n.templatesFilterEmptyMinutesOrMore('$minutes')
-                  : l10n.templatesFilterEmptyMinutes('$minutes'),
-            TemplatesEmptyReason.daysAndMinutes =>
-              l10n.templatesFilterEmptyDaysAndMinutes,
+            TemplatesEmptyReason.minutes => l10n.templatesFilterEmptyMinutes(
+                '${preferences.minutesPerSession ?? 0}',
+              ),
+            TemplatesEmptyReason.goals => l10n.templatesFilterEmptyGoals,
+            TemplatesEmptyReason.zones => l10n.templatesFilterEmptyZones,
+            TemplatesEmptyReason.combination =>
+              l10n.templatesFilterEmptyCombination,
           };
           return message(
             Column(

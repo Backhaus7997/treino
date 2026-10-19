@@ -6,6 +6,7 @@ import '../domain/routine.dart';
 import 'routine_providers.dart';
 import 'template_preferences_providers.dart';
 import '../domain/template_affinity.dart';
+import '../domain/template_preferences.dart';
 import '../domain/template_search.dart';
 
 /// Where a PLANTILLAS grid entry comes from — drives its badge and its
@@ -94,7 +95,7 @@ final unifiedTemplatesProvider =
   });
 });
 
-/// El atleta levantó el filtro duro de días/minutos ("ver todas") para esta
+/// El atleta levantó los filtros del cuestionario ("ver todas") para esta
 /// vista (#1561). El estado vive acá y no en el widget.
 ///
 /// Mira las preferencias a propósito: si el atleta las edita, el provider se
@@ -106,7 +107,7 @@ final templatesPreferenceFilterLiftedProvider =
   return false;
 });
 
-/// True si hay un filtro duro de días/minutos EN EFECTO: el atleta respondió
+/// True si hay un filtro del cuestionario EN EFECTO: el atleta respondió
 /// alguno y no lo levantó con "ver todas".
 final templatesPreferenceFilterActiveProvider = Provider.autoDispose<bool>((
   ref,
@@ -118,7 +119,7 @@ final templatesPreferenceFilterActiveProvider = Provider.autoDispose<bool>((
 
 /// [unifiedTemplatesProvider] filtrado por la pill de nivel
 /// ([routinesLevelFilterProvider], a TODA la grilla, coach incluido) Y por el
-/// filtro duro de días/minutos del mini-onboarding (#1561, ver
+/// filtro del mini-onboarding —días, minutos, objetivo y zonas— (ver
 /// [TemplateAffinity.matchesHardFilters]) mientras no se haya levantado.
 final filteredUnifiedTemplatesProvider =
     Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
@@ -141,9 +142,9 @@ final filteredUnifiedTemplatesProvider =
 /// [filteredUnifiedTemplatesProvider] ORDENADO por afinidad con lo que el
 /// atleta respondió en el mini-onboarding (#635 PR#3).
 ///
-/// Ordena, no filtra: el filtro duro de días/minutos ya se aplicó en
-/// [filteredUnifiedTemplatesProvider] (#1561); acá objetivo y zonas sólo
-/// reordenan lo que sobrevivió — ver el dartdoc de [TemplateAffinity].
+/// Ordena, no filtra: el filtro del cuestionario ya se aplicó en
+/// [filteredUnifiedTemplatesProvider]; acá sólo se reordena lo que
+/// sobrevivió — ver el dartdoc de [TemplateAffinity].
 ///
 /// Es un provider derivado y no una cuenta en el `build` a propósito:
 /// `PlantillasTab` es `AutomaticKeepAliveClientMixin`, así que rankear en el
@@ -219,17 +220,23 @@ enum TemplatesEmptyReason {
   /// Nivel y texto dejan algo, pero ninguna tiene los días pedidos.
   days,
 
-  /// Nivel y texto dejan algo, pero ninguna dura lo pedido (±15).
+  /// Nivel y texto dejan algo, pero ninguna dura lo pedido o menos.
   minutes,
 
-  /// Días y minutos dejan algo CADA UNO por separado, pero no juntos.
-  daysAndMinutes;
+  /// Nivel y texto dejan algo, pero ninguna declara los objetivos pedidos.
+  goals,
 
-  /// Si levantar el filtro de días/minutos ("Ver todas") cambia algo. En
+  /// Nivel y texto dejan algo, pero ninguna trabaja las zonas pedidas.
+  zones,
+
+  /// Cada respuesta deja algo por separado, pero no todas juntas.
+  combination;
+
+  /// Si levantar los filtros del cuestionario ("Ver todas") cambia algo. En
   /// [catalog], [level] y [search] no: la grilla seguiría vacía, y ofrecerlo
   /// sería un botón que no hace nada visible.
   bool get canLiftPreferenceFilter =>
-      this == days || this == minutes || this == daysAndMinutes;
+      this != catalog && this != level && this != search;
 }
 
 /// El motivo del vacío de [searchedUnifiedTemplatesProvider], o `null` si la
@@ -244,11 +251,10 @@ enum TemplatesEmptyReason {
 ///      y "Ver todas" no se ofrece. El nivel va antes que el texto: con los
 ///      dos puestos y la pill sola vaciando la grilla, culpar al texto
 ///      mandaría al atleta a reescribir una búsqueda que no es el problema.
-///   2. Si sí: sólo días ⇒ ¿vacío? → [TemplatesEmptyReason.days]; sólo
-///      minutos ⇒ ¿vacío? → [TemplatesEmptyReason.minutes]; si ninguno solo
-///      vacía la grilla, es la combinación. Si los dos solos la vacían, se
-///      nombran los días: es la dimensión más gruesa, y "Ver todas" levanta
-///      las dos igual.
+///   2. Si sí: se prueba cada respuesta SOLA (días, minutos, objetivo,
+///      zonas, en ese orden) y se culpa a la primera que vacía la grilla por
+///      sí misma. Si ninguna sola la vacía, es la combinación. "Ver todas"
+///      levanta las cuatro igual.
 ///
 /// Vive en un provider y no en el widget: es lógica de negocio sobre los
 /// mismos datos que la grilla, y así se testea sin montar la pantalla. Sólo
@@ -266,32 +272,38 @@ final templatesEmptyReasonProvider =
   final hardFilter = ref.watch(templatesPreferenceFilterActiveProvider);
   final searching = !TemplateSearch.isBlank(query);
 
-  bool anyLeft({
-    required bool days,
-    required bool minutes,
+  bool anyLeft(
+    bool Function(Routine r) prefFilter, {
     bool search = true,
   }) {
     final list = [
       for (final e in all)
         if ((level == null || e.routine.level == level) &&
-            (!days || TemplateAffinity.matchesDays(e.routine, preferences)) &&
-            (!minutes ||
-                TemplateAffinity.matchesMinutes(e.routine, preferences)))
+            prefFilter(e.routine))
           e,
     ];
     if (!searching || !search) return list.isNotEmpty;
     return TemplateSearch.filter(list, query, (e) => e.routine).isNotEmpty;
   }
 
-  if (!hardFilter || !anyLeft(days: false, minutes: false)) {
-    if (level != null && !anyLeft(days: false, minutes: false, search: false)) {
+  bool none(Routine _) => true;
+  if (!hardFilter || !anyLeft(none)) {
+    if (level != null && !anyLeft(none, search: false)) {
       return TemplatesEmptyReason.level;
     }
     if (searching) return TemplatesEmptyReason.search;
     if (level != null) return TemplatesEmptyReason.level;
     return TemplatesEmptyReason.catalog;
   }
-  if (!anyLeft(days: true, minutes: false)) return TemplatesEmptyReason.days;
-  if (!anyLeft(days: false, minutes: true)) return TemplatesEmptyReason.minutes;
-  return TemplatesEmptyReason.daysAndMinutes;
+  final porDimension =
+      <TemplatesEmptyReason, bool Function(Routine, TemplatePreferences)>{
+    TemplatesEmptyReason.days: TemplateAffinity.matchesDays,
+    TemplatesEmptyReason.minutes: TemplateAffinity.matchesMinutes,
+    TemplatesEmptyReason.goals: TemplateAffinity.matchesGoals,
+    TemplatesEmptyReason.zones: TemplateAffinity.matchesZones,
+  };
+  for (final MapEntry(key: reason, value: matches) in porDimension.entries) {
+    if (!anyLeft((r) => matches(r, preferences))) return reason;
+  }
+  return TemplatesEmptyReason.combination;
 });
