@@ -7,6 +7,7 @@ import '../../../coach/application/profile_share_providers.dart';
 import '../../../coach/application/trainer_link_providers.dart';
 import '../../application/user_providers.dart';
 import 'profile_section_tile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// PRIVACIDAD — "Compartir mis datos con mi entrenador" toggle.
 ///
@@ -72,41 +73,27 @@ class _ProfileShareToggleTileState
           updatedAt: DateTime.now().toUtc(),
         );
         if (!mounted) return;
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Datos compartidos con tu entrenador.', // i18n: Fase W2
-              ),
-              duration: Duration(seconds: 2),
-            ),
-          );
+        showTreinoToastOn(
+          messenger,
+          'Datos compartidos con tu entrenador.', // i18n: Fase W2
+          type: TreinoToastType.success,
+        );
       } else {
         await repo.revoke(profile.uid);
         if (!mounted) return;
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Ya no compartís tus datos con tu entrenador.', // i18n: Fase W2
-              ),
-              duration: Duration(seconds: 2),
-            ),
-          );
+        showTreinoToastOn(
+          messenger,
+          'Ya no compartís tus datos con tu entrenador.', // i18n: Fase W2
+          type: TreinoToastType.success,
+        );
       }
     } catch (_) {
       if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No pudimos cambiar la configuración. Probá de nuevo.', // i18n: Fase W2
-            ),
-          ),
-        );
+      showTreinoToastOn(
+        messenger,
+        'No pudimos cambiar la configuración. Probá de nuevo.', // i18n: Fase W2
+        type: TreinoToastType.error,
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
