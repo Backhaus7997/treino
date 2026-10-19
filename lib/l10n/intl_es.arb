@@ -1,4 +1,9 @@
 {
+  "templatesFilterEmptyDays": "{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}",
+  "@templatesFilterEmptyDays": {"placeholders": {"days": {"type": "int"}}},
+  "templatesFilterEmptyMinutes": "No hay plantillas de unos {minutes} min",
+  "@templatesFilterEmptyMinutes": {"placeholders": {"minutes": {"type": "String"}}},
+  "templatesFilterEmptyAction": "Ver todas",
   "workoutHistorialSeeAll": "Ver todo",
   "workoutHistorialFullTitle": "HISTORIAL",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",

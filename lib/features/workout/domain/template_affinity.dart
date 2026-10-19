@@ -5,16 +5,25 @@ import 'template_preferences.dart';
 /// Afinidad entre una plantilla y lo que el atleta respondió en el
 /// mini-onboarding de PLANTILLAS (#635 PR#3).
 ///
-/// ## Ordena, NUNCA excluye
+/// ## Qué FILTRA y qué sólo ORDENA (#1561)
 ///
-/// El catálogo del sistema son 7 plantillas. Cruzar cuatro dimensiones sobre 7
-/// ítems da vacío en la mayoría de las combinaciones: *2 días · 30 min ·
-/// deporte · tren superior* no matchea ninguna, porque el mínimo del catálogo
-/// son 3 días y 45 minutos. Un filtro duro dejaría la grilla en cero y el
-/// atleta sin saber por qué.
+/// Decisión de producto (owner, 2026-10): **días y minutos son filtro duro**;
+/// **objetivo y zonas siguen siendo sólo orden**.
 ///
-/// Por eso esto devuelve un puntaje para ORDENAR. Toda plantilla sigue
-/// visible; lo que cambia es cuál se ve primero.
+///   * Días por semana: coincidencia EXACTA con `days.length`. Quien elige 3
+///     días no ve una Bro Split de 5: la UI presenta estas respuestas como
+///     filtro ("AJUSTAR", "3 días/sem · 75 min") y que no filtraran era un bug.
+///   * Minutos por sesión: tolerancia de ±[minutesTolerance]. `75` significa
+///     "75 o más" (la última opción del cuestionario), así que no tiene techo.
+///   * "Sin dato" NO es desajuste: una plantilla sin `estimatedMinutesPerDay`
+///     (comunidad/PF) o sin días cargados nunca se excluye por esa dimensión.
+///   * Objetivo y zonas NO excluyen: dan puntaje para ordenar. Cruzar cuatro
+///     dimensiones duras vaciaría la grilla; con dos (que el atleta controla y
+///     puede levantar) el vacío tiene salida — ver [matchesHardFilters] y el
+///     estado vacío "ver todas" de PlantillasTab.
+///
+/// El filtro lo aplica `filteredUnifiedTemplatesProvider`; lo que sobrevive se
+/// ordena con [score].
 ///
 /// ## "Sin dato" es NEUTRO, y esa es la decisión central
 ///
@@ -48,6 +57,47 @@ import 'template_preferences.dart';
 abstract final class TemplateAffinity {
   /// Puntaje de una dimensión sin dato suficiente para opinar.
   static const double neutral = 0.5;
+
+  /// Tolerancia del filtro duro de minutos: ±15.
+  static const int minutesTolerance = 15;
+
+  /// True si las preferencias traen algo que FILTRA (días o minutos).
+  /// Objetivo y zonas no cuentan: sólo ordenan.
+  static bool hasHardFilters(TemplatePreferences preferences) =>
+      (preferences.daysPerWeek ?? 0) > 0 ||
+      (preferences.minutesPerSession ?? 0) > 0;
+
+  /// Filtro duro (#1561): ¿la plantilla encaja en los días y minutos pedidos?
+  ///
+  ///   * Días: `days.length == daysPerWeek`. Sin días cargados ⇒ pasa.
+  ///   * Minutos: `|estimatedMinutesPerDay − pedidos| ≤` [minutesTolerance];
+  ///     con 75 ("75 o más") alcanza `≥ 75 − tolerancia`. Sin minutos
+  ///     (null / ≤ 0) ⇒ pasa: desconocido no es desajuste.
+  ///   * Preferencia no respondida en esa dimensión ⇒ pasa.
+  static bool matchesHardFilters(
+    Routine routine,
+    TemplatePreferences preferences,
+  ) {
+    final wantedDays = preferences.daysPerWeek;
+    if (wantedDays != null && wantedDays > 0) {
+      final days = routine.days.length;
+      if (days > 0 && days != wantedDays) return false;
+    }
+    final wantedMinutes = preferences.minutesPerSession;
+    if (wantedMinutes != null && wantedMinutes > 0) {
+      final minutes = routine.estimatedMinutesPerDay;
+      if (minutes != null && minutes > 0) {
+        final diff = minutes - wantedMinutes;
+        final openEnded = wantedMinutes >= _minutosOMas;
+        if (diff < -minutesTolerance) return false;
+        if (!openEnded && diff > minutesTolerance) return false;
+      }
+    }
+    return true;
+  }
+
+  /// Valor de la opción "75 MIN O MÁS" del cuestionario.
+  static const int _minutosOMas = 75;
 
   /// Afinidad total en `[0, 1]`. Más alto = se muestra antes.
   ///

@@ -26,12 +26,11 @@ import '../onboarding/templates_onboarding_steps.dart';
 /// distintas palabras. Dos: es la mitad del código, y el ranking ya vive en un
 /// provider derivado que no le importa quién escribió las preferencias.
 ///
-/// ## Dice ORDENADO, no filtrado
+/// ## Dice FILTRADO y ordenado (#1561)
 ///
-/// Con 7 plantillas en el catálogo un filtro duro vacía la grilla en la
-/// mayoría de las combinaciones (ver `TemplateAffinity`). La copy no puede
-/// prometer que esconde lo que no encaja, porque no lo hace: nada desaparece,
-/// sólo cambia el orden.
+/// Días y minutos filtran la grilla (si queda vacía, PlantillasTab ofrece
+/// "Ver todas"); objetivo y zonas sólo la ordenan. La copy no puede prometer
+/// menos que eso: el resumen que se ve acá ES lo que está recortando la grilla.
 class TemplatesPreferencesBar extends ConsumerWidget {
   const TemplatesPreferencesBar({super.key});
 

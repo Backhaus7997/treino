@@ -2030,6 +2030,24 @@ abstract class AppL10n {
   /// **'No hay rutinas para este nivel.'**
   String get workoutExploreEmptyLevel;
 
+  /// Estado vacío de EXPLORAR cuando el filtro duro de días (#1561) no deja ninguna plantilla. Va seguido del botón templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}'**
+  String templatesFilterEmptyDays(int days);
+
+  /// Igual que templatesFilterEmptyDays pero cuando sólo hay filtro de minutos (±15).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay plantillas de unos {minutes} min'**
+  String templatesFilterEmptyMinutes(String minutes);
+
+  /// CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver todas'**
+  String get templatesFilterEmptyAction;
+
   /// Placeholder of the text search box above the EXPLORAR template grid (#1412). Tells the athlete what the box matches: template name, muscle group, exercise.
   ///
   /// In es_AR, this message translates to:
@@ -7707,10 +7725,10 @@ abstract class AppL10n {
   /// **'Días por semana'**
   String get templatesOnboardingStep1Label;
 
-  /// Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde.
+  /// Aclara qué hace cada respuesta (#1561): días y minutos FILTRAN la grilla (con salida "Ver todas" si queda vacía); objetivo y zonas sólo ordenan.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.'**
+  /// **'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.'**
   String get templatesOnboardingStep1Hint;
 
   /// Paso 2. Pregunta por duración de sesión.
@@ -7911,10 +7929,10 @@ abstract class AppL10n {
   /// **'AJUSTAR MI BÚSQUEDA'**
   String get templatesFilterBarSetUp;
 
-  /// Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde.
+  /// Explica por qué la grilla se ve así (#1561): días y minutos filtran, el resto ordena.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ordenado según lo que buscás'**
+  /// **'Filtrado y ordenado según lo que buscás'**
   String get templatesFilterBarHint;
 
   /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).

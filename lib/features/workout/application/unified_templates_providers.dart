@@ -94,28 +94,56 @@ final unifiedTemplatesProvider =
   });
 });
 
-/// [unifiedTemplatesProvider] filtered by [routinesLevelFilterProvider] —
-/// the level pills apply to the WHOLE grid, coach templates included.
+/// El atleta levantó el filtro duro de días/minutos ("ver todas") para esta
+/// vista (#1561). El estado vive acá y no en el widget.
+///
+/// Mira las preferencias a propósito: si el atleta las edita, el provider se
+/// recrea y vuelve a `false` — una respuesta nueva merece su filtro nuevo, no
+/// el "ver todas" de la anterior. `autoDispose`: dura lo que la pestaña.
+final templatesPreferenceFilterLiftedProvider =
+    StateProvider.autoDispose<bool>((ref) {
+  ref.watch(athleteTemplatePreferencesProvider);
+  return false;
+});
+
+/// True si hay un filtro duro de días/minutos EN EFECTO: el atleta respondió
+/// alguno y no lo levantó con "ver todas".
+final templatesPreferenceFilterActiveProvider = Provider.autoDispose<bool>((
+  ref,
+) {
+  final prefs = ref.watch(athleteTemplatePreferencesProvider);
+  return TemplateAffinity.hasHardFilters(prefs) &&
+      !ref.watch(templatesPreferenceFilterLiftedProvider);
+});
+
+/// [unifiedTemplatesProvider] filtrado por la pill de nivel
+/// ([routinesLevelFilterProvider], a TODA la grilla, coach incluido) Y por el
+/// filtro duro de días/minutos del mini-onboarding (#1561, ver
+/// [TemplateAffinity.matchesHardFilters]) mientras no se haya levantado.
 final filteredUnifiedTemplatesProvider =
     Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
   final entries = ref.watch(unifiedTemplatesProvider);
   final filter = ref.watch(routinesLevelFilterProvider);
+  final hardFilter = ref.watch(templatesPreferenceFilterActiveProvider);
+  final preferences = ref.watch(athleteTemplatePreferencesProvider);
+  if (filter == null && !hardFilter) return entries;
   return entries.whenData(
-    (list) => filter == null
-        ? list
-        : [
-            for (final e in list)
-              if (e.routine.level == filter) e,
-          ],
+    (list) => [
+      for (final e in list)
+        if ((filter == null || e.routine.level == filter) &&
+            (!hardFilter ||
+                TemplateAffinity.matchesHardFilters(e.routine, preferences)))
+          e,
+    ],
   );
 });
 
 /// [filteredUnifiedTemplatesProvider] ORDENADO por afinidad con lo que el
 /// atleta respondió en el mini-onboarding (#635 PR#3).
 ///
-/// Ordena, no filtra. Con 7 plantillas en el catálogo, cruzar cuatro
-/// dimensiones da vacío en la mayoría de las combinaciones — ver el dartdoc de
-/// [TemplateAffinity]. Toda plantilla que entra sale; sólo cambia el orden.
+/// Ordena, no filtra: el filtro duro de días/minutos ya se aplicó en
+/// [filteredUnifiedTemplatesProvider] (#1561); acá objetivo y zonas sólo
+/// reordenan lo que sobrevivió — ver el dartdoc de [TemplateAffinity].
 ///
 /// Es un provider derivado y no una cuenta en el `build` a propósito:
 /// `PlantillasTab` es `AutomaticKeepAliveClientMixin`, así que rankear en el

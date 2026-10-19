@@ -1065,6 +1065,25 @@ class AppL10nEn extends AppL10n {
   String get workoutExploreEmptyLevel => 'No routines for this level.';
 
   @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No $days-day templates',
+      one: 'No 1-day templates',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No templates of around $minutes min';
+  }
+
+  @override
+  String get templatesFilterEmptyAction => 'Show all';
+
+  @override
   String get workoutExploreSearchHint => 'Search by name, muscle or exercise';
 
   @override
@@ -4356,7 +4375,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'No answer filters the catalog: you will keep seeing every template.';
+      'Days and minutes filter the catalog: you will only see templates that fit. Goal and focus areas only sort.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';
@@ -4463,7 +4482,8 @@ class AppL10nEn extends AppL10n {
   String get templatesFilterBarSetUp => 'SET UP MY SEARCH';
 
   @override
-  String get templatesFilterBarHint => 'Sorted to match what you are after';
+  String get templatesFilterBarHint =>
+      'Filtered and sorted to match what you are after';
 
   @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';

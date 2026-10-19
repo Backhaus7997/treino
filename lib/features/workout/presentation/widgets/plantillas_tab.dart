@@ -8,7 +8,10 @@ import '../../../../l10n/app_l10n.dart';
 import '../../../paywall/application/athlete_entitlement_provider.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../application/routine_providers.dart';
+import '../../application/template_preferences_providers.dart';
 import '../../application/unified_templates_providers.dart';
+import '../../domain/routine.dart';
+import '../../domain/template_affinity.dart';
 import '../../domain/template_search.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
@@ -127,9 +130,9 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     super.build(context);
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
-    // Rankeado, no sólo filtrado (#635 PR#3): las pills de nivel siguen
-    // filtrando, y encima de eso el catálogo se ordena por afinidad con lo que
-    // el atleta respondió en el mini-onboarding. Quien no respondió ve el
+    // Filtrado Y rankeado: las pills de nivel y los días/minutos del
+    // mini-onboarding filtran (#1561); encima de eso el catálogo se ordena por
+    // afinidad (objetivo, zonas) con lo que el atleta respondió (#635 PR#3). Quien no respondió ve el
     // mismo orden de siempre — con preferencias vacías el provider devuelve la
     // lista sin tocar.
     //
@@ -140,6 +143,8 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     final entriesAsync = ref.watch(searchedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
     final searchQuery = ref.watch(templatesSearchQueryProvider);
+    final hardFilterActive = ref.watch(templatesPreferenceFilterActiveProvider);
+    final preferences = ref.watch(athleteTemplatePreferencesProvider);
 
     Widget message(Widget child) => SliverToBoxAdapter(
           child: Padding(
@@ -152,17 +157,39 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
       data: (entries) {
         if (entries.isEmpty) {
           final l10n = AppL10n.of(context);
-          final msg = !TemplateSearch.isBlank(searchQuery)
+          final textStyle = theme.textTheme.bodyMedium?.copyWith(
+            color: palette.textMuted,
+          );
+          // Filtro duro de días/minutos en efecto (#1561): si es lo que dejó
+          // la grilla en cero (sin texto de por medio), el mensaje lo dice y
+          // el CTA lo levanta. Con texto de búsqueda se conserva el mensaje de
+          // búsqueda, pero la salida sigue estando.
+          final blank = TemplateSearch.isBlank(searchQuery);
+          final msg = !blank
               ? l10n.workoutExploreSearchEmpty(searchQuery)
-              : filter == null
-                  ? l10n.workoutExploreEmptyAll
-                  : l10n.workoutExploreEmptyLevel;
+              : hardFilterActive
+                  ? (preferences.daysPerWeek ?? 0) > 0
+                      ? l10n.templatesFilterEmptyDays(preferences.daysPerWeek!)
+                      : l10n.templatesFilterEmptyMinutes(
+                          '${preferences.minutesPerSession}',
+                        )
+                  : filter == null
+                      ? l10n.workoutExploreEmptyAll
+                      : l10n.workoutExploreEmptyLevel;
           return message(
-            Text(
-              msg,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: palette.textMuted,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(msg, style: textStyle),
+                if (hardFilterActive)
+                  TextButton(
+                    key: const Key('templates_filter_empty_show_all'),
+                    onPressed: () => ref
+                        .read(templatesPreferenceFilterLiftedProvider.notifier)
+                        .state = true,
+                    child: Text(l10n.templatesFilterEmptyAction),
+                  ),
+              ],
             ),
           );
         }
@@ -214,10 +241,8 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
                   child: const LevelFilterPills(),
                 ),
                 const SizedBox(height: AppSpacing.s8),
-                // Por qué la grilla está en ese orden, y cómo cambiarlo (#635
-                // PR#3). Encima de la grilla y debajo de las pills de nivel: el
-                // nivel FILTRA (saca cosas), esto ORDENA (no saca nada), y
-                // verlos en ese orden es lo que hace legible la diferencia.
+                // Por qué la grilla se ve así, y cómo cambiarlo (#635 PR#3).
+                // Días y minutos FILTRAN (#1561), objetivo y zonas ORDENAN.
                 TreinoFadeSlideIn(
                   delay: AppMotion.stagger(1),
                   child: const TemplatesPreferencesBar(),
@@ -276,12 +301,17 @@ class _CatalogErrorState extends ConsumerWidget {
     // part included.
     final community = ref.watch(communityTemplatesProvider);
     final coachIds = {for (final r in coach) r.id};
+    // Mismo filtro duro de días/minutos que la grilla (#1561).
+    final hardFilter = ref.watch(templatesPreferenceFilterActiveProvider);
+    final prefs = ref.watch(athleteTemplatePreferencesProvider);
+    bool fits(Routine r) =>
+        (filter == null || r.level == filter) &&
+        (!hardFilter || TemplateAffinity.matchesHardFilters(r, prefs));
     final entries = <TemplateEntry>[
       for (final r in coach)
-        if (filter == null || r.level == filter)
-          (routine: r, origin: TemplateOrigin.coach),
+        if (fits(r)) (routine: r, origin: TemplateOrigin.coach),
       for (final r in community)
-        if (!coachIds.contains(r.id) && (filter == null || r.level == filter))
+        if (!coachIds.contains(r.id) && fits(r))
           (routine: r, origin: TemplateOrigin.community),
     ];
 
