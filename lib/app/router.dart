@@ -665,19 +665,18 @@ GoRouter buildRouter({
         builder: (_, __) => _withBg(const ChatListScreen()),
       ),
       GoRoute(
-        // Trainer custom exercise library — list + create/edit form. Both are
-        // bare Columns (no Scaffold of their own) → wrap in _immersive.
-        path: '/profile/my-exercises',
-        builder: (_, __) => _immersive(const MyExercisesScreen()),
-        routes: [
-          GoRoute(
-            path: ':exId',
-            builder: (context, state) {
-              final exId = state.pathParameters['exId'];
-              return _immersive(CustomExerciseEditorScreen(exerciseId: exId));
-            },
-          ),
-        ],
+        // Editor de un ejercicio propio (crear = `new`, editar = `:exId`).
+        // Es un formulario con CTA fijo al pie y confirmación de descarte, así
+        // que sigue inmersivo (sin nav bar) y fuera del shell — bare Column sin
+        // Scaffold → _immersive. La LISTA (`/profile/my-exercises`) vive en el
+        // shell, con el resto de las subpantallas de Perfil (#1502): se empuja
+        // a esta ruta out-of-shell desde la lista, que es el sentido seguro
+        // (el inverso es el que aterriza en blanco, #399/#410).
+        path: '/profile/my-exercises/:exId',
+        builder: (context, state) {
+          final exId = state.pathParameters['exId'];
+          return _immersive(CustomExerciseEditorScreen(exerciseId: exId));
+        },
       ),
 
       GoRoute(
@@ -1186,8 +1185,15 @@ GoRouter buildRouter({
               // CTA on the PERFIL PÚBLICO card. A future subscribe flow can
               // reintroduce a multi-tier catalog if needed.
 
-              // Trainer custom exercise library moved to the top-level
-              // immersive route /profile/my-exercises (no bottom nav bar).
+              // Biblioteca de ejercicios propios. Había salido del shell como
+              // ruta inmersiva (sin nav bar) y el QA (#1502) pidió que tenga
+              // la barra inferior como el resto de las subpantallas de
+              // Perfil: vuelve al shell. El editor
+              // (`/profile/my-exercises/:exId`) sigue siendo top-level.
+              GoRoute(
+                path: 'my-exercises',
+                builder: (_, __) => _withBg(const MyExercisesScreen()),
+              ),
             ],
           ),
         ],
