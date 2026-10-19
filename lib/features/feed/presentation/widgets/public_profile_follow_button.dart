@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -177,16 +178,13 @@ class _PublicProfileFollowButtonState
       if (widget.targetIsPublic) {
         container.invalidate(myFollowingFeedProvider);
       }
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(successMessage)));
+      showTreinoToastOn(messenger, successMessage,
+          type: TreinoToastType.success);
     } catch (_) {
       // The pill stays as SEGUIR (the stream won't emit on failure); tell the
       // user the request did not go through so they can retry instead of
       // assuming it succeeded.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -213,15 +211,12 @@ class _PublicProfileFollowButtonState
       // explicitly — Riverpod does NOT auto-cascade to providers with no
       // active listener at the moment (ADR-FPS-006).
       container.invalidate(myFollowingFeedProvider);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(successMessage)));
+      showTreinoToastOn(messenger, successMessage,
+          type: TreinoToastType.success);
     } catch (_) {
       // On failure the feed is NOT invalidated and the pill stays as ACEPTAR;
       // surface the error so the user can retry instead of silently swallowing.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -278,9 +273,8 @@ class _PublicProfileFollowButtonState
           } catch (_) {
             // La arista sigue viva (el delete no commiteó);
             // surface the failure so the user can retry instead of swallowing.
-            messenger
-              ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text(errorMessage)));
+            showTreinoToastOn(messenger, errorMessage,
+                type: TreinoToastType.error);
           }
         },
       ),

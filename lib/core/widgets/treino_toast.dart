@@ -42,7 +42,19 @@ void showTreinoToast(
     _showEnOverlay(context, message, type, action);
     return;
   }
-  final messenger = ScaffoldMessenger.of(context);
+  showTreinoToastOn(ScaffoldMessenger.of(context), message,
+      type: type, action: action);
+}
+
+/// Variante para código que ya capturó el messenger ANTES de un `await`
+/// (el `context` puede estar desmontado al volver). No cubre el caso sheet:
+/// ahí usá [showTreinoToast] con el context del sheet.
+void showTreinoToastOn(
+  ScaffoldMessengerState messenger,
+  String message, {
+  TreinoToastType type = TreinoToastType.info,
+  TreinoToastAction? action,
+}) {
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(

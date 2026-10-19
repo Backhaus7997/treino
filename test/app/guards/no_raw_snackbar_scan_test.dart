@@ -15,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 ///
 /// QUÉ **NO** PRUEBA. Que el toast se vea bien; sólo que no se agregan
 /// SnackBars nuevos a mano.
-const int baseline = 214;
+const int baseline = 203;
 
 const _helper = 'lib/core/widgets/treino_toast.dart';
 

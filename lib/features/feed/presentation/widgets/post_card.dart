@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:treino/core/widgets/treino_confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -327,13 +328,11 @@ class PostCard extends ConsumerWidget {
 
     try {
       await ref.read(postActionsProvider).deletePost(post);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteSuccess)));
+      showTreinoToastOn(messenger, l10n.postCardDeleteSuccess,
+          type: TreinoToastType.success);
     } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(l10n.postCardDeleteError)));
+      showTreinoToastOn(messenger, l10n.postCardDeleteError,
+          type: TreinoToastType.error);
     }
   }
 }
