@@ -11,6 +11,7 @@ import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_toast.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/custom_exercise_limit_gate.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart'
@@ -1020,6 +1021,7 @@ class _UploadVideoButton extends StatelessWidget {
   }
 }
 
-void _toast(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-}
+/// Todos los avisos de este editor son de error: límites, validación y
+/// fallos de red o de galería.
+void _toast(BuildContext context, String message) =>
+    showTreinoToast(context, message, type: TreinoToastType.error);

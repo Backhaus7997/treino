@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/widgets/treino_toast.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../../core/utils/kg_format.dart';
 
@@ -76,15 +77,7 @@ class BoundedNumberFormatter extends TextInputFormatter {
 void avisarTopeAlcanzado(BuildContext context,
     {required double max, required String unit}) {
   HapticFeedback.selectionClick();
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  if (messenger == null) return;
+  if (ScaffoldMessenger.maybeOf(context) == null) return;
   final valor = formatWeightKg(max).replaceAll('.', ',');
-  messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(AppL10n.of(context).inputMaxReached(valor, unit)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+  showTreinoToast(context, AppL10n.of(context).inputMaxReached(valor, unit));
 }
