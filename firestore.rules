@@ -1922,8 +1922,18 @@ service cloud.firestore {
     // gymId, gymName, workoutsCount, racha, rachaUpdatedAt, followersCount,
     // followingCount, sharedTemplatesWithAthletes, rankingOptIn,
     // isProfilePublic, lifetimeVolumeKg, bestSquatKg, bestBenchKg,
-    // bestDeadliftKg, squatRank, benchRank, deadliftRank).
+    // bestDeadliftKg, squatRank, benchRank, deadliftRank, searchPrefixes).
     // REQ-UPP-014, REQ-UPP-015. GAP-1, GAP-2, GAP-3 from design Section C.
+    //
+    // searchPrefixes (#1478) son los prefijos plegados de cada palabra del
+    // nombre ("Martín López" → ma, mar, …, martin, lo, …, lopez), con los que
+    // la búsqueda de usuarios pregunta por `array-contains`. Los escribe SÓLO
+    // `functions/src/profile/user-search-prefixes.ts`: el cliente no puede
+    // crearlos, cambiarlos ni borrarlos. Si pudiera, cualquiera se cargaría
+    // "messi" para aparecer en las búsquedas de otro. Mismo trato que los
+    // rangos de abajo, y el mismo ⚠️: está en el `hasOnly` de update porque la
+    // CF lo escribe en el doc; sin eso todo update del dueño falla. Reglas
+    // ANTES que la función.
     //
     // squatRank / benchRank / deadliftRank (enteros 0..8, o null) son los
     // rangos de levantamiento que la pestaña Rankings dibuja como insignia.
@@ -2021,7 +2031,8 @@ service cloud.firestore {
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg',
-                         'squatRank', 'benchRank', 'deadliftRank'
+                         'squatRank', 'benchRank', 'deadliftRank',
+                         'searchPrefixes'
                        ])
                     // Sello de frescura de `rachaSemanas`, siempre derivado
                     // por UserPublicProfileRepository.updateCounters (server
@@ -2058,6 +2069,9 @@ service cloud.firestore {
                         || request.resource.data.benchRank == null)
                     && (!('deadliftRank' in request.resource.data)
                         || request.resource.data.deadliftRank == null)
+                    // searchPrefixes (#1478): lo deriva la CF del nombre. Un
+                    // create no puede traerlo, ni vacío.
+                    && !('searchPrefixes' in request.resource.data)
                     && (!('rankingOptIn' in request.resource.data)
                         || request.resource.data.rankingOptIn is bool);
 
@@ -2083,7 +2097,8 @@ service cloud.firestore {
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg',
-                         'squatRank', 'benchRank', 'deadliftRank'
+                         'squatRank', 'benchRank', 'deadliftRank',
+                         'searchPrefixes'
                        ])
                     // Sello de frescura de `rachaSemanas` — timestamp cuando
                     // está presente. El disyunto `unchanged` es el del #849:
@@ -2194,6 +2209,14 @@ service cloud.firestore {
                         || (request.resource.data.get('rankingOptIn', true) == false
                             && resource.data.get('rankingOptIn', false) == true
                             && request.resource.data.deadliftRank == null))
+                    // searchPrefixes (#1478): sólo la CF. El dueño puede
+                    // re-presentar lo guardado (el merge lo trae en cada
+                    // escritura parcial) y nada más: ni cambiarlo, ni
+                    // crearlo, ni borrarlo. Por eso compara con `get` de los
+                    // dos lados en vez de `!(… in …) ||`: ese disyunto dejaría
+                    // borrarlo con FieldValue.delete().
+                    && request.resource.data.get('searchPrefixes', null)
+                       == resource.data.get('searchPrefixes', null)
                     // Type/Range Validation (AD-8): cotas de defensa en
                     // profundidad detrás del pin de arriba. Una escritura
                     // FRESCA ya fue rechazada por el pin salvo que iguale el
