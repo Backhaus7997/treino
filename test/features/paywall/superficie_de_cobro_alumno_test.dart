@@ -220,6 +220,12 @@ void main() {
               'que un usuario sin rol de PF contacte al equipo. Es contacto, '
               'no compra, y el destino lo fija la propia pantalla (no viene de '
               'datos). Tampoco linkea a las stores: la app no está publicada',
+      'lib/features/auth/presentation/welcome_screen.dart':
+          '«Quiero ser entrenador» en la Welcome: abre el MISMO `mailto:` a '
+              '`kLegalContactEmail` que la pantalla de arriba (sale de '
+              '`mailtoQuieroSerEntrenador`). Es contacto con el equipo, que da '
+              'el rol de PF a mano por Admin SDK: no hay precio, plan ni '
+              'checkout del otro lado, y el destino es fijo (no viene de datos)',
     };
 
     test('la lista de archivos que abren URLs es exactamente la declarada', () {

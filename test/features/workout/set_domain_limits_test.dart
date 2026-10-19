@@ -120,4 +120,46 @@ void main() {
       );
     });
   });
+
+  // #1510: recortar en silencio hace que el atleta no se entere de que su
+  // número cambió. El formatter avisa SÓLO cuando rechaza por el tope.
+  group('BoundedNumberFormatter — onOverMax (#1510)', () {
+    late int avisos;
+    late BoundedNumberFormatter f;
+    setUp(() {
+      avisos = 0;
+      f = BoundedNumberFormatter(
+        max: kMaxWeightKg,
+        decimal: true,
+        onOverMax: () => avisos++,
+      );
+    });
+    void apply(String oldT, String newT) => f.formatEditUpdate(
+          TextEditingValue(text: oldT),
+          TextEditingValue(text: newT),
+        );
+
+    test('avisa cuando rechaza por pasarse del tope', () {
+      apply('75', '750');
+      expect(avisos, 1);
+    });
+    test('no avisa al aceptar', () {
+      apply('45', '450');
+      apply('50', '500');
+      expect(avisos, 0);
+    });
+    test('no avisa por un separador de más: eso no es el tope', () {
+      apply('1.2', '1.2.');
+      expect(avisos, 0);
+    });
+    test('también en enteros', () {
+      var n = 0;
+      BoundedNumberFormatter(max: 999, decimal: false, onOverMax: () => n++)
+          .formatEditUpdate(
+        const TextEditingValue(text: '999'),
+        const TextEditingValue(text: '9999'),
+      );
+      expect(n, 1);
+    });
+  });
 }

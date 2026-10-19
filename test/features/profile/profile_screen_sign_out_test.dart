@@ -114,6 +114,12 @@ void main() {
     await tester.tap(find.text('Cerrar sesión'));
     await tester.pumpAndSettle();
 
+    // #1504: ahora pregunta antes; se confirma con «Salir».
+    await tester.pumpAndSettle();
+    expect(notifier.signOutCallCount, 0,
+        reason: 'el primer toque sólo pregunta');
+    await tester.tap(find.text('Salir'));
+    await tester.pumpAndSettle();
     expect(notifier.signOutCallCount, 1);
   });
 }

@@ -26,6 +26,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -928,6 +929,112 @@ void main() {
       expect(find.text('Reintentar'), findsOneWidget);
       // ...so a transient failure never claims the trainer has no athletes.
       expect(find.text('No tenés alumnos activos.'), findsNothing);
+    });
+  });
+
+  // ── #1490: la hora por defecto no puede proponer el pasado ─────────────────
+  group('#1490 — hora por defecto', () {
+    tearDown(AppClock.unfreeze);
+
+    testWidgets('hoy a las 9:51 arranca en 10:00, no en 9:00', (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('10:00'), findsOneWidget);
+      expect(find.text('9:00'), findsNothing);
+    });
+
+    testWidgets('hoy antes de las 9:00 sigue arrancando en 9:00',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 7, 40));
+      _useTallViewport(tester);
+      await tester.pumpWidget(_wrap(overrides: _overrides()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('9:00'), findsOneWidget);
+    });
+
+    testWidgets('una hora elegida por el timeline se respeta tal cual',
+        (tester) async {
+      AppClock.freeze(DateTime(2026, 10, 19, 9, 51));
+      _useTallViewport(tester);
+      await tester.pumpWidget(ProviderScope(
+        overrides: _overrides(),
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          locale: const Locale('es', 'AR'),
+          home: Scaffold(
+            body: NewSessionSheet(
+              initialDate: DateTime(2026, 10, 25),
+              initialTime: const TimeOfDay(hour: 7, minute: 15),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('7:15'), findsOneWidget);
+    });
+  });
+
+  // ── #1490: los avisos del sheet tienen que verse ENCIMA del sheet ─────────
+  //
+  // Los tests de arriba montan el sheet como `body` de un Scaffold, así que
+  // nunca vieron el caso real: abierto con `showModalBottomSheet`, un
+  // `SnackBar` lo pinta el Scaffold de ATRÁS y el sheet lo tapa.
+  group('#1490 — aviso desde el sheet abierto como modal', () {
+    testWidgets('duración inválida → el aviso es tocable encima del sheet',
+        (tester) async {
+      _useTallViewport(tester);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _overrides(
+            links: [_activeLink(_kAthleteId1)],
+            profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+            appointmentRepo: mockAppointmentRepo,
+          ),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) =>
+                        NewSessionSheet(initialDate: targetDateOnly),
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('abrir'));
+      await tester.pumpAndSettle();
+
+      await _selectAthlete(tester, 'Carlos Pérez');
+      await tester.enterText(find.widgetWithText(TextField, '60'), '2');
+      await tester.tap(find.text('REGISTRAR SESIÓN'));
+      await tester.pumpAndSettle();
+
+      const aviso = 'Ingresá una duración válida (5–480 min).';
+      // Si lo pintara el Scaffold de atrás existiría pero el sheet lo taparía.
+      expect(find.text(aviso).hitTestable(), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+
+      // El toast por Overlay se cierra solo: no deja Timers colgando.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(find.text(aviso), findsNothing);
     });
   });
 }

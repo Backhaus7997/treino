@@ -99,7 +99,7 @@ class _ReAuthBottomSheetState extends ConsumerState<ReAuthBottomSheet> {
               const SizedBox(height: 12),
               Text(
                 _errorMessage!,
-                style: TextStyle(color: palette.danger, fontSize: 13),
+                style: TextStyle(color: palette.dangerText, fontSize: 13),
                 textAlign: TextAlign.center,
               ),
             ],

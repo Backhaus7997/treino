@@ -533,11 +533,6 @@ class ChartPeriodSelector extends StatelessWidget {
       // seleccionado y el gráfico mostraría el año igual. Se desvía antes.
       onSelected: (p) =>
           lockedPeriods.contains(p) ? onLockedTap?.call(p) : onSelect(p),
-      color: palette.bgCard,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        side: BorderSide(color: palette.border),
-      ),
       itemBuilder: (context) => ChartPeriod.values.map((p) {
         final locked = lockedPeriods.contains(p);
         return PopupMenuItem<ChartPeriod>(

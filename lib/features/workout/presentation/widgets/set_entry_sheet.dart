@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -156,7 +157,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
           // Hint objetivo
           Text(
             'Objetivo: ${widget.slot.targetRepsMin}–${widget.slot.targetRepsMax} reps '
-            '· ${widget.slot.targetWeightKg != null ? '${formatWeightKg(widget.slot.targetWeightKg)} kg' : '– kg'}',
+            '· ${widget.slot.targetWeightKg != null ? '${formatWeightDisplay(widget.slot.targetWeightKg!, AppL10n.of(context).localeName)} kg' : '– kg'}',
             style: GoogleFonts.barlow(
               fontWeight: FontWeight.w400,
               fontSize: 12,
@@ -202,7 +203,7 @@ class _SetEntrySheetState extends State<SetEntrySheet> {
               _StepperButton(icon: '–', onTap: _decWeight),
               const SizedBox(width: 20),
               Text(
-                formatWeightKg(_weight),
+                formatWeightDisplay(_weight, AppL10n.of(context).localeName),
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
                   fontSize: 40,

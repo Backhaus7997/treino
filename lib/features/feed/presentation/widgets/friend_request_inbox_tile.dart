@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -180,9 +182,7 @@ class _FriendRequestInboxTileState
     } catch (_) {
       // The stream will not emit a removal, so the row stays — tell the user
       // the action failed so they can retry instead of silently swallowing it.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -209,9 +209,7 @@ class _FriendRequestInboxTileState
     } catch (_) {
       // The stream will not emit a removal, so the row stays — surface the
       // failure instead of swallowing it so the user can retry.
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(errorMessage)));
+      showTreinoToastOn(messenger, errorMessage, type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -248,7 +246,7 @@ class _InboxActionPill extends StatelessWidget {
     final isFilled = variant == _PillVariant.mintFilled;
     final bg = isFilled ? palette.accent : Colors.transparent;
     final borderColor = isFilled ? palette.accent : palette.border;
-    final textColor = isFilled ? palette.bg : palette.textMuted;
+    final textColor = isFilled ? TreinoButtonTokens.ink : palette.textMuted;
 
     // a11y: expose the pill as a button with its localized action label and
     // enabled/disabled state (onTap is null while a request is in flight), so

@@ -11,6 +11,7 @@ import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_status.dart';
 import '../../../../workout/domain/routine_visibility.dart';
+import '../../../../../core/widgets/treino_destructive_menu_item.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -386,12 +387,9 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
             value: _AccionRutina.recuperar,
             child: Text('Recuperar'), // i18n
           ),
-        PopupMenuItem(
+        TreinoDestructiveMenuItem(
           value: _AccionRutina.eliminar,
-          child: Text(
-            'Eliminar', // i18n
-            style: TextStyle(color: palette.danger),
-          ),
+          child: const Text('Eliminar'), // i18n
         ),
       ],
     );
@@ -909,7 +907,7 @@ class _DialogoDePublicarState extends State<_DialogoDePublicar> {
                 fontFamily: AppFonts.barlow,
                 fontWeight: AppFonts.w600,
                 fontSize: AppTextSize.caption,
-                color: palette.danger,
+                color: palette.dangerText,
               ),
             ),
           ],

@@ -3,7 +3,9 @@
 
 import 'dart:async';
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:treino/features/checkins/data/check_in_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -111,6 +113,7 @@ Widget _buildWithRouter({
   bool reduceMotion = false,
   double? textScale,
   List<CheckIn> dayCheckIns = const [],
+  List<Override> extraOverrides = const [],
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -180,6 +183,7 @@ Widget _buildWithRouter({
       (ref, key) => Future.value(dayCheckIns),
     ),
     currentUidProvider.overrideWithValue('u1'),
+    ...extraOverrides,
     if (notifierOverride != null)
       postWorkoutNotifierProvider.overrideWith(notifierOverride),
   ];
@@ -271,16 +275,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('52'), findsOneWidget);
-    expect(find.text('3.2'), findsOneWidget);
+    expect(find.text('3,2'), findsOneWidget); // coma en es (#1512)
     expect(find.text('22'), findsOneWidget);
     // PRS HOY ya es real: con highlights resueltos y sin récords muestra 0.
     expect(find.text('0'), findsOneWidget);
 
-    // Labels carry their unit (#363) — bare DURACIÓN/VOLUMEN must be gone.
-    expect(find.text('DURACIÓN MIN'), findsOneWidget);
-    expect(find.text('VOLUMEN KG'), findsOneWidget);
-    expect(find.text('DURACIÓN'), findsNothing);
-    expect(find.text('VOLUMEN'), findsNothing);
+    // #1512 revierte #363: la unidad va al lado del número («52 min»), no en
+    // el label («DURACIÓN MIN 52» se leía al revés).
+    expect(find.text('DURACIÓN'), findsOneWidget);
+    expect(find.text('VOLUMEN'), findsOneWidget);
+    expect(find.text('min'), findsOneWidget);
+    expect(find.text('kg'), findsOneWidget);
+    expect(find.text('DURACIÓN MIN'), findsNothing);
+    expect(find.text('VOLUMEN KG'), findsNothing);
   });
 
   testWidgets('SCENARIO-346: SETS stat uses count from setLogs',
@@ -343,6 +350,8 @@ void main() {
               recordType: ProgressionRecordType.heaviestWeight,
               value: 80.0,
               previousBest: 75.0,
+              set: null,
+              previousSet: null,
             ),
           ]),
         ],
@@ -612,6 +621,8 @@ void main() {
                 recordType: ProgressionRecordType.heaviestWeight,
                 value: 80.0,
                 previousBest: 75.0,
+                set: null,
+                previousSet: null,
               ),
             ],
           ),
@@ -632,8 +643,9 @@ void main() {
     expect(find.text('EJERCICIOS'), findsOneWidget);
     expect(find.text('Press banca'), findsWidgets);
     expect(find.text('4 sets · 80 kg × 5'), findsOneWidget);
-    // Bodyweight (#368): mejor set solo por reps.
-    expect(find.text('3 sets · 12 reps'), findsOneWidget);
+    // Bodyweight (#368): mejor set por reps, y dice que es peso corporal
+    // (#1513) en vez de dejarlo implícito.
+    expect(find.text('3 sets · 12 reps · peso corporal'), findsOneWidget);
     expect(find.text('PR'), findsOneWidget);
     expect(find.text('1ª VEZ'), findsOneWidget);
     // Destacado: e1 tiene el mayor volumen → una sola estrella.
@@ -818,6 +830,48 @@ void main() {
     }
   });
 
+  // #1513: el ánimo se preguntaba dos veces el mismo día. Si ya se respondió
+  // en Inicio (registro sin sesión), el resumen lo ofrece en vez de la escala,
+  // y un toque lo ata a ESTA sesión sobre el mismo documento.
+  testWidgets(
+      '#1513: con el ánimo del día ya respondido no vuelve a preguntar y un '
+      'toque lo usa para este entreno', (tester) async {
+    final firestore = FakeFirebaseFirestore();
+    final delDia = CheckIn(
+      id: 'del-dia',
+      date: checkInDateKey(DateTime.now()),
+      feeling: CheckInFeeling.bien,
+      recordedAt: DateTime.now().toUtc(),
+    );
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      dayCheckIns: [delDia],
+      extraOverrides: [
+        checkInRepositoryProvider
+            .overrideWithValue(CheckInRepository(firestore: firestore)),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ya lo contaste hoy en Inicio.'), findsOneWidget);
+    // No vuelve la escala completa: sólo la respuesta del día.
+    expect(find.text('😞'), findsNothing);
+
+    await tester.ensureVisible(find.text('USAR PARA ESTE ENTRENO'));
+    await tester.tap(find.text('USAR PARA ESTE ENTRENO'));
+    await tester.pumpAndSettle();
+
+    final docs = await firestore
+        .collection('users')
+        .doc('u1')
+        .collection('wellbeingCheckIns')
+        .get();
+    expect(docs.docs, hasLength(1));
+    expect(docs.docs.single.id, 'del-dia',
+        reason: 'edita el registro del día, no crea otro');
+    expect(docs.docs.single.data()['sessionId'], 's1');
+  });
+
   // ── #456 regression: mood row must never overflow ────────────────────────
 
   testWidgets(
@@ -902,6 +956,8 @@ void main() {
                   recordType: ProgressionRecordType.bestSetVolume,
                   value: 412.5,
                   previousBest: 375.0,
+                  set: (weightKg: 82.5, reps: 5),
+                  previousSet: (weightKg: 75.0, reps: 5),
                 ),
               ],
             ),
@@ -964,6 +1020,8 @@ void main() {
                   recordType: ProgressionRecordType.bestSetVolume,
                   value: 412.5,
                   previousBest: 375.0,
+                  set: (weightKg: 82.5, reps: 5),
+                  previousSet: (weightKg: 75.0, reps: 5),
                 ),
               ],
             ),
@@ -1140,6 +1198,36 @@ void main() {
 
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
     expect(find.text('BUEN ENTRENO'), findsOneWidget);
+  });
+
+  // #1512: «Mejor serie 560 kg·reps» era jerga. Se muestra la serie.
+  testWidgets('#1512: la mejor serie se lee «82,5 kg × 5», sin kg·reps',
+      (tester) async {
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      highlights: _highlights(
+        recordCount: 1,
+        exercises: [
+          _exercise(
+            records: const [
+              (
+                recordType: ProgressionRecordType.bestSetVolume,
+                value: 412.5,
+                previousBest: 375.0,
+                set: (weightKg: 82.5, reps: 5),
+                previousSet: (weightKg: 75.0, reps: 5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('82,5 kg × 5'), findsOneWidget);
+    expect(find.textContaining('75 kg × 5'), findsOneWidget);
+    expect(find.textContaining('kg·reps'), findsNothing);
+    expect(find.textContaining('412'), findsNothing);
   });
 }
 

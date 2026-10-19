@@ -35,6 +35,8 @@ void main() {
         () => expect(p.espresso, const Color(0xFF3C3534)));
     test('danger == 0xFFE53935',
         () => expect(p.danger, const Color(0xFFE53935)));
+    test('dangerText == 0xFFEF5350',
+        () => expect(p.dangerText, const Color(0xFFEF5350)));
     test('warning == 0xFFFFB300',
         () => expect(p.warning, const Color(0xFFFFB300)));
     test('onDanger == 0xFFFFFFFF',
@@ -68,6 +70,8 @@ void main() {
         () => expect(p.espresso, const Color(0xFFEDE5E2)));
     test('danger == 0xFFD32F2F',
         () => expect(p.danger, const Color(0xFFD32F2F)));
+    test('dangerText == danger en claro (0xFFD32F2F ya pasa AA)',
+        () => expect(p.dangerText, const Color(0xFFD32F2F)));
     test('warning == 0xFFFB8C00',
         () => expect(p.warning, const Color(0xFFFB8C00)));
     test('onDanger == 0xFFFFFFFF',

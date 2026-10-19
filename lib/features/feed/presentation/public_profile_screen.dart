@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -365,15 +366,8 @@ class _MessageButtonState extends ConsumerState<_MessageButton> {
           .getOrCreate(selfId: widget.viewerUid, otherId: widget.targetUid);
       router.push('/coach/chat/${chat.chatId}?other=${widget.targetUid}');
     } catch (_) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'No pudimos abrir el chat. Probá de nuevo.', // i18n: Fase W2
-            ),
-          ),
-        );
+      showTreinoToastOn(messenger, 'No pudimos abrir el chat. Probá de nuevo.',
+          type: TreinoToastType.error);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
