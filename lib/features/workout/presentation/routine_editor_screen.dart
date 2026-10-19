@@ -2227,8 +2227,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .any((s) => !identical(s, slot) && s.exercise?.id == newExercise.id);
     if (isDuplicate) {
       showTreinoToast(
-          context, AppL10n.of(context).routineEditorDuplicateExercise,
-          type: TreinoToastType.error);
+          context, AppL10n.of(context).routineEditorDuplicateExercise);
       return;
     }
     _markDirty();
