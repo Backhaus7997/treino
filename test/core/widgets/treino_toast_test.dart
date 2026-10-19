@@ -364,4 +364,52 @@ void main() {
     final levantado = await fondoCon(88);
     expect(base - levantado, moreOrLessEquals(88));
   });
+
+  group('ancho en pantallas anchas (Coach Hub web)', () {
+    Future<Rect> rectDelToast(
+      WidgetTester tester,
+      Size pantalla, {
+      bool enSheet = false,
+    }) async {
+      tester.view.physicalSize = pantalla;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      if (enSheet) {
+        await tester.pumpWidget(_appConSheet('Guardado'));
+        await _abrirSheetYDisparar(tester);
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(find
+            .ancestor(
+                of: find.text('Guardado'), matching: find.byType(Material))
+            .first);
+        await tester.pumpWidget(const SizedBox());
+        return rect;
+      }
+      await tester.pumpWidget(_app(
+        home: _Boton((c) => showTreinoToast(c, 'Guardado')),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      return tester.getRect(_cuerpoDelSnack());
+    }
+
+    testWidgets('en un monitor no pasa de 560 y queda centrado',
+        (tester) async {
+      final r = await rectDelToast(tester, const Size(1440, 900));
+      expect(r.width, moreOrLessEquals(560));
+      expect(r.center.dx, moreOrLessEquals(720));
+    });
+
+    testWidgets('en el teléfono manda el margen lateral de 20', (tester) async {
+      final r = await rectDelToast(tester, const Size(390, 844));
+      expect(r.left, moreOrLessEquals(AppSpacing.s20));
+      expect(r.width, moreOrLessEquals(390 - 2 * AppSpacing.s20));
+    });
+
+    testWidgets('el toast por Overlay respeta el mismo máximo', (tester) async {
+      final r =
+          await rectDelToast(tester, const Size(1440, 900), enSheet: true);
+      expect(r.width, moreOrLessEquals(560));
+    });
+  });
 }

@@ -23,6 +23,18 @@ const Duration _kToastDuration = Duration(seconds: 4);
 /// Separación lateral del toast contra los bordes de la pantalla.
 const double _kMargenLateral = AppSpacing.s20;
 
+/// Ancho máximo del toast. En el teléfono no pesa (manda el margen lateral),
+/// pero el Coach Hub es web: con sólo el margen, en un monitor de 1440 px el
+/// aviso medía 1400 y se leía como una banda de borde a borde, el mismo
+/// problema que este helper vino a sacar (#1560). Arriba del máximo el margen
+/// crece y el toast queda centrado.
+const double _kAnchoMaximo = 560;
+
+/// Margen lateral para que el toast no supere [_kAnchoMaximo] en una pantalla
+/// de [anchoPantalla].
+double _margenLateral(double anchoPantalla) =>
+    math.max(_kMargenLateral, (anchoPantalla - _kAnchoMaximo) / 2);
+
 /// Separación entre el toast y lo que tenga abajo: la barra de navegación,
 /// el teclado o el borde seguro. Es un gap de diseño y NADA más: el
 /// `Scaffold` ya ubica el SnackBar flotante arriba de `bottomNavigationBar`
@@ -115,6 +127,7 @@ void showTreinoToastOn(
   if (!messenger.mounted) return;
   _cerrarOverlay();
   final palette = AppPalette.of(messenger.context);
+  final lateral = _margenLateral(MediaQuery.sizeOf(messenger.context).width);
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
@@ -125,9 +138,9 @@ void showTreinoToastOn(
         ),
         behavior: SnackBarBehavior.floating,
         margin: EdgeInsets.fromLTRB(
-          _kMargenLateral,
+          lateral,
           0,
-          _kMargenLateral,
+          lateral,
           _kMargenInferior + bottomOffset,
         ),
         backgroundColor: palette.bgCard,
@@ -182,26 +195,29 @@ void _showEnOverlay(
   }
 
   entrada = OverlayEntry(
-    builder: (ctx) => Positioned(
-      left: _kMargenLateral,
-      right: _kMargenLateral,
-      // El mayor entre teclado y borde seguro: con el teclado abierto el
-      // `viewPadding` sigue siendo el del home indicator y el toast quedaba
-      // escondido debajo del teclado.
-      bottom: math.max(
-            MediaQuery.viewInsetsOf(ctx).bottom,
-            MediaQuery.viewPaddingOf(ctx).bottom,
-          ) +
-          _kMargenInferior +
-          bottomOffset,
-      child: _OverlayToast(
-        message: message,
-        type: type,
-        action: action,
-        duration: duration,
-        onDismiss: cerrarEsta,
-      ),
-    ),
+    builder: (ctx) {
+      final lateral = _margenLateral(MediaQuery.sizeOf(ctx).width);
+      return Positioned(
+        left: lateral,
+        right: lateral,
+        // El mayor entre teclado y borde seguro: con el teclado abierto el
+        // `viewPadding` sigue siendo el del home indicator y el toast quedaba
+        // escondido debajo del teclado.
+        bottom: math.max(
+              MediaQuery.viewInsetsOf(ctx).bottom,
+              MediaQuery.viewPaddingOf(ctx).bottom,
+            ) +
+            _kMargenInferior +
+            bottomOffset,
+        child: _OverlayToast(
+          message: message,
+          type: type,
+          action: action,
+          duration: duration,
+          onDismiss: cerrarEsta,
+        ),
+      );
+    },
   );
   _entradaActual = entrada;
   overlay.insert(entrada);
