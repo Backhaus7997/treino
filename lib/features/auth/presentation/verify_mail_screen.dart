@@ -17,6 +17,7 @@ import '../data/mail_verification_service.dart';
 import '../domain/alta_reciente.dart';
 import 'widgets/auth_input.dart';
 import 'widgets/auth_pill_button.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Gate obligatorio: confirmar el mail con el código de 6 dígitos.
 ///
@@ -331,11 +332,10 @@ class _VerifyMailScreenState extends ConsumerState<VerifyMailScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() => _borrando = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.verifyMailWrongEmailError),
-          duration: const Duration(seconds: 3),
-        ),
+      showTreinoToast(
+        context,
+        l10n.verifyMailWrongEmailError,
+        type: TreinoToastType.error,
       );
     }
   }

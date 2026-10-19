@@ -208,6 +208,61 @@ void main() {
   });
 
   testWidgets(
+      'en tema CLARO el toast usa la paleta clara: el messenger raíz vive '
+      'arriba del Theme y su context no la ve', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      home: _Boton((c) => showTreinoToast(c, 'Guardado')),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+
+    final clara = AppTheme.light().extension<AppPalette>()!;
+    final material = tester.widget<Material>(_cuerpoDelSnack());
+    expect(material.color, clara.bgCard);
+    final texto = tester.widget<RichText>(
+      find.descendant(
+        of: find.text('Guardado'),
+        matching: find.byType(RichText),
+      ),
+    );
+    expect(texto.text.style?.color, clara.textPrimary);
+  });
+
+  testWidgets(
+      'fuera del shell (sin nav bar, antes del login) con el messenger RAÍZ '
+      'por key: se ve, cerca del borde y con la acción andando',
+      (tester) async {
+    // El camino de `app.dart` (cartel FCM) y de chat_media_send_controller:
+    // sin context de pantalla, sólo el `rootScaffoldMessengerKey`.
+    final key = GlobalKey<ScaffoldMessengerState>();
+    var tocado = false;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
+      scaffoldMessengerKey: key,
+      home: const Scaffold(body: SizedBox.expand()),
+    ));
+
+    showTreinoToastOn(
+      key.currentState!,
+      'Nuevo mensaje\nTenés una rutina asignada',
+      action: TreinoToastAction(label: 'VER', onPressed: () => tocado = true),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+        find.text('Nuevo mensaje\nTenés una rutina asignada'), findsOneWidget);
+    final alto = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final gap = alto - tester.getBottomLeft(_cuerpoDelSnack()).dy;
+    expect(gap, lessThanOrEqualTo(20), reason: 'sin nav, el toast va abajo');
+
+    await tester.tap(find.text('VER'));
+    await tester.pumpAndSettle();
+    expect(tocado, isTrue);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets(
       'desde un sheet con el teclado abierto el toast queda ARRIBA '
       'del teclado', (tester) async {
     const teclado = 300.0;

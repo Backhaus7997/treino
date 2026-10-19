@@ -27,6 +27,7 @@ import 'router.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_mode_provider.dart';
 import 'theme/theme_watcher.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Whether [message] was sent by [currentUid] — used to suppress
 /// self-notifications.
@@ -402,34 +403,17 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // Capture context from the navigator so goDeepLink has GoRouter access.
     final ctx = _router.routerDelegate.navigatorKey.currentContext;
 
-    messenger.showSnackBar(
-      SnackBar(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (title.isNotEmpty)
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            if (body.isNotEmpty) Text(body),
-          ],
-        ),
-        // `persist: false` A MANO. `SnackBar` hace
-        // `persist = persist ?? action != null`: con acción es eterno por
-        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
-        // se queda hasta recargar la página.
-        persist: false,
-        duration: const Duration(seconds: 4),
-        action: SnackBarAction(
-          label:
-              ctx != null ? AppL10n.of(ctx).appFcmSnackBarActionLabel : 'Ver',
-          onPressed: () {
-            if (ctx == null || !ctx.mounted) return;
-            goDeepLink(ctx, deepLink);
-          },
-        ),
+    // El helper ya fija `persist: false`: con acción, un SnackBar es eterno
+    // por default y el cartel se quedaba hasta recargar la página.
+    showTreinoToastOn(
+      messenger,
+      [title, body].where((s) => s.isNotEmpty).join('\n'),
+      action: TreinoToastAction(
+        label: ctx != null ? AppL10n.of(ctx).appFcmSnackBarActionLabel : 'Ver',
+        onPressed: () {
+          if (ctx == null || !ctx.mounted) return;
+          goDeepLink(ctx, deepLink);
+        },
       ),
     );
   }

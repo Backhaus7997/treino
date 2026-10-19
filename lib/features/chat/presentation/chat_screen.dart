@@ -31,6 +31,7 @@ import '../domain/media_type.dart';
 import '../domain/message.dart';
 import 'chat_image_bubble.dart';
 import 'chat_video_bubble.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Pantalla de chat 1-1. Burbujas + textfield + send. Real-time via
 /// `messagesProvider(chatId)`.
@@ -127,9 +128,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final copy = e is ModerationBlockedException
             ? AppL10n.of(context).moderationBlockedMessage
             : AppL10n.of(context).chatScreenSendError;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(copy)),
-        );
+        showTreinoToast(context, copy, type: TreinoToastType.error);
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -141,8 +140,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// construcción — el usuario acaba de tocar el clip.
   void _toastQuota(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showTreinoToast(context, message, type: TreinoToastType.error);
   }
 
   static String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);

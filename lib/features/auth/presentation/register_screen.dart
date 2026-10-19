@@ -22,6 +22,7 @@ import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
 import 'widgets/trainer_inquiry_card.dart';
 import '../../../core/widgets/treino_logo.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -91,13 +92,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // flow still creates a TREINO account. Surface a snackbar instead of
     // silently doing nothing so the user knows what is missing.
     if (!_termsAccepted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Aceptá los Términos y la Política de Privacidad para continuar',
-          ),
-          duration: Duration(seconds: 3),
-        ),
+      showTreinoToast(
+        context,
+        'Aceptá los Términos y la Política de Privacidad para continuar',
+        type: TreinoToastType.error,
       );
       return;
     }
@@ -108,13 +106,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     // Same Terms gate as Google: Apple Sign-In also creates a TREINO account
     // on first sign-in, so the user must accept Terms first.
     if (!_termsAccepted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Aceptá los Términos y la Política de Privacidad para continuar',
-          ),
-          duration: Duration(seconds: 3),
-        ),
+      showTreinoToast(
+        context,
+        'Aceptá los Términos y la Política de Privacidad para continuar',
+        type: TreinoToastType.error,
       );
       return;
     }

@@ -83,10 +83,10 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo.
-    const allowlistCeiling = 158;
+    const allowlistCeiling = 157;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const offScaleDebtCeiling = 962;
+    const offScaleDebtCeiling = 949;
 
     /// Allowlist de rutas relativas a `lib/` con spacing fuera de escala. Es
     /// un REGISTRO DE DEUDA, no una licencia.
@@ -217,7 +217,6 @@ void main() {
       'features/profile_setup/presentation/widgets/gym_card.dart',
       'features/profile_setup/presentation/widgets/gym_search_box.dart',
       'features/profile_setup/presentation/widgets/profile_setup_header.dart',
-      'features/reviews/presentation/widgets/review_bottom_sheet.dart',
       'features/reviews/presentation/widgets/review_cta.dart',
       'features/reviews/presentation/widgets/review_tile.dart',
       'features/reviews/presentation/widgets/star_rating_display.dart',
