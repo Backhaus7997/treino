@@ -13,13 +13,16 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/racha_freshness.dart';
 import '../domain/user_public_profile.dart';
+import '../domain/user_search_terms.dart';
 
 /// Repository for the `userPublicProfiles` collection.
 ///
 /// Exposes only the three public operations:
 ///   - [get] — fetch a single profile by uid.
 ///   - [set] — write / merge a profile doc.
-///   - [searchByDisplayName] — prefix-range query on `displayNameLowercase`.
+///   - [searchByDisplayName] — any word of the name, accent-insensitive
+///     (`searchPrefixes`), plus the legacy prefix-range on
+///     `displayNameLowercase` during the transition (#1478).
 ///
 /// Note: `fake_cloud_firestore` does NOT enforce Firestore security rules.
 /// Permission coverage is provided by the T35-style manual emulator test
@@ -352,13 +355,31 @@ class UserPublicProfileRepository {
     return snap.docs.any((d) => d.id != excludeUid);
   }
 
-  /// Returns up to [limit] profiles whose `displayNameLowercase` starts with
-  /// the trimmed lowercase [query]. Returns an empty list when [query] is
-  /// blank after trimming. No Firestore call is issued in that case.
+  /// Busca perfiles por cualquier palabra del nombre, sin importar tildes ni
+  /// mayúsculas (#1478): "martin" y "lopez" encuentran a "Martín López".
+  /// Devuelve `[]` sin consultar si [query] queda vacía.
   ///
-  /// The prefix-range technique uses the Unicode replacement character `￿`
-  /// as an upper bound so that `startAt(q) + endBefore(q + '￿')` covers
-  /// every string that begins with [q].
+  /// Corre DOS consultas en paralelo y las junta sin repetidos:
+  ///
+  ///   1. La vieja: prefijo de `displayNameLowercase` (rango `[q, q + '￿')`),
+  ///      sólo desde el principio del nombre y sin plegar. Va primero y en su
+  ///      orden de siempre.
+  ///   2. La nueva: `array-contains` sobre `searchPrefixes`, con la palabra más
+  ///      larga de la consulta ([searchNeedle]). El resto de las palabras se
+  ///      filtra acá ([nameMatchesQuery]), porque Firestore no combina dos
+  ///      `array-contains`.
+  ///
+  /// La vieja queda sólo mientras dure la transición: `searchPrefixes` lo
+  /// escribe una Cloud Function, y los perfiles que no se escribieron desde
+  /// su deploy no lo tienen hasta que corra
+  /// `scripts/backfill_user_search_prefixes.js`. Sin la vieja, esos perfiles
+  /// desaparecerían de la búsqueda. Con el backfill corrido, sale en un PR
+  /// aparte.
+  ///
+  /// Cada consulta trae hasta [limit], así que el resultado puede tener hasta
+  /// el doble. No se recorta a [limit] a propósito: si "martin" llena las 20
+  /// de la vieja con handles `martin_…`, recortar dejaría afuera justo a
+  /// "Martín López", que es lo que este cambio vino a encontrar.
   Future<List<UserPublicProfile>> searchByDisplayName(
     String query, {
     int limit = 20,
@@ -366,14 +387,29 @@ class UserPublicProfileRepository {
     final trimmed = query.trim().toLowerCase();
     if (trimmed.isEmpty) return const [];
 
-    final end = '$trimmed￿';
+    final queryTokens = searchTokens(trimmed);
+    final needle = searchNeedle(queryTokens);
 
-    final snap = await _col
-        .where('displayNameLowercase', isGreaterThanOrEqualTo: trimmed)
-        .where('displayNameLowercase', isLessThan: end)
-        .limit(limit)
-        .get();
+    final snaps = await Future.wait([
+      _col
+          .where('displayNameLowercase', isGreaterThanOrEqualTo: trimmed)
+          .where('displayNameLowercase', isLessThan: '$trimmed￿')
+          .limit(limit)
+          .get(),
+      if (needle != null)
+        _col.where('searchPrefixes', arrayContains: needle).limit(limit).get(),
+    ]);
 
-    return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
+    final seen = <String>{};
+    final results = <UserPublicProfile>[];
+    for (final doc in snaps.first.docs) {
+      if (seen.add(doc.id)) results.add(UserPublicProfile.fromJson(doc.data()));
+    }
+    for (final doc in snaps.skip(1).expand((s) => s.docs)) {
+      final profile = UserPublicProfile.fromJson(doc.data());
+      if (!nameMatchesQuery(profile.displayName, queryTokens)) continue;
+      if (seen.add(doc.id)) results.add(profile);
+    }
+    return results;
   }
 }
