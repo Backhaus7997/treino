@@ -20,7 +20,8 @@
  *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
  *       terminated + reason 'cancelled-by-athlete' → notify TRAINER,
  *         deepLink al centro de notificaciones
- *       * → terminated (resto) → notify BOTH, deepLink "/coach"
+ *       * → terminated (resto) → notify BOTH, deepLink "/coach", cada uno con el
+ *         nombre de la OTRA parte en el cuerpo (#1464)
  *   - `pending` es la ÚNICA rama que abre «Solicitudes»: es la única cuyo
  *     vínculo sigue en `pending` y por lo tanto la lista puede mostrarlo.
  *     `cancelled-by-athlete` cuenta algo ya terminado y va al historial.
@@ -325,6 +326,10 @@ export async function notifyOnLinkChangeHandler(
   // "no hay nada que purgar", que es lo que lee el efecto de cola.
   let causaTerminacion: CausaDeTerminacion | undefined;
   let prefKey: string | undefined;
+  // Cuerpo a medida por destinatario, para la rama donde los dos reciben el
+  // mismo título pero cada uno tiene que leer el nombre del OTRO. Si un uid no
+  // está acá, recibe `body`.
+  let bodyPorUid: Map<string, string> | undefined;
 
   if (afterStatus === "pending") {
     // New link request → notify trainer.
@@ -443,7 +448,21 @@ export async function notifyOnLinkChangeHandler(
       // a chequear el rol, con la mitad del código.
       prefKey = "vinculo_finalizado";
       title = "Vinculación finalizada"; // i18n: Fase 6 Etapa 2
-      body = "La vinculación entre atleta y entrenador fue finalizada."; // i18n: Fase 6 Etapa 2
+      // Antes los dos leían "La vinculación entre atleta y entrenador fue
+      // finalizada.", sin decir con QUIÉN (#1464). El PF con varios alumnos no
+      // podía saber cuál se había ido. Cada uno ve el nombre de la otra parte, y
+      // el texto sigue sin afirmar quién cortó: el modelo no lo sabe.
+      const [athleteName, trainerName] = await Promise.all([
+        resolveAthleteName(app, athleteId),
+        resolveTrainerName(app, trainerId),
+      ]);
+      bodyPorUid = new Map([
+        [athleteId, `La vinculación con ${trainerName} fue finalizada.`], // i18n: #1464
+        [trainerId, `La vinculación con ${athleteName} fue finalizada.`], // i18n: #1464
+      ]);
+      // Red de seguridad: los nombres siempre resuelven (hay fallback), pero
+      // `body` no puede quedar sin asignar.
+      body = "La vinculación fue finalizada."; // i18n: #1464
     }
   } else {
     logger.info("notifyOnLinkChange: unhandled status transition, skipping", {
@@ -453,17 +472,26 @@ export async function notifyOnLinkChangeHandler(
     return;
   }
 
-  await sendFcm(
-    app,
-    {
-      uids: recipientUids,
-      kind: "link-change",
-      notification: { title, body },
-      data: { deepLink },
-      actorUid,
-      prefKey,
-    },
-    messaging,
+  // Un push por destinatario: `sendFcm` manda UN mismo `notification` a todos
+  // los `uids`, y la rama de vínculo finalizado necesita un cuerpo distinto para
+  // cada uno. Las demás ramas tienen un único destinatario, así que para ellas
+  // es exactamente una llamada, como antes. Se lanzan juntas: el segundo no
+  // espera al primero, y la invocación falla igual que antes si alguna falla.
+  await Promise.all(
+    recipientUids.map((uid) =>
+      sendFcm(
+        app,
+        {
+          uids: [uid],
+          kind: "link-change",
+          notification: { title, body: bodyPorUid?.get(uid) ?? body },
+          data: { deepLink },
+          actorUid,
+          prefKey,
+        },
+        messaging,
+      ),
+    ),
   );
 
   // Best-effort: a queue failure must never take the push down with it.
