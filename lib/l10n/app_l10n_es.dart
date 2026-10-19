@@ -153,6 +153,17 @@ class AppL10nEs extends AppL10n {
   String get authWelcomeSignIn => 'Iniciar sesión';
 
   @override
+  String get authWelcomeTrainerPrompt => '¿Eres entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escríbenos a $email.';
+  }
+
+  @override
   String get authLoginTitle => 'BIENVENIDO';
 
   @override
@@ -1094,6 +1105,34 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No hay plantillas de $days días',
+      one: 'No hay plantillas de 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No hay plantillas de unos $minutes min';
+  }
+
+  @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No hay plantillas de $minutes min o más';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
+
+  @override
+  String get templatesFilterEmptyAction => 'Ver todas';
 
   @override
   String get workoutExploreSearchHint =>
@@ -4446,7 +4485,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
+      'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
@@ -4554,7 +4593,11 @@ class AppL10nEs extends AppL10n {
   String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
 
   @override
-  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
+  String get templatesFilterBarHint =>
+      'Filtrado y ordenado según lo que buscás';
+
+  @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
@@ -5593,6 +5636,17 @@ class AppL10nEsAr extends AppL10nEs {
   String get authWelcomeSignIn => 'Iniciar sesión';
 
   @override
+  String get authWelcomeTrainerPrompt => '¿Sos entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escribinos a $email.';
+  }
+
+  @override
   String get authLoginTitle => 'BIENVENIDO';
 
   @override
@@ -6534,6 +6588,34 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutExploreEmptyLevel => 'No hay rutinas para este nivel.';
+
+  @override
+  String templatesFilterEmptyDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: 'No hay plantillas de $days días',
+      one: 'No hay plantillas de 1 día',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String templatesFilterEmptyMinutes(String minutes) {
+    return 'No hay plantillas de unos $minutes min';
+  }
+
+  @override
+  String templatesFilterEmptyMinutesOrMore(String minutes) {
+    return 'No hay plantillas de $minutes min o más';
+  }
+
+  @override
+  String get templatesFilterEmptyDaysAndMinutes =>
+      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
+
+  @override
+  String get templatesFilterEmptyAction => 'Ver todas';
 
   @override
   String get workoutExploreSearchHint =>
@@ -9883,7 +9965,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.';
+      'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
@@ -9991,7 +10073,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
 
   @override
-  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
+  String get templatesFilterBarHint =>
+      'Filtrado y ordenado según lo que buscás';
+
+  @override
+  String get templatesFilterBarHintSorted => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';

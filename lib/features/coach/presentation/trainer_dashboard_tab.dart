@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
@@ -407,9 +408,11 @@ class _PendingRequestCardState extends ConsumerState<_PendingRequestCard> {
   // mounted porque corre después del await.
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
+    showTreinoToast(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+      message,
+      type: TreinoToastType.error,
+    );
   }
 
   Future<void> _decline() async {
@@ -642,8 +645,10 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.dashboardFeedbackSaved)),
+    showTreinoToastOn(
+      messenger,
+      l10n.dashboardFeedbackSaved,
+      type: TreinoToastType.success,
     );
   }
 
@@ -2092,15 +2097,19 @@ class _CobroPendienteRow extends ConsumerWidget {
         }
 
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(l10n.dashboardCobroRegistrado)),
+          showTreinoToast(
+            context,
+            l10n.dashboardCobroRegistrado,
+            type: TreinoToastType.success,
           );
         }
       } catch (_) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
+          showTreinoToast(
             context,
-          ).showSnackBar(SnackBar(content: Text(l10n.dashboardCobroError)));
+            l10n.dashboardCobroError,
+            type: TreinoToastType.error,
+          );
         }
       }
     }
@@ -2453,17 +2462,21 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
     final concept = _conceptController.text.trim();
 
     if (athleteId == null || amountText.isEmpty || concept.isEmpty) {
-      ScaffoldMessenger.of(
+      showTreinoToast(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.dashboardCompletaCampos)));
+        l10n.dashboardCompletaCampos,
+        type: TreinoToastType.error,
+      );
       return;
     }
 
     final amount = parseGroupedInt(amountText);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(
+      showTreinoToast(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.dashboardMontoInvalido)));
+        l10n.dashboardMontoInvalido,
+        type: TreinoToastType.error,
+      );
       return;
     }
 
@@ -2502,16 +2515,20 @@ class _AddSueltoSheetState extends ConsumerState<_AddSueltoSheet> {
 
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.dashboardCobroSueltoAgregado)),
+        showTreinoToast(
+          context,
+          l10n.dashboardCobroSueltoAgregado,
+          type: TreinoToastType.success,
         );
       }
     } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(
+        showTreinoToast(
           context,
-        ).showSnackBar(SnackBar(content: Text(l10n.dashboardGuardarError)));
+          l10n.dashboardGuardarError,
+          type: TreinoToastType.error,
+        );
       }
     }
   }

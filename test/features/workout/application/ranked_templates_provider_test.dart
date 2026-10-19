@@ -130,8 +130,23 @@ void main() {
       expect(segunda, primera);
     });
 
-    test('ninguna combinación vacía la grilla', () async {
-      // La combinación que el issue cita como "cero matches" en un filtro duro.
+    test('objetivo y zonas por sí solos nunca vacían la grilla', () async {
+      final ids = await _rankedIds(
+        [
+          _routine('ppl',
+              days: 3, minutes: 60, goals: const [RoutineGoal.health]),
+          _routine('full', days: 3, minutes: 55),
+        ],
+        const TemplatePreferences(
+          goals: [RoutineGoal.sport],
+          priorityMuscleGroups: ['back'],
+        ),
+      );
+      expect(ids, hasLength(2));
+    });
+
+    test('días y minutos SÍ filtran (#1561): 2 días · 30 min no deja ninguna',
+        () async {
       final ids = await _rankedIds(
         [
           _routine('ppl',
@@ -145,7 +160,7 @@ void main() {
           priorityMuscleGroups: ['back'],
         ),
       );
-      expect(ids, hasLength(2));
+      expect(ids, isEmpty);
     });
   });
 }

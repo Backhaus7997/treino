@@ -5,6 +5,7 @@ import 'package:treino/core/widgets/treino_confirm_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -672,8 +673,10 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
         ));
       }
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppL10n.of(context).agendaSaveSuccess)),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).agendaSaveSuccess,
+          type: TreinoToastType.success,
         );
         Navigator.of(context).pop();
       }
@@ -836,8 +839,10 @@ class _BlockOverrideFormSheetState
             ),
           );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppL10n.of(context).agendaSaveSuccess)),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).agendaSaveSuccess,
+          type: TreinoToastType.success,
         );
         Navigator.of(context).pop();
       }

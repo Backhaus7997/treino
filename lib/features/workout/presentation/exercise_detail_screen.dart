@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/exercise_asset_image.dart';
+import '../../../core/widgets/floating_bar_metrics.dart';
 import '../../../core/widgets/firebase_storage_video_player.dart'
     show VideoPlayOverlay;
 import '../../../core/widgets/motion/treino_shimmer.dart';
@@ -161,12 +162,16 @@ class _BackBar extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
+      padding: const EdgeInsets.only(
+        left: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: palette.scrimDark.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: IconButton(
+          style: FloatingBarMetrics.buttonStyle,
           tooltip: l10n.commonBack,
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
@@ -647,7 +652,12 @@ class _CompactHeader extends StatelessWidget {
     final palette = AppPalette.of(context);
     return Container(
       color: palette.bg,
-      padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        FloatingBarMetrics.reservedHeight + 16,
+        20,
+        16,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
