@@ -252,6 +252,7 @@ class _BackBar extends StatelessWidget {
           button: true,
           label: l10n.commonBack,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: l10n.commonBack,
             icon: Icon(TreinoIcon.back, color: palette.textPrimary),
             onPressed: () =>
@@ -304,6 +305,7 @@ class _EditBar extends ConsumerWidget {
           button: true,
           label: 'Editar rutina', // i18n: Fase W2
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             tooltip: 'Editar rutina', // i18n: Fase W2
             icon: Icon(Icons.edit, color: palette.textPrimary),
             onPressed: () =>
@@ -452,6 +454,7 @@ class _FollowTemplateBar extends ConsumerWidget {
           button: true,
           label: label,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_follow_template'),
             tooltip: label,
             icon: Icon(
@@ -565,6 +568,7 @@ class _UseAsBaseBar extends ConsumerWidget {
           button: true,
           label: l10n.workoutRoutineUseAsBase,
           child: IconButton(
+            style: FloatingBarMetrics.buttonStyle,
             key: const Key('routine_use_as_base'),
             tooltip: l10n.workoutRoutineUseAsBase,
             icon: Icon(

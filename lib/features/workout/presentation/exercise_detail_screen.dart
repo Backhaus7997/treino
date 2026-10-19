@@ -171,6 +171,7 @@ class _BackBar extends StatelessWidget {
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: IconButton(
+          style: FloatingBarMetrics.buttonStyle,
           tooltip: l10n.commonBack,
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
