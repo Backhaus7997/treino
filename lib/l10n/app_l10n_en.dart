@@ -1092,17 +1092,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String templatesFilterEmptyMinutes(String minutes) {
-    return 'No templates of around $minutes min';
+    return 'No templates of $minutes min or less';
   }
 
   @override
-  String templatesFilterEmptyMinutesOrMore(String minutes) {
-    return 'No templates of $minutes min or more';
-  }
+  String get templatesFilterEmptyCombination =>
+      'No template matches everything you picked at once';
 
   @override
-  String get templatesFilterEmptyDaysAndMinutes =>
-      'No template fits both your days and your minutes';
+  String get templatesFilterEmptyGoals =>
+      'No template targets the goals you picked';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'No template works the areas you picked';
 
   @override
   String get templatesFilterEmptyAction => 'Show all';
@@ -4399,7 +4402,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Days and minutes filter the catalog: you will only see templates that fit. Goal and focus areas only sort.';
+      'Everything you pick filters the catalog: you will only see templates that match all of it. If none is left, you can show them all.';
 
   @override
   String get templatesOnboardingStep2Title => 'How long is your session?';

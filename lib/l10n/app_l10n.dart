@@ -2060,25 +2060,31 @@ abstract class AppL10n {
   /// **'{days, plural, =1{No hay plantillas de 1 día} other{No hay plantillas de {days} días}}'**
   String templatesFilterEmptyDays(int days);
 
-  /// Igual que templatesFilterEmptyDays pero cuando sólo hay filtro de minutos (±15).
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla dura los minutos elegidos o menos ("tengo hasta X"). La opción "75 o más" no filtra, así que nunca llega acá.
   ///
   /// In es_AR, this message translates to:
-  /// **'No hay plantillas de unos {minutes} min'**
+  /// **'No hay plantillas de {minutes} min o menos'**
   String templatesFilterEmptyMinutes(String minutes);
 
-  /// Igual que templatesFilterEmptyMinutes pero para la opción "75 MIN O MÁS" del cuestionario, que no tiene techo: decir "unos 75 min" mentiría sobre qué se filtró.
+  /// Estado vacío de EXPLORAR cuando cada respuesta del cuestionario deja plantillas por separado pero ninguna cumple todas a la vez. Va seguido de templatesFilterEmptyAction.
   ///
   /// In es_AR, this message translates to:
-  /// **'No hay plantillas de {minutes} min o más'**
-  String templatesFilterEmptyMinutesOrMore(String minutes);
+  /// **'Ninguna plantilla cumple todo lo que elegiste a la vez'**
+  String get templatesFilterEmptyCombination;
 
-  /// Estado vacío de EXPLORAR cuando días y minutos dejan plantillas CADA UNO por separado pero ninguna cumple los dos (#1561). Va seguido de templatesFilterEmptyAction.
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla declara alguno de los objetivos elegidos. Va seguido de templatesFilterEmptyAction.
   ///
   /// In es_AR, this message translates to:
-  /// **'Ninguna plantilla encaja con tus días y tus minutos a la vez'**
-  String get templatesFilterEmptyDaysAndMinutes;
+  /// **'Ninguna plantilla apunta a los objetivos que elegiste'**
+  String get templatesFilterEmptyGoals;
 
-  /// CTA del estado vacío de EXPLORAR: levanta el filtro de días/minutos de esa vista.
+  /// Estado vacío de EXPLORAR cuando ninguna plantilla dedica al menos el 10 % de sus ejercicios a alguna de las zonas elegidas. Va seguido de templatesFilterEmptyAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna plantilla trabaja las zonas que elegiste'**
+  String get templatesFilterEmptyZones;
+
+  /// CTA del estado vacío de EXPLORAR: levanta todos los filtros del cuestionario (días, minutos, objetivo y zonas) en esa vista; el nivel y la búsqueda quedan.
   ///
   /// In es_AR, this message translates to:
   /// **'Ver todas'**
@@ -7761,10 +7767,10 @@ abstract class AppL10n {
   /// **'Días por semana'**
   String get templatesOnboardingStep1Label;
 
-  /// Aclara qué hace cada respuesta (#1561): días y minutos FILTRAN la grilla (con salida "Ver todas" si queda vacía); objetivo y zonas sólo ordenan.
+  /// Aclara que TODAS las respuestas filtran la grilla: sólo se ven plantillas que cumplen todo, con salida "Ver todas" si queda vacía.
   ///
   /// In es_AR, this message translates to:
-  /// **'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.'**
+  /// **'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.'**
   String get templatesOnboardingStep1Hint;
 
   /// Paso 2. Pregunta por duración de sesión.

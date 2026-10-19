@@ -1114,17 +1114,20 @@ class AppL10nEs extends AppL10n {
 
   @override
   String templatesFilterEmptyMinutes(String minutes) {
-    return 'No hay plantillas de unos $minutes min';
+    return 'No hay plantillas de $minutes min o menos';
   }
 
   @override
-  String templatesFilterEmptyMinutesOrMore(String minutes) {
-    return 'No hay plantillas de $minutes min o más';
-  }
+  String get templatesFilterEmptyCombination =>
+      'Ninguna plantilla cumple todo lo que elegiste a la vez';
 
   @override
-  String get templatesFilterEmptyDaysAndMinutes =>
-      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
+  String get templatesFilterEmptyGoals =>
+      'Ninguna plantilla apunta a los objetivos que elegiste';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'Ninguna plantilla trabaja las zonas que elegiste';
 
   @override
   String get templatesFilterEmptyAction => 'Ver todas';
@@ -4480,7 +4483,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.';
+      'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
@@ -6592,17 +6595,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String templatesFilterEmptyMinutes(String minutes) {
-    return 'No hay plantillas de unos $minutes min';
+    return 'No hay plantillas de $minutes min o menos';
   }
 
   @override
-  String templatesFilterEmptyMinutesOrMore(String minutes) {
-    return 'No hay plantillas de $minutes min o más';
-  }
+  String get templatesFilterEmptyCombination =>
+      'Ninguna plantilla cumple todo lo que elegiste a la vez';
 
   @override
-  String get templatesFilterEmptyDaysAndMinutes =>
-      'Ninguna plantilla encaja con tus días y tus minutos a la vez';
+  String get templatesFilterEmptyGoals =>
+      'Ninguna plantilla apunta a los objetivos que elegiste';
+
+  @override
+  String get templatesFilterEmptyZones =>
+      'Ninguna plantilla trabaja las zonas que elegiste';
 
   @override
   String get templatesFilterEmptyAction => 'Ver todas';
@@ -9955,7 +9961,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingStep1Hint =>
-      'Los días y los minutos filtran el catálogo: sólo vas a ver plantillas que encajen. El objetivo y las zonas solamente ordenan.';
+      'Todo lo que elijas filtra el catálogo: sólo vas a ver plantillas que cumplan con todo. Si no queda ninguna, podés ver todas.';
 
   @override
   String get templatesOnboardingStep2Title => '¿Cuánto dura tu sesión?';
