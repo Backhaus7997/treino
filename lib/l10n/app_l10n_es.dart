@@ -625,9 +625,6 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
-  String get trainerNutritionEditorDeleteConfirm => 'Eliminar';
-
-  @override
   String get trainerNutritionEditorDeleteMealBody =>
       'Se borra la comida con todos sus grupos y opciones.';
 
@@ -6194,9 +6191,6 @@ class AppL10nEsAr extends AppL10nEs {
   String trainerNutritionEditorDeleteTitle(String name) {
     return '¿Eliminar «$name»?';
   }
-
-  @override
-  String get trainerNutritionEditorDeleteConfirm => 'Eliminar';
 
   @override
   String get trainerNutritionEditorDeleteMealBody =>

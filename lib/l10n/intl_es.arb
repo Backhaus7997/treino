@@ -622,7 +622,6 @@
   "trainerNutritionEditorDiscardBody": "Si salís ahora vas a perder los cambios del plan sin guardar.",
   "trainerNutritionEditorDiscardConfirm": "Descartar",
   "trainerNutritionEditorDeleteTitle": "¿Eliminar «{name}»?",
-  "trainerNutritionEditorDeleteConfirm": "Eliminar",
   "trainerNutritionEditorDeleteMealBody": "Se borra la comida con todos sus grupos y opciones.",
   "trainerNutritionEditorDeleteGroupBody": "Se borra el grupo con todas sus opciones.",
   "trainerNutritionOptionNewTitle": "NUEVA OPCIÓN",

@@ -616,9 +616,6 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
-  String get trainerNutritionEditorDeleteConfirm => 'Delete';
-
-  @override
   String get trainerNutritionEditorDeleteMealBody =>
       'The meal will be deleted with all its groups and options.';
 

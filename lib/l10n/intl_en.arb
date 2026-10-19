@@ -210,7 +210,6 @@
   "trainerNutritionEditorDiscardBody": "If you leave now you'll lose your unsaved plan changes.",
   "trainerNutritionEditorDiscardConfirm": "Discard",
   "trainerNutritionEditorDeleteTitle": "Delete “{name}”?",
-  "trainerNutritionEditorDeleteConfirm": "Delete",
   "trainerNutritionEditorDeleteMealBody": "The meal will be deleted with all its groups and options.",
   "trainerNutritionEditorDeleteGroupBody": "The group will be deleted with all its options.",
   "trainerNutritionOptionNewTitle": "NEW OPTION",

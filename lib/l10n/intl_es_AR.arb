@@ -417,10 +417,6 @@
       }
     }
   },
-  "trainerNutritionEditorDeleteConfirm": "Eliminar",
-  "@trainerNutritionEditorDeleteConfirm": {
-    "description": "Botón que confirma borrar una comida o un grupo con opciones cargadas."
-  },
   "trainerNutritionEditorDeleteMealBody": "Se borra la comida con todos sus grupos y opciones.",
   "@trainerNutritionEditorDeleteMealBody": {
     "description": "Cuerpo del diálogo al borrar una comida que tiene opciones cargadas."

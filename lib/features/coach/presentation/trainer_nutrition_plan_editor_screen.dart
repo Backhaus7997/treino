@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../core/widgets/treino_confirm_dialog.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
@@ -94,71 +95,12 @@ class _TrainerNutritionPlanEditorScreenState
 
   Future<bool> _confirmDiscard() {
     final l10n = AppL10n.of(context);
-    return _confirm(
+    return showTreinoConfirmDialog(
+      context,
       title: l10n.trainerNutritionEditorDiscardTitle,
       body: l10n.trainerNutritionEditorDiscardBody,
       confirmLabel: l10n.trainerNutritionEditorDiscardConfirm,
     );
-  }
-
-  Future<bool> _confirm({
-    required String title,
-    required String body,
-    required String confirmLabel,
-  }) async {
-    final l10n = AppL10n.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) {
-        final palette = AppPalette.of(ctx);
-        return AlertDialog(
-          backgroundColor: palette.bgCard,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
-          title: Text(
-            title,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: AppTextSize.title,
-              color: palette.textPrimary,
-            ),
-          ),
-          content: Text(
-            body,
-            style: GoogleFonts.barlow(
-              fontSize: AppTextSize.body,
-              color: palette.textMuted,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(
-                l10n.commonCancel,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppTextSize.body,
-                  color: palette.textMuted,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(
-                confirmLabel,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppTextSize.body,
-                  color: palette.danger,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    return confirmed ?? false;
   }
 
   // ── Guardado ────────────────────────────────────────────────────────────
@@ -254,10 +196,11 @@ class _TrainerNutritionPlanEditorScreenState
     final hasOptions = meal.groups.any((g) => g.options.isNotEmpty);
     if (hasOptions) {
       final l10n = AppL10n.of(context);
-      final ok = await _confirm(
+      final ok = await showTreinoConfirmDialog(
+        context,
         title: _deleteTitle(meal.name, l10n.trainerNutritionEditorMealNameHint),
         body: l10n.trainerNutritionEditorDeleteMealBody,
-        confirmLabel: l10n.trainerNutritionEditorDeleteConfirm,
+        confirmLabel: l10n.commonDelete,
       );
       if (!ok || !mounted) return;
     }
@@ -272,11 +215,12 @@ class _TrainerNutritionPlanEditorScreenState
   Future<void> _removeGroup(String mealId, FoodGroup group) async {
     if (group.options.isNotEmpty) {
       final l10n = AppL10n.of(context);
-      final ok = await _confirm(
+      final ok = await showTreinoConfirmDialog(
+        context,
         title:
             _deleteTitle(group.name, l10n.trainerNutritionEditorGroupNameHint),
         body: l10n.trainerNutritionEditorDeleteGroupBody,
-        confirmLabel: l10n.trainerNutritionEditorDeleteConfirm,
+        confirmLabel: l10n.commonDelete,
       );
       if (!ok || !mounted) return;
     }
@@ -1162,7 +1106,7 @@ class _FoodOptionSheetState extends State<_FoodOptionSheet> {
                     fontWeight: FontWeight.w700,
                     fontSize: AppTextSize.body,
                     letterSpacing: 1.4,
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ),
               ),

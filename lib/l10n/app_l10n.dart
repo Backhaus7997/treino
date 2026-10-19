@@ -1190,12 +1190,6 @@ abstract class AppL10n {
   /// **'¿Eliminar «{name}»?'**
   String trainerNutritionEditorDeleteTitle(String name);
 
-  /// Botón que confirma borrar una comida o un grupo con opciones cargadas.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Eliminar'**
-  String get trainerNutritionEditorDeleteConfirm;
-
   /// Cuerpo del diálogo al borrar una comida que tiene opciones cargadas.
   ///
   /// In es_AR, this message translates to:
