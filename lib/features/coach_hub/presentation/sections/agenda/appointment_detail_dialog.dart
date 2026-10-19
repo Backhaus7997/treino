@@ -18,6 +18,7 @@ import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../../core/widgets/treino_toast.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
 import '../../../../coach/domain/appointment.dart';
@@ -193,12 +194,11 @@ class _AppointmentDetailDialogState
       setState(() => _attendance = next);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'No pudimos guardar la asistencia. Probá de nuevo.', // i18n
-          ),
-        ),
+      // Desde el diálogo: el toast va por el Overlay raíz y no queda tapado.
+      showTreinoToast(
+        context,
+        'No pudimos guardar la asistencia. Probá de nuevo.', // i18n
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _savingAttendance = false);

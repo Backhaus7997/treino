@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../l10n/app_l10n.dart';
@@ -48,8 +49,11 @@ class _SessionAttendanceControlState
       setState(() => _attendance = next);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppL10n.of(context).agendaAttendanceError)),
+      // Desde el sheet: el toast va por el Overlay raíz y no queda tapado.
+      showTreinoToast(
+        context,
+        AppL10n.of(context).agendaAttendanceError,
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
