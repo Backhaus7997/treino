@@ -625,6 +625,27 @@ class AppL10nEn extends AppL10n {
   String get agendaCancellationTooLate => '';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCEL';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      'Cancel this session? We\'ll let your trainer know.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Booking cancelled by the athlete.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'TELL MY TRAINER';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Less than 24 h left: if you can\'t make it, tell your trainer.';
+
+  @override
+  String get agendaAthleteChatError => 'We couldn\'t open the chat. Try again.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => '';
 
   @override

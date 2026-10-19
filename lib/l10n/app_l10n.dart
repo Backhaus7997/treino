@@ -1214,6 +1214,42 @@ abstract class AppL10n {
   /// **'No podés cancelar con menos de 24h de anticipación.'**
   String get agendaCancellationTooLate;
 
+  /// Botón de una sesión en MI AGENDA del alumno, con más de 24 h de anticipación (#1515).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get agendaAthleteCancelCta;
+
+  /// Cuerpo del diálogo de confirmación cuando el alumno cancela una sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cancelar esta sesión? Le avisamos a tu PF.'**
+  String get agendaAthleteCancelConfirmBody;
+
+  /// Motivo que queda en el registro de cancelación cuando cancela el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reserva cancelada por el alumno.'**
+  String get agendaBookingCancelledByAthlete;
+
+  /// Botón de una sesión con menos de 24 h en MI AGENDA: abre el chat con el PF (#1515).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AVISAR A MI PF'**
+  String get agendaAthleteNotifyTrainerCta;
+
+  /// Texto sobre el botón AVISAR A MI PF, que explica por qué no hay CANCELAR.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Faltan menos de 24 h: si no podés ir, avisale a tu PF.'**
+  String get agendaAthleteNotifyHint;
+
+  /// Snackbar cuando AVISAR A MI PF no puede abrir el chat.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir el chat. Probá de nuevo.'**
+  String get agendaAthleteChatError;
+
   /// No description provided for @agendaUpcomingAppointmentsHeading.
   ///
   /// In es_AR, this message translates to:

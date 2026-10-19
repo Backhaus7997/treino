@@ -635,6 +635,28 @@ class AppL10nEs extends AppL10n {
       'No podés cancelar con menos de 24h de anticipación.';
 
   @override
+  String get agendaAthleteCancelCta => 'CANCELAR';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      '¿Cancelar esta sesión? Le avisamos a tu entrenador.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Reserva cancelada por el alumno.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'AVISAR A MI ENTRENADOR';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Faltan menos de 24 h: si no puedes ir, avísale a tu entrenador.';
+
+  @override
+  String get agendaAthleteChatError =>
+      'No pudimos abrir el chat. Inténtalo de nuevo.';
+
+  @override
   String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
 
   @override
@@ -6191,6 +6213,28 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get agendaCancellationTooLate =>
       'No podés cancelar con menos de 24h de anticipación.';
+
+  @override
+  String get agendaAthleteCancelCta => 'CANCELAR';
+
+  @override
+  String get agendaAthleteCancelConfirmBody =>
+      '¿Cancelar esta sesión? Le avisamos a tu PF.';
+
+  @override
+  String get agendaBookingCancelledByAthlete =>
+      'Reserva cancelada por el alumno.';
+
+  @override
+  String get agendaAthleteNotifyTrainerCta => 'AVISAR A MI PF';
+
+  @override
+  String get agendaAthleteNotifyHint =>
+      'Faltan menos de 24 h: si no podés ir, avisale a tu PF.';
+
+  @override
+  String get agendaAthleteChatError =>
+      'No pudimos abrir el chat. Probá de nuevo.';
 
   @override
   String get agendaUpcomingAppointmentsHeading => 'TUS PRÓXIMAS RESERVAS';
