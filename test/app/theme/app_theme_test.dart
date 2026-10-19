@@ -123,6 +123,54 @@ void main() {
         expect(p.textStyle!.fontWeight, FontWeight.w600);
         expect(p.textStyle!.color, palette.textPrimary);
       });
+
+      // Con `useMaterial3: true`, `PopupMenuItem` NO lee `textStyle`: sólo
+      // `labelTextStyle`. Este test mide lo que el ítem renderiza de verdad.
+      testWidgets('el ítem renderiza Barlow 600 en ${entry.key}',
+          (tester) async {
+        final (theme, palette) = entry.value;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: theme,
+            home: Scaffold(
+              body: PopupMenuButton<int>(
+                itemBuilder: (_) => const [
+                  PopupMenuItem<int>(value: 1, child: Text('EDITAR')),
+                  PopupMenuItem<int>(
+                    value: 2,
+                    enabled: false,
+                    child: Text('BLOQUEADO'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.byType(PopupMenuButton<int>));
+        await tester.pumpAndSettle();
+
+        final activo =
+            DefaultTextStyle.of(tester.element(find.text('EDITAR'))).style;
+        expect(activo.fontFamily, contains('Barlow'));
+        expect(activo.fontWeight, FontWeight.w600);
+        expect(activo.fontSize, AppTextSize.body);
+        expect(activo.color, palette.textPrimary);
+
+        final inactivo =
+            DefaultTextStyle.of(tester.element(find.text('BLOQUEADO'))).style;
+        expect(inactivo.fontWeight, FontWeight.w600);
+        expect(
+          inactivo.color,
+          palette.textPrimary.withValues(alpha: 0.38),
+        );
+      });
     }
+
+    test('labelTextStyle tiene igualdad de valor (no rebuildea la app)', () {
+      expect(
+        AppTheme.dark().popupMenuTheme.labelTextStyle,
+        AppTheme.dark().popupMenuTheme.labelTextStyle,
+      );
+    });
   });
 }
