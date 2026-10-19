@@ -24,6 +24,7 @@ import '../application/user_providers.dart';
 import '../domain/experience_level.dart';
 import '../domain/gender.dart';
 import '../domain/user_profile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ---------------------------------------------------------------------------
 // Validators (inline per design §4.2 — NOT shared from auth)
@@ -259,13 +260,10 @@ class _ProfileEditPersonalScreenState
     if (uid == null) {
       _setSaveState(_SaveState.error);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppL10n.of(context).authGenericErrorFallback,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).authGenericErrorFallback,
+          type: TreinoToastType.error,
         );
       }
       return;
@@ -294,13 +292,10 @@ class _ProfileEditPersonalScreenState
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No pudimos subir tu foto. Probá de nuevo.', // i18n: Fase 6 Etapa 3
-                style: GoogleFonts.barlow(fontSize: 14),
-              ),
-            ),
+          showTreinoToast(
+            context,
+            'No pudimos subir tu foto. Probá de nuevo.', // i18n: Fase 6 Etapa 3
+            type: TreinoToastType.error,
           );
         }
         _setSaveState(_SaveState.idle);
@@ -366,13 +361,10 @@ class _ProfileEditPersonalScreenState
     try {
       await ref.read(userRepositoryProvider).update(uid, partial);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppL10n.of(context).profilePersonalSaveSuccess,
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
-          ),
+        showTreinoToast(
+          context,
+          AppL10n.of(context).profilePersonalSaveSuccess,
+          type: TreinoToastType.success,
         );
         context.pop();
       }
@@ -384,11 +376,7 @@ class _ProfileEditPersonalScreenState
         final copy = e is ModerationBlockedException
             ? AppL10n.of(context).moderationBlockedMessage
             : 'No pudimos guardar los cambios. Probá de nuevo.'; // i18n
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(copy, style: GoogleFonts.barlow(fontSize: 14)),
-          ),
-        );
+        showTreinoToast(context, copy, type: TreinoToastType.error);
       }
       _setSaveState(_SaveState.idle);
     }

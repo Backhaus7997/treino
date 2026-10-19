@@ -22,6 +22,7 @@ import 'presentation/widgets/eliminar_cuenta_sheet.dart';
 import '../coach/domain/trainer_public_profile.dart';
 import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/user_providers.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 /// Trainer profile screen — matches docs/app-trainer/screens/perfil/perfil.png.
 ///
@@ -666,9 +667,7 @@ class _MenuRow extends StatelessWidget {
 const _solicitudesPath = '$kCentroDeNotificaciones?tab=$kTabSolicitudes';
 
 void _toast(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  showTreinoToast(context, message);
 }
 
 /// El promedio de reseñas a mostrar en la tarjeta, o null si no hay nada que

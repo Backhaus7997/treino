@@ -24,6 +24,7 @@ import '../../gyms/domain/gym.dart';
 import '../application/trainer_location_consent_providers.dart';
 import '../application/user_providers.dart';
 import '../domain/user_profile.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 // ADR-TPO-005: view-only enum co-located with its single screen consumer.
 enum ProfileEditTrainerMode { edit, onboarding }
@@ -368,9 +369,10 @@ class _ProfileEditTrainerScreenState
             grantLocationConsent: otorgaConsentimiento,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(AppL10n.of(context).profileEditTrainerSaveSuccess)),
+      showTreinoToast(
+        context,
+        AppL10n.of(context).profileEditTrainerSaveSuccess,
+        type: TreinoToastType.success,
       );
       // ADR-TPO-006: post-save navigation branches on mode.
       if (widget.mode == ProfileEditTrainerMode.onboarding) {
