@@ -325,4 +325,43 @@ void main() {
       isTrue,
     );
   });
+
+  testWidgets('duration alarga la vida del toast con acción', (tester) async {
+    await tester.pumpWidget(_app(
+      home: _Boton((c) => showTreinoToast(
+            c,
+            'Sacado',
+            duration: const Duration(seconds: 6),
+            action: TreinoToastAction(label: 'Deshacer', onPressed: () {}),
+          )),
+    ));
+    await tester.tap(find.text('go'));
+    // El timer del SnackBar arranca cuando termina la animación de entrada.
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Sacado'), findsOneWidget,
+        reason: 'a los 5 s sigue: el default de 4 no alcanza para decidir');
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Sacado'), findsNothing,
+        reason: 'con acción igual se va solo (persist: false)');
+  });
+
+  testWidgets('bottomOffset levanta el toast por encima de un pie fijo',
+      (tester) async {
+    Future<double> fondoCon(double offset) async {
+      await tester.pumpWidget(_app(
+        home: _Boton((c) => showTreinoToast(c, 'Hola', bottomOffset: offset)),
+      ));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      final fondo = tester.getBottomLeft(_cuerpoDelSnack()).dy;
+      await tester.pumpWidget(const SizedBox());
+      return fondo;
+    }
+
+    final base = await fondoCon(0);
+    final levantado = await fondoCon(88);
+    expect(base - levantado, moreOrLessEquals(88));
+  });
 }

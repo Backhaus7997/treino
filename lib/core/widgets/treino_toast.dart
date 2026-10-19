@@ -70,22 +70,35 @@ TextStyle _estiloTexto(AppPalette palette) => GoogleFonts.barlow(
 ///
 /// Mostrar uno por cualquiera de los dos caminos cierra el que estuviera
 /// visible por el otro: nunca hay dos avisos apilados.
+///
+/// [duration] es para los avisos con algo que decidir (un «Deshacer» que hay
+/// que leer antes de tocar); el resto usa el default. [bottomOffset] despeja
+/// contenido FIJO al pie que el `Scaffold` no conoce —un pie con «Guardar»
+/// dentro del `body`—: la `bottomNavigationBar` ya la descuenta él solo.
 void showTreinoToast(
   BuildContext context,
   String message, {
   TreinoToastType type = TreinoToastType.info,
   TreinoToastAction? action,
+  Duration duration = _kToastDuration,
+  double bottomOffset = 0,
 }) {
   // Típico después de un `await`: la pantalla ya no está.
   if (!context.mounted) return;
   final enModal = ModalRoute.of(context) is PopupRoute;
   if (enModal) {
     ScaffoldMessenger.maybeOf(context)?.hideCurrentSnackBar();
-    _showEnOverlay(context, message, type, action);
+    _showEnOverlay(context, message, type, action, duration, bottomOffset);
     return;
   }
-  showTreinoToastOn(ScaffoldMessenger.of(context), message,
-      type: type, action: action);
+  showTreinoToastOn(
+    ScaffoldMessenger.of(context),
+    message,
+    type: type,
+    action: action,
+    duration: duration,
+    bottomOffset: bottomOffset,
+  );
 }
 
 /// Variante para código que ya capturó el messenger ANTES de un `await`
@@ -96,6 +109,8 @@ void showTreinoToastOn(
   String message, {
   TreinoToastType type = TreinoToastType.info,
   TreinoToastAction? action,
+  Duration duration = _kToastDuration,
+  double bottomOffset = 0,
 }) {
   if (!messenger.mounted) return;
   _cerrarOverlay();
@@ -109,16 +124,16 @@ void showTreinoToastOn(
           child: _ToastContent(message: message, type: type),
         ),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(
+        margin: EdgeInsets.fromLTRB(
           _kMargenLateral,
           0,
           _kMargenLateral,
-          _kMargenInferior,
+          _kMargenInferior + bottomOffset,
         ),
         backgroundColor: palette.bgCard,
         elevation: 0,
         shape: _forma(palette),
-        duration: _kToastDuration,
+        duration: duration,
         // Explícito: con acción Material lo deja eterno por default
         // (ver snackbar_persist_scan_test).
         persist: false,
@@ -156,6 +171,8 @@ void _showEnOverlay(
   String message,
   TreinoToastType type,
   TreinoToastAction? action,
+  Duration duration,
+  double bottomOffset,
 ) {
   final overlay = Overlay.of(context, rootOverlay: true);
   _cerrarOverlay();
@@ -175,11 +192,13 @@ void _showEnOverlay(
             MediaQuery.viewInsetsOf(ctx).bottom,
             MediaQuery.viewPaddingOf(ctx).bottom,
           ) +
-          _kMargenInferior,
+          _kMargenInferior +
+          bottomOffset,
       child: _OverlayToast(
         message: message,
         type: type,
         action: action,
+        duration: duration,
         onDismiss: cerrarEsta,
       ),
     ),
@@ -193,12 +212,14 @@ class _OverlayToast extends StatefulWidget {
     required this.message,
     required this.type,
     required this.action,
+    required this.duration,
     required this.onDismiss,
   });
 
   final String message;
   final TreinoToastType type;
   final TreinoToastAction? action;
+  final Duration duration;
   final VoidCallback onDismiss;
 
   @override
@@ -211,7 +232,7 @@ class _OverlayToastState extends State<_OverlayToast> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(_kToastDuration, widget.onDismiss);
+    _timer = Timer(widget.duration, widget.onDismiss);
   }
 
   @override
