@@ -4,6 +4,7 @@
 // (REQ-SETLOGS-006, REQ-SETLOGS-009).
 
 import 'package:flutter/material.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -201,7 +202,7 @@ class _SetRow extends StatelessWidget {
                 ),
               ),
               Text(
-                '${formatWeightKg(log.weightKg)} kg',
+                '${formatWeightDisplay(log.weightKg, AppL10n.of(context).localeName)} kg',
                 style: TextStyle(color: palette.textPrimary),
               ),
               // QA-WKT-007: no PR badge until real personal-record detection

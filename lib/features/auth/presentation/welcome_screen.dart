@@ -4,13 +4,18 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/primitives.dart';
+import '../../../core/contact/quiero_ser_entrenador.dart';
+import '../../../core/widgets/treino_icon.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../application/auth_providers.dart';
 import '../domain/auth_failure.dart';
+import 'legal/legal_content.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../profile/application/account_deletion_notifier.dart';
 import 'widgets/auth_failure_banner.dart';
@@ -24,7 +29,11 @@ import '../../../core/widgets/treino_logo.dart';
 enum _SocialProvider { google, apple }
 
 class WelcomeScreen extends ConsumerStatefulWidget {
-  const WelcomeScreen({super.key});
+  const WelcomeScreen({super.key, this.abrirUrl = launchUrl});
+
+  /// Abre el `mailto:` de «Quiero ser entrenador». Seam para probarlo sin
+  /// plataforma, igual que en `CoachHubNotAllowedScreen`.
+  final Future<bool> Function(Uri url) abrirUrl;
 
   @override
   ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -261,6 +270,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: AppSpacing.s12),
+                            _quieroSerEntrenador(palette, l10n),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -271,6 +282,72 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Acceso «Quiero ser entrenador». No hay alta self-service de PF —el rol lo
+  /// asigna el equipo por Admin SDK—, así que lleva al mismo mail de contacto
+  /// que la pantalla de no-autorizado del Coach Hub, no a un registro.
+  Widget _quieroSerEntrenador(AppPalette palette, AppL10n l10n) {
+    return Center(
+      child: Semantics(
+        button: true,
+        child: InkWell(
+          onTap: _contactarParaSerEntrenador,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s14,
+              vertical: AppSpacing.s12,
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.s8,
+              children: [
+                Icon(TreinoIcon.mail, size: 18, color: palette.accentText),
+                Text(
+                  l10n.authWelcomeTrainerPrompt,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    color: palette.textMuted,
+                  ),
+                ),
+                Text(
+                  l10n.authWelcomeBecomeTrainer,
+                  style: GoogleFonts.barlow(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: palette.accentText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _contactarParaSerEntrenador() async {
+    final l10n = AppL10n.of(context);
+    var abierto = false;
+    try {
+      abierto = await widget.abrirUrl(
+        mailtoQuieroSerEntrenador(l10n.coachHubNotAllowedMailSubject),
+      );
+    } catch (_) {
+      // Sin handler de `mailto:` la plataforma lanza o devuelve false; los dos
+      // casos se tratan igual: avisar con la dirección escrita.
+      abierto = false;
+    }
+    if (abierto || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          l10n.authWelcomeBecomeTrainerFallback(kLegalContactEmail),
         ),
       ),
     );

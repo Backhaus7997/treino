@@ -352,7 +352,7 @@ class _FollowPill extends StatelessWidget {
     switch (style) {
       case _FollowPillStyle.mintFilled:
         bg = palette.accent;
-        textColor = palette.bg;
+        textColor = TreinoButtonTokens.ink;
         borderColor = palette.accent;
         break;
       case _FollowPillStyle.outlined:

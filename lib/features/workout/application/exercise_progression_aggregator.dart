@@ -237,6 +237,9 @@ ExerciseProgression aggregateExerciseProgression({
   final heaviestWeightPoints = <ProgressionPoint>[];
   final oneRepMaxPoints = <ProgressionPoint>[];
   final bestSetVolumePoints = <ProgressionPoint>[];
+  // La serie que dio cada punto de [bestSetVolumePoints], mismo índice: el
+  // récord la necesita para mostrarse como «80 kg × 7» (#1512).
+  final bestSetVolumeLogs = <SetLog>[];
   final bestSessionVolumePoints = <ProgressionPoint>[];
   int frecuencia = 0;
   String? resolvedName;
@@ -272,12 +275,14 @@ ExerciseProgression aggregateExerciseProgression({
       heaviestWeightPoints
           .add(ProgressionPoint(date: localDate, value: maxWeight));
 
-      // Best Set Volume = max(reps × weightKg) of a single set this session
-      final maxSetVolume = weightedLogs
-          .map((l) => l.reps * l.weightKg)
-          .reduce((a, b) => a > b ? a : b);
-      bestSetVolumePoints
-          .add(ProgressionPoint(date: localDate, value: maxSetVolume));
+      // Best Set Volume = max(reps × weightKg) of a single set this session.
+      // Primera serie que alcanza el máximo, como la primera ocurrencia que
+      // conserva derivePersonalRecords.
+      final bestSetLog = weightedLogs
+          .reduce((a, b) => b.reps * b.weightKg > a.reps * a.weightKg ? b : a);
+      bestSetVolumePoints.add(ProgressionPoint(
+          date: localDate, value: bestSetLog.reps * bestSetLog.weightKg));
+      bestSetVolumeLogs.add(bestSetLog);
 
       // Best Session Volume = Σ(reps × weightKg) for this session
       final sessionVolume = weightedLogs.fold<double>(
@@ -331,7 +336,16 @@ ExerciseProgression aggregateExerciseProgression({
     ...derivePersonalRecords(oneRepMaxPoints,
         recordType: ProgressionRecordType.oneRepMax),
     ...derivePersonalRecords(bestSetVolumePoints,
-        recordType: ProgressionRecordType.bestSetVolume),
+            recordType: ProgressionRecordType.bestSetVolume)
+        .map((record) {
+      // El punto del récord es la PRIMERA ocurrencia del máximo (misma regla
+      // que derivePersonalRecords); su serie está en el mismo índice.
+      final i = bestSetVolumePoints.indexWhere(
+          (p) => p.value == record.value && p.date == record.achievedAt);
+      if (i < 0) return record;
+      final log = bestSetVolumeLogs[i];
+      return record.copyWith(setWeightKg: log.weightKg, setReps: log.reps);
+    }),
     ...derivePersonalRecords(bestSessionVolumePoints,
         recordType: ProgressionRecordType.bestSessionVolume),
   ];

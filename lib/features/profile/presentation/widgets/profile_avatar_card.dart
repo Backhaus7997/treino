@@ -4,14 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../core/utils/handle_derivation.dart';
 import '../../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
 import '../../../gyms/application/gym_display_name_provider.dart';
 import '../../application/user_providers.dart';
 import '../../../gyms/domain/gym.dart' show hasRealGym;
 
-/// Displays the current user's avatar, display name, derived @handle, and
+/// Displays the current user's avatar, display name, and
 /// optional gym chip.
 ///
 /// Tapping the card opens the user's OWN public profile
@@ -62,7 +61,6 @@ class _CardBody extends StatelessWidget {
     final displayName = profile.displayName as String?;
     final avatarUrl = profile.avatarUrl as String?;
     final gymId = profile.gymId as String?;
-    final handle = deriveHandle(displayName);
 
     // Tap → own public profile. Guarded on a non-empty uid so a half-hydrated
     // profile can't push `/feed/profile/` with an empty segment.
@@ -119,17 +117,10 @@ class _CardBody extends StatelessWidget {
                             color: palette.textPrimary,
                           ),
                         ),
-                        if (handle.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            '@$handle', // i18n: Fase 6 Etapa 3
-                            style: GoogleFonts.barlow(
-                              fontWeight: FontWeight.w400,
-                              fontSize: 13,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                        ],
+                        // #1516: sin @handle. Era el nombre en minúscula con
+                        // puntos — con tildes y no único (dos «Martín López»
+                        // mostraban el mismo): un dato inventado. Vuelve
+                        // cuando haya handles reales y únicos.
                         if (hasRealGym(gymId)) ...[
                           const SizedBox(height: 6),
                           _GymChip(gymId: gymId!, palette: palette),

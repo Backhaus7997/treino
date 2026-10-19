@@ -55,6 +55,7 @@ class _MuscleDistributionScreenState
     );
 
     final radarLabels = MuscleDistributionLabels(
+      localeName: AppL10n.of(context).localeName,
       currentLabel: l10n.muscleDistributionCurrentLabel,
       previousLabel: l10n.muscleDistributionPreviousLabel,
       emptyStateText: l10n.muscleDistributionEmptyState,

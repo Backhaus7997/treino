@@ -487,7 +487,7 @@ void main() {
       await tester.pumpWidget(_wrap(PostCard(post: post)));
       await tester.pump();
 
-      expect(find.text('3.2 kg'), findsOneWidget);
+      expect(find.text('3,2 kg'), findsOneWidget); // coma en es (#1465)
       expect(find.text('52 min'), findsOneWidget);
       expect(find.text('6 ej.'), findsOneWidget);
       // And never the old em-dash stub.

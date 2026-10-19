@@ -1,5 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -394,10 +396,10 @@ class _ChartHeader extends StatelessWidget {
     final absDelta = delta.abs();
     final glyph = delta >= 0 ? '▲' : '▼';
     final span = _spanLabel(l10n, first.m.recordedAt, last.m.recordedAt);
-    final currentStr = last.value % 1 == 0
-        ? last.value.toStringAsFixed(0)
-        : last.value.toStringAsFixed(1);
-    final deltaStr = absDelta.toStringAsFixed(1);
+    final currentStr = formatNumberDisplay(last.value, l10n.localeName);
+    // El delta siempre con un decimal, como antes, pero con el separador.
+    final deltaStr =
+        intl.NumberFormat('#,##0.0', l10n.localeName).format(absDelta);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -565,9 +567,7 @@ class _ProgressLineChart extends StatelessWidget {
                     (y) => (y - value).abs() < (maxY - minY) * 0.05,
                   );
                   if (!isNear) return const SizedBox.shrink();
-                  final label = value % 1 == 0
-                      ? value.toStringAsFixed(0)
-                      : value.toStringAsFixed(1);
+                  final label = formatNumberDisplay(value, localeName);
                   return SideTitleWidget(
                     meta: meta,
                     child: Text(
@@ -602,9 +602,7 @@ class _ProgressLineChart extends StatelessWidget {
                 return touchedSpots.map((spot) {
                   final idx = spot.x.round();
                   final date = indexToDate[idx];
-                  final valStr = spot.y % 1 == 0
-                      ? spot.y.toStringAsFixed(0)
-                      : spot.y.toStringAsFixed(1);
+                  final valStr = formatNumberDisplay(spot.y, localeName);
                   final dateStr =
                       date != null ? '\n${_shortDate(date, localeName)}' : '';
                   return LineTooltipItem(

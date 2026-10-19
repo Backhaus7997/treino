@@ -2,15 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../profile/application/user_providers.dart';
 import '../../workout/application/assigned_routine_providers.dart';
+import '../../workout/application/next_position_for_routine.dart';
 import '../../workout/application/routine_providers.dart' show routinesProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider;
 import '../../workout/application/user_routines_providers.dart';
-import '../../workout/domain/plan_advance.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_day.dart';
 import '../../workout/domain/routine_selection.dart';
-import '../../workout/domain/session.dart';
 
 /// Resolved "what to train today" snapshot for the home `EmpezarEntrenamientoCard`.
 ///
@@ -136,32 +135,12 @@ final todaysRoutineProvider = FutureProvider.autoDispose<TodaysRoutine?>(
 
     if (routine == null || routine.days.isEmpty) return null;
 
-    // Find the most recent FINISHED session for THIS routine (sessions are
-    // already ordered startedAt desc by the repo).
+    // La cuenta vive en `nextPositionForRoutine` (la comparte el detalle de
+    // la rutina, #1509), y la aritmética en `nextPlanPosition`
+    // (workout/domain/plan_advance.dart), que el cliente watchOS reimplementa
+    // en Swift con `conformance/plan_advance.json` como contrato.
     final sessions = await ref.watch(sessionsByUidProvider(uid).future);
-    Session? lastFinished;
-    for (final s in sessions) {
-      if (s.routineId == routine.id && s.countsAsWorkout) {
-        lastFinished = s;
-        break;
-      }
-    }
-
-    // La aritmética vive en `nextPlanPosition` (workout/domain/plan_advance.dart)
-    // porque el cliente watchOS la reimplementa en Swift y los fixtures
-    // compartidos de `conformance/plan_advance.json` son el contrato entre las
-    // dos implementaciones. Acá solo se resuelven las entradas.
-    final numDays = routine.days.length;
-    final position = nextPlanPosition(
-      lastFinished: lastFinished == null
-          ? null
-          : (
-              dayNumber: lastFinished.dayNumber,
-              weekNumber: lastFinished.weekNumber,
-            ),
-      numDays: numDays,
-      numWeeks: routine.numWeeks,
-    );
+    final position = nextPositionForRoutine(routine, sessions);
     final nextDayNumber = position.dayNumber;
     final weekNumber = position.weekNumber;
 

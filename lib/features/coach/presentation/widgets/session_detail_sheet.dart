@@ -467,7 +467,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                     onPressed: _cancelSeries,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: palette.danger),
-                      foregroundColor: palette.danger,
+                      foregroundColor: palette.dangerText,
                       minimumSize: const Size.fromHeight(48),
                       shape: const StadiumBorder(),
                     ),

@@ -24,6 +24,7 @@ class EditorFooterBar extends StatelessWidget {
     required this.onSubmit,
     this.onGoToProblem,
     this.submitting = false,
+    this.acceptsTaps = true,
     super.key,
   });
 
@@ -47,6 +48,11 @@ class EditorFooterBar extends StatelessWidget {
   final VoidCallback? onGoToProblem;
 
   final bool submitting;
+
+  /// `false` deja el CTA inerte sin cambiarle el aspecto: es el resguardo de
+  /// cuando el pie recién vuelve al cerrar el teclado, y el mismo dedo que
+  /// tocó el ✓ cae sobre ASIGNAR (#1487).
+  final bool acceptsTaps;
 
   /// Alto del CTA. Del handoff.
   static const double _kAltoCta = 52;
@@ -89,6 +95,7 @@ class EditorFooterBar extends StatelessWidget {
                 label: submitLabel,
                 habilitado: !_hayProblemas,
                 enviando: submitting,
+                acceptsTaps: acceptsTaps,
                 onTap: onSubmit,
               ),
             ],
@@ -191,12 +198,14 @@ class _Cta extends StatelessWidget {
     required this.label,
     required this.habilitado,
     required this.enviando,
+    required this.acceptsTaps,
     required this.onTap,
   });
 
   final String label;
   final bool habilitado;
   final bool enviando;
+  final bool acceptsTaps;
   final VoidCallback onTap;
 
   @override
@@ -210,7 +219,7 @@ class _Cta extends StatelessWidget {
       // sigue siendo tocable, y ese tap es lo que muestra el primer problema y
       // salta a su día. Un botón muerto no explica nada. Sólo se apaga de
       // verdad mientras el guardado está en vuelo.
-      onPressed: enviando ? null : onTap,
+      onPressed: enviando || !acceptsTaps ? null : onTap,
       style: ElevatedButton.styleFrom(
         backgroundColor:
             habilitado ? palette.accent : palette.accent.withAlpha(_kApagado),

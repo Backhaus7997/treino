@@ -3923,6 +3923,10 @@ void main() {
               _overrides(repo: repo, analytics: analytics, blocked: blocked),
           child: MaterialApp.router(
             theme: AppTheme.dark(),
+            // El resumen de la prescripción escribe el peso con el locale (#1481).
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
             routerConfig: router,
           ),
         ),

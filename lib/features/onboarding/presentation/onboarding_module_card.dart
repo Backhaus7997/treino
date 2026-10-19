@@ -106,7 +106,7 @@ class OnboardingModuleCard extends StatelessWidget {
                       // 44pt minimum touch target (a11y, #619).
                       minimumSize: const Size(44, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
-                      foregroundColor: palette.accent,
+                      foregroundColor: palette.accentText,
                     ),
                     // Label only — no trailing icon. At large text scales a
                     // Row[text, icon] on a 320pt screen overflows horizontally, and

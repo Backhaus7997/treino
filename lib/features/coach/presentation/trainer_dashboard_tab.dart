@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -740,7 +741,7 @@ class _DejarFeedbackSheetState extends ConsumerState<_DejarFeedbackSheet> {
                   l10n.dashboardFeedbackSaveError,
                   style: GoogleFonts.barlow(
                     fontSize: 13,
-                    color: palette.danger,
+                    color: palette.dangerText,
                   ),
                 ),
               ],
@@ -1162,7 +1163,7 @@ class _ResumenDelDiaCard extends ConsumerWidget {
         _StatColumn(
           value: cancelled,
           label: l10n.dashboardStatCanceladas,
-          color: palette.danger,
+          color: palette.dangerText,
           palette: palette,
         ),
       ],
@@ -1269,7 +1270,7 @@ class _SectionHeader extends StatelessWidget {
                     fontSize: 12,
                     color: trailingOnTap == null
                         ? palette.textMuted
-                        : palette.accent,
+                        : palette.accentText,
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -1278,7 +1279,7 @@ class _SectionHeader extends StatelessWidget {
                   size: 14,
                   color: trailingOnTap == null
                       ? palette.textMuted
-                      : palette.accent,
+                      : palette.accentText,
                 ),
               ],
             ),
@@ -1567,7 +1568,7 @@ class _EntrenaronHoyRow extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg.toStringAsFixed(0)} kg',
+              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -1852,7 +1853,7 @@ class _ActividadRecienteRow extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '${session.totalVolumeKg.toStringAsFixed(0)} kg',
+              '${formatVolumeKg(session.totalVolumeKg, AppL10n.of(context).localeName)} kg',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,

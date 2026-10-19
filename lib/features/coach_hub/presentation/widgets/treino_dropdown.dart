@@ -116,43 +116,18 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final textStyle = TextStyle(
-      fontFamily: AppFonts.barlow,
-      fontWeight: AppFonts.w400,
-      fontSize: AppTextSize.body,
-      color: palette.textPrimary,
-    );
-
-    return Theme(
-      data: Theme.of(context).copyWith(
-        popupMenuTheme: PopupMenuThemeData(
-          color: TreinoCardTokens.background(context),
-          surfaceTintColor: Colors.transparent,
-          textStyle: textStyle,
-          shape: RoundedRectangleBorder(
-            side: BorderSide(color: TreinoCardTokens.border(context)),
-            borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
-          ),
-        ),
-      ),
-      child: PopupMenuButton<T>(
-        tooltip: tooltip,
-        initialValue: initialValue,
-        padding: padding,
-        iconSize: iconSize,
-        style: style,
-        color: TreinoCardTokens.background(context),
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: TreinoCardTokens.border(context)),
-          borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
-        ),
-        icon: icon,
-        onSelected: onSelected,
-        itemBuilder: itemBuilder,
-        child: child,
-      ),
+    // El look del menú (superficie, borde, radio, Barlow 600) lo pone
+    // `popupMenuTheme` en `AppTheme` (#1558): acá no se pisa nada.
+    return PopupMenuButton<T>(
+      tooltip: tooltip,
+      initialValue: initialValue,
+      padding: padding,
+      iconSize: iconSize,
+      style: style,
+      icon: icon,
+      onSelected: onSelected,
+      itemBuilder: itemBuilder,
+      child: child,
     );
   }
 }

@@ -97,22 +97,26 @@ void main() {
   group('workout-40: repsDisplayText', () {
     test('failure set shows "Al fallo" regardless of reps/mode', () {
       const spec = SetSpec(type: SetType.failure, reps: 8);
-      expect(repsDisplayText(spec, ExerciseMode.reps), 'Al fallo');
+      expect(repsDisplayText(spec, ExerciseMode.reps, localeName: 'es_AR'),
+          'Al fallo');
     });
 
     test('duration set renders MM:SS (90s → 01:30)', () {
       const spec = SetSpec(durationSeconds: 90);
-      expect(repsDisplayText(spec, ExerciseMode.duration), '01:30');
+      expect(repsDisplayText(spec, ExerciseMode.duration, localeName: 'es_AR'),
+          '01:30');
     });
 
     test('range set renders "min–max reps" with en-dash', () {
       const spec = SetSpec(repsMin: 8, repsMax: 12);
-      expect(repsDisplayText(spec, ExerciseMode.reps), '8–12 reps');
+      expect(repsDisplayText(spec, ExerciseMode.reps, localeName: 'es_AR'),
+          '8–12 reps');
     });
 
     test('single reps set renders "N reps"', () {
       const spec = SetSpec(reps: 10);
-      expect(repsDisplayText(spec, ExerciseMode.reps), '10 reps');
+      expect(repsDisplayText(spec, ExerciseMode.reps, localeName: 'es_AR'),
+          '10 reps');
     });
   });
 

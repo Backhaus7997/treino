@@ -16,6 +16,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
@@ -34,7 +35,6 @@ import 'onboarding_sample_data.dart';
 import 'widgets/onboarding_device_preview.dart';
 import 'widgets/onboarding_nav_bar.dart';
 import 'widgets/onboarding_preview_cards.dart';
-import '../../../app/theme/tokens/primitives.dart';
 
 // ── 1 — Resumen del día ─────────────────────────────────────────────────────
 
@@ -345,9 +345,10 @@ class _SegmentedPill extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
-                      // Ink on accent — `onPrimary: palette.bg`, dark in dark
-                      // mode, not white.
-                      color: i == 0 ? palette.bg : palette.textMuted,
+                      // Ink on accent — `TreinoButtonTokens.ink`, near-black
+                      // in both themes.
+                      color:
+                          i == 0 ? TreinoButtonTokens.ink : palette.textMuted,
                     ),
                   ),
                 ),
