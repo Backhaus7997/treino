@@ -1,0 +1,124 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/tokens.dart';
+import '../../../../core/widgets/treino_icon.dart';
+import '../../../../l10n/app_l10n.dart';
+
+/// Marca de «VISTA PREVIA» arriba del perfil público cuando el que mira es el
+/// propio PF (VER PREVIEW, #1498).
+///
+/// Sin esto la pantalla es idéntica a la que ve un alumno, con CONSULTAR y
+/// PEDIR VÍNCULO a la vista: el PF los tocaba y no pasaba nada (ninguno actúa
+/// sobre uno mismo), sin ninguna pista de que estaba mirando un ensayo.
+class TrainerPreviewBanner extends StatelessWidget {
+  const TrainerPreviewBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Semantics(
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.s12),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: palette.accent),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(TreinoIcon.eye, size: 20, color: palette.accent),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.coachPreviewBannerTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: AppTextSize.body,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    l10n.coachPreviewBannerBody,
+                    style: GoogleFonts.barlow(
+                      fontSize: AppTextSize.bodyDense,
+                      height: 1.4,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Aviso al PF de que le falta cargar sus años de experiencia, bajo los stats
+/// de la vista previa (#1498).
+///
+/// «AÑOS EXP —» es verdad —el dato no está— pero el PF no tiene cómo saber que
+/// el que falta es suyo: RESEÑAS y ALUMNOS también muestran «—» y esos los
+/// calcula el servidor. Los años los carga el PF a mano en EDITAR, así que acá
+/// se lo dice y se lo lleva al formulario.
+///
+/// No refresca nada al volver del formulario: la vista previa escucha el
+/// documento (`trainerLiveByIdProvider`), así que el dato recién guardado
+/// aparece solo y el aviso se va con él. Un `invalidate` acá dependía de qué le
+/// contestara una lectura puntual al SDK, y en QA seguía mostrando «—».
+class TrainerPreviewMissingExperienceNotice extends StatelessWidget {
+  const TrainerPreviewMissingExperienceNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Material(
+      color: palette.bgCard,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: () => context.push<void>('/profile/edit-trainer'),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.s12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: palette.border),
+          ),
+          child: Row(
+            children: [
+              Icon(TreinoIcon.infoCircle, size: 20, color: palette.accent),
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Text(
+                  l10n.coachPreviewMissingExperience,
+                  style: GoogleFonts.barlow(
+                    fontSize: AppTextSize.bodyDense,
+                    height: 1.4,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.s8),
+              Icon(TreinoIcon.forward, size: 16, color: palette.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

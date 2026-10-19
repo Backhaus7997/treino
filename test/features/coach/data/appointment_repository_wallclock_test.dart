@@ -50,6 +50,9 @@ void main() {
     });
   });
 
+  // #1492: the 24h gate is the ATHLETE's — the trainer cancels any time — so
+  // these cases cancel as the athlete. The wall-clock arithmetic they pin is
+  // the same; with the trainer as actor they'd now pass without measuring it.
   group('cancel() — wall-clock 24h gate', () {
     test(
       '(a) a session ~25 REAL hours away CAN be cancelled '
@@ -63,7 +66,7 @@ void main() {
         await seed(appt);
 
         // Must NOT throw CancellationTooLateException.
-        await repo.cancel(appointment: appt, actorUid: trainerId, now: now);
+        await repo.cancel(appointment: appt, actorUid: athleteId, now: now);
 
         final snap =
             await firestore.collection('appointments').doc(appt.id).get();
@@ -81,7 +84,7 @@ void main() {
         await seed(appt);
 
         await expectLater(
-          repo.cancel(appointment: appt, actorUid: trainerId, now: now),
+          repo.cancel(appointment: appt, actorUid: athleteId, now: now),
           throwsA(isA<CancellationTooLateException>()),
         );
       },
@@ -96,7 +99,7 @@ void main() {
         final at24h =
             confirmedAt(DateTime.utc(2026, 7, 21, 9, 0), id: 'at-24h');
         await seed(at24h);
-        await repo.cancel(appointment: at24h, actorUid: trainerId, now: now);
+        await repo.cancel(appointment: at24h, actorUid: athleteId, now: now);
         expect(
           (await firestore.collection('appointments').doc(at24h.id).get())
               .data()!['status'],
@@ -107,7 +110,7 @@ void main() {
             confirmedAt(DateTime.utc(2026, 7, 21, 8, 59), id: 'at-23h59');
         await seed(at23h59);
         await expectLater(
-          repo.cancel(appointment: at23h59, actorUid: trainerId, now: now),
+          repo.cancel(appointment: at23h59, actorUid: athleteId, now: now),
           throwsA(isA<CancellationTooLateException>()),
         );
       },

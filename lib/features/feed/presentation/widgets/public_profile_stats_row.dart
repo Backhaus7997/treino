@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/utils/k_formatter.dart';
+import '../../../../l10n/app_l10n.dart';
 import '../../../workout/presentation/widgets/session_stats_card.dart';
 import '../../../workout/presentation/widgets/stat_tile.dart';
 
 /// 2×2 stats card for the public profile. Accepts nullable counter values;
-/// null renders as '0'. kFormat is applied to WORKOUTS, SEGUIDORES, SIGUIENDO
+/// null renders as '0'. kFormat is applied to ENTRENOS, SEGUIDORES, SIGUIENDO
 /// (compact Xk display). RACHA is rendered as raw integer (design spec).
 ///
 /// RACHA is rendered in accent color to match the mockup; the others use
@@ -29,7 +30,7 @@ class PublicProfileStatsRow extends StatelessWidget {
   final int? followingCount;
 
   /// Abre la lista de SEGUIDORES. `null` (default) → el contador no es
-  /// tappable, que es como se comportó siempre. WORKOUTS y RACHA nunca lo son:
+  /// tappable, que es como se comportó siempre. ENTRENOS y RACHA nunca lo son:
   /// no llevan a ninguna parte.
   final VoidCallback? onFollowersTap;
 
@@ -44,7 +45,7 @@ class PublicProfileStatsRow extends StatelessWidget {
     return SessionStatsCard(
       tiles: [
         StatTile(
-          label: 'WORKOUTS',
+          label: AppL10n.of(context).publicProfileStatWorkouts,
           value: kFormat(workoutsCount ?? 0),
         ),
         StatTile(

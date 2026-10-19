@@ -68,6 +68,20 @@ Widget _app({
         path: '/feed/friend-requests',
         builder: (_, __) => const Scaffold(body: Text('REQUESTS')),
       ),
+      // Las rutas del stack que arma el push en frío (`abrirChatConStack`):
+      // si la lista las usara, «atrás» caería en MENSAJES en vez de volver.
+      GoRoute(
+        path: '/feed',
+        builder: (_, __) => const Scaffold(body: Text('FEED')),
+      ),
+      GoRoute(
+        path: '/feed/messages',
+        builder: (_, __) => const Scaffold(body: Text('MENSAJES')),
+      ),
+      GoRoute(
+        path: '/coach/chat/:chatId',
+        builder: (_, __) => const Scaffold(body: Text('CHAT')),
+      ),
     ],
   );
   final app = MaterialApp.router(
@@ -191,6 +205,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('TARGET'), findsOneWidget);
     semanticsHandle.dispose();
+  });
+
+  testWidgets(
+      'tocar un chat apila el chat sobre la lista: atrás vuelve a '
+      'Notificaciones y no pasa por Mensajes (#1468)', (tester) async {
+    final repository = _FakeRepository();
+    await tester.pumpWidget(
+      _app(
+        repository: repository,
+        notifications: Stream.value([
+          _item(deepLink: '/coach/chat/abc?other=xyz'),
+        ]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('notificationItem-n1')));
+    await tester.pumpAndSettle();
+    expect(find.text('CHAT'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('notificationItem-n1')), findsOneWidget);
+    expect(find.text('MENSAJES'), findsNothing);
+    expect(find.text('FEED'), findsNothing);
   });
 
   // Cada estado va en su propio test y no en pumpWidget sucesivos sobre el

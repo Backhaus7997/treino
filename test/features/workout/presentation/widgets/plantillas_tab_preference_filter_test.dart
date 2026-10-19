@@ -1,5 +1,6 @@
-// Estado vacío del filtro duro de días/minutos de EXPLORAR (#1561): mensaje
-// con plural + CTA "Ver todas" que levanta el filtro (estado en el provider).
+// Estado vacío de los filtros del cuestionario en EXPLORAR: el mensaje nombra
+// la respuesta que vació la grilla + CTA "Ver todas" que levanta el filtro
+// (estado en el provider).
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import 'package:treino/features/workout/application/template_preferences_provide
 import 'package:treino/features/workout/application/unified_templates_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_goal.dart';
 import 'package:treino/features/workout/domain/template_preferences.dart';
 import 'package:treino/features/workout/presentation/widgets/plantillas_tab.dart';
 import 'package:treino/features/workout/presentation/widgets/routine_card.dart';
@@ -30,6 +32,27 @@ Routine _r(String id, int days, {int? minutes}) => Routine(
 
 final _catalogo = [_r('a', 3, minutes: 60), _r('b', 5, minutes: 60)];
 
+/// Controller falso: registra qué se pidió borrar y restaurar.
+class _FakeController extends TemplatePreferencesController {
+  _FakeController(super.ref);
+
+  int clears = 0;
+  final saved = <TemplatePreferences>[];
+  bool clearResult = true;
+
+  @override
+  Future<bool> clear() async {
+    clears++;
+    return clearResult;
+  }
+
+  @override
+  Future<void> save(TemplatePreferences preferences) async =>
+      saved.add(preferences);
+}
+
+late _FakeController _ctrl;
+
 Future<ProviderContainer> _pump(
   WidgetTester tester,
   TemplatePreferences prefs, {
@@ -41,6 +64,8 @@ Future<ProviderContainer> _pump(
     currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
     routinesProvider.overrideWith((ref) async => catalogo ?? _catalogo),
     athleteTemplatePreferencesProvider.overrideWithValue(prefs),
+    templatePreferencesControllerProvider
+        .overrideWith((ref) => _ctrl = _FakeController(ref)),
   ]);
   addTearDown(container.dispose);
   container.read(routinesLevelFilterProvider.notifier).state = level;
@@ -100,18 +125,32 @@ void main() {
 
   testWidgets('vacío sólo por minutos: mensaje de minutos', (tester) async {
     await _pump(tester, const TemplatePreferences(minutesPerSession: 30));
-    expect(find.text('No hay plantillas de unos 30 min'), findsOneWidget);
+    expect(find.text('No hay plantillas de 30 min o menos'), findsOneWidget);
     expect(find.text('Ver todas'), findsOneWidget);
   });
 
-  testWidgets('sin filtro duro (sólo objetivo) no hay estado vacío ni CTA',
-      (tester) async {
+  testWidgets('vacío por ZONAS: mensaje de zonas y CTA', (tester) async {
     await _pump(
       tester,
       const TemplatePreferences(priorityMuscleGroups: ['back']),
     );
-    expect(find.byType(RoutineCard), findsNWidgets(2));
-    expect(find.text('Ver todas'), findsNothing);
+    expect(
+      find.text('Ninguna plantilla trabaja las zonas que elegiste'),
+      findsOneWidget,
+    );
+    expect(find.text('Ver todas'), findsOneWidget);
+  });
+
+  testWidgets('vacío por OBJETIVO: mensaje de objetivo y CTA', (tester) async {
+    await _pump(
+      tester,
+      const TemplatePreferences(goals: [RoutineGoal.sport]),
+    );
+    expect(
+      find.text('Ninguna plantilla apunta a los objetivos que elegiste'),
+      findsOneWidget,
+    );
+    expect(find.text('Ver todas'), findsOneWidget);
   });
 
   group('el vacío culpa a lo que lo causó', () {
@@ -156,12 +195,12 @@ void main() {
         tester,
         const TemplatePreferences(daysPerWeek: 3, minutesPerSession: 30),
       );
-      expect(find.text('No hay plantillas de unos 30 min'), findsOneWidget);
+      expect(find.text('No hay plantillas de 30 min o menos'), findsOneWidget);
       expect(find.text('No hay plantillas de 3 días'), findsNothing);
       expect(find.text('Ver todas'), findsOneWidget);
     });
 
-    testWidgets('días y minutos encajan por separado pero no juntos',
+    testWidgets('cada respuesta encaja por separado pero no juntas',
         (tester) async {
       await _pump(
         tester,
@@ -169,21 +208,21 @@ void main() {
         catalogo: [_r('a', 3, minutes: 60), _r('c', 5, minutes: 30)],
       );
       expect(
-        find.text(
-            'Ninguna plantilla encaja con tus días y tus minutos a la vez'),
+        find.text('Ninguna plantilla cumple todo lo que elegiste a la vez'),
         findsOneWidget,
       );
       expect(find.text('Ver todas'), findsOneWidget);
     });
 
-    testWidgets('"75 o más" no dice "unos 75 min"', (tester) async {
+    testWidgets('"75 o más" no filtra: se ven todas, sin estado vacío',
+        (tester) async {
       await _pump(
         tester,
         const TemplatePreferences(minutesPerSession: 75),
         catalogo: [_r('a', 3, minutes: 30)],
       );
-      expect(find.text('No hay plantillas de 75 min o más'), findsOneWidget);
-      expect(find.text('No hay plantillas de unos 75 min'), findsNothing);
+      expect(find.byType(RoutineCard), findsOneWidget);
+      expect(find.text('Ver todas'), findsNothing);
     });
   });
 
@@ -194,10 +233,10 @@ void main() {
           find.text('Filtrado y ordenado según lo que buscás'), findsOneWidget);
     });
 
-    testWidgets('sólo objetivo/zonas: ordenado', (tester) async {
+    testWidgets('sólo "75 o más": ordenado', (tester) async {
       await _pump(
         tester,
-        const TemplatePreferences(priorityMuscleGroups: ['back']),
+        const TemplatePreferences(minutesPerSession: 75),
       );
       expect(find.text('Ordenado según lo que buscás'), findsOneWidget);
       expect(find.textContaining('Filtrado'), findsNothing);
@@ -210,6 +249,53 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       expect(find.text('Ordenado según lo que buscás'), findsOneWidget);
       expect(find.textContaining('Filtrado'), findsNothing);
+    });
+  });
+
+  group('borrar filtros', () {
+    const prefs = TemplatePreferences(
+      daysPerWeek: 3,
+      minutesPerSession: 30,
+      goals: [RoutineGoal.health],
+    );
+    const borrar = Key('templates_preferences_clear');
+
+    testWidgets('sin respuestas no hay nada que borrar', (tester) async {
+      await _pump(tester, const TemplatePreferences());
+      expect(find.byKey(borrar), findsNothing);
+    });
+
+    testWidgets('borra, avisa y DESHACER restaura lo que había',
+        (tester) async {
+      await _pump(tester, prefs);
+      await tester.tap(find.byKey(borrar));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(_ctrl.clears, 1);
+      expect(find.text('Filtros borrados'), findsOneWidget);
+
+      // Que termine de entrar antes de tocar la acción.
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.tap(find.text('DESHACER'));
+      await tester.pump();
+      expect(_ctrl.saved, [prefs]);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('si no se pudo borrar, lo dice y no ofrece DESHACER',
+        (tester) async {
+      final c = await _pump(tester, prefs);
+      c.read(templatePreferencesControllerProvider);
+      _ctrl.clearResult = false;
+      await tester.tap(find.byKey(borrar));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('No pudimos borrar los filtros. Probá de nuevo.'),
+          findsOneWidget);
+      expect(find.text('DESHACER'), findsNothing);
+      await tester.pump(const Duration(seconds: 5));
     });
   });
 }

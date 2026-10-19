@@ -158,7 +158,9 @@ describe("notifyOnLinkChange — orden del purge", () => {
       },
     );
 
-    expect(calls).toEqual(["sendFcm", "purge"]);
+    // Un push por destinatario (#1464: cada uno lee el nombre de la otra
+    // parte), y el purge sigue DESPUÉS de los dos.
+    expect(calls).toEqual(["sendFcm", "sendFcm", "purge"]);
     expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
       APP,
       "link-1",

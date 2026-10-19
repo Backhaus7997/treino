@@ -7,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/firestore_error.dart';
+import '../../../core/widgets/discard_changes_dialog.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
@@ -20,6 +21,17 @@ import '../domain/custom_exercise.dart';
 import '../domain/equipment_type.dart';
 import '../domain/muscle_group.dart';
 import 'widgets/exercise_video_player.dart';
+
+/// Lo que el usuario puede haber cargado en el formulario, para saber si hay
+/// cambios sin guardar (#1502). Un record: la comparación por valor sale gratis.
+typedef _Draft = (
+  String name,
+  MuscleGroup? primary,
+  MuscleGroup? secondary,
+  EquipmentType? equipment,
+  String description,
+  String videoUrl,
+);
 
 /// Create or edit a trainer's custom exercise. Routed at
 /// `/profile/my-exercises/new` (create) or `/profile/my-exercises/:exId`
@@ -51,6 +63,21 @@ class _CustomExerciseEditorScreenState
   bool _uploadingVideo = false;
   double _uploadProgress = 0;
 
+  /// Línea de base del formulario: vacío al crear, lo hidratado al editar. Se
+  /// compara contra [_draft] para saber si salir descartaría algo.
+  _Draft _baseline = ('', null, null, null, '', '');
+
+  _Draft _draft() => (
+        _nameCtrl.text.trim(),
+        _primaryMuscle,
+        _secondaryMuscle,
+        _equipment,
+        _descCtrl.text.trim(),
+        _videoCtrl.text.trim(),
+      );
+
+  bool get _isDirty => _draft() != _baseline;
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -73,6 +100,18 @@ class _CustomExerciseEditorScreenState
     _descCtrl.text = ex.description;
     _videoCtrl.text = ex.videoUrl ?? '';
     _videoPreviewUrl = ex.videoUrl ?? '';
+    _baseline = _draft();
+  }
+
+  /// Volver con datos cargados sin guardar pregunta antes de tirarlos (#1502):
+  /// «atrás» descartaba todo sin avisar. Sin cambios, sale directo.
+  Future<void> _handleBack() async {
+    if (!_isDirty) {
+      context.pop();
+      return;
+    }
+    final discard = await confirmDiscardChanges(context);
+    if (discard && mounted) context.pop();
   }
 
   @override
@@ -155,6 +194,28 @@ class _CustomExerciseEditorScreenState
     AppL10n l10n,
     CustomExercise? existing,
   ) {
+    // El PopScope se reconstruye con cada tecla (los controllers avisan) y el
+    // formulario no: `canPop` tiene que estar al día sin rearmar la pantalla.
+    return ListenableBuilder(
+      listenable: Listenable.merge([_nameCtrl, _descCtrl, _videoCtrl]),
+      child: _buildFormBody(context, palette, l10n, existing),
+      builder: (context, body) => PopScope(
+        canPop: !_isDirty,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _handleBack();
+        },
+        child: body!,
+      ),
+    );
+  }
+
+  Widget _buildFormBody(
+    BuildContext context,
+    AppPalette palette,
+    AppL10n l10n,
+    CustomExercise? existing,
+  ) {
     return Column(
       children: [
         Padding(
@@ -165,7 +226,7 @@ class _CustomExerciseEditorScreenState
                 button: true,
                 label: l10n.commonBack,
                 child: TreinoTappable(
-                  onTap: () => context.pop(),
+                  onTap: _handleBack,
                   child: ConstrainedBox(
                     constraints:
                         const BoxConstraints(minWidth: 44, minHeight: 44),

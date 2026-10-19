@@ -529,7 +529,24 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     }
   }
 
-  Future<void> _finishSession() async {
+  /// TERMINAR SESIÓN (#1511). Con la sesión completa cierra de una; con series
+  /// sin hacer primero avisa cuáles faltan y si la sesión va a contar como
+  /// entreno, y recién ahí cierra si el atleta confirma.
+  Future<void> _onTerminarPressed(SessionState state) async {
+    if (_isFinalizing) return;
+    if (state.isFullyCompleted) {
+      await _finishSession();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _FinishEarlyDialog(state: state),
+    );
+    if (confirmed != true || !mounted) return;
+    await _finishSession(allowIncomplete: true);
+  }
+
+  Future<void> _finishSession({bool allowIncomplete = false}) async {
     final notifier = ref.read(sessionNotifierProvider(widget.init).notifier);
     final sessionId =
         ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
@@ -538,11 +555,12 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       // Mismo contrato que abandon: el notifier relanza ante fallo de write
       // (finding 23). Capturamos para no dejar la pantalla congelada con el
       // botón inutilizable; reseteamos _isFinalizing y mostramos Reintentar.
-      await notifier.finishSession();
+      await notifier.finishSession(allowIncomplete: allowIncomplete);
     } catch (_) {
       if (mounted) {
         _isFinalizing = false;
-        _showFinishError(_finishSession);
+        _showFinishError(
+            () => _finishSession(allowIncomplete: allowIncomplete));
       }
       return;
     }
@@ -977,9 +995,16 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              // #1511: TERMINAR se habilita con la PRIMERA serie hecha, no al
+              // 100 %. Antes el único modo de cerrar con series sin hacer era
+              // ABANDONAR, que suena a fracaso y no cuenta nada. Con series
+              // pendientes el botón abre un aviso de qué falta; con cero
+              // series sigue deshabilitado y la leyenda dice por qué.
               child: _TerminarSessionButton(
-                enabled: state.isFullyCompleted,
-                onPressed: state.isFullyCompleted ? _finishSession : null,
+                enabled: state.doneSetsTotal > 0,
+                onPressed: state.doneSetsTotal > 0
+                    ? () => _onTerminarPressed(state)
+                    : null,
               ),
             ),
           ],
@@ -3068,9 +3093,152 @@ class _TerminarSessionButton extends StatelessWidget {
     );
 
     if (!enabled) {
-      return Opacity(opacity: 0.4, child: button);
+      // #1511: un botón apagado que no dice por qué es exactamente lo que
+      // reportó el QA. Sin series hechas no hay nada que guardar, y la otra
+      // salida es ABANDONAR — la leyenda dice las dos cosas.
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Opacity(opacity: 0.4, child: button),
+          const SizedBox(height: 8),
+          Text(
+            AppL10n.of(context).sessionFinishNeedOneSet,
+            key: const Key('session_finish_need_one_set'),
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
+          ),
+        ],
+      );
     }
     return button;
+  }
+}
+
+// ── _FinishEarlyDialog ────────────────────────────────────────────────────────
+
+/// Aviso de "TERMINAR IGUAL" (#1511): qué series faltan y qué pasa con la
+/// sesión. Devuelve `true` si el atleta confirma, `false`/`null` si vuelve.
+///
+/// El texto de abajo NO promete lo que no se cumple: dice que cuenta como
+/// entreno sólo cuando llegó al [kEarlyFinishCountsRatio] de las series
+/// planificadas, y si no, dice sin vueltas que se guarda pero no cuenta.
+class _FinishEarlyDialog extends StatelessWidget {
+  const _FinishEarlyDialog({required this.state});
+
+  final SessionState state;
+
+  /// Cuántos ejercicios se listan antes de resumir el resto con "y N más".
+  static const _maxListed = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    final missing = state.missingSets;
+    final missingTotal =
+        missing.fold<int>(0, (sum, m) => sum + (m.planned - m.done));
+    final listed = missing.take(_maxListed).toList();
+    final hidden = missing.length - listed.length;
+
+    final percent = (state.completionRatio * 100).floor();
+    final counts = state.countsAsWorkoutIfFinished;
+
+    return AlertDialog(
+      backgroundColor: palette.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      title: Text(
+        l10n.sessionFinishEarlyTitle,
+        style: GoogleFonts.barlowCondensed(
+          fontWeight: FontWeight.w700,
+          fontSize: AppTextSize.bodyLarge,
+          letterSpacing: 1.0,
+          color: palette.textPrimary,
+        ),
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.sessionFinishEarlyMissingHeader(missingTotal),
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.body,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final m in listed)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '${m.slot.exerciseName} · ${m.done}/${m.planned}',
+                  style: GoogleFonts.barlow(
+                    fontSize: AppTextSize.body,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ),
+            if (hidden > 0)
+              Text(
+                l10n.sessionFinishEarlyMore(hidden),
+                style: GoogleFonts.barlow(
+                  fontSize: AppTextSize.body,
+                  color: palette.textMuted,
+                ),
+              ),
+            const SizedBox(height: 12),
+            Text(
+              counts
+                  ? l10n.sessionFinishEarlyCounts(percent)
+                  : l10n.sessionFinishEarlyNotCounts(
+                      percent,
+                      (kEarlyFinishCountsRatio * 100).round(),
+                    ),
+              key: const Key('session_finish_early_outcome'),
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.body,
+                color: counts ? palette.accentText : palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(
+            l10n.sessionFinishEarlyKeepGoing,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.body,
+              color: palette.textPrimary,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: palette.accent),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(
+            l10n.sessionFinishEarlyConfirm,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.body,
+              color: TreinoButtonTokens.foreground(context),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

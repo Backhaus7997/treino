@@ -944,32 +944,44 @@ void main() {
       return tema.extension<AppPalette>()!;
     }
 
-    // El disco es el `Material` con `CircleBorder`; el más cercano al ícono es
-    // el interno del `IconButton`, siempre transparente.
-    Color fondoDelBotonAtras(WidgetTester tester) => tester
-        .widget<Material>(find.ancestor(
+    // #1559: ya no hay disco. El círculo gris sólido era justo lo que #1509
+    // marcaba como fuera del lenguaje del resto: la flecha va suelta.
+    bool hayDiscoDetrasDelBotonAtras(WidgetTester tester) => find
+        .ancestor(
           of: find.byTooltip('Volver'),
           matching: find.byWidgetPredicate(
               (w) => w is Material && w.shape is CircleBorder),
-        ))
-        .color!;
+        )
+        .evaluate()
+        .isNotEmpty;
 
-    testWidgets('sin foto, el botón atrás es de superficie de card, no gris',
+    Color colorDeLaFlecha(WidgetTester tester) => IconTheme.of(
+          tester.element(find.descendant(
+            of: find.byTooltip('Volver'),
+            matching: find.byType(Icon),
+          )),
+        ).color!;
+
+    testWidgets(
+        'sin foto, la flecha va suelta (sin disco) y del color del tema',
         (tester) async {
       final palette = await abrir(tester, planDelPf());
-      // Ni el scrim gris (es para leer SOBRE una foto) ni transparente: la
-      // lista scrollea por debajo de los botones y el ícono se perdería.
-      expect(fondoDelBotonAtras(tester), palette.bgCard);
+      expect(hayDiscoDetrasDelBotonAtras(tester), isFalse);
+      expect(colorDeLaFlecha(tester), palette.textPrimary);
     });
 
-    testWidgets('con foto, el botón atrás conserva el scrim', (tester) async {
+    testWidgets('con foto, la flecha va suelta y blanca para leerse sobre ella',
+        (tester) async {
       await abrir(
           tester,
           planDelPf().copyWith(
               id: 'atletico-4dias-avanzado',
               source: RoutineSource.system,
               assignedBy: null));
-      expect(fondoDelBotonAtras(tester).a, greaterThan(0));
+      // Llega con los datos: el color viaja con la animación de la barra.
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(hayDiscoDetrasDelBotonAtras(tester), isFalse);
+      expect(colorDeLaFlecha(tester), Colors.white);
     });
 
     testWidgets('«Asignado por» y el badge del día van en accentText',
