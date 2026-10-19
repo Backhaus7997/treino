@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
@@ -19,6 +20,7 @@ class StatTile extends StatelessWidget {
     this.isAccent = false,
     this.onTap,
     this.semanticsLabel,
+    this.unit,
   });
 
   final String label;
@@ -34,6 +36,11 @@ class StatTile extends StatelessWidget {
 
   /// Etiqueta de accesibilidad del tile tappable. Ignorada si [onTap] es null.
   final String? semanticsLabel;
+
+  /// Unidad opcional, chica y atenuada, a la DERECHA del número: «45 min»,
+  /// «9.600 kg» (#1512). Antes la unidad iba en el label («DURACIÓN MIN 45»,
+  /// #363), que se leía al revés. `null` (default) → sin cambios.
+  final String? unit;
 
   /// Ícono opcional de la métrica, a la izquierda del número.
   ///
@@ -70,12 +77,33 @@ class StatTile extends StatelessWidget {
     );
     final countUpValue = this.countUpValue;
     final icon = this.icon;
-    final valueWidget = countUpValue == null
+    final numberWidget = countUpValue == null
         ? Text(value ?? '—', style: valueStyle)
         : TreinoCountUp(
             value: countUpValue,
             formatter: countUpFormatter,
             style: valueStyle,
+          );
+    final unit = this.unit;
+    // Sin dato («—») no hay unidad que mostrar: «— min» sería ruido.
+    final valueWidget = unit == null || (countUpValue == null && value == null)
+        ? numberWidget
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              numberWidget,
+              const SizedBox(width: 4),
+              Text(
+                unit,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w600,
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ],
           );
     final labelWidget = Text(
       label.toUpperCase(),

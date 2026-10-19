@@ -392,7 +392,11 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _time);
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time,
+      helpText: AppL10n.of(context).timePickerHelpText,
+    );
     if (picked != null && mounted) {
       setState(() => _time = picked);
     }

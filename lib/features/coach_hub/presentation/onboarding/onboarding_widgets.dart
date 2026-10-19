@@ -80,7 +80,7 @@ class OnboardingError extends StatelessWidget {
     return Text(
       mensaje,
       style: GoogleFonts.barlow(
-        color: AppPalette.of(context).danger,
+        color: AppPalette.of(context).dangerText,
         fontSize: AppTextSize.bodyDense,
       ),
     );

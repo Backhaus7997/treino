@@ -61,6 +61,7 @@ class SessionMuscleDistributionSection extends StatelessWidget {
             previousSets: 0,
           ),
           labels: MuscleDistributionLabels(
+            localeName: AppL10n.of(context).localeName,
             currentLabel: l10n.muscleDistributionCurrentLabel,
             previousLabel: l10n.muscleDistributionPreviousLabel,
             emptyStateText: l10n.muscleDistributionEmptyState,

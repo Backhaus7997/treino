@@ -166,7 +166,7 @@ class _CoachHubUploadPlanScreenState
                     Text(
                       _error!,
                       textAlign: TextAlign.center,
-                      style: importText(palette.danger,
+                      style: importText(palette.dangerText,
                           size: AppTextSize.bodyDense),
                     ),
                   ],

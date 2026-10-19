@@ -220,7 +220,7 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(
         find.textContaining(RegExp(r'[Ee]rror|[Ee]xcepci')),
         findsNothing,
@@ -282,7 +282,7 @@ void main() {
 
       final header = tester.widget<HomeHeader>(find.byType(HomeHeader));
       expect(header.profile, isNull);
-      expect(find.text('HOLA!'), findsOneWidget);
+      expect(find.text('¡HOLA!'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsNothing);
     });
 
@@ -303,7 +303,7 @@ void main() {
       ));
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('HOLA, MARTÍN!'), findsOneWidget);
+      expect(find.text('¡HOLA, MARTÍN!'), findsOneWidget);
       expect(find.byType(CachedNetworkImage), findsAtLeastNWidgets(1));
     });
 

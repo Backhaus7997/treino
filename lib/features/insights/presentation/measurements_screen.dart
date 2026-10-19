@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -259,7 +260,8 @@ class _ProfileDataCard extends StatelessWidget {
                 Expanded(
                   child: _Stat(
                     label: weightLabel,
-                    value: '${_trimNum(weightKg!)} kg',
+                    value:
+                        '${formatNumberDisplay(weightKg!, AppL10n.of(context).localeName)} kg',
                     palette: palette,
                   ),
                 ),
@@ -321,10 +323,6 @@ class _Stat extends StatelessWidget {
     );
   }
 }
-
-/// `80.0` → `80`, `78.5` → `78.5`. Mismo criterio que las stat cards del radar.
-String _trimNum(double v) =>
-    v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
 // ── Hint (empty / not-enough-data) ────────────────────────────────────────────
 

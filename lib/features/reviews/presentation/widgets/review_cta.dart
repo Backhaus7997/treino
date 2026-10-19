@@ -82,7 +82,7 @@ class ReviewCta extends ConsumerWidget {
           );
         },
         style: OutlinedButton.styleFrom(
-          foregroundColor: palette.accent,
+          foregroundColor: palette.accentText,
           side: BorderSide(color: palette.accent),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
           shape: RoundedRectangleBorder(
