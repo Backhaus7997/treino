@@ -133,6 +133,23 @@
   "authWelcomeCta": "EMPEZAR",
   "authWelcomeHaveAccount": "Ya tengo cuenta",
   "authWelcomeSignIn": "Iniciar sesión",
+  "authWelcomeTrainerPrompt": "¿Sos entrenador?",
+  "@authWelcomeTrainerPrompt": {
+    "description": "Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail."
+  },
+  "authWelcomeBecomeTrainer": "Quiero ser entrenador",
+  "@authWelcomeBecomeTrainer": {
+    "description": "Welcome screen — link that opens a mailto: to the TREINO team (same channel and subject as the Coach Hub not-allowed screen)."
+  },
+  "authWelcomeBecomeTrainerFallback": "No pudimos abrir tu correo. Escribinos a {email}.",
+  "@authWelcomeBecomeTrainerFallback": {
+    "description": "Welcome screen — SnackBar when no mail app handles the mailto:. Shows the address so it can be typed by hand.",
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authLoginTitle": "BIENVENIDO",
   "authLoginSubtitle": "Entrá para seguir tu rutina",
   "authLoginEmailHint": "tu@email.com",

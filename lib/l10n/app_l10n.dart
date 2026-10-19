@@ -332,6 +332,24 @@ abstract class AppL10n {
   /// **'Iniciar sesión'**
   String get authWelcomeSignIn;
 
+  /// Welcome screen — lead-in before the «Quiero ser entrenador» link. Trainers are created by the team (no self-service), so the link opens the contact mail.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Sos entrenador?'**
+  String get authWelcomeTrainerPrompt;
+
+  /// Welcome screen — link that opens a mailto: to the TREINO team (same channel and subject as the Coach Hub not-allowed screen).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quiero ser entrenador'**
+  String get authWelcomeBecomeTrainer;
+
+  /// Welcome screen — SnackBar when no mail app handles the mailto:. Shows the address so it can be typed by hand.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir tu correo. Escribinos a {email}.'**
+  String authWelcomeBecomeTrainerFallback(String email);
+
   /// No description provided for @authLoginTitle.
   ///
   /// In es_AR, this message translates to:

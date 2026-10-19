@@ -153,6 +153,17 @@ class AppL10nEs extends AppL10n {
   String get authWelcomeSignIn => 'Iniciar sesión';
 
   @override
+  String get authWelcomeTrainerPrompt => '¿Eres entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escríbenos a $email.';
+  }
+
+  @override
   String get authLoginTitle => 'BIENVENIDO';
 
   @override
@@ -5571,6 +5582,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authWelcomeSignIn => 'Iniciar sesión';
+
+  @override
+  String get authWelcomeTrainerPrompt => '¿Sos entrenador?';
+
+  @override
+  String get authWelcomeBecomeTrainer => 'Quiero ser entrenador';
+
+  @override
+  String authWelcomeBecomeTrainerFallback(String email) {
+    return 'No pudimos abrir tu correo. Escribinos a $email.';
+  }
 
   @override
   String get authLoginTitle => 'BIENVENIDO';
