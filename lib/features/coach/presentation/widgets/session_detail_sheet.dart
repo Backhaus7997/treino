@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/widgets/treino_toast.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -65,13 +66,17 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
             noteAfter: after.isEmpty ? null : after,
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notas guardadas.')),
+      showTreinoToast(
+        context,
+        'Notas guardadas.',
+        type: TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No pudimos guardar. Probá de nuevo.')),
+      showTreinoToast(
+        context,
+        'No pudimos guardar. Probá de nuevo.',
+        type: TreinoToastType.error,
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -99,18 +104,24 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
           );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationSuccess)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationSuccess,
+        type: TreinoToastType.success,
       );
     } on CancellationTooLateException {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaCancellationTooLate)),
+      showTreinoToast(
+        context,
+        l10n.agendaCancellationTooLate,
+        type: TreinoToastType.error,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToast(
+        context,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -139,17 +150,19 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
               );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(n == 0
-              ? 'No había sesiones futuras para cancelar.'
-              : 'Se cancelaron $n sesiones de la serie.'),
-        ),
+      showTreinoToast(
+        context,
+        n == 0
+            ? 'No había sesiones futuras para cancelar.'
+            : 'Se cancelaron $n sesiones de la serie.',
+        type: n == 0 ? TreinoToastType.info : TreinoToastType.success,
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.agendaGenericError)),
+      showTreinoToast(
+        context,
+        l10n.agendaGenericError,
+        type: TreinoToastType.error,
       );
     }
   }
@@ -467,7 +480,7 @@ class _SessionDetailSheetState extends ConsumerState<SessionDetailSheet> {
                     onPressed: _cancelSeries,
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: palette.danger),
-                      foregroundColor: palette.danger,
+                      foregroundColor: palette.dangerText,
                       minimumSize: const Size.fromHeight(48),
                       shape: const StadiumBorder(),
                     ),

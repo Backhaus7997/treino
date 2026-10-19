@@ -93,10 +93,14 @@ void main() {
               'no le sirve');
     });
 
-    test('minutos ausentes no penalizan: el campo es nullable en el modelo',
-        () {
+    test(
+        'minutos ausentes no penalizan: sin campo y sin series que estimar '
+        'es neutro', () {
       const prefs = TemplatePreferences(minutesPerSession: 45);
-      final sinMinutos = TemplateAffinity.score(_routine(), prefs);
+      // Sin zonas no hay slots: ni `estimatedMinutesPerDay` ni nada que el
+      // estimador de #1562 pueda medir. Con slots, los minutos se estiman.
+      final sinMinutos =
+          TemplateAffinity.score(_routine(zones: const []), prefs);
       final conflicto = TemplateAffinity.score(_routine(minutes: 120), prefs);
       expect(sinMinutos, greaterThan(conflicto));
     });

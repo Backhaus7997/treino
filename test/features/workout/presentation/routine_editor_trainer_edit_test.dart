@@ -596,4 +596,56 @@ void main() {
       expect(fetches(), 2);
     });
   });
+
+  // #1487: con el teclado abierto el pie (aviso + ASIGNAR PLAN) subía pegado
+  // al teclado, tapaba las sugerencias de la entrada rápida, y al cerrarlo el
+  // botón quedaba justo donde estaba el ✓ del teclado: tap de más → plan
+  // asignado sin querer.
+  group('#1487 — el pie y el teclado', () {
+    testWidgets('con el teclado abierto el pie no está', (tester) async {
+      await _pumpEditor(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-x'),
+        overrides: _overrides(),
+      );
+      expect(
+          find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'), findsOneWidget);
+
+      simularTeclado(tester);
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'), findsNothing);
+    });
+
+    testWidgets(
+        'al cerrar el teclado, un tap inmediato sobre ASIGNAR no hace nada',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async =>
+          (inv.positionalArguments.first as Routine).copyWith(id: 'nuevo'));
+      await _pumpEditor(
+        tester,
+        mode: const TrainerAssigning(athleteId: 'athlete-x'),
+        overrides: _overrides(repo: repo),
+      );
+
+      simularTeclado(tester);
+      await tester.pump();
+      // El teclado se cierra (el ✓): vuelve el pie.
+      tester.view.resetViewInsets();
+      await tester.pump();
+
+      final asignar = find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN');
+      expect(asignar, findsOneWidget);
+      // El mismo dedo que tocó el ✓ cae sobre el botón: se ignora.
+      expect(
+        tester.widget<ElevatedButton>(asignar).onPressed,
+        isNull,
+        reason: 'recién vuelto, el pie no acepta taps',
+      );
+
+      // Pasado el resguardo, el botón vuelve a andar.
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(tester.widget<ElevatedButton>(asignar).onPressed, isNotNull);
+    });
+  });
 }

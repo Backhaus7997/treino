@@ -109,7 +109,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
                       child: OutlinedButton(
                         onPressed: () => _openAvailabilityEditor(context),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: palette.accent,
+                          foregroundColor: palette.accentText,
                           side: BorderSide(color: palette.accent, width: 1),
                           padding: EdgeInsets.zero,
                           shape: const CircleBorder(),

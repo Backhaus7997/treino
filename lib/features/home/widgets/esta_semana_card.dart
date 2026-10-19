@@ -463,7 +463,7 @@ class _ZeroWeekState extends StatelessWidget {
               onPressed: () => context.go('/workout'),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: palette.accent, width: 1),
-                foregroundColor: palette.accent,
+                foregroundColor: palette.accentText,
                 minimumSize: const Size.fromHeight(48),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.full),

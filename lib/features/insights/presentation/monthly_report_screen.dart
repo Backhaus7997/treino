@@ -177,6 +177,7 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
                           selectedMonth: selectedPoint,
                           previousMonth: previousPoint,
                           labels: MonthlyReportSummaryLabels(
+                            localeName: AppL10n.of(context).localeName,
                             workoutsLabel: l10n.monthlyReportMetricWorkouts,
                             durationLabel: l10n.monthlyReportMetricDuration,
                             volumeLabel: l10n.monthlyReportMetricVolume,
@@ -544,6 +545,7 @@ class _MonthRadarSection extends ConsumerWidget {
           MuscleDistributionRadar(
             insights: insights,
             labels: MuscleDistributionLabels(
+              localeName: AppL10n.of(context).localeName,
               currentLabel: _monthLegendLabel(month, l10n.localeName),
               previousLabel: _monthLegendLabel(
                 DateTime(month.year, month.month - 1, 1),

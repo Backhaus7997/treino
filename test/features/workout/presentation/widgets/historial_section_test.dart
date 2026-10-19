@@ -145,6 +145,15 @@ void main() {
       expect(find.byType(HistorialSection), findsOneWidget);
     });
 
+    // #1514: el heading iba en `titleMedium` (Barlow regular).
+    testWidgets('#1514: HISTORIAL va en Barlow Condensed 700', (tester) async {
+      await _pumpHistorialSection(tester, sessions: [_makeSession()]);
+      await tester.pumpAndSettle();
+      final style = tester.widget<Text>(find.text('HISTORIAL')).style!;
+      expect(style.fontFamily, contains('BarlowCondensed'));
+      expect(style.fontWeight, FontWeight.w700);
+    });
+
     // SCENARIO-356: two finished sessions render in newest-first order
     testWidgets(
         'SCENARIO-356: two finished sessions render newest-first (by startedAt)',

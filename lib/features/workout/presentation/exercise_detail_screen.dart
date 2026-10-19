@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:treino/core/utils/kg_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/exercise_asset_image.dart';
+import '../../../core/widgets/floating_bar_metrics.dart';
 import '../../../core/widgets/firebase_storage_video_player.dart'
     show VideoPlayOverlay;
 import '../../../core/widgets/motion/treino_shimmer.dart';
@@ -160,12 +162,16 @@ class _BackBar extends StatelessWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 8),
+      padding: const EdgeInsets.only(
+        left: FloatingBarMetrics.sideInset,
+        top: FloatingBarMetrics.topInset,
+      ),
       child: Material(
         color: palette.scrimDark.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: IconButton(
+          style: FloatingBarMetrics.buttonStyle,
           tooltip: l10n.commonBack,
           icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           onPressed: () =>
@@ -360,7 +366,10 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
         const SizedBox(height: 12),
         _StatsCard(
           tiles: [
-            StatTile(label: '1RM', value: _oneRepMaxValue(progression)),
+            StatTile(
+                label: '1RM',
+                value: _oneRepMaxValue(
+                    progression, AppL10n.of(context).localeName)),
             StatTile(
               label: 'SESIONES',
               value: progression == null
@@ -381,21 +390,22 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
 // Personal stats derivations (display-side)
 // ---------------------------------------------------------------------------
 
-/// Formats a kg / kg·reps value the same way the chart and the records list
-/// do: whole numbers drop the decimals, fractional values keep one.
-String _formatStatValue(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+/// Formats a kg value the same way the chart and the records list do: whole
+/// numbers drop the decimals, fractional values keep one — with the locale's
+/// separator («112,5» in es).
+String _formatStatValue(double value, String localeName) =>
+    formatNumberDisplay(value, localeName);
 
 /// 1RM tile: best Epley estimate within the active period, rounded to 0.5kg
 /// at display only (AD2 — same convention as chart/records).
-String? _oneRepMaxValue(ExerciseProgression? progression) {
+String? _oneRepMaxValue(ExerciseProgression? progression, String localeName) {
   final series = progression?.oneRepMaxSeries;
   if (series == null || series.isEmpty) return null;
   var best = series.first.value;
   for (final point in series.skip(1)) {
     if (point.value > best) best = point.value;
   }
-  return '${_formatStatValue(roundToNearestHalfKg(best))} kg';
+  return '${_formatStatValue(roundToNearestHalfKg(best), localeName)} kg';
 }
 
 /// PROGRESO tile criterion: % delta first→last session over the period's 1RM
@@ -451,7 +461,7 @@ class _ProgressionChartBlock extends StatelessWidget {
               oneRepMaxLabel: l10n.progressionMetricOneRepMax,
               bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
               bestSessionVolumeLabel: l10n.progressionMetricVolume,
-              volumeUnit: 'kg·reps',
+              volumeUnit: 'kg',
               weightUnit: 'kg',
               frequencyLabel: (n) => l10n.progressionFrequencyPeriod(n),
               singlePointHint: l10n.progressionSinglePointHint,
@@ -471,7 +481,7 @@ class _ProgressionChartBlock extends StatelessWidget {
                 oneRepMaxLabel: l10n.progressionMetricOneRepMax,
                 bestSetVolumeLabel: l10n.progressionMetricBestSetVolume,
                 bestSessionVolumeLabel: l10n.progressionMetricVolume,
-                volumeUnit: 'kg·reps',
+                volumeUnit: 'kg',
                 weightUnit: 'kg',
                 emptyText: l10n.progressionEmptyExercise,
                 localeName: l10n.localeName,
@@ -568,7 +578,7 @@ class _HistoryRow extends StatelessWidget {
     final isBodyweight = entry.bestWeightKg <= 0;
     final bestSet = isBodyweight
         ? '${entry.bestSetReps} reps'
-        : '${_formatStatValue(entry.bestWeightKg)} kg × ${entry.bestSetReps}';
+        : '${_formatStatValue(entry.bestWeightKg, AppL10n.of(context).localeName)} kg × ${entry.bestSetReps}';
 
     return Row(
       children: [
@@ -609,7 +619,7 @@ class _HistoryRow extends StatelessWidget {
             if (entry.sessionVolume > 0) ...[
               const SizedBox(height: 2),
               Text(
-                '${_formatStatValue(entry.sessionVolume)} kg·reps',
+                '${formatVolumeKg(entry.sessionVolume, AppL10n.of(context).localeName)} kg',
                 style: GoogleFonts.barlow(
                   fontSize: 11,
                   color: palette.textMuted,
@@ -642,7 +652,12 @@ class _CompactHeader extends StatelessWidget {
     final palette = AppPalette.of(context);
     return Container(
       color: palette.bg,
-      padding: const EdgeInsets.fromLTRB(20, 80, 20, 16),
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        FloatingBarMetrics.reservedHeight + 16,
+        20,
+        16,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

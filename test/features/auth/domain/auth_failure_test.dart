@@ -275,4 +275,47 @@ void main() {
       expect(failure.userMessage, contains('misma cuenta'));
     });
   });
+
+  // #1505: el login decía «La contraseña es incorrecta» o «No encontramos una
+  // cuenta con ese email» — cualquiera de los dos le confirma a quien prueba
+  // emails si la cuenta existe (enumeración). En el SIGN-IN los tres códigos
+  // de credenciales colapsan a UN mensaje que no dice cuál de los dos falló.
+  // `fromFirebase` no cambia: el reset de contraseña NECESITA `userNotFound`
+  // para tratarlo como éxito (REQ-AUTH-011).
+  group('AuthFailure.forSignIn (#1505)', () {
+    AuthFailure signIn(String code) =>
+        AuthFailure.forSignIn(FirebaseAuthException(code: code));
+
+    for (final code in [
+      'user-not-found',
+      'wrong-password',
+      'invalid-credential'
+    ]) {
+      test('$code → invalidCredentials', () {
+        expect(signIn(code), const AuthFailure.invalidCredentials());
+      });
+    }
+
+    test('el mensaje no revela si el email existe', () {
+      final msg = const AuthFailure.invalidCredentials().userMessage;
+      expect(msg, 'Email o contraseña incorrectos');
+      expect(msg, isNot(contains('No encontramos')));
+      expect(msg, isNot(contains('La contraseña es incorrecta')));
+    });
+
+    test('los demás códigos pasan igual que fromFirebase', () {
+      expect(signIn('too-many-requests'), const AuthFailure.tooManyRequests());
+      expect(signIn('user-disabled'), const AuthFailure.userDisabled());
+      expect(
+          signIn('network-request-failed'), const AuthFailure.networkError());
+    });
+
+    test('fromFirebase sigue distinguiendo user-not-found (reset de clave)',
+        () {
+      expect(
+        AuthFailure.fromFirebase(FirebaseAuthException(code: 'user-not-found')),
+        const AuthFailure.userNotFound(),
+      );
+    });
+  });
 }

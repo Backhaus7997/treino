@@ -18,6 +18,7 @@ MonthlyReportSummaryLabels _labels({
   String volumeUnit = 'kg',
 }) =>
     MonthlyReportSummaryLabels(
+      localeName: 'es_AR',
       workoutsLabel: workoutsLabel,
       durationLabel: durationLabel,
       volumeLabel: volumeLabel,
